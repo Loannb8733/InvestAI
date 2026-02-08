@@ -1,0 +1,87 @@
+# Render Blueprint - InvestAI
+# Deploy: https://render.com/deploy
+
+services:
+  # Backend API
+  - type: web
+    name: investai-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: investai-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: investai-redis
+          type: redis
+          property: connectionString
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_TLS
+        value: "true"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: InvestAI
+      - key: FERNET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+
+  # Celery Worker
+  - type: worker
+    name: investai-worker
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    envVars:
+      - fromGroup: investai-shared
+
+  # Celery Beat (Scheduler)
+  - type: worker
+    name: investai-beat
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app beat --loglevel=info
+    envVars:
+      - fromGroup: investai-shared
+
+databases:
+  - name: investai-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "15"
+
+# Note: Redis requires paid plan on Render
+# Alternative: Use Upstash Redis (free tier)

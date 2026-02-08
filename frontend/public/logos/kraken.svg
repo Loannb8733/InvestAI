@@ -1,0 +1,7 @@
+<svg viewBox="0 0 126 126" xmlns="http://www.w3.org/2000/svg">
+  <rect fill="#5741D9" width="126" height="126" rx="16"/>
+  <g fill="white" transform="translate(63, 63)">
+    <!-- Kraken stylized K logo -->
+    <path d="M-20,-30 L-10,-30 L-10,-5 L10,-30 L23,-30 L-2,0 L25,30 L10,30 L-10,5 L-10,30 L-20,30 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,34 @@
+"""Test CSV import for Crypto.com"""
+from app.services.csv_parsers import CryptoComCSVParser
+
+csv_content = '''Timestamp (UTC),Transaction Description,Currency,Amount,To Currency,To Amount,Native Currency,Native Amount,Native Amount (in USD),Transaction Kind,Transaction Hash
+2025-11-04 21:37:49,FET > BTC,FET,-4.902,BTC,0.00000932,EUR,0.81140365410367459710354977436058,0.9599970763325039429215910212249351713656,crypto_exchange,
+2025-11-04 21:37:01,LINK > BTC,LINK,-0.2055,BTC,0.00002773,EUR,2.4268222521158984030874170963686,2.871249414551255670630707864617148924552,crypto_exchange,
+2025-11-04 21:36:24,PENDLE > ETH,PENDLE,-1.391,ETH,0.00104688726152602,EUR,2.85850221209936890334796893016694,3.3819834954240463017850348996673995425608,crypto_exchange,
+2025-11-04 21:35:51,TAO > ETH,TAO,-0.0106,ETH,0.00122667391320719,EUR,3.36192895130902051417998995192646,3.9776034379084571688488502294094891627272,crypto_exchange,
+2025-11-04 21:34:13,ONDO > BTC,ONDO,-57.08,BTC,0.00030278,EUR,26.81423472144540825750153594937288,31.7247609207735381796366921298089886866016,crypto_exchange,
+2025-11-04 21:31:19,INJ > BTC,INJ,-4.7344,BTC,0.00028004,EUR,24.66951463017822676106168598606892,29.1872754081620772630742371421232229305744,crypto_exchange,
+2025-10-11 22:29:41,Bought INJ,EUR,-24.50,INJ,3.15,EUR,24.5,28.98671734,viban_purchase,
+2025-05-10 14:35:42,USDT (Optimism) Deposit,USDT,0.000001,,,EUR,0.00000087020818233967410379251976,0.0000010295705554463393107898609097748832,crypto_deposit,0x3b1c8b778cc34e339e8f80bb5e5711f881ff5c37a244f7c0f1a7ef935c187065
+2025-04-27 10:47:44,Bought ONDO,EUR,-6.00,ONDO,6.89,EUR,6.0,7.09878792,viban_purchase,
+2025-03-31 12:17:35,Balance Conversion,USDC,0.005,,,EUR,0.0045722625716644970995662006005,0.00540958705180001105054593034385435766,crypto_wallet_swap_credited,
+2025-03-31 12:17:35,Balance Conversion,USDT,-0.005,,,EUR,0.00452567631946609890240677719568,0.0053544693977426672896550814804707766976,crypto_wallet_swap_debited,
+2025-03-04 07:08:46,Sold USDT,USDT,-25.14,EUR,23.50,EUR,23.5,27.80358602,crypto_viban_exchange,
+2024-01-21 14:52:52,Bought BTC,BTC,0.0000515,,,EUR,2.0,2.36626264,trading.crypto_purchase.google_pay,
+'''
+
+parser = CryptoComCSVParser()
+transactions, errors = parser.parse_csv(csv_content)
+
+print(f"=== Resultat du parsing ===")
+print(f"Transactions parsees: {len(transactions)}")
+print(f"Erreurs: {len(errors)}")
+
+if errors:
+    print(f"\nErreurs:")
+    for e in errors:
+        print(f"  - {e}")
+
+print(f"\n=== Transactions ===")
+for tx in transactions:
+    print(f"{tx.transaction_type:15} | {tx.symbol:6} | qty={float(tx.quantity):15.8f} | price={float(tx.price):10.2f} EUR")
