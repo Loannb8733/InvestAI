@@ -48,7 +48,7 @@ router = APIRouter()
 class RegisterResponse(BaseModel):
     """Response for registration."""
     message: str
-    email_verification_required: bool = True
+    email_verification_required: bool = False
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -58,10 +58,7 @@ async def register(
     register_data: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
-    """Register a new user. Sends verification email."""
-    from app.core.config import settings
-    from app.services.email_service import email_service
-
+    """Register a new user."""
     # Check if email already exists
     result = await db.execute(select(User).where(User.email == register_data.email))
     existing_user = result.scalar_one_or_none()
@@ -72,55 +69,23 @@ async def register(
             detail="Un compte avec cet email existe déjà",
         )
 
-    # Generate verification token
-    verification_token = secrets.token_urlsafe(48)
-    verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
-
-    # Create new user (inactive until email verified)
+    # Create new user (active immediately, no email verification)
     user = User(
         email=register_data.email,
         password_hash=hash_password(register_data.password),
         first_name=register_data.first_name,
         last_name=register_data.last_name,
-        is_active=False,  # Inactive until email verified
-        email_verified=False,
-        email_verification_token=verification_token,
-        email_verification_expires=verification_expires,
+        is_active=True,
+        email_verified=True,
     )
 
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    # Send verification email
-    try:
-        frontend_url = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "http://localhost:3000"
-        verify_url = f"{frontend_url}/verify-email?token={verification_token}"
-
-        content = f"""
-        <h2>Bienvenue sur InvestAI !</h2>
-        <p>Merci de vous être inscrit. Pour activer votre compte, veuillez confirmer votre adresse email.</p>
-        <div style="text-align: center; margin: 24px 0;">
-            <a href="{verify_url}" class="button">Confirmer mon email</a>
-        </div>
-        <p>Ce lien est valable <strong>24 heures</strong>.</p>
-        <p>Si vous n'avez pas créé de compte sur InvestAI, ignorez simplement cet email.</p>
-        """
-
-        html = email_service._get_base_template(content, "Confirmez votre email")
-        await email_service.send_email(
-            to_email=user.email,
-            subject="[InvestAI] Confirmez votre adresse email",
-            html_content=html,
-        )
-    except Exception as e:
-        # Log but don't fail registration
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to send verification email: {e}")
-
     return RegisterResponse(
-        message="Compte créé avec succès. Vérifiez votre email pour activer votre compte.",
-        email_verification_required=True,
+        message="Compte créé avec succès.",
+        email_verification_required=False,
     )
 
 
@@ -242,12 +207,6 @@ async def login(
         )
 
     if not user.is_active:
-        # Check if it's because email is not verified
-        if hasattr(user, 'email_verified') and not user.email_verified:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Veuillez vérifier votre email avant de vous connecter.",
-            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is inactive",

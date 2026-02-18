@@ -16,7 +16,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -83,7 +83,7 @@ celerybeat.pid
 *.pkl
 *.h5
 *.onnx
-models/
+/models/
 
 # Jupyter
 .ipynb_checkpoints/
