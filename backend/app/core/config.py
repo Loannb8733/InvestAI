@@ -1,5 +1,6 @@
 """Application configuration."""
 
+import os
 import secrets
 from typing import List, Optional, Union
 
@@ -29,8 +30,8 @@ class Settings(BaseSettings):
     # Database - Credentials must come from environment
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str  # Required - no default
-    POSTGRES_PASSWORD: str  # Required - no default
+    POSTGRES_USER: str = "investai"
+    POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "investai"
 
     # Database pool configuration
@@ -58,7 +59,10 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        """Build async database URL."""
+        """Build async database URL. Uses DATABASE_URL env var (Railway) if set."""
+        external = os.environ.get("DATABASE_URL", "")
+        if external:
+            return external.replace("postgresql://", "postgresql+asyncpg://")
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -67,6 +71,9 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL_SYNC(self) -> str:
         """Build sync database URL for Alembic."""
+        external = os.environ.get("DATABASE_URL", "")
+        if external:
+            return external.replace("postgresql+asyncpg://", "postgresql://")
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -78,7 +85,10 @@ class Settings(BaseSettings):
 
     @property
     def REDIS_URL(self) -> str:
-        """Build Redis URL."""
+        """Build Redis URL. Uses REDIS_URL env var (Railway) if set."""
+        external = os.environ.get("REDIS_URL", "")
+        if external:
+            return external
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     # CORS - Restricted methods and headers
