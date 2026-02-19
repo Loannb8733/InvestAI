@@ -1,0 +1,6 @@
+[build]
+dockerfilePath = "Dockerfile.railway"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
