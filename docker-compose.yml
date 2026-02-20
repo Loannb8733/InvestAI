@@ -152,7 +152,7 @@ services:
     container_name: investai-frontend
     restart: unless-stopped
     environment:
-      - VITE_API_URL=http://localhost:8000/api/v1
+      - VITE_API_URL=/api/v1
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -168,7 +168,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/conf.d/prod.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "80:80"
       - "443:443"
@@ -177,6 +177,22 @@ services:
       - frontend
     profiles:
       - production
+
+  # Nginx Reverse Proxy (tunnel — single port, no SSL)
+  nginx-tunnel:
+    image: nginx:alpine
+    container_name: investai-nginx-tunnel
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d/tunnel.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "9090:80"
+    depends_on:
+      - backend
+      - frontend
+    profiles:
+      - tunnel
 
 volumes:
   postgres_data:
