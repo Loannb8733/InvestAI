@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -14,6 +14,7 @@ from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
 from app.models.portfolio import Portfolio
+from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.metrics_service import metrics_service
@@ -214,27 +215,40 @@ class EnhancedDashboardResponse(BaseModel):
 
 @router.get("/")
 async def get_dashboard(
-    days: int = Query(30, ge=7, le=365),
+    days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> EnhancedDashboardResponse:
-    """Get enhanced dashboard metrics for the current user."""
+    """Get enhanced dashboard metrics for the current user.
+
+    days=0 means "all time" (from oldest transaction).
+    """
     user_id = str(current_user.id)
+
+    # Resolve days=0 ("all time") to actual days since first transaction
+    if days == 0:
+        first_tx = await db.execute(
+            select(func.min(Transaction.executed_at))
+            .join(Asset, Transaction.asset_id == Asset.id)
+            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+            .where(Portfolio.user_id == current_user.id)
+        )
+        first_date = first_tx.scalar()
+        if first_date:
+            if hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
+                first_date = first_date.replace(tzinfo=None)
+            days = max((datetime.utcnow() - first_date).days + 1, 7)
+        else:
+            days = 30
 
     # Get basic metrics (period-aware)
     metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, days=days)
 
-    # Get historical data
+    # Get historical data — always use real price-based series
+    historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
     is_data_estimated = False
-    historical_data = await snapshot_service.get_historical_values(db, user_id, days)
-    if not historical_data:
-        # Generate from transactions if no snapshots exist
-        historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
-        is_data_estimated = True
-
-    # Mark data points as estimated
     for point in historical_data:
-        point["is_estimated"] = is_data_estimated
+        point["is_estimated"] = False
 
     # Calculate period change from historical data
     if historical_data and len(historical_data) >= 2:
@@ -293,18 +307,24 @@ async def get_dashboard(
 
     # ============== Calculate Advanced Metrics ==============
 
-    # Risk metrics
-    volatility = await snapshot_service.calculate_volatility(db, user_id, days)
-    sharpe_ratio = await snapshot_service.calculate_sharpe_ratio(db, user_id, days)
-    mdd_data = await snapshot_service.calculate_max_drawdown(db, user_id, days)
-    var_data = await snapshot_service.calculate_var(db, user_id, days, 0.95, metrics["total_value"])
+    # Risk metrics (builds price series once, shared across all 4 metric functions)
+    risk_data = await snapshot_service.get_all_risk_metrics(
+        db,
+        user_id,
+        metrics["total_value"],
+        [{"symbol": a.symbol, "value": a.value} for a in asset_allocation],
+        days,
+    )
+
+    volatility = risk_data["volatility"]
+    sharpe_ratio = risk_data["sharpe_ratio"]
+    mdd_data = risk_data["max_drawdown"]
+    var_data = risk_data["var_95"]
 
     # Beta and Alpha calculation (vs BTC as benchmark for crypto-heavy portfolios)
     beta = None
     alpha = None
     if historical_data and len(historical_data) > 5:
-        # Get BTC historical prices for beta calculation
-        # For now, use a default beta of 1.0 - in production would fetch actual BTC prices
         beta = 1.0
         alpha = 0.0
 
@@ -332,9 +352,7 @@ async def get_dashboard(
     )
 
     # Concentration metrics (HHI)
-    concentration_data = snapshot_service.calculate_hhi(
-        [{"symbol": a.symbol, "value": a.value} for a in asset_allocation]
-    )
+    concentration_data = risk_data["concentration"]
     concentration = ConcentrationMetrics(
         hhi=concentration_data["hhi"],
         interpretation=concentration_data["interpretation"],
@@ -344,11 +362,9 @@ async def get_dashboard(
     )
 
     # Stress tests
-    stress_test_20 = snapshot_service.calculate_stress_test(metrics["total_value"], all_assets_data, 0.20)
-    stress_test_40 = snapshot_service.calculate_stress_test(metrics["total_value"], all_assets_data, 0.40)
     stress_tests = [
-        StressTest(**stress_test_20),
-        StressTest(**stress_test_40),
+        StressTest(**risk_data["stress_test_20"]),
+        StressTest(**risk_data["stress_test_40"]),
     ]
 
     # P&L breakdown (realized vs unrealized)
@@ -376,9 +392,22 @@ async def get_dashboard(
         pnl_breakdown=pnl_breakdown,
     )
 
-    # Create snapshot for today if we have assets
+    # Create snapshot for today if we have assets (max 1 per day)
     if metrics["assets_count"] > 0:
-        await snapshot_service.create_user_snapshot(db, user_id)
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        existing_today = await db.execute(
+            select(func.count())
+            .select_from(PortfolioSnapshot)
+            .where(
+                and_(
+                    PortfolioSnapshot.user_id == user_id,
+                    PortfolioSnapshot.snapshot_date >= today_start,
+                    PortfolioSnapshot.portfolio_id.is_(None),
+                )
+            )
+        )
+        if existing_today.scalar() == 0:
+            await snapshot_service.create_user_snapshot(db, user_id)
 
     return EnhancedDashboardResponse(
         total_value=metrics["total_value"],
@@ -634,22 +663,32 @@ async def get_upcoming_events(
 
 @router.get("/historical-data", response_model=List[HistoricalDataPoint])
 async def get_historical_data(
-    days: int = Query(30, ge=7, le=365),
+    days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[HistoricalDataPoint]:
-    """Get historical portfolio values."""
+    """Get historical portfolio values. days=0 means all time."""
     user_id = str(current_user.id)
 
-    # Always use transaction-based generation for better investment progression visualization
-    # This shows actual investment growth over time rather than flat snapshot values
-    historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
-    is_estimated = True
+    # Resolve days=0 to all time
+    if days == 0:
+        first_tx = await db.execute(
+            select(func.min(Transaction.executed_at))
+            .join(Asset, Transaction.asset_id == Asset.id)
+            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+            .where(Portfolio.user_id == current_user.id)
+        )
+        first_date = first_tx.scalar()
+        if first_date:
+            if hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
+                first_date = first_date.replace(tzinfo=None)
+            days = max((datetime.utcnow() - first_date).days + 1, 7)
+        else:
+            days = 30
 
-    # If no transaction data, try snapshots as fallback
-    if not historical_data:
-        historical_data = await snapshot_service.get_historical_values(db, user_id, days)
-        is_estimated = False
+    # Use real price-based series (transactions + historical market prices)
+    historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
+    is_estimated = False
 
     for point in historical_data:
         point["is_estimated"] = is_estimated
@@ -673,7 +712,7 @@ class BenchmarkSeries(BaseModel):
 
 @router.get("/benchmarks", response_model=List[BenchmarkSeries])
 async def get_benchmark_data(
-    days: int = Query(default=90, ge=7, le=365),
+    days: int = Query(default=90, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -681,10 +720,12 @@ async def get_benchmark_data(
 
     Returns BTC, SPY, MSCI World + portfolio performance, all normalized.
     """
-    from app.ml.historical_data import HistoricalDataManager
+    from app.core.config import settings
+    from app.ml.historical_data import HistoricalDataFetcher
 
     user_id = current_user.id
-    hist_manager = HistoricalDataManager()
+    coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
+    fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
 
     benchmarks = [
         ("Bitcoin", "BTC", "crypto"),
@@ -694,31 +735,29 @@ async def get_benchmark_data(
 
     result = []
 
-    for name, symbol, asset_type in benchmarks:
-        try:
-            df = await hist_manager.get_history(symbol, asset_type, days)
-            if df is not None and len(df) > 1:
-                prices = df["close"].values if "close" in df.columns else df.iloc[:, 0].values
-                dates = df.index if hasattr(df.index, "strftime") else range(len(prices))
-                base = float(prices[0]) if prices[0] != 0 else 1
-                points = []
-                for i, price in enumerate(prices):
-                    d = dates[i]
-                    date_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
-                    points.append(
-                        BenchmarkDataPoint(
-                            date=date_str,
-                            value=round(float(price) / base * 100, 2),
+    try:
+        for name, symbol, asset_type in benchmarks:
+            try:
+                dates, prices = await fetcher.get_history(symbol, asset_type, days)
+                if dates and prices and len(dates) > 1:
+                    base = float(prices[0]) if prices[0] != 0 else 1
+                    points = []
+                    for d, price in zip(dates, prices):
+                        date_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+                        points.append(
+                            BenchmarkDataPoint(
+                                date=date_str,
+                                value=round(float(price) / base * 100, 2),
+                            )
                         )
-                    )
-                result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
-        except Exception:
-            pass
+                    result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
+            except Exception:
+                pass
+    finally:
+        await fetcher.close()
 
-    # Portfolio performance normalized
-    historical_data = await snapshot_service.get_historical_values(db, user_id, days)
-    if not historical_data:
-        historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
+    # Portfolio performance normalized — use real price-based series
+    historical_data = await snapshot_service.build_portfolio_value_series(db, str(user_id), days)
     if historical_data and len(historical_data) > 1:
         base = historical_data[0].get("value", 1) or 1
         points = [

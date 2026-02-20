@@ -20,6 +20,9 @@ class TransactionType(str, enum.Enum):
     INTEREST = "interest"
     FEE = "fee"
     STAKING_REWARD = "staking_reward"
+    AIRDROP = "airdrop"
+    CONVERSION_IN = "conversion_in"
+    CONVERSION_OUT = "conversion_out"
 
 
 class Transaction(Base):

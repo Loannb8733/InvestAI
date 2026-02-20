@@ -200,6 +200,7 @@ const PERIOD_OPTIONS = [
   { label: '30j', value: 30 },
   { label: '90j', value: 90 },
   { label: '1an', value: 365 },
+  { label: 'Tout', value: 0 },
 ]
 
 const transactionTypeLabels: Record<string, string> = {

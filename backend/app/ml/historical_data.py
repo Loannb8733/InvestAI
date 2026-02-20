@@ -43,6 +43,9 @@ class HistoricalDataFetcher:
         "USDT": "tether",
         "TON": "the-open-network",
         "FET": "fetch-ai",
+        "ONDO": "ondo-finance",
+        "PENDLE": "pendle",
+        "INJ": "injective-protocol",
     }
 
     def __init__(self, coingecko_api_key: Optional[str] = None):
@@ -81,8 +84,10 @@ class HistoricalDataFetcher:
                     "interval": "daily",
                 },
             )
-            if response.status_code == 429:
-                logger.warning("CoinGecko 429 for %s — skipping (will retry on next page load)", symbol)
+            if response.status_code in (401, 429):
+                logger.warning(
+                    "CoinGecko %d for %s — skipping (will retry on next page load)", response.status_code, symbol
+                )
                 return [], []
             response.raise_for_status()
             data = response.json()

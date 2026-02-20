@@ -1,9 +1,10 @@
 """Portfolio snapshot service for historical value tracking."""
 
+import logging
 import math
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,8 @@ from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction, TransactionType
 from app.services.metrics_service import metrics_service
+
+logger = logging.getLogger(__name__)
 
 
 class SnapshotService:
@@ -302,8 +305,10 @@ class SnapshotService:
             return 1  # Every day
         elif days <= 90:
             return 3  # Every 3 days
-        else:
+        elif days <= 365:
             return 7  # Every week for year view
+        else:
+            return 14  # Every 2 weeks for multi-year view
 
     async def generate_historical_from_transactions(
         self,
@@ -312,311 +317,12 @@ class SnapshotService:
         days: int = 30,
     ) -> List[Dict]:
         """
-        Generate historical data combining:
-        - Invested curve from transactions (actual buys/sells)
-        - Value curve from snapshots (actual portfolio values)
+        Generate historical data from transactions + real historical prices.
+
+        Delegates to build_portfolio_value_series() which reconstructs daily
+        portfolio value using actual market prices instead of interpolation.
         """
-        # Get current metrics
-        current_metrics = await metrics_service.get_user_dashboard_metrics(db, user_id)
-        current_value = current_metrics["total_value"]
-        current_invested = current_metrics["total_invested"]
-
-        if current_value == 0 and current_invested == 0:
-            return []
-
-        today = datetime.utcnow()
-        start_date = today - timedelta(days=days)
-
-        # Get all user's portfolios
-        portfolios_result = await db.execute(
-            select(Portfolio.id).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolio_ids = [str(p[0]) for p in portfolios_result.all()]
-
-        if not portfolio_ids:
-            return []
-
-        # === 1. Build INVESTED curve from transactions ===
-        transactions_query = (
-            select(
-                Transaction.executed_at,
-                Transaction.transaction_type,
-                Transaction.quantity,
-                Transaction.price,
-                Transaction.fee,
-            )
-            .join(Asset, Transaction.asset_id == Asset.id)
-            .where(Asset.portfolio_id.in_(portfolio_ids))
-            .order_by(Transaction.executed_at.asc())
-        )
-
-        result = await db.execute(transactions_query)
-        transactions = result.all()
-
-        # Build cumulative invested by date
-        # "Invested" = total money put IN (only increases, never decreases)
-        cumulative_invested = Decimal("0")
-        invested_by_date: Dict[str, float] = {}
-
-        # Net capital = money injected - money withdrawn (actual cash still in play)
-        cumulative_net_capital = Decimal("0")
-        net_capital_by_date: Dict[str, float] = {}
-
-        # Also track "position value" which changes with buys AND sells
-        # This represents the cost basis of currently held assets
-        cumulative_position = Decimal("0")
-        position_by_date: Dict[str, float] = {}
-
-        for tx in transactions:
-            tx_type = tx.transaction_type
-            quantity = Decimal(str(tx.quantity))
-            price = Decimal(str(tx.price))
-            fee = Decimal(str(tx.fee or 0))
-            tx_amount = quantity * price
-
-            # Invested: Only count money going IN (never decreases)
-            if tx_type in [TransactionType.BUY]:
-                cumulative_invested += tx_amount + fee
-                cumulative_net_capital += tx_amount + fee
-            elif tx_type in [TransactionType.TRANSFER_IN]:
-                cumulative_invested += tx_amount
-                cumulative_net_capital += tx_amount
-
-            # Net capital decreases on sells
-            if tx_type in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
-                cumulative_net_capital -= tx_amount
-
-            # Position: Changes with buys AND sells (reflects actual holdings)
-            if tx_type in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
-                cumulative_position += tx_amount
-            elif tx_type in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
-                cumulative_position -= tx_amount
-            elif tx_type == TransactionType.CONVERSION_OUT:
-                cumulative_position -= tx_amount
-            elif tx_type == TransactionType.CONVERSION_IN:
-                cumulative_position += tx_amount
-
-            # Ensure position doesn't go negative
-            if cumulative_position < 0:
-                cumulative_position = Decimal("0")
-            if cumulative_net_capital < 0:
-                cumulative_net_capital = Decimal("0")
-
-            date_str = tx.executed_at.strftime("%Y-%m-%d")
-            invested_by_date[date_str] = float(cumulative_invested)
-            net_capital_by_date[date_str] = float(cumulative_net_capital)
-            position_by_date[date_str] = float(cumulative_position)
-
-        # === 2. Get VALUE curve from snapshots ===
-        snapshots_query = (
-            select(
-                PortfolioSnapshot.snapshot_date,
-                PortfolioSnapshot.total_value,
-            )
-            .where(
-                and_(
-                    PortfolioSnapshot.user_id == user_id,
-                    PortfolioSnapshot.portfolio_id.is_(None),  # Global snapshots
-                )
-            )
-            .order_by(PortfolioSnapshot.snapshot_date.asc())
-        )
-
-        result = await db.execute(snapshots_query)
-        snapshots = result.all()
-
-        # Build value by date (keep last snapshot of each day)
-        value_by_date: Dict[str, float] = {}
-        for snap in snapshots:
-            date_str = snap.snapshot_date.strftime("%Y-%m-%d")
-            value_by_date[date_str] = float(snap.total_value)
-
-        # === 3. Merge into unified timeline ===
-        # Collect all dates with transactions (buys/sells) or snapshots
-        all_dates = (
-            set(invested_by_date.keys())
-            | set(net_capital_by_date.keys())
-            | set(position_by_date.keys())
-            | set(value_by_date.keys())
-        )
-        all_dates = {d for d in all_dates if d >= start_date.strftime("%Y-%m-%d")}
-
-        if not all_dates and not transactions:
-            return self._generate_flat_history(today, days, current_value, current_invested)
-
-        # Get last known invested/net_capital before period
-        last_invested = 0.0
-        last_net_capital = 0.0
-        for date_str in sorted(invested_by_date.keys()):
-            if date_str < start_date.strftime("%Y-%m-%d"):
-                last_invested = invested_by_date[date_str]
-            else:
-                break
-        for date_str in sorted(net_capital_by_date.keys()):
-            if date_str < start_date.strftime("%Y-%m-%d"):
-                last_net_capital = net_capital_by_date[date_str]
-            else:
-                break
-
-        # Add today's value to value_by_date for interpolation
-        today_str = today.strftime("%Y-%m-%d")
-        value_by_date[today_str] = current_value
-
-        # Get sorted list of dates with known values for interpolation
-        known_value_dates = sorted(value_by_date.keys())
-
-        # Calculate performance ratio (value vs position cost basis)
-        current_position = (
-            position_by_date.get(max(position_by_date.keys()), float(current_invested))
-            if position_by_date
-            else float(current_invested)
-        )
-        current_perf_ratio = current_value / current_position if current_position > 0 else 1.0
-
-        # Get first known snapshot's performance ratio for backward extrapolation
-        first_snapshot_ratio = current_perf_ratio
-        if known_value_dates:
-            first_date = known_value_dates[0]
-            first_value = value_by_date[first_date]
-            # Find position at that date
-            first_position = 0.0
-            for d in sorted(position_by_date.keys()):
-                if d <= first_date:
-                    first_position = position_by_date[d]
-            if first_position > 0:
-                first_snapshot_ratio = first_value / first_position
-
-        def get_position_at_date(date_str: str) -> float:
-            """Get position value at a given date."""
-            pos = 0.0
-            for d in sorted(position_by_date.keys()):
-                if d <= date_str:
-                    pos = position_by_date[d]
-                else:
-                    break
-            return pos
-
-        def interpolate_value(date_str: str, position: float) -> float:
-            """Interpolate value between known snapshot points."""
-            if date_str in value_by_date:
-                return value_by_date[date_str]
-
-            # Find surrounding known dates
-            before_date = None
-            after_date = None
-            for kd in known_value_dates:
-                if kd <= date_str:
-                    before_date = kd
-                elif after_date is None:
-                    after_date = kd
-                    break
-
-            # If we have both before and after, interpolate
-            if before_date and after_date:
-                before_val = value_by_date[before_date]
-                after_val = value_by_date[after_date]
-
-                d1 = datetime.strptime(before_date, "%Y-%m-%d")
-                d2 = datetime.strptime(after_date, "%Y-%m-%d")
-                d = datetime.strptime(date_str, "%Y-%m-%d")
-
-                total_days = (d2 - d1).days
-                elapsed_days = (d - d1).days
-
-                if total_days > 0:
-                    ratio = elapsed_days / total_days
-                    return before_val + (after_val - before_val) * ratio
-
-            # If only after date known, use first snapshot's ratio with position
-            if after_date and not before_date:
-                return position * first_snapshot_ratio
-
-            # If only before, use current ratio with position
-            if before_date:
-                return position * current_perf_ratio
-
-            # No known values, use first snapshot ratio with position
-            return position * first_snapshot_ratio
-
-        # Build data points
-        data = []
-
-        # Get starting position
-        start_position = get_position_at_date(start_date.strftime("%Y-%m-%d"))
-
-        # Add start point
-        start_value = interpolate_value(start_date.strftime("%Y-%m-%d"), start_position)
-        data.append(
-            {
-                "date": self._format_date_for_period(start_date, days),
-                "full_date": start_date.isoformat(),
-                "value": round(start_value, 2),
-                "invested": round(last_invested, 2),
-                "net_capital": round(last_net_capital, 2),
-                "gain_loss": round(start_value - last_net_capital, 2),
-            }
-        )
-
-        # Add points for each date with data
-        for date_str in sorted(all_dates):
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-
-            # Get invested (use last known if no transaction that day)
-            if date_str in invested_by_date:
-                last_invested = invested_by_date[date_str]
-            invested = last_invested
-
-            # Get net capital (use last known if no transaction that day)
-            if date_str in net_capital_by_date:
-                last_net_capital = net_capital_by_date[date_str]
-            net_cap = last_net_capital
-
-            # Get position at this date (changes with buys AND sells)
-            position = get_position_at_date(date_str)
-
-            # Interpolate value based on position
-            value = interpolate_value(date_str, position)
-
-            data.append(
-                {
-                    "date": self._format_date_for_period(dt, days),
-                    "full_date": dt.isoformat(),
-                    "value": round(value, 2),
-                    "invested": round(invested, 2),
-                    "net_capital": round(net_cap, 2),
-                    "gain_loss": round(value - net_cap, 2),
-                }
-            )
-
-        # Compute current net capital
-        current_net_capital = float(current_invested)
-        if net_capital_by_date:
-            last_nc_date = max(net_capital_by_date.keys())
-            current_net_capital = net_capital_by_date[last_nc_date]
-
-        # Add today's point with actual current values
-        data.append(
-            {
-                "date": self._format_date_for_period(today, days),
-                "full_date": today.isoformat(),
-                "value": round(current_value, 2),
-                "invested": round(float(current_invested), 2),
-                "net_capital": round(current_net_capital, 2),
-                "gain_loss": round(current_value - current_net_capital, 2),
-            }
-        )
-
-        # Remove duplicates based on date, keeping the last one
-        seen_dates = {}
-        for point in data:
-            date_key = point["full_date"][:10]
-            seen_dates[date_key] = point
-
-        data = sorted(seen_dates.values(), key=lambda x: x["full_date"])
-
-        return data
+        return await self.build_portfolio_value_series(db, user_id, days)
 
     def _generate_flat_history(self, today: datetime, days: int, value: float, invested: float) -> List[Dict]:
         """Generate minimal history when no transaction data available."""
@@ -640,9 +346,332 @@ class SnapshotService:
             },
         ]
 
-    async def calculate_volatility(self, db: AsyncSession, user_id: str, days: int = 30) -> float:
+    # ================================================================
+    # Real-price based portfolio value reconstruction
+    # ================================================================
+
+    async def _get_user_transactions_with_assets(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+    ) -> List[Tuple]:
+        """Fetch all user transactions with asset symbol and type, ordered by date."""
+        if portfolio_id:
+            portfolio_ids = [portfolio_id]
+        else:
+            portfolios_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == user_id))
+            portfolio_ids = [str(p[0]) for p in portfolios_result.all()]
+
+        if not portfolio_ids:
+            return []
+
+        query = (
+            select(
+                Transaction.executed_at,
+                Transaction.transaction_type,
+                Transaction.quantity,
+                Transaction.price,
+                Transaction.fee,
+                Transaction.currency,
+                Asset.symbol,
+                Asset.asset_type,
+            )
+            .join(Asset, Transaction.asset_id == Asset.id)
+            .where(Asset.portfolio_id.in_(portfolio_ids))
+            .order_by(Transaction.executed_at.asc())
+        )
+
+        result = await db.execute(query)
+        return result.all()
+
+    def _replay_transactions_to_daily_holdings(
+        self,
+        transactions: List[Tuple],
+        start_date: datetime,
+        end_date: datetime,
+    ) -> Tuple[Dict[str, Dict[str, float]], Dict[str, float], Dict[str, float], Dict[str, str]]:
+        """
+        Replay transactions chronologically to build daily holdings map.
+
+        Returns:
+            - daily_holdings: Dict[date_str, Dict[symbol, quantity]]
+            - daily_invested: Dict[date_str, cumulative_invested]
+            - daily_net_capital: Dict[date_str, net_capital]
+            - asset_types: Dict[symbol, asset_type_str]
+        """
+        holdings: Dict[str, float] = {}  # symbol -> quantity
+        cumulative_invested = 0.0
+        cumulative_net_capital = 0.0
+        asset_types: Dict[str, str] = {}
+
+        # Group transactions by date
+        tx_by_date: Dict[str, List] = {}
+        for tx in transactions:
+            executed_at = tx.executed_at
+            if hasattr(executed_at, "tzinfo") and executed_at.tzinfo is not None:
+                executed_at = executed_at.replace(tzinfo=None)
+            date_str = executed_at.strftime("%Y-%m-%d")
+            if date_str not in tx_by_date:
+                tx_by_date[date_str] = []
+            tx_by_date[date_str].append(tx)
+            # Track asset types
+            symbol = tx.symbol.upper()
+            if symbol not in asset_types:
+                asset_types[symbol] = tx.asset_type.value if hasattr(tx.asset_type, "value") else str(tx.asset_type)
+
+        # Iterate day by day
+        daily_holdings: Dict[str, Dict[str, float]] = {}
+        daily_invested: Dict[str, float] = {}
+        daily_net_capital: Dict[str, float] = {}
+
+        current = start_date
+        while current <= end_date:
+            date_str = current.strftime("%Y-%m-%d")
+
+            # Apply transactions for this day
+            if date_str in tx_by_date:
+                for tx in tx_by_date[date_str]:
+                    symbol = tx.symbol.upper()
+                    quantity = float(tx.quantity)
+                    price = float(tx.price)
+                    fee = float(tx.fee or 0)
+                    tx_type = tx.transaction_type
+                    tx_amount = quantity * price
+
+                    if tx_type in (TransactionType.BUY,):
+                        holdings[symbol] = holdings.get(symbol, 0.0) + quantity
+                        cumulative_invested += tx_amount + fee
+                        cumulative_net_capital += tx_amount + fee
+                    elif tx_type in (
+                        TransactionType.TRANSFER_IN,
+                        TransactionType.AIRDROP,
+                        TransactionType.STAKING_REWARD,
+                    ):
+                        holdings[symbol] = holdings.get(symbol, 0.0) + quantity
+                        if tx_type == TransactionType.TRANSFER_IN:
+                            cumulative_invested += tx_amount
+                            cumulative_net_capital += tx_amount
+                    elif tx_type in (TransactionType.SELL,):
+                        holdings[symbol] = max(0.0, holdings.get(symbol, 0.0) - quantity)
+                        cumulative_net_capital -= tx_amount
+                    elif tx_type in (TransactionType.TRANSFER_OUT,):
+                        holdings[symbol] = max(0.0, holdings.get(symbol, 0.0) - quantity)
+                        cumulative_net_capital -= tx_amount
+                    elif tx_type == TransactionType.CONVERSION_OUT:
+                        holdings[symbol] = max(0.0, holdings.get(symbol, 0.0) - quantity)
+                    elif tx_type == TransactionType.CONVERSION_IN:
+                        holdings[symbol] = holdings.get(symbol, 0.0) + quantity
+
+                    if cumulative_net_capital < 0:
+                        cumulative_net_capital = 0.0
+
+            # Record snapshot of holdings for this day (only non-zero)
+            daily_holdings[date_str] = {s: q for s, q in holdings.items() if q > 1e-10}
+            daily_invested[date_str] = cumulative_invested
+            daily_net_capital[date_str] = cumulative_net_capital
+
+            current += timedelta(days=1)
+
+        return daily_holdings, daily_invested, daily_net_capital, asset_types
+
+    async def _fetch_all_price_series(
+        self,
+        symbols_with_types: Dict[str, str],
+        days: int,
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Fetch historical prices for all symbols.
+        Returns: Dict[symbol, Dict[date_str, price_eur]]
+
+        Uses Redis cache first, then falls back to API.
+        """
+        from app.core.config import settings
+        from app.ml.historical_data import HistoricalDataFetcher
+        from app.tasks.history_cache import get_cached_history
+
+        price_series: Dict[str, Dict[str, float]] = {}
+
+        # Stablecoins: default price of ~1 EUR (close enough)
+        STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
+
+        coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
+        fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
+
+        try:
+            for symbol, asset_type in symbols_with_types.items():
+                symbol_upper = symbol.upper()
+
+                # Try Redis cache first
+                dates, prices = get_cached_history(symbol_upper, days)
+
+                # Fallback to direct API call
+                if not dates or not prices:
+                    try:
+                        dates, prices = await fetcher.get_history(symbol_upper, asset_type, days)
+                    except Exception as e:
+                        logger.warning("Failed to fetch prices for %s: %s", symbol_upper, e)
+                        dates, prices = [], []
+
+                if dates and prices:
+                    series: Dict[str, float] = {}
+                    for d, p in zip(dates, prices):
+                        date_str = d.strftime("%Y-%m-%d")
+                        series[date_str] = float(p)
+                    price_series[symbol_upper] = series
+                elif symbol_upper in STABLECOINS:
+                    # Stablecoin fallback — approximate 1 USD ~ 0.92 EUR
+                    price_series[symbol_upper] = {}  # Will use fallback in value computation
+                else:
+                    logger.warning("No price data available for %s", symbol_upper)
+        finally:
+            await fetcher.close()
+
+        return price_series
+
+    async def build_portfolio_value_series(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+        portfolio_id: Optional[str] = None,
+    ) -> List[Dict]:
+        """
+        Build daily portfolio value series from transactions + real historical prices.
+
+        This is the core method that replaces snapshot-based history.
+        It replays transactions to determine daily holdings, fetches real prices,
+        and computes portfolio value for each day.
+        """
+        transactions = await self._get_user_transactions_with_assets(db, user_id, portfolio_id)
+
+        if not transactions:
+            return []
+
+        today = datetime.utcnow()
+        first_tx_date = transactions[0].executed_at
+
+        # Normalize to naive datetimes for comparison (all dates are UTC)
+        if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
+            first_tx_date = first_tx_date.replace(tzinfo=None)
+
+        # Start from the later of: (first transaction, today - days)
+        period_start = today - timedelta(days=days)
+        # We need to replay from first transaction to get correct holdings
+        replay_start = min(first_tx_date, period_start)
+        replay_start = replay_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Build daily holdings
+        daily_holdings, daily_invested, daily_net_capital, asset_types = self._replay_transactions_to_daily_holdings(
+            transactions, replay_start, today
+        )
+
+        # Collect all symbols that were ever held
+        all_symbols: Dict[str, str] = {}
+        for date_holdings in daily_holdings.values():
+            for symbol in date_holdings:
+                if symbol not in all_symbols and symbol in asset_types:
+                    all_symbols[symbol] = asset_types[symbol]
+
+        if not all_symbols:
+            return []
+
+        # Fetch price data
+        # Use max(days, days_since_first_tx) but cap at 365 (CoinGecko free tier limit)
+        days_since_first = (today - replay_start).days + 5  # extra buffer
+        fetch_days = min(max(days, days_since_first, 90), 365)
+        price_series = await self._fetch_all_price_series(all_symbols, fetch_days)
+
+        # Build value series for the display period
+        STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
+        result: List[Dict] = []
+        interval = self._get_data_point_interval(days)
+
+        # Only output data for the requested period
+        output_start = max(period_start, replay_start)
+        output_start_str = output_start.strftime("%Y-%m-%d")
+
+        # Collect all dates in the period
+        period_dates = sorted(d for d in daily_holdings.keys() if d >= output_start_str)
+
+        if not period_dates:
+            return []
+
+        # Track last known prices for LOCF (Last Observation Carried Forward)
+        last_known_prices: Dict[str, float] = {}
+
+        for i, date_str in enumerate(period_dates):
+            # Only include points at the interval (or always include first/last)
+            if i % interval != 0 and i != len(period_dates) - 1 and i != 0:
+                # Still update last known prices for skipped days
+                for symbol in daily_holdings[date_str]:
+                    if symbol in price_series and date_str in price_series[symbol]:
+                        last_known_prices[symbol] = price_series[symbol][date_str]
+                continue
+
+            holdings = daily_holdings[date_str]
+            invested = daily_invested.get(date_str, 0.0)
+            net_capital = daily_net_capital.get(date_str, 0.0)
+
+            # Compute portfolio value for this day
+            daily_value = 0.0
+            for symbol, qty in holdings.items():
+                if qty <= 1e-10:
+                    continue
+
+                price = None
+                # Try exact date
+                if symbol in price_series and date_str in price_series[symbol]:
+                    price = price_series[symbol][date_str]
+                    last_known_prices[symbol] = price
+                # LOCF: use last known price
+                elif symbol in last_known_prices:
+                    price = last_known_prices[symbol]
+                # Stablecoin fallback
+                elif symbol in STABLECOINS:
+                    price = 0.92  # ~1 USD in EUR
+                    last_known_prices[symbol] = price
+                # Try to find nearest price in series
+                elif symbol in price_series:
+                    # Find closest earlier date
+                    available_dates = sorted(price_series[symbol].keys())
+                    for d in reversed(available_dates):
+                        if d <= date_str:
+                            price = price_series[symbol][d]
+                            last_known_prices[symbol] = price
+                            break
+                    # If no earlier date, try first available
+                    if price is None and available_dates:
+                        price = price_series[symbol][available_dates[0]]
+                        last_known_prices[symbol] = price
+
+                if price is not None:
+                    daily_value += qty * price
+
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            result.append(
+                {
+                    "date": self._format_date_for_period(dt, days),
+                    "full_date": dt.isoformat(),
+                    "value": round(daily_value, 2),
+                    "invested": round(invested, 2),
+                    "net_capital": round(net_capital, 2),
+                    "gain_loss": round(daily_value - net_capital, 2),
+                }
+            )
+
+        return result
+
+    async def calculate_volatility(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+        history: Optional[List[Dict]] = None,
+    ) -> float:
         """Calculate portfolio volatility based on historical returns."""
-        history = await self.get_historical_values(db, user_id, days)
+        if history is None:
+            history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 2:
             return 0.0
@@ -672,9 +701,11 @@ class SnapshotService:
         user_id: str,
         days: int = 30,
         risk_free_rate: float = 0.02,
+        history: Optional[List[Dict]] = None,
     ) -> float:
         """Calculate Sharpe ratio for the portfolio."""
-        history = await self.get_historical_values(db, user_id, days)
+        if history is None:
+            history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 2:
             return 0.0
@@ -705,12 +736,19 @@ class SnapshotService:
         sharpe = (annualized_return - risk_free_rate) / volatility
         return round(sharpe, 2)
 
-    async def calculate_max_drawdown(self, db: AsyncSession, user_id: str, days: int = 30) -> Dict:
+    async def calculate_max_drawdown(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+        history: Optional[List[Dict]] = None,
+    ) -> Dict:
         """
         Calculate Maximum Drawdown (MDD) - the largest peak-to-trough decline.
         Returns both the percentage and the period.
         """
-        history = await self.get_historical_values(db, user_id, days)
+        if history is None:
+            history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 2:
             return {"max_drawdown_percent": 0.0, "peak_date": None, "trough_date": None}
@@ -751,12 +789,14 @@ class SnapshotService:
         days: int = 30,
         confidence_level: float = 0.95,
         current_value: float = 0,
+        history: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Calculate Value at Risk (VaR) using historical simulation method.
         Returns the potential loss at the given confidence level.
         """
-        history = await self.get_historical_values(db, user_id, days)
+        if history is None:
+            history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 5:
             return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
@@ -935,11 +975,13 @@ class SnapshotService:
         allocations: List[Dict],
         days: int = 30,
     ) -> Dict:
-        """Get all risk metrics in one call."""
-        volatility = await self.calculate_volatility(db, user_id, days)
-        sharpe = await self.calculate_sharpe_ratio(db, user_id, days)
-        mdd = await self.calculate_max_drawdown(db, user_id, days)
-        var = await self.calculate_var(db, user_id, days, 0.95, current_value)
+        """Get all risk metrics in one call (builds price series once)."""
+        # Build portfolio value series once and share across all metric functions
+        history = await self.build_portfolio_value_series(db, user_id, days)
+        volatility = await self.calculate_volatility(db, user_id, days, history=history)
+        sharpe = await self.calculate_sharpe_ratio(db, user_id, days, history=history)
+        mdd = await self.calculate_max_drawdown(db, user_id, days, history=history)
+        var = await self.calculate_var(db, user_id, days, 0.95, current_value, history=history)
         hhi = self.calculate_hhi(allocations)
         stress_20 = self.calculate_stress_test(current_value, allocations, 0.20)
         stress_40 = self.calculate_stress_test(current_value, allocations, 0.40)

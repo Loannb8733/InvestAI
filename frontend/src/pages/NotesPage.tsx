@@ -362,7 +362,7 @@ export default function NotesPage() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {editingNote ? 'Modifier la note' : 'Nouvelle note'}

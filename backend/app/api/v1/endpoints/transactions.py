@@ -595,6 +595,21 @@ async def import_transactions_csv(
             detail=f"Database error: {str(e)}",
         )
 
+    # Trigger historical price cache for imported assets (background Celery tasks)
+    if success_count > 0:
+        try:
+            from app.tasks.history_cache import cache_single_asset
+
+            for symbol, asset in asset_map.items():
+                asset_type_value = (
+                    asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type)
+                )
+                cache_single_asset.delay(symbol, asset_type_value)
+            print(f"Triggered history cache for {len(asset_map)} assets")
+        except Exception as e:
+            # Non-critical: don't fail import if cache trigger fails
+            print(f"Warning: Failed to trigger history cache: {e}")
+
     return CSVImportResult(
         success_count=success_count,
         error_count=error_count,

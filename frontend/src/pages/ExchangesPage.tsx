@@ -676,7 +676,7 @@ export default function ExchangesPage() {
 
       {/* Test Result Dialog */}
       <Dialog open={!!testResult} onOpenChange={() => setTestResult(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {testResult?.success ? (

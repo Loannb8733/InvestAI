@@ -638,7 +638,7 @@ export default function TransactionsPage() {
                 <span className="hidden sm:inline">Nouvelle</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
               <DialogHeader>
                 <DialogTitle>Ajouter une transaction</DialogTitle>
                 <DialogDescription>Enregistrez une nouvelle transaction</DialogDescription>

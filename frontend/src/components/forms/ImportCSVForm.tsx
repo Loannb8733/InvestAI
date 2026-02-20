@@ -95,11 +95,25 @@ export default function ImportCSVForm({
       }
     },
     onError: (error: unknown) => {
-      const axiosError = error as import('axios').AxiosError<{ detail?: string }>
+      const axiosError = error as import('axios').AxiosError<{ detail?: string | object }>
+      let message = 'Impossible d\'importer le fichier.'
+      const data = axiosError.response?.data
+      if (data) {
+        if (typeof data.detail === 'string') {
+          message = data.detail
+        } else if (typeof data === 'string') {
+          message = data
+        } else if (typeof data.detail === 'object') {
+          message = JSON.stringify(data.detail)
+        }
+      }
+      if (axiosError.response?.status) {
+        message = `[${axiosError.response.status}] ${message}`
+      }
       toast({
         variant: 'destructive',
-        title: 'Erreur',
-        description: axiosError.response?.data?.detail || 'Impossible d\'importer le fichier.',
+        title: 'Erreur d\'import',
+        description: message,
       })
     },
   })
@@ -293,7 +307,7 @@ export default function ImportCSVForm({
   if (open !== undefined && onOpenChange !== undefined) {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Importer des transactions</DialogTitle>
             <DialogDescription>

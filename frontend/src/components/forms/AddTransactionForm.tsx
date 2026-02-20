@@ -429,7 +429,7 @@ export default function AddTransactionForm({
   if (open !== undefined && onOpenChange !== undefined) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Ajouter une transaction</DialogTitle>
             <DialogDescription>

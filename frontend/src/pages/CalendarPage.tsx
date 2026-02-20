@@ -536,7 +536,7 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {editingEvent ? 'Modifier l\'evenement' : 'Nouvel evenement'}
