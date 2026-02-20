@@ -4,12 +4,13 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.user import User
 from app.services.report_service import report_service
 
@@ -17,7 +18,9 @@ router = APIRouter()
 
 
 @router.get("/performance/pdf")
+@limiter.limit("10/minute")
 async def get_performance_report_pdf(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -35,7 +38,9 @@ async def get_performance_report_pdf(
 
 
 @router.get("/performance/excel")
+@limiter.limit("10/minute")
 async def get_performance_report_excel(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -53,7 +58,9 @@ async def get_performance_report_excel(
 
 
 @router.get("/tax/{year}/pdf")
+@limiter.limit("10/minute")
 async def get_tax_report_pdf(
+    request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -74,7 +81,9 @@ async def get_tax_report_pdf(
 
 
 @router.get("/tax/{year}/excel")
+@limiter.limit("10/minute")
 async def get_tax_report_excel(
+    request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -95,7 +104,9 @@ async def get_tax_report_excel(
 
 
 @router.get("/transactions/pdf")
+@limiter.limit("10/minute")
 async def get_transactions_report_pdf(
+    request: Request,
     year: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -115,7 +126,9 @@ async def get_transactions_report_pdf(
 
 
 @router.get("/available-years")
+@limiter.limit("10/minute")
 async def get_available_years(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

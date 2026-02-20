@@ -203,15 +203,14 @@ class AlertService:
                     message = f"{asset.symbol} a baissé de {abs(change):.1f}% (seuil: {threshold}%)"
 
         elif alert.condition == AlertCondition.DAILY_CHANGE_UP:
-            # Would need previous day price - simulate
-            daily_change = 2.5  # Simulated
-            if daily_change >= threshold:
+            daily_change = await self._get_daily_change(asset)
+            if daily_change is not None and daily_change >= threshold:
                 should_trigger = True
                 message = f"{asset.symbol} hausse journalière de {daily_change:.1f}% (seuil: {threshold}%)"
 
         elif alert.condition == AlertCondition.DAILY_CHANGE_DOWN:
-            daily_change = -3.0  # Simulated
-            if daily_change <= -threshold:
+            daily_change = await self._get_daily_change(asset)
+            if daily_change is not None and daily_change <= -threshold:
                 should_trigger = True
                 message = f"{asset.symbol} baisse journalière de {abs(daily_change):.1f}% (seuil: {threshold}%)"
 
@@ -227,6 +226,22 @@ class AlertService:
                 message=message,
             )
 
+        return None
+
+    async def _get_daily_change(self, asset: Asset) -> Optional[float]:
+        """Get 24h price change percentage for an asset."""
+        try:
+            if asset.asset_type == AssetType.CRYPTO:
+                prices = await self.price_service.get_multiple_crypto_prices([asset.symbol], "eur")
+                data = prices.get(asset.symbol.upper())
+                if data:
+                    return float(data.get("change_percent_24h", 0) or 0)
+            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
+                data = await self.price_service.get_stock_price(asset.symbol)
+                if data:
+                    return float(data.get("change_percent_24h", 0) or 0)
+        except Exception:
+            pass
         return None
 
     async def _get_asset_price(self, asset: Asset) -> float:

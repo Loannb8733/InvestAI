@@ -125,7 +125,6 @@ def _macd(prices: List[float]) -> Optional[Tuple[float, float, float]]:
     for v in macd_line[9:]:
         signal.append(signal[-1] * (1 - k) + v * k)
     hist = macd_line[-1] - signal[-1]
-    _ = macd_line[-2] - signal[-2] if len(signal) >= 2 and len(macd_line) >= 2 else hist
     return (macd_line[-1], signal[-1], hist)
 
 
@@ -301,16 +300,18 @@ class MarketRegimeDetector:
         hist_prev = macd_series[-2] - signal_series[-2]
         hist_prev2 = macd_series[-3] - signal_series[-3] if len(signal_series) >= 3 else hist_prev
         hist_rising = hist_now > hist_prev
-        (hist_now - hist_prev) > (hist_prev - hist_prev2)
+        hist_accelerating = (hist_now - hist_prev) > (hist_prev - hist_prev2)
 
         if histogram > 0 and hist_rising:
-            signal, strength = "bullish", min(1.0, abs(histogram) * 50)
+            base = min(1.0, abs(histogram) * 50)
+            signal, strength = "bullish", base * (1.1 if hist_accelerating else 1.0)
             desc = "MACD positif et croissant — tendance haussiere"
         elif histogram > 0 and not hist_rising:
             signal, strength = "top", min(1.0, abs(histogram) * 30)
             desc = "MACD positif mais ralentit — possible sommet"
         elif histogram < 0 and not hist_rising:
-            signal, strength = "bearish", min(1.0, abs(histogram) * 50)
+            base = min(1.0, abs(histogram) * 50)
+            signal, strength = "bearish", base * (1.1 if not hist_accelerating else 1.0)
             desc = "MACD negatif et decroissant — tendance baissiere"
         else:  # histogram < 0 and hist_rising
             signal, strength = "bottom", min(1.0, abs(histogram) * 30)

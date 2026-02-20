@@ -427,9 +427,13 @@ class MetricsService:
         worst_performers.sort(key=lambda x: x["period_change_percent"])
         worst_performers = worst_performers[:5]
 
-        # Period change (portfolio-level)
-        period_change = 0.0
+        # Period change (portfolio-level) — weighted average of asset period changes
         period_change_percent = 0.0
+        if float(total_value) > 0 and aggregated:
+            for a in aggregated:
+                weight = a["current_value"] / float(total_value) if float(total_value) > 0 else 0
+                period_change_percent += a.get("period_change_percent", 0) * weight
+        period_change = float(total_value) * period_change_percent / 100 if period_change_percent else 0.0
 
         # Net capital = money injected - money withdrawn (actual cash still in play)
         net_capital = total_invested - total_sold

@@ -297,7 +297,7 @@ function CustomizePanel({
     <Card className="absolute right-0 top-12 z-50 w-72 shadow-lg">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Personnaliser le dashboard</CardTitle>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0" aria-label="Fermer le panneau de personnalisation">
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -575,8 +575,8 @@ export default function DashboardPage() {
                         {isPositive ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
                       </CardHeader>
                       <CardContent>
-                        <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(netGainLoss)}</div>
-                        <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent)}</p>
+                        <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '▲' : '▼'} {formatCurrency(netGainLoss)}</div>
+                        <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '▲' : '▼'} {formatPercent(metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent)}</p>
                       </CardContent>
                     </Card>
                     <Card>
@@ -585,8 +585,8 @@ export default function DashboardPage() {
                         {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
                       </CardHeader>
                       <CardContent>
-                        <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(metrics.daily_change)}</div>
-                        <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(metrics.daily_change_percent)}</p>
+                        <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '▲' : '▼'} {formatCurrency(metrics.daily_change)}</div>
+                        <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '▲' : '▼'} {formatPercent(metrics.daily_change_percent)}</p>
                       </CardContent>
                     </Card>
                     <Card>
@@ -612,11 +612,11 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div>
                           <MetricTooltip content="Profits/pertes sur les positions actuellement détenues. Non imposable tant que non vendu."><p className="text-xs text-muted-foreground">P&L Latent</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.unrealized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(pnl_breakdown.unrealized_pnl)}</p>
+                          <p className={`text-lg font-bold ${pnl_breakdown.unrealized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.unrealized_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.unrealized_pnl)}</p>
                         </div>
                         <div>
                           <MetricTooltip content="Profits/pertes sur les actifs vendus. Soumis à imposition."><p className="text-xs text-muted-foreground">P&L Réalisé</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.realized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(pnl_breakdown.realized_pnl)}</p>
+                          <p className={`text-lg font-bold ${pnl_breakdown.realized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.realized_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.realized_pnl)}</p>
                         </div>
                         <div>
                           <MetricTooltip content="Total des frais de transaction payés."><p className="text-xs text-muted-foreground">Total Frais</p></MetricTooltip>
@@ -624,11 +624,11 @@ export default function DashboardPage() {
                         </div>
                         <div>
                           <MetricTooltip content="P&L total (latent + réalisé)."><p className="text-xs text-muted-foreground">P&L Total</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(pnl_breakdown.total_pnl)}</p>
+                          <p className={`text-lg font-bold ${pnl_breakdown.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.total_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.total_pnl)}</p>
                         </div>
                         <div>
                           <MetricTooltip content="P&L net après déduction des frais."><p className="text-xs text-muted-foreground">P&L Net</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(pnl_breakdown.net_pnl)}</p>
+                          <p className={`text-lg font-bold ${pnl_breakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.net_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.net_pnl)}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -749,7 +749,7 @@ export default function DashboardPage() {
                                 <p className="text-sm font-medium">{index.name}</p>
                                 {livePrices[index.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
                               </div>
-                              <p className={`text-sm ${liveIndexChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{liveIndexChange >= 0 ? '+' : ''}{liveIndexChange.toFixed(2)}%</p>
+                              <p className={`text-sm ${liveIndexChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{liveIndexChange >= 0 ? '▲ +' : '▼ '}{liveIndexChange.toFixed(2)}%</p>
                             </div>
                             <p className="text-sm text-muted-foreground ml-2">{formatCurrency(liveIndexPrice)}</p>
                           </div>)
@@ -758,7 +758,7 @@ export default function DashboardPage() {
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><Wallet className="h-4 w-4 text-primary" /></div>
                           <div>
                             <p className="text-sm font-medium">Votre portefeuille</p>
-                            <p className={`text-sm ${metrics.daily_change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{metrics.daily_change_percent >= 0 ? '+' : ''}{metrics.daily_change_percent.toFixed(2)}%</p>
+                            <p className={`text-sm ${metrics.daily_change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{metrics.daily_change_percent >= 0 ? '▲ +' : '▼ '}{metrics.daily_change_percent.toFixed(2)}%</p>
                           </div>
                         </div>
                       </div>
@@ -808,7 +808,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-sm">{asset.percentage.toFixed(1)}%</p>
-                                  <p className={`text-xs ${displayChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(displayChange)}</p>
+                                  <p className={`text-xs ${displayChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{displayChange >= 0 ? '▲' : '▼'} {formatPercent(displayChange)}</p>
                                 </div>
                               </div>
                               )

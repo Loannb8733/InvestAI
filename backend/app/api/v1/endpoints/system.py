@@ -15,6 +15,12 @@ from app.services.email_service import email_service
 router = APIRouter()
 
 
+class MessageResponse(BaseModel):
+    """Simple message response."""
+
+    message: str
+
+
 class EmailTestRequest(BaseModel):
     """Request to send a test email."""
 
@@ -132,7 +138,7 @@ async def test_email(
         )
 
 
-@router.post("/trigger-weekly-report")
+@router.post("/trigger-weekly-report", response_model=MessageResponse)
 async def trigger_weekly_report(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),

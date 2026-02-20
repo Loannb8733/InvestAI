@@ -83,7 +83,7 @@ export default function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label={unreadCount > 0 ? `Notifications (${unreadCount} non lues)` : 'Notifications'}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
@@ -130,6 +130,7 @@ export default function NotificationBell() {
                     size="icon"
                     className="h-6 w-6 shrink-0"
                     onClick={() => markReadMutation.mutate(n.id)}
+                    aria-label="Marquer comme lu"
                   >
                     <Check className="h-3 w-3" />
                   </Button>

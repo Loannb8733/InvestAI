@@ -2,10 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { useTheme } from '@/components/theme-provider'
 import { Button } from '@/components/ui/button'
-import { LogOut, Moon, Sun } from 'lucide-react'
+import { LogOut, Menu, Moon, Sun } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 
-export default function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate()
   const logout = useAuthStore((state) => state.logout)
   const { theme, setTheme } = useTheme()
@@ -21,7 +25,17 @@ export default function Header() {
 
   return (
     <header className="h-16 border-b border-border flex items-center justify-between px-6">
-      <div>
+      <div className="flex items-center gap-2">
+        {/* Mobile hamburger menu */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden"
+          onClick={onMenuClick}
+          aria-label="Ouvrir le menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
         {/* Breadcrumb or page title could go here */}
       </div>
 
@@ -30,7 +44,7 @@ export default function Header() {
         <NotificationBell />
 
         {/* Theme toggle */}
-        <Button variant="ghost" size="icon" onClick={toggleTheme}>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}>
           {theme === 'dark' ? (
             <Sun className="h-5 w-5" />
           ) : (
@@ -39,7 +53,7 @@ export default function Header() {
         </Button>
 
         {/* Logout */}
-        <Button variant="ghost" size="icon" onClick={handleLogout}>
+        <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Se déconnecter">
           <LogOut className="h-5 w-5" />
         </Button>
       </div>

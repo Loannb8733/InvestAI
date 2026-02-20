@@ -213,7 +213,7 @@ class EnhancedDashboardResponse(BaseModel):
 # ============== Main Endpoint ==============
 
 
-@router.get("/")
+@router.get("/", response_model=EnhancedDashboardResponse)
 async def get_dashboard(
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),

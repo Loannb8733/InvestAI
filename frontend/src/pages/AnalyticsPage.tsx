@@ -235,7 +235,7 @@ const MetricWithTooltip = ({ metricKey, children }: { metricKey: string; childre
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-1 cursor-help">
+          <div className="flex items-center gap-1 cursor-help" aria-label={`Aide sur ${explanation.title}`}>
             {children}
             <HelpCircle className="h-3 w-3 text-muted-foreground" />
           </div>
@@ -699,7 +699,7 @@ export default function AnalyticsPage() {
               Profil de risque
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger aria-label="Aide sur le profil de risque">
                     <HelpCircle className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
@@ -948,7 +948,7 @@ export default function AnalyticsPage() {
                       </span>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger>
+                          <TooltipTrigger aria-label={`Aide sur le beta de ${asset.symbol}`}>
                             <HelpCircle className="h-3 w-3 text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
@@ -1042,7 +1042,7 @@ export default function AnalyticsPage() {
                 Matrice de corrélation
                 <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger>
+                    <TooltipTrigger aria-label="Aide sur la matrice de corrélation">
                       <HelpCircle className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">

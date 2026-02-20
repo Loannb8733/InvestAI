@@ -233,31 +233,31 @@ async def _run_all_cleanup_async() -> dict:
 # === Celery Tasks ===
 
 
-@celery_app.task(name="tasks.cleanup_old_notifications")
+@celery_app.task(name="app.tasks.cleanup.cleanup_old_notifications")
 def cleanup_old_notifications(days_to_keep: int = 30) -> dict:
     """Celery task: Delete old read notifications."""
     return run_async(_cleanup_old_notifications_async(days_to_keep))
 
 
-@celery_app.task(name="tasks.cleanup_old_predictions")
+@celery_app.task(name="app.tasks.cleanup.cleanup_old_predictions")
 def cleanup_old_predictions(days_to_keep: int = 90) -> dict:
     """Celery task: Delete old prediction records."""
     return run_async(_cleanup_old_predictions_async(days_to_keep))
 
 
-@celery_app.task(name="tasks.cleanup_duplicate_transactions")
+@celery_app.task(name="app.tasks.cleanup.cleanup_duplicate_transactions")
 def cleanup_duplicate_transactions() -> dict:
     """Celery task: Remove duplicate transactions."""
     return run_async(_cleanup_duplicate_transactions_async())
 
 
-@celery_app.task(name="tasks.validate_portfolio_consistency")
+@celery_app.task(name="app.tasks.cleanup.validate_portfolio_consistency")
 def validate_portfolio_consistency() -> dict:
     """Celery task: Validate portfolio quantities match transactions."""
     return run_async(_validate_portfolio_consistency_async())
 
 
-@celery_app.task(name="tasks.run_weekly_cleanup")
+@celery_app.task(name="app.tasks.cleanup.run_weekly_cleanup")
 def run_weekly_cleanup() -> dict:
     """Celery task: Run all cleanup tasks."""
     return run_async(_run_all_cleanup_async())

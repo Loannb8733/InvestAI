@@ -173,7 +173,7 @@ async def _send_monthly_reports_async() -> dict:
                 # Generate PDF report
                 pdf_content = None
                 try:
-                    report_data = await report_service.get_performance_report(db, str(user.id))
+                    report_data = await report_service.get_portfolio_data(db, str(user.id))
                     pdf_content = report_service.generate_performance_pdf(report_data)
                 except Exception as e:
                     logger.warning(f"Could not generate PDF for {user.email}: {e}")
@@ -281,7 +281,7 @@ async def _send_daily_digest_async() -> dict:
 # === Celery Tasks ===
 
 
-@celery_app.task(name="tasks.send_alert_email")
+@celery_app.task(name="app.tasks.emails.send_alert_email")
 def send_alert_email(
     user_id: str,
     alert_name: str,
@@ -294,19 +294,19 @@ def send_alert_email(
     return run_async(_send_alert_email_async(user_id, alert_name, asset_symbol, current_price, target_price, condition))
 
 
-@celery_app.task(name="tasks.send_weekly_reports")
+@celery_app.task(name="app.tasks.emails.send_weekly_reports")
 def send_weekly_reports() -> dict:
     """Celery task: Send weekly performance reports to all users."""
     return run_async(_send_weekly_reports_async())
 
 
-@celery_app.task(name="tasks.send_monthly_reports")
+@celery_app.task(name="app.tasks.emails.send_monthly_reports")
 def send_monthly_reports() -> dict:
     """Celery task: Send monthly performance reports to all users."""
     return run_async(_send_monthly_reports_async())
 
 
-@celery_app.task(name="tasks.send_daily_digest")
+@celery_app.task(name="app.tasks.emails.send_daily_digest")
 def send_daily_digest() -> dict:
     """Celery task: Send daily digest to users with recent notifications."""
     return run_async(_send_daily_digest_async())

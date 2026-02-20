@@ -8,13 +8,14 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -45,7 +46,7 @@ async def list_transactions(
     asset_id: Optional[UUID] = None,
     portfolio_id: Optional[UUID] = None,
     skip: int = 0,
-    limit: int = 10000,
+    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[TransactionWithAsset]:
@@ -372,7 +373,9 @@ async def delete_transaction(
 
 
 @router.post("/import-csv", response_model=CSVImportResult)
+@limiter.limit("10/minute")
 async def import_transactions_csv(
+    request: Request,
     file: UploadFile = File(...),
     portfolio_id: Optional[UUID] = Query(None),
     platform: Optional[str] = Query(None),

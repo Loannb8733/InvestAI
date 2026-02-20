@@ -281,7 +281,7 @@ export default function PortfolioPage() {
                   <div className="text-right">
                     <p className="text-2xl font-bold">{formatCurrency(portfolioMetrics.total_value)}</p>
                     <p className={`text-sm ${portfolioMetrics.total_gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {formatCurrency(portfolioMetrics.total_gain_loss)} ({formatPercent(portfolioMetrics.total_gain_loss_percent)})
+                      {portfolioMetrics.total_gain_loss >= 0 ? '▲' : '▼'} {formatCurrency(portfolioMetrics.total_gain_loss)} ({formatPercent(portfolioMetrics.total_gain_loss_percent)})
                     </p>
                   </div>
                 )}
@@ -417,8 +417,9 @@ export default function PortfolioPage() {
                             <td className="text-center py-3 font-medium">{formatCurrency(asset.current_value)}</td>
                             <td className={`text-center py-3 ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                               <div>
-                                <p>{formatCurrency(asset.gain_loss)}</p>
+                                <p>{asset.gain_loss >= 0 ? '▲' : '▼'} {formatCurrency(asset.gain_loss)}</p>
                                 <p className="text-xs">
+                                  {asset.gain_loss >= 0 ? '▲' : '▼'}{' '}
                                   {asset.avg_buy_price > 0 && asset.current_price
                                     ? `${((asset.current_price - asset.avg_buy_price) / asset.avg_buy_price * 100).toFixed(2)}%`
                                     : formatPercent(asset.gain_loss_percent)}
@@ -552,7 +553,7 @@ export default function PortfolioPage() {
                                   <td className="text-center py-3">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
                                   <td className="text-center py-3">{formatCurrency(asset.total_sold_value)}</td>
                                   <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {formatCurrency(asset.realized_gain)}
+                                    {asset.realized_gain >= 0 ? '▲' : '▼'} {formatCurrency(asset.realized_gain)}
                                   </td>
                                 </tr>
                               ))}

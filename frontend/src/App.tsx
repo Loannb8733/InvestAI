@@ -1,31 +1,45 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import Layout from '@/components/layout/Layout'
+import { Loader2 } from 'lucide-react'
+
+// Eagerly loaded (auth pages — needed immediately)
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
-import NotFoundPage from '@/pages/NotFoundPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
-import DashboardPage from '@/pages/DashboardPage'
-import PortfolioPage from '@/pages/PortfolioPage'
-import TransactionsPage from '@/pages/TransactionsPage'
-import ExchangesPage from '@/pages/ExchangesPage'
-import AnalyticsPage from '@/pages/AnalyticsPage'
-import AlertsPage from '@/pages/AlertsPage'
-import PredictionsPage from '@/pages/PredictionsPage'
-import ReportsPage from '@/pages/ReportsPage'
-import SettingsPage from '@/pages/SettingsPage'
-import AdminPage from '@/pages/AdminPage'
-import NotesPage from '@/pages/NotesPage'
-import CalendarPage from '@/pages/CalendarPage'
-import SimulationsPage from '@/pages/SimulationsPage'
-import InsightsPage from '@/pages/InsightsPage'
-import GoalsPage from '@/pages/GoalsPage'
-import SmartInsightsPage from '@/pages/SmartInsightsPage'
 import VerifyEmailPage from '@/pages/VerifyEmailPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+
+// Lazy loaded (behind auth, loaded on demand)
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const PortfolioPage = lazy(() => import('@/pages/PortfolioPage'))
+const TransactionsPage = lazy(() => import('@/pages/TransactionsPage'))
+const ExchangesPage = lazy(() => import('@/pages/ExchangesPage'))
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
+const AlertsPage = lazy(() => import('@/pages/AlertsPage'))
+const PredictionsPage = lazy(() => import('@/pages/PredictionsPage'))
+const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const AdminPage = lazy(() => import('@/pages/AdminPage'))
+const NotesPage = lazy(() => import('@/pages/NotesPage'))
+const CalendarPage = lazy(() => import('@/pages/CalendarPage'))
+const SimulationsPage = lazy(() => import('@/pages/SimulationsPage'))
+const InsightsPage = lazy(() => import('@/pages/InsightsPage'))
+const GoalsPage = lazy(() => import('@/pages/GoalsPage'))
+const SmartInsightsPage = lazy(() => import('@/pages/SmartInsightsPage'))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-[50vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  )
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -57,26 +71,26 @@ function App() {
               </PrivateRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
-            <Route path="portfolio" element={<PortfolioPage />} />
-            <Route path="transactions" element={<TransactionsPage />} />
-            <Route path="exchanges" element={<ExchangesPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="alerts" element={<AlertsPage />} />
-            <Route path="predictions" element={<PredictionsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="notes" element={<NotesPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="simulations" element={<SimulationsPage />} />
-            <Route path="insights" element={<InsightsPage />} />
-            <Route path="smart-insights" element={<SmartInsightsPage />} />
-            <Route path="goals" element={<GoalsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route index element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
+            <Route path="portfolio" element={<Suspense fallback={<PageLoader />}><PortfolioPage /></Suspense>} />
+            <Route path="transactions" element={<Suspense fallback={<PageLoader />}><TransactionsPage /></Suspense>} />
+            <Route path="exchanges" element={<Suspense fallback={<PageLoader />}><ExchangesPage /></Suspense>} />
+            <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
+            <Route path="alerts" element={<Suspense fallback={<PageLoader />}><AlertsPage /></Suspense>} />
+            <Route path="predictions" element={<Suspense fallback={<PageLoader />}><PredictionsPage /></Suspense>} />
+            <Route path="reports" element={<Suspense fallback={<PageLoader />}><ReportsPage /></Suspense>} />
+            <Route path="notes" element={<Suspense fallback={<PageLoader />}><NotesPage /></Suspense>} />
+            <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
+            <Route path="simulations" element={<Suspense fallback={<PageLoader />}><SimulationsPage /></Suspense>} />
+            <Route path="insights" element={<Suspense fallback={<PageLoader />}><InsightsPage /></Suspense>} />
+            <Route path="smart-insights" element={<Suspense fallback={<PageLoader />}><SmartInsightsPage /></Suspense>} />
+            <Route path="goals" element={<Suspense fallback={<PageLoader />}><GoalsPage /></Suspense>} />
+            <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
             <Route
               path="admin"
               element={
                 <AdminRoute>
-                  <AdminPage />
+                  <Suspense fallback={<PageLoader />}><AdminPage /></Suspense>
                 </AdminRoute>
               }
             />

@@ -32,6 +32,25 @@ from app.schemas.auth import (
 )
 
 
+class MessageResponse(BaseModel):
+    """Simple message response."""
+
+    message: str
+
+
+class UserProfileResponse(BaseModel):
+    """User profile response."""
+
+    id: str
+    email: str
+    role: str
+    first_name: Optional[str]
+    last_name: Optional[str]
+    preferred_currency: str
+    mfa_enabled: bool
+    created_at: str
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
@@ -146,7 +165,7 @@ async def verify_email(
     )
 
 
-@router.post("/resend-verification")
+@router.post("/resend-verification", response_model=MessageResponse)
 @limiter.limit("3/minute")
 async def resend_verification(
     request: Request,
@@ -321,7 +340,7 @@ async def setup_mfa(
     )
 
 
-@router.post("/mfa/verify")
+@router.post("/mfa/verify", response_model=MessageResponse)
 async def verify_mfa(
     request: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
@@ -347,7 +366,7 @@ async def verify_mfa(
     return {"message": "MFA enabled successfully"}
 
 
-@router.post("/mfa/disable")
+@router.post("/mfa/disable", response_model=MessageResponse)
 async def disable_mfa(
     request: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
@@ -374,7 +393,7 @@ async def disable_mfa(
     return {"message": "MFA disabled successfully"}
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ):
@@ -391,7 +410,7 @@ async def get_current_user_info(
     }
 
 
-@router.patch("/me")
+@router.patch("/me", response_model=UserProfileResponse)
 async def update_profile(
     data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
@@ -417,7 +436,7 @@ async def update_profile(
     }
 
 
-@router.post("/change-password")
+@router.post("/change-password", response_model=MessageResponse)
 async def change_password(
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_user),
@@ -436,7 +455,7 @@ async def change_password(
     return {"message": "Mot de passe modifié avec succès"}
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(
     request: Request,
     data: ForgotPasswordRequest,
@@ -484,7 +503,7 @@ async def forgot_password(
     return {"message": "Si un compte existe avec cette adresse, un email de réinitialisation a été envoyé."}
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", response_model=MessageResponse)
 async def reset_password(
     data: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),

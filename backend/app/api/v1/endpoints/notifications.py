@@ -16,6 +16,12 @@ from app.services.notification_service import notification_service
 router = APIRouter()
 
 
+class MessageResponse(BaseModel):
+    """Simple message response."""
+
+    message: str
+
+
 class NotificationResponse(BaseModel):
     """Notification response schema."""
 
@@ -87,7 +93,7 @@ async def get_unread_count(
     return NotificationCountResponse(unread_count=count)
 
 
-@router.post("/{notification_id}/read")
+@router.post("/{notification_id}/read", response_model=MessageResponse)
 async def mark_as_read(
     notification_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -107,7 +113,7 @@ async def mark_as_read(
     return {"message": "Notification marked as read"}
 
 
-@router.post("/read-all")
+@router.post("/read-all", response_model=MessageResponse)
 async def mark_all_as_read(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

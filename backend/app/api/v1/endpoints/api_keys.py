@@ -7,12 +7,13 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.core.security import decrypt_api_key, encrypt_api_key
 from app.models.api_key import APIKey
 from app.models.user import User
@@ -186,7 +187,9 @@ async def delete_api_key(
 
 
 @router.post("/{api_key_id}/test", response_model=APIKeyTestResult)
+@limiter.limit("5/minute")
 async def test_api_key(
+    request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -259,7 +262,9 @@ async def test_api_key(
 
 
 @router.post("/{api_key_id}/import-history")
+@limiter.limit("5/minute")
 async def import_trade_history(
+    request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -764,7 +769,9 @@ async def import_trade_history(
 
 
 @router.post("/{api_key_id}/sync")
+@limiter.limit("5/minute")
 async def sync_exchange(
+    request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

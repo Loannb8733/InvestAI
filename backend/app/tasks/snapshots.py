@@ -147,19 +147,19 @@ async def _cleanup_old_snapshots_async(days_to_keep: int = 365) -> dict:
         return {"deleted": count_to_delete}
 
 
-@celery_app.task(name="tasks.create_daily_snapshots")
+@celery_app.task(name="app.tasks.snapshots.create_daily_snapshots")
 def create_daily_snapshots() -> dict:
     """Celery task: Create daily portfolio snapshots for all users."""
     return run_async(_create_all_snapshots_async())
 
 
-@celery_app.task(name="tasks.cleanup_old_snapshots")
+@celery_app.task(name="app.tasks.snapshots.cleanup_old_snapshots")
 def cleanup_old_snapshots(days_to_keep: int = 365) -> dict:
     """Celery task: Delete snapshots older than specified days."""
     return run_async(_cleanup_old_snapshots_async(days_to_keep))
 
 
-@celery_app.task(name="tasks.create_user_snapshot")
+@celery_app.task(name="app.tasks.snapshots.create_user_snapshot")
 def create_user_snapshot(user_id: str) -> dict:
     """Celery task: Create a snapshot for a specific user (on-demand)."""
 
