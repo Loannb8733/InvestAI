@@ -1,17 +1,14 @@
 """Predictions endpoints for ML-based forecasting."""
 
 from typing import Dict, List, Optional
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.models.asset import AssetType
 from app.models.user import User
 from app.services.prediction_service import prediction_service
 
@@ -115,9 +112,7 @@ async def get_asset_prediction(
     return AssetPredictionResponse(
         symbol=prediction.symbol,
         current_price=prediction.current_price,
-        predictions=[
-            PredictionPoint(**p) for p in prediction.predictions
-        ],
+        predictions=[PredictionPoint(**p) for p in prediction.predictions],
         trend=prediction.trend,
         trend_strength=prediction.trend_strength,
         support_level=prediction.support_level,
@@ -134,9 +129,7 @@ async def get_portfolio_predictions(
     db: AsyncSession = Depends(get_db),
 ) -> PortfolioPredictionResponse:
     """Get predictions for all assets in user's portfolio."""
-    result = await prediction_service.get_portfolio_predictions(
-        db, str(current_user.id), days
-    )
+    result = await prediction_service.get_portfolio_predictions(db, str(current_user.id), days)
 
     return PortfolioPredictionResponse(
         predictions=result["predictions"],
@@ -150,9 +143,7 @@ async def get_anomalies(
     db: AsyncSession = Depends(get_db),
 ) -> List[AnomalyResponse]:
     """Detect anomalies in user's portfolio assets."""
-    anomalies = await prediction_service.detect_anomalies(
-        db, str(current_user.id)
-    )
+    anomalies = await prediction_service.detect_anomalies(db, str(current_user.id))
 
     return [
         AnomalyResponse(
@@ -174,9 +165,7 @@ async def get_market_sentiment(
     db: AsyncSession = Depends(get_db),
 ) -> MarketSentimentResponse:
     """Get market sentiment analysis."""
-    sentiment = await prediction_service.get_market_sentiment(
-        db, str(current_user.id)
-    )
+    sentiment = await prediction_service.get_market_sentiment(db, str(current_user.id))
 
     return MarketSentimentResponse(
         overall_sentiment=sentiment.overall_sentiment,

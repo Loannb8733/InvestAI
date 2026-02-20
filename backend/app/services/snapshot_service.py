@@ -1,16 +1,16 @@
 """Portfolio snapshot service for historical value tracking."""
 
+import math
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional
-import math
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.asset import Asset
 from app.models.transaction import Transaction, TransactionType
 from app.services.metrics_service import metrics_service
 
@@ -146,54 +146,63 @@ class SnapshotService:
     ) -> List[Dict]:
         """Get historical portfolio values for chart display."""
         start_date = datetime.utcnow() - timedelta(days=days)
-        today = datetime.utcnow()
+        datetime.utcnow()
 
         # Get invested timeline from transactions
         invested_timeline, net_capital_timeline = await self._get_invested_timeline(db, user_id, portfolio_id)
 
         if portfolio_id:
             # Get snapshots for a specific portfolio
-            query = select(PortfolioSnapshot).where(
-                and_(
-                    PortfolioSnapshot.user_id == user_id,
-                    PortfolioSnapshot.snapshot_date >= start_date,
-                    PortfolioSnapshot.portfolio_id == portfolio_id,
+            query = (
+                select(PortfolioSnapshot)
+                .where(
+                    and_(
+                        PortfolioSnapshot.user_id == user_id,
+                        PortfolioSnapshot.snapshot_date >= start_date,
+                        PortfolioSnapshot.portfolio_id == portfolio_id,
+                    )
                 )
-            ).order_by(PortfolioSnapshot.snapshot_date.asc())
+                .order_by(PortfolioSnapshot.snapshot_date.asc())
+            )
 
             result = await db.execute(query)
             snapshots = result.scalars().all()
         else:
             # First try to get global snapshots (portfolio_id IS NULL)
-            query = select(PortfolioSnapshot).where(
-                and_(
-                    PortfolioSnapshot.user_id == user_id,
-                    PortfolioSnapshot.snapshot_date >= start_date,
-                    PortfolioSnapshot.portfolio_id.is_(None),
+            query = (
+                select(PortfolioSnapshot)
+                .where(
+                    and_(
+                        PortfolioSnapshot.user_id == user_id,
+                        PortfolioSnapshot.snapshot_date >= start_date,
+                        PortfolioSnapshot.portfolio_id.is_(None),
+                    )
                 )
-            ).order_by(PortfolioSnapshot.snapshot_date.asc())
+                .order_by(PortfolioSnapshot.snapshot_date.asc())
+            )
 
             result = await db.execute(query)
             snapshots = result.scalars().all()
 
             # If no global snapshots, aggregate from per-portfolio snapshots
             if not snapshots:
-                agg_query = select(
-                    func.date(PortfolioSnapshot.snapshot_date).label("date"),
-                    func.sum(PortfolioSnapshot.total_value).label("total_value"),
-                    func.sum(PortfolioSnapshot.total_invested).label("total_invested"),
-                    func.sum(PortfolioSnapshot.total_gain_loss).label("total_gain_loss"),
-                    func.max(PortfolioSnapshot.snapshot_date).label("snapshot_date"),
-                ).where(
-                    and_(
-                        PortfolioSnapshot.user_id == user_id,
-                        PortfolioSnapshot.snapshot_date >= start_date,
-                        PortfolioSnapshot.portfolio_id.isnot(None),
+                agg_query = (
+                    select(
+                        func.date(PortfolioSnapshot.snapshot_date).label("date"),
+                        func.sum(PortfolioSnapshot.total_value).label("total_value"),
+                        func.sum(PortfolioSnapshot.total_invested).label("total_invested"),
+                        func.sum(PortfolioSnapshot.total_gain_loss).label("total_gain_loss"),
+                        func.max(PortfolioSnapshot.snapshot_date).label("snapshot_date"),
                     )
-                ).group_by(
-                    func.date(PortfolioSnapshot.snapshot_date)
-                ).order_by(
-                    func.date(PortfolioSnapshot.snapshot_date).asc()
+                    .where(
+                        and_(
+                            PortfolioSnapshot.user_id == user_id,
+                            PortfolioSnapshot.snapshot_date >= start_date,
+                            PortfolioSnapshot.portfolio_id.isnot(None),
+                        )
+                    )
+                    .group_by(func.date(PortfolioSnapshot.snapshot_date))
+                    .order_by(func.date(PortfolioSnapshot.snapshot_date).asc())
                 )
 
                 result = await db.execute(agg_query)
@@ -220,14 +229,16 @@ class SnapshotService:
                         net_cap = float(last_net_capital)
                         value = float(row.total_value) if row.total_value else 0.0
 
-                        formatted_data.append({
-                            "date": self._format_date_for_period(row.snapshot_date, days),
-                            "full_date": row.snapshot_date.isoformat(),
-                            "value": value,
-                            "invested": invested,
-                            "net_capital": net_cap,
-                            "gain_loss": value - net_cap,
-                        })
+                        formatted_data.append(
+                            {
+                                "date": self._format_date_for_period(row.snapshot_date, days),
+                                "full_date": row.snapshot_date.isoformat(),
+                                "value": value,
+                                "invested": invested,
+                                "net_capital": net_cap,
+                                "gain_loss": value - net_cap,
+                            }
+                        )
 
                 return formatted_data
 
@@ -253,14 +264,16 @@ class SnapshotService:
                 net_cap = float(last_net_capital) if net_capital_timeline else invested
                 value = float(s.total_value)
 
-                formatted_data.append({
-                    "date": self._format_date_for_period(s.snapshot_date, days),
-                    "full_date": s.snapshot_date.isoformat(),
-                    "value": value,
-                    "invested": invested,
-                    "net_capital": net_cap,
-                    "gain_loss": value - net_cap,
-                })
+                formatted_data.append(
+                    {
+                        "date": self._format_date_for_period(s.snapshot_date, days),
+                        "full_date": s.snapshot_date.isoformat(),
+                        "value": value,
+                        "invested": invested,
+                        "net_capital": net_cap,
+                        "gain_loss": value - net_cap,
+                    }
+                )
 
         return formatted_data
 
@@ -268,7 +281,7 @@ class SnapshotService:
         """Format date label based on the period length."""
         if days <= 7:
             # Short period: show day name + date (Lun 23)
-            day_names = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+            day_names = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
             return f"{day_names[date.weekday()]} {date.day}"
         elif days <= 30:
             # Medium period: show day + month (23 Jan)
@@ -397,15 +410,19 @@ class SnapshotService:
             position_by_date[date_str] = float(cumulative_position)
 
         # === 2. Get VALUE curve from snapshots ===
-        snapshots_query = select(
-            PortfolioSnapshot.snapshot_date,
-            PortfolioSnapshot.total_value,
-        ).where(
-            and_(
-                PortfolioSnapshot.user_id == user_id,
-                PortfolioSnapshot.portfolio_id.is_(None),  # Global snapshots
+        snapshots_query = (
+            select(
+                PortfolioSnapshot.snapshot_date,
+                PortfolioSnapshot.total_value,
             )
-        ).order_by(PortfolioSnapshot.snapshot_date.asc())
+            .where(
+                and_(
+                    PortfolioSnapshot.user_id == user_id,
+                    PortfolioSnapshot.portfolio_id.is_(None),  # Global snapshots
+                )
+            )
+            .order_by(PortfolioSnapshot.snapshot_date.asc())
+        )
 
         result = await db.execute(snapshots_query)
         snapshots = result.all()
@@ -418,7 +435,12 @@ class SnapshotService:
 
         # === 3. Merge into unified timeline ===
         # Collect all dates with transactions (buys/sells) or snapshots
-        all_dates = set(invested_by_date.keys()) | set(net_capital_by_date.keys()) | set(position_by_date.keys()) | set(value_by_date.keys())
+        all_dates = (
+            set(invested_by_date.keys())
+            | set(net_capital_by_date.keys())
+            | set(position_by_date.keys())
+            | set(value_by_date.keys())
+        )
         all_dates = {d for d in all_dates if d >= start_date.strftime("%Y-%m-%d")}
 
         if not all_dates and not transactions:
@@ -446,7 +468,11 @@ class SnapshotService:
         known_value_dates = sorted(value_by_date.keys())
 
         # Calculate performance ratio (value vs position cost basis)
-        current_position = position_by_date.get(max(position_by_date.keys()), float(current_invested)) if position_by_date else float(current_invested)
+        current_position = (
+            position_by_date.get(max(position_by_date.keys()), float(current_invested))
+            if position_by_date
+            else float(current_invested)
+        )
         current_perf_ratio = current_value / current_position if current_position > 0 else 1.0
 
         # Get first known snapshot's performance ratio for backward extrapolation
@@ -522,14 +548,16 @@ class SnapshotService:
 
         # Add start point
         start_value = interpolate_value(start_date.strftime("%Y-%m-%d"), start_position)
-        data.append({
-            "date": self._format_date_for_period(start_date, days),
-            "full_date": start_date.isoformat(),
-            "value": round(start_value, 2),
-            "invested": round(last_invested, 2),
-            "net_capital": round(last_net_capital, 2),
-            "gain_loss": round(start_value - last_net_capital, 2),
-        })
+        data.append(
+            {
+                "date": self._format_date_for_period(start_date, days),
+                "full_date": start_date.isoformat(),
+                "value": round(start_value, 2),
+                "invested": round(last_invested, 2),
+                "net_capital": round(last_net_capital, 2),
+                "gain_loss": round(start_value - last_net_capital, 2),
+            }
+        )
 
         # Add points for each date with data
         for date_str in sorted(all_dates):
@@ -551,14 +579,16 @@ class SnapshotService:
             # Interpolate value based on position
             value = interpolate_value(date_str, position)
 
-            data.append({
-                "date": self._format_date_for_period(dt, days),
-                "full_date": dt.isoformat(),
-                "value": round(value, 2),
-                "invested": round(invested, 2),
-                "net_capital": round(net_cap, 2),
-                "gain_loss": round(value - net_cap, 2),
-            })
+            data.append(
+                {
+                    "date": self._format_date_for_period(dt, days),
+                    "full_date": dt.isoformat(),
+                    "value": round(value, 2),
+                    "invested": round(invested, 2),
+                    "net_capital": round(net_cap, 2),
+                    "gain_loss": round(value - net_cap, 2),
+                }
+            )
 
         # Compute current net capital
         current_net_capital = float(current_invested)
@@ -567,14 +597,16 @@ class SnapshotService:
             current_net_capital = net_capital_by_date[last_nc_date]
 
         # Add today's point with actual current values
-        data.append({
-            "date": self._format_date_for_period(today, days),
-            "full_date": today.isoformat(),
-            "value": round(current_value, 2),
-            "invested": round(float(current_invested), 2),
-            "net_capital": round(current_net_capital, 2),
-            "gain_loss": round(current_value - current_net_capital, 2),
-        })
+        data.append(
+            {
+                "date": self._format_date_for_period(today, days),
+                "full_date": today.isoformat(),
+                "value": round(current_value, 2),
+                "invested": round(float(current_invested), 2),
+                "net_capital": round(current_net_capital, 2),
+                "gain_loss": round(current_value - current_net_capital, 2),
+            }
+        )
 
         # Remove duplicates based on date, keeping the last one
         seen_dates = {}
@@ -586,9 +618,7 @@ class SnapshotService:
 
         return data
 
-    def _generate_flat_history(
-        self, today: datetime, days: int, value: float, invested: float
-    ) -> List[Dict]:
+    def _generate_flat_history(self, today: datetime, days: int, value: float, invested: float) -> List[Dict]:
         """Generate minimal history when no transaction data available."""
         start_date = today - timedelta(days=days)
         return [
@@ -610,9 +640,7 @@ class SnapshotService:
             },
         ]
 
-    async def calculate_volatility(
-        self, db: AsyncSession, user_id: str, days: int = 30
-    ) -> float:
+    async def calculate_volatility(self, db: AsyncSession, user_id: str, days: int = 30) -> float:
         """Calculate portfolio volatility based on historical returns."""
         history = await self.get_historical_values(db, user_id, days)
 
@@ -677,9 +705,7 @@ class SnapshotService:
         sharpe = (annualized_return - risk_free_rate) / volatility
         return round(sharpe, 2)
 
-    async def calculate_max_drawdown(
-        self, db: AsyncSession, user_id: str, days: int = 30
-    ) -> Dict:
+    async def calculate_max_drawdown(self, db: AsyncSession, user_id: str, days: int = 30) -> Dict:
         """
         Calculate Maximum Drawdown (MDD) - the largest peak-to-trough decline.
         Returns both the percentage and the period.
@@ -695,7 +721,6 @@ class SnapshotService:
         max_drawdown = 0.0
         peak_value = values[0]
         peak_idx = 0
-        trough_idx = 0
         max_peak_idx = 0
         max_trough_idx = 0
 
@@ -787,13 +812,10 @@ class SnapshotService:
 
         # Calculate covariance and variance
         covariance = sum(
-            (p - port_mean) * (b - bench_mean)
-            for p, b in zip(portfolio_returns, benchmark_returns)
+            (p - port_mean) * (b - bench_mean) for p, b in zip(portfolio_returns, benchmark_returns)
         ) / len(portfolio_returns)
 
-        bench_variance = sum(
-            (b - bench_mean) ** 2 for b in benchmark_returns
-        ) / len(benchmark_returns)
+        bench_variance = sum((b - bench_mean) ** 2 for b in benchmark_returns) / len(benchmark_returns)
 
         if bench_variance == 0:
             return 1.0
@@ -851,7 +873,7 @@ class SnapshotService:
         for a in allocations:
             value = a.get("value", 0) or a.get("current_value", 0)
             share = (value / total_value) * 100
-            hhi += share ** 2
+            hhi += share**2
 
             if share > max_concentration:
                 max_concentration = share
@@ -878,9 +900,7 @@ class SnapshotService:
             "top_concentration": round(max_concentration, 1),
         }
 
-    def calculate_stress_test(
-        self, current_value: float, allocations: List[Dict], scenario_drop: float = 0.20
-    ) -> Dict:
+    def calculate_stress_test(self, current_value: float, allocations: List[Dict], scenario_drop: float = 0.20) -> Dict:
         """
         Calculate portfolio value under stress scenario.
         Default scenario: 20% market drop.

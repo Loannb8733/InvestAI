@@ -35,6 +35,7 @@ class AnomalyDetector:
         """Check if scikit-learn is available."""
         try:
             from sklearn.ensemble import IsolationForest  # noqa: F401
+
             return True
         except ImportError:
             logger.warning("scikit-learn not available, using Z-score only")

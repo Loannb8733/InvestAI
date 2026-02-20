@@ -4,17 +4,15 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 
 from app.core.database import AsyncSessionLocal
-from app.models.user import User
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.asset import Asset
-from app.services.snapshot_service import snapshot_service
+from app.models.user import User
 from app.services.metrics_service import metrics_service
+from app.services.snapshot_service import snapshot_service
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -33,13 +31,7 @@ async def _create_all_snapshots_async() -> dict:
     """Create daily snapshots for all users with portfolios."""
     async with AsyncSessionLocal() as db:
         # Get all users with at least one portfolio
-        result = await db.execute(
-            select(User.id).where(
-                User.id.in_(
-                    select(Portfolio.user_id).distinct()
-                )
-            )
-        )
+        result = await db.execute(select(User.id).where(User.id.in_(select(Portfolio.user_id).distinct())))
         user_ids = [str(row[0]) for row in result.fetchall()]
 
         if not user_ids:
@@ -81,9 +73,7 @@ async def _create_all_snapshots_async() -> dict:
                     success_count += 1
 
                 # Also create per-portfolio snapshots
-                portfolios_result = await db.execute(
-                    select(Portfolio).where(Portfolio.user_id == user_id)
-                )
+                portfolios_result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
                 portfolios = portfolios_result.scalars().all()
 
                 for portfolio in portfolios:
@@ -103,9 +93,7 @@ async def _create_all_snapshots_async() -> dict:
                             continue
 
                         # Get portfolio metrics
-                        metrics = await metrics_service.get_portfolio_metrics(
-                            db, str(portfolio.id), "EUR"
-                        )
+                        metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), "EUR")
 
                         if metrics.get("total_value", 0) > 0:
                             portfolio_snapshot = PortfolioSnapshot(
@@ -145,19 +133,14 @@ async def _cleanup_old_snapshots_async(days_to_keep: int = 365) -> dict:
         cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
 
         result = await db.execute(
-            select(func.count(PortfolioSnapshot.id)).where(
-                PortfolioSnapshot.snapshot_date < cutoff_date
-            )
+            select(func.count(PortfolioSnapshot.id)).where(PortfolioSnapshot.snapshot_date < cutoff_date)
         )
         count_to_delete = result.scalar()
 
         if count_to_delete > 0:
             from sqlalchemy import delete
-            await db.execute(
-                delete(PortfolioSnapshot).where(
-                    PortfolioSnapshot.snapshot_date < cutoff_date
-                )
-            )
+
+            await db.execute(delete(PortfolioSnapshot).where(PortfolioSnapshot.snapshot_date < cutoff_date))
             await db.commit()
             logger.info(f"Deleted {count_to_delete} snapshots older than {days_to_keep} days")
 

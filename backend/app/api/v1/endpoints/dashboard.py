@@ -2,32 +2,33 @@
 
 from datetime import datetime, timedelta
 from typing import List, Optional
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.user import User
+from app.models.alert import Alert
 from app.models.asset import Asset
+from app.models.calendar_event import CalendarEvent
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
-from app.models.alert import Alert
-from app.models.calendar_event import CalendarEvent
+from app.models.user import User
 from app.services.metrics_service import metrics_service
-from app.services.snapshot_service import snapshot_service
 from app.services.price_service import price_service
+from app.services.snapshot_service import snapshot_service
 
 router = APIRouter()
 
 
 # ============== Pydantic Models ==============
 
+
 class HistoricalDataPoint(BaseModel):
     """Historical data point for charts."""
+
     date: str
     full_date: Optional[str] = None
     value: float
@@ -39,6 +40,7 @@ class HistoricalDataPoint(BaseModel):
 
 class RecentTransaction(BaseModel):
     """Recent transaction for dashboard."""
+
     id: str
     symbol: str
     asset_type: str
@@ -51,6 +53,7 @@ class RecentTransaction(BaseModel):
 
 class ActiveAlert(BaseModel):
     """Active alert summary."""
+
     id: str
     name: str
     symbol: Optional[str]
@@ -61,6 +64,7 @@ class ActiveAlert(BaseModel):
 
 class UpcomingEvent(BaseModel):
     """Upcoming calendar event."""
+
     id: str
     title: str
     event_type: str
@@ -70,6 +74,7 @@ class UpcomingEvent(BaseModel):
 
 class AssetAllocation(BaseModel):
     """Individual asset allocation."""
+
     symbol: str
     name: Optional[str]
     asset_type: str
@@ -81,6 +86,7 @@ class AssetAllocation(BaseModel):
 
 class IndexComparison(BaseModel):
     """Index comparison data."""
+
     name: str
     symbol: str
     change_percent: float
@@ -89,6 +95,7 @@ class IndexComparison(BaseModel):
 
 class MaxDrawdown(BaseModel):
     """Maximum drawdown metrics."""
+
     max_drawdown_percent: float
     peak_date: Optional[str] = None
     trough_date: Optional[str] = None
@@ -98,6 +105,7 @@ class MaxDrawdown(BaseModel):
 
 class ValueAtRisk(BaseModel):
     """Value at Risk metrics."""
+
     var_percent: float
     var_amount: float
     confidence_level: float
@@ -105,6 +113,7 @@ class ValueAtRisk(BaseModel):
 
 class ConcentrationMetrics(BaseModel):
     """Portfolio concentration metrics (HHI)."""
+
     hhi: float
     interpretation: str
     is_concentrated: bool
@@ -114,6 +123,7 @@ class ConcentrationMetrics(BaseModel):
 
 class StressTest(BaseModel):
     """Stress test scenario."""
+
     scenario_name: str
     current_value: float
     stressed_value: float
@@ -123,6 +133,7 @@ class StressTest(BaseModel):
 
 class PnLBreakdown(BaseModel):
     """P&L breakdown between realized and unrealized."""
+
     realized_pnl: float
     unrealized_pnl: float
     total_pnl: float
@@ -132,6 +143,7 @@ class PnLBreakdown(BaseModel):
 
 class RiskMetrics(BaseModel):
     """All risk-related metrics."""
+
     volatility: float
     sharpe_ratio: float
     max_drawdown: MaxDrawdown
@@ -142,6 +154,7 @@ class RiskMetrics(BaseModel):
 
 class AdvancedMetrics(BaseModel):
     """Advanced portfolio metrics."""
+
     roi_annualized: float
     risk_metrics: RiskMetrics
     concentration: ConcentrationMetrics
@@ -151,6 +164,7 @@ class AdvancedMetrics(BaseModel):
 
 class EnhancedDashboardResponse(BaseModel):
     """Enhanced dashboard response with all features."""
+
     # Basic metrics
     total_value: float
     total_invested: float
@@ -197,6 +211,7 @@ class EnhancedDashboardResponse(BaseModel):
 
 # ============== Main Endpoint ==============
 
+
 @router.get("/")
 async def get_dashboard(
     days: int = Query(30, ge=7, le=365),
@@ -207,18 +222,14 @@ async def get_dashboard(
     user_id = str(current_user.id)
 
     # Get basic metrics (period-aware)
-    metrics = await metrics_service.get_user_dashboard_metrics(
-        db, user_id, days=days
-    )
+    metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, days=days)
 
     # Get historical data
     is_data_estimated = False
     historical_data = await snapshot_service.get_historical_values(db, user_id, days)
     if not historical_data:
         # Generate from transactions if no snapshots exist
-        historical_data = await snapshot_service.generate_historical_from_transactions(
-            db, user_id, days
-        )
+        historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
         is_data_estimated = True
 
     # Mark data points as estimated
@@ -247,16 +258,12 @@ async def get_dashboard(
         portfolios = result.scalars().all()
 
         for portfolio in portfolios:
-            portfolio_metrics = await metrics_service.get_portfolio_metrics(
-                db, str(portfolio.id)
-            )
+            portfolio_metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id))
             for asset in portfolio_metrics.get("assets", []):
                 all_assets_data.append(asset)
                 if asset["current_value"] > 0:
                     percentage = (
-                        (asset["current_value"] / metrics["total_value"] * 100)
-                        if metrics["total_value"] > 0
-                        else 0
+                        (asset["current_value"] / metrics["total_value"] * 100) if metrics["total_value"] > 0 else 0
                     )
                     asset_allocation.append(
                         AssetAllocation(
@@ -290,9 +297,7 @@ async def get_dashboard(
     volatility = await snapshot_service.calculate_volatility(db, user_id, days)
     sharpe_ratio = await snapshot_service.calculate_sharpe_ratio(db, user_id, days)
     mdd_data = await snapshot_service.calculate_max_drawdown(db, user_id, days)
-    var_data = await snapshot_service.calculate_var(
-        db, user_id, days, 0.95, metrics["total_value"]
-    )
+    var_data = await snapshot_service.calculate_var(db, user_id, days, 0.95, metrics["total_value"])
 
     # Beta and Alpha calculation (vs BTC as benchmark for crypto-heavy portfolios)
     beta = None
@@ -339,12 +344,8 @@ async def get_dashboard(
     )
 
     # Stress tests
-    stress_test_20 = snapshot_service.calculate_stress_test(
-        metrics["total_value"], all_assets_data, 0.20
-    )
-    stress_test_40 = snapshot_service.calculate_stress_test(
-        metrics["total_value"], all_assets_data, 0.40
-    )
+    stress_test_20 = snapshot_service.calculate_stress_test(metrics["total_value"], all_assets_data, 0.20)
+    stress_test_40 = snapshot_service.calculate_stress_test(metrics["total_value"], all_assets_data, 0.40)
     stress_tests = [
         StressTest(**stress_test_20),
         StressTest(**stress_test_40),
@@ -408,25 +409,18 @@ async def get_dashboard(
 
 # ============== Helper Functions ==============
 
+
 async def get_recent_transactions_internal(
     db: AsyncSession, current_user: User, limit: int = 5
 ) -> List[RecentTransaction]:
     """Get recent transactions for dashboard."""
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:
         return []
 
-    asset_result = await db.execute(
-        select(Asset).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
     assets = asset_result.scalars().all()
     asset_map = {a.id: a for a in assets}
     asset_ids = list(asset_map.keys())
@@ -464,15 +458,15 @@ async def get_recent_transactions_internal(
     return result_list
 
 
-async def get_active_alerts_internal(
-    db: AsyncSession, current_user: User
-) -> List[ActiveAlert]:
+async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> List[ActiveAlert]:
     """Get active alerts for dashboard."""
     result = await db.execute(
-        select(Alert).where(
+        select(Alert)
+        .where(
             Alert.user_id == current_user.id,
             Alert.is_active == True,
-        ).limit(5)
+        )
+        .limit(5)
     )
     alerts = result.scalars().all()
 
@@ -482,9 +476,7 @@ async def get_active_alerts_internal(
         current_price = None
 
         if alert.asset_id:
-            asset_result = await db.execute(
-                select(Asset).where(Asset.id == alert.asset_id)
-            )
+            asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
             asset = asset_result.scalar_one_or_none()
             if asset:
                 symbol = asset.symbol
@@ -509,9 +501,7 @@ async def get_active_alerts_internal(
     return active_alerts
 
 
-async def get_upcoming_events_internal(
-    db: AsyncSession, current_user: User, days: int = 30
-) -> List[UpcomingEvent]:
+async def get_upcoming_events_internal(db: AsyncSession, current_user: User, days: int = 30) -> List[UpcomingEvent]:
     """Get upcoming calendar events for dashboard."""
     now = datetime.utcnow()
     end_date = now + timedelta(days=days)
@@ -590,6 +580,7 @@ async def get_index_comparison() -> List[IndexComparison]:
 
 # ============== Additional Endpoints ==============
 
+
 @router.get("/portfolio/{portfolio_id}")
 async def get_portfolio_dashboard(
     portfolio_id: str,
@@ -652,9 +643,7 @@ async def get_historical_data(
 
     # Always use transaction-based generation for better investment progression visualization
     # This shows actual investment growth over time rather than flat snapshot values
-    historical_data = await snapshot_service.generate_historical_from_transactions(
-        db, user_id, days
-    )
+    historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
     is_estimated = True
 
     # If no transaction data, try snapshots as fallback
@@ -669,12 +658,14 @@ async def get_historical_data(
 
 class BenchmarkDataPoint(BaseModel):
     """Benchmark data point (normalized to base 100)."""
+
     date: str
     value: float
 
 
 class BenchmarkSeries(BaseModel):
     """A single benchmark series."""
+
     name: str
     symbol: str
     data: List[BenchmarkDataPoint]
@@ -708,16 +699,18 @@ async def get_benchmark_data(
             df = await hist_manager.get_history(symbol, asset_type, days)
             if df is not None and len(df) > 1:
                 prices = df["close"].values if "close" in df.columns else df.iloc[:, 0].values
-                dates = df.index if hasattr(df.index, 'strftime') else range(len(prices))
+                dates = df.index if hasattr(df.index, "strftime") else range(len(prices))
                 base = float(prices[0]) if prices[0] != 0 else 1
                 points = []
                 for i, price in enumerate(prices):
                     d = dates[i]
-                    date_str = d.strftime("%Y-%m-%d") if hasattr(d, 'strftime') else str(d)
-                    points.append(BenchmarkDataPoint(
-                        date=date_str,
-                        value=round(float(price) / base * 100, 2),
-                    ))
+                    date_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+                    points.append(
+                        BenchmarkDataPoint(
+                            date=date_str,
+                            value=round(float(price) / base * 100, 2),
+                        )
+                    )
                 result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
         except Exception:
             pass
@@ -725,9 +718,7 @@ async def get_benchmark_data(
     # Portfolio performance normalized
     historical_data = await snapshot_service.get_historical_values(db, user_id, days)
     if not historical_data:
-        historical_data = await snapshot_service.generate_historical_from_transactions(
-            db, user_id, days
-        )
+        historical_data = await snapshot_service.generate_historical_from_transactions(db, user_id, days)
     if historical_data and len(historical_data) > 1:
         base = historical_data[0].get("value", 1) or 1
         points = [

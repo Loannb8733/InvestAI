@@ -47,9 +47,7 @@ class CryptoComService(BaseExchangeService):
 
         return signature
 
-    async def _make_request(
-        self, method: str, params: Optional[dict] = None
-    ) -> dict:
+    async def _make_request(self, method: str, params: Optional[dict] = None) -> dict:
         """Make an authenticated request to Crypto.com API."""
         request_id = str(int(time.time() * 1000))
         nonce = str(int(time.time() * 1000))
@@ -163,9 +161,7 @@ class CryptoComService(BaseExchangeService):
                             price=Decimal(str(trade["traded_price"])),
                             fee=Decimal(str(trade.get("fee", 0))),
                             fee_currency=trade.get("fee_currency", "USDT"),
-                            timestamp=datetime.fromtimestamp(
-                                trade["create_time"] / 1000
-                            ),
+                            timestamp=datetime.fromtimestamp(trade["create_time"] / 1000),
                         )
                     )
             except Exception:
@@ -216,9 +212,7 @@ class CryptoComService(BaseExchangeService):
 
         # Create tasks for all instruments
         tasks = [
-            self._fetch_trades_for_instrument(
-                instrument, start_time, end_time, limit, semaphore
-            )
+            self._fetch_trades_for_instrument(instrument, start_time, end_time, limit, semaphore)
             for instrument in instruments_list
         ]
 
@@ -270,9 +264,7 @@ class CryptoComService(BaseExchangeService):
                         deposit_id=str(deposit.get("id", "")),
                         symbol=deposit["currency"],
                         amount=Decimal(str(deposit["amount"])),
-                        timestamp=datetime.fromtimestamp(
-                            deposit["create_time"] / 1000
-                        ),
+                        timestamp=datetime.fromtimestamp(deposit["create_time"] / 1000),
                         status=status_map.get(deposit.get("status", 0), "unknown"),
                         tx_id=deposit.get("txid"),
                     )
@@ -299,9 +291,7 @@ class CryptoComService(BaseExchangeService):
             if start_time:
                 params["start_ts"] = int(start_time.timestamp() * 1000)
 
-            result = await self._make_request(
-                "private/get-withdrawal-history", params
-            )
+            result = await self._make_request("private/get-withdrawal-history", params)
 
             if result.get("code") != 0:
                 return withdrawals
@@ -322,12 +312,8 @@ class CryptoComService(BaseExchangeService):
                         symbol=withdrawal["currency"],
                         amount=Decimal(str(withdrawal["amount"])),
                         fee=Decimal(str(withdrawal.get("fee", 0))),
-                        timestamp=datetime.fromtimestamp(
-                            withdrawal["create_time"] / 1000
-                        ),
-                        status=status_map.get(
-                            withdrawal.get("status", 0), "unknown"
-                        ),
+                        timestamp=datetime.fromtimestamp(withdrawal["create_time"] / 1000),
+                        status=status_map.get(withdrawal.get("status", 0), "unknown"),
                         tx_id=withdrawal.get("txid"),
                         address=withdrawal.get("address"),
                     )
@@ -349,10 +335,7 @@ class CryptoComService(BaseExchangeService):
         try:
             # Get all assets from balances to build crypto-to-crypto pairs
             balances = await self.get_balances()
-            crypto_assets = [
-                b.symbol for b in balances
-                if b.symbol not in self.FIAT_CURRENCIES
-            ]
+            crypto_assets = [b.symbol for b in balances if b.symbol not in self.FIAT_CURRENCIES]
 
             print(f"Crypto.com: Checking {len(crypto_assets)} crypto assets for conversions...")
 
@@ -378,12 +361,7 @@ class CryptoComService(BaseExchangeService):
             semaphore = asyncio.Semaphore(5)
 
             # Create tasks for all pairs
-            tasks = [
-                self._fetch_trades_for_instrument(
-                    pair, None, None, limit, semaphore
-                )
-                for pair in pairs_list
-            ]
+            tasks = [self._fetch_trades_for_instrument(pair, None, None, limit, semaphore) for pair in pairs_list]
 
             # Execute all tasks in parallel
             results = await asyncio.gather(*tasks, return_exceptions=True)

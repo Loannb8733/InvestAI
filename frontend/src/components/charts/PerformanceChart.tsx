@@ -32,19 +32,12 @@ export default function PerformanceChart({
   color = '#2563EB',
   period = 30,
 }: PerformanceChartProps) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-        Aucune donnée disponible
-      </div>
-    )
-  }
-
-  const hasInvested = data.some(d => d.invested != null && d.invested > 0)
-  const hasNetCapital = data.some(d => d.net_capital != null && d.net_capital > 0)
+  const hasInvested = data?.some(d => d.invested != null && d.invested > 0) ?? false
+  const hasNetCapital = data?.some(d => d.net_capital != null && d.net_capital > 0) ?? false
 
   // Calculate min/max for better Y-axis scaling
   const { minValue, maxValue } = useMemo(() => {
+    if (!data || data.length === 0) return { minValue: 0, maxValue: 100 }
     const allValues = data.flatMap(d => {
       const vals = [d.value]
       if (d.invested != null) vals.push(d.invested)
@@ -61,12 +54,21 @@ export default function PerformanceChart({
 
   // Determine how many X-axis labels to show based on data length
   const xAxisInterval = useMemo(() => {
+    if (!data) return 0
     if (data.length <= 7) return 0
     if (data.length <= 14) return 1
     if (data.length <= 30) return Math.floor(data.length / 7) - 1
     if (data.length <= 60) return Math.floor(data.length / 6) - 1
     return Math.floor(data.length / 5) - 1
-  }, [data.length])
+  }, [data])
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+        Aucune donnée disponible
+      </div>
+    )
+  }
 
   const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string; payload: DataPoint }>; label?: string }) => {
     if (active && payload && payload.length) {

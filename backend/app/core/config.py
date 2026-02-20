@@ -1,8 +1,7 @@
 """Application configuration."""
 
 import os
-import secrets
-from typing import List, Optional, Union
+from typing import List, Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -93,7 +92,9 @@ class Settings(BaseSettings):
 
     # CORS - Restricted methods and headers
     # Override with comma-separated env var: CORS_ORIGINS=https://mysite.com,https://www.mysite.com
-    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    CORS_ORIGINS: Union[
+        str, List[str]
+    ] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -113,6 +114,16 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+
+    # Sentry
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
+
+    @property
+    def sentry_enabled(self) -> bool:
+        """Check if Sentry is configured."""
+        return bool(self.SENTRY_DSN)
 
     # Email (SMTP)
     SMTP_HOST: str = ""

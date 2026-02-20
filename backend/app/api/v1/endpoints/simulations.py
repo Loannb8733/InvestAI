@@ -1,7 +1,6 @@
 """Simulations endpoints for what-if scenarios, projections, and FIRE calculator."""
 
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -21,6 +20,7 @@ router = APIRouter()
 
 
 # ============ Schemas ============
+
 
 class FIREParameters(BaseModel):
     """Parameters for FIRE calculation."""
@@ -136,6 +136,7 @@ class SimulationTypeInfo(BaseModel):
 
 # ============ Endpoints ============
 
+
 @router.get("/types", response_model=List[SimulationTypeInfo])
 async def list_simulation_types() -> List[SimulationTypeInfo]:
     """List all available simulation types."""
@@ -181,9 +182,7 @@ async def calculate_fire(
     fire_number = annual_expenses / (params.withdrawal_rate / 100)
 
     # Monthly passive income at current portfolio value
-    monthly_passive_income = (
-        params.current_portfolio_value * (params.withdrawal_rate / 100) / 12
-    )
+    monthly_passive_income = params.current_portfolio_value * (params.withdrawal_rate / 100) / 12
 
     # Check if already FIRE
     is_fire_achieved = params.current_portfolio_value >= fire_number
@@ -200,13 +199,15 @@ async def calculate_fire(
         adjusted_expenses = annual_expenses * ((1 + params.inflation_rate / 100) ** year)
         adjusted_fire_number = adjusted_expenses / (params.withdrawal_rate / 100)
 
-        projections.append({
-            "year": year,
-            "portfolio_value": round(value, 2),
-            "fire_number": round(adjusted_fire_number, 2),
-            "is_fire": value >= adjusted_fire_number,
-            "progress_percent": round((value / adjusted_fire_number) * 100, 1),
-        })
+        projections.append(
+            {
+                "year": year,
+                "portfolio_value": round(value, 2),
+                "fire_number": round(adjusted_fire_number, 2),
+                "is_fire": value >= adjusted_fire_number,
+                "progress_percent": round((value / adjusted_fire_number) * 100, 1),
+            }
+        )
 
         # Check if FIRE achieved this year
         if years_to_fire is None and value >= adjusted_fire_number:
@@ -249,10 +250,7 @@ async def project_portfolio(
     )
     assets = result.scalars().all()
 
-    current_value = sum(
-        float(a.quantity or 0) * float(a.current_price or a.avg_buy_price or 0)
-        for a in assets
-    )
+    current_value = sum(float(a.quantity or 0) * float(a.current_price or a.avg_buy_price or 0) for a in assets)
 
     if current_value == 0:
         current_value = 10000  # Default for demo
@@ -268,13 +266,15 @@ async def project_portfolio(
         if params.inflation_adjustment:
             real_value = value / ((1 + params.inflation_rate / 100) ** year)
 
-        projections.append({
-            "year": year,
-            "nominal_value": round(value, 2),
-            "real_value": round(real_value, 2),
-            "contributions": round(total_contributions, 2),
-            "returns": round(value - current_value - total_contributions, 2),
-        })
+        projections.append(
+            {
+                "year": year,
+                "nominal_value": round(value, 2),
+                "real_value": round(real_value, 2),
+                "contributions": round(total_contributions, 2),
+                "returns": round(value - current_value - total_contributions, 2),
+            }
+        )
 
         # Grow for next year
         for _ in range(12):
@@ -319,7 +319,7 @@ async def simulate_dca(
     total_invested = 0
     price = 100  # Starting price
     monthly_return = params.expected_return / 100 / 12
-    monthly_volatility = params.expected_volatility / 100 / (12 ** 0.5)
+    monthly_volatility = params.expected_volatility / 100 / (12**0.5)
 
     random.seed(42)  # For reproducibility
 
@@ -334,15 +334,17 @@ async def simulate_dca(
         total_units += units_bought
         total_invested += amount_per_investment
 
-        projections.append({
-            "period": i + 1,
-            "price": round(price, 2),
-            "amount_invested": round(amount_per_investment, 2),
-            "units_bought": round(units_bought, 4),
-            "total_units": round(total_units, 4),
-            "total_invested": round(total_invested, 2),
-            "current_value": round(total_units * price, 2),
-        })
+        projections.append(
+            {
+                "period": i + 1,
+                "price": round(price, 2),
+                "amount_invested": round(amount_per_investment, 2),
+                "units_bought": round(units_bought, 4),
+                "total_units": round(total_units, 4),
+                "total_invested": round(total_invested, 2),
+                "current_value": round(total_units * price, 2),
+            }
+        )
 
     final_value = total_units * price
     average_cost = total_invested / total_units if total_units > 0 else 0
@@ -398,13 +400,15 @@ async def simulate_what_if(
         new_value = asset_value * (1 + change_percent / 100)
         projected_value += new_value
 
-        asset_breakdown.append({
-            "symbol": asset.symbol,
-            "current_value": round(asset_value, 2),
-            "change_percent": change_percent,
-            "projected_value": round(new_value, 2),
-            "difference": round(new_value - asset_value, 2),
-        })
+        asset_breakdown.append(
+            {
+                "symbol": asset.symbol,
+                "current_value": round(asset_value, 2),
+                "change_percent": change_percent,
+                "projected_value": round(new_value, 2),
+                "difference": round(new_value - asset_value, 2),
+            }
+        )
 
     # Apply withdrawal/contribution
     projected_value = projected_value - params.withdrawal_amount + params.contribution_amount

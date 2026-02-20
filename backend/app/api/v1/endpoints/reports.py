@@ -1,12 +1,12 @@
 """Reports endpoints for PDF and Excel exports."""
 
+import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-import io
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -62,9 +62,7 @@ async def get_tax_report_pdf(
     if year < 2015 or year > datetime.now().year:
         year = datetime.now().year - 1
 
-    pdf_content = await report_service.generate_tax_report_2086(
-        db, str(current_user.id), year
-    )
+    pdf_content = await report_service.generate_tax_report_2086(db, str(current_user.id), year)
 
     filename = f"declaration_fiscale_crypto_{year}.pdf"
 
@@ -85,9 +83,7 @@ async def get_tax_report_excel(
     if year < 2015 or year > datetime.now().year:
         year = datetime.now().year - 1
 
-    excel_content = await report_service.generate_tax_excel(
-        db, str(current_user.id), year
-    )
+    excel_content = await report_service.generate_tax_excel(db, str(current_user.id), year)
 
     filename = f"declaration_fiscale_crypto_{year}.xlsx"
 
@@ -124,10 +120,11 @@ async def get_available_years(
     db: AsyncSession = Depends(get_db),
 ):
     """Get list of years with transactions for reporting."""
-    from sqlalchemy import select, extract, distinct
-    from app.models.transaction import Transaction
+    from sqlalchemy import distinct, extract, select
+
     from app.models.asset import Asset
     from app.models.portfolio import Portfolio
+    from app.models.transaction import Transaction
 
     portfolio_result = await db.execute(
         select(Portfolio.id).where(
@@ -150,9 +147,9 @@ async def get_available_years(
         return {"years": [datetime.now().year]}
 
     years_result = await db.execute(
-        select(distinct(extract('year', Transaction.executed_at)))
+        select(distinct(extract("year", Transaction.executed_at)))
         .where(Transaction.asset_id.in_(asset_ids))
-        .order_by(extract('year', Transaction.executed_at).desc())
+        .order_by(extract("year", Transaction.executed_at).desc())
     )
     years = [int(y) for y in years_result.scalars().all() if y]
 

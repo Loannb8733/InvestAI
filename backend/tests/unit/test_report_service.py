@@ -6,12 +6,7 @@ from datetime import datetime
 import pytest
 from openpyxl import load_workbook
 
-from app.services.report_service import (
-    AssetReport,
-    PortfolioSummary,
-    ReportService,
-    TaxTransaction,
-)
+from app.services.report_service import AssetReport, PortfolioSummary, ReportService, TaxTransaction
 
 
 @pytest.fixture

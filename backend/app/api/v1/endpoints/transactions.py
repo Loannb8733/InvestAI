@@ -2,7 +2,6 @@
 
 import csv
 import io
-from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 from uuid import UUID
 
@@ -49,20 +48,14 @@ async def list_transactions(
 ) -> List[TransactionWithAsset]:
     """List transactions for the current user with asset details."""
     # Get user's portfolio IDs
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:
         return []
 
     # Get user's assets (full objects for later mapping)
-    asset_query = select(Asset).where(
-        Asset.portfolio_id.in_(portfolio_ids)
-    )
+    asset_query = select(Asset).where(Asset.portfolio_id.in_(portfolio_ids))
 
     if portfolio_id:
         if portfolio_id not in portfolio_ids:
@@ -93,9 +86,7 @@ async def list_transactions(
             )
         query = query.where(Transaction.asset_id == asset_id)
 
-    result = await db.execute(
-        query.order_by(Transaction.executed_at.desc()).offset(skip).limit(limit)
-    )
+    result = await db.execute(query.order_by(Transaction.executed_at.desc()).offset(skip).limit(limit))
     transactions = result.scalars().all()
 
     # Enrich transactions with asset info
@@ -125,9 +116,7 @@ async def list_transactions(
     return enriched_transactions
 
 
-@router.post(
-    "/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     transaction_in: TransactionCreate,
     current_user: User = Depends(get_current_user),
@@ -135,11 +124,7 @@ async def create_transaction(
 ) -> TransactionResponse:
     """Create a new transaction."""
     # Verify asset belongs to user
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     asset_result = await db.execute(
@@ -188,10 +173,7 @@ async def create_transaction(
     if transaction_in.transaction_type.value in ["buy", "transfer_in", "airdrop"]:
         new_total = float(asset.quantity) + quantity
         if new_total > 0 and price > 0:
-            new_avg_price = (
-                float(asset.quantity) * float(asset.avg_buy_price)
-                + quantity * price
-            ) / new_total
+            new_avg_price = (float(asset.quantity) * float(asset.avg_buy_price) + quantity * price) / new_total
             # Clamp avg_buy_price to valid range
             new_avg_price = max(0, min(new_avg_price, MAX_NUMERIC_VALUE))
             asset.avg_buy_price = new_avg_price
@@ -215,6 +197,7 @@ async def create_transaction(
 async def get_csv_platforms():
     """Get list of supported CSV platforms for import."""
     from app.services.csv_parsers import get_available_platforms
+
     return {"platforms": get_available_platforms()}
 
 
@@ -226,18 +209,10 @@ async def get_transaction(
 ) -> TransactionResponse:
     """Get a specific transaction."""
     # Get user's asset IDs
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
-    asset_result = await db.execute(
-        select(Asset.id).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset.id).where(Asset.portfolio_id.in_(portfolio_ids)))
     asset_ids = [a for a in asset_result.scalars().all()]
 
     result = await db.execute(
@@ -266,18 +241,10 @@ async def update_transaction(
 ) -> TransactionResponse:
     """Update a transaction (quantity, price, fee, notes, executed_at)."""
     # Get user's asset IDs
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
-    asset_result = await db.execute(
-        select(Asset.id).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset.id).where(Asset.portfolio_id.in_(portfolio_ids)))
     asset_ids = [a for a in asset_result.scalars().all()]
 
     result = await db.execute(
@@ -307,6 +274,7 @@ async def update_transaction(
 
 class DeleteAllResult(BaseModel):
     """Result of delete all operation."""
+
     deleted_count: int
 
 
@@ -317,22 +285,14 @@ async def delete_all_transactions(
 ) -> DeleteAllResult:
     """Delete all transactions for the current user and reset asset quantities."""
     # Get user's portfolio IDs
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:
         return DeleteAllResult(deleted_count=0)
 
     # Get user's assets
-    asset_result = await db.execute(
-        select(Asset).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
     assets = asset_result.scalars().all()
     asset_ids = [a.id for a in assets]
 
@@ -370,18 +330,10 @@ async def delete_transaction(
 ):
     """Delete a transaction (and revert asset quantity)."""
     # Get user's asset IDs
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id
-        )
-    )
+    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
-    asset_result = await db.execute(
-        select(Asset.id).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset.id).where(Asset.portfolio_id.in_(portfolio_ids)))
     asset_ids = [a for a in asset_result.scalars().all()]
 
     result = await db.execute(
@@ -436,8 +388,8 @@ async def import_transactions_csv(
     Platform is auto-detected if not specified.
     Assets are created automatically if they don't exist.
     """
-    from app.services.csv_parsers import detect_csv_format, get_parser_by_name
     from app.models.asset import AssetType
+    from app.services.csv_parsers import detect_csv_format, get_parser_by_name
 
     print(f"CSV Import: portfolio_id={portfolio_id}, platform={platform}, filename={file.filename}")
 
@@ -614,10 +566,7 @@ async def import_transactions_csv(
             if trans_type.value in ["buy", "transfer_in", "airdrop", "staking_reward", "conversion_in"]:
                 new_total = float(asset.quantity) + quantity
                 if new_total > MIN_QUANTITY and price > 0:
-                    new_avg_price = (
-                        float(asset.quantity) * float(asset.avg_buy_price)
-                        + quantity * price
-                    ) / new_total
+                    new_avg_price = (float(asset.quantity) * float(asset.avg_buy_price) + quantity * price) / new_total
                     # Clamp avg_buy_price to valid range
                     new_avg_price = max(0, min(new_avg_price, MAX_NUMERIC_VALUE))
                     asset.avg_buy_price = new_avg_price
@@ -666,9 +615,7 @@ async def export_transactions_csv(
     from fastapi.responses import StreamingResponse
 
     # Get user's portfolio IDs
-    portfolio_query = select(Portfolio).where(
-        Portfolio.user_id == current_user.id
-    )
+    portfolio_query = select(Portfolio).where(Portfolio.user_id == current_user.id)
     if portfolio_id:
         portfolio_query = portfolio_query.where(Portfolio.id == portfolio_id)
 
@@ -683,20 +630,14 @@ async def export_transactions_csv(
         )
 
     # Get user's assets with symbols
-    asset_result = await db.execute(
-        select(Asset).where(
-            Asset.portfolio_id.in_(portfolio_ids)
-        )
-    )
+    asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
     assets = asset_result.scalars().all()
     asset_map = {a.id: a for a in assets}
     asset_ids = [a.id for a in assets]
 
     # Get transactions
     result = await db.execute(
-        select(Transaction)
-        .where(Transaction.asset_id.in_(asset_ids))
-        .order_by(Transaction.executed_at.desc())
+        select(Transaction).where(Transaction.asset_id.in_(asset_ids)).order_by(Transaction.executed_at.desc())
     )
     transactions = result.scalars().all()
 
@@ -708,15 +649,17 @@ async def export_transactions_csv(
     for trans in transactions:
         asset = asset_map.get(trans.asset_id)
         symbol = asset.symbol if asset else "UNKNOWN"
-        writer.writerow([
-            symbol,
-            trans.transaction_type.value,
-            str(trans.quantity),
-            str(trans.price),
-            str(trans.fee),
-            trans.executed_at.strftime("%Y-%m-%d %H:%M:%S"),
-            trans.notes or "",
-        ])
+        writer.writerow(
+            [
+                symbol,
+                trans.transaction_type.value,
+                str(trans.quantity),
+                str(trans.price),
+                str(trans.fee),
+                trans.executed_at.strftime("%Y-%m-%d %H:%M:%S"),
+                trans.notes or "",
+            ]
+        )
 
     output.seek(0)
 

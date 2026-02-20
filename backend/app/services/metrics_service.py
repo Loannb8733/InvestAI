@@ -1,18 +1,16 @@
 """Metrics calculation service for portfolio analysis."""
 
-import asyncio
 import logging
 from decimal import Decimal
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset, AssetType
-from app.models.transaction import Transaction, TransactionType
-from app.models.portfolio import Portfolio
 from app.ml.historical_data import HistoricalDataFetcher
+from app.models.asset import Asset, AssetType
+from app.models.portfolio import Portfolio
+from app.models.transaction import Transaction
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
@@ -22,8 +20,20 @@ FIAT_SYMBOLS = {"EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY"}
 
 # Stablecoins -> separate card, excluded from investment metrics
 STABLECOIN_SYMBOLS = {
-    "USDT", "USDC", "BUSD", "DAI", "TUSD", "USDP", "GUSD", "FRAX", "LUSD",
-    "USDG", "PYUSD", "FDUSD", "EURC", "EURT",
+    "USDT",
+    "USDC",
+    "BUSD",
+    "DAI",
+    "TUSD",
+    "USDP",
+    "GUSD",
+    "FRAX",
+    "LUSD",
+    "USDG",
+    "PYUSD",
+    "FDUSD",
+    "EURC",
+    "EURT",
 }
 
 
@@ -42,9 +52,7 @@ def is_cash_like(symbol: str) -> bool:
 class MetricsService:
     """Service for calculating portfolio metrics."""
 
-    async def get_asset_metrics(
-        self, asset: Asset, current_price: Optional[Decimal] = None
-    ) -> Dict:
+    async def get_asset_metrics(self, asset: Asset, current_price: Optional[Decimal] = None) -> Dict:
         """Calculate metrics for a single asset."""
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
@@ -61,9 +69,7 @@ class MetricsService:
             current_price = Decimal(str(current_price))
             current_value = quantity * current_price
             gain_loss = current_value - total_invested
-            gain_loss_percent = (
-                float(gain_loss / total_invested * 100) if total_invested > 0 else 0.0
-            )
+            gain_loss_percent = float(gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
         return {
             "quantity": float(quantity),
@@ -76,9 +82,12 @@ class MetricsService:
         }
 
     async def get_portfolio_metrics(
-        self, db: AsyncSession, portfolio_id: str, currency: str = "EUR",
+        self,
+        db: AsyncSession,
+        portfolio_id: str,
+        currency: str = "EUR",
         include_zero_quantity: bool = False,
-        min_value_eur: float = 0.10  # Filter out dust positions worth less than this
+        min_value_eur: float = 0.10,  # Filter out dust positions worth less than this
     ) -> Dict:
         """Calculate metrics for an entire portfolio."""
         # Get all assets in portfolio
@@ -120,17 +129,13 @@ class MetricsService:
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
-        stock_symbols = [
-            a.symbol for a in investment_assets if a.asset_type in [AssetType.STOCK, AssetType.ETF]
-        ]
+        stock_symbols = [a.symbol for a in investment_assets if a.asset_type in [AssetType.STOCK, AssetType.ETF]]
 
         # Fetch prices (with 24h change data)
         prices = {}
         price_changes = {}
         if crypto_symbols:
-            crypto_prices = await price_service.get_multiple_crypto_prices(
-                crypto_symbols, currency.lower()
-            )
+            crypto_prices = await price_service.get_multiple_crypto_prices(crypto_symbols, currency.lower())
             for symbol, data in crypto_prices.items():
                 prices[symbol] = data["price"]
                 price_changes[symbol] = float(data.get("change_percent_24h", 0) or 0)
@@ -153,27 +158,35 @@ class MetricsService:
             total_value += Decimal(str(metrics["current_value"]))
             total_invested += Decimal(str(metrics["total_invested"]))
 
-            asset_metrics.append({
-                "id": str(asset.id),
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "asset_type": asset.asset_type.value,
-                "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
-                **metrics,
-            })
+            asset_metrics.append(
+                {
+                    "id": str(asset.id),
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "asset_type": asset.asset_type.value,
+                    "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
+                    **metrics,
+                }
+            )
 
         # Calculate stablecoin cash value
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
         for asset in stablecoin_assets:
-            value = float(asset.quantity) * float(asset.avg_buy_price) if float(asset.avg_buy_price) > 0 else float(asset.quantity)
+            value = (
+                float(asset.quantity) * float(asset.avg_buy_price)
+                if float(asset.avg_buy_price) > 0
+                else float(asset.quantity)
+            )
             cash_from_stablecoins += Decimal(str(value))
-            stablecoin_list.append({
-                "id": str(asset.id),
-                "symbol": asset.symbol,
-                "quantity": float(asset.quantity),
-                "value": value,
-            })
+            stablecoin_list.append(
+                {
+                    "id": str(asset.id),
+                    "symbol": asset.symbol,
+                    "quantity": float(asset.quantity),
+                    "value": value,
+                }
+            )
 
         # Calculate fiat cash value
         cash_from_fiat = Decimal("0")
@@ -181,20 +194,20 @@ class MetricsService:
         for asset in fiat_assets:
             value = float(asset.quantity)  # 1 EUR = 1 EUR
             cash_from_fiat += Decimal(str(value))
-            fiat_list.append({
-                "id": str(asset.id),
-                "symbol": asset.symbol,
-                "quantity": float(asset.quantity),
-                "value": value,
-            })
+            fiat_list.append(
+                {
+                    "id": str(asset.id),
+                    "symbol": asset.symbol,
+                    "quantity": float(asset.quantity),
+                    "value": value,
+                }
+            )
 
         # Sort by value descending
         asset_metrics.sort(key=lambda x: x["current_value"], reverse=True)
 
         total_gain_loss = total_value - total_invested
-        total_gain_loss_percent = (
-            float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
-        )
+        total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
         return {
             "total_value": float(total_value),
@@ -209,9 +222,7 @@ class MetricsService:
             "fiat_assets": fiat_list,
         }
 
-    async def _fetch_period_changes(
-        self, symbols_by_type: Dict[str, List[str]], days: int
-    ) -> Dict[str, float]:
+    async def _fetch_period_changes(self, symbols_by_type: Dict[str, List[str]], days: int) -> Dict[str, float]:
         """Fetch price change percentage over a period for each symbol.
 
         Returns {SYMBOL: change_percent} using CoinGecko /coins/markets
@@ -245,16 +256,14 @@ class MetricsService:
             try:
                 # Build coin IDs
                 from app.ml.historical_data import HistoricalDataFetcher as HDF
-                coin_ids = [
-                    HDF.SYMBOL_MAP.get(s.upper(), s.lower())
-                    for s in crypto_symbols
-                ]
+
+                coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in crypto_symbols]
 
                 headers = {
                     "User-Agent": "Mozilla/5.0",
                     "Accept": "application/json",
                 }
-                coingecko_key = getattr(price_service, 'coingecko_api_key', None)
+                coingecko_key = getattr(price_service, "coingecko_api_key", None)
                 if coingecko_key:
                     headers["x-cg-demo-api-key"] = coingecko_key
 
@@ -304,7 +313,10 @@ class MetricsService:
         return changes
 
     async def get_user_dashboard_metrics(
-        self, db: AsyncSession, user_id: str, currency: str = "EUR",
+        self,
+        db: AsyncSession,
+        user_id: str,
+        currency: str = "EUR",
         days: int = 30,
     ) -> Dict:
         """Calculate dashboard metrics for a user's entire portfolio."""
@@ -341,22 +353,16 @@ class MetricsService:
         all_assets = []
 
         for portfolio in portfolios:
-            portfolio_metrics = await self.get_portfolio_metrics(
-                db, str(portfolio.id), currency
-            )
+            portfolio_metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
             # Get historical total invested (sum of all buy transactions)
-            portfolio_history = await self.get_portfolio_history(
-                db, str(portfolio.id), currency
-            )
+            portfolio_history = await self.get_portfolio_history(db, str(portfolio.id), currency)
             total_value += Decimal(str(portfolio_metrics["total_value"]))
             total_invested += Decimal(str(portfolio_history["total_invested_all_time"]))
             total_sold += Decimal(str(portfolio_history.get("total_sold", 0)))
             all_assets.extend(portfolio_metrics["assets"])
 
         total_gain_loss = total_value - total_invested
-        total_gain_loss_percent = (
-            float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
-        )
+        total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
         # Calculate allocation by asset type
         allocation = {}
@@ -408,22 +414,16 @@ class MetricsService:
             else:
                 # Fallback to gain/loss vs avg buy price
                 inv = data["total_invested"]
-                data["period_change_percent"] = (
-                    (data["current_value"] - inv) / inv * 100 if inv > 0 else 0.0
-                )
+                data["period_change_percent"] = (data["current_value"] - inv) / inv * 100 if inv > 0 else 0.0
 
         aggregated = list(symbol_agg.values())
 
         # Top and worst performers (by price change over selected period)
-        top_performers = [
-            a for a in aggregated if a["period_change_percent"] > 0
-        ]
+        top_performers = [a for a in aggregated if a["period_change_percent"] > 0]
         top_performers.sort(key=lambda x: x["period_change_percent"], reverse=True)
         top_performers = top_performers[:5]
 
-        worst_performers = [
-            a for a in aggregated if a["period_change_percent"] < 0
-        ]
+        worst_performers = [a for a in aggregated if a["period_change_percent"] < 0]
         worst_performers.sort(key=lambda x: x["period_change_percent"])
         worst_performers = worst_performers[:5]
 
@@ -434,9 +434,7 @@ class MetricsService:
         # Net capital = money injected - money withdrawn (actual cash still in play)
         net_capital = total_invested - total_sold
         net_gain_loss = total_value - net_capital
-        net_gain_loss_percent = (
-            float(net_gain_loss / net_capital * 100) if net_capital > 0 else 0.0
-        )
+        net_gain_loss_percent = float(net_gain_loss / net_capital * 100) if net_capital > 0 else 0.0
 
         return {
             "total_value": float(total_value),
@@ -473,9 +471,7 @@ class MetricsService:
             ],
         }
 
-    async def get_portfolio_history(
-        self, db: AsyncSession, portfolio_id: str, currency: str = "EUR"
-    ) -> Dict:
+    async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:
         """
         Calculate historical investment metrics for a portfolio.
         Includes all assets (even those with 0 quantity) and calculates
@@ -485,7 +481,7 @@ class MetricsService:
         result = await db.execute(
             select(Asset).where(
                 Asset.portfolio_id == portfolio_id,
-                )
+            )
         )
         all_assets = result.scalars().all()
         asset_ids = [a.id for a in all_assets]
@@ -502,9 +498,11 @@ class MetricsService:
 
         # Get all transactions for these assets
         result = await db.execute(
-            select(Transaction).where(
+            select(Transaction)
+            .where(
                 Transaction.asset_id.in_(asset_ids),
-            ).order_by(Transaction.executed_at.desc())
+            )
+            .order_by(Transaction.executed_at.desc())
         )
         transactions = result.scalars().all()
 
@@ -582,13 +580,21 @@ class MetricsService:
                 "total_sold": float(ah["total_sold"]),
                 "total_sold_value": float(ah["total_sold_value"]),
                 "total_fees": float(ah["total_fees"]),
-                "realized_gain": float(ah["total_sold_value"] - (ah["total_bought_value"] * ah["total_sold"] / ah["total_bought"])) if ah["total_bought"] > 0 and ah["total_sold"] > 0 else 0.0,
+                "realized_gain": float(
+                    ah["total_sold_value"] - (ah["total_bought_value"] * ah["total_sold"] / ah["total_bought"])
+                )
+                if ah["total_bought"] > 0 and ah["total_sold"] > 0
+                else 0.0,
                 "first_transaction": ah["first_transaction"].isoformat() if ah["first_transaction"] else None,
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
 
             # Consider as "sold" if quantity is 0 or value is less than 0.10€
-            est_value = float(ah["current_quantity"]) * float(ah["total_bought_value"] / ah["total_bought"]) if ah["total_bought"] > 0 else 0
+            est_value = (
+                float(ah["current_quantity"]) * float(ah["total_bought_value"] / ah["total_bought"])
+                if ah["total_bought"] > 0
+                else 0
+            )
             if ah["current_quantity"] > 0 and est_value >= 0.10:
                 current_holdings.append(asset_data)
             else:
@@ -598,9 +604,7 @@ class MetricsService:
         sold_assets.sort(key=lambda x: x["total_bought_value"], reverse=True)
 
         # Sum realized gains from individual assets (already computed per-asset)
-        total_realized_gains = sum(
-            Decimal(str(a["realized_gain"])) for a in current_holdings + sold_assets
-        )
+        total_realized_gains = sum(Decimal(str(a["realized_gain"])) for a in current_holdings + sold_assets)
 
         return {
             "total_invested_all_time": float(total_invested_all_time),
@@ -612,9 +616,7 @@ class MetricsService:
             "sold_assets": sold_assets,
         }
 
-    async def calculate_roi(
-        self, total_invested: Decimal, current_value: Decimal
-    ) -> float:
+    async def calculate_roi(self, total_invested: Decimal, current_value: Decimal) -> float:
         """Calculate Return on Investment."""
         if total_invested <= 0:
             return 0.0
@@ -631,9 +633,7 @@ class MetricsService:
             return 0.0
         return float((pow(float(final_value / initial_value), 1 / years) - 1) * 100)
 
-    async def calculate_realized_unrealized_pnl(
-        self, db: AsyncSession, user_id: str, currency: str = "EUR"
-    ) -> Dict:
+    async def calculate_realized_unrealized_pnl(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Dict:
         """
         Calculate realized and unrealized P&L separately.
         Realized: Profits/losses from assets that have been sold

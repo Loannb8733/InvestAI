@@ -86,17 +86,14 @@ class BaseExchangeService(ABC):
     @abstractmethod
     def exchange_name(self) -> str:
         """Return the exchange name."""
-        pass
 
     @abstractmethod
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
-        pass
 
     @abstractmethod
     async def get_balances(self) -> List[ExchangeBalance]:
         """Get all non-zero balances from the exchange."""
-        pass
 
     @abstractmethod
     async def get_trades(
@@ -107,7 +104,6 @@ class BaseExchangeService(ABC):
         limit: int = 500,
     ) -> List[ExchangeTrade]:
         """Get trade history from the exchange."""
-        pass
 
     @abstractmethod
     async def get_deposits(
@@ -117,7 +113,6 @@ class BaseExchangeService(ABC):
         limit: int = 100,
     ) -> List[ExchangeDeposit]:
         """Get deposit history from the exchange."""
-        pass
 
     @abstractmethod
     async def get_withdrawals(
@@ -127,7 +122,6 @@ class BaseExchangeService(ABC):
         limit: int = 100,
     ) -> List[ExchangeWithdrawal]:
         """Get withdrawal history from the exchange."""
-        pass
 
     async def get_fiat_orders(
         self,

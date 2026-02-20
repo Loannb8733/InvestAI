@@ -3,7 +3,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,7 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.portfolio import Portfolio
 from app.models.user import User
-from app.schemas.portfolio import PortfolioCreate, PortfolioResponse, PortfolioUpdate, CashBalanceUpdate
+from app.schemas.portfolio import CashBalanceUpdate, PortfolioCreate, PortfolioResponse, PortfolioUpdate
 
 router = APIRouter()
 
@@ -23,9 +23,7 @@ async def list_portfolios(
 ) -> List[PortfolioResponse]:
     """List all portfolios for the current user."""
     result = await db.execute(
-        select(Portfolio)
-        .where(Portfolio.user_id == current_user.id)
-        .order_by(Portfolio.created_at.desc())
+        select(Portfolio).where(Portfolio.user_id == current_user.id).order_by(Portfolio.created_at.desc())
     )
     portfolios = result.scalars().all()
     return portfolios
@@ -134,16 +132,12 @@ async def delete_portfolio(
 
     if delete_assets:
         # Get all assets in this portfolio
-        assets_result = await db.execute(
-            select(Asset).where(Asset.portfolio_id == portfolio_id)
-        )
+        assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id))
         assets = assets_result.scalars().all()
 
         # Delete all transactions for each asset
         for asset in assets:
-            trans_result = await db.execute(
-                select(Transaction).where(Transaction.asset_id == asset.id)
-            )
+            trans_result = await db.execute(select(Transaction).where(Transaction.asset_id == asset.id))
             transactions = trans_result.scalars().all()
             for transaction in transactions:
                 await db.delete(transaction)

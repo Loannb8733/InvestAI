@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -101,32 +101,25 @@ async def get_calendar_summary(
     db: AsyncSession = Depends(get_db),
 ) -> CalendarSummaryResponse:
     """Get summary of user's calendar events."""
-    result = await db.execute(
-        select(CalendarEvent).where(CalendarEvent.user_id == current_user.id)
-    )
+    result = await db.execute(select(CalendarEvent).where(CalendarEvent.user_id == current_user.id))
     events = result.scalars().all()
 
     now = datetime.utcnow()
 
     # Count upcoming events (not completed, date >= now)
-    upcoming = sum(
-        1 for e in events
-        if not e.is_completed and e.event_date >= now
-    )
+    upcoming = sum(1 for e in events if not e.is_completed and e.event_date >= now)
 
     # Count completed events
     completed = sum(1 for e in events if e.is_completed)
 
     # Events this month
-    events_this_month = sum(
-        1 for e in events
-        if e.event_date.year == now.year and e.event_date.month == now.month
-    )
+    events_this_month = sum(1 for e in events if e.event_date.year == now.year and e.event_date.month == now.month)
 
     # Total expected income (from dividends, rent, interest)
     income_types = [EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]
     total_income = sum(
-        float(e.amount or 0) for e in events
+        float(e.amount or 0)
+        for e in events
         if e.event_type in income_types and not e.is_completed and e.event_date >= now
     )
 
@@ -150,12 +143,14 @@ async def list_upcoming_events(
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
-        select(CalendarEvent).where(
+        select(CalendarEvent)
+        .where(
             CalendarEvent.user_id == current_user.id,
             CalendarEvent.is_completed == False,
             CalendarEvent.event_date >= now,
             CalendarEvent.event_date <= end_date,
-        ).order_by(CalendarEvent.event_date.asc())
+        )
+        .order_by(CalendarEvent.event_date.asc())
     )
     events = result.scalars().all()
 

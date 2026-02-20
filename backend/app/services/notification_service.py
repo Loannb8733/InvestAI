@@ -55,8 +55,7 @@ class NotificationService:
             if user and user.email:
                 await self._send_email(
                     to_email=user.email,
-                    to_name=f"{user.first_name or ''} {user.last_name or ''}".strip()
-                    or user.email,
+                    to_name=f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
                     subject=title,
                     body=message,
                     priority=priority,

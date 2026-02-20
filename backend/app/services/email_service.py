@@ -3,13 +3,12 @@
 import logging
 import smtplib
 import ssl
+from datetime import datetime
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 
@@ -388,11 +387,13 @@ class EmailService:
 
         attachments = None
         if pdf_content:
-            attachments = [{
-                "filename": f"rapport_mensuel_{datetime.now().strftime('%Y_%m')}.pdf",
-                "content": pdf_content,
-                "content_type": "application/pdf",
-            }]
+            attachments = [
+                {
+                    "filename": f"rapport_mensuel_{datetime.now().strftime('%Y_%m')}.pdf",
+                    "content": pdf_content,
+                    "content_type": "application/pdf",
+                }
+            ]
 
         return await self.send_email(
             to_email,
@@ -424,8 +425,8 @@ class EmailService:
             predictions_html = "<h3>Predictions du jour</h3><table>"
             predictions_html += "<thead><tr><th>Actif</th><th>Prediction 7j</th><th>Confiance</th></tr></thead><tbody>"
             for pred in predictions[:5]:
-                pred_class = "positive" if pred['predicted_change'] >= 0 else "negative"
-                sign = "+" if pred['predicted_change'] >= 0 else ""
+                pred_class = "positive" if pred["predicted_change"] >= 0 else "negative"
+                sign = "+" if pred["predicted_change"] >= 0 else ""
                 predictions_html += f"""
                 <tr>
                     <td>{pred['symbol']}</td>

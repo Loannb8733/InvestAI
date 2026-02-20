@@ -1,7 +1,7 @@
 """Price fetching service for various asset types."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
 
@@ -140,7 +140,7 @@ class PriceService:
             decode_responses=True,
         )
         # CoinGecko API key (optional, for higher rate limits)
-        self.coingecko_api_key = getattr(settings, 'COINGECKO_API_KEY', None) or None
+        self.coingecko_api_key = getattr(settings, "COINGECKO_API_KEY", None) or None
 
         # Build headers
         headers = {
@@ -256,20 +256,20 @@ class PriceService:
 
     # Stablecoins: peg currency (USD or EUR)
     STABLECOINS: Dict[str, str] = {
-        "USDT": "USD",   # Tether
-        "USDC": "USD",   # USD Coin
-        "BUSD": "USD",   # Binance USD
-        "DAI": "USD",    # Dai
-        "TUSD": "USD",   # TrueUSD
-        "USDP": "USD",   # Pax Dollar
-        "GUSD": "USD",   # Gemini Dollar
-        "FRAX": "USD",   # Frax
-        "LUSD": "USD",   # Liquity USD
-        "USDD": "USD",   # USDD
+        "USDT": "USD",  # Tether
+        "USDC": "USD",  # USD Coin
+        "BUSD": "USD",  # Binance USD
+        "DAI": "USD",  # Dai
+        "TUSD": "USD",  # TrueUSD
+        "USDP": "USD",  # Pax Dollar
+        "GUSD": "USD",  # Gemini Dollar
+        "FRAX": "USD",  # Frax
+        "LUSD": "USD",  # Liquity USD
+        "USDD": "USD",  # USDD
         "PYUSD": "USD",  # PayPal USD
         "FDUSD": "USD",  # First Digital USD
-        "USDG": "USD",   # Global Dollar (Paxos)
-        "EURT": "EUR",   # Euro Tether
+        "USDG": "USD",  # Global Dollar (Paxos)
+        "EURT": "EUR",  # Euro Tether
         "EUROC": "EUR",  # Euro Coin
     }
 
@@ -285,6 +285,7 @@ class PriceService:
     async def _get_eur_usd_rate(self) -> Decimal:
         """Get EUR/USD rate with 1h cache."""
         import time
+
         now = time.time()
         if self._eur_usd_rate and now - self._eur_usd_rate_ts < 3600:
             return self._eur_usd_rate
@@ -413,9 +414,7 @@ class PriceService:
                     "interval": "1d",
                     "range": "2d",
                 },
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             )
             response.raise_for_status()
             data = response.json()
@@ -467,9 +466,7 @@ class PriceService:
             return await self.get_real_estate_price(symbol)
         return None
 
-    async def _fetch_from_cryptocompare(
-        self, symbols: List[str], currency: str = "EUR"
-    ) -> Dict[str, Dict]:
+    async def _fetch_from_cryptocompare(self, symbols: List[str], currency: str = "EUR") -> Dict[str, Dict]:
         """Fallback: Fetch prices from CryptoCompare API."""
         results = {}
         try:
@@ -505,9 +502,7 @@ class PriceService:
 
         return results
 
-    async def get_multiple_crypto_prices(
-        self, symbols: List[str], currency: str = "eur"
-    ) -> Dict[str, Dict]:
+    async def get_multiple_crypto_prices(self, symbols: List[str], currency: str = "eur") -> Dict[str, Dict]:
         """Fetch multiple cryptocurrency prices at once."""
         results = {}
 
@@ -605,9 +600,7 @@ class PriceService:
             print(f"Redis cache read error for forex: {e}")
 
         try:
-            response = await self.http_client.get(
-                f"https://api.exchangerate-api.com/v4/latest/{from_currency}"
-            )
+            response = await self.http_client.get(f"https://api.exchangerate-api.com/v4/latest/{from_currency}")
             response.raise_for_status()
             data = response.json()
 
@@ -623,7 +616,6 @@ class PriceService:
             print(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
 
         return None
-
 
     async def get_historical_crypto_price(
         self, symbol: str, date: datetime, currency: str = "eur"
@@ -682,9 +674,7 @@ class PriceService:
         return None
 
     async def get_multiple_historical_prices(
-        self,
-        requests: list[tuple[str, datetime]],
-        currency: str = "eur"
+        self, requests: list[tuple[str, datetime]], currency: str = "eur"
     ) -> dict[str, Decimal]:
         """Fetch multiple historical prices with rate limiting.
 

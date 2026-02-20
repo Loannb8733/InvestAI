@@ -1,7 +1,7 @@
 """Test CSV import for Crypto.com"""
 from app.services.csv_parsers import CryptoComCSVParser
 
-csv_content = '''Timestamp (UTC),Transaction Description,Currency,Amount,To Currency,To Amount,Native Currency,Native Amount,Native Amount (in USD),Transaction Kind,Transaction Hash
+csv_content = """Timestamp (UTC),Transaction Description,Currency,Amount,To Currency,To Amount,Native Currency,Native Amount,Native Amount (in USD),Transaction Kind,Transaction Hash
 2025-11-04 21:37:49,FET > BTC,FET,-4.902,BTC,0.00000932,EUR,0.81140365410367459710354977436058,0.9599970763325039429215910212249351713656,crypto_exchange,
 2025-11-04 21:37:01,LINK > BTC,LINK,-0.2055,BTC,0.00002773,EUR,2.4268222521158984030874170963686,2.871249414551255670630707864617148924552,crypto_exchange,
 2025-11-04 21:36:24,PENDLE > ETH,PENDLE,-1.391,ETH,0.00104688726152602,EUR,2.85850221209936890334796893016694,3.3819834954240463017850348996673995425608,crypto_exchange,
@@ -15,7 +15,7 @@ csv_content = '''Timestamp (UTC),Transaction Description,Currency,Amount,To Curr
 2025-03-31 12:17:35,Balance Conversion,USDT,-0.005,,,EUR,0.00452567631946609890240677719568,0.0053544693977426672896550814804707766976,crypto_wallet_swap_debited,
 2025-03-04 07:08:46,Sold USDT,USDT,-25.14,EUR,23.50,EUR,23.5,27.80358602,crypto_viban_exchange,
 2024-01-21 14:52:52,Bought BTC,BTC,0.0000515,,,EUR,2.0,2.36626264,trading.crypto_purchase.google_pay,
-'''
+"""
 
 parser = CryptoComCSVParser()
 transactions, errors = parser.parse_csv(csv_content)
@@ -31,4 +31,6 @@ if errors:
 
 print(f"\n=== Transactions ===")
 for tx in transactions:
-    print(f"{tx.transaction_type:15} | {tx.symbol:6} | qty={float(tx.quantity):15.8f} | price={float(tx.price):10.2f} EUR")
+    print(
+        f"{tx.transaction_type:15} | {tx.symbol:6} | qty={float(tx.quantity):15.8f} | price={float(tx.price):10.2f} EUR"
+    )

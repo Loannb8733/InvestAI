@@ -1,7 +1,8 @@
-import { useState, useRef, lazy, Suspense, type ReactNode } from 'react'
+import { useState, useRef, useMemo, lazy, Suspense, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding } from '@/components/OnboardingWizard'
+import { useRealtimePrices } from '@/hooks/useRealtimePrices'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -58,6 +59,7 @@ import {
   EyeOff,
   RotateCcw,
   X,
+  Radio,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { useExportPdf } from '@/hooks/useExportPdf'
@@ -364,6 +366,25 @@ export default function DashboardPage() {
     enabled: showBenchmarks,
   })
 
+  // Real-time price updates via WebSocket
+  const portfolioSymbols = useMemo(() => {
+    if (!metrics?.asset_allocation) return []
+    return metrics.asset_allocation.map((a) => a.symbol)
+  }, [metrics?.asset_allocation])
+
+  const { prices: livePrices, connected: wsConnected } = useRealtimePrices(portfolioSymbols)
+
+  // Helper: get live price for a symbol, falling back to the static value
+  const getLivePrice = (symbol: string, fallbackValue: number): number => {
+    const live = livePrices[symbol.toUpperCase()]
+    return live ? live.price : fallbackValue
+  }
+
+  const getLiveChange = (symbol: string, fallbackPercent: number): number => {
+    const live = livePrices[symbol.toUpperCase()]
+    return live ? live.change_24h_percent : fallbackPercent
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -428,9 +449,17 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Dernière mise à jour : {new Date(metrics.last_updated).toLocaleString('fr-FR')}
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-muted-foreground">
+              Dernière mise à jour : {new Date(metrics.last_updated).toLocaleString('fr-FR')}
+            </p>
+            {wsConnected && (
+              <Badge variant="outline" className="text-green-600 border-green-500/50 bg-green-500/10 gap-1 text-xs">
+                <Radio className="h-3 w-3 animate-pulse" />
+                Live
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-muted rounded-lg p-1">
@@ -708,16 +737,22 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex gap-6 flex-wrap">
-                        {metrics.index_comparison.map((index) => (
+                        {metrics.index_comparison.map((index) => {
+                          const liveIndexPrice = getLivePrice(index.symbol, index.price)
+                          const liveIndexChange = getLiveChange(index.symbol, index.change_percent)
+                          return (
                           <div key={index.symbol} className="flex items-center gap-3">
                             <AssetIconCompact symbol={index.symbol} assetType="crypto" size={32} />
                             <div>
-                              <p className="text-sm font-medium">{index.name}</p>
-                              <p className={`text-sm ${index.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{index.change_percent >= 0 ? '+' : ''}{index.change_percent.toFixed(2)}%</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-medium">{index.name}</p>
+                                {livePrices[index.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
+                              </div>
+                              <p className={`text-sm ${liveIndexChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{liveIndexChange >= 0 ? '+' : ''}{liveIndexChange.toFixed(2)}%</p>
                             </div>
-                            <p className="text-sm text-muted-foreground ml-2">{formatCurrency(index.price)}</p>
-                          </div>
-                        ))}
+                            <p className="text-sm text-muted-foreground ml-2">{formatCurrency(liveIndexPrice)}</p>
+                          </div>)
+                        })}
                         <div className="flex items-center gap-3 border-l pl-6 ml-2">
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><Wallet className="h-4 w-4 text-primary" /></div>
                           <div>
@@ -755,21 +790,28 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.asset_allocation.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.asset_allocation.slice(0, 6).map((asset) => (
+                            {metrics.asset_allocation.slice(0, 6).map((asset) => {
+                              const livePrice = livePrices[asset.symbol.toUpperCase()]
+                              const displayChange = livePrice ? livePrice.change_24h_percent : asset.gain_loss_percent
+                              return (
                               <div key={asset.symbol} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={32} />
                                   <div>
-                                    <p className="font-medium text-sm">{asset.symbol}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="font-medium text-sm">{asset.symbol}</p>
+                                      {livePrice && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Prix live" />}
+                                    </div>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(asset.value)}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-sm">{asset.percentage.toFixed(1)}%</p>
-                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(asset.gain_loss_percent)}</p>
+                                  <p className={`text-xs ${displayChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(displayChange)}</p>
                                 </div>
                               </div>
-                            ))}
+                              )
+                            })}
                             {metrics.asset_allocation.length > 6 && (<p className="text-xs text-muted-foreground text-center pt-2">+{metrics.asset_allocation.length - 6} autres actifs</p>)}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-8">Aucun actif</p>)}
@@ -912,15 +954,20 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.top_performers.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.top_performers.map((item, index) => (
+                            {metrics.top_performers.map((item, index) => {
+                              const liveChange = getLiveChange(item.symbol, item.gain_loss_percent)
+                              return (
                               <div key={`top-${item.symbol}-${index}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                                  <div><p className="font-medium text-sm">{item.symbol}</p><p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p></div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
+                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
+                                  </div>
                                 </div>
-                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
-                              </div>
-                            ))}
+                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(liveChange)}</span></div>
+                              </div>)
+                            })}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-4">Aucun actif en gain</p>)}
                       </CardContent>
@@ -932,15 +979,20 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.worst_performers.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.worst_performers.map((item, index) => (
+                            {metrics.worst_performers.map((item, index) => {
+                              const liveChange = getLiveChange(item.symbol, item.gain_loss_percent)
+                              return (
                               <div key={`worst-${item.symbol}-${index}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                                  <div><p className="font-medium text-sm">{item.symbol}</p><p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p></div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
+                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
+                                  </div>
                                 </div>
-                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
-                              </div>
-                            ))}
+                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(liveChange)}</span></div>
+                              </div>)
+                            })}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-4">Aucun actif en perte</p>)}
                       </CardContent>

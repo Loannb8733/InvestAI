@@ -32,11 +32,7 @@ async def _run_daily_predictions():
     """Async implementation of daily predictions."""
     async with async_session_factory() as db:
         # Get all unique symbols across all portfolios
-        result = await db.execute(
-            select(Asset.symbol, Asset.asset_type)
-            .where(Asset.quantity > 0)
-            .distinct()
-        )
+        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
         assets = result.all()
 
         logger.info("Running daily predictions for %d unique assets", len(assets))
@@ -46,12 +42,12 @@ async def _run_daily_predictions():
 
         for symbol, asset_type in assets:
             try:
-                prediction = await prediction_service.get_price_prediction(
-                    symbol, asset_type, days_ahead=7
-                )
+                prediction = await prediction_service.get_price_prediction(symbol, asset_type, days_ahead=7)
                 logger.info(
                     "Prediction for %s: trend=%s, model=%s",
-                    symbol, prediction.trend, prediction.model_used,
+                    symbol,
+                    prediction.trend,
+                    prediction.model_used,
                 )
                 success += 1
             except Exception as e:
@@ -60,7 +56,8 @@ async def _run_daily_predictions():
 
         logger.info(
             "Daily predictions complete: %d success, %d errors",
-            success, errors,
+            success,
+            errors,
         )
 
 
@@ -80,9 +77,7 @@ def predict_price(symbol: str, asset_type: str, horizon_days: int = 7):
         logger.error("Unknown asset type: %s", asset_type)
         return None
 
-    result = run_async(
-        prediction_service.get_price_prediction(symbol, at, horizon_days)
-    )
+    result = run_async(prediction_service.get_price_prediction(symbol, at, horizon_days))
 
     return {
         "symbol": result.symbol,
@@ -104,9 +99,7 @@ async def _detect_anomalies():
     from app.models.user import User
 
     async with async_session_factory() as db:
-        result = await db.execute(
-            select(User.id).where(User.is_active.is_(True))
-        )
+        result = await db.execute(select(User.id).where(User.is_active.is_(True)))
         user_ids = [str(uid) for (uid,) in result.all()]
 
         total_anomalies = 0
@@ -119,7 +112,9 @@ async def _detect_anomalies():
                 for anomaly in anomalies:
                     logger.warning(
                         "Anomaly detected for user %s: %s %s (%.1f%%)",
-                        user_id, anomaly.symbol, anomaly.anomaly_type,
+                        user_id,
+                        anomaly.symbol,
+                        anomaly.anomaly_type,
                         anomaly.price_change_percent,
                     )
             except Exception as e:
@@ -136,8 +131,10 @@ def check_prediction_accuracy():
 
 async def _check_prediction_accuracy():
     """Compare past predictions with actual prices to monitor drift."""
-    from datetime import datetime, timedelta
-    from sqlalchemy import select, and_
+    from datetime import datetime
+
+    from sqlalchemy import and_, select
+
     from app.models.prediction_log import PredictionLog
     from app.services.price_service import PriceService
 
@@ -147,12 +144,14 @@ async def _check_prediction_accuracy():
     async with async_session_factory() as db:
         # Find predictions whose target_date has passed but haven't been checked
         result = await db.execute(
-            select(PredictionLog).where(
+            select(PredictionLog)
+            .where(
                 and_(
                     PredictionLog.target_date <= now,
                     PredictionLog.accuracy_checked.is_(None),
                 )
-            ).limit(100)
+            )
+            .limit(100)
         )
         logs = result.scalars().all()
 
@@ -167,6 +166,7 @@ async def _check_prediction_accuracy():
             try:
                 # Get actual price
                 from app.models.asset import AssetType
+
                 asset_type = AssetType(log.asset_type) if log.asset_type else AssetType.CRYPTO
 
                 if asset_type == AssetType.CRYPTO:
@@ -190,7 +190,9 @@ async def _check_prediction_accuracy():
                         drift_alerts += 1
                         logger.warning(
                             "DRIFT ALERT: %s prediction MAPE=%.1f%% (threshold=%.0f%%)",
-                            log.symbol, log.mape, threshold,
+                            log.symbol,
+                            log.mape,
+                            threshold,
                         )
 
                 checked += 1
@@ -200,7 +202,8 @@ async def _check_prediction_accuracy():
         await db.commit()
         logger.info(
             "Prediction accuracy check: %d checked, %d drift alerts",
-            checked, drift_alerts,
+            checked,
+            drift_alerts,
         )
 
 
@@ -212,18 +215,14 @@ def tune_hyperparameters():
 
 async def _tune_hyperparameters():
     """Async hyperparameter tuning."""
-    from app.ml.hyperparameter_tuner import tune_xgboost, tune_prophet
-    from app.ml.historical_data import HistoricalDataFetcher
     from app.core.redis_client import cache_hyperparams
+    from app.ml.historical_data import HistoricalDataFetcher
+    from app.ml.hyperparameter_tuner import tune_prophet, tune_xgboost
 
     fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
-        result = await db.execute(
-            select(Asset.symbol, Asset.asset_type)
-            .where(Asset.quantity > 0)
-            .distinct()
-        )
+        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
         assets = result.all()
 
     logger.info("Starting hyperparameter tuning for %d assets", len(assets))

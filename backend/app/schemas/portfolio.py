@@ -17,8 +17,6 @@ class PortfolioBase(BaseModel):
 class PortfolioCreate(PortfolioBase):
     """Schema for creating a portfolio."""
 
-    pass
-
 
 class PortfolioUpdate(BaseModel):
     """Schema for updating a portfolio."""

@@ -10,7 +10,15 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import get_cached_prediction, cache_prediction
+from app.core.redis_client import (
+    _data_hash,
+    cache_ensemble,
+    cache_history,
+    cache_prediction,
+    get_cached_ensemble,
+    get_cached_history,
+    get_cached_prediction,
+)
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
 from app.ml.historical_data import HistoricalDataFetcher
@@ -72,7 +80,7 @@ class PredictionService:
         self.forecaster = PriceForecaster()
         self.anomaly_detector = AnomalyDetector()
         self.data_fetcher = HistoricalDataFetcher(
-            coingecko_api_key=getattr(self.price_service, 'coingecko_api_key', None)
+            coingecko_api_key=getattr(self.price_service, "coingecko_api_key", None)
         )
 
     async def get_price_prediction(
@@ -85,7 +93,7 @@ class PredictionService:
         # Check cache first
         cached = await get_cached_prediction(symbol, days_ahead)
         if cached:
-            return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith('_')})
+            return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith("_")})
 
         current_price = await self._get_current_price(symbol, asset_type)
 
@@ -93,9 +101,23 @@ class PredictionService:
             return self._empty_prediction(symbol)
 
         # Fetch historical data (90 days for Prophet, less is OK for linear)
-        dates, prices = await self.data_fetcher.get_history(
-            symbol, asset_type.value, days=90
-        )
+        # Check history cache first to avoid redundant API calls
+        cached_hist = await get_cached_history(symbol, asset_type.value, 90)
+        if cached_hist:
+            dates = [datetime.fromisoformat(d) for d in cached_hist["dates"]]
+            prices = cached_hist["prices"]
+        else:
+            dates, prices = await self.data_fetcher.get_history(symbol, asset_type.value, days=90)
+            if dates and prices:
+                await cache_history(
+                    symbol,
+                    asset_type.value,
+                    90,
+                    {
+                        "dates": [d.isoformat() for d in dates],
+                        "prices": prices,
+                    },
+                )
 
         # Use enough decimal places for micro-price assets (PEPE, SHIB, etc.)
         def smart_round(v: float) -> float:
@@ -106,8 +128,32 @@ class PredictionService:
             return round(v, 2)
 
         if prices and len(prices) >= 5:
-            # Use ML forecaster
-            result = self.forecaster.ensemble_forecast(prices, dates, days_ahead)
+            # Check ensemble cache before running expensive ML models
+            dhash = _data_hash(prices)
+            cached_ens = await get_cached_ensemble(symbol, dhash, days_ahead)
+            if cached_ens:
+                from app.ml.forecaster import ForecastResult
+
+                result = ForecastResult(**cached_ens)
+            else:
+                result = self.forecaster.ensemble_forecast(prices, dates, days_ahead, symbol=symbol, data_hash=dhash)
+                # Cache the ensemble result for future requests
+                await cache_ensemble(
+                    symbol,
+                    dhash,
+                    days_ahead,
+                    {
+                        "dates": result.dates,
+                        "prices": result.prices,
+                        "confidence_low": result.confidence_low,
+                        "confidence_high": result.confidence_high,
+                        "trend": result.trend,
+                        "trend_strength": result.trend_strength,
+                        "model_used": result.model_used,
+                        "models_detail": result.models_detail,
+                        "explanations": result.explanations,
+                    },
+                )
 
             predictions = [
                 {
@@ -123,7 +169,7 @@ class PredictionService:
             trend_strength = result.trend_strength
             model_used = result.model_used
             models_detail = result.models_detail
-            explanations = getattr(result, 'explanations', [])
+            explanations = getattr(result, "explanations", [])
         else:
             # Fallback: simple random walk when no historical data
             logger.warning("No historical data for %s, using random walk", symbol)
@@ -136,22 +182,18 @@ class PredictionService:
 
         # Support/resistance from pivot points + price level clustering
         if prices and len(prices) >= 10:
-            support, resistance = self._compute_support_resistance(
-                prices, current_price
-            )
+            support, resistance = self._compute_support_resistance(prices, current_price)
         else:
             vol = await self._get_daily_volatility(symbol, asset_type)
             support = current_price * (1 - vol * 5)
             resistance = current_price * (1 + vol * 5)
 
-        recommendation = self._generate_recommendation(
-            trend, trend_strength, current_price, support, resistance
-        )
+        recommendation = self._generate_recommendation(trend, trend_strength, current_price, support, resistance)
 
         # Log prediction for monitoring
         try:
-            from app.models.prediction_log import PredictionLog
             from app.core.database import AsyncSessionLocal
+            from app.models.prediction_log import PredictionLog
 
             if predictions:
                 last_pred = predictions[-1]
@@ -234,10 +276,24 @@ class PredictionService:
                 if current_price == 0:
                     continue
 
-                # Fetch historical prices for ML-based detection
-                _, prices = await self.data_fetcher.get_history(
-                    asset.symbol, asset.asset_type.value, days=30
-                )
+                # Fetch historical prices for ML-based detection (with cache)
+                cached_hist = await get_cached_history(asset.symbol, asset.asset_type.value, 30)
+                if cached_hist:
+                    prices = cached_hist["prices"]
+                else:
+                    hist_dates, prices = await self.data_fetcher.get_history(
+                        asset.symbol, asset.asset_type.value, days=30
+                    )
+                    if hist_dates and prices:
+                        await cache_history(
+                            asset.symbol,
+                            asset.asset_type.value,
+                            30,
+                            {
+                                "dates": [d.isoformat() for d in hist_dates],
+                                "prices": prices,
+                            },
+                        )
 
                 anomaly = self.anomaly_detector.detect(
                     symbol=asset.symbol,
@@ -248,15 +304,17 @@ class PredictionService:
                 )
 
                 if anomaly:
-                    anomalies.append(AnomalyDetection(
-                        symbol=anomaly.symbol,
-                        is_anomaly=anomaly.is_anomaly,
-                        anomaly_type=anomaly.anomaly_type,
-                        severity=anomaly.severity,
-                        description=anomaly.description,
-                        detected_at=anomaly.detected_at,
-                        price_change_percent=anomaly.price_change_percent,
-                    ))
+                    anomalies.append(
+                        AnomalyDetection(
+                            symbol=anomaly.symbol,
+                            is_anomaly=anomaly.is_anomaly,
+                            anomaly_type=anomaly.anomaly_type,
+                            severity=anomaly.severity,
+                            description=anomaly.description,
+                            detected_at=anomaly.detected_at,
+                            price_change_percent=anomaly.price_change_percent,
+                        )
+                    )
 
             except Exception as e:
                 logger.warning("Error checking anomaly for %s: %s", asset.symbol, e)
@@ -288,7 +346,7 @@ class PredictionService:
             result = await db.execute(
                 select(Asset).where(
                     Asset.portfolio_id.in_(portfolio_ids),
-                        Asset.quantity > 0,
+                    Asset.quantity > 0,
                 )
             )
             assets = result.scalars().all()
@@ -307,9 +365,7 @@ class PredictionService:
             # Batch fetch crypto prices (single API call)
             if crypto_symbols:
                 try:
-                    crypto_prices = await self.price_service.get_multiple_crypto_prices(
-                        crypto_symbols
-                    )
+                    crypto_prices = await self.price_service.get_multiple_crypto_prices(crypto_symbols)
                     for sym, price_data in crypto_prices.items():
                         change_pct = float(price_data.get("change_percent_24h", 0))
                         total_change += change_pct
@@ -340,6 +396,7 @@ class PredictionService:
         fear_greed = 50
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get("https://api.alternative.me/fng/?limit=1")
                 resp.raise_for_status()
@@ -368,37 +425,47 @@ class PredictionService:
         signals = []
 
         if fear_greed > 75:
-            signals.append({
-                "type": "warning",
-                "message": "Marché en zone de cupidité extrême",
-                "action": "Envisagez de prendre des profits",
-            })
+            signals.append(
+                {
+                    "type": "warning",
+                    "message": "Marché en zone de cupidité extrême",
+                    "action": "Envisagez de prendre des profits",
+                }
+            )
         elif fear_greed < 25:
-            signals.append({
-                "type": "opportunity",
-                "message": "Marché en zone de peur extrême",
-                "action": "Opportunité d'achat potentielle",
-            })
+            signals.append(
+                {
+                    "type": "opportunity",
+                    "message": "Marché en zone de peur extrême",
+                    "action": "Opportunité d'achat potentielle",
+                }
+            )
 
         if bullish_count > 0:
-            signals.append({
-                "type": "buy",
-                "message": f"{bullish_count} actif(s) en hausse significative (+1%)",
-                "action": "Momentum positif sur votre portefeuille",
-            })
+            signals.append(
+                {
+                    "type": "buy",
+                    "message": f"{bullish_count} actif(s) en hausse significative (+1%)",
+                    "action": "Momentum positif sur votre portefeuille",
+                }
+            )
         if bearish_count > 0:
-            signals.append({
-                "type": "sell",
-                "message": f"{bearish_count} actif(s) en baisse significative (-1%)",
-                "action": "Surveillez vos positions en baisse",
-            })
+            signals.append(
+                {
+                    "type": "sell",
+                    "message": f"{bearish_count} actif(s) en baisse significative (-1%)",
+                    "action": "Surveillez vos positions en baisse",
+                }
+            )
 
         if crypto_count > 0:
-            signals.append({
-                "type": "info",
-                "message": f"Exposition crypto: {crypto_count} actif(s)",
-                "action": "Surveillez la volatilité du marché crypto",
-            })
+            signals.append(
+                {
+                    "type": "info",
+                    "message": f"Exposition crypto: {crypto_count} actif(s)",
+                    "action": "Surveillez la volatilité du marché crypto",
+                }
+            )
 
         return MarketSentiment(
             overall_sentiment=sentiment,
@@ -457,17 +524,11 @@ class PredictionService:
             if PriceService.is_stablecoin(asset.symbol):
                 continue
 
-            prediction = await self.get_price_prediction(
-                asset.symbol, asset.asset_type, days_ahead
-            )
+            prediction = await self.get_price_prediction(asset.symbol, asset.asset_type, days_ahead)
 
             qty = quantity_map[asset.symbol]
             current_value = prediction.current_price * qty
-            predicted_value = (
-                prediction.predictions[-1]["price"] * qty
-                if prediction.predictions
-                else current_value
-            )
+            predicted_value = prediction.predictions[-1]["price"] * qty if prediction.predictions else current_value
 
             total_current += current_value
             total_predicted += predicted_value
@@ -519,37 +580,33 @@ class PredictionService:
                 consensus_score = 50.0
                 models_agree = True
 
-            predictions.append({
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "asset_type": asset.asset_type.value,
-                "current_price": prediction.current_price,
-                "predicted_price": predicted_price,
-                "change_percent": round(change_percent, 2),
-                "trend": prediction.trend,
-                "trend_strength": prediction.trend_strength,
-                "recommendation": prediction.recommendation,
-                "model_used": prediction.model_used,
-                "predictions": prediction.predictions,
-                "support_level": prediction.support_level,
-                "resistance_level": prediction.resistance_level,
-                "accuracy": accuracy,
-                "consensus_score": round(consensus_score, 1),
-                "models_agree": models_agree,
-                "models_detail": models_detail,
-                "explanations": prediction.explanations or [],
-            })
+            predictions.append(
+                {
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "asset_type": asset.asset_type.value,
+                    "current_price": prediction.current_price,
+                    "predicted_price": predicted_price,
+                    "change_percent": round(change_percent, 2),
+                    "trend": prediction.trend,
+                    "trend_strength": prediction.trend_strength,
+                    "recommendation": prediction.recommendation,
+                    "model_used": prediction.model_used,
+                    "predictions": prediction.predictions,
+                    "support_level": prediction.support_level,
+                    "resistance_level": prediction.resistance_level,
+                    "accuracy": accuracy,
+                    "consensus_score": round(consensus_score, 1),
+                    "models_agree": models_agree,
+                    "models_detail": models_detail,
+                    "explanations": prediction.explanations or [],
+                }
+            )
 
-        portfolio_change = (
-            ((total_predicted - total_current) / total_current * 100)
-            if total_current > 0
-            else 0
-        )
+        portfolio_change = ((total_predicted - total_current) / total_current * 100) if total_current > 0 else 0
 
         overall_sentiment = (
-            "bullish" if bullish_count > bearish_count
-            else "bearish" if bearish_count > bullish_count
-            else "neutral"
+            "bullish" if bullish_count > bearish_count else "bearish" if bearish_count > bullish_count else "neutral"
         )
 
         return {
@@ -619,14 +676,16 @@ class PredictionService:
             total_current += current_val
             total_simulated += simulated_val
 
-            per_asset.append({
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "current_value": round(current_val, 2),
-                "simulated_value": round(simulated_val, 2),
-                "change_percent": change,
-                "impact": round(simulated_val - current_val, 2),
-            })
+            per_asset.append(
+                {
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "current_value": round(current_val, 2),
+                    "simulated_value": round(simulated_val, 2),
+                    "change_percent": change,
+                    "impact": round(simulated_val - current_val, 2),
+                }
+            )
 
         impact_pct = ((total_simulated - total_current) / total_current * 100) if total_current > 0 else 0
 
@@ -640,24 +699,33 @@ class PredictionService:
     async def get_market_events(self) -> List[Dict]:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
+
         now = datetime.utcnow()
         current_year = now.year
         events = []
 
         # Month name mappings
         month_map = {
-            "january": 1, "february": 2, "march": 3, "april": 4,
-            "may": 5, "june": 6, "july": 7, "august": 8,
-            "september": 9, "october": 10, "november": 11, "december": 12,
+            "january": 1,
+            "february": 2,
+            "march": 3,
+            "april": 4,
+            "may": 5,
+            "june": 6,
+            "july": 7,
+            "august": 8,
+            "september": 9,
+            "october": 10,
+            "november": 11,
+            "december": 12,
         }
 
         # 1. Fetch this week's economic events from Forex Factory (free, no key)
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-                )
+                resp = await client.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json")
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -669,9 +737,7 @@ class PredictionService:
                 if not date_str:
                     continue
                 try:
-                    evt_date = datetime.fromisoformat(
-                        date_str.replace("Z", "+00:00")
-                    ).replace(tzinfo=None)
+                    evt_date = datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
                 except (ValueError, TypeError):
                     continue
                 if evt_date < now:
@@ -689,24 +755,25 @@ class PredictionService:
                 if forecast:
                     desc_parts.append(f"Prévision: {forecast}")
 
-                events.append({
-                    "title": title,
-                    "date": evt_date.strftime("%Y-%m-%d"),
-                    "category": "macro",
-                    "description": " — ".join(desc_parts) if desc_parts else title,
-                    "impact": "high" if impact == "High" else "medium",
-                    "days_until": (evt_date - now).days,
-                })
+                events.append(
+                    {
+                        "title": title,
+                        "date": evt_date.strftime("%Y-%m-%d"),
+                        "category": "macro",
+                        "description": " — ".join(desc_parts) if desc_parts else title,
+                        "impact": "high" if impact == "High" else "medium",
+                        "days_until": (evt_date - now).days,
+                    }
+                )
         except Exception as e:
             logger.warning("Failed to fetch Forex Factory calendar: %s", e)
 
         # 2. Scrape FOMC meeting dates from Federal Reserve website
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
-                )
+                resp = await client.get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
                 resp.raise_for_status()
                 html = resp.text
 
@@ -715,19 +782,13 @@ class PredictionService:
             for year in [current_year, current_year + 1]:
                 # Find meeting date patterns like "January 27-28" or "March 17-18*"
                 pattern = rf'({"|".join(month_map.keys())})\s+(\d{{1,2}})-(\d{{1,2}})\*?'
-                year_section_match = re.search(
-                    rf'class="[^"]*"[^>]*>\s*{year}\s*<',
-                    html, re.IGNORECASE
-                )
+                year_section_match = re.search(rf'class="[^"]*"[^>]*>\s*{year}\s*<', html, re.IGNORECASE)
                 if not year_section_match:
                     continue
 
                 # Search from year header to next year header or end
                 start = year_section_match.start()
-                next_year = re.search(
-                    rf'class="[^"]*"[^>]*>\s*{year + 1}\s*<',
-                    html[start + 100:], re.IGNORECASE
-                )
+                next_year = re.search(rf'class="[^"]*"[^>]*>\s*{year + 1}\s*<', html[start + 100 :], re.IGNORECASE)
                 end = start + 100 + next_year.start() if next_year else len(html)
                 section = html[start:end]
 
@@ -744,32 +805,33 @@ class PredictionService:
                     if evt_date < now:
                         continue
 
-                    events.append({
-                        "title": "Réunion FOMC (Fed)",
-                        "date": evt_date.strftime("%Y-%m-%d"),
-                        "category": "macro",
-                        "description": "Décision sur les taux d'intérêt américains",
-                        "impact": "high",
-                        "days_until": (evt_date - now).days,
-                    })
+                    events.append(
+                        {
+                            "title": "Réunion FOMC (Fed)",
+                            "date": evt_date.strftime("%Y-%m-%d"),
+                            "category": "macro",
+                            "description": "Décision sur les taux d'intérêt américains",
+                            "impact": "high",
+                            "days_until": (evt_date - now).days,
+                        }
+                    )
         except Exception as e:
             logger.warning("Failed to scrape FOMC calendar: %s", e)
 
         # 3. Scrape ECB meeting dates
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                resp = await client.get(
-                    "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
-                )
+                resp = await client.get("https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html")
                 resp.raise_for_status()
                 html = resp.text
 
             # ECB calendar uses dates like "5 February", "19 March", etc.
             # Look for "Monetary policy" sections with dates
             # Pattern: day month year in various formats
-            pattern = r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})'
-            monetary_sections = re.split(r'(?i)monetary\s+polic', html)
+            pattern = r"(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})"
+            monetary_sections = re.split(r"(?i)monetary\s+polic", html)
 
             seen_ecb_dates = set()
             for section in monetary_sections[1:]:  # Skip text before first match
@@ -793,33 +855,43 @@ class PredictionService:
                         continue
                     seen_ecb_dates.add(date_key)
 
-                    events.append({
-                        "title": "Réunion BCE",
-                        "date": date_key,
-                        "category": "macro",
-                        "description": "Décision sur les taux d'intérêt européens",
-                        "impact": "high",
-                        "days_until": (evt_date - now).days,
-                    })
+                    events.append(
+                        {
+                            "title": "Réunion BCE",
+                            "date": date_key,
+                            "category": "macro",
+                            "description": "Décision sur les taux d'intérêt européens",
+                            "impact": "high",
+                            "days_until": (evt_date - now).days,
+                        }
+                    )
         except Exception as e:
             logger.warning("Failed to scrape ECB calendar: %s", e)
 
         # 4. Fiscal events (quarterly — these are fixed by definition)
         for year in [current_year, current_year + 1]:
-            for q, (m, d, label) in enumerate([
-                (3, 31, "Q1"), (6, 30, "Q2"), (9, 30, "Q3"), (12, 31, "Q4"),
-            ], 1):
+            for q, (m, d, label) in enumerate(
+                [
+                    (3, 31, "Q1"),
+                    (6, 30, "Q2"),
+                    (9, 30, "Q3"),
+                    (12, 31, "Q4"),
+                ],
+                1,
+            ):
                 evt_date = datetime(year, m, d)
                 if evt_date < now or (evt_date - now).days > 365:
                     continue
-                events.append({
-                    "title": f"Fin de trimestre {label}",
-                    "date": evt_date.strftime("%Y-%m-%d"),
-                    "category": "fiscal",
-                    "description": f"Clôture {label} — rééquilibrages institutionnels",
-                    "impact": "medium",
-                    "days_until": (evt_date - now).days,
-                })
+                events.append(
+                    {
+                        "title": f"Fin de trimestre {label}",
+                        "date": evt_date.strftime("%Y-%m-%d"),
+                        "category": "fiscal",
+                        "description": f"Clôture {label} — rééquilibrages institutionnels",
+                        "impact": "medium",
+                        "days_until": (evt_date - now).days,
+                    }
+                )
 
         # 5. Crypto events — dynamically estimate next BTC halving from blockchain
         try:
@@ -836,14 +908,16 @@ class PredictionService:
                     est_halving_date = now + timedelta(minutes=minutes_remaining)
                     halving_number = next_halving_block // halving_interval
                     if (est_halving_date - now).days > 0:
-                        events.append({
-                            "title": f"Halving Bitcoin #{halving_number}",
-                            "date": est_halving_date.strftime("%Y-%m-%d"),
-                            "category": "crypto",
-                            "description": f"Réduction de la récompense de minage — bloc {next_halving_block:,}",
-                            "impact": "high",
-                            "days_until": (est_halving_date - now).days,
-                        })
+                        events.append(
+                            {
+                                "title": f"Halving Bitcoin #{halving_number}",
+                                "date": est_halving_date.strftime("%Y-%m-%d"),
+                                "category": "crypto",
+                                "description": f"Réduction de la récompense de minage — bloc {next_halving_block:,}",
+                                "impact": "high",
+                                "days_until": (est_halving_date - now).days,
+                            }
+                        )
         except Exception as e:
             logger.warning("Failed to fetch BTC block height: %s", e)
 
@@ -860,16 +934,14 @@ class PredictionService:
         return unique[:15]
 
     @staticmethod
-    def _compute_support_resistance(
-        prices: List[float], current_price: float
-    ) -> Tuple[float, float]:
+    def _compute_support_resistance(prices: List[float], current_price: float) -> Tuple[float, float]:
         """Compute support/resistance using pivot points + price clustering.
 
         1. Classic pivot points (H, L, C of recent window)
         2. K-means clustering of local extrema to find key price levels
         3. Pick nearest support below and resistance above current price
         """
-        recent = prices[-min(60, len(prices)):]
+        recent = prices[-min(60, len(prices)) :]
         arr = np.array(recent, dtype=float)
 
         # --- Pivot points ---
@@ -912,9 +984,7 @@ class PredictionService:
 
         return support, resistance
 
-    def _compute_accuracy_from_data(
-        self, dates: List, prices: List[float]
-    ) -> float:
+    def _compute_accuracy_from_data(self, dates: List, prices: List[float]) -> float:
         """Compute prediction accuracy via ensemble backtesting on already-fetched data.
 
         Runs the full ensemble_forecast on multiple train/test splits and measures
@@ -938,13 +1008,9 @@ class PredictionService:
 
                 # Use ensemble forecast instead of just linear
                 try:
-                    result = self.forecaster.ensemble_forecast(
-                        train_prices, train_dates, horizon
-                    )
+                    result = self.forecaster.ensemble_forecast(train_prices, train_dates, horizon)
                 except Exception:
-                    result = self.forecaster._linear_forecast(
-                        train_prices, train_dates, horizon
-                    )
+                    result = self.forecaster._linear_forecast(train_prices, train_dates, horizon)
 
                 # Measure error at each predicted day
                 for i in range(min(len(result.prices), horizon)):
@@ -999,14 +1065,24 @@ class PredictionService:
     async def _get_daily_volatility(self, symbol: str, asset_type: AssetType) -> float:
         """Compute daily volatility from actual historical data."""
         try:
-            _, prices = await self.data_fetcher.get_history(
-                symbol, asset_type.value, days=30
-            )
+            cached_hist = await get_cached_history(symbol, asset_type.value, 30)
+            if cached_hist:
+                prices = cached_hist["prices"]
+            else:
+                hist_dates, prices = await self.data_fetcher.get_history(symbol, asset_type.value, days=30)
+                if hist_dates and prices:
+                    await cache_history(
+                        symbol,
+                        asset_type.value,
+                        30,
+                        {
+                            "dates": [d.isoformat() for d in hist_dates],
+                            "prices": prices,
+                        },
+                    )
             if prices and len(prices) >= 5:
                 returns = [
-                    (prices[i] - prices[i - 1]) / prices[i - 1]
-                    for i in range(1, len(prices))
-                    if prices[i - 1] > 0
+                    (prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices)) if prices[i - 1] > 0
                 ]
                 if returns:
                     return float(np.std(returns))
@@ -1070,12 +1146,14 @@ class PredictionService:
                     return round(v, 10)
                 return round(v, 2)
 
-            predictions.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "price": _rw_round(predicted_price),
-                "confidence_low": _rw_round(max(0, confidence_low)),
-                "confidence_high": _rw_round(confidence_high),
-            })
+            predictions.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "price": _rw_round(predicted_price),
+                    "confidence_low": _rw_round(max(0, confidence_low)),
+                    "confidence_high": _rw_round(confidence_high),
+                }
+            )
             base_price = predicted_price
 
         return predictions, trend, trend_strength

@@ -25,11 +25,7 @@ async def list_users(
 ) -> List[UserResponse]:
     """List all users (admin only)."""
     result = await db.execute(
-        select(User)
-        .where(User.is_active == True)
-        .offset(skip)
-        .limit(limit)
-        .order_by(User.created_at.desc())
+        select(User).where(User.is_active == True).offset(skip).limit(limit).order_by(User.created_at.desc())
     )
     users = result.scalars().all()
     return users
@@ -75,9 +71,7 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """Get a specific user (admin only)."""
-    result = await db.execute(
-        select(User).where(User.id == user_id, User.is_active == True)
-    )
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -97,9 +91,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """Update a user (admin only)."""
-    result = await db.execute(
-        select(User).where(User.id == user_id, User.is_active == True)
-    )
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -116,9 +108,7 @@ async def update_user(
 
     if "email" in update_data and update_data["email"] != user.email:
         # Check if new email already exists
-        result = await db.execute(
-            select(User).where(User.email == update_data["email"])
-        )
+        result = await db.execute(select(User).where(User.email == update_data["email"]))
         if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -147,9 +137,7 @@ async def delete_user(
             detail="Cannot delete yourself",
         )
 
-    result = await db.execute(
-        select(User).where(User.id == user_id, User.is_active == True)
-    )
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
     user = result.scalar_one_or_none()
 
     if not user:

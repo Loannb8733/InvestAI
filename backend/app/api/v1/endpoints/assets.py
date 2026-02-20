@@ -3,7 +3,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -105,6 +105,7 @@ async def create_asset(
     # Pre-cache historical data for this asset (background)
     try:
         from app.tasks.history_cache import cache_single_asset
+
         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
     except Exception:
         pass  # Non-critical

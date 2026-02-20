@@ -2,8 +2,8 @@
 
 from app.services.exchanges.base import BaseExchangeService
 from app.services.exchanges.binance import BinanceService
-from app.services.exchanges.kraken import KrakenService
 from app.services.exchanges.cryptocom import CryptoComService
+from app.services.exchanges.kraken import KrakenService
 
 EXCHANGE_SERVICES = {
     "binance": BinanceService,

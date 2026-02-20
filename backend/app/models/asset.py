@@ -2,7 +2,6 @@
 
 import enum
 import uuid
-from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String
@@ -25,7 +24,9 @@ class Asset(Base):
     __tablename__ = "assets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True)
+    portfolio_id = Column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     symbol = Column(String(20), nullable=False, index=True)
     name = Column(String(200), nullable=True)
     asset_type = Column(Enum(AssetType), nullable=False)

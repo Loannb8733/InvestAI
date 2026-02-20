@@ -47,6 +47,9 @@ ta>=0.11.0
 # tensorflow==2.15.0  # Uncomment when needed
 # torch==2.1.2        # Uncomment when needed
 
+# Monitoring
+sentry-sdk[fastapi]==1.40.0
+
 # Utilities
 python-dotenv==1.0.0
 python-dateutil==2.8.2
@@ -63,6 +66,8 @@ black==23.12.1
 isort==5.13.2
 flake8==7.0.0
 mypy==1.8.0
+types-redis==4.6.0.20240106
+sqlalchemy[mypy]==2.0.25
 
 # PDF Generation (Phase 7)
 reportlab==4.0.8

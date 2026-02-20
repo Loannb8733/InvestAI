@@ -21,19 +21,22 @@ PHASES = ("bearish", "bottom", "bullish", "top")
 # Dataclasses
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class IndicatorSignal:
     """Single indicator signal."""
+
     name: str
     value: float
-    signal: str        # dominant phase
-    strength: float    # 0-1
+    signal: str  # dominant phase
+    strength: float  # 0-1
     description: str
 
 
 @dataclass
 class RegimeResult:
     """Regime detection result for a single symbol."""
+
     symbol: str
     probabilities: Dict[str, float]
     dominant_regime: str
@@ -45,6 +48,7 @@ class RegimeResult:
 @dataclass
 class MarketRegime:
     """Aggregate regime for market + per-asset."""
+
     market: RegimeResult
     per_asset: List[RegimeResult] = field(default_factory=list)
     generated_at: datetime = field(default_factory=datetime.utcnow)
@@ -53,6 +57,7 @@ class MarketRegime:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _safe(v) -> float:
     if v is None:
@@ -111,8 +116,7 @@ def _macd(prices: List[float]) -> Optional[Tuple[float, float, float]]:
         return None
     # Align lengths
     min_len = min(len(ema12), len(ema26))
-    macd_line = [ema12[len(ema12) - min_len + i] - ema26[len(ema26) - min_len + i]
-                 for i in range(min_len)]
+    macd_line = [ema12[len(ema12) - min_len + i] - ema26[len(ema26) - min_len + i] for i in range(min_len)]
     if len(macd_line) < 9:
         return None
     # Signal = EMA9 of MACD line
@@ -121,12 +125,11 @@ def _macd(prices: List[float]) -> Optional[Tuple[float, float, float]]:
     for v in macd_line[9:]:
         signal.append(signal[-1] * (1 - k) + v * k)
     hist = macd_line[-1] - signal[-1]
-    prev_hist = macd_line[-2] - signal[-2] if len(signal) >= 2 and len(macd_line) >= 2 else hist
+    _ = macd_line[-2] - signal[-2] if len(signal) >= 2 and len(macd_line) >= 2 else hist
     return (macd_line[-1], signal[-1], hist)
 
 
-def _bollinger(prices: List[float], period: int = 20, num_std: float = 2.0
-               ) -> Optional[Tuple[float, float, float]]:
+def _bollinger(prices: List[float], period: int = 20, num_std: float = 2.0) -> Optional[Tuple[float, float, float]]:
     """Return (lower_band, middle, upper_band) for last value."""
     if len(prices) < period:
         return None
@@ -139,6 +142,7 @@ def _bollinger(prices: List[float], period: int = 20, num_std: float = 2.0
 # ---------------------------------------------------------------------------
 # Main Detector
 # ---------------------------------------------------------------------------
+
 
 class MarketRegimeDetector:
     """Detects market regime from price history using 7 technical indicators."""
@@ -284,8 +288,7 @@ class MarketRegimeDetector:
         if not ema12 or not ema26:
             return None
         min_len = min(len(ema12), len(ema26))
-        macd_series = [ema12[len(ema12) - min_len + i] - ema26[len(ema26) - min_len + i]
-                       for i in range(min_len)]
+        macd_series = [ema12[len(ema12) - min_len + i] - ema26[len(ema26) - min_len + i] for i in range(min_len)]
         k = 2 / 10
         signal_series = [float(np.mean(macd_series[:9]))]
         for v in macd_series[9:]:
@@ -298,7 +301,7 @@ class MarketRegimeDetector:
         hist_prev = macd_series[-2] - signal_series[-2]
         hist_prev2 = macd_series[-3] - signal_series[-3] if len(signal_series) >= 3 else hist_prev
         hist_rising = hist_now > hist_prev
-        hist_accelerating = (hist_now - hist_prev) > (hist_prev - hist_prev2)
+        (hist_now - hist_prev) > (hist_prev - hist_prev2)
 
         if histogram > 0 and hist_rising:
             signal, strength = "bullish", min(1.0, abs(histogram) * 50)
@@ -330,23 +333,21 @@ class MarketRegimeDetector:
 
         if position > 0.95:
             signal, strength = "top", min(1.0, (position - 0.9) * 5)
-            desc = f"Prix au-dessus de la bande haute de Bollinger — surachat"
+            desc = "Prix au-dessus de la bande haute de Bollinger — surachat"
         elif position > 0.65:
             signal, strength = "bullish", 0.3 + 0.4 * (position - 0.65) / 0.3
-            desc = f"Prix dans la partie haute des bandes de Bollinger"
+            desc = "Prix dans la partie haute des bandes de Bollinger"
         elif position > 0.35:
             signal, strength = "bullish", 0.2
-            desc = f"Prix au milieu des bandes de Bollinger — neutre"
+            desc = "Prix au milieu des bandes de Bollinger — neutre"
         elif position > 0.05:
             signal, strength = "bearish", 0.3 + 0.4 * (0.35 - position) / 0.3
-            desc = f"Prix dans la partie basse des bandes de Bollinger"
+            desc = "Prix dans la partie basse des bandes de Bollinger"
         else:
             signal, strength = "bottom", min(1.0, (0.1 - position) * 5)
-            desc = f"Prix sous la bande basse de Bollinger — survente"
+            desc = "Prix sous la bande basse de Bollinger — survente"
 
-        return IndicatorSignal(
-            "Bollinger Bands", round(position, 2), signal, round(strength, 2), desc
-        )
+        return IndicatorSignal("Bollinger Bands", round(position, 2), signal, round(strength, 2), desc)
 
     def _analyze_ma_cross(self, prices: List[float]) -> Optional[IndicatorSignal]:
         sma20 = _sma(prices, 20)
@@ -373,26 +374,24 @@ class MarketRegimeDetector:
         else:
             old_sma20, old_sma50 = sma20, sma50
 
-        recently_crossed_up = (old_sma20 and old_sma50 and
-                               old_sma20 < old_sma50 and sma20 > sma50)
-        recently_crossed_down = (old_sma20 and old_sma50 and
-                                 old_sma20 > old_sma50 and sma20 < sma50)
+        recently_crossed_up = old_sma20 and old_sma50 and old_sma20 < old_sma50 and sma20 > sma50
+        recently_crossed_down = old_sma20 and old_sma50 and old_sma20 > old_sma50 and sma20 < sma50
 
         if recently_crossed_up:
             signal, strength = "bottom", 0.8
-            desc = f"Golden cross — la MA courte croise la MA longue a la hausse"
+            desc = "Golden cross — la MA courte croise la MA longue a la hausse"
         elif recently_crossed_down:
             signal, strength = "top", 0.8
-            desc = f"Death cross — la MA courte croise la MA longue a la baisse"
+            desc = "Death cross — la MA courte croise la MA longue a la baisse"
         elif diff_pct > 3:
             signal, strength = "bullish", min(0.9, diff_pct / 10)
             desc = f"MA courte au-dessus de la MA longue (+{diff_pct:.1f}%)"
         elif diff_pct > 0:
             signal, strength = "bullish", 0.3
-            desc = f"MA courte legerement au-dessus de la MA longue"
+            desc = "MA courte legerement au-dessus de la MA longue"
         elif diff_pct > -3:
             signal, strength = "bearish", 0.3
-            desc = f"MA courte legerement sous la MA longue"
+            desc = "MA courte legerement sous la MA longue"
         else:
             signal, strength = "bearish", min(0.9, abs(diff_pct) / 10)
             desc = f"MA courte sous la MA longue ({diff_pct:.1f}%)"
@@ -405,8 +404,11 @@ class MarketRegimeDetector:
             return None
 
         roc = (prices[-1] - prices[-period - 1]) / max(abs(prices[-period - 1]), 1e-10) * 100
-        prev_roc = ((prices[-2] - prices[-period - 2]) /
-                    max(abs(prices[-period - 2]), 1e-10) * 100) if len(prices) > period + 2 else roc
+        prev_roc = (
+            ((prices[-2] - prices[-period - 2]) / max(abs(prices[-period - 2]), 1e-10) * 100)
+            if len(prices) > period + 2
+            else roc
+        )
 
         roc_accelerating = roc > prev_roc
         roc_decelerating = roc < prev_roc
@@ -431,22 +433,18 @@ class MarketRegimeDetector:
                 signal, strength = "bearish", min(0.9, abs(roc) / 20)
                 desc = f"Momentum fortement baissier ({roc:+.1f}%)"
 
-        return IndicatorSignal(
-            f"Momentum {period}j", round(roc, 1), signal, round(strength, 2), desc
-        )
+        return IndicatorSignal(f"Momentum {period}j", round(roc, 1), signal, round(strength, 2), desc)
 
     def _analyze_volatility(self, prices: List[float]) -> Optional[IndicatorSignal]:
         if len(prices) < 15:
             return None
 
-        returns = [(prices[i] - prices[i - 1]) / max(abs(prices[i - 1]), 1e-10)
-                    for i in range(-14, 0)]
+        returns = [(prices[i] - prices[i - 1]) / max(abs(prices[i - 1]), 1e-10) for i in range(-14, 0)]
         vol = float(np.std(returns)) * np.sqrt(365) * 100  # annualized %
 
         # Price position relative to recent range
         recent = prices[-14:]
-        price_position = ((prices[-1] - min(recent)) /
-                          max(max(recent) - min(recent), 1e-10))
+        price_position = (prices[-1] - min(recent)) / max(max(recent) - min(recent), 1e-10)
 
         if vol > 80 and price_position > 0.7:
             signal, strength = "top", min(0.8, vol / 150)
@@ -514,9 +512,7 @@ class MarketRegimeDetector:
 
         return votes
 
-    def _compute_confidence(
-        self, probs: Dict[str, float], num_indicators: int, num_prices: int
-    ) -> float:
+    def _compute_confidence(self, probs: Dict[str, float], num_indicators: int, num_prices: int) -> float:
         """Confidence based on indicator count, data length, and probability spread."""
         # More indicators → more confidence
         indicator_factor = min(1.0, num_indicators / 7)
@@ -529,9 +525,7 @@ class MarketRegimeDetector:
 
         return indicator_factor * 0.4 + data_factor * 0.3 + spread_factor * 0.3
 
-    def _make_description(
-        self, dominant: str, probs: Dict[str, float], confidence: float
-    ) -> str:
+    def _make_description(self, dominant: str, probs: Dict[str, float], confidence: float) -> str:
         pct = probs[dominant] * 100
         labels = {
             "bearish": "Marche baissier",

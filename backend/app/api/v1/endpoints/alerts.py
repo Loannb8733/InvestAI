@@ -161,9 +161,7 @@ async def list_alerts(
         asset_name = None
 
         if alert.asset_id:
-            asset_result = await db.execute(
-                select(Asset).where(Asset.id == alert.asset_id)
-            )
+            asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
             asset = asset_result.scalar_one_or_none()
             if asset:
                 asset_symbol = asset.symbol
@@ -280,9 +278,7 @@ async def get_alert(
     asset_name = None
 
     if alert.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == alert.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol
@@ -346,9 +342,7 @@ async def update_alert(
     asset_name = None
 
     if alert.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == alert.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol

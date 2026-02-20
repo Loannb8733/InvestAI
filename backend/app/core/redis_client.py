@@ -1,9 +1,9 @@
 """Redis client for caching predictions and fitted models."""
 
-import json
 import hashlib
-import pickle
+import json
 import logging
+import pickle
 from typing import Optional
 
 import redis.asyncio as aioredis
@@ -98,3 +98,45 @@ async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int
         await r.setex(f"hparams:{symbol}:{model_name}", ttl, json.dumps(params))
     except Exception as e:
         logger.warning("Failed to cache hyperparams: %s", e)
+
+
+async def get_cached_history(symbol: str, asset_type: str, days: int) -> Optional[dict]:
+    """Get cached historical OHLCV data."""
+    try:
+        r = await get_redis()
+        data = await r.get(f"hist:{symbol}:{asset_type}:{days}")
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.debug("Redis cache miss for history %s: %s", symbol, e)
+    return None
+
+
+async def cache_history(symbol: str, asset_type: str, days: int, result: dict, ttl: int = 3600):
+    """Cache historical OHLCV data (default 1h TTL)."""
+    try:
+        r = await get_redis()
+        await r.setex(f"hist:{symbol}:{asset_type}:{days}", ttl, json.dumps(result, default=str))
+    except Exception as e:
+        logger.warning("Failed to cache history: %s", e)
+
+
+async def get_cached_ensemble(symbol: str, data_hash: str, days: int) -> Optional[dict]:
+    """Get cached ensemble forecast result."""
+    try:
+        r = await get_redis()
+        data = await r.get(f"ensemble:{symbol}:{data_hash}:{days}")
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.debug("Redis cache miss for ensemble %s: %s", symbol, e)
+    return None
+
+
+async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, ttl: int = 14400):
+    """Cache ensemble forecast result (default 4h TTL)."""
+    try:
+        r = await get_redis()
+        await r.setex(f"ensemble:{symbol}:{data_hash}:{days}", ttl, json.dumps(result, default=str))
+    except Exception as e:
+        logger.warning("Failed to cache ensemble: %s", e)

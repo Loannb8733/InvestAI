@@ -14,14 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.core.rate_limit import limiter, RATE_LIMITS
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-    hash_password,
-    verify_password,
-)
+from app.core.rate_limit import RATE_LIMITS, limiter
+from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
@@ -42,11 +36,13 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
 
+
 router = APIRouter()
 
 
 class RegisterResponse(BaseModel):
     """Response for registration."""
+
     message: str
     email_verification_required: bool = False
 
@@ -91,6 +87,7 @@ async def register(
 
 class VerifyEmailRequest(BaseModel):
     """Request to verify email."""
+
     token: str
 
 
@@ -100,9 +97,7 @@ async def verify_email(
     db: AsyncSession = Depends(get_db),
 ) -> Token:
     """Verify email address and activate account."""
-    result = await db.execute(
-        select(User).where(User.email_verification_token == data.token)
-    )
+    result = await db.execute(select(User).where(User.email_verification_token == data.token))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -398,6 +393,7 @@ async def update_profile(
         valid_currencies = {"EUR", "USD", "CHF", "GBP"}
         if data["preferred_currency"] not in valid_currencies:
             from fastapi import HTTPException, status
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Currency must be one of: {', '.join(valid_currencies)}",
@@ -466,11 +462,11 @@ async def forgot_password(
             reset_url = f"{frontend_url}/reset-password?token={token}"
 
             body = (
-                f'Vous avez demandé la réinitialisation de votre mot de passe.<br><br>'
+                f"Vous avez demandé la réinitialisation de votre mot de passe.<br><br>"
                 f'<a href="{reset_url}" style="display:inline-block;padding:12px 24px;'
-                f'background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;'
+                f"background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;"
                 f'font-weight:bold;">Réinitialiser mon mot de passe</a><br><br>'
-                f'Ce lien est valable <strong>1 heure</strong>.<br>'
+                f"Ce lien est valable <strong>1 heure</strong>.<br>"
                 f"Si vous n'avez pas fait cette demande, ignorez cet email."
             )
 
@@ -495,9 +491,7 @@ async def reset_password(
     db: AsyncSession = Depends(get_db),
 ):
     """Reset password using a token from the forgot-password email."""
-    result = await db.execute(
-        select(User).where(User.password_reset_token == data.token)
-    )
+    result = await db.execute(select(User).where(User.password_reset_token == data.token))
     user = result.scalar_one_or_none()
 
     if not user:

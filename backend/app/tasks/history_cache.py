@@ -8,7 +8,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Set
 
 from redis import Redis
 from sqlalchemy import select
@@ -16,7 +15,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.ml.historical_data import HistoricalDataFetcher
-from app.models.asset import Asset, AssetType
+from app.models.asset import Asset
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -42,15 +41,8 @@ def _run_async(coro):
 async def _get_all_crypto_symbols() -> list:
     """Get all unique crypto symbols from DB."""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Asset.symbol, Asset.asset_type)
-            .where(Asset.quantity > 0)
-            .distinct()
-        )
-        return [
-            (row[0].upper(), row[1].value)
-            for row in result.all()
-        ]
+        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
+        return [(row[0].upper(), row[1].value) for row in result.all()]
 
 
 async def _fetch_and_cache_all():
@@ -62,7 +54,7 @@ async def _fetch_and_cache_all():
         logger.info("No assets to cache history for")
         return 0
 
-    coingecko_key = getattr(settings, 'COINGECKO_API_KEY', None) or None
+    coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
     fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
     cached_count = 0
 
@@ -86,11 +78,13 @@ async def _fetch_and_cache_all():
             try:
                 dates, prices = await fetcher.get_history(symbol, asset_type, days=90)
                 if dates and prices:
-                    payload = json.dumps({
-                        "dates": [d.isoformat() for d in dates],
-                        "prices": prices,
-                        "fetched_at": datetime.utcnow().timestamp(),
-                    })
+                    payload = json.dumps(
+                        {
+                            "dates": [d.isoformat() for d in dates],
+                            "prices": prices,
+                            "fetched_at": datetime.utcnow().timestamp(),
+                        }
+                    )
                     redis.setex(cache_key, REDIS_HISTORY_TTL, payload)
                     cached_count += 1
                     logger.info("Cached %d data points for %s", len(prices), symbol)
@@ -127,16 +121,18 @@ async def _cache_single(symbol: str, asset_type: str):
     if redis.get(cache_key):
         return True
 
-    coingecko_key = getattr(settings, 'COINGECKO_API_KEY', None) or None
+    coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
     fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
     try:
         dates, prices = await fetcher.get_history(symbol, asset_type, days=90)
         if dates and prices:
-            payload = json.dumps({
-                "dates": [d.isoformat() for d in dates],
-                "prices": prices,
-                "fetched_at": datetime.utcnow().timestamp(),
-            })
+            payload = json.dumps(
+                {
+                    "dates": [d.isoformat() for d in dates],
+                    "prices": prices,
+                    "fetched_at": datetime.utcnow().timestamp(),
+                }
+            )
             redis.setex(cache_key, REDIS_HISTORY_TTL, payload)
             logger.info("Cached %d data points for %s (on-demand)", len(prices), symbol)
             return True

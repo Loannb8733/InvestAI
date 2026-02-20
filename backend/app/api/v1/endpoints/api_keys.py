@@ -13,13 +13,7 @@ from app.core.database import get_db
 from app.core.security import decrypt_api_key, encrypt_api_key
 from app.models.api_key import APIKey
 from app.models.user import User
-from app.schemas.api_key import (
-    APIKeyCreate,
-    APIKeyResponse,
-    APIKeyTestResult,
-    APIKeyUpdate,
-    ExchangeInfo,
-)
+from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
 from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
 
 router = APIRouter()
@@ -37,9 +31,7 @@ async def list_api_keys(
     db: AsyncSession = Depends(get_db),
 ) -> List[APIKeyResponse]:
     """List all API keys for the current user."""
-    result = await db.execute(
-        select(APIKey).where(APIKey.user_id == current_user.id)
-    )
+    result = await db.execute(select(APIKey).where(APIKey.user_id == current_user.id))
     api_keys = result.scalars().all()
     return api_keys
 
@@ -270,11 +262,12 @@ async def import_trade_history(
     db: AsyncSession = Depends(get_db),
 ):
     """Import full trade history from exchange with actual prices."""
+    from collections import defaultdict
+    from decimal import Decimal
+
     from app.models.asset import Asset, AssetType
     from app.models.portfolio import Portfolio
     from app.models.transaction import Transaction, TransactionType
-    from decimal import Decimal
-    from collections import defaultdict
 
     result = await db.execute(
         select(APIKey).where(
@@ -333,7 +326,7 @@ async def import_trade_history(
 
         # Get Instant Buy transactions from Kraken ledgers
         instant_buys = []
-        if hasattr(service, 'get_instant_buys'):
+        if hasattr(service, "get_instant_buys"):
             print("Querying Kraken Instant Buy history from ledgers...")
             instant_buys = await service.get_instant_buys(limit=500)
             print(f"Instant Buy orders found: {len(instant_buys)}")
@@ -342,15 +335,17 @@ async def import_trade_history(
 
         # Get staking rewards from Kraken ledgers
         rewards = []
-        if hasattr(service, 'get_rewards'):
+        if hasattr(service, "get_rewards"):
             print("Querying Kraken rewards/staking history from ledgers...")
             rewards = await service.get_rewards(limit=500)
             print(f"Rewards found: {len(rewards)}")
 
             # Fetch historical prices for rewards
             if rewards:
-                from app.services.price_service import price_service
                 import asyncio
+
+                from app.services.price_service import price_service
+
                 print("Fetching historical prices for rewards (this may take a moment)...")
 
                 # Group rewards by symbol and date to minimize API calls
@@ -362,9 +357,7 @@ async def import_trade_history(
 
                     if date_key not in price_cache:
                         try:
-                            price = await price_service.get_historical_crypto_price(
-                                symbol, reward.timestamp, "eur"
-                            )
+                            price = await price_service.get_historical_crypto_price(symbol, reward.timestamp, "eur")
                             price_cache[date_key] = price
                             if price:
                                 print(f"  {symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
@@ -383,15 +376,17 @@ async def import_trade_history(
 
         # Get crypto-to-crypto conversions (Kraken, Crypto.com)
         conversions = []
-        if hasattr(service, 'get_crypto_conversions'):
+        if hasattr(service, "get_crypto_conversions"):
             print(f"Querying {service.exchange_name} crypto-to-crypto conversions...")
             conversions = await service.get_crypto_conversions(limit=500)
             print(f"Crypto conversions found: {len(conversions)}")
 
             # Fetch historical prices for conversions if needed
             if conversions:
-                from app.services.price_service import price_service
                 import asyncio
+
+                from app.services.price_service import price_service
+
                 print("Fetching historical prices for conversions...")
 
                 price_cache = {}
@@ -408,16 +403,14 @@ async def import_trade_history(
                         # No separator, try to extract base from common patterns
                         for quote in ["EUR", "USD", "USDT", "BTC", "ETH"]:
                             if symbol.endswith(quote) and len(symbol) > len(quote):
-                                symbol = symbol[:-len(quote)]
+                                symbol = symbol[: -len(quote)]
                                 break
 
                     date_key = f"{symbol}_{conversion.timestamp.strftime('%Y-%m-%d')}"
 
                     if date_key not in price_cache:
                         try:
-                            price = await price_service.get_historical_crypto_price(
-                                symbol, conversion.timestamp, "eur"
-                            )
+                            price = await price_service.get_historical_crypto_price(symbol, conversion.timestamp, "eur")
                             price_cache[date_key] = price
                             if price:
                                 print(f"  {symbol} @ {conversion.timestamp.date()}: {float(price):.2f} EUR")
@@ -442,7 +435,7 @@ async def import_trade_history(
         # Get convert history (EUR -> BTC conversions)
         # Query in 30-day chunks from 2017 to now (API requires time ranges)
         convert_orders = []
-        if hasattr(service, 'get_convert_history'):
+        if hasattr(service, "get_convert_history"):
             # Start from 2017 (Binance launch) to now
             target_start = datetime(2017, 7, 1, 0, 0, 0)  # Binance launched July 2017
             target_end = datetime.now()
@@ -456,11 +449,7 @@ async def import_trade_history(
                 chunk_start = max(chunk_end - timedelta(days=30), target_start)
 
                 try:
-                    chunk = await service.get_convert_history(
-                        start_time=chunk_start,
-                        end_time=chunk_end,
-                        limit=1000
-                    )
+                    chunk = await service.get_convert_history(start_time=chunk_start, end_time=chunk_end, limit=1000)
 
                     if chunk:
                         convert_orders.extend(chunk)
@@ -474,7 +463,7 @@ async def import_trade_history(
 
         # Get Auto-Invest (DCA) history
         auto_invest_orders = []
-        if hasattr(service, 'get_auto_invest_history'):
+        if hasattr(service, "get_auto_invest_history"):
             print("Querying Auto-Invest history...")
             # Query in 90-day chunks
             chunk_end = datetime.now()
@@ -483,11 +472,7 @@ async def import_trade_history(
             while chunk_end > target_start:
                 chunk_start = max(chunk_end - timedelta(days=90), target_start)
                 try:
-                    chunk = await service.get_auto_invest_history(
-                        start_time=chunk_start,
-                        end_time=chunk_end,
-                        limit=100
-                    )
+                    chunk = await service.get_auto_invest_history(start_time=chunk_start, end_time=chunk_end, limit=100)
                     if chunk:
                         auto_invest_orders.extend(chunk)
                         print(f"Found {len(chunk)} auto-invest orders from {chunk_start.date()} to {chunk_end.date()}")
@@ -521,7 +506,7 @@ async def import_trade_history(
             symbol = trade.symbol
             for quote in ["USDT", "BUSD", "EUR", "USD", "BTC", "ETH", "BNB"]:
                 if symbol.endswith(quote):
-                    base_asset = symbol[:-len(quote)]
+                    base_asset = symbol[: -len(quote)]
                     asset_trades[base_asset].append(trade)
                     break
 
@@ -616,7 +601,11 @@ async def import_trade_history(
 
                 # Determine transaction type based on trade source
                 is_staking_reward = trade.trade_id.startswith("reward_staking_")
-                is_airdrop = trade.trade_id.startswith("reward_airdrop_") or trade.trade_id.startswith("reward_") and not trade.trade_id.startswith("reward_staking_")
+                is_airdrop = (
+                    trade.trade_id.startswith("reward_airdrop_")
+                    or trade.trade_id.startswith("reward_")
+                    and not trade.trade_id.startswith("reward_staking_")
+                )
                 is_fiat_order = trade.trade_id.startswith("fiat_") or trade.trade_id.startswith("instant_")
                 is_conversion = trade.trade_id.startswith("convert_")
 
@@ -698,10 +687,7 @@ async def import_trade_history(
         if conversions_count > 0:
             conversion_trans_result = await db.execute(
                 select(Transaction).where(
-                    Transaction.transaction_type.in_([
-                        TransactionType.CONVERSION_OUT,
-                        TransactionType.CONVERSION_IN
-                    ]),
+                    Transaction.transaction_type.in_([TransactionType.CONVERSION_OUT, TransactionType.CONVERSION_IN]),
                     Transaction.related_transaction_id.is_(None),
                     Transaction.notes.ilike("%convert_%"),
                 )
@@ -715,12 +701,12 @@ async def import_trade_history(
                     trade_id = trans.notes.split("trade_id:")[1]
                     # Extract base ID (remove convert_sell_ or convert_buy_ prefix)
                     if trade_id.startswith("convert_sell_"):
-                        base_id = trade_id[len("convert_sell_"):]
+                        base_id = trade_id[len("convert_sell_") :]
                         if base_id not in conversion_pairs:
                             conversion_pairs[base_id] = {}
                         conversion_pairs[base_id]["sell"] = trans
                     elif trade_id.startswith("convert_buy_"):
-                        base_id = trade_id[len("convert_buy_"):]
+                        base_id = trade_id[len("convert_buy_") :]
                         if base_id not in conversion_pairs:
                             conversion_pairs[base_id] = {}
                         conversion_pairs[base_id]["buy"] = trans
@@ -759,8 +745,9 @@ async def import_trade_history(
         }
 
     except Exception as e:
-        import traceback
         import logging
+        import traceback
+
         logger = logging.getLogger(__name__)
         logger.error(f"Import error: {type(e).__name__}: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")
@@ -868,11 +855,7 @@ async def sync_exchange(
                 if abs(new_quantity - old_quantity) > 0.00000001:
                     # Create adjustment transaction
                     diff = new_quantity - old_quantity
-                    trans_type = (
-                        TransactionType.TRANSFER_IN
-                        if diff > 0
-                        else TransactionType.TRANSFER_OUT
-                    )
+                    trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
                     transaction = Transaction(
                         asset_id=asset.id,
@@ -923,7 +906,7 @@ async def sync_exchange(
         await db.commit()
 
         return {
-            "message": f"Synchronisation réussie",
+            "message": "Synchronisation réussie",
             "synced_assets": synced_count,
             "portfolio_id": str(portfolio.id),
             "portfolio_name": portfolio.name,

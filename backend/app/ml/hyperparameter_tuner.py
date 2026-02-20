@@ -1,7 +1,7 @@
 """Hyperparameter tuning for ML models using Optuna."""
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 
@@ -90,8 +90,8 @@ def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
     """Tune Prophet hyperparameters."""
     try:
         import optuna
-        from prophet import Prophet
         import pandas as pd
+        from prophet import Prophet
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:

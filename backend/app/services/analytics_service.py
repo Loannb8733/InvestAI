@@ -2,11 +2,9 @@
 
 import asyncio
 import logging
-import math
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from decimal import Decimal
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -137,6 +135,7 @@ class OptimizationResult:
 # Helper functions
 # ---------------------------------------------------------------------------
 
+
 def _compute_returns(prices: List[float]) -> np.ndarray:
     """Compute daily log returns from price series."""
     arr = np.array(prices, dtype=float)
@@ -175,7 +174,7 @@ def _downside_deviation(returns: np.ndarray, threshold: float = 0.0, asset_type=
     if len(neg) == 0:
         return 0.0
     td = _trading_days(asset_type) if asset_type else 365
-    return float(np.sqrt(np.mean(neg ** 2)) * np.sqrt(td) * 100)
+    return float(np.sqrt(np.mean(neg**2)) * np.sqrt(td) * 100)
 
 
 def _max_drawdown(prices: List[float]) -> float:
@@ -215,6 +214,7 @@ def _var_parametric(returns: np.ndarray, confidence: float = 0.95) -> float:
     if len(returns) < 5:
         return 0.0
     from scipy.stats import norm
+
     mu = float(np.mean(returns))
     sigma = float(np.std(returns, ddof=1))
     z = norm.ppf(1 - confidence)  # negative, e.g. -1.645 for 95%
@@ -279,10 +279,7 @@ def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Option
     d0 = min(dates)
 
     def npv(rate: float) -> float:
-        return sum(
-            amt / (1.0 + rate) ** ((d - d0).days / 365.25)
-            for d, amt in zip(dates, amounts)
-        )
+        return sum(amt / (1.0 + rate) ** ((d - d0).days / 365.25) for d, amt in zip(dates, amounts))
 
     try:
         result = sp_optimize.brentq(npv, -0.99, 10.0, maxiter=200)
@@ -308,9 +305,7 @@ class AnalyticsService:
     # Data fetching
     # ------------------------------------------------------------------
 
-    async def _fetch_history(
-        self, symbol: str, asset_type, days: int = 60
-    ) -> Tuple[List[float], List[float]]:
+    async def _fetch_history(self, symbol: str, asset_type, days: int = 60) -> Tuple[List[float], List[float]]:
         """Fetch historical prices. Returns (timestamps, prices).
         Priority: in-memory cache → Redis cache → live API (with rate limiting)."""
         fetch_days = 90
@@ -409,27 +404,27 @@ class AnalyticsService:
 
             is_stable = PriceService.is_stablecoin(asset.symbol)
 
-            asset_data.append({
-                "asset": asset,
-                "price": price,
-                "current_value": current_value,
-                "total_invested": total_invested,
-                "gain_loss": gain_loss,
-                "gain_loss_percent": gain_loss_pct,
-                "hist_prices": hist_prices,
-                "returns": rets,
-                "volatility": vol,
-                "downside_dev": dd_dev,
-                "annualized_return": ann_ret,
-                "max_drawdown": dd,
-                "daily_return": dr,
-                "is_stablecoin": is_stable,
-            })
+            asset_data.append(
+                {
+                    "asset": asset,
+                    "price": price,
+                    "current_value": current_value,
+                    "total_invested": total_invested,
+                    "gain_loss": gain_loss,
+                    "gain_loss_percent": gain_loss_pct,
+                    "hist_prices": hist_prices,
+                    "returns": rets,
+                    "volatility": vol,
+                    "downside_dev": dd_dev,
+                    "annualized_return": ann_ret,
+                    "max_drawdown": dd,
+                    "daily_return": dr,
+                    "is_stablecoin": is_stable,
+                }
+            )
         return asset_data
 
-    def _build_portfolio_metrics(
-        self, asset_data_list: list, total_value: float
-    ) -> dict:
+    def _build_portfolio_metrics(self, asset_data_list: list, total_value: float) -> dict:
         """Compute portfolio-level risk metrics from asset data."""
         # --- weights (exclude stablecoins from risk computations) ---
         weights = []
@@ -484,7 +479,7 @@ class AnalyticsService:
             # Override with portfolio trading days
             neg = port_returns[port_returns < 0]
             if len(neg) > 0:
-                port_dd_dev = float(np.sqrt(np.mean(neg ** 2)) * np.sqrt(port_td) * 100)
+                port_dd_dev = float(np.sqrt(np.mean(neg**2)) * np.sqrt(port_td) * 100)
         else:
             port_dd_dev = 0.0
 
@@ -588,10 +583,7 @@ class AnalyticsService:
 
         for sym, d in aggregated.items():
             d["gain_loss"] = d["current_value"] - d["total_invested"]
-            d["gain_loss_percent"] = (
-                (d["gain_loss"] / d["total_invested"] * 100)
-                if d["total_invested"] > 0 else 0
-            )
+            d["gain_loss_percent"] = (d["gain_loss"] / d["total_invested"] * 100) if d["total_invested"] > 0 else 0
 
         return self._assemble_analytics(list(aggregated.values()))
 
@@ -631,9 +623,7 @@ class AnalyticsService:
         cvar_95_eur = round(total_value * cvar95_pct / 100, 2)
 
         concentration = self._hhi(allocation_by_asset)
-        diversification = self._diversification_score(
-            len(asset_data), len(allocation_by_type), concentration
-        )
+        diversification = self._diversification_score(len(asset_data), len(allocation_by_type), concentration)
 
         # Build per-asset performances
         perfs = []
@@ -642,21 +632,23 @@ class AnalyticsService:
             v = d["volatility"]
             dd_d = d["downside_dev"]
             ann_r = d.get("annualized_return", 0.0)
-            perfs.append(AssetPerformance(
-                symbol=a.symbol,
-                name=a.name or a.symbol,
-                asset_type=a.asset_type.value,
-                current_value=d["current_value"],
-                total_invested=d["total_invested"],
-                gain_loss=d["gain_loss"],
-                gain_loss_percent=d["gain_loss_percent"],
-                weight=d["weight"],
-                daily_return=round(d["daily_return"], 2),
-                volatility_30d=round(v, 1),
-                sharpe_ratio=_sharpe(ann_r, v),
-                sortino_ratio=_sortino(ann_r, dd_d),
-                max_drawdown=round(d["max_drawdown"], 2),
-            ))
+            perfs.append(
+                AssetPerformance(
+                    symbol=a.symbol,
+                    name=a.name or a.symbol,
+                    asset_type=a.asset_type.value,
+                    current_value=d["current_value"],
+                    total_invested=d["total_invested"],
+                    gain_loss=d["gain_loss"],
+                    gain_loss_percent=d["gain_loss_percent"],
+                    weight=d["weight"],
+                    daily_return=round(d["daily_return"], 2),
+                    volatility_30d=round(v, 1),
+                    sharpe_ratio=_sharpe(ann_r, v),
+                    sortino_ratio=_sortino(ann_r, dd_d),
+                    max_drawdown=round(d["max_drawdown"], 2),
+                )
+            )
 
         sorted_p = sorted(perfs, key=lambda x: x.gain_loss_percent, reverse=True)
         best = sorted_p[0].symbol if sorted_p else None
@@ -804,34 +796,42 @@ class AnalyticsService:
         recs = []
         if analytics.concentration_risk > 0.25:
             top = sorted(analytics.allocation_by_asset.items(), key=lambda x: -x[1])[:3]
-            recs.append({
-                "type": "concentration",
-                "severity": "high" if analytics.concentration_risk > 0.4 else "medium",
-                "message": f"Concentration élevée: {top[0][0]} représente {top[0][1]:.1f}% du portefeuille",
-                "action": "Envisagez de diversifier vers d'autres actifs",
-            })
+            recs.append(
+                {
+                    "type": "concentration",
+                    "severity": "high" if analytics.concentration_risk > 0.4 else "medium",
+                    "message": f"Concentration élevée: {top[0][0]} représente {top[0][1]:.1f}% du portefeuille",
+                    "action": "Envisagez de diversifier vers d'autres actifs",
+                }
+            )
         if len(analytics.allocation_by_type) < 3:
-            recs.append({
-                "type": "asset_types",
-                "severity": "medium",
-                "message": f"Seulement {len(analytics.allocation_by_type)} classe(s) d'actifs",
-                "action": "Diversifiez entre crypto, actions, ETF et immobilier",
-            })
+            recs.append(
+                {
+                    "type": "asset_types",
+                    "severity": "medium",
+                    "message": f"Seulement {len(analytics.allocation_by_type)} classe(s) d'actifs",
+                    "action": "Diversifiez entre crypto, actions, ETF et immobilier",
+                }
+            )
         for at, w in analytics.allocation_by_type.items():
             if w > 70:
-                recs.append({
-                    "type": "overweight",
-                    "severity": "medium",
-                    "message": f"{at} représente {w:.1f}% du portefeuille",
-                    "action": f"Réduisez l'exposition à {at}",
-                })
+                recs.append(
+                    {
+                        "type": "overweight",
+                        "severity": "medium",
+                        "message": f"{at} représente {w:.1f}% du portefeuille",
+                        "action": f"Réduisez l'exposition à {at}",
+                    }
+                )
         if analytics.asset_count < 5:
-            recs.append({
-                "type": "asset_count",
-                "severity": "low",
-                "message": f"Seulement {analytics.asset_count} actif(s) en portefeuille",
-                "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
-            })
+            recs.append(
+                {
+                    "type": "asset_count",
+                    "severity": "low",
+                    "message": f"Seulement {analytics.asset_count} actif(s) en portefeuille",
+                    "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
+                }
+            )
 
         return {
             "score": analytics.diversification_score,
@@ -920,7 +920,7 @@ class AnalyticsService:
 
         # Per-asset mean and covariance matrix
         mu_vec = np.mean(aligned, axis=1)  # (n_assets,)
-        cov_matrix = np.cov(aligned)       # (n_assets, n_assets)
+        cov_matrix = np.cov(aligned)  # (n_assets, n_assets)
 
         # Ensure cov_matrix is 2D even for single asset
         if cov_matrix.ndim == 0:
@@ -999,18 +999,20 @@ class AnalyticsService:
             elif diff_val < -total_value * 0.005:
                 action = "sell"
 
-            orders.append(RebalanceOrder(
-                symbol=a.symbol,
-                name=a.name,
-                asset_type=a.asset_type,
-                current_weight=round(a.weight, 2),
-                target_weight=round(target_w, 2),
-                diff_weight=round(diff_w, 2),
-                current_value=round(a.current_value, 2),
-                target_value=round(target_val, 2),
-                diff_value=round(diff_val, 2),
-                action=action,
-            ))
+            orders.append(
+                RebalanceOrder(
+                    symbol=a.symbol,
+                    name=a.name,
+                    asset_type=a.asset_type,
+                    current_weight=round(a.weight, 2),
+                    target_weight=round(target_w, 2),
+                    diff_weight=round(diff_w, 2),
+                    current_value=round(a.current_value, 2),
+                    target_value=round(target_val, 2),
+                    diff_value=round(diff_val, 2),
+                    action=action,
+                )
+            )
 
         return sorted(orders, key=lambda x: abs(x.diff_value), reverse=True)
 
@@ -1110,9 +1112,7 @@ class AnalyticsService:
     # XIRR
     # ------------------------------------------------------------------
 
-    async def compute_xirr(
-        self, db: AsyncSession, user_id: str
-    ) -> Optional[float]:
+    async def compute_xirr(self, db: AsyncSession, user_id: str) -> Optional[float]:
         """Compute XIRR across all user portfolios."""
         result = await db.execute(
             select(Portfolio).where(
@@ -1270,25 +1270,29 @@ class AnalyticsService:
                 stressed = val * (1 + shock_pct / 100)
                 loss = stressed - val
                 stressed_value += stressed
-                per_asset.append({
-                    "symbol": sym,
-                    "current_value": round(val, 2),
-                    "stressed_value": round(stressed, 2),
-                    "loss": round(loss, 2),
-                    "shock_pct": shock_pct,
-                })
+                per_asset.append(
+                    {
+                        "symbol": sym,
+                        "current_value": round(val, 2),
+                        "stressed_value": round(stressed, 2),
+                        "loss": round(loss, 2),
+                        "shock_pct": shock_pct,
+                    }
+                )
 
             total_loss = stressed_value - total_value
             total_loss_pct = (total_loss / total_value * 100) if total_value > 0 else 0
 
-            scenarios.append({
-                "name": scenario["name"],
-                "description": scenario["description"],
-                "stressed_value": round(stressed_value, 2),
-                "total_loss": round(total_loss, 2),
-                "total_loss_pct": round(total_loss_pct, 2),
-                "per_asset": sorted(per_asset, key=lambda x: x["loss"]),
-            })
+            scenarios.append(
+                {
+                    "name": scenario["name"],
+                    "description": scenario["description"],
+                    "stressed_value": round(stressed_value, 2),
+                    "total_loss": round(total_loss, 2),
+                    "total_loss_pct": round(total_loss_pct, 2),
+                    "per_asset": sorted(per_asset, key=lambda x: x["loss"]),
+                }
+            )
 
         # Sort by worst-case first
         scenarios.sort(key=lambda s: s["total_loss"])
@@ -1376,14 +1380,16 @@ class AnalyticsService:
 
             beta = self._calc_beta(rets, bench_returns)
 
-            asset_betas.append({
-                "symbol": sym,
-                "asset_type": at,
-                "beta": round(beta, 3) if beta is not None else None,
-                "benchmark": bench_name,
-                "interpretation": self._interpret_beta(beta),
-                "value": round(val, 2),
-            })
+            asset_betas.append(
+                {
+                    "symbol": sym,
+                    "asset_type": at,
+                    "beta": round(beta, 3) if beta is not None else None,
+                    "benchmark": bench_name,
+                    "interpretation": self._interpret_beta(beta),
+                    "value": round(val, 2),
+                }
+            )
 
             if beta is not None:
                 if at == "crypto":
@@ -1441,9 +1447,7 @@ class AnalyticsService:
     # Parametric VaR (#16)
     # ------------------------------------------------------------------
 
-    def _build_portfolio_var_parametric(
-        self, port_returns: np.ndarray, total_value: float
-    ) -> dict:
+    def _build_portfolio_var_parametric(self, port_returns: np.ndarray, total_value: float) -> dict:
         """Compute parametric VaR alongside historical VaR for comparison."""
         var_hist = _var_historical(port_returns) if len(port_returns) >= 5 else 0.0
         var_param = _var_parametric(port_returns) if len(port_returns) >= 5 else 0.0
@@ -1464,13 +1468,25 @@ class AnalyticsService:
 
     def _empty_analytics(self) -> PortfolioAnalytics:
         return PortfolioAnalytics(
-            total_value=0, total_invested=0, total_gain_loss=0,
-            total_gain_loss_percent=0, portfolio_volatility=0,
-            sharpe_ratio=0, sortino_ratio=0, calmar_ratio=0,
-            max_drawdown=0, var_95=0, cvar_95=0,
-            diversification_score=0, concentration_risk=0, asset_count=0,
-            allocation_by_type={}, allocation_by_asset={},
-            assets=[], best_performer=None, worst_performer=None,
+            total_value=0,
+            total_invested=0,
+            total_gain_loss=0,
+            total_gain_loss_percent=0,
+            portfolio_volatility=0,
+            sharpe_ratio=0,
+            sortino_ratio=0,
+            calmar_ratio=0,
+            max_drawdown=0,
+            var_95=0,
+            cvar_95=0,
+            diversification_score=0,
+            concentration_risk=0,
+            asset_count=0,
+            allocation_by_type={},
+            allocation_by_asset={},
+            assets=[],
+            best_performer=None,
+            worst_performer=None,
         )
 
     @staticmethod

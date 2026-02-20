@@ -83,10 +83,7 @@ async def get_notes_summary(
 
     # Count notes this month
     now = datetime.utcnow()
-    notes_this_month = sum(
-        1 for n in notes
-        if n.created_at.year == now.year and n.created_at.month == now.month
-    )
+    notes_this_month = sum(1 for n in notes if n.created_at.year == now.year and n.created_at.month == now.month)
 
     # Collect unique tags
     all_tags = set()
@@ -151,18 +148,13 @@ async def list_notes(
 
     # Filter by tag if specified
     if tag:
-        notes = [
-            n for n in notes
-            if n.tags and tag.lower() in n.tags.lower()
-        ]
+        notes = [n for n in notes if n.tags and tag.lower() in n.tags.lower()]
 
     # Filter by search term
     if search:
         search_lower = search.lower()
         notes = [
-            n for n in notes
-            if search_lower in n.title.lower()
-            or (n.content and search_lower in n.content.lower())
+            n for n in notes if search_lower in n.title.lower() or (n.content and search_lower in n.content.lower())
         ]
 
     # Build response with asset info
@@ -172,9 +164,7 @@ async def list_notes(
         asset_name = None
 
         if note.asset_id:
-            asset_result = await db.execute(
-                select(Asset).where(Asset.id == note.asset_id)
-            )
+            asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
             asset = asset_result.scalar_one_or_none()
             if asset:
                 asset_symbol = asset.symbol
@@ -292,9 +282,7 @@ async def get_note(
     asset_name = None
 
     if note.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == note.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol
@@ -382,9 +370,7 @@ async def update_note(
     asset_name = None
 
     if note.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == note.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol

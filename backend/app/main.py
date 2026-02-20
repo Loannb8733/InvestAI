@@ -7,23 +7,47 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
-from app.core.logging import setup_logging, get_logger
+from app.core.logging import get_logger, setup_logging
 from app.core.rate_limit import limiter
 from app.models import Base
 
 # Setup structured logging
 setup_logging()
 logger = get_logger(__name__)
+
+# Sentry error tracking
+if settings.sentry_enabled:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.APP_ENV,
+        release="investai@1.0.0",
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            SqlalchemyIntegration(),
+            CeleryIntegration(),
+            RedisIntegration(),
+        ],
+        send_default_pii=False,
+    )
+    logger.info("Sentry initialized (env=%s)", settings.APP_ENV)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -32,6 +56,21 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Log request details and timing."""
         start_time = time.perf_counter()
+
+        # Set Sentry user context from JWT if available
+        if settings.sentry_enabled:
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                try:
+                    from app.core.security import decode_access_token
+
+                    payload = decode_access_token(auth_header.split(" ")[1])
+                    if payload:
+                        import sentry_sdk
+
+                        sentry_sdk.set_user({"id": payload.get("sub"), "ip_address": "{{auto}}"})
+                except Exception:
+                    pass
 
         try:
             # Process the request
@@ -63,6 +102,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return response
         except Exception as e:
             import traceback
+
             logger.error(f"Middleware error: {type(e).__name__}: {e}")
             logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise
@@ -78,6 +118,7 @@ async def lifespan(app: FastAPI):
     # Trigger historical data cache on startup (via Celery)
     try:
         from app.tasks.history_cache import cache_historical_data
+
         cache_historical_data.delay()
         logger.info("Triggered historical data cache task")
     except Exception as e:
@@ -89,10 +130,72 @@ async def lifespan(app: FastAPI):
 
 
 # Conditionally expose OpenAPI docs (only in development/debug mode)
+OPENAPI_TAGS = [
+    {
+        "name": "Authentication",
+        "description": "Login, register, MFA (TOTP), JWT refresh, password reset, email verification.",
+    },
+    {"name": "Users", "description": "User management and preferences (admin: list/delete users)."},
+    {
+        "name": "Dashboard",
+        "description": "Portfolio summary, allocation breakdown, performance overview, and recommendations.",
+    },
+    {"name": "Portfolios", "description": "CRUD portfolios, snapshot history, rebalancing suggestions."},
+    {"name": "Assets", "description": "CRUD assets (crypto, stocks, ETF, real estate), price history, exchange sync."},
+    {
+        "name": "Transactions",
+        "description": "CRUD transactions (buy/sell/dividend/fee/airdrop/conversion), CSV bulk import, P&L.",
+    },
+    {
+        "name": "API Keys",
+        "description": "Manage exchange API keys (Binance, Kraken, Crypto.com). Keys are Fernet-encrypted at rest.",
+    },
+    {
+        "name": "Analytics",
+        "description": "Sharpe, Sortino, Calmar ratios, VaR/CVaR, max drawdown, correlation matrix, "
+        "Markowitz optimization, stress testing, diversification score.",
+    },
+    {
+        "name": "Predictions",
+        "description": "ML ensemble forecasts (Prophet + ARIMA + XGBoost + EMA + Linear). "
+        "Confidence intervals, model breakdown, feature importance.",
+    },
+    {"name": "Alerts", "description": "Price and performance alerts with threshold conditions and notifications."},
+    {
+        "name": "Reports",
+        "description": "Generate PDF/Excel reports: performance summary, holdings, French fiscal form 2086.",
+    },
+    {"name": "Notes", "description": "Investment journal: create, search, and manage notes per asset or portfolio."},
+    {
+        "name": "Calendar",
+        "description": "Financial calendar: dividends, loyers, scheduled events with recurring support.",
+    },
+    {
+        "name": "Simulations",
+        "description": "FIRE calculator, DCA simulator, what-if scenarios, Monte Carlo projections.",
+    },
+    {"name": "Notifications", "description": "User notifications: list, mark as read, delete."},
+    {"name": "Insights", "description": "Rule-based insights: concentration risk, volatility alerts, rebalancing."},
+    {
+        "name": "Smart Insights",
+        "description": "AI-powered recommendations, portfolio health analysis, rebalancing suggestions.",
+    },
+    {"name": "Goals", "description": "Financial goals tracking with target amounts, deadlines, and progress."},
+    {"name": "WebSocket", "description": "Real-time price updates via WebSocket connection."},
+    {"name": "System", "description": "Health check, system stats, version info."},
+]
+
 app = FastAPI(
     title=settings.APP_NAME,
-    description="API pour la gestion et l'analyse d'investissements",
+    description=(
+        "**InvestAI** — API de gestion et d'analyse d'investissements multi-actifs.\n\n"
+        "Supporte crypto, actions, ETF et immobilier avec analytics avancés, "
+        "prédictions ML, et intégrations exchanges (Binance, Kraken, Crypto.com).\n\n"
+        "**Auth**: JWT Bearer token (15min) + refresh token (7j). "
+        "Inclure `Authorization: Bearer <token>` dans les headers."
+    ),
     version="1.0.0",
+    openapi_tags=OPENAPI_TAGS,
     # Disable OpenAPI in production for security
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if settings.DEBUG else None,
     docs_url=f"{settings.API_V1_PREFIX}/docs" if settings.DEBUG else None,
@@ -100,17 +203,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # Global exception handler to log errors
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Catch all unhandled exceptions and log them."""
     import traceback
+
     logger.error(f"Unhandled exception: {type(exc).__name__}: {exc}")
     logger.error(f"Traceback:\n{traceback.format_exc()}")
     return JSONResponse(
         status_code=500,
         content={"detail": f"Internal server error: {str(exc)}"},
     )
+
 
 # Rate limiting
 app.state.limiter = limiter
@@ -151,6 +257,7 @@ async def health_check():
     # Check Redis
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.REDIS_URL, socket_timeout=2)
         await r.ping()
         await r.aclose()

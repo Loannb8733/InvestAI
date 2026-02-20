@@ -19,15 +19,12 @@ RATE_LIMITS = {
     "auth_login": "5/minute",
     "auth_register": "3/minute",
     "auth_refresh": "30/minute",
-
     # Standard API endpoints
     "api_read": "120/minute",
     "api_write": "60/minute",
-
     # Heavy operations
     "csv_import": "10/minute",
     "report_generate": "5/minute",
-
     # Price/external API calls (to respect external rate limits)
     "price_fetch": "30/minute",
 }

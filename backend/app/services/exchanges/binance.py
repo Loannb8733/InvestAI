@@ -160,9 +160,7 @@ class BinanceService(BaseExchangeService):
                 if response.status_code == 200:
                     data = response.json()
                     self._valid_pairs = {
-                        symbol["symbol"]
-                        for symbol in data.get("symbols", [])
-                        if symbol.get("status") == "TRADING"
+                        symbol["symbol"] for symbol in data.get("symbols", []) if symbol.get("status") == "TRADING"
                     }
                     print(f"Binance: {len(self._valid_pairs)} valid trading pairs cached")
         except Exception as e:
@@ -278,9 +276,7 @@ class BinanceService(BaseExchangeService):
         async with self._get_http_client() as client:
             # Create tasks for all symbols
             tasks = [
-                self._fetch_trades_for_symbol(
-                    client, trading_symbol, start_time, end_time, limit, semaphore
-                )
+                self._fetch_trades_for_symbol(client, trading_symbol, start_time, end_time, limit, semaphore)
                 for trading_symbol in symbols_list
             ]
 
@@ -391,9 +387,7 @@ class BinanceService(BaseExchangeService):
                         symbol=withdrawal["coin"],
                         amount=Decimal(withdrawal["amount"]),
                         fee=Decimal(withdrawal.get("transactionFee", 0)),
-                        timestamp=datetime.fromisoformat(
-                            withdrawal["applyTime"].replace("Z", "+00:00")
-                        ),
+                        timestamp=datetime.fromisoformat(withdrawal["applyTime"].replace("Z", "+00:00")),
                         status=status_map.get(withdrawal["status"], "unknown"),
                         tx_id=withdrawal.get("txId"),
                         address=withdrawal.get("address"),
@@ -444,7 +438,9 @@ class BinanceService(BaseExchangeService):
                                 "page": page,
                             }
 
-                            print(f"Fiat orders API: type={transaction_type}, page={page}, {chunk_start.date()} to {chunk_end.date()}")
+                            print(
+                                f"Fiat orders API: type={transaction_type}, page={page}, {chunk_start.date()} to {chunk_end.date()}"
+                            )
 
                             params = self._sign_request(params)
                             response = await client.get(

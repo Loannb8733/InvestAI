@@ -3,8 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from decimal import Decimal
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,6 +66,7 @@ async def _get_or_create_asset(
     # Pre-cache historical data
     try:
         from app.tasks.history_cache import cache_single_asset
+
         cache_single_asset.delay(symbol, "crypto")
     except Exception:
         pass
@@ -86,18 +86,34 @@ def _normalize_earn_variant(symbol: str) -> Optional[str]:
     skip_prefixes = ["LD", "BF", "W"]  # LDBTC, BFUSD, WBTC
     for prefix in skip_prefixes:
         if symbol.startswith(prefix) and len(symbol) > len(prefix) + 2:
-            return symbol[len(prefix):]
+            return symbol[len(prefix) :]
 
     # Common earn suffixes: U (flexible), S (staking), KA (Kaito rewards), etc.
     # ADAU -> ADA, SUIU -> SUI, XRPU -> XRP, FETU -> FET, OMKA -> OM
     # But don't change real coins like TAO, OM, KAITO
-    known_bases = ["ADA", "SUI", "XRP", "FET", "ETH", "BTC", "SOL", "TAO",
-                   "OM", "PENDLE", "LINK", "ONDO", "INJ", "KAITO", "DOGE",
-                   "USDC", "USDT"]
+    known_bases = [
+        "ADA",
+        "SUI",
+        "XRP",
+        "FET",
+        "ETH",
+        "BTC",
+        "SOL",
+        "TAO",
+        "OM",
+        "PENDLE",
+        "LINK",
+        "ONDO",
+        "INJ",
+        "KAITO",
+        "DOGE",
+        "USDC",
+        "USDT",
+    ]
 
     for base in known_bases:
         if symbol.startswith(base) and len(symbol) > len(base):
-            suffix = symbol[len(base):]
+            suffix = symbol[len(base) :]
             # If suffix is short alphanumeric (U, S, KA, US, etc.), it's likely an earn variant
             if len(suffix) <= 2 and suffix.isalnum():
                 return base
@@ -234,7 +250,7 @@ async def _sync_detailed_transactions(
                 base_asset = None
                 for quote in ["EUR", "USD", "GBP"]:
                     if trade.symbol.endswith(quote):
-                        base_asset = trade.symbol[:-len(quote)]
+                        base_asset = trade.symbol[: -len(quote)]
                         break
 
                 if not base_asset or base_asset in fiat_currencies:
@@ -389,7 +405,7 @@ async def _sync_detailed_transactions(
                 # Try to extract from symbol by removing common quote currencies
                 for quote in ["EUR", "USD", "USDT", "USDC", "BTC", "ETH"]:
                     if trade.symbol.endswith(quote):
-                        potential_base = trade.symbol[:-len(quote)]
+                        potential_base = trade.symbol[: -len(quote)]
                         if potential_base and potential_base not in fiat_currencies:
                             base_asset = potential_base
                             break
@@ -447,7 +463,7 @@ async def _sync_detailed_transactions(
                 reward_asset = reward.symbol
                 for quote in ["EUR", "USD"]:
                     if reward_asset.endswith(quote):
-                        reward_asset = reward_asset[:-len(quote)]
+                        reward_asset = reward_asset[: -len(quote)]
                         break
 
                 if reward_asset in fiat_currencies:
@@ -600,15 +616,11 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
             existing_assets = {a.symbol: a for a in assets_result.scalars().all()}
 
             # === STEP 1: Sync detailed transactions (trades, conversions, rewards) ===
-            detailed_synced = await _sync_detailed_transactions(
-                db, service, portfolio, existing_assets
-            )
+            detailed_synced = await _sync_detailed_transactions(db, service, portfolio, existing_assets)
             logger.info(f"Synced {detailed_synced} detailed transactions from {service.exchange_name}")
 
             # Refresh existing_assets after detailed sync (new assets may have been created)
-            assets_result = await db.execute(
-                select(Asset).where(Asset.portfolio_id == portfolio.id)
-            )
+            assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
             existing_assets = {a.symbol: a for a in assets_result.scalars().all()}
 
             # === STEP 2: Sync remaining balance discrepancies ===
@@ -634,11 +646,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     # Only adjust if there's a significant discrepancy
                     if abs(exchange_quantity - our_quantity) > 0.00000001:
                         diff = exchange_quantity - our_quantity
-                        trans_type = (
-                            TransactionType.TRANSFER_IN
-                            if diff > 0
-                            else TransactionType.TRANSFER_OUT
-                        )
+                        trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
                         logger.info(
                             f"Balance adjustment for {balance.symbol}: "
@@ -662,7 +670,11 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         db.add(transaction)
 
                         # Update avg_buy_price if it's 0 and we have a price
-                        if trans_type == TransactionType.TRANSFER_IN and current_price > 0 and float(asset.avg_buy_price) == 0:
+                        if (
+                            trans_type == TransactionType.TRANSFER_IN
+                            and current_price > 0
+                            and float(asset.avg_buy_price) == 0
+                        ):
                             asset.avg_buy_price = current_price
 
                         asset.quantity = exchange_quantity
@@ -687,6 +699,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     # Pre-cache historical data for new asset
                     try:
                         from app.tasks.history_cache import cache_single_asset
+
                         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
                     except Exception:
                         pass
@@ -724,9 +737,7 @@ async def _sync_all_exchanges_async() -> dict:
     """Sync all active exchange accounts (async implementation)."""
     async with AsyncSessionLocal() as db:
         # Get all active API keys
-        result = await db.execute(
-            select(APIKey).where(APIKey.is_active == True)
-        )
+        result = await db.execute(select(APIKey).where(APIKey.is_active == True))
         api_keys = result.scalars().all()
 
         if not api_keys:

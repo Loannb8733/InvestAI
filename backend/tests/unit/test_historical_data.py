@@ -16,7 +16,6 @@ class TestSymbolMap:
 
     def test_unknown_symbol_fallback(self):
         """Unknown symbols should use lowercase as coin_id."""
-        fetcher = HistoricalDataFetcher()
         # Verify the logic in get_crypto_history uses .lower() for unknown
         coin_id = HistoricalDataFetcher.SYMBOL_MAP.get("UNKNOWN", "unknown")
         assert coin_id == "unknown"

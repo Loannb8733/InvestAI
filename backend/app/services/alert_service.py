@@ -6,14 +6,14 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
-from app.services.price_service import PriceService
 from app.services.notification_service import notification_service
+from app.services.price_service import PriceService
 
 
 @dataclass
@@ -160,9 +160,7 @@ class AlertService:
     ) -> Optional[AlertTrigger]:
         """Check if a single alert should trigger."""
         # Get asset
-        result = await db.execute(
-            select(Asset).where(Asset.id == alert.asset_id)
-        )
+        result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = result.scalar_one_or_none()
 
         if not asset:
@@ -249,16 +247,11 @@ class AlertService:
         user_id: str,
     ) -> dict:
         """Get summary of user's alerts."""
-        result = await db.execute(
-            select(Alert).where(Alert.user_id == user_id)
-        )
+        result = await db.execute(select(Alert).where(Alert.user_id == user_id))
         alerts = result.scalars().all()
 
         active_count = sum(1 for a in alerts if a.is_active)
-        triggered_today = sum(
-            1 for a in alerts
-            if a.triggered_at and a.triggered_at.date() == datetime.utcnow().date()
-        )
+        triggered_today = sum(1 for a in alerts if a.triggered_at and a.triggered_at.date() == datetime.utcnow().date())
         total_triggered = sum(a.triggered_count or 0 for a in alerts)
 
         return {

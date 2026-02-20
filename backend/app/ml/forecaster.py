@@ -2,6 +2,7 @@
    Prophet, ARIMA, XGBoost, EMA, and Linear Regression.
 """
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -9,8 +10,24 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import redis
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Sync Redis client for caching individual model results within sync forecaster
+_sync_redis: Optional[redis.Redis] = None
+
+
+def _get_sync_redis() -> redis.Redis:
+    global _sync_redis
+    if _sync_redis is None:
+        _sync_redis = redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+        )
+    return _sync_redis
 
 
 @dataclass
@@ -36,9 +53,7 @@ class PriceForecaster:
     def __init__(self, hyperparams: Optional[Dict] = None):
         self._prophet_available = self._check_import("prophet", "Prophet")
         self._xgboost_available = self._check_import("xgboost", "XGBRegressor")
-        self._arima_available = self._check_import(
-            "statsmodels.tsa.arima.model", "ARIMA"
-        )
+        self._arima_available = self._check_import("statsmodels.tsa.arima.model", "ARIMA")
         self._auto_arima_available = self._check_import("pmdarima", "auto_arima")
         self._hyperparams = hyperparams or {}
 
@@ -77,8 +92,18 @@ class PriceForecaster:
         prices: List[float],
         dates: List[datetime],
         days_ahead: int = 7,
+        symbol: Optional[str] = None,
+        data_hash: Optional[str] = None,
     ) -> ForecastResult:
-        """Run all available models, weight by backtest, combine."""
+        """Run all available models, weight by backtest, combine.
+
+        Args:
+            prices: Historical price list.
+            dates: Corresponding date list.
+            days_ahead: Forecast horizon in days.
+            symbol: Asset symbol for per-model Redis caching.
+            data_hash: Hash of price data for cache key staleness detection.
+        """
 
         if len(prices) < 5:
             return self._fallback_forecast(prices, days_ahead)
@@ -89,7 +114,7 @@ class PriceForecaster:
         # Prophet
         if self._prophet_available and len(prices) >= 14:
             try:
-                r = self._prophet_forecast(prices, dates, days_ahead)
+                r = self._get_or_run_model("Prophet", symbol, data_hash, days_ahead, prices, dates)
                 candidates.append(("Prophet", r))
             except Exception as e:
                 logger.warning("Prophet ensemble: %s", e)
@@ -97,7 +122,7 @@ class PriceForecaster:
         # ARIMA
         if self._arima_available and len(prices) >= 20:
             try:
-                r = self._arima_forecast(prices, dates, days_ahead)
+                r = self._get_or_run_model("ARIMA", symbol, data_hash, days_ahead, prices, dates)
                 candidates.append(("ARIMA", r))
             except Exception as e:
                 logger.warning("ARIMA ensemble: %s", e)
@@ -105,7 +130,7 @@ class PriceForecaster:
         # XGBoost
         if self._xgboost_available and len(prices) >= 30:
             try:
-                r = self._xgboost_forecast(prices, dates, days_ahead)
+                r = self._get_or_run_model("XGBoost", symbol, data_hash, days_ahead, prices, dates)
                 candidates.append(("XGBoost", r))
             except Exception as e:
                 logger.warning("XGBoost ensemble: %s", e)
@@ -113,14 +138,14 @@ class PriceForecaster:
         # EMA (always available if >=7 points)
         if len(prices) >= 7:
             try:
-                r = self._ema_forecast(prices, dates, days_ahead)
+                r = self._get_or_run_model("EMA", symbol, data_hash, days_ahead, prices, dates)
                 candidates.append(("EMA", r))
             except Exception as e:
                 logger.warning("EMA ensemble: %s", e)
 
         # Linear (always available if >=5 points)
         try:
-            r = self._linear_forecast(prices, dates, days_ahead)
+            r = self._get_or_run_model("Linear", symbol, data_hash, days_ahead, prices, dates)
             candidates.append(("Linear", r))
         except Exception as e:
             logger.warning("Linear ensemble: %s", e)
@@ -130,9 +155,7 @@ class PriceForecaster:
         if len(candidates) == 1:
             name, result = candidates[0]
             result.model_used = name.lower()
-            result.models_detail = [
-                {"name": name, "weight_pct": 100, "mape": 0, "trend": result.trend}
-            ]
+            result.models_detail = [{"name": name, "weight_pct": 100, "mape": 0, "trend": result.trend}]
             return result
 
         # ── 2. Compute weights via mini-backtest ─────────────────────
@@ -156,9 +179,7 @@ class PriceForecaster:
         for (name, res), w in zip(candidates, weights):
             trend_scores[res.trend] += w
         final_trend = max(trend_scores, key=trend_scores.get)  # type: ignore
-        final_strength = self._compute_trend(
-            prices[-1], combined_prices[-1], prices
-        )[1]
+        final_strength = self._compute_trend(prices[-1], combined_prices[-1], prices)[1]
 
         # ── 5. Build model_used string and details ───────────────────
         details = []
@@ -166,12 +187,14 @@ class PriceForecaster:
         for (name, res), w in zip(candidates, weights):
             pct = round(w * 100)
             mape = self._quick_mape(prices, dates, name, res)
-            details.append({
-                "name": name,
-                "weight_pct": pct,
-                "mape": round(mape, 1),
-                "trend": res.trend,
-            })
+            details.append(
+                {
+                    "name": name,
+                    "weight_pct": pct,
+                    "mape": round(mape, 1),
+                    "trend": res.trend,
+                }
+            )
             parts.append(f"{name}: {pct}%")
 
         model_str = f"ensemble ({', '.join(parts)})"
@@ -191,9 +214,7 @@ class PriceForecaster:
     # Individual Models
     # ─────────────────────────────────────────────────────────────────
 
-    def _prophet_forecast(
-        self, prices: List[float], dates: List[datetime], days_ahead: int
-    ) -> ForecastResult:
+    def _prophet_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
         """Facebook Prophet forecast."""
         from prophet import Prophet
 
@@ -227,9 +248,7 @@ class PriceForecaster:
             model_used="prophet",
         )
 
-    def _arima_forecast(
-        self, prices: List[float], dates: List[datetime], days_ahead: int
-    ) -> ForecastResult:
+    def _arima_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
         """ARIMA forecast with auto parameter selection via pmdarima or grid search."""
         import warnings
 
@@ -250,9 +269,12 @@ class PriceForecaster:
                     warnings.simplefilter("ignore")
                     model = pm_auto_arima(
                         y,
-                        start_p=0, max_p=5,
-                        start_q=0, max_q=3,
-                        d=1, max_d=2,
+                        start_p=0,
+                        max_p=5,
+                        start_q=0,
+                        max_q=3,
+                        d=1,
+                        max_d=2,
                         seasonal=False,
                         stepwise=True,
                         suppress_warnings=True,
@@ -267,10 +289,7 @@ class PriceForecaster:
             model, fc, ci, best_order = self._arima_grid_search(y, days_ahead)
 
         last_date = dates[-1]
-        result_dates = [
-            (last_date + timedelta(days=i)).strftime("%Y-%m-%d")
-            for i in range(1, days_ahead + 1)
-        ]
+        result_dates = [(last_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, days_ahead + 1)]
         result_prices = [max(0.0, float(v) / scale) for v in fc]
         result_low = [max(0.0, float(ci[i, 0]) / scale) for i in range(days_ahead)]
         result_high = [float(ci[i, 1]) / scale for i in range(days_ahead)]
@@ -289,6 +308,7 @@ class PriceForecaster:
     def _arima_grid_search(self, y, days_ahead):
         """Fallback manual ARIMA grid search."""
         import warnings
+
         from statsmodels.tsa.arima.model import ARIMA
 
         best_aic = float("inf")
@@ -313,12 +333,10 @@ class PriceForecaster:
         fc_result = fit.get_forecast(steps=days_ahead)
         mean = fc_result.predicted_mean
         ci = fc_result.conf_int(alpha=0.05)
-        ci_arr = ci.values if hasattr(ci, 'values') else np.asarray(ci)
+        ci_arr = ci.values if hasattr(ci, "values") else np.asarray(ci)
         return fit, np.array(mean), ci_arr, best_order
 
-    def _xgboost_forecast(
-        self, prices: List[float], dates: List[datetime], days_ahead: int
-    ) -> ForecastResult:
+    def _xgboost_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
         """XGBoost forecast with engineered features."""
         from xgboost import XGBRegressor
 
@@ -360,9 +378,7 @@ class PriceForecaster:
             pred = max(0.0, pred)
             result_prices.append(pred)
             extended.append(pred)
-            result_dates.append(
-                (last_date + timedelta(days=d)).strftime("%Y-%m-%d")
-            )
+            result_dates.append((last_date + timedelta(days=d)).strftime("%Y-%m-%d"))
 
         # Confidence from residuals
         train_preds = model.predict(X)
@@ -376,12 +392,13 @@ class PriceForecaster:
         explanations = []
         try:
             import shap
+
             explainer = shap.TreeExplainer(model)
             # Explain the last prediction
             last_feat = np.array([self._build_features(np.array(extended[:-1]), len(extended) - 1)])
             shap_values = explainer.shap_values(last_feat)
 
-            feature_names = getattr(self, 'FEATURE_NAMES', [f"f{i}" for i in range(len(shap_values[0]))])
+            feature_names = getattr(self, "FEATURE_NAMES", [f"f{i}" for i in range(len(shap_values[0]))])
 
             # Top 3 most impactful features
             abs_shap = np.abs(shap_values[0])
@@ -390,11 +407,13 @@ class PriceForecaster:
             for idx in top_indices:
                 fname = feature_names[idx] if idx < len(feature_names) else f"feature_{idx}"
                 val = float(shap_values[0][idx])
-                explanations.append({
-                    "feature": fname,
-                    "importance": round(abs(val), 6),
-                    "direction": "hausse" if val > 0 else "baisse",
-                })
+                explanations.append(
+                    {
+                        "feature": fname,
+                        "importance": round(abs(val), 6),
+                        "direction": "hausse" if val > 0 else "baisse",
+                    }
+                )
         except Exception as e:
             logger.debug("SHAP computation failed: %s", e)
 
@@ -411,11 +430,23 @@ class PriceForecaster:
 
     # Feature names for SHAP explainability
     FEATURE_NAMES = [
-        "ret_1d", "ret_2d", "ret_3d", "ret_4d", "ret_5d", "ret_6d", "ret_7d",
-        "volatility_7d", "rsi_14", "price_sma20_ratio",
-        "momentum_3d", "momentum_7d", "momentum_14d",
-        "volatility_14d", "price_sma7_ratio",
-        "high_low_range_7d", "mean_return_7d",
+        "ret_1d",
+        "ret_2d",
+        "ret_3d",
+        "ret_4d",
+        "ret_5d",
+        "ret_6d",
+        "ret_7d",
+        "volatility_7d",
+        "rsi_14",
+        "price_sma20_ratio",
+        "momentum_3d",
+        "momentum_7d",
+        "momentum_14d",
+        "volatility_14d",
+        "price_sma7_ratio",
+        "high_low_range_7d",
+        "mean_return_7d",
     ]
 
     @staticmethod
@@ -429,20 +460,13 @@ class PriceForecaster:
         # --- Lagged returns J-1 to J-7 (7 features) ---
         for lag in range(1, 8):
             if idx - lag >= 1:
-                feats.append(
-                    (prices[idx - lag] - prices[idx - lag - 1])
-                    / max(prices[idx - lag - 1], 1e-10)
-                )
+                feats.append((prices[idx - lag] - prices[idx - lag - 1]) / max(prices[idx - lag - 1], 1e-10))
             else:
                 feats.append(0.0)
 
         # --- Volatility 7d (1 feature) ---
         if idx >= 8:
-            rets = [
-                (prices[idx - i] - prices[idx - i - 1])
-                / max(prices[idx - i - 1], 1e-10)
-                for i in range(1, 8)
-            ]
+            rets = [(prices[idx - i] - prices[idx - i - 1]) / max(prices[idx - i - 1], 1e-10) for i in range(1, 8)]
             feats.append(float(np.std(rets)))
         else:
             feats.append(0.0)
@@ -469,18 +493,14 @@ class PriceForecaster:
         # --- Momentum 3d, 7d, 14d (3 features) ---
         for period in [3, 7, 14]:
             if idx >= period + 1:
-                feats.append(
-                    (prices[idx - 1] - prices[idx - period - 1])
-                    / max(prices[idx - period - 1], 1e-10)
-                )
+                feats.append((prices[idx - 1] - prices[idx - period - 1]) / max(prices[idx - period - 1], 1e-10))
             else:
                 feats.append(0.0)
 
         # --- Volatility 14d (1 feature) ---
         if idx >= 15:
             rets_14 = [
-                (prices[idx - i] - prices[idx - i - 1])
-                / max(prices[idx - i - 1], 1e-10)
+                (prices[idx - i] - prices[idx - i - 1]) / max(prices[idx - i - 1], 1e-10)
                 for i in range(1, min(15, idx))
             ]
             feats.append(float(np.std(rets_14)))
@@ -505,25 +525,19 @@ class PriceForecaster:
 
         # --- Mean return 7d (1 feature) ---
         if idx >= 8:
-            rets_7 = [
-                (prices[idx - i] - prices[idx - i - 1])
-                / max(prices[idx - i - 1], 1e-10)
-                for i in range(1, 8)
-            ]
+            rets_7 = [(prices[idx - i] - prices[idx - i - 1]) / max(prices[idx - i - 1], 1e-10) for i in range(1, 8)]
             feats.append(float(np.mean(rets_7)))
         else:
             feats.append(0.0)
 
         return feats
 
-    def _ema_forecast(
-        self, prices: List[float], dates: List[datetime], days_ahead: int
-    ) -> ForecastResult:
+    def _ema_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
         """EMA-based forecast using 7-day and 21-day EMAs."""
         arr = np.array(prices, dtype=float)
 
         ema7 = self._ema(arr, 7)
-        ema21 = self._ema(arr, min(21, len(arr)))
+        self._ema(arr, min(21, len(arr)))
 
         # Slope from last 3 EMA7 values
         if len(ema7) >= 3:
@@ -546,9 +560,7 @@ class PriceForecaster:
             pred = base + slope * i
             pred = max(0.0, float(pred))
             ci = 1.96 * std_r * np.sqrt(i)
-            result_dates.append(
-                (last_date + timedelta(days=i)).strftime("%Y-%m-%d")
-            )
+            result_dates.append((last_date + timedelta(days=i)).strftime("%Y-%m-%d"))
             result_prices.append(pred)
             result_low.append(max(0.0, pred - ci))
             result_high.append(pred + ci)
@@ -575,9 +587,7 @@ class PriceForecaster:
             result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
         return result
 
-    def _linear_forecast(
-        self, prices: List[float], dates: List[datetime], days_ahead: int
-    ) -> ForecastResult:
+    def _linear_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
         """Linear regression on log prices."""
         n = len(prices)
         x = np.arange(n, dtype=float)
@@ -600,9 +610,7 @@ class PriceForecaster:
             result_dates.append(d.strftime("%Y-%m-%d"))
             pred_log = slope * fx + intercept
             pred = float(np.exp(pred_log))
-            ci = 1.96 * std_r * np.sqrt(
-                1 + 1 / n + (fx - np.mean(x)) ** 2 / np.sum((x - np.mean(x)) ** 2)
-            )
+            ci = 1.96 * std_r * np.sqrt(1 + 1 / n + (fx - np.mean(x)) ** 2 / np.sum((x - np.mean(x)) ** 2))
             result_prices.append(max(0.0, pred))
             result_low.append(max(0.0, float(np.exp(pred_log - ci))))
             result_high.append(float(np.exp(pred_log + ci)))
@@ -618,14 +626,17 @@ class PriceForecaster:
             model_used="linear",
         )
 
-    def _fallback_forecast(
-        self, prices: List[float], days_ahead: int
-    ) -> ForecastResult:
+    def _fallback_forecast(self, prices: List[float], days_ahead: int) -> ForecastResult:
         """Random walk fallback for very little data."""
         if not prices:
             return ForecastResult(
-                dates=[], prices=[], confidence_low=[], confidence_high=[],
-                trend="neutral", trend_strength=0, model_used="fallback",
+                dates=[],
+                prices=[],
+                confidence_low=[],
+                confidence_high=[],
+                trend="neutral",
+                trend_strength=0,
+                model_used="fallback",
             )
         current = prices[-1]
         vol = np.std(prices) / np.mean(prices) if len(prices) > 1 else 0.03
@@ -646,14 +657,81 @@ class PriceForecaster:
 
         trend, strength = self._compute_trend(current, result_prices[-1], prices)
         return ForecastResult(
-            dates=result_dates, prices=result_prices,
-            confidence_low=result_low, confidence_high=result_high,
-            trend=trend, trend_strength=round(strength, 1), model_used="fallback",
+            dates=result_dates,
+            prices=result_prices,
+            confidence_low=result_low,
+            confidence_high=result_high,
+            trend=trend,
+            trend_strength=round(strength, 1),
+            model_used="fallback",
         )
 
     # ─────────────────────────────────────────────────────────────────
     # Weighting & Helpers
     # ─────────────────────────────────────────────────────────────────
+
+    def _get_or_run_model(
+        self,
+        model_name: str,
+        symbol: Optional[str],
+        data_hash: Optional[str],
+        days_ahead: int,
+        prices: List[float],
+        dates: List[datetime],
+    ) -> ForecastResult:
+        """Try to load a cached individual model result; run and cache on miss."""
+        # Attempt cache lookup when symbol and data_hash are provided
+        if symbol and data_hash:
+            cached = self._get_cached_model_result(symbol, model_name, data_hash, days_ahead)
+            if cached is not None:
+                logger.debug("Cache hit for %s:%s:%s:%d", symbol, model_name, data_hash, days_ahead)
+                return cached
+
+        # Run the model
+        result = self._run_model_by_name(model_name, prices, dates, days_ahead)
+
+        # Cache the result for next time
+        if symbol and data_hash:
+            self._cache_model_result(symbol, model_name, data_hash, days_ahead, result)
+
+        return result
+
+    @staticmethod
+    def _get_cached_model_result(symbol: str, model_name: str, data_hash: str, days: int) -> Optional[ForecastResult]:
+        """Get cached individual model ForecastResult from Redis (sync)."""
+        try:
+            r = _get_sync_redis()
+            data = r.get(f"{symbol}:{model_name}:{data_hash}:{days}")
+            if data:
+                return ForecastResult(**json.loads(data))
+        except Exception as e:
+            logger.debug("Redis model result cache miss %s:%s: %s", symbol, model_name, e)
+        return None
+
+    @staticmethod
+    def _cache_model_result(
+        symbol: str, model_name: str, data_hash: str, days: int, result: ForecastResult, ttl: int = 14400
+    ) -> None:
+        """Cache individual model ForecastResult in Redis (sync, default 4h TTL)."""
+        try:
+            r = _get_sync_redis()
+            payload = json.dumps(
+                {
+                    "dates": result.dates,
+                    "prices": result.prices,
+                    "confidence_low": result.confidence_low,
+                    "confidence_high": result.confidence_high,
+                    "trend": result.trend,
+                    "trend_strength": result.trend_strength,
+                    "model_used": result.model_used,
+                    "models_detail": result.models_detail,
+                    "explanations": result.explanations,
+                },
+                default=str,
+            )
+            r.setex(f"{symbol}:{model_name}:{data_hash}:{days}", ttl, payload)
+        except Exception as e:
+            logger.warning("Failed to cache model result %s:%s: %s", symbol, model_name, e)
 
     def _compute_weights(
         self,
@@ -692,9 +770,7 @@ class PriceForecaster:
         total = sum(inv)
         return [w / total for w in inv]
 
-    def _run_model_by_name(
-        self, name: str, prices: List[float], dates: List[datetime], days: int
-    ) -> ForecastResult:
+    def _run_model_by_name(self, name: str, prices: List[float], dates: List[datetime], days: int) -> ForecastResult:
         """Run a specific model by name."""
         if name == "Prophet":
             return self._prophet_forecast(prices, dates, days)
@@ -718,12 +794,8 @@ class PriceForecaster:
         if not prices or not result.prices:
             return 0.0
         # Approximate: use the recent price trend vs predicted trend as proxy
-        recent_change = (prices[-1] - prices[-min(7, len(prices))]) / max(
-            prices[-min(7, len(prices))], 1e-10
-        ) * 100
-        predicted_change = (result.prices[-1] - prices[-1]) / max(
-            prices[-1], 1e-10
-        ) * 100
+        recent_change = (prices[-1] - prices[-min(7, len(prices))]) / max(prices[-min(7, len(prices))], 1e-10) * 100
+        predicted_change = (result.prices[-1] - prices[-1]) / max(prices[-1], 1e-10) * 100
         return abs(recent_change - predicted_change)
 
     @staticmethod

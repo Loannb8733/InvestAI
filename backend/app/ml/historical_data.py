@@ -1,6 +1,5 @@
 """Historical price data fetcher for ML models."""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -19,14 +18,30 @@ class HistoricalDataFetcher:
 
     # Common symbol -> CoinGecko ID mapping (subset, full map in PriceService)
     SYMBOL_MAP: Dict[str, str] = {
-        "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-        "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
-        "DOGE": "dogecoin", "DOT": "polkadot", "LINK": "chainlink",
-        "AVAX": "avalanche-2", "MATIC": "matic-network", "UNI": "uniswap",
-        "ATOM": "cosmos", "LTC": "litecoin", "SHIB": "shiba-inu",
-        "NEAR": "near", "SUI": "sui", "PEPE": "pepe",
-        "PAXG": "pax-gold", "USDG": "first-digital-usd", "USDC": "usd-coin",
-        "TAO": "bittensor", "USDT": "tether", "TON": "the-open-network",
+        "BTC": "bitcoin",
+        "ETH": "ethereum",
+        "SOL": "solana",
+        "BNB": "binancecoin",
+        "XRP": "ripple",
+        "ADA": "cardano",
+        "DOGE": "dogecoin",
+        "DOT": "polkadot",
+        "LINK": "chainlink",
+        "AVAX": "avalanche-2",
+        "MATIC": "matic-network",
+        "UNI": "uniswap",
+        "ATOM": "cosmos",
+        "LTC": "litecoin",
+        "SHIB": "shiba-inu",
+        "NEAR": "near",
+        "SUI": "sui",
+        "PEPE": "pepe",
+        "PAXG": "pax-gold",
+        "USDG": "first-digital-usd",
+        "USDC": "usd-coin",
+        "TAO": "bittensor",
+        "USDT": "tether",
+        "TON": "the-open-network",
         "FET": "fetch-ai",
     }
 
@@ -128,7 +143,7 @@ class HistoricalDataFetcher:
 
             dates = [datetime.fromtimestamp(ts) for ts in timestamps]
             prices = [float(c) for c in closes if c is not None]
-            dates = dates[:len(prices)]
+            dates = dates[: len(prices)]
 
             logger.info("Fetched %d data points for %s from Yahoo Finance", len(prices), symbol)
             return dates, prices
@@ -157,7 +172,9 @@ class HistoricalDataFetcher:
                 if dates and len(dates) >= 5:
                     logger.info(
                         "Using %s as real estate proxy for %s (%d points)",
-                        proxy_ticker, symbol, len(dates),
+                        proxy_ticker,
+                        symbol,
+                        len(dates),
                     )
                     return dates, prices
             except Exception:

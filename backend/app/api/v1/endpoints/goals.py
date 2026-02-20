@@ -20,6 +20,7 @@ router = APIRouter()
 
 # ---- Schemas ----
 
+
 class GoalCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     target_amount: Decimal = Field(..., gt=0)
@@ -105,11 +106,7 @@ async def list_goals(
     db: AsyncSession = Depends(get_db),
 ):
     """List all goals for the current user."""
-    result = await db.execute(
-        select(Goal)
-        .where(Goal.user_id == current_user.id)
-        .order_by(Goal.created_at.desc())
-    )
+    result = await db.execute(select(Goal).where(Goal.user_id == current_user.id).order_by(Goal.created_at.desc()))
     goals = result.scalars().all()
     return [_build_response(g) for g in goals]
 

@@ -3,9 +3,8 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 
 from app.core.database import AsyncSessionLocal
 
@@ -17,14 +16,15 @@ def run_async(coro):
         return loop.run_until_complete(coro)
     finally:
         loop.close()
-from app.models.user import User
-from app.models.portfolio import Portfolio
+
+
 from app.models.notification import Notification
-from app.models.alert import Alert
+from app.models.portfolio import Portfolio
+from app.models.user import User
 from app.services.email_service import email_service
 from app.services.metrics_service import metrics_service
-from app.services.snapshot_service import snapshot_service
 from app.services.report_service import report_service
+from app.services.snapshot_service import snapshot_service
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -67,11 +67,7 @@ async def _send_weekly_reports_async() -> dict:
 
     async with AsyncSessionLocal() as db:
         # Get all users with portfolios
-        result = await db.execute(
-            select(User).where(
-                User.id.in_(select(Portfolio.user_id).distinct())
-            )
-        )
+        result = await db.execute(select(User).where(User.id.in_(select(Portfolio.user_id).distinct())))
         users = result.scalars().all()
 
         sent_count = 0
@@ -86,9 +82,7 @@ async def _send_weekly_reports_async() -> dict:
                     continue
 
                 # Get historical data for week comparison
-                history = await snapshot_service.get_historical_values(
-                    db, str(user.id), days=7
-                )
+                history = await snapshot_service.get_historical_values(db, str(user.id), days=7)
 
                 week_start_value = history[0]["value"] if history else metrics["total_value"]
                 week_change = metrics["total_value"] - week_start_value
@@ -129,11 +123,7 @@ async def _send_monthly_reports_async() -> dict:
         return {"sent": 0, "failed": 0, "skipped": "email_not_configured"}
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(User).where(
-                User.id.in_(select(Portfolio.user_id).distinct())
-            )
-        )
+        result = await db.execute(select(User).where(User.id.in_(select(Portfolio.user_id).distinct())))
         users = result.scalars().all()
 
         sent_count = 0
@@ -147,18 +137,14 @@ async def _send_monthly_reports_async() -> dict:
                     continue
 
                 # Get historical data for month comparison
-                history = await snapshot_service.get_historical_values(
-                    db, str(user.id), days=30
-                )
+                history = await snapshot_service.get_historical_values(db, str(user.id), days=30)
 
                 month_start_value = history[0]["value"] if history else metrics["total_value"]
                 month_change = metrics["total_value"] - month_start_value
                 month_change_pct = (month_change / month_start_value * 100) if month_start_value > 0 else 0
 
                 # YTD calculation
-                ytd_history = await snapshot_service.get_historical_values(
-                    db, str(user.id), days=365
-                )
+                ytd_history = await snapshot_service.get_historical_values(db, str(user.id), days=365)
                 jan1_value = metrics["total_invested"]  # Fallback
                 if ytd_history:
                     # Find value closest to Jan 1
@@ -175,11 +161,13 @@ async def _send_monthly_reports_async() -> dict:
                     total = metrics["total_value"]
                     for asset in metrics["assets"]:
                         value = asset.get("current_value", 0)
-                        allocation.append({
-                            "symbol": asset.get("symbol", "?"),
-                            "allocation_pct": (value / total * 100) if total > 0 else 0,
-                            "value": value,
-                        })
+                        allocation.append(
+                            {
+                                "symbol": asset.get("symbol", "?"),
+                                "allocation_pct": (value / total * 100) if total > 0 else 0,
+                                "value": value,
+                            }
+                        )
                     allocation.sort(key=lambda x: x["value"], reverse=True)
 
                 # Generate PDF report
@@ -226,11 +214,7 @@ async def _send_daily_digest_async() -> dict:
         # Get users with notifications in last 24h
         result = await db.execute(
             select(User).where(
-                User.id.in_(
-                    select(Notification.user_id).where(
-                        Notification.created_at >= yesterday
-                    ).distinct()
-                )
+                User.id.in_(select(Notification.user_id).where(Notification.created_at >= yesterday).distinct())
             )
         )
         users = result.scalars().all()
@@ -242,12 +226,14 @@ async def _send_daily_digest_async() -> dict:
             try:
                 # Get recent notifications
                 notif_result = await db.execute(
-                    select(Notification).where(
+                    select(Notification)
+                    .where(
                         and_(
                             Notification.user_id == user.id,
                             Notification.created_at >= yesterday,
                         )
-                    ).order_by(Notification.created_at.desc())
+                    )
+                    .order_by(Notification.created_at.desc())
                 )
                 notifications = notif_result.scalars().all()
 
@@ -258,10 +244,12 @@ async def _send_daily_digest_async() -> dict:
                 alerts_triggered = []
                 for n in notifications:
                     if "alert" in n.type.lower():
-                        alerts_triggered.append({
-                            "symbol": n.title.split()[-1] if n.title else "?",
-                            "message": n.message,
-                        })
+                        alerts_triggered.append(
+                            {
+                                "symbol": n.title.split()[-1] if n.title else "?",
+                                "message": n.message,
+                            }
+                        )
 
                 # Get insights (simplified)
                 insights = []
@@ -292,6 +280,7 @@ async def _send_daily_digest_async() -> dict:
 
 # === Celery Tasks ===
 
+
 @celery_app.task(name="tasks.send_alert_email")
 def send_alert_email(
     user_id: str,
@@ -302,9 +291,7 @@ def send_alert_email(
     condition: str,
 ) -> bool:
     """Celery task: Send alert notification email."""
-    return run_async(
-        _send_alert_email_async(user_id, alert_name, asset_symbol, current_price, target_price, condition)
-    )
+    return run_async(_send_alert_email_async(user_id, alert_name, asset_symbol, current_price, target_price, condition))
 
 
 @celery_app.task(name="tasks.send_weekly_reports")

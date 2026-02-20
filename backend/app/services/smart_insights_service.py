@@ -4,17 +4,16 @@ import logging
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ml.historical_data import HistoricalDataFetcher
+from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeResult
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
-from app.ml.historical_data import HistoricalDataFetcher
-from app.ml.regime_detector import MarketRegimeDetector, MarketRegime, RegimeResult
 from app.services.analytics_service import AnalyticsService
 from app.services.prediction_service import PredictionService
 from app.services.price_service import price_service
@@ -25,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class InsightSeverity(str, Enum):
     """Severity level for insights."""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -32,6 +32,7 @@ class InsightSeverity(str, Enum):
 
 class InsightCategory(str, Enum):
     """Category of insight."""
+
     PERFORMANCE = "performance"
     RISK = "risk"
     DIVERSIFICATION = "diversification"
@@ -43,6 +44,7 @@ class InsightCategory(str, Enum):
 @dataclass
 class SmartInsight:
     """A single smart insight/recommendation."""
+
     category: InsightCategory
     severity: InsightSeverity
     title: str
@@ -58,6 +60,7 @@ class SmartInsight:
 @dataclass
 class RebalancingOrder:
     """A suggested rebalancing order."""
+
     symbol: str
     name: str
     action: str  # "buy" or "sell"
@@ -72,6 +75,7 @@ class RebalancingOrder:
 @dataclass
 class AnomalyImpact:
     """Anomaly with calculated EUR impact."""
+
     symbol: str
     anomaly_type: str
     severity: str
@@ -85,6 +89,7 @@ class AnomalyImpact:
 @dataclass
 class PortfolioHealthReport:
     """Complete portfolio health analysis."""
+
     overall_score: int  # 0-100
     overall_status: str  # "excellent", "good", "fair", "poor", "critical"
     insights: List[SmartInsight]
@@ -151,12 +156,14 @@ class SmartInsightsService:
             return PortfolioHealthReport(
                 overall_score=0,
                 overall_status="unknown",
-                insights=[SmartInsight(
-                    category=InsightCategory.PERFORMANCE,
-                    severity=InsightSeverity.WARNING,
-                    title="Analyse impossible",
-                    message="Impossible d'analyser le portfolio. Vérifiez que vous avez des actifs.",
-                )],
+                insights=[
+                    SmartInsight(
+                        category=InsightCategory.PERFORMANCE,
+                        severity=InsightSeverity.WARNING,
+                        title="Analyse impossible",
+                        message="Impossible d'analyser le portfolio. Vérifiez que vous avez des actifs.",
+                    )
+                ],
                 rebalancing_orders=[],
                 anomaly_impacts=[],
                 metrics_summary={},
@@ -208,33 +215,40 @@ class SmartInsightsService:
         rebalancing_orders = await self._get_rebalancing_suggestions(db, user_id, total_value)
         if rebalancing_orders:
             # Calculate potential Sharpe improvement
-            insights.append(SmartInsight(
-                category=InsightCategory.REBALANCING,
-                severity=InsightSeverity.INFO,
-                title="Optimisation possible",
-                message=f"Un rééquilibrage de {len(rebalancing_orders)} positions pourrait améliorer votre ratio de Sharpe.",
-                metric_name="positions_to_rebalance",
-                current_value=len(rebalancing_orders),
-                actions=[{
-                    "type": order.action,
-                    "symbol": order.symbol,
-                    "amount_eur": order.amount_eur,
-                    "reason": order.reason,
-                } for order in rebalancing_orders[:3]],  # Top 3 actions
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.REBALANCING,
+                    severity=InsightSeverity.INFO,
+                    title="Optimisation possible",
+                    message=f"Un rééquilibrage de {len(rebalancing_orders)} positions pourrait améliorer votre ratio de Sharpe.",
+                    metric_name="positions_to_rebalance",
+                    current_value=len(rebalancing_orders),
+                    actions=[
+                        {
+                            "type": order.action,
+                            "symbol": order.symbol,
+                            "amount_eur": order.amount_eur,
+                            "reason": order.reason,
+                        }
+                        for order in rebalancing_orders[:3]
+                    ],  # Top 3 actions
+                )
+            )
 
         # === ANOMALY IMPACTS ===
         anomaly_impacts = await self._get_anomaly_impacts(db, user_id)
         for impact in anomaly_impacts:
             severity = InsightSeverity.CRITICAL if impact.severity == "high" else InsightSeverity.WARNING
-            insights.append(SmartInsight(
-                category=InsightCategory.ANOMALY,
-                severity=severity,
-                title=f"Anomalie détectée sur {impact.symbol}",
-                message=f"{impact.description}. Impact: {impact.impact_eur:+,.0f}€ ({impact.price_change_percent:+.1f}%)",
-                metric_name="impact_eur",
-                current_value=impact.impact_eur,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.ANOMALY,
+                    severity=severity,
+                    title=f"Anomalie détectée sur {impact.symbol}",
+                    message=f"{impact.description}. Impact: {impact.impact_eur:+,.0f}€ ({impact.price_change_percent:+.1f}%)",
+                    metric_name="impact_eur",
+                    current_value=impact.impact_eur,
+                )
+            )
 
         # === MARKET REGIME ===
         market_regime = await self._get_market_regime(db, user_id, top_holdings, days)
@@ -268,46 +282,54 @@ class SmartInsightsService:
         insights = []
 
         if sharpe < self.SHARPE_POOR:
-            insights.append(SmartInsight(
-                category=InsightCategory.PERFORMANCE,
-                severity=InsightSeverity.CRITICAL,
-                title="Performance très faible",
-                message=f"Votre ratio de Sharpe ({sharpe:.2f}) est négatif. Votre portfolio sous-performe un placement sans risque.",
-                metric_name="sharpe_ratio",
-                current_value=sharpe,
-                target_value=self.SHARPE_GOOD,
-                potential_improvement="Diversifiez vers des actifs moins corrélés ou réduisez les positions perdantes.",
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.PERFORMANCE,
+                    severity=InsightSeverity.CRITICAL,
+                    title="Performance très faible",
+                    message=f"Votre ratio de Sharpe ({sharpe:.2f}) est négatif. Votre portfolio sous-performe un placement sans risque.",
+                    metric_name="sharpe_ratio",
+                    current_value=sharpe,
+                    target_value=self.SHARPE_GOOD,
+                    potential_improvement="Diversifiez vers des actifs moins corrélés ou réduisez les positions perdantes.",
+                )
+            )
         elif sharpe < self.SHARPE_FAIR:
-            insights.append(SmartInsight(
-                category=InsightCategory.PERFORMANCE,
-                severity=InsightSeverity.WARNING,
-                title="Performance à améliorer",
-                message=f"Votre ratio de Sharpe ({sharpe:.2f}) est faible. Le rendement ne compense pas suffisamment le risque pris.",
-                metric_name="sharpe_ratio",
-                current_value=sharpe,
-                target_value=self.SHARPE_GOOD,
-                potential_improvement=f"Ciblez un Sharpe > {self.SHARPE_GOOD} via une meilleure allocation.",
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.PERFORMANCE,
+                    severity=InsightSeverity.WARNING,
+                    title="Performance à améliorer",
+                    message=f"Votre ratio de Sharpe ({sharpe:.2f}) est faible. Le rendement ne compense pas suffisamment le risque pris.",
+                    metric_name="sharpe_ratio",
+                    current_value=sharpe,
+                    target_value=self.SHARPE_GOOD,
+                    potential_improvement=f"Ciblez un Sharpe > {self.SHARPE_GOOD} via une meilleure allocation.",
+                )
+            )
         elif sharpe < self.SHARPE_GOOD:
-            insights.append(SmartInsight(
-                category=InsightCategory.PERFORMANCE,
-                severity=InsightSeverity.INFO,
-                title="Performance correcte",
-                message=f"Votre ratio de Sharpe ({sharpe:.2f}) est acceptable mais peut être optimisé.",
-                metric_name="sharpe_ratio",
-                current_value=sharpe,
-                target_value=self.SHARPE_EXCELLENT,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.PERFORMANCE,
+                    severity=InsightSeverity.INFO,
+                    title="Performance correcte",
+                    message=f"Votre ratio de Sharpe ({sharpe:.2f}) est acceptable mais peut être optimisé.",
+                    metric_name="sharpe_ratio",
+                    current_value=sharpe,
+                    target_value=self.SHARPE_EXCELLENT,
+                )
+            )
         else:
-            insights.append(SmartInsight(
-                category=InsightCategory.PERFORMANCE,
-                severity=InsightSeverity.INFO,
-                title="Excellente performance",
-                message=f"Votre ratio de Sharpe ({sharpe:.2f}) est excellent. Votre rendement ajusté au risque est très bon.",
-                metric_name="sharpe_ratio",
-                current_value=sharpe,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.PERFORMANCE,
+                    severity=InsightSeverity.INFO,
+                    title="Excellente performance",
+                    message=f"Votre ratio de Sharpe ({sharpe:.2f}) est excellent. Votre rendement ajusté au risque est très bon.",
+                    metric_name="sharpe_ratio",
+                    current_value=sharpe,
+                )
+            )
 
         return insights
 
@@ -317,58 +339,68 @@ class SmartInsightsService:
 
         # Volatility analysis
         if volatility > self.VOLATILITY_EXTREME:
-            insights.append(SmartInsight(
-                category=InsightCategory.RISK,
-                severity=InsightSeverity.CRITICAL,
-                title="Volatilité extrême",
-                message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. C'est très risqué.",
-                metric_name="volatility",
-                current_value=volatility,
-                target_value=0.30,
-                potential_improvement="Ajoutez des actifs stables (ETF obligataires, stablecoins) pour réduire la volatilité.",
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.CRITICAL,
+                    title="Volatilité extrême",
+                    message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. C'est très risqué.",
+                    metric_name="volatility",
+                    current_value=volatility,
+                    target_value=0.30,
+                    potential_improvement="Ajoutez des actifs stables (ETF obligataires, stablecoins) pour réduire la volatilité.",
+                )
+            )
         elif volatility > self.VOLATILITY_HIGH:
-            insights.append(SmartInsight(
-                category=InsightCategory.RISK,
-                severity=InsightSeverity.WARNING,
-                title="Volatilité élevée",
-                message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. Préparez-vous à des variations importantes.",
-                metric_name="volatility",
-                current_value=volatility,
-                target_value=0.30,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.WARNING,
+                    title="Volatilité élevée",
+                    message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. Préparez-vous à des variations importantes.",
+                    metric_name="volatility",
+                    current_value=volatility,
+                    target_value=0.30,
+                )
+            )
 
         # VaR analysis
         if var_95 > self.VAR_CRITICAL:
-            insights.append(SmartInsight(
-                category=InsightCategory.RISK,
-                severity=InsightSeverity.CRITICAL,
-                title="Risque de perte élevé",
-                message=f"Votre VaR 95% est de {var_95*100:.1f}%. Vous pouvez perdre cette proportion en une journée (5% de chance).",
-                metric_name="var_95",
-                current_value=var_95,
-                target_value=0.05,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.CRITICAL,
+                    title="Risque de perte élevé",
+                    message=f"Votre VaR 95% est de {var_95*100:.1f}%. Vous pouvez perdre cette proportion en une journée (5% de chance).",
+                    metric_name="var_95",
+                    current_value=var_95,
+                    target_value=0.05,
+                )
+            )
         elif var_95 > self.VAR_WARNING:
-            insights.append(SmartInsight(
-                category=InsightCategory.RISK,
-                severity=InsightSeverity.WARNING,
-                title="VaR à surveiller",
-                message=f"Votre VaR 95% est de {var_95*100:.1f}%. Le risque journalier est notable.",
-                metric_name="var_95",
-                current_value=var_95,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.WARNING,
+                    title="VaR à surveiller",
+                    message=f"Votre VaR 95% est de {var_95*100:.1f}%. Le risque journalier est notable.",
+                    metric_name="var_95",
+                    current_value=var_95,
+                )
+            )
 
         # Max drawdown
         if max_drawdown > 0.30:
-            insights.append(SmartInsight(
-                category=InsightCategory.RISK,
-                severity=InsightSeverity.WARNING,
-                title="Drawdown important",
-                message=f"Votre portfolio a subi une baisse max de {max_drawdown*100:.0f}% depuis son pic.",
-                metric_name="max_drawdown",
-                current_value=max_drawdown,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.WARNING,
+                    title="Drawdown important",
+                    message=f"Votre portfolio a subi une baisse max de {max_drawdown*100:.0f}% depuis son pic.",
+                    metric_name="max_drawdown",
+                    current_value=max_drawdown,
+                )
+            )
 
         return insights
 
@@ -382,53 +414,63 @@ class SmartInsightsService:
             top_symbol = top_holdings[0].get("symbol", "?") if top_holdings else "?"
 
             if top_weight > self.CONCENTRATION_CRITICAL:
-                insights.append(SmartInsight(
-                    category=InsightCategory.DIVERSIFICATION,
-                    severity=InsightSeverity.CRITICAL,
-                    title="Concentration excessive",
-                    message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio. C'est trop concentré.",
-                    metric_name="top_holding_weight",
-                    current_value=top_weight,
-                    target_value=0.25,
-                    potential_improvement=f"Réduisez {top_symbol} à max 25% et diversifiez.",
-                    actions=[{
-                        "type": "sell",
-                        "symbol": top_symbol,
-                        "reason": "Réduire la concentration",
-                    }],
-                ))
+                insights.append(
+                    SmartInsight(
+                        category=InsightCategory.DIVERSIFICATION,
+                        severity=InsightSeverity.CRITICAL,
+                        title="Concentration excessive",
+                        message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio. C'est trop concentré.",
+                        metric_name="top_holding_weight",
+                        current_value=top_weight,
+                        target_value=0.25,
+                        potential_improvement=f"Réduisez {top_symbol} à max 25% et diversifiez.",
+                        actions=[
+                            {
+                                "type": "sell",
+                                "symbol": top_symbol,
+                                "reason": "Réduire la concentration",
+                            }
+                        ],
+                    )
+                )
             elif top_weight > self.CONCENTRATION_WARNING:
-                insights.append(SmartInsight(
-                    category=InsightCategory.DIVERSIFICATION,
-                    severity=InsightSeverity.WARNING,
-                    title="Concentration élevée",
-                    message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio.",
-                    metric_name="top_holding_weight",
-                    current_value=top_weight,
-                    target_value=0.25,
-                ))
+                insights.append(
+                    SmartInsight(
+                        category=InsightCategory.DIVERSIFICATION,
+                        severity=InsightSeverity.WARNING,
+                        title="Concentration élevée",
+                        message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio.",
+                        metric_name="top_holding_weight",
+                        current_value=top_weight,
+                        target_value=0.25,
+                    )
+                )
 
         # HHI analysis
         if hhi > 0.25:  # Concentrated
-            insights.append(SmartInsight(
-                category=InsightCategory.DIVERSIFICATION,
-                severity=InsightSeverity.WARNING,
-                title="Portfolio peu diversifié",
-                message=f"Votre indice HHI ({hhi:.2f}) indique une concentration élevée.",
-                metric_name="hhi",
-                current_value=hhi,
-                target_value=0.15,
-                potential_improvement="Ajoutez des actifs décorrélés (actions, ETF, or).",
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.DIVERSIFICATION,
+                    severity=InsightSeverity.WARNING,
+                    title="Portfolio peu diversifié",
+                    message=f"Votre indice HHI ({hhi:.2f}) indique une concentration élevée.",
+                    metric_name="hhi",
+                    current_value=hhi,
+                    target_value=0.15,
+                    potential_improvement="Ajoutez des actifs décorrélés (actions, ETF, or).",
+                )
+            )
         elif hhi < 0.10:
-            insights.append(SmartInsight(
-                category=InsightCategory.DIVERSIFICATION,
-                severity=InsightSeverity.INFO,
-                title="Bonne diversification",
-                message=f"Votre portfolio est bien diversifié (HHI: {hhi:.2f}).",
-                metric_name="hhi",
-                current_value=hhi,
-            ))
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.DIVERSIFICATION,
+                    severity=InsightSeverity.INFO,
+                    title="Bonne diversification",
+                    message=f"Votre portfolio est bien diversifié (HHI: {hhi:.2f}).",
+                    metric_name="hhi",
+                    current_value=hhi,
+                )
+            )
 
         return insights
 
@@ -444,9 +486,7 @@ class SmartInsightsService:
 
         try:
             # Get optimal weights from MPT
-            optimization = await self.analytics_service.optimize_portfolio(
-                db, user_id, objective="max_sharpe"
-            )
+            optimization = await self.analytics_service.optimize_portfolio(db, user_id, objective="max_sharpe")
             if not optimization or not optimization.weights:
                 return []
 
@@ -484,21 +524,25 @@ class SmartInsightsService:
 
                 reason = ""
                 if action == "buy":
-                    reason = f"Augmenter de {current_weight*100:.1f}% → {target_weight*100:.1f}% pour optimiser le Sharpe"
+                    reason = (
+                        f"Augmenter de {current_weight*100:.1f}% → {target_weight*100:.1f}% pour optimiser le Sharpe"
+                    )
                 else:
                     reason = f"Réduire de {current_weight*100:.1f}% → {target_weight*100:.1f}% (surpondéré)"
 
-                orders.append(RebalancingOrder(
-                    symbol=symbol,
-                    name=name,
-                    action=action,
-                    current_weight=current_weight,
-                    target_weight=target_weight,
-                    current_value_eur=current_value,
-                    target_value_eur=target_value,
-                    amount_eur=abs(amount),
-                    reason=reason,
-                ))
+                orders.append(
+                    RebalancingOrder(
+                        symbol=symbol,
+                        name=name,
+                        action=action,
+                        current_weight=current_weight,
+                        target_weight=target_weight,
+                        current_value_eur=current_value,
+                        target_value_eur=target_value,
+                        amount_eur=abs(amount),
+                        reason=reason,
+                    )
+                )
 
         # Sort by absolute amount (biggest changes first)
         orders.sort(key=lambda x: x.amount_eur, reverse=True)
@@ -520,17 +564,13 @@ class SmartInsightsService:
         impacts = []
 
         # Get user's assets to calculate position values
-        portfolios_result = await db.execute(
-            select(Portfolio).where(Portfolio.user_id == user_id)
-        )
+        portfolios_result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
         portfolios = portfolios_result.scalars().all()
 
         # Build asset map
         asset_map = {}
         for portfolio in portfolios:
-            assets_result = await db.execute(
-                select(Asset).where(Asset.portfolio_id == portfolio.id)
-            )
+            assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
             for asset in assets_result.scalars().all():
                 if asset.symbol not in asset_map:
                     asset_map[asset.symbol] = {
@@ -568,16 +608,18 @@ class SmartInsightsService:
             # If price dropped 15%, the impact is the value lost
             impact_eur = position_value * price_change
 
-            impacts.append(AnomalyImpact(
-                symbol=symbol,
-                anomaly_type=anomaly.anomaly_type or "unknown",
-                severity=anomaly.severity,
-                description=anomaly.description,
-                price_change_percent=anomaly.price_change_percent,
-                position_value_eur=position_value,
-                impact_eur=impact_eur,
-                detected_at=anomaly.detected_at,
-            ))
+            impacts.append(
+                AnomalyImpact(
+                    symbol=symbol,
+                    anomaly_type=anomaly.anomaly_type or "unknown",
+                    severity=anomaly.severity,
+                    description=anomaly.description,
+                    price_change_percent=anomaly.price_change_percent,
+                    position_value_eur=position_value,
+                    impact_eur=impact_eur,
+                    detected_at=anomaly.detected_at,
+                )
+            )
 
         # Sort by absolute impact
         impacts.sort(key=lambda x: abs(x.impact_eur), reverse=True)
@@ -599,6 +641,7 @@ class SmartInsightsService:
             fear_greed: Optional[int] = None
             try:
                 import httpx
+
                 async with httpx.AsyncClient(timeout=10) as client:
                     resp = await client.get("https://api.alternative.me/fng/?limit=1")
                     if resp.status_code == 200:
@@ -671,8 +714,7 @@ class SmartInsightsService:
             "bullish": (
                 InsightSeverity.INFO,
                 "Marche haussier",
-                f"Le marche est en tendance haussiere ({prob*100:.0f}%). "
-                f"Conditions favorables pour vos positions.",
+                f"Le marche est en tendance haussiere ({prob*100:.0f}%). " f"Conditions favorables pour vos positions.",
             ),
             "top": (
                 InsightSeverity.WARNING,

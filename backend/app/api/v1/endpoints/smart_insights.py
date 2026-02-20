@@ -16,8 +16,10 @@ router = APIRouter()
 
 # === Response Models ===
 
+
 class ActionResponse(BaseModel):
     """A suggested action."""
+
     type: str  # buy, sell, hold
     symbol: str
     amount_eur: Optional[float] = None
@@ -26,6 +28,7 @@ class ActionResponse(BaseModel):
 
 class InsightResponse(BaseModel):
     """A smart insight."""
+
     category: str
     severity: str
     title: str
@@ -39,6 +42,7 @@ class InsightResponse(BaseModel):
 
 class RebalancingOrderResponse(BaseModel):
     """A rebalancing order suggestion."""
+
     symbol: str
     name: str
     action: str  # buy or sell
@@ -52,6 +56,7 @@ class RebalancingOrderResponse(BaseModel):
 
 class AnomalyImpactResponse(BaseModel):
     """An anomaly with EUR impact."""
+
     symbol: str
     anomaly_type: str
     severity: str
@@ -64,6 +69,7 @@ class AnomalyImpactResponse(BaseModel):
 
 class MetricsSummaryResponse(BaseModel):
     """Summary of key metrics."""
+
     sharpe_ratio: float
     sortino_ratio: float
     volatility: float
@@ -75,6 +81,7 @@ class MetricsSummaryResponse(BaseModel):
 
 class IndicatorSignalResponse(BaseModel):
     """A single indicator signal."""
+
     name: str
     value: float
     signal: str
@@ -84,6 +91,7 @@ class IndicatorSignalResponse(BaseModel):
 
 class RegimeResultResponse(BaseModel):
     """Regime detection for a symbol."""
+
     symbol: str
     probabilities: Dict[str, float]
     dominant_regime: str
@@ -94,6 +102,7 @@ class RegimeResultResponse(BaseModel):
 
 class MarketRegimeResponse(BaseModel):
     """Market regime analysis."""
+
     market: RegimeResultResponse
     per_asset: List[RegimeResultResponse]
     generated_at: str
@@ -101,6 +110,7 @@ class MarketRegimeResponse(BaseModel):
 
 class PortfolioHealthResponse(BaseModel):
     """Complete portfolio health report."""
+
     overall_score: int
     overall_status: str
     insights: List[InsightResponse]
@@ -112,6 +122,7 @@ class PortfolioHealthResponse(BaseModel):
 
 
 # === Helpers ===
+
 
 def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
     """Convert MarketRegime dataclass to response model."""
@@ -131,7 +142,8 @@ def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
                     signal=s.signal,
                     strength=s.strength,
                     description=s.description,
-                ) for s in r.signals
+                )
+                for s in r.signals
             ],
             description=r.description,
         )
@@ -144,6 +156,7 @@ def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
 
 
 # === Endpoints ===
+
 
 @router.get("/health", response_model=PortfolioHealthResponse)
 async def get_portfolio_health(
@@ -161,9 +174,7 @@ async def get_portfolio_health(
     - Anomalies détectées avec impact en EUR
     - Régime de marché (bearish/bottom/bullish/top)
     """
-    report = await smart_insights_service.get_portfolio_health(
-        db, str(current_user.id), days
-    )
+    report = await smart_insights_service.get_portfolio_health(db, str(current_user.id), days)
 
     return PortfolioHealthResponse(
         overall_score=report.overall_score,
@@ -184,9 +195,11 @@ async def get_portfolio_health(
                         symbol=a.get("symbol", ""),
                         amount_eur=a.get("amount_eur"),
                         reason=a.get("reason"),
-                    ) for a in i.actions
+                    )
+                    for a in i.actions
                 ],
-            ) for i in report.insights
+            )
+            for i in report.insights
         ],
         rebalancing_orders=[
             RebalancingOrderResponse(
@@ -199,7 +212,8 @@ async def get_portfolio_health(
                 target_value_eur=o.target_value_eur,
                 amount_eur=o.amount_eur,
                 reason=o.reason,
-            ) for o in report.rebalancing_orders
+            )
+            for o in report.rebalancing_orders
         ],
         anomaly_impacts=[
             AnomalyImpactResponse(
@@ -211,7 +225,8 @@ async def get_portfolio_health(
                 position_value_eur=a.position_value_eur,
                 impact_eur=a.impact_eur,
                 detected_at=a.detected_at.isoformat() if a.detected_at else "",
-            ) for a in report.anomaly_impacts
+            )
+            for a in report.anomaly_impacts
         ],
         metrics_summary=MetricsSummaryResponse(
             sharpe_ratio=report.metrics_summary.get("sharpe_ratio", 0),
@@ -237,9 +252,7 @@ async def get_rebalancing_suggestions(
 
     Retourne les ordres d'achat/vente suggérés pour maximiser le ratio de Sharpe.
     """
-    report = await smart_insights_service.get_portfolio_health(
-        db, str(current_user.id), days=30
-    )
+    report = await smart_insights_service.get_portfolio_health(db, str(current_user.id), days=30)
 
     return [
         RebalancingOrderResponse(
@@ -252,7 +265,8 @@ async def get_rebalancing_suggestions(
             target_value_eur=o.target_value_eur,
             amount_eur=o.amount_eur,
             reason=o.reason,
-        ) for o in report.rebalancing_orders
+        )
+        for o in report.rebalancing_orders
     ]
 
 
@@ -266,9 +280,7 @@ async def get_anomalies_with_impact(
 
     Retourne les mouvements anormaux sur vos positions avec leur impact financier.
     """
-    report = await smart_insights_service.get_portfolio_health(
-        db, str(current_user.id), days=30
-    )
+    report = await smart_insights_service.get_portfolio_health(db, str(current_user.id), days=30)
 
     return [
         AnomalyImpactResponse(
@@ -280,5 +292,6 @@ async def get_anomalies_with_impact(
             position_value_eur=a.position_value_eur,
             impact_eur=a.impact_eur,
             detected_at=a.detected_at.isoformat() if a.detected_at else "",
-        ) for a in report.anomaly_impacts
+        )
+        for a in report.anomaly_impacts
     ]

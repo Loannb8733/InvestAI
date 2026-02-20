@@ -1,11 +1,8 @@
 """Tests for prediction service helper methods."""
 
-from datetime import datetime
 
-import numpy as np
 import pytest
 
-from app.ml.forecaster import PriceForecaster
 from app.services.prediction_service import PredictionService, PricePrediction
 
 
@@ -50,6 +47,7 @@ class TestGetDailyVolatility:
 
     def test_crypto_highest_volatility(self, svc):
         from app.models.asset import AssetType
+
         crypto = svc._get_daily_volatility(AssetType.CRYPTO)
         stock = svc._get_daily_volatility(AssetType.STOCK)
         etf = svc._get_daily_volatility(AssetType.ETF)
@@ -70,6 +68,7 @@ class TestRandomWalkFallback:
 
     def test_returns_correct_structure(self, svc):
         from app.models.asset import AssetType
+
         predictions, trend, strength = svc._random_walk_fallback(100.0, AssetType.CRYPTO, 7)
         assert len(predictions) == 7
         assert trend in ("bullish", "bearish", "neutral")
@@ -77,6 +76,7 @@ class TestRandomWalkFallback:
 
     def test_predictions_have_required_keys(self, svc):
         from app.models.asset import AssetType
+
         predictions, _, _ = svc._random_walk_fallback(100.0, AssetType.STOCK, 3)
         for p in predictions:
             assert "date" in p
@@ -86,6 +86,7 @@ class TestRandomWalkFallback:
 
     def test_no_negative_prices(self, svc):
         from app.models.asset import AssetType
+
         # Run multiple times to reduce randomness
         for _ in range(10):
             predictions, _, _ = svc._random_walk_fallback(1.0, AssetType.CRYPTO, 7)

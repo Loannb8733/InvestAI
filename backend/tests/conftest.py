@@ -12,7 +12,6 @@ os.environ.setdefault("POSTGRES_PASSWORD", "test")
 
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -25,9 +24,7 @@ from app.models import Base
 from app.models.user import User, UserRole
 
 # Test database URL
-TEST_DATABASE_URL = settings.DATABASE_URL.replace(
-    settings.POSTGRES_DB, f"{settings.POSTGRES_DB}_test"
-)
+TEST_DATABASE_URL = settings.DATABASE_URL.replace(settings.POSTGRES_DB, f"{settings.POSTGRES_DB}_test")
 
 # Create test engine
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)

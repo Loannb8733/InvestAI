@@ -19,6 +19,7 @@ router = APIRouter()
 
 # ── Response Models ──────────────────────────────────────────────────
 
+
 class AssetPerformanceResponse(BaseModel):
     symbol: str
     name: str
@@ -112,6 +113,7 @@ class OptimizationResponse(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+
 def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
     return PortfolioAnalyticsResponse(
         total_value=a.total_value,
@@ -132,12 +134,19 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
         allocation_by_asset=a.allocation_by_asset,
         assets=[
             AssetPerformanceResponse(
-                symbol=x.symbol, name=x.name, asset_type=x.asset_type,
-                current_value=x.current_value, total_invested=x.total_invested,
-                gain_loss=x.gain_loss, gain_loss_percent=x.gain_loss_percent,
-                weight=x.weight, daily_return=x.daily_return,
-                volatility_30d=x.volatility_30d, sharpe_ratio=x.sharpe_ratio,
-                sortino_ratio=x.sortino_ratio, max_drawdown=x.max_drawdown,
+                symbol=x.symbol,
+                name=x.name,
+                asset_type=x.asset_type,
+                current_value=x.current_value,
+                total_invested=x.total_invested,
+                gain_loss=x.gain_loss,
+                gain_loss_percent=x.gain_loss_percent,
+                weight=x.weight,
+                daily_return=x.daily_return,
+                volatility_30d=x.volatility_30d,
+                sharpe_ratio=x.sharpe_ratio,
+                sortino_ratio=x.sortino_ratio,
+                max_drawdown=x.max_drawdown,
             )
             for x in a.assets
         ],
@@ -147,6 +156,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
+
 
 @router.get("/", response_model=PortfolioAnalyticsResponse)
 async def get_global_analytics(
@@ -185,11 +195,10 @@ async def get_correlation_matrix(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    c = await analytics_service.get_correlation_matrix(
-        db, str(current_user.id), portfolio_id=portfolio_id, days=days
-    )
+    c = await analytics_service.get_correlation_matrix(db, str(current_user.id), portfolio_id=portfolio_id, days=days)
     return CorrelationResponse(
-        symbols=c.symbols, matrix=c.matrix,
+        symbols=c.symbols,
+        matrix=c.matrix,
         strongly_correlated=[(s1, s2, v) for s1, s2, v in c.strongly_correlated],
         negatively_correlated=[(s1, s2, v) for s1, s2, v in c.negatively_correlated],
     )
@@ -206,8 +215,10 @@ async def get_diversification_analysis(
         db, str(current_user.id), portfolio_id=portfolio_id, days=days
     )
     return DiversificationResponse(
-        score=a["score"], concentration_risk=a["concentration_risk"],
-        asset_count=a["asset_count"], type_count=a["type_count"],
+        score=a["score"],
+        concentration_risk=a["concentration_risk"],
+        asset_count=a["asset_count"],
+        type_count=a["type_count"],
         allocation_by_type=a["allocation_by_type"],
         recommendations=[RecommendationResponse(**r) for r in a["recommendations"]],
         rating=a["rating"],
@@ -241,14 +252,22 @@ async def get_performance_summary(
         },
         "top_gainers": [
             {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
-            for a in by_gain[:5] if a.gain_loss_percent > 0
+            for a in by_gain[:5]
+            if a.gain_loss_percent > 0
         ],
         "top_losers": [
             {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
-            for a in reversed(by_gain[-5:]) if a.gain_loss_percent < 0
+            for a in reversed(by_gain[-5:])
+            if a.gain_loss_percent < 0
         ],
         "largest_positions": [
-            {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "current_value": a.current_value, "weight": a.weight}
+            {
+                "symbol": a.symbol,
+                "name": a.name,
+                "asset_type": a.asset_type,
+                "current_value": a.current_value,
+                "weight": a.weight,
+            }
             for a in by_value[:5]
         ],
         "most_volatile": [
@@ -274,7 +293,7 @@ async def get_risk_metrics(
         risk_level = "medium"
 
     # Compute parametric VaR from portfolio returns (reuse internal data)
-    from app.services.analytics_service import _var_parametric, _compute_returns
+
     # We need portfolio returns — rebuild them quickly
     var_parametric_pct = 0.0
     var_parametric_eur = 0.0
@@ -299,7 +318,10 @@ async def get_risk_metrics(
         "var_95": {
             "historical": analytics.var_95,
             "parametric": var_parametric_eur,
-            "description": f"Perte max journalière (95%): historique {analytics.var_95:.2f}€ / paramétrique {var_parametric_eur:.2f}€",
+            "description": (
+                f"Perte max journalière (95%): historique {analytics.var_95:.2f}€"
+                f" / paramétrique {var_parametric_eur:.2f}€"
+            ),
         },
         "cvar_95": {
             "value": analytics.cvar_95,
@@ -406,16 +428,19 @@ async def get_rebalance_orders(
             detail=f"Les poids cibles doivent sommer à 100% (actuellement {total:.1f}%)",
         )
 
-    orders = await analytics_service.get_rebalance_orders(
-        db, str(current_user.id), target_weights
-    )
+    orders = await analytics_service.get_rebalance_orders(db, str(current_user.id), target_weights)
     return {
         "orders": [
             RebalanceOrderResponse(
-                symbol=o.symbol, name=o.name, asset_type=o.asset_type,
-                current_weight=o.current_weight, target_weight=o.target_weight,
-                diff_weight=o.diff_weight, current_value=o.current_value,
-                target_value=o.target_value, diff_value=o.diff_value,
+                symbol=o.symbol,
+                name=o.name,
+                asset_type=o.asset_type,
+                current_weight=o.current_weight,
+                target_weight=o.target_weight,
+                diff_weight=o.diff_weight,
+                current_value=o.current_value,
+                target_value=o.target_value,
+                diff_value=o.diff_value,
                 action=o.action,
             ).model_dump()
             for o in orders
@@ -430,9 +455,7 @@ async def optimize_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """MPT portfolio optimization — find optimal weights."""
-    result = await analytics_service.optimize_portfolio(
-        db, str(current_user.id), objective=objective
-    )
+    result = await analytics_service.optimize_portfolio(db, str(current_user.id), objective=objective)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -448,31 +471,42 @@ async def optimize_portfolio(
 
 # ── Risk recommendations ─────────────────────────────────────────────
 
+
 def _get_risk_recommendations(analytics, risk_level: str) -> list:
     recs = []
     if risk_level == "high":
-        recs.append({
-            "type": "volatility",
-            "message": "Volatilité élevée — ajoutez des actifs moins volatils (ETF, obligations)",
-        })
+        recs.append(
+            {
+                "type": "volatility",
+                "message": "Volatilité élevée — ajoutez des actifs moins volatils (ETF, obligations)",
+            }
+        )
     if analytics.sharpe_ratio < 0.5:
-        recs.append({
-            "type": "sharpe",
-            "message": "Sharpe faible — le rendement ne compense pas le risque pris",
-        })
+        recs.append(
+            {
+                "type": "sharpe",
+                "message": "Sharpe faible — le rendement ne compense pas le risque pris",
+            }
+        )
     if analytics.sortino_ratio < 0.5 and analytics.sortino_ratio != 0:
-        recs.append({
-            "type": "sortino",
-            "message": "Sortino faible — trop de volatilité baissière",
-        })
+        recs.append(
+            {
+                "type": "sortino",
+                "message": "Sortino faible — trop de volatilité baissière",
+            }
+        )
     if analytics.concentration_risk > 0.25:
-        recs.append({
-            "type": "concentration",
-            "message": "Concentration élevée — diversifiez davantage",
-        })
+        recs.append(
+            {
+                "type": "concentration",
+                "message": "Concentration élevée — diversifiez davantage",
+            }
+        )
     if analytics.max_drawdown < -30:
-        recs.append({
-            "type": "drawdown",
-            "message": f"Max drawdown important ({analytics.max_drawdown:.1f}%) — envisagez des stop-loss",
-        })
+        recs.append(
+            {
+                "type": "drawdown",
+                "message": f"Max drawdown important ({analytics.max_drawdown:.1f}%) — envisagez des stop-loss",
+            }
+        )
     return recs

@@ -68,7 +68,7 @@ class KrakenService(BaseExchangeService):
         # Kraken uses .S for staked, .M for margin, .F for flex staking
         for suffix in [".S", ".M", ".F", ".P", "2.S"]:
             if asset.endswith(suffix):
-                asset = asset[:-len(suffix)]
+                asset = asset[: -len(suffix)]
                 break
 
         # Check known mappings first
@@ -117,7 +117,7 @@ class KrakenService(BaseExchangeService):
         # Try to find and remove quote currency
         for quote in self.QUOTE_CURRENCIES:
             if pair.endswith(quote):
-                base = pair[:-len(quote)]
+                base = pair[: -len(quote)]
                 normalized_base = self._normalize_asset(base)
                 normalized_quote = self._normalize_asset(quote)
                 return normalized_base, normalized_quote
@@ -127,7 +127,7 @@ class KrakenService(BaseExchangeService):
         for quote in ["EUR", "USD", "GBP"]:
             zquote = f"Z{quote}"
             if pair.endswith(zquote):
-                base = pair[:-len(zquote)]
+                base = pair[: -len(zquote)]
                 return self._normalize_asset(base), quote
 
         # Last resort: return first 3-4 chars normalized, assume EUR
@@ -161,6 +161,7 @@ class KrakenService(BaseExchangeService):
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
         import logging
+
         logger = logging.getLogger(__name__)
         try:
             async with httpx.AsyncClient() as client:
@@ -435,18 +436,20 @@ class KrakenService(BaseExchangeService):
                     if len(ledgers) >= limit:
                         break
 
-                    ledgers.append({
-                        "ledger_id": ledger_id,
-                        "refid": entry.get("refid", ""),
-                        "time": datetime.fromtimestamp(entry["time"]),
-                        "type": entry["type"],
-                        "subtype": entry.get("subtype", ""),
-                        "aclass": entry.get("aclass", ""),
-                        "asset": self._normalize_asset(entry["asset"]),
-                        "amount": Decimal(entry["amount"]),
-                        "fee": Decimal(entry["fee"]),
-                        "balance": Decimal(entry["balance"]),
-                    })
+                    ledgers.append(
+                        {
+                            "ledger_id": ledger_id,
+                            "refid": entry.get("refid", ""),
+                            "time": datetime.fromtimestamp(entry["time"]),
+                            "type": entry["type"],
+                            "subtype": entry.get("subtype", ""),
+                            "aclass": entry.get("aclass", ""),
+                            "asset": self._normalize_asset(entry["asset"]),
+                            "amount": Decimal(entry["amount"]),
+                            "fee": Decimal(entry["fee"]),
+                            "balance": Decimal(entry["balance"]),
+                        }
+                    )
 
                 offset += len(ledgers_data)
 
