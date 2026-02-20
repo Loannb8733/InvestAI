@@ -111,6 +111,46 @@ class OptimizationResponse(BaseModel):
     sharpe_ratio: float
 
 
+class PerformanceSummaryItem(BaseModel):
+    symbol: str
+    name: str
+    asset_type: str
+    gain_loss_percent: Optional[float] = None
+    current_value: Optional[float] = None
+    weight: Optional[float] = None
+    volatility: Optional[float] = None
+
+
+class PerformanceSummaryMetrics(BaseModel):
+    total_value: float
+    total_gain_loss: float
+    total_gain_loss_percent: float
+    volatility: float
+    sharpe_ratio: float
+    sortino_ratio: float
+    calmar_ratio: float
+    max_drawdown: float
+    cvar_95: float
+
+
+class PerformanceSummaryResponse(BaseModel):
+    period: str
+    summary: PerformanceSummaryMetrics
+    top_gainers: List[PerformanceSummaryItem]
+    top_losers: List[PerformanceSummaryItem]
+    largest_positions: List[PerformanceSummaryItem]
+    most_volatile: List[PerformanceSummaryItem]
+
+
+class RebalanceResponse(BaseModel):
+    orders: List[Dict]
+
+
+class XIRRResponse(BaseModel):
+    xirr: Optional[float]
+    description: str
+
+
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
@@ -158,7 +198,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
 # ── Endpoints ────────────────────────────────────────────────────────
 
 
-@router.get("/", response_model=PortfolioAnalyticsResponse)
+@router.get("", response_model=PortfolioAnalyticsResponse)
 async def get_global_analytics(
     days: int = Query(60, ge=7, le=365),
     current_user: User = Depends(get_current_user),
@@ -225,7 +265,7 @@ async def get_diversification_analysis(
     )
 
 
-@router.get("/performance")
+@router.get("/performance", response_model=PerformanceSummaryResponse)
 async def get_performance_summary(
     period: str = Query("30d", regex="^(7d|30d|90d|1y|all)$"),
     current_user: User = Depends(get_current_user),
@@ -277,7 +317,7 @@ async def get_performance_summary(
     }
 
 
-@router.get("/risk-metrics")
+@router.get("/risk-metrics", response_model=dict)
 async def get_risk_metrics(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -363,7 +403,7 @@ async def get_risk_metrics(
     }
 
 
-@router.get("/stress-test")
+@router.get("/stress-test", response_model=dict)
 async def get_stress_test(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -372,7 +412,7 @@ async def get_stress_test(
     return await analytics_service.stress_test(db, str(current_user.id))
 
 
-@router.get("/beta")
+@router.get("/beta", response_model=dict)
 async def get_beta(
     days: int = Query(90, ge=30, le=365),
     current_user: User = Depends(get_current_user),
@@ -403,7 +443,7 @@ async def get_monte_carlo(
     )
 
 
-@router.get("/xirr")
+@router.get("/xirr", response_model=XIRRResponse)
 async def get_xirr(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -413,7 +453,7 @@ async def get_xirr(
     return {"xirr": rate, "description": "Taux de rendement interne annualisé (XIRR) en %"}
 
 
-@router.post("/rebalance")
+@router.post("/rebalance", response_model=RebalanceResponse)
 async def get_rebalance_orders(
     target_weights: Dict[str, float],
     current_user: User = Depends(get_current_user),

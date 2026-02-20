@@ -88,7 +88,7 @@ class PortfolioPredictionResponse(BaseModel):
     summary: PortfolioPredictionSummary
 
 
-@router.get("/asset/{symbol}")
+@router.get("/asset/{symbol}", response_model=AssetPredictionResponse)
 async def get_asset_prediction(
     symbol: str,
     asset_type: str = Query("crypto", regex="^(crypto|stock|etf)$"),
@@ -122,7 +122,7 @@ async def get_asset_prediction(
     )
 
 
-@router.get("/portfolio")
+@router.get("/portfolio", response_model=PortfolioPredictionResponse)
 async def get_portfolio_predictions(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(get_current_user),
@@ -189,7 +189,7 @@ class WhatIfRequest(BaseModel):
     scenarios: List[WhatIfScenario]
 
 
-@router.post("/what-if")
+@router.post("/what-if", response_model=dict)
 async def what_if_simulation(
     request: WhatIfRequest,
     current_user: User = Depends(get_current_user),
@@ -204,7 +204,7 @@ async def what_if_simulation(
     return result
 
 
-@router.get("/events")
+@router.get("/events", response_model=dict)
 async def get_market_events(
     current_user: User = Depends(get_current_user),
 ):

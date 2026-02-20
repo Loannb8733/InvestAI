@@ -201,6 +201,8 @@ app = FastAPI(
     docs_url=f"{settings.API_V1_PREFIX}/docs" if settings.DEBUG else None,
     redoc_url=f"{settings.API_V1_PREFIX}/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
+    # Disable trailing slash redirects — they break CORS (307 without CORS headers)
+    redirect_slashes=False,
 )
 
 

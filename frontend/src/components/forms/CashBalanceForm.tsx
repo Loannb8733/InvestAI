@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { portfoliosApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { Loader2, Trash2 } from 'lucide-react'
 
 const COMMON_EXCHANGES = [
@@ -60,7 +61,7 @@ export default function CashBalanceForm({
     mutationFn: ({ exchange, amount }: { exchange: string; amount: number }) =>
       portfoliosApi.updateCashBalance(portfolioId, exchange, amount),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios.all })
       toast({ title: 'Solde mis à jour' })
       setExchange('')
       setCustomExchange('')
@@ -75,7 +76,7 @@ export default function CashBalanceForm({
     mutationFn: (exchange: string) =>
       portfoliosApi.deleteCashBalance(portfolioId, exchange),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios.all })
       toast({ title: 'Solde supprimé' })
     },
     onError: () => {

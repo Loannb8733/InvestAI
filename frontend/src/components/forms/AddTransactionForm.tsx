@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Loader2, Plus } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
+import { queryKeys } from '@/lib/queryKeys'
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Sélectionnez un actif'),
@@ -97,12 +98,13 @@ export default function AddTransactionForm({
   const queryClient = useQueryClient()
 
   const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ['portfolios'],
+    queryKey: queryKeys.portfolios.list(),
     queryFn: () => portfoliosApi.list(),
+    staleTime: 60_000,
   })
 
   const { data: assets } = useQuery<Asset[]>({
-    queryKey: ['assets'],
+    queryKey: queryKeys.assets.list(),
     queryFn: () => assetsApi.list(),
   })
 
@@ -139,7 +141,7 @@ export default function AddTransactionForm({
     mutationFn: (data: { portfolio_id: string; symbol: string; name: string; asset_type: string }) =>
       assetsApi.create(data),
     onSuccess: (newAsset: Asset) => {
-      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
       setValue('asset_id', newAsset.id)
       setShowNewAsset(false)
       setNewSymbol('')

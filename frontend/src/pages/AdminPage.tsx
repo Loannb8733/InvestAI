@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatDateTime } from '@/lib/utils'
+import { queryKeys } from '@/lib/queryKeys'
 import { usersApi } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Users, Shield, ShieldCheck, Loader2, Trash2 } from 'lucide-react'
@@ -60,14 +61,14 @@ export default function AdminPage() {
   })
 
   const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ['admin-users'],
+    queryKey: queryKeys.admin.users,
     queryFn: usersApi.list,
   })
 
   const createMutation = useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users })
       setIsCreateOpen(false)
       setFormData({ email: '', password: '', first_name: '', last_name: '', role: 'user' })
       toast({ title: 'Utilisateur créé' })
@@ -86,7 +87,7 @@ export default function AdminPage() {
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       usersApi.update(id, { is_active }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users })
       toast({ title: 'Statut mis à jour' })
     },
     onError: () => {
@@ -97,7 +98,7 @@ export default function AdminPage() {
   const deleteMutation = useMutation({
     mutationFn: usersApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users })
       toast({ title: 'Utilisateur supprimé' })
     },
     onError: () => {

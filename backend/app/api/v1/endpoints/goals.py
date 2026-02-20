@@ -100,18 +100,22 @@ def _build_response(goal: Goal) -> dict:
     }
 
 
-@router.get("/", response_model=List[GoalResponse])
+@router.get("", response_model=List[GoalResponse])
 async def list_goals(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all goals for the current user."""
-    result = await db.execute(select(Goal).where(Goal.user_id == current_user.id).order_by(Goal.created_at.desc()))
+    result = await db.execute(
+        select(Goal).where(Goal.user_id == current_user.id).order_by(Goal.created_at.desc()).offset(skip).limit(limit)
+    )
     goals = result.scalars().all()
     return [_build_response(g) for g in goals]
 
 
-@router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     data: GoalCreate,
     current_user: User = Depends(get_current_user),

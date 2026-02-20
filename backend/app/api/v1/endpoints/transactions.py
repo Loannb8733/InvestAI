@@ -41,7 +41,7 @@ class CSVRowError(BaseModel):
     message: str
 
 
-@router.get("/", response_model=List[TransactionWithAsset])
+@router.get("", response_model=List[TransactionWithAsset])
 async def list_transactions(
     asset_id: Optional[UUID] = None,
     portfolio_id: Optional[UUID] = None,
@@ -120,7 +120,7 @@ async def list_transactions(
     return enriched_transactions
 
 
-@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     transaction_in: TransactionCreate,
     current_user: User = Depends(get_current_user),

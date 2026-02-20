@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/utils'
 import { analyticsApi, dashboardApi, portfoliosApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   PieChart,
   Pie,
@@ -33,15 +34,11 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  Legend,
-  AreaChart,
-  Area,
 } from 'recharts'
 import {
   TrendingUp,
   TrendingDown,
   Shield,
-  AlertTriangle,
   Target,
   Activity,
   Loader2,
@@ -50,15 +47,29 @@ import {
   Info,
   HelpCircle,
   FileSpreadsheet,
-  LineChart as LineChartIcon,
   Zap,
   Percent,
   ArrowDownRight,
   Shuffle,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import PortfolioEvolutionChart from '@/components/analytics/PortfolioEvolutionChart'
+import MonteCarloCard from '@/components/analytics/MonteCarloCard'
+import StressTestCard from '@/components/analytics/StressTestCard'
+import CorrelationMatrix from '@/components/analytics/CorrelationMatrix'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+
+const chartTooltipStyle: React.CSSProperties = {
+  backgroundColor: 'hsl(var(--popover))',
+  borderColor: 'hsl(var(--border))',
+  color: 'hsl(var(--popover-foreground))',
+  borderRadius: '0.5rem',
+  fontSize: 12,
+}
+
+const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
+const axisTickSm = { fill: 'hsl(var(--muted-foreground))', fontSize: 11 }
 
 interface Analytics {
   total_value: number
@@ -254,8 +265,9 @@ export default function AnalyticsPage() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all')
 
   const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ['portfolios'],
+    queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
+    staleTime: 60_000,
   })
 
   const analyticsQueryOpts = { retry: 1, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const
@@ -265,68 +277,74 @@ export default function AnalyticsPage() {
   const portfolioParam = selectedPortfolio === 'all' ? undefined : selectedPortfolio
 
   const { data: analytics, isLoading: loadingAnalytics } = useQuery<Analytics>({
-    queryKey: ['analytics', selectedPortfolio, periodDays],
+    queryKey: queryKeys.analytics.global(portfolioParam, periodDays),
     queryFn: () => selectedPortfolio === 'all'
       ? analyticsApi.getGlobal(periodDays)
       : analyticsApi.getPortfolio(selectedPortfolio, periodDays),
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
   })
 
   const { data: diversification, isLoading: loadingDiversification } = useQuery<Diversification>({
-    queryKey: ['diversification', selectedPortfolio, periodDays],
+    queryKey: queryKeys.analytics.diversification(portfolioParam, periodDays),
     queryFn: () => analyticsApi.getDiversification(portfolioParam, periodDays),
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
   })
 
   const { data: correlation } = useQuery<Correlation>({
-    queryKey: ['correlation', selectedPortfolio, periodDays],
+    queryKey: queryKeys.analytics.correlation(portfolioParam, periodDays),
     queryFn: () => analyticsApi.getCorrelation(portfolioParam, periodDays),
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
   })
 
   const { data: performance } = useQuery({
-    queryKey: ['performance', period],
+    queryKey: queryKeys.analytics.performance(period),
     queryFn: () => analyticsApi.getPerformance(period),
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
   })
 
   const { data: monteCarlo } = useQuery<MonteCarloData>({
-    queryKey: ['monteCarlo'],
+    queryKey: queryKeys.analytics.monteCarlo,
     queryFn: () => analyticsApi.getMonteCarlo(90),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
 
   const { data: xirrData } = useQuery<{ xirr: number | null }>({
-    queryKey: ['xirr'],
+    queryKey: queryKeys.analytics.xirr,
     queryFn: analyticsApi.getXirr,
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
 
   const { data: optimization } = useQuery<OptimizeData>({
-    queryKey: ['optimize', periodDays],
+    queryKey: queryKeys.analytics.optimize(periodDays),
     queryFn: () => analyticsApi.getOptimize('max_sharpe'),
     enabled: !!analytics && analytics.asset_count >= 2,
     ...analyticsQueryOpts,
   })
 
   const { data: stressTest } = useQuery<StressTestData>({
-    queryKey: ['stressTest'],
+    queryKey: queryKeys.analytics.stressTest,
     queryFn: analyticsApi.getStressTest,
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
 
   const { data: betaData } = useQuery<BetaData>({
-    queryKey: ['beta', periodDays],
+    queryKey: queryKeys.analytics.beta(periodDays),
     queryFn: () => analyticsApi.getBeta(periodDays),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
   const { data: historicalData } = useQuery<HistoricalDataPoint[]>({
-    queryKey: ['historicalData', periodDays],
+    queryKey: queryKeys.analytics.historicalData(periodDays),
     queryFn: () => dashboardApi.getHistoricalData(periodDays),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 
   if (loadingAnalytics || loadingDiversification) {
@@ -477,47 +495,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Portfolio Evolution Chart */}
-      {chartHistoricalData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LineChartIcon className="h-5 w-5" />
-              Évolution du portefeuille
-            </CardTitle>
-            <CardDescription>Valeur totale vs montant investi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartHistoricalData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorInvested" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} interval="preserveStartEnd" />
-                  <YAxis tickFormatter={(v) => formatCurrency(v).replace('€', '')} tick={{ fontSize: 12 }} width={80} />
-                  <RechartsTooltip
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value),
-                      name === 'value' ? 'Valeur' : 'Investi'
-                    ]}
-                  />
-                  <Legend formatter={(value) => value === 'value' ? 'Valeur actuelle' : 'Montant investi'} />
-                  <Area type="monotone" dataKey="invested" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#colorInvested)" />
-                  <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <PortfolioEvolutionChart chartHistoricalData={chartHistoricalData} />
 
       {/* Key Metrics — Row 1: Core risk */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -685,7 +663,7 @@ export default function AnalyticsPage() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: number) => `${value}%`} />
+                  <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -716,8 +694,8 @@ export default function AnalyticsPage() {
                   <PolarGrid />
                   <PolarAngleAxis dataKey="metric" tick={{ fill: 'currentColor', fontSize: 11 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'currentColor', fontSize: 10 }} />
-                  <Radar name="Score" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
-                  <RechartsTooltip formatter={(value: number) => `${value.toFixed(0)}/100`} />
+                  <Radar name="Score" dataKey="value" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.5} />
+                  <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value.toFixed(0)}/100`} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
@@ -729,63 +707,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Monte Carlo */}
         {monteCarlo && monteCarlo.simulations > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-purple-500" />
-                Simulation Monte Carlo
-              </CardTitle>
-              <CardDescription>
-                {monteCarlo.simulations.toLocaleString()} simulations sur {monteCarlo.horizon_days} jours
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Distribution bars */}
-                <div className="space-y-2">
-                  {[
-                    { label: 'Pessimiste (5%)', value: monteCarlo.percentiles.p5, color: 'bg-red-500' },
-                    { label: 'Bas (25%)', value: monteCarlo.percentiles.p25, color: 'bg-orange-500' },
-                    { label: 'Médian (50%)', value: monteCarlo.percentiles.p50, color: 'bg-blue-500' },
-                    { label: 'Haut (75%)', value: monteCarlo.percentiles.p75, color: 'bg-green-400' },
-                    { label: 'Optimiste (95%)', value: monteCarlo.percentiles.p95, color: 'bg-green-600' },
-                  ].map((p) => (
-                    <div key={p.label} className="flex items-center gap-3">
-                      <span className="text-xs w-28 text-muted-foreground">{p.label}</span>
-                      <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden relative">
-                        <div
-                          className={`h-full ${p.color} rounded-full absolute`}
-                          style={{
-                            width: `${Math.min(100, Math.max(2, Math.abs(p.value)))}%`,
-                            left: p.value < 0 ? `${Math.max(0, 50 + p.value / 2)}%` : '50%',
-                          }}
-                        />
-                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-foreground/30" />
-                      </div>
-                      <span className={`text-xs font-mono w-16 text-right ${p.value >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {p.value > 0 ? '+' : ''}{p.value.toFixed(1)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 pt-2 border-t">
-                  <div className="text-center">
-                    <div className="text-lg font-bold">{monteCarlo.expected_return > 0 ? '+' : ''}{monteCarlo.expected_return.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">Rendement moyen</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-green-500">{monteCarlo.prob_positive.toFixed(0)}%</div>
-                    <div className="text-xs text-muted-foreground">Prob. gain</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-red-500">{monteCarlo.prob_loss_10.toFixed(0)}%</div>
-                    <div className="text-xs text-muted-foreground">Prob. perte &gt;10%</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <MonteCarloCard monteCarlo={monteCarlo} />
         )}
 
         {/* MPT Optimization */}
@@ -849,43 +771,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Stress Test */}
         {stressTest && stressTest.scenarios.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                Stress Tests
-              </CardTitle>
-              <CardDescription>
-                Impact de scénarios de crise historiques sur votre portefeuille
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {stressTest.scenarios.map((scenario) => (
-                  <div key={scenario.name} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium">{scenario.name}</span>
-                      <span className="text-sm font-bold text-red-500">
-                        {scenario.total_loss_pct.toFixed(1)}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">{scenario.description}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-red-500 rounded-full"
-                          style={{ width: `${Math.min(100, Math.abs(scenario.total_loss_pct))}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono text-red-500 w-24 text-right">
-                        {formatCurrency(scenario.total_loss)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <StressTestCard scenarios={stressTest.scenarios} />
         )}
 
         {/* Beta vs Benchmark */}
@@ -976,10 +862,10 @@ export default function AnalyticsPage() {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={performanceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="name" width={60} tick={{ fontSize: 12 }} />
-                <RechartsTooltip formatter={(value: number) => `${value}%`} />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={axisTick} />
+                <YAxis type="category" dataKey="name" width={60} tick={axisTick} />
+                <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
                 <Bar dataKey="performance" radius={4}>
                   {performanceData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -1001,11 +887,11 @@ export default function AnalyticsPage() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={allocationByAssetData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={(v) => `${v}%`} />
-                <RechartsTooltip formatter={(value: number) => `${value}%`} />
-                <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={axisTickSm} />
+                <YAxis tickFormatter={(v) => `${v}%`} tick={axisTickSm} />
+                <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
+                <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1013,154 +899,16 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Correlation Matrix */}
-      {correlation && correlation.symbols.length > 1 && (() => {
-        // Build color for correlation value: blue (negative) → gray (0) → red (positive)
-        const corrColor = (v: number, isDiag: boolean) => {
-          if (isDiag) return 'bg-muted'
-          const abs = Math.abs(v)
-          if (v > 0.01) return `rgba(239, 68, 68, ${Math.min(abs * 0.85, 0.85)})`   // red
-          if (v < -0.01) return `rgba(59, 130, 246, ${Math.min(abs * 0.85, 0.85)})`  // blue
-          return 'rgba(148, 163, 184, 0.1)'
-        }
-        const corrTextColor = (v: number) => {
-          const abs = Math.abs(v)
-          if (abs > 0.55) return 'text-white'
-          return ''
-        }
-        const corrLabel = (v: number) => {
-          if (v >= 0.7) return 'Forte +'
-          if (v >= 0.4) return 'Modérée +'
-          if (v <= -0.5) return 'Inverse'
-          if (v <= -0.3) return 'Faible -'
-          return ''
-        }
-
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Matrice de corrélation
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger aria-label="Aide sur la matrice de corrélation">
-                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-xs">+1 = parfaitement corrélés, 0 = indépendants, -1 = inversement corrélés. Basé sur 60j de rendements journaliers.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </CardTitle>
-              <CardDescription>Comment vos actifs évoluent ensemble</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Heatmap grid */}
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="p-2 bg-muted/50 sticky left-0 z-10"></th>
-                      {correlation.symbols.map((sym) => (
-                        <th key={sym} className="p-2 text-center font-semibold text-xs bg-muted/50 min-w-[52px]">
-                          {sym}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {correlation.symbols.map((sym1, i) => (
-                      <tr key={sym1} className="border-b last:border-b-0">
-                        <td className="p-2 font-semibold text-xs bg-muted/50 sticky left-0 z-10">{sym1}</td>
-                        {correlation.symbols.map((sym2, j) => {
-                          const value = correlation.matrix[i]?.[j] ?? 0
-                          const isDiag = i === j
-                          return (
-                            <TooltipProvider key={`${sym1}-${sym2}`}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <td
-                                    className={`p-0 text-center transition-opacity hover:opacity-80 ${isDiag ? 'bg-muted' : ''}`}
-                                    style={!isDiag ? { backgroundColor: corrColor(value, false) } : undefined}
-                                  >
-                                    <div className={`py-2 px-1 text-xs font-mono font-medium ${corrTextColor(value)} ${isDiag ? 'text-muted-foreground' : ''}`}>
-                                      {isDiag ? '—' : value.toFixed(2)}
-                                    </div>
-                                  </td>
-                                </TooltipTrigger>
-                                {!isDiag && (
-                                  <TooltipContent>
-                                    <p className="text-xs font-medium">{sym1} / {sym2}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Corrélation: {value.toFixed(3)}
-                                      {corrLabel(value) && ` (${corrLabel(value)})`}
-                                    </p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Color scale legend */}
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-xs text-muted-foreground">-1</span>
-                <div className="flex h-3 w-48 rounded-full overflow-hidden">
-                  <div className="flex-1" style={{ background: 'rgba(59, 130, 246, 0.85)' }} />
-                  <div className="flex-1" style={{ background: 'rgba(59, 130, 246, 0.45)' }} />
-                  <div className="flex-1" style={{ background: 'rgba(148, 163, 184, 0.2)' }} />
-                  <div className="flex-1" style={{ background: 'rgba(239, 68, 68, 0.45)' }} />
-                  <div className="flex-1" style={{ background: 'rgba(239, 68, 68, 0.85)' }} />
-                </div>
-                <span className="text-xs text-muted-foreground">+1</span>
-              </div>
-
-              {/* Notable pairs */}
-              {(correlation.strongly_correlated.length > 0 || correlation.negatively_correlated.length > 0) && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {correlation.strongly_correlated.length > 0 && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                      <p className="text-xs font-semibold text-red-500 mb-2">Fortement corrélés (risque de concentration)</p>
-                      <div className="space-y-1.5">
-                        {correlation.strongly_correlated.slice(0, 4).map(([s1, s2, v]) => (
-                          <div key={`${s1}-${s2}`} className="flex items-center justify-between">
-                            <span className="text-xs">{s1} — {s2}</span>
-                            <span className="text-xs font-mono font-semibold text-red-500">{typeof v === 'number' ? v.toFixed(2) : v}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {correlation.negatively_correlated.length > 0 && (
-                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                      <p className="text-xs font-semibold text-blue-500 mb-2">Corrélation inverse (bonne diversification)</p>
-                      <div className="space-y-1.5">
-                        {correlation.negatively_correlated.slice(0, 4).map(([s1, s2, v]) => (
-                          <div key={`${s1}-${s2}`} className="flex items-center justify-between">
-                            <span className="text-xs">{s1} — {s2}</span>
-                            <span className="text-xs font-mono font-semibold text-blue-500">{typeof v === 'number' ? v.toFixed(2) : v}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )
-      })()}
+      {correlation && correlation.symbols.length > 1 && (
+        <CorrelationMatrix correlation={correlation} />
+      )}
 
       {/* Recommendations */}
       {diversification && diversification.recommendations.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <Zap className="h-5 w-5 text-yellow-500" />
               Recommandations
             </CardTitle>
             <CardDescription>Actions suggérées pour améliorer votre portefeuille</CardDescription>

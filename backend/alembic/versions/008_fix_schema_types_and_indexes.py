@@ -7,7 +7,7 @@
 - Add index on transactions.external_id
 
 Revision ID: 008
-Revises: 007
+Revises: 5e79ca77dcc3
 Create Date: 2026-02-20
 
 """
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "008"
-down_revision = "007"
+down_revision = "5e79ca77dcc3"
 branch_labels = None
 depends_on = None
 

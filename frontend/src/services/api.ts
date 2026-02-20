@@ -8,6 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 // Request interceptor to add auth token
@@ -110,9 +111,17 @@ export const authApi = {
     return response.data
   },
 
-  refresh: async (refreshToken: string) => {
-    const response = await api.post('/auth/refresh', { refresh_token: refreshToken })
+  refresh: async (refreshToken?: string) => {
+    const response = await api.post('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : {})
     return response.data
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Ignore errors on logout
+    }
   },
 
   getCurrentUser: async () => {

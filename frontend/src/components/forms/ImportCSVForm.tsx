@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { transactionsApi, portfoliosApi } from '@/services/api'
 import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, HelpCircle } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
+import { queryKeys } from '@/lib/queryKeys'
 
 interface Portfolio {
   id: string
@@ -55,14 +56,16 @@ export default function ImportCSVForm({
 
   // Fetch portfolios for selection
   const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ['portfolios'],
+    queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
+    staleTime: 60_000,
   })
 
   // Fetch available platforms
   const { data: platformsData } = useQuery<{ platforms: string[] }>({
-    queryKey: ['csv-platforms'],
+    queryKey: queryKeys.transactions.csvPlatforms,
     queryFn: transactionsApi.getCSVPlatforms,
+    staleTime: 10 * 60_000,
   })
 
   const importMutation = useMutation({

@@ -137,7 +137,7 @@ export default function PerformanceChart({
           tickLine={false}
           axisLine={false}
           interval={xAxisInterval}
-          tick={{ fontSize: 11 }}
+          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
           dy={5}
         />
         <YAxis
@@ -146,7 +146,7 @@ export default function PerformanceChart({
           axisLine={false}
           tickFormatter={formatYAxis}
           domain={[minValue, maxValue]}
-          tick={{ fontSize: 11 }}
+          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
           width={55}
         />
         <Tooltip content={<CustomTooltip />} />

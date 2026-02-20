@@ -135,6 +135,8 @@ async def get_calendar_summary(
 @router.get("/upcoming", response_model=List[EventResponse])
 async def list_upcoming_events(
     days: int = 30,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[EventResponse]:
@@ -151,6 +153,8 @@ async def list_upcoming_events(
             CalendarEvent.event_date <= end_date,
         )
         .order_by(CalendarEvent.event_date.asc())
+        .offset(skip)
+        .limit(limit)
     )
     events = result.scalars().all()
 
@@ -173,12 +177,14 @@ async def list_upcoming_events(
     ]
 
 
-@router.get("/", response_model=List[EventResponse])
+@router.get("", response_model=List[EventResponse])
 async def list_events(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     event_type: Optional[EventType] = None,
     show_completed: bool = True,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[EventResponse]:
@@ -194,7 +200,7 @@ async def list_events(
     if not show_completed:
         query = query.where(CalendarEvent.is_completed == False)
 
-    result = await db.execute(query.order_by(CalendarEvent.event_date.asc()))
+    result = await db.execute(query.order_by(CalendarEvent.event_date.asc()).offset(skip).limit(limit))
     events = result.scalars().all()
 
     return [
@@ -216,7 +222,7 @@ async def list_events(
     ]
 
 
-@router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(
     event_in: EventCreate,
     current_user: User = Depends(get_current_user),

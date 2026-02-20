@@ -12,6 +12,7 @@ class Base(DeclarativeBase):
 from app.models.alert import Alert  # noqa: E402, F401
 from app.models.api_key import APIKey  # noqa: E402, F401
 from app.models.asset import Asset  # noqa: E402, F401
+from app.models.audit_log import AuditLog  # noqa: E402, F401
 from app.models.calendar_event import CalendarEvent  # noqa: E402, F401
 from app.models.goal import Goal  # noqa: E402, F401
 from app.models.note import Note  # noqa: E402, F401

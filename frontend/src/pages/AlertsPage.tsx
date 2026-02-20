@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
+import { queryKeys } from '@/lib/queryKeys'
 import { alertsApi, assetsApi } from '@/services/api'
 import {
   Bell,
@@ -112,30 +113,32 @@ export default function AlertsPage() {
   })
 
   const { data: alerts, isLoading: loadingAlerts } = useQuery<Alert[]>({
-    queryKey: ['alerts'],
+    queryKey: queryKeys.alerts.list(),
     queryFn: () => alertsApi.list(),
   })
 
   const { data: conditions } = useQuery<AlertCondition[]>({
-    queryKey: ['alert-conditions'],
+    queryKey: queryKeys.alerts.conditions,
     queryFn: alertsApi.listConditions,
+    staleTime: 10 * 60_000,
   })
 
   const { data: summary } = useQuery<AlertSummary>({
-    queryKey: ['alert-summary'],
+    queryKey: queryKeys.alerts.summary,
     queryFn: alertsApi.getSummary,
   })
 
   const { data: assets } = useQuery<Asset[]>({
-    queryKey: ['assets'],
+    queryKey: queryKeys.assets.list(),
     queryFn: () => assetsApi.list(),
+    staleTime: 60_000,
   })
 
   const createMutation = useMutation({
     mutationFn: alertsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       setIsCreateOpen(false)
       resetForm()
       toast({ title: 'Alerte créée avec succès' })
@@ -148,8 +151,8 @@ export default function AlertsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof alertsApi.update>[1] }) => alertsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       setSelectedAlert(null)
       toast({ title: 'Alerte mise à jour' })
     },
@@ -161,8 +164,8 @@ export default function AlertsPage() {
   const deleteMutation = useMutation({
     mutationFn: alertsApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       toast({ title: 'Alerte supprimée' })
     },
     onError: () => {
@@ -173,8 +176,8 @@ export default function AlertsPage() {
   const checkMutation = useMutation({
     mutationFn: alertsApi.checkAlerts,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       if (data.length > 0) {
         toast({ title: `${data.length} alerte(s) déclenchée(s)` })
       } else {

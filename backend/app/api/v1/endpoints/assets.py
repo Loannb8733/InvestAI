@@ -17,9 +17,11 @@ from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AssetResponse])
+@router.get("", response_model=List[AssetResponse])
 async def list_assets(
     portfolio_id: UUID = None,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[AssetResponse]:
@@ -47,12 +49,12 @@ async def list_assets(
             )
         query = query.where(Asset.portfolio_id == portfolio_id)
 
-    result = await db.execute(query.order_by(Asset.symbol))
+    result = await db.execute(query.order_by(Asset.symbol).offset(skip).limit(limit))
     assets = result.scalars().all()
     return assets
 
 
-@router.post("/", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
 async def create_asset(
     asset_in: AssetCreate,
     current_user: User = Depends(get_current_user),

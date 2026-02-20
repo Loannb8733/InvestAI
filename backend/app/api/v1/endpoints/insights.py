@@ -13,7 +13,7 @@ from app.services.insights_service import insights_service
 router = APIRouter()
 
 
-@router.get("/fees")
+@router.get("/fees", response_model=dict)
 async def get_fee_analysis(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -22,7 +22,7 @@ async def get_fee_analysis(
     return await insights_service.get_fee_analysis(db, str(current_user.id))
 
 
-@router.get("/tax-loss-harvesting")
+@router.get("/tax-loss-harvesting", response_model=dict)
 async def get_tax_loss_harvesting(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -31,7 +31,7 @@ async def get_tax_loss_harvesting(
     return await insights_service.get_tax_loss_harvesting(db, str(current_user.id))
 
 
-@router.get("/passive-income")
+@router.get("/passive-income", response_model=dict)
 async def get_passive_income(
     year: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -41,7 +41,7 @@ async def get_passive_income(
     return await insights_service.get_passive_income(db, str(current_user.id), year=year)
 
 
-@router.get("/backtest-dca")
+@router.get("/backtest-dca", response_model=dict)
 async def backtest_dca(
     symbol: str = Query(..., description="Symbole de l'actif (ex: BTC, ETH)"),
     asset_type: str = Query("crypto", description="Type d'actif"),

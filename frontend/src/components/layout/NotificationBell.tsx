@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { notificationsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { cn } from '@/lib/utils'
 
 interface Notification {
@@ -31,13 +32,13 @@ export default function NotificationBell() {
   const queryClient = useQueryClient()
 
   const { data: countData } = useQuery<NotificationCount>({
-    queryKey: ['notifications-count'],
+    queryKey: queryKeys.notifications.unreadCount,
     queryFn: notificationsApi.getUnreadCount,
     refetchInterval: 30000, // Poll every 30s
   })
 
   const { data: notifications } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
+    queryKey: queryKeys.notifications.list,
     queryFn: () => notificationsApi.list(false, 20),
     enabled: open,
   })
@@ -45,16 +46,14 @@ export default function NotificationBell() {
   const markReadMutation = useMutation({
     mutationFn: (id: string) => notificationsApi.markAsRead(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['notifications-count'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
     },
   })
 
   const markAllReadMutation = useMutation({
     mutationFn: notificationsApi.markAllAsRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['notifications-count'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
     },
   })
 

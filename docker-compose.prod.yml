@@ -151,8 +151,8 @@ services:
     volumes:
       - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d/prod.conf:/etc/nginx/conf.d/default.conf:ro
-      - certbot_conf:/etc/letsencrypt:ro
-      - certbot_www:/var/www/certbot:ro
+      - ./docker/certbot/conf:/etc/letsencrypt:ro
+      - ./docker/certbot/www:/var/www/certbot:ro
     ports:
       - "80:80"
       - "443:443"
@@ -165,8 +165,8 @@ services:
     image: certbot/certbot
     container_name: investai-certbot
     volumes:
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
+      - ./docker/certbot/conf:/etc/letsencrypt
+      - ./docker/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
   # Database backup
@@ -196,6 +196,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  certbot_conf:
-  certbot_www:
   db_backups:

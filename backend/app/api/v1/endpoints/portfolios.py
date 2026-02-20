@@ -16,20 +16,26 @@ from app.schemas.portfolio import CashBalanceUpdate, PortfolioCreate, PortfolioR
 router = APIRouter()
 
 
-@router.get("/", response_model=List[PortfolioResponse])
+@router.get("", response_model=List[PortfolioResponse])
 async def list_portfolios(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[PortfolioResponse]:
     """List all portfolios for the current user."""
     result = await db.execute(
-        select(Portfolio).where(Portfolio.user_id == current_user.id).order_by(Portfolio.created_at.desc())
+        select(Portfolio)
+        .where(Portfolio.user_id == current_user.id)
+        .order_by(Portfolio.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     portfolios = result.scalars().all()
     return portfolios
 
 
-@router.post("/", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     portfolio_in: PortfolioCreate,
     current_user: User = Depends(get_current_user),

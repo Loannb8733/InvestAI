@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { notesApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Select,
   SelectContent,
@@ -75,16 +76,17 @@ export default function NotesPage() {
 
   // Fetch notes
   const { data: notes, isLoading } = useQuery<Note[]>({
-    queryKey: ['notes', searchTerm, selectedTag],
+    queryKey: queryKeys.notes.list(searchTerm, selectedTag),
     queryFn: () => notesApi.list({
       search: searchTerm || undefined,
       tag: selectedTag || undefined,
     }),
+    placeholderData: keepPreviousData,
   })
 
   // Fetch summary
   const { data: summary } = useQuery<NoteSummary>({
-    queryKey: ['notes-summary'],
+    queryKey: queryKeys.notes.summary,
     queryFn: notesApi.getSummary,
   })
 
@@ -92,8 +94,8 @@ export default function NotesPage() {
   const createMutation = useMutation({
     mutationFn: notesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
       setShowAddNote(false)
       toast({ title: 'Note créée', description: 'La note a été ajoutée avec succès.' })
     },
@@ -107,8 +109,8 @@ export default function NotesPage() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof notesApi.update>[1] }) =>
       notesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
       setEditingNote(null)
       toast({ title: 'Note mise à jour' })
     },
@@ -121,8 +123,8 @@ export default function NotesPage() {
   const deleteMutation = useMutation({
     mutationFn: notesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
       toast({ title: 'Note supprimée' })
     },
     onError: () => {

@@ -126,11 +126,13 @@ async def list_tags(
     return sorted(list(all_tags))
 
 
-@router.get("/", response_model=List[NoteResponse])
+@router.get("", response_model=List[NoteResponse])
 async def list_notes(
     tag: Optional[str] = None,
     asset_id: Optional[UUID] = None,
     search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[NoteResponse]:
@@ -143,7 +145,7 @@ async def list_notes(
     if asset_id:
         query = query.where(Note.asset_id == asset_id)
 
-    result = await db.execute(query.order_by(Note.created_at.desc()))
+    result = await db.execute(query.order_by(Note.created_at.desc()).offset(skip).limit(limit))
     notes = result.scalars().all()
 
     # Filter by tag if specified
@@ -190,7 +192,7 @@ async def list_notes(
     return response
 
 
-@router.post("/", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(
     note_in: NoteCreate,
     current_user: User = Depends(get_current_user),

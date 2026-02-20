@@ -425,9 +425,11 @@ async def simulate_what_if(
     )
 
 
-@router.get("/", response_model=List[SimulationResponse])
+@router.get("", response_model=List[SimulationResponse])
 async def list_simulations(
     simulation_type: Optional[SimulationType] = None,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[SimulationResponse]:
@@ -437,7 +439,7 @@ async def list_simulations(
     if simulation_type:
         query = query.where(Simulation.simulation_type == simulation_type)
 
-    result = await db.execute(query.order_by(Simulation.created_at.desc()))
+    result = await db.execute(query.order_by(Simulation.created_at.desc()).offset(skip).limit(limit))
     simulations = result.scalars().all()
 
     return [
@@ -454,7 +456,7 @@ async def list_simulations(
     ]
 
 
-@router.post("/", response_model=SimulationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SimulationResponse, status_code=status.HTTP_201_CREATED)
 async def save_simulation(
     sim_in: SimulationCreate,
     current_user: User = Depends(get_current_user),

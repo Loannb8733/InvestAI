@@ -33,6 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { apiKeysApi } from '@/services/api'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatDate } from '@/lib/utils'
 import {
   Plus,
@@ -126,13 +127,13 @@ export default function ExchangesPage() {
 
   // Fetch supported exchanges
   const { data: exchanges } = useQuery<Exchange[]>({
-    queryKey: ['exchanges'],
+    queryKey: queryKeys.exchanges.list,
     queryFn: apiKeysApi.listExchanges,
   })
 
   // Fetch user's API keys
   const { data: apiKeys, isLoading } = useQuery<APIKey[]>({
-    queryKey: ['apiKeys'],
+    queryKey: queryKeys.apiKeys.list,
     queryFn: apiKeysApi.list,
   })
 
@@ -140,7 +141,7 @@ export default function ExchangesPage() {
   const createMutation = useMutation({
     mutationFn: apiKeysApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apiKeys'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
       setShowAddKey(false)
       setSelectedExchange('')
       toast({ title: 'Clé API ajoutée', description: 'La clé API a été enregistrée avec succès.' })
@@ -159,7 +160,7 @@ export default function ExchangesPage() {
   const deleteMutation = useMutation({
     mutationFn: apiKeysApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apiKeys'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
       invalidateAllFinancialData(queryClient)
       toast({ title: 'Clé API supprimée', description: 'La connexion a été supprimée avec succès.' })
     },
@@ -173,7 +174,7 @@ export default function ExchangesPage() {
     mutationFn: apiKeysApi.test,
     onSuccess: (result: TestResult) => {
       setTestResult(result)
-      queryClient.invalidateQueries({ queryKey: ['apiKeys'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
       if (result.success) {
         toast({ title: 'Connexion réussie', description: result.message })
       } else {
@@ -197,7 +198,7 @@ export default function ExchangesPage() {
   const syncMutation = useMutation({
     mutationFn: apiKeysApi.sync,
     onSuccess: (result: { synced_assets: number }) => {
-      queryClient.invalidateQueries({ queryKey: ['apiKeys'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
       invalidateAllFinancialData(queryClient)
       toast({
         title: 'Synchronisation réussie',
@@ -227,7 +228,7 @@ export default function ExchangesPage() {
       assets_created: number
       debug?: { spot_trades_count: number; fiat_orders_count: number; convert_orders_count: number }
     }) => {
-      queryClient.invalidateQueries({ queryKey: ['apiKeys'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
       invalidateAllFinancialData(queryClient)
 
       const details = []

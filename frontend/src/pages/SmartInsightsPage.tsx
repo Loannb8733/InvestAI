@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
 import { smartInsightsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Activity,
   AlertTriangle,
@@ -124,9 +125,10 @@ export default function SmartInsightsPage() {
   const [days, setDays] = useState(30)
 
   const { data, isLoading, refetch, isFetching } = useQuery<PortfolioHealth>({
-    queryKey: ['smart-insights-health', days],
+    queryKey: queryKeys.smartInsights.health(days),
     queryFn: () => smartInsightsApi.getHealth(days),
     staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 
   const getScoreColor = (score: number) => {

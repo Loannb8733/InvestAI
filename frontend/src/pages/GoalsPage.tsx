@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { formatCurrency } from '@/lib/utils'
 import { goalsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import {
   Plus,
@@ -64,14 +65,14 @@ export default function GoalsPage() {
   const [color, setColor] = useState('#6366f1')
 
   const { data: goals = [], isLoading } = useQuery<Goal[]>({
-    queryKey: ['goals'],
+    queryKey: queryKeys.goals.list,
     queryFn: goalsApi.list,
   })
 
   const createMutation = useMutation({
     mutationFn: goalsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all })
       toast({ title: 'Objectif créé' })
       setShowAdd(false)
       setName('')
@@ -86,7 +87,7 @@ export default function GoalsPage() {
   const syncMutation = useMutation({
     mutationFn: (id: string) => goalsApi.sync(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all })
       toast({ title: 'Objectif synchronisé avec le portefeuille' })
     },
     onError: () => {
@@ -97,7 +98,7 @@ export default function GoalsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => goalsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all })
       toast({ title: 'Objectif supprimé' })
     },
     onError: () => {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
+import { queryKeys } from '@/lib/queryKeys'
 import { transactionsApi, portfoliosApi } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -262,16 +263,18 @@ export default function TransactionsPage() {
   // ============== Queries ==============
 
   const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ['portfolios'],
+    queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
+    staleTime: 60_000,
   })
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
-    queryKey: ['transactions', selectedPortfolio],
+    queryKey: queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined),
     queryFn: () =>
       transactionsApi.list({
         portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
       }),
+    placeholderData: keepPreviousData,
   })
 
   // ============== Derived Data ==============
@@ -625,7 +628,7 @@ export default function TransactionsPage() {
                 portfolioId={selectedPortfolio !== 'all' ? selectedPortfolio : undefined}
                 onSuccess={() => {
                   setIsImportOpen(false)
-                  queryClient.invalidateQueries({ queryKey: ['transactions'] })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all })
                 }}
               />
             </DialogContent>
@@ -646,8 +649,8 @@ export default function TransactionsPage() {
               <AddTransactionForm
                 onSuccess={() => {
                   setIsAddOpen(false)
-                  queryClient.invalidateQueries({ queryKey: ['transactions'] })
-                  queryClient.invalidateQueries({ queryKey: ['assets'] })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
                 }}
               />
             </DialogContent>

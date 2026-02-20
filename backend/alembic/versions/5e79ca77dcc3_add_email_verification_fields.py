@@ -1,7 +1,7 @@
 """Add email verification fields
 
 Revision ID: 5e79ca77dcc3
-Revises: 006_hard_delete_cascade
+Revises: 007_add_transaction_types
 Create Date: 2026-02-08 17:29:26.007941
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "5e79ca77dcc3"
-down_revision: Union[str, None] = "006_hard_delete_cascade"
+down_revision: Union[str, None] = "007_add_transaction_types"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

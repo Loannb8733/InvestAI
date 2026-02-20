@@ -1,7 +1,7 @@
 """Application configuration."""
 
 import os
-from typing import List, Union
+from typing import List, Optional, Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -25,6 +25,11 @@ class Settings(BaseSettings):
 
     # Encryption for API keys - Required for production
     FERNET_KEY: str  # Required - no default
+    FERNET_OLD_KEYS: Optional[str] = None  # Comma-separated old keys for rotation
+
+    # Cookie settings
+    COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
+    COOKIE_SECURE: bool = False  # True in production (requires HTTPS)
 
     # Database - Credentials must come from environment
     POSTGRES_HOST: str = "localhost"

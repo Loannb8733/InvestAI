@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { calendarApi, predictionsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Plus,
   Loader2,
@@ -100,41 +101,41 @@ export default function CalendarPage() {
 
   // Fetch event types
   const { data: eventTypes } = useQuery<EventType[]>({
-    queryKey: ['event-types'],
+    queryKey: queryKeys.calendar.eventTypes,
     queryFn: calendarApi.getEventTypes,
+    staleTime: 10 * 60_000,
   })
 
   // Fetch events
   const { data: events, isLoading } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar-events', showCompleted],
+    queryKey: queryKeys.calendar.events(showCompleted),
     queryFn: () => calendarApi.list({ show_completed: showCompleted }),
   })
 
   // Fetch upcoming events
   const { data: upcomingEvents } = useQuery<CalendarEvent[]>({
-    queryKey: ['upcoming-events'],
+    queryKey: queryKeys.calendar.upcoming(),
     queryFn: () => calendarApi.getUpcoming(30),
   })
 
   // Fetch summary
   const { data: summary } = useQuery<CalendarSummary>({
-    queryKey: ['calendar-summary'],
+    queryKey: queryKeys.calendar.summary,
     queryFn: calendarApi.getSummary,
   })
 
   // Fetch market events
   const { data: marketEvents } = useQuery<MarketEvent[]>({
-    queryKey: ['market-events'],
+    queryKey: queryKeys.calendar.marketEvents,
     queryFn: predictionsApi.getMarketEvents,
+    staleTime: 5 * 60_000,
   })
 
   // Create event mutation
   const createMutation = useMutation({
     mutationFn: calendarApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       setShowAddEvent(false)
       toast({ title: 'Événement créé', description: 'L\'événement a été ajouté.' })
     },
@@ -148,9 +149,7 @@ export default function CalendarPage() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof calendarApi.update>[1] }) =>
       calendarApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       setEditingEvent(null)
       toast({ title: 'Événement mis à jour' })
     },
@@ -163,9 +162,7 @@ export default function CalendarPage() {
   const completeMutation = useMutation({
     mutationFn: calendarApi.complete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       toast({ title: 'Événement complété' })
     },
     onError: () => {
@@ -177,9 +174,7 @@ export default function CalendarPage() {
   const deleteMutation = useMutation({
     mutationFn: calendarApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       toast({ title: 'Événement supprimé' })
     },
     onError: () => {

@@ -139,9 +139,11 @@ async def get_alert_summary(
     return AlertSummaryResponse(**summary)
 
 
-@router.get("/", response_model=List[AlertResponse])
+@router.get("", response_model=List[AlertResponse])
 async def list_alerts(
     active_only: bool = False,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[AlertResponse]:
@@ -151,7 +153,7 @@ async def list_alerts(
     if active_only:
         query = query.where(Alert.is_active == True)
 
-    result = await db.execute(query.order_by(Alert.created_at.desc()))
+    result = await db.execute(query.order_by(Alert.created_at.desc()).offset(skip).limit(limit))
     alerts = result.scalars().all()
 
     # Get asset info for each alert
@@ -189,7 +191,7 @@ async def list_alerts(
     return response
 
 
-@router.post("/", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(
     alert_in: AlertCreate,
     current_user: User = Depends(get_current_user),

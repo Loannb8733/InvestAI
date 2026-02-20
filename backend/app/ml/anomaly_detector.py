@@ -9,6 +9,12 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Configurable thresholds
+ISOLATION_FOREST_CONTAMINATION = 0.05
+ISOLATION_FOREST_N_ESTIMATORS = 100
+ZSCORE_THRESHOLD_CRYPTO = 2.5
+ZSCORE_THRESHOLD_DEFAULT = 3.0
+
 
 @dataclass
 class Anomaly:
@@ -98,9 +104,9 @@ class AnomalyDetector:
 
         # Fit Isolation Forest
         model = IsolationForest(
-            contamination=0.05,  # Expect 5% anomalies
+            contamination=ISOLATION_FOREST_CONTAMINATION,
             random_state=42,
-            n_estimators=100,
+            n_estimators=ISOLATION_FOREST_N_ESTIMATORS,
         )
         X = returns.reshape(-1, 1)
         model.fit(X)
@@ -160,7 +166,7 @@ class AnomalyDetector:
         z = (latest_return - mean_return) / std_return
 
         # Threshold depends on asset type
-        threshold = 2.5 if asset_type == "crypto" else 3.0
+        threshold = ZSCORE_THRESHOLD_CRYPTO if asset_type == "crypto" else ZSCORE_THRESHOLD_DEFAULT
 
         if abs(z) > threshold:
             pct_change = latest_return * 100

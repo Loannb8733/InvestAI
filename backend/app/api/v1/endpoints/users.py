@@ -16,7 +16,7 @@ from app.schemas.user import UserCreate, UserResponse, UserUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 async def list_users(
     skip: int = 0,
     limit: int = 100,
@@ -31,7 +31,7 @@ async def list_users(
     return users
 
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_in: UserCreate,
     current_user: User = Depends(get_current_admin_user),

@@ -29,7 +29,7 @@ async def list_supported_exchanges() -> List[ExchangeInfo]:
     return [ExchangeInfo(**exchange) for exchange in SUPPORTED_EXCHANGES]
 
 
-@router.get("/", response_model=List[APIKeyResponse])
+@router.get("", response_model=List[APIKeyResponse])
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -40,7 +40,7 @@ async def list_api_keys(
     return api_keys
 
 
-@router.post("/", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
 async def create_api_key(
     api_key_in: APIKeyCreate,
     current_user: User = Depends(get_current_user),
@@ -261,7 +261,7 @@ async def test_api_key(
         )
 
 
-@router.post("/{api_key_id}/import-history")
+@router.post("/{api_key_id}/import-history", response_model=dict)
 @limiter.limit("5/minute")
 async def import_trade_history(
     request: Request,
@@ -768,7 +768,7 @@ async def import_trade_history(
         )
 
 
-@router.post("/{api_key_id}/sync")
+@router.post("/{api_key_id}/sync", response_model=dict)
 @limiter.limit("5/minute")
 async def sync_exchange(
     request: Request,

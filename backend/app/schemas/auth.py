@@ -1,6 +1,6 @@
 """Authentication schemas."""
 
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -19,7 +19,7 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str
-    mfa_code: Optional[str] = Field(None, min_length=6, max_length=6)
+    mfa_code: Optional[str] = Field(None, min_length=6, max_length=8)
 
 
 class Token(BaseModel):
@@ -49,6 +49,7 @@ class MFASetupResponse(BaseModel):
 
     secret: str
     qr_code: str  # Base64 encoded QR code image
+    backup_codes: List[str]
 
 
 class MFAVerifyRequest(BaseModel):

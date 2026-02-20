@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { insightsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   BarChart,
   Bar,
@@ -85,7 +86,7 @@ export default function InsightsPage() {
 // ──────────────────────────────────────────────────────
 function FeeAnalysis() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-fees'],
+    queryKey: queryKeys.insights.fees,
     queryFn: insightsApi.getFees,
     staleTime: 5 * 60 * 1000,
   })
@@ -199,7 +200,7 @@ function FeeAnalysis() {
 // ──────────────────────────────────────────────────────
 function TaxLossHarvesting() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-harvest'],
+    queryKey: queryKeys.insights.taxLossHarvesting,
     queryFn: insightsApi.getTaxLossHarvesting,
     staleTime: 5 * 60 * 1000,
   })
@@ -304,7 +305,7 @@ function TaxLossHarvesting() {
 // ──────────────────────────────────────────────────────
 function PassiveIncome() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-income'],
+    queryKey: queryKeys.insights.passiveIncome,
     queryFn: () => insightsApi.getPassiveIncome(),
     staleTime: 5 * 60 * 1000,
   })
@@ -421,7 +422,7 @@ function DcaBacktest() {
   const [started, setStarted] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['insights-dca', symbol, assetType, amount, startYear],
+    queryKey: queryKeys.insights.dcaBacktest(symbol, assetType, amount, startYear),
     queryFn: () => insightsApi.backtestDca(symbol, assetType, amount, startYear),
     enabled: started,
     staleTime: 10 * 60 * 1000,

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
@@ -18,6 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency } from '@/lib/utils'
 import { predictionsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   TrendingUp,
   TrendingDown,
@@ -240,17 +241,18 @@ export default function PredictionsPage() {
   const [whatIfLoading, setWhatIfLoading] = useState(false)
 
   const { data: portfolioPredictions, isLoading: loadingPredictions } = useQuery({
-    queryKey: ['portfolio-predictions', daysAhead],
+    queryKey: queryKeys.predictions.portfolio(daysAhead),
     queryFn: () => predictionsApi.getPortfolioPredictions(daysAhead),
+    placeholderData: keepPreviousData,
   })
 
   const { data: anomalies } = useQuery<Anomaly[]>({
-    queryKey: ['anomalies'],
+    queryKey: queryKeys.predictions.anomalies,
     queryFn: predictionsApi.getAnomalies,
   })
 
   const { data: sentiment, isLoading: loadingSentiment } = useQuery<MarketSentiment>({
-    queryKey: ['market-sentiment'],
+    queryKey: queryKeys.predictions.marketSentiment,
     queryFn: predictionsApi.getMarketSentiment,
   })
 

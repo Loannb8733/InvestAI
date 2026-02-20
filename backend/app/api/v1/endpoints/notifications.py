@@ -51,7 +51,7 @@ class MarkReadRequest(BaseModel):
     notification_id: UUID
 
 
-@router.get("/", response_model=List[NotificationResponse])
+@router.get("", response_model=List[NotificationResponse])
 async def list_notifications(
     unread_only: bool = False,
     limit: int = 50,

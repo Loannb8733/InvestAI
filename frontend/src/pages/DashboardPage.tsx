@@ -1,9 +1,9 @@
 import { useState, useRef, useMemo, lazy, Suspense, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding } from '@/components/OnboardingWizard'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -15,43 +15,28 @@ import {
 } from '@/components/ui/tooltip'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import { dashboardApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import AllocationChart from '@/components/charts/AllocationChart'
 import PerformanceChart from '@/components/charts/PerformanceChart'
-import {
-  LineChart,
-  Line,
-  XAxis as RXAxis,
-  YAxis as RYAxis,
-  CartesianGrid as RCartesianGrid,
-  Tooltip as RTooltip,
-  ResponsiveContainer,
-  Legend as RLegend,
-} from 'recharts'
 import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  PieChart,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
   Loader2,
-  Banknote,
   Plus,
   Bell,
   Calendar,
   Clock,
-  Activity,
   BarChart3,
   ArrowRightLeft,
   ChevronRight,
-  Zap,
   AlertTriangle,
   ShieldAlert,
   Info,
   Target,
-  TrendingDown as TrendDown,
-  Scale,
   Printer,
   Settings2,
   GripVertical,
@@ -64,6 +49,10 @@ import {
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { useExportPdf } from '@/hooks/useExportPdf'
 import { useDashboardLayout, WIDGET_LABELS, type WidgetId } from '@/hooks/useDashboardLayout'
+import DashboardMetricsRow from '@/components/dashboard/DashboardMetricsRow'
+import DashboardPnlCard from '@/components/dashboard/DashboardPnlCard'
+import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
+import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 
 // ============== Interfaces ==============
 
@@ -356,15 +345,19 @@ export default function DashboardPage() {
     error,
     refetch,
   } = useQuery<DashboardMetrics>({
-    queryKey: ['dashboard', selectedPeriod],
+    queryKey: queryKeys.dashboard.metrics(selectedPeriod),
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
     refetchInterval: 60000,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 
   const { data: benchmarks } = useQuery<Array<{ name: string; symbol: string; data: Array<{ date: string; value: number }> }>>({
-    queryKey: ['benchmarks', selectedPeriod],
+    queryKey: queryKeys.dashboard.benchmarks(selectedPeriod),
     queryFn: () => dashboardApi.getBenchmarks(selectedPeriod),
     enabled: showBenchmarks,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 
   // Real-time price updates via WebSocket
@@ -548,144 +541,27 @@ export default function DashboardPage() {
             switch (widgetId) {
               case 'metrics':
                 return (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Patrimoine Total</CardTitle>
-                        <Wallet className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(metrics.total_value)}</div>
-                        <p className="text-xs text-muted-foreground">{metrics.assets_count} actifs</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Capital Net</CardTitle>
-                        <Banknote className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(metrics.net_capital ?? metrics.total_invested)}</div>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(metrics.total_invested)} investi au total</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Plus-value Nette</CardTitle>
-                        {isPositive ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
-                      </CardHeader>
-                      <CardContent>
-                        <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '▲' : '▼'} {formatCurrency(netGainLoss)}</div>
-                        <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '▲' : '▼'} {formatPercent(metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Variation 24h</CardTitle>
-                        {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
-                      </CardHeader>
-                      <CardContent>
-                        <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '▲' : '▼'} {formatCurrency(metrics.daily_change)}</div>
-                        <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '▲' : '▼'} {formatPercent(metrics.daily_change_percent)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Portefeuilles</CardTitle>
-                        <PieChart className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{metrics.portfolios_count}</div>
-                        <p className="text-xs text-muted-foreground">portefeuille{metrics.portfolios_count > 1 ? 's' : ''} actif{metrics.portfolios_count > 1 ? 's' : ''}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <DashboardMetricsRow
+                    totalValue={metrics.total_value}
+                    assetsCount={metrics.assets_count}
+                    netCapital={metrics.net_capital ?? metrics.total_invested}
+                    totalInvested={metrics.total_invested}
+                    netGainLoss={netGainLoss}
+                    netGainLossPercent={metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent}
+                    isPositive={isPositive}
+                    dailyChange={metrics.daily_change}
+                    dailyChangePercent={metrics.daily_change_percent}
+                    isDailyPositive={isDailyPositive}
+                    portfoliosCount={metrics.portfolios_count}
+                  />
                 )
               case 'pnl':
                 return (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2"><Scale className="h-4 w-4" />Répartition des Plus/Moins-values</CardTitle>
-                      <CardDescription>Distinction entre gains réalisés et latents (fiscalité)</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div>
-                          <MetricTooltip content="Profits/pertes sur les positions actuellement détenues. Non imposable tant que non vendu."><p className="text-xs text-muted-foreground">P&L Latent</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.unrealized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.unrealized_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.unrealized_pnl)}</p>
-                        </div>
-                        <div>
-                          <MetricTooltip content="Profits/pertes sur les actifs vendus. Soumis à imposition."><p className="text-xs text-muted-foreground">P&L Réalisé</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.realized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.realized_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.realized_pnl)}</p>
-                        </div>
-                        <div>
-                          <MetricTooltip content="Total des frais de transaction payés."><p className="text-xs text-muted-foreground">Total Frais</p></MetricTooltip>
-                          <p className="text-lg font-bold text-orange-500">-{formatCurrency(pnl_breakdown.total_fees)}</p>
-                        </div>
-                        <div>
-                          <MetricTooltip content="P&L total (latent + réalisé)."><p className="text-xs text-muted-foreground">P&L Total</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.total_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.total_pnl)}</p>
-                        </div>
-                        <div>
-                          <MetricTooltip content="P&L net après déduction des frais."><p className="text-xs text-muted-foreground">P&L Net</p></MetricTooltip>
-                          <p className={`text-lg font-bold ${pnl_breakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnl_breakdown.net_pnl >= 0 ? '▲' : '▼'} {formatCurrency(pnl_breakdown.net_pnl)}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} />
                 )
               case 'risk':
                 return (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <MetricTooltip content="Mesure de la dispersion des rendements. Plus la volatilité est élevée, plus le risque est important."><p className="text-sm text-muted-foreground">Volatilité</p></MetricTooltip>
-                            <p className="text-xl font-bold">{risk_metrics.volatility.toFixed(1)}%</p>
-                            <p className="text-xs text-muted-foreground">annualisée</p>
-                          </div>
-                          <Activity className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <MetricTooltip content="Rendement ajusté au risque. >1 = bon, >2 = très bon, <0 = mauvais"><p className="text-sm text-muted-foreground">Ratio de Sharpe</p></MetricTooltip>
-                            <p className={`text-xl font-bold ${risk_metrics.sharpe_ratio >= 1 ? 'text-green-500' : risk_metrics.sharpe_ratio >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>{risk_metrics.sharpe_ratio.toFixed(2)}</p>
-                            <p className="text-xs text-muted-foreground">{risk_metrics.sharpe_ratio >= 1 ? 'Bon' : risk_metrics.sharpe_ratio >= 0 ? 'Moyen' : 'Faible'}</p>
-                          </div>
-                          <Zap className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <MetricTooltip content="Perte maximale historique entre un pic et un creux. Mesure le pire scénario passé."><p className="text-sm text-muted-foreground">Max Drawdown</p></MetricTooltip>
-                            <p className="text-xl font-bold text-red-500">-{risk_metrics.max_drawdown.max_drawdown_percent.toFixed(1)}%</p>
-                            <p className="text-xs text-muted-foreground">pire baisse</p>
-                          </div>
-                          <TrendDown className="h-8 w-8 text-red-500" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <MetricTooltip content={`Perte potentielle maximale avec ${(risk_metrics.var_95.confidence_level * 100).toFixed(0)}% de confiance sur 1 jour.`}><p className="text-sm text-muted-foreground">VaR 95%</p></MetricTooltip>
-                            <p className="text-xl font-bold text-orange-500">{formatCurrency(risk_metrics.var_95.var_amount)}</p>
-                            <p className="text-xs text-muted-foreground">soit {risk_metrics.var_95.var_percent.toFixed(1)}%</p>
-                          </div>
-                          <ShieldAlert className="h-8 w-8 text-orange-500" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <DashboardRiskCards riskMetrics={risk_metrics} />
                 )
               case 'roi-concentration':
                 return (
@@ -819,42 +695,9 @@ export default function DashboardPage() {
                       </CardContent>
                     </Card>
                   </div>
-                  {showBenchmarks && benchmarks && benchmarks.length > 0 && (() => {
-                    const BENCH_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#22c55e']
-                    // Merge all series into one dataset keyed by date
-                    const dateMap: Record<string, Record<string, number>> = {}
-                    benchmarks.forEach((series) => {
-                      series.data.forEach((p) => {
-                        if (!dateMap[p.date]) dateMap[p.date] = {}
-                        dateMap[p.date][series.symbol] = p.value
-                      })
-                    })
-                    const chartData = Object.entries(dateMap)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([date, vals]) => ({ date: date.slice(5), ...vals }))
-
-                    return (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Performance comparée (base 100)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={250}>
-                            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                              <RCartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                              <RXAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                              <RYAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
-                              <RTooltip contentStyle={{ fontSize: 12 }} />
-                              <RLegend verticalAlign="top" height={30} wrapperStyle={{ fontSize: 12 }} />
-                              {benchmarks.map((series, i) => (
-                                <Line key={series.symbol} type="monotone" dataKey={series.symbol} name={series.name} stroke={BENCH_COLORS[i % BENCH_COLORS.length]} strokeWidth={2} dot={false} />
-                              ))}
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )
-                  })()}
+                  {showBenchmarks && benchmarks && benchmarks.length > 0 && (
+                    <DashboardBenchmarkChart benchmarks={benchmarks} />
+                  )}
                   </div>
                 )
               case 'allocation-transactions-alerts':

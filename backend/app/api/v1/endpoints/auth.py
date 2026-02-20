@@ -1,6 +1,7 @@
 """Authentication endpoints."""
 
 import base64
+import json
 import logging
 import secrets
 from datetime import datetime, timedelta
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 import pyotp
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import RATE_LIMITS, limiter
-from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
+from app.core.security import (
+    compute_token_fingerprint,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
@@ -61,6 +69,32 @@ class ResetPasswordRequest(BaseModel):
 
 
 router = APIRouter()
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Set httpOnly auth cookies on the response."""
+    from app.core.config import settings
+
+    common = {
+        "httponly": True,
+        "samesite": "lax",
+        "secure": settings.COOKIE_SECURE,
+        "domain": settings.COOKIE_DOMAIN,
+    }
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/api",
+        **common,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/api/v1/auth",
+        **common,
+    )
 
 
 class RegisterResponse(BaseModel):
@@ -124,6 +158,7 @@ class UserProfileUpdate(BaseModel):
 
 @router.post("/verify-email", response_model=Token)
 async def verify_email(
+    request: Request,
     data: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db),
 ) -> Token:
@@ -155,9 +190,10 @@ async def verify_email(
     user.email_verification_expires = None
     await db.commit()
 
-    # Generate tokens for automatic login
-    access_token = create_access_token(subject=str(user.id))
-    refresh_token = create_refresh_token(subject=str(user.id))
+    # Generate tokens for automatic login with fingerprint
+    fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
+    refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp)
 
     return Token(
         access_token=access_token,
@@ -217,6 +253,7 @@ async def resend_verification(
 @limiter.limit(RATE_LIMITS["auth_login"])
 async def login(
     request: Request,
+    response: Response,
     login_data: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> Token:
@@ -246,19 +283,43 @@ async def login(
             )
 
         totp = pyotp.TOTP(user.mfa_secret)
-        if not totp.verify(login_data.mfa_code):
+        if totp.verify(login_data.mfa_code):
+            pass  # TOTP valid
+        elif user.mfa_backup_codes:
+            # Try backup codes
+            codes = json.loads(user.mfa_backup_codes)
+            matched = False
+            for i, hashed_code in enumerate(codes):
+                if verify_password(login_data.mfa_code, hashed_code):
+                    codes.pop(i)
+                    user.mfa_backup_codes = json.dumps(codes)
+                    matched = True
+                    break
+            if not matched:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid MFA code",
+                )
+        else:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid MFA code",
             )
 
-    # Generate tokens
-    access_token = create_access_token(subject=str(user.id))
-    refresh_token = create_refresh_token(subject=str(user.id))
+        # Persist backup code consumption if one was used
+        await db.commit()
+
+    # Generate tokens with fingerprint binding
+    fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
+    refresh_tok = create_refresh_token(subject=str(user.id), fingerprint=fp)
+
+    # Set httpOnly cookies
+    _set_auth_cookies(response, access_token, refresh_tok)
 
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
+        refresh_token=refresh_tok,
     )
 
 
@@ -266,11 +327,25 @@ async def login(
 @limiter.limit(RATE_LIMITS["auth_refresh"])
 async def refresh_token(
     request: Request,
-    refresh_data: RefreshTokenRequest,
+    response: Response,
+    refresh_data: Optional[RefreshTokenRequest] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Token:
-    """Refresh access token using refresh token."""
-    payload = decode_token(refresh_data.refresh_token)
+    """Refresh access token using refresh token (from body or cookie)."""
+    # Try body first, then cookie
+    raw_token = None
+    if refresh_data and refresh_data.refresh_token:
+        raw_token = refresh_data.refresh_token
+    else:
+        raw_token = request.cookies.get("refresh_token")
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token provided",
+        )
+
+    payload = decode_token(raw_token)
 
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
@@ -288,14 +363,37 @@ async def refresh_token(
             detail="User not found or inactive",
         )
 
-    # Generate new tokens
-    access_token = create_access_token(subject=str(user.id))
-    new_refresh_token = create_refresh_token(subject=str(user.id))
+    # Verify refresh token fingerprint
+    token_fp = payload.get("fp")
+    if token_fp:
+        user_agent = request.headers.get("user-agent", "")
+        current_fp = compute_token_fingerprint(user_agent)
+        if token_fp != current_fp:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token binding validation failed",
+            )
+
+    # Generate new tokens with fingerprint
+    fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
+    new_refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp)
+
+    # Set httpOnly cookies
+    _set_auth_cookies(response, access_token, new_refresh_token)
 
     return Token(
         access_token=access_token,
         refresh_token=new_refresh_token,
     )
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(response: Response) -> dict:
+    """Clear auth cookies."""
+    response.delete_cookie("access_token", path="/api")
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    return {"message": "Déconnexion réussie"}
 
 
 @router.post("/mfa/setup", response_model=MFASetupResponse)
@@ -330,13 +428,19 @@ async def setup_mfa(
     img.save(buffer, format="PNG")
     qr_base64 = base64.b64encode(buffer.getvalue()).decode()
 
-    # Store secret (not enabled yet)
+    # Generate backup codes
+    plain_codes = [secrets.token_hex(4) for _ in range(10)]
+    hashed_codes = [hash_password(code) for code in plain_codes]
+
+    # Store secret and backup codes (not enabled yet)
     current_user.mfa_secret = secret
+    current_user.mfa_backup_codes = json.dumps(hashed_codes)
     await db.commit()
 
     return MFASetupResponse(
         secret=secret,
         qr_code=f"data:image/png;base64,{qr_base64}",
+        backup_codes=plain_codes,
     )
 
 
@@ -388,9 +492,53 @@ async def disable_mfa(
 
     current_user.mfa_enabled = False
     current_user.mfa_secret = None
+    current_user.mfa_backup_codes = None
     await db.commit()
 
     return {"message": "MFA disabled successfully"}
+
+
+@router.get("/mfa/backup-codes-count")
+async def get_backup_codes_count(
+    current_user: User = Depends(get_current_user),
+):
+    """Get the number of remaining MFA backup codes."""
+    if not current_user.mfa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is not enabled",
+        )
+    codes = json.loads(current_user.mfa_backup_codes or "[]")
+    return {"remaining_codes": len(codes)}
+
+
+@router.post("/mfa/regenerate-backup-codes")
+async def regenerate_backup_codes(
+    request: MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Regenerate MFA backup codes. Requires a valid TOTP code."""
+    if not current_user.mfa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is not enabled",
+        )
+
+    totp = pyotp.TOTP(current_user.mfa_secret)
+    if not totp.verify(request.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid MFA code",
+        )
+
+    # Generate new codes
+    plain_codes = [secrets.token_hex(4) for _ in range(10)]
+    hashed_codes = [hash_password(code) for code in plain_codes]
+    current_user.mfa_backup_codes = json.dumps(hashed_codes)
+    await db.commit()
+
+    return {"backup_codes": plain_codes, "message": "New backup codes generated"}
 
 
 @router.get("/me", response_model=UserProfileResponse)
