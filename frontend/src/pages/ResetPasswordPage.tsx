@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
       return
     }
     if (password.length < 8) {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caracteres.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.' })
       return
     }
     mutation.mutate({ token, new_password: password })
@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="py-12 text-center">
-            <p className="text-destructive mb-4">Lien de reinitialisation invalide.</p>
+            <p className="text-destructive mb-4">Lien de réinitialisation invalide.</p>
             <Link to="/forgot-password">
               <Button>Demander un nouveau lien</Button>
             </Link>
@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
           </div>
           <CardTitle className="text-2xl">Nouveau mot de passe</CardTitle>
           <CardDescription>
-            {success ? 'Mot de passe reinitialise' : 'Choisissez un nouveau mot de passe'}
+            {success ? 'Mot de passe réinitialisé' : 'Choisissez un nouveau mot de passe'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -79,7 +79,7 @@ export default function ResetPasswordPage() {
             <div className="text-center space-y-4">
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
               <p className="text-sm text-muted-foreground">
-                Votre mot de passe a ete reinitialise avec succes.
+                Votre mot de passe a été réinitialisé avec succès.
               </p>
               <Button className="w-full" onClick={() => navigate('/login')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -93,7 +93,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Minimum 8 caracteres"
+                  placeholder="Minimum 8 caractères"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -119,12 +119,12 @@ export default function ResetPasswordPage() {
                 ) : (
                   <Lock className="h-4 w-4 mr-2" />
                 )}
-                Reinitialiser le mot de passe
+                Réinitialiser le mot de passe
               </Button>
               <div className="text-center">
                 <Link to="/login" className="text-sm text-primary hover:underline">
                   <ArrowLeft className="h-3 w-3 inline mr-1" />
-                  Retour a la connexion
+                  Retour à la connexion
                 </Link>
               </div>
             </form>

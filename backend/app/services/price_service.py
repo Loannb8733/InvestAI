@@ -1,9 +1,12 @@
 """Price fetching service for various asset types."""
 
 import asyncio
+import logging
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from redis import Redis
@@ -205,13 +208,13 @@ class PriceService:
                         except Exception:
                             pass
                         self._dynamic_symbol_cache[symbol_upper] = coin_id
-                        print(f"Discovered CoinGecko ID for {symbol_upper}: {coin_id}")
+                        logger.debug(f"Discovered CoinGecko ID for {symbol_upper}: {coin_id}")
                         return coin_id
 
-            print(f"No exact match found on CoinGecko for symbol: {symbol_upper}")
+            logger.warning(f"No exact match found on CoinGecko for symbol: {symbol_upper}")
 
         except Exception as e:
-            print(f"Error searching CoinGecko for {symbol}: {e}")
+            logger.error(f"Error searching CoinGecko for {symbol}: {e}")
 
         return None
 
@@ -234,7 +237,7 @@ class PriceService:
                     "last_updated": data.get("last_updated"),
                 }
         except Exception as e:
-            print(f"Redis cache read error for {symbol}: {e}")
+            logger.warning(f"Redis cache read error for {symbol}: {e}")
         return None
 
     def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
@@ -252,7 +255,7 @@ class PriceService:
             self.redis.hset(key, mapping=cache_data)
             self.redis.expire(key, ttl)
         except Exception as e:
-            print(f"Redis cache write error for {symbol}: {e}")
+            logger.warning(f"Redis cache write error for {symbol}: {e}")
 
     # Stablecoins: peg currency (USD or EUR)
     STABLECOINS: Dict[str, str] = {
@@ -350,7 +353,7 @@ class PriceService:
                     return result
 
         except Exception as e:
-            print(f"CoinGecko failed for {symbol}: {e}, trying CryptoCompare...")
+            logger.warning(f"CoinGecko failed for {symbol}: {e}, trying CryptoCompare...")
 
         # Fallback to CryptoCompare
         try:
@@ -380,14 +383,14 @@ class PriceService:
                     return result
 
         except Exception as e:
-            print(f"CryptoCompare also failed for {symbol}: {e}")
+            logger.error(f"CryptoCompare also failed for {symbol}: {e}")
 
         # Fallback to live forex rate for stablecoins if APIs failed
         if is_stablecoin:
             base_price = await self._stablecoin_price_eur(symbol_upper)
             if currency.lower() == "usd":
                 base_price = Decimal("1.00")
-            print(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
+            logger.info(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
             result = {
                 "price": base_price,
                 "change_24h": 0,
@@ -439,7 +442,7 @@ class PriceService:
             return result
 
         except Exception as e:
-            print(f"Error fetching stock price for {symbol}: {e}")
+            logger.error(f"Error fetching stock price for {symbol}: {e}")
 
         return None
 
@@ -498,7 +501,7 @@ class PriceService:
                     results[symbol.upper()] = result
 
         except Exception as e:
-            print(f"Error fetching from CryptoCompare: {e}")
+            logger.error(f"Error fetching from CryptoCompare: {e}")
 
         return results
 
@@ -561,12 +564,12 @@ class PriceService:
                 results[symbol.upper()] = result
 
         except Exception as e:
-            print(f"CoinGecko failed: {e}, falling back to CryptoCompare...")
+            logger.warning(f"CoinGecko failed: {e}, falling back to CryptoCompare...")
 
         # Check which symbols still don't have prices and try CryptoCompare
         missing_symbols = [s for s in uncached_symbols if s.upper() not in results]
         if missing_symbols:
-            print(f"Trying CryptoCompare for missing symbols: {missing_symbols}")
+            logger.info(f"Trying CryptoCompare for missing symbols: {missing_symbols}")
             fallback_results = await self._fetch_from_cryptocompare(missing_symbols, currency)
             results.update(fallback_results)
 
@@ -578,7 +581,7 @@ class PriceService:
                     base_price = await self._stablecoin_price_eur(symbol_upper)
                     if currency.lower() == "usd":
                         base_price = Decimal("1.00")
-                    print(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
+                    logger.info(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
                     results[symbol_upper] = {
                         "price": base_price,
                         "change_24h": 0,
@@ -597,7 +600,7 @@ class PriceService:
             if cached:
                 return Decimal(cached)
         except Exception as e:
-            print(f"Redis cache read error for forex: {e}")
+            logger.warning(f"Redis cache read error for forex: {e}")
 
         try:
             response = await self.http_client.get(f"https://api.exchangerate-api.com/v4/latest/{from_currency}")
@@ -609,11 +612,11 @@ class PriceService:
                 try:
                     self.redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
                 except Exception as e:
-                    print(f"Redis cache write error for forex: {e}")
+                    logger.warning(f"Redis cache write error for forex: {e}")
                 return Decimal(str(rate))
 
         except Exception as e:
-            print(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
+            logger.error(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
 
         return None
 
@@ -642,7 +645,7 @@ class PriceService:
             if cached:
                 return Decimal(cached)
         except Exception as e:
-            print(f"Redis cache read error for historical price: {e}")
+            logger.warning(f"Redis cache read error for historical price: {e}")
 
         try:
             response = await self.http_client.get(
@@ -665,11 +668,11 @@ class PriceService:
                 try:
                     self.redis.setex(cache_key, 86400, str(price_decimal))
                 except Exception as e:
-                    print(f"Redis cache write error for historical price: {e}")
+                    logger.warning(f"Redis cache write error for historical price: {e}")
                 return price_decimal
 
         except Exception as e:
-            print(f"Error fetching historical price for {symbol} on {date_str}: {e}")
+            logger.error(f"Error fetching historical price for {symbol} on {date_str}: {e}")
 
         return None
 

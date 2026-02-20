@@ -156,7 +156,7 @@ async def trigger_weekly_report(
                 detail="No portfolio value to report",
             )
 
-        history = await snapshot_service.get_historical_values(db, str(current_user.id), days=7)
+        history = await snapshot_service.build_portfolio_value_series(db, str(current_user.id), days=7)
 
         week_start_value = history[0]["value"] if history else metrics["total_value"]
         week_change = metrics["total_value"] - week_start_value

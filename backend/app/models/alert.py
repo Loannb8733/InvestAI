@@ -30,7 +30,7 @@ class Alert(Base):
     threshold = Column(Numeric(precision=18, scale=8), nullable=False)
     currency = Column(String(10), default="EUR", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    triggered_at = Column(String(255), nullable=True)
+    triggered_at = Column(DateTime(timezone=True), nullable=True)
     triggered_count = Column(Integer, default=0, nullable=False)
     notify_email = Column(Boolean, default=True, nullable=False)
     notify_in_app = Column(Boolean, default=True, nullable=False)

@@ -743,7 +743,7 @@ export default function DashboardPage() {
                           const liveIndexChange = getLiveChange(index.symbol, index.change_percent)
                           return (
                           <div key={index.symbol} className="flex items-center gap-3">
-                            <AssetIconCompact symbol={index.symbol} assetType="crypto" size={32} />
+                            <AssetIconCompact symbol={index.symbol} assetType={['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOT', 'AVAX', 'MATIC', 'LINK'].includes(index.symbol.toUpperCase()) ? 'crypto' : 'stock'} size={32} />
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <p className="text-sm font-medium">{index.name}</p>
@@ -836,7 +836,7 @@ export default function DashboardPage() {
                     return (
                       <Card>
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Performance comparee (base 100)</CardTitle>
+                          <CardTitle className="text-sm font-medium">Performance comparée (base 100)</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ResponsiveContainer width="100%" height={250}>

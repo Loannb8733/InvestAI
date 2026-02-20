@@ -172,7 +172,7 @@ export default function SmartInsightsPage() {
             Smart Insights
           </h1>
           <p className="text-muted-foreground">
-            Analyse IA de votre portefeuille avec recommandations personnalisees
+            Analyse IA de votre portefeuille avec recommandations personnalisées
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -227,7 +227,7 @@ export default function SmartInsightsPage() {
                       {(data.metrics_summary.sharpe_ratio ?? 0).toFixed(2)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {(data.metrics_summary.sharpe_ratio ?? 0) >= 1 ? 'Bon' : (data.metrics_summary.sharpe_ratio ?? 0) >= 0.5 ? 'Correct' : 'A ameliorer'}
+                      {(data.metrics_summary.sharpe_ratio ?? 0) >= 1 ? 'Bon' : (data.metrics_summary.sharpe_ratio ?? 0) >= 0.5 ? 'Correct' : 'À améliorer'}
                     </p>
                   </div>
                   <TooltipProvider>
@@ -236,7 +236,7 @@ export default function SmartInsightsPage() {
                         <Target className="h-8 w-8 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Rendement ajuste au risque. Objectif: &gt;1</p>
+                        <p>Rendement ajusté au risque. Objectif: &gt;1</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -281,7 +281,7 @@ export default function SmartInsightsPage() {
                       {((data.metrics_summary.hhi ?? 0) * 100).toFixed(0)}%
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {(data.metrics_summary.hhi ?? 0) < 0.15 ? 'Bien diversifie' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'Moderement concentre' : 'Tres concentre'}
+                      {(data.metrics_summary.hhi ?? 0) < 0.15 ? 'Bien diversifié' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'Modérément concentré' : 'Très concentré'}
                     </p>
                   </div>
                   <TooltipProvider>
@@ -290,7 +290,7 @@ export default function SmartInsightsPage() {
                         <BarChart3 className="h-8 w-8 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Indice Herfindahl-Hirschman. Plus bas = plus diversifie</p>
+                        <p>Indice Herfindahl-Hirschman. Plus bas = plus diversifié</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -313,7 +313,7 @@ export default function SmartInsightsPage() {
                   Recommandations IA
                 </CardTitle>
                 <CardDescription>
-                  Actions suggérees pour améliorer votre portefeuille
+                  Actions suggérées pour améliorer votre portefeuille
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -376,10 +376,10 @@ export default function SmartInsightsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5 text-blue-500" />
-                  Suggestions de reequilibrage
+                  Suggestions de rééquilibrage
                 </CardTitle>
                 <CardDescription>
-                  Ordres suggeres pour optimiser le ratio de Sharpe (MPT)
+                  Ordres suggérés pour optimiser le ratio de Sharpe (MPT)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -435,7 +435,7 @@ export default function SmartInsightsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  Anomalies detectees
+                  Anomalies détectées
                 </CardTitle>
                 <CardDescription>
                   Mouvements inhabituels sur vos positions avec impact en EUR
@@ -471,7 +471,7 @@ export default function SmartInsightsPage() {
                       <p className="text-sm text-muted-foreground">{anomaly.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Position: {formatCurrency(anomaly.position_value_eur ?? 0)} |
-                        Detecte: {new Date(anomaly.detected_at).toLocaleDateString('fr-FR')}
+                        Détecté : {new Date(anomaly.detected_at).toLocaleDateString('fr-FR')}
                       </p>
                     </div>
                   ))}
@@ -485,9 +485,9 @@ export default function SmartInsightsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <CheckCircle2 className="h-16 w-16 mx-auto text-green-500 mb-4" />
-                <h3 className="text-xl font-semibold">Votre portefeuille est en bonne sante !</h3>
+                <h3 className="text-xl font-semibold">Votre portefeuille est en bonne santé !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Aucune recommandation ou anomalie detectee pour le moment.
+                  Aucune recommandation ou anomalie détectée pour le moment.
                 </p>
               </CardContent>
             </Card>
@@ -495,14 +495,14 @@ export default function SmartInsightsPage() {
 
           {/* Footer */}
           <p className="text-xs text-muted-foreground text-center">
-            Analyse generee le {new Date(data.generated_at).toLocaleString('fr-FR')}
+            Analyse générée le {new Date(data.generated_at).toLocaleString('fr-FR')}
           </p>
         </>
       ) : (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Impossible de charger les donnees</p>
+            <p className="text-muted-foreground">Impossible de charger les données</p>
           </CardContent>
         </Card>
       )}
@@ -567,10 +567,10 @@ function MarketRegimeCard({ regime }: { regime: MarketRegime }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-primary" />
-          Regime de Marche
+          Régime de Marché
         </CardTitle>
         <CardDescription>
-          Analyse basee sur 7 indicateurs techniques (BTC comme proxy)
+          Analyse basée sur 7 indicateurs techniques (BTC comme proxy)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

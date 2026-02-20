@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
       setSent(true)
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Une erreur est survenue. Veuillez reessayer.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Une erreur est survenue. Veuillez réessayer.' })
     },
   })
 
@@ -40,11 +40,11 @@ export default function ForgotPasswordPage() {
           <div className="flex justify-center mb-4">
             <TrendingUp className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Mot de passe oublie</CardTitle>
+          <CardTitle className="text-2xl">Mot de passe oublié</CardTitle>
           <CardDescription>
             {sent
-              ? 'Verifiez votre boite email'
-              : 'Entrez votre adresse email pour recevoir un lien de reinitialisation'}
+              ? 'Vérifiez votre boîte email'
+              : 'Entrez votre adresse email pour recevoir un lien de réinitialisation'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -53,20 +53,20 @@ export default function ForgotPasswordPage() {
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
               <p className="text-sm text-muted-foreground">
                 Si un compte existe avec l'adresse <strong>{email}</strong>, vous recevrez un email
-                avec un lien pour reinitialiser votre mot de passe.
+                avec un lien pour réinitialiser votre mot de passe.
               </p>
               <p className="text-xs text-muted-foreground">
-                Le lien est valable 1 heure. Pensez a verifier vos spams.
+                Le lien est valable 1 heure. Pensez à vérifier vos spams.
               </p>
               <div className="flex flex-col gap-2 pt-4">
                 <Button variant="outline" onClick={() => { setSent(false); setEmail('') }}>
                   <Mail className="h-4 w-4 mr-2" />
-                  Envoyer a une autre adresse
+                  Envoyer à une autre adresse
                 </Button>
                 <Link to="/login">
                   <Button variant="ghost" className="w-full">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Retour a la connexion
+                    Retour à la connexion
                   </Button>
                 </Link>
               </div>
@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
               <div className="text-center">
                 <Link to="/login" className="text-sm text-primary hover:underline">
                   <ArrowLeft className="h-3 w-3 inline mr-1" />
-                  Retour a la connexion
+                  Retour à la connexion
                 </Link>
               </div>
             </form>

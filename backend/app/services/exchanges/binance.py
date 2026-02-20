@@ -3,12 +3,15 @@
 import asyncio
 import hashlib
 import hmac
+import logging
 import ssl
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 import httpx
 
@@ -60,9 +63,9 @@ class BinanceService(BaseExchangeService):
                     server_time = response.json().get("serverTime", 0)
                     local_time = int(time.time() * 1000)
                     self._server_time_offset = server_time - local_time
-                    print(f"Binance time sync: offset = {self._server_time_offset}ms")
+                    logger.debug(f"Binance time sync: offset = {self._server_time_offset}ms")
         except Exception as e:
-            print(f"Failed to sync Binance server time: {e}")
+            logger.warning(f"Failed to sync Binance server time: {e}")
             self._server_time_offset = 0
 
     def _get_timestamp(self) -> int:
@@ -101,7 +104,7 @@ class BinanceService(BaseExchangeService):
                 )
                 return response.status_code == 200
         except Exception as e:
-            print(f"Binance test_connection error: {e}")
+            logger.error(f"Binance test_connection error: {e}")
             return False
 
     async def get_balances(self) -> List[ExchangeBalance]:
@@ -162,9 +165,9 @@ class BinanceService(BaseExchangeService):
                     self._valid_pairs = {
                         symbol["symbol"] for symbol in data.get("symbols", []) if symbol.get("status") == "TRADING"
                     }
-                    print(f"Binance: {len(self._valid_pairs)} valid trading pairs cached")
+                    logger.info(f"Binance: {len(self._valid_pairs)} valid trading pairs cached")
         except Exception as e:
-            print(f"Error fetching exchange info: {e}")
+            logger.error(f"Error fetching exchange info: {e}")
 
         return self._valid_pairs
 
@@ -202,7 +205,7 @@ class BinanceService(BaseExchangeService):
 
                 data = response.json()
                 if data:
-                    print(f"Binance: Found {len(data)} trades for {trading_symbol}")
+                    logger.debug(f"Binance: Found {len(data)} trades for {trading_symbol}")
 
                 for trade in data:
                     side = "buy" if trade["isBuyer"] else "sell"
@@ -250,7 +253,7 @@ class BinanceService(BaseExchangeService):
             # Get ALL assets from user's balances and build trading pairs
             try:
                 balances = await self.get_balances()
-                print(f"Binance: Found {len(balances)} assets with balance > 0")
+                logger.info(f"Binance: Found {len(balances)} assets with balance > 0")
 
                 for balance in balances:
                     # Skip fiat currencies
@@ -265,10 +268,10 @@ class BinanceService(BaseExchangeService):
                                 symbols_to_fetch.add(pair)
 
             except Exception as e:
-                print(f"Error fetching balances for trade pairs: {e}")
+                logger.error(f"Error fetching balances for trade pairs: {e}")
 
         symbols_list = list(symbols_to_fetch)
-        print(f"Binance: Fetching trades for {len(symbols_list)} valid trading pairs (parallel)...")
+        logger.info(f"Binance: Fetching trades for {len(symbols_list)} valid trading pairs (parallel)...")
 
         # Use semaphore for rate limiting (10 concurrent requests)
         semaphore = asyncio.Semaphore(10)
@@ -289,7 +292,7 @@ class BinanceService(BaseExchangeService):
             if isinstance(result, list):
                 all_trades.extend(result)
 
-        print(f"Binance: Total trades found: {len(all_trades)}")
+        logger.info(f"Binance: Total trades found: {len(all_trades)}")
         return sorted(all_trades, key=lambda x: x.timestamp, reverse=True)
 
     async def get_deposits(
@@ -438,7 +441,7 @@ class BinanceService(BaseExchangeService):
                                 "page": page,
                             }
 
-                            print(
+                            logger.debug(
                                 f"Fiat orders API: type={transaction_type}, page={page}, {chunk_start.date()} to {chunk_end.date()}"
                             )
 
@@ -451,7 +454,7 @@ class BinanceService(BaseExchangeService):
                             )
 
                             if response.status_code != 200:
-                                print(f"Fiat orders API error: {response.status_code} - {response.text[:200]}")
+                                logger.error(f"Fiat orders API error: {response.status_code} - {response.text[:200]}")
                                 break
 
                             data = response.json()
@@ -460,9 +463,11 @@ class BinanceService(BaseExchangeService):
                             if not page_data:
                                 break
 
-                            print(f"Fiat orders: found {len(page_data)} orders (type={transaction_type}, page={page})")
+                            logger.debug(
+                                f"Fiat orders: found {len(page_data)} orders (type={transaction_type}, page={page})"
+                            )
                             if page == 1 and page_data:
-                                print(f"Sample: {page_data[0]}")
+                                logger.debug(f"Sample: {page_data[0]}")
 
                             for order in page_data:
                                 # Only include completed orders
@@ -504,15 +509,15 @@ class BinanceService(BaseExchangeService):
                             page += 1
 
                         except Exception as e:
-                            print(f"Error fetching fiat orders: {e}")
+                            logger.error(f"Error fetching fiat orders: {e}")
                             break
 
                     # Move to previous chunk
                     chunk_end = chunk_start - timedelta(seconds=1)
 
-                print(f"Total fiat orders for type {transaction_type}: {total_orders_for_type}")
+                logger.info(f"Total fiat orders for type {transaction_type}: {total_orders_for_type}")
 
-        print(f"Total fiat orders found: {len(orders)}")
+        logger.info(f"Total fiat orders found: {len(orders)}")
         return sorted(orders, key=lambda x: x.timestamp, reverse=True)
 
     async def get_convert_history(
@@ -548,14 +553,14 @@ class BinanceService(BaseExchangeService):
                 )
 
                 if response.status_code != 200:
-                    print(f"Convert history API error: {response.status_code} - {response.text[:200]}")
+                    logger.error(f"Convert history API error: {response.status_code} - {response.text[:200]}")
                     return orders
 
                 data = response.json()
                 convert_list = data.get("list", [])
 
                 if convert_list:
-                    print(f"Convert history: {len(convert_list)} conversions found")
+                    logger.info(f"Convert history: {len(convert_list)} conversions found")
 
                 for conv in convert_list:
                     # Determine which is crypto and which is fiat
@@ -633,7 +638,7 @@ class BinanceService(BaseExchangeService):
                         )
 
             except Exception as e:
-                print(f"Error fetching convert history: {e}")
+                logger.error(f"Error fetching convert history: {e}")
 
         return orders
 
@@ -737,7 +742,7 @@ class BinanceService(BaseExchangeService):
                                     timestamp=timestamp,
                                 )
                             )
-                            print(f"Binance: Found conversion {from_asset} -> {to_asset} (to stablecoin)")
+                            logger.debug(f"Binance: Found conversion {from_asset} -> {to_asset} (to stablecoin)")
                         elif from_asset in stablecoins:
                             # Stablecoin -> Crypto: BUY of crypto (user buys crypto with stable)
                             conversions.append(
@@ -764,7 +769,7 @@ class BinanceService(BaseExchangeService):
                                     timestamp=timestamp,
                                 )
                             )
-                            print(f"Binance: Found conversion {from_asset} -> {to_asset} (from stablecoin)")
+                            logger.debug(f"Binance: Found conversion {from_asset} -> {to_asset} (from stablecoin)")
                         else:
                             # True crypto-to-crypto conversion
                             conversions.append(
@@ -791,14 +796,14 @@ class BinanceService(BaseExchangeService):
                                     timestamp=timestamp,
                                 )
                             )
-                            print(f"Binance: Found conversion {from_asset} -> {to_asset}")
+                            logger.debug(f"Binance: Found conversion {from_asset} -> {to_asset}")
 
                 except Exception as e:
-                    print(f"Error fetching Binance conversions: {e}")
+                    logger.error(f"Error fetching Binance conversions: {e}")
 
                 chunk_end = chunk_start - timedelta(seconds=1)
 
-        print(f"Binance: Total crypto conversions found: {len(conversions) // 2}")
+        logger.info(f"Binance: Total crypto conversions found: {len(conversions) // 2}")
         return sorted(conversions, key=lambda x: x.timestamp, reverse=True)
 
     async def get_auto_invest_history(
@@ -837,7 +842,7 @@ class BinanceService(BaseExchangeService):
                 invest_list = data.get("list", [])
 
                 if invest_list:
-                    print(f"Auto-invest history: {len(invest_list)} orders found")
+                    logger.info(f"Auto-invest history: {len(invest_list)} orders found")
 
                 for invest in invest_list:
                     if invest.get("status") != "SUCCESS":
@@ -865,7 +870,7 @@ class BinanceService(BaseExchangeService):
                         )
 
             except Exception as e:
-                print(f"Error fetching auto-invest history: {e}")
+                logger.error(f"Error fetching auto-invest history: {e}")
 
         return orders
 
@@ -905,7 +910,7 @@ class BinanceService(BaseExchangeService):
                 rows = data.get("rows", [])
 
                 if rows:
-                    print(f"Simple earn subscriptions: {len(rows)} found")
+                    logger.info(f"Simple earn subscriptions: {len(rows)} found")
 
                 for row in rows:
                     if row.get("status") != "SUCCESS":
@@ -927,6 +932,6 @@ class BinanceService(BaseExchangeService):
                     )
 
             except Exception as e:
-                print(f"Error fetching simple earn history: {e}")
+                logger.error(f"Error fetching simple earn history: {e}")
 
         return orders

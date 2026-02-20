@@ -300,13 +300,13 @@ export default function RegisterPage() {
                   className="text-sm text-muted-foreground cursor-pointer"
                 >
                   J'accepte les{' '}
-                  <Link to="/terms" className="text-primary hover:underline">
+                  <span className="text-primary cursor-pointer hover:underline">
                     conditions d'utilisation
-                  </Link>{' '}
+                  </span>{' '}
                   et la{' '}
-                  <Link to="/privacy" className="text-primary hover:underline">
+                  <span className="text-primary cursor-pointer hover:underline">
                     politique de confidentialité
-                  </Link>
+                  </span>
                 </label>
                 {errors.acceptTerms && (
                   <p className="text-sm text-destructive">{errors.acceptTerms.message}</p>
@@ -416,7 +416,7 @@ export default function RegisterPage() {
 
           {/* Footer */}
           <p className="text-white/50 text-sm">
-            © 2025 InvestAI. Tous droits réservés.
+            © 2026 InvestAI. Tous droits réservés.
           </p>
         </div>
       </div>

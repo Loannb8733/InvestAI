@@ -261,7 +261,7 @@ export default function AnalyticsPage() {
   const analyticsQueryOpts = { retry: 1, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const
 
   // Map period label to days for all analytics queries
-  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : period === '1y' ? 365 : 365
+  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : period === '1y' ? 365 : period === 'all' ? 0 : 365
   const portfolioParam = selectedPortfolio === 'all' ? undefined : selectedPortfolio
 
   const { data: analytics, isLoading: loadingAnalytics } = useQuery<Analytics>({
@@ -451,7 +451,7 @@ export default function AnalyticsPage() {
               <SelectValue placeholder="Portefeuille" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous les portfolios</SelectItem>
+              <SelectItem value="all">Tous les portefeuilles</SelectItem>
               {portfolios?.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
               ))}

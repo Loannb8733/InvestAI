@@ -186,7 +186,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="currency" className="flex items-center gap-1">
                 <Globe className="h-4 w-4" />
-                Devise preferee
+                Devise préférée
               </Label>
               <Select value={preferredCurrency} onValueChange={setPreferredCurrency}>
                 <SelectTrigger className="w-48">
@@ -198,7 +198,7 @@ export default function SettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Tous les montants seront affiches dans cette devise</p>
+              <p className="text-xs text-muted-foreground">Tous les montants seront affichés dans cette devise</p>
             </div>
             <Button
               onClick={() => profileMutation.mutate()}
@@ -330,10 +330,10 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center py-8 text-muted-foreground">
-              Aucune clé API configurée
+              <p>Gérez vos connexions exchanges depuis la page dédiée.</p>
             </div>
-            <Button>
-              Ajouter une clé API
+            <Button onClick={() => window.location.href = '/exchanges'}>
+              Gérer mes exchanges
             </Button>
           </CardContent>
         </Card>

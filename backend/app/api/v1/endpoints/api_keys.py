@@ -1,8 +1,11 @@
 """API Keys endpoints for exchange connections."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import List
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -251,7 +254,7 @@ async def test_api_key(
 
         return APIKeyTestResult(
             success=False,
-            message=f"Erreur: {str(e)}",
+            message="Erreur de connexion. Vérifiez vos identifiants et réessayez.",
         )
 
 
@@ -303,7 +306,6 @@ async def import_trade_history(
             select(Portfolio).where(
                 Portfolio.user_id == current_user.id,
                 Portfolio.name == f"{service.exchange_name}",
-                Portfolio.user_id == current_user.id,
             )
         )
         portfolio = portfolio_result.scalar_one_or_none()
@@ -327,18 +329,18 @@ async def import_trade_history(
         # Get Instant Buy transactions from Kraken ledgers
         instant_buys = []
         if hasattr(service, "get_instant_buys"):
-            print("Querying Kraken Instant Buy history from ledgers...")
+            logger.info("Querying Kraken Instant Buy history from ledgers...")
             instant_buys = await service.get_instant_buys(limit=500)
-            print(f"Instant Buy orders found: {len(instant_buys)}")
+            logger.info(f"Instant Buy orders found: {len(instant_buys)}")
             # Add instant buys to trades list
             trades.extend(instant_buys)
 
         # Get staking rewards from Kraken ledgers
         rewards = []
         if hasattr(service, "get_rewards"):
-            print("Querying Kraken rewards/staking history from ledgers...")
+            logger.info("Querying Kraken rewards/staking history from ledgers...")
             rewards = await service.get_rewards(limit=500)
-            print(f"Rewards found: {len(rewards)}")
+            logger.info(f"Rewards found: {len(rewards)}")
 
             # Fetch historical prices for rewards
             if rewards:
@@ -346,7 +348,7 @@ async def import_trade_history(
 
                 from app.services.price_service import price_service
 
-                print("Fetching historical prices for rewards (this may take a moment)...")
+                logger.info("Fetching historical prices for rewards (this may take a moment)...")
 
                 # Group rewards by symbol and date to minimize API calls
                 price_cache = {}
@@ -360,11 +362,11 @@ async def import_trade_history(
                             price = await price_service.get_historical_crypto_price(symbol, reward.timestamp, "eur")
                             price_cache[date_key] = price
                             if price:
-                                print(f"  {symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
+                                logger.debug(f"{symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
                             # Delay to avoid CoinGecko rate limiting (50 req/min)
                             await asyncio.sleep(1.5)
                         except Exception as e:
-                            print(f"  Error getting price for {symbol}: {e}")
+                            logger.error(f"Error getting price for {symbol}: {e}")
                             price_cache[date_key] = None
 
                     # Update reward price
@@ -377,9 +379,9 @@ async def import_trade_history(
         # Get crypto-to-crypto conversions (Kraken, Crypto.com)
         conversions = []
         if hasattr(service, "get_crypto_conversions"):
-            print(f"Querying {service.exchange_name} crypto-to-crypto conversions...")
+            logger.info(f"Querying {service.exchange_name} crypto-to-crypto conversions...")
             conversions = await service.get_crypto_conversions(limit=500)
-            print(f"Crypto conversions found: {len(conversions)}")
+            logger.info(f"Crypto conversions found: {len(conversions)}")
 
             # Fetch historical prices for conversions if needed
             if conversions:
@@ -387,7 +389,7 @@ async def import_trade_history(
 
                 from app.services.price_service import price_service
 
-                print("Fetching historical prices for conversions...")
+                logger.info("Fetching historical prices for conversions...")
 
                 price_cache = {}
                 for conversion in conversions:
@@ -413,11 +415,11 @@ async def import_trade_history(
                             price = await price_service.get_historical_crypto_price(symbol, conversion.timestamp, "eur")
                             price_cache[date_key] = price
                             if price:
-                                print(f"  {symbol} @ {conversion.timestamp.date()}: {float(price):.2f} EUR")
+                                logger.debug(f"{symbol} @ {conversion.timestamp.date()}: {float(price):.2f} EUR")
                             # Delay to avoid rate limiting
                             await asyncio.sleep(1.5)
                         except Exception as e:
-                            print(f"  Error getting price for {symbol}: {e}")
+                            logger.error(f"Error getting price for {symbol}: {e}")
                             price_cache[date_key] = None
 
                     # Update conversion price if we have historical data
@@ -430,7 +432,7 @@ async def import_trade_history(
         # Get fiat orders (direct EUR/USD purchases via card/bank)
         # Query full history (from 2017 when Binance started)
         fiat_orders = await service.get_fiat_orders(limit=500)
-        print(f"Fiat orders found: {len(fiat_orders)}")
+        logger.info(f"Fiat orders found: {len(fiat_orders)}")
 
         # Get convert history (EUR -> BTC conversions)
         # Query in 30-day chunks from 2017 to now (API requires time ranges)
@@ -440,7 +442,7 @@ async def import_trade_history(
             target_start = datetime(2017, 7, 1, 0, 0, 0)  # Binance launched July 2017
             target_end = datetime.now()
 
-            print(f"Querying FULL convert history from {target_start} to {target_end}")
+            logger.info(f"Querying FULL convert history from {target_start} to {target_end}")
 
             # Query in 30-day chunks going backwards
             chunk_end = target_end
@@ -453,18 +455,18 @@ async def import_trade_history(
 
                     if chunk:
                         convert_orders.extend(chunk)
-                        print(f"Found {len(chunk)} conversions from {chunk_start.date()} to {chunk_end.date()}")
+                        logger.info(f"Found {len(chunk)} conversions from {chunk_start.date()} to {chunk_end.date()}")
                 except Exception as e:
-                    print(f"Error querying convert history {chunk_start.date()} to {chunk_end.date()}: {e}")
+                    logger.error(f"Error querying convert history {chunk_start.date()} to {chunk_end.date()}: {e}")
 
                 chunk_end = chunk_start - timedelta(seconds=1)
 
-            print(f"Total convert orders found: {len(convert_orders)}")
+            logger.info(f"Total convert orders found: {len(convert_orders)}")
 
         # Get Auto-Invest (DCA) history
         auto_invest_orders = []
         if hasattr(service, "get_auto_invest_history"):
-            print("Querying Auto-Invest history...")
+            logger.info("Querying Auto-Invest history...")
             # Query in 90-day chunks
             chunk_end = datetime.now()
             target_start = datetime(2020, 1, 1)  # Auto-invest launched around 2020
@@ -475,12 +477,14 @@ async def import_trade_history(
                     chunk = await service.get_auto_invest_history(start_time=chunk_start, end_time=chunk_end, limit=100)
                     if chunk:
                         auto_invest_orders.extend(chunk)
-                        print(f"Found {len(chunk)} auto-invest orders from {chunk_start.date()} to {chunk_end.date()}")
+                        logger.info(
+                            f"Found {len(chunk)} auto-invest orders from {chunk_start.date()} to {chunk_end.date()}"
+                        )
                 except Exception as e:
-                    print(f"Error querying auto-invest: {e}")
+                    logger.error(f"Error querying auto-invest: {e}")
                 chunk_end = chunk_start - timedelta(seconds=1)
 
-            print(f"Total auto-invest orders found: {len(auto_invest_orders)}")
+            logger.info(f"Total auto-invest orders found: {len(auto_invest_orders)}")
 
         # Combine all orders
         all_fiat_orders = fiat_orders + convert_orders + auto_invest_orders
@@ -723,7 +727,7 @@ async def import_trade_history(
                     linked_count += 1
 
             if linked_count > 0:
-                print(f"Linked {linked_count} conversion pairs")
+                logger.info(f"Linked {linked_count} conversion pairs")
 
         # Update last sync time
         api_key.last_sync_at = datetime.utcnow().isoformat()
@@ -745,10 +749,8 @@ async def import_trade_history(
         }
 
     except Exception as e:
-        import logging
         import traceback
 
-        logger = logging.getLogger(__name__)
         logger.error(f"Import error: {type(e).__name__}: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")
 
@@ -815,7 +817,6 @@ async def sync_exchange(
             select(Portfolio).where(
                 Portfolio.user_id == current_user.id,
                 Portfolio.name == f"{service.exchange_name}",
-                Portfolio.user_id == current_user.id,
             )
         )
         portfolio = portfolio_result.scalar_one_or_none()

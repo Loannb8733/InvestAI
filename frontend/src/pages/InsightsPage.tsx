@@ -474,7 +474,7 @@ function DcaBacktest() {
             </div>
             <div>
               <Label>Depuis</Label>
-              <Input type="number" value={startYear} onChange={(e) => { setStartYear(+e.target.value); setStarted(false) }} min={2010} max={2025} />
+              <Input type="number" value={startYear} onChange={(e) => { setStartYear(+e.target.value); setStarted(false) }} min={2010} max={new Date().getFullYear()} />
             </div>
             <div className="flex items-end">
               <Button onClick={handleRun} disabled={isLoading} className="w-full">

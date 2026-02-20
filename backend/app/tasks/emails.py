@@ -82,7 +82,7 @@ async def _send_weekly_reports_async() -> dict:
                     continue
 
                 # Get historical data for week comparison
-                history = await snapshot_service.get_historical_values(db, str(user.id), days=7)
+                history = await snapshot_service.build_portfolio_value_series(db, str(user.id), days=7)
 
                 week_start_value = history[0]["value"] if history else metrics["total_value"]
                 week_change = metrics["total_value"] - week_start_value
@@ -137,14 +137,14 @@ async def _send_monthly_reports_async() -> dict:
                     continue
 
                 # Get historical data for month comparison
-                history = await snapshot_service.get_historical_values(db, str(user.id), days=30)
+                history = await snapshot_service.build_portfolio_value_series(db, str(user.id), days=30)
 
                 month_start_value = history[0]["value"] if history else metrics["total_value"]
                 month_change = metrics["total_value"] - month_start_value
                 month_change_pct = (month_change / month_start_value * 100) if month_start_value > 0 else 0
 
                 # YTD calculation
-                ytd_history = await snapshot_service.get_historical_values(db, str(user.id), days=365)
+                ytd_history = await snapshot_service.build_portfolio_value_series(db, str(user.id), days=365)
                 jan1_value = metrics["total_invested"]  # Fallback
                 if ytd_history:
                     # Find value closest to Jan 1

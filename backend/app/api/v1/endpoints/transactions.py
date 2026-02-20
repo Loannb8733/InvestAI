@@ -2,8 +2,11 @@
 
 import csv
 import io
+import logging
 from typing import List, Optional
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
@@ -391,7 +394,7 @@ async def import_transactions_csv(
     from app.models.asset import AssetType
     from app.services.csv_parsers import detect_csv_format, get_parser_by_name
 
-    print(f"CSV Import: portfolio_id={portfolio_id}, platform={platform}, filename={file.filename}")
+    logger.info(f"CSV Import: portfolio_id={portfolio_id}, platform={platform}, filename={file.filename}")
 
     if not file.filename.endswith(".csv"):
         raise HTTPException(
@@ -455,11 +458,11 @@ async def import_transactions_csv(
                     detail="Could not detect CSV format. Please specify the platform.",
                 )
 
-        print(f"Using parser: {parser.name}")
+        logger.info(f"Using parser: {parser.name}")
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error detecting parser: {e}")
+        logger.error(f"Error detecting parser: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error detecting CSV format: {str(e)}",
@@ -468,9 +471,9 @@ async def import_transactions_csv(
     # Parse CSV
     try:
         parsed_transactions, parse_errors = parser.parse_csv(content_str)
-        print(f"Parsed {len(parsed_transactions)} transactions, {len(parse_errors)} parse errors")
+        logger.info(f"Parsed {len(parsed_transactions)} transactions, {len(parse_errors)} parse errors")
     except Exception as e:
-        print(f"Error parsing CSV: {e}")
+        logger.error(f"Error parsing CSV: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error parsing CSV file: {str(e)}",
@@ -582,13 +585,13 @@ async def import_transactions_csv(
         except Exception as e:
             errors.append(f"Error processing {parsed.symbol}: {str(e)}")
             error_count += 1
-            print(f"Error processing {parsed.symbol}: {e}")
+            logger.error(f"Error processing {parsed.symbol}: {e}")
 
     try:
         await db.commit()
-        print(f"Successfully committed {success_count} transactions")
+        logger.info(f"Successfully committed {success_count} transactions")
     except Exception as e:
-        print(f"Database commit error: {e}")
+        logger.error(f"Database commit error: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -605,10 +608,10 @@ async def import_transactions_csv(
                     asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type)
                 )
                 cache_single_asset.delay(symbol, asset_type_value)
-            print(f"Triggered history cache for {len(asset_map)} assets")
+            logger.info(f"Triggered history cache for {len(asset_map)} assets")
         except Exception as e:
             # Non-critical: don't fail import if cache trigger fails
-            print(f"Warning: Failed to trigger history cache: {e}")
+            logger.warning(f"Failed to trigger history cache: {e}")
 
     return CSVImportResult(
         success_count=success_count,

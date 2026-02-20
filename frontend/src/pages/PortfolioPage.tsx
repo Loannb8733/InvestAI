@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -168,9 +168,11 @@ export default function PortfolioPage() {
   })
 
   // Auto-select first portfolio
-  if (portfolios && portfolios.length > 0 && !selectedPortfolio) {
-    setSelectedPortfolio(portfolios[0].id)
-  }
+  useEffect(() => {
+    if (portfolios && portfolios.length > 0 && !selectedPortfolio) {
+      setSelectedPortfolio(portfolios[0].id)
+    }
+  }, [portfolios, selectedPortfolio])
 
   if (loadingPortfolios) {
     return (

@@ -1,9 +1,13 @@
 """Authentication endpoints."""
 
 import base64
+import logging
 import secrets
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import pyotp
 import qrcode
@@ -91,6 +95,14 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+class UserProfileUpdate(BaseModel):
+    """Request to update user profile."""
+
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    preferred_currency: Optional[str] = Field(None, pattern=r"^(EUR|USD|CHF|GBP)$")
+
+
 @router.post("/verify-email", response_model=Token)
 async def verify_email(
     data: VerifyEmailRequest,
@@ -108,15 +120,14 @@ async def verify_email(
 
     # Check expiration
     if user.email_verification_expires:
-        try:
-            expires = datetime.fromisoformat(user.email_verification_expires)
-            if datetime.utcnow() > expires:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Lien de vérification expiré. Veuillez vous réinscrire.",
-                )
-        except ValueError:
-            pass
+        expires = user.email_verification_expires
+        if hasattr(expires, "tzinfo") and expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        if datetime.utcnow() > expires:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lien de vérification expiré. Veuillez vous réinscrire.",
+            )
 
     # Activate user
     user.is_active = True
@@ -153,7 +164,7 @@ async def resend_verification(
         # Generate new token
         verification_token = secrets.token_urlsafe(48)
         user.email_verification_token = verification_token
-        user.email_verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
         await db.commit()
 
         # Send verification email
@@ -176,8 +187,8 @@ async def resend_verification(
                 subject="[InvestAI] Nouveau lien de vérification",
                 html_content=html,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send verification email to {user.email}: {e}")
 
     # Always return success to prevent email enumeration
     return {"message": "Si un compte non vérifié existe avec cette adresse, un email a été envoyé."}
@@ -382,25 +393,14 @@ async def get_current_user_info(
 
 @router.patch("/me")
 async def update_profile(
-    data: dict,
+    data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update current user profile (first_name, last_name, preferred_currency)."""
-    allowed_fields = {"first_name", "last_name", "preferred_currency"}
-    # Validate currency
-    if "preferred_currency" in data:
-        valid_currencies = {"EUR", "USD", "CHF", "GBP"}
-        if data["preferred_currency"] not in valid_currencies:
-            from fastapi import HTTPException, status
-
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Currency must be one of: {', '.join(valid_currencies)}",
-            )
-    for field, value in data.items():
-        if field in allowed_fields:
-            setattr(current_user, field, value)
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
 
     await db.commit()
     await db.refresh(current_user)
@@ -450,7 +450,7 @@ async def forgot_password(
         # Generate secure token
         token = secrets.token_urlsafe(48)
         user.password_reset_token = token
-        user.password_reset_expires = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
         await db.commit()
 
         # Send email
@@ -477,9 +477,8 @@ async def forgot_password(
                 subject="Réinitialisation de votre mot de passe",
                 body=body,
             )
-        except Exception:
-            # Don't fail the request if email sending fails
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send password reset email: {e}")
 
     # Always return success to prevent email enumeration
     return {"message": "Si un compte existe avec cette adresse, un email de réinitialisation a été envoyé."}
@@ -502,18 +501,17 @@ async def reset_password(
 
     # Check expiration
     if user.password_reset_expires:
-        try:
-            expires = datetime.fromisoformat(user.password_reset_expires)
-            if datetime.utcnow() > expires:
-                user.password_reset_token = None
-                user.password_reset_expires = None
-                await db.commit()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Lien de réinitialisation expiré. Veuillez en demander un nouveau.",
-                )
-        except ValueError:
-            pass
+        expires = user.password_reset_expires
+        if hasattr(expires, "tzinfo") and expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        if datetime.utcnow() > expires:
+            user.password_reset_token = None
+            user.password_reset_expires = None
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lien de réinitialisation expiré. Veuillez en demander un nouveau.",
+            )
 
     # Update password and clear token
     user.password_hash = hash_password(data.new_password)

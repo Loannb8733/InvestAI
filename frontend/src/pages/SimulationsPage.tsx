@@ -125,7 +125,7 @@ export default function SimulationsPage() {
     mutationFn: simulationsApi.calculateFIRE,
     onSuccess: (data) => {
       setFireResult(data)
-      toast({ title: 'Calcul FIRE effectue' })
+      toast({ title: 'Calcul FIRE effectué' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de calculer le FIRE.' })
@@ -137,7 +137,7 @@ export default function SimulationsPage() {
     mutationFn: simulationsApi.projectPortfolio,
     onSuccess: (data) => {
       setProjectionResult(data)
-      toast({ title: 'Projection calculee' })
+      toast({ title: 'Projection calculée' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de calculer la projection.' })
@@ -149,7 +149,7 @@ export default function SimulationsPage() {
     mutationFn: simulationsApi.simulateDCA,
     onSuccess: (data) => {
       setDcaResult(data)
-      toast({ title: 'Simulation DCA calculee' })
+      toast({ title: 'Simulation DCA calculée' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de simuler le DCA.' })
@@ -199,7 +199,7 @@ export default function SimulationsPage() {
                   Calculateur FIRE
                 </CardTitle>
                 <CardDescription>
-                  Financial Independence, Retire Early - Calculez votre objectif d'independance financiere.
+                  Financial Independence, Retire Early - Calculez votre objectif d'indépendance financière.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -223,7 +223,7 @@ export default function SimulationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Depenses mensuelles prevues a la retraite</Label>
+                  <Label>Dépenses mensuelles prévues à la retraite</Label>
                   <Input
                     type="number"
                     value={fireParams.monthly_expenses}
@@ -263,7 +263,7 @@ export default function SimulationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Horizon (annees)</Label>
+                    <Label>Horizon (années)</Label>
                     <Input
                       type="number"
                       value={fireParams.target_years}
@@ -290,7 +290,7 @@ export default function SimulationsPage() {
             {fireResult && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Resultats FIRE</CardTitle>
+                  <CardTitle>Résultats FIRE</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
@@ -301,7 +301,7 @@ export default function SimulationsPage() {
                     </div>
                     <div className="text-center p-4 rounded-lg bg-blue-500/10">
                       <Clock className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-                      <p className="text-sm text-muted-foreground">Annees restantes</p>
+                      <p className="text-sm text-muted-foreground">Années restantes</p>
                       <p className="text-2xl font-bold">
                         {fireResult.years_to_fire !== null ? `${fireResult.years_to_fire} ans` : 'N/A'}
                       </p>
@@ -324,7 +324,7 @@ export default function SimulationsPage() {
                   {fireResult.is_fire_achieved && (
                     <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/20 text-green-700">
                       <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Felicitations ! Vous avez atteint le FIRE !</span>
+                      <span className="font-medium">Félicitations ! Vous avez atteint le FIRE !</span>
                     </div>
                   )}
 
@@ -361,7 +361,7 @@ export default function SimulationsPage() {
                       <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                       <Tooltip
                         formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(label) => `Annee ${label}`}
+                        labelFormatter={(label) => `Année ${label}`}
                       />
                       <Legend />
                       <Area
@@ -403,7 +403,7 @@ export default function SimulationsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Horizon (annees)</Label>
+                    <Label>Horizon (années)</Label>
                     <Input
                       type="number"
                       value={projectionParams.years}
@@ -459,7 +459,7 @@ export default function SimulationsPage() {
             {projectionResult && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Resultats de la projection</CardTitle>
+                  <CardTitle>Résultats de la projection</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -468,7 +468,7 @@ export default function SimulationsPage() {
                       <p className="text-2xl font-bold">{formatCurrency(projectionResult.final_value)}</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-green-500/10">
-                      <p className="text-sm text-muted-foreground">Valeur reelle (inflation)</p>
+                      <p className="text-sm text-muted-foreground">Valeur réelle (inflation)</p>
                       <p className="text-2xl font-bold">{formatCurrency(projectionResult.real_final_value)}</p>
                     </div>
                   </div>
@@ -493,7 +493,7 @@ export default function SimulationsPage() {
           {projectionResult && (
             <Card>
               <CardHeader>
-                <CardTitle>Evolution du portefeuille</CardTitle>
+                <CardTitle>Évolution du portefeuille</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -504,7 +504,7 @@ export default function SimulationsPage() {
                       <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                       <Tooltip
                         formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(label) => `Annee ${label}`}
+                        labelFormatter={(label) => `Année ${label}`}
                       />
                       <Legend />
                       <Area
@@ -518,7 +518,7 @@ export default function SimulationsPage() {
                       <Area
                         type="monotone"
                         dataKey="real_value"
-                        name="Valeur reelle"
+                        name="Valeur réelle"
                         stroke="#22c55e"
                         fill="#22c55e"
                         fillOpacity={0.3}
@@ -548,12 +548,12 @@ export default function SimulationsPage() {
                   Simulateur DCA
                 </CardTitle>
                 <CardDescription>
-                  Dollar Cost Averaging - Simulez une strategie d'investissement programme.
+                  Dollar Cost Averaging - Simulez une stratégie d'investissement programmé.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Montant total a investir</Label>
+                  <Label>Montant total à investir</Label>
                   <Input
                     type="number"
                     value={dcaParams.total_amount}
@@ -563,7 +563,7 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Frequence</Label>
+                    <Label>Fréquence</Label>
                     <Select
                       value={dcaParams.frequency}
                       onValueChange={(v) => setDcaParams({ ...dcaParams, frequency: v })}
@@ -579,7 +579,7 @@ export default function SimulationsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Duree (mois)</Label>
+                    <Label>Durée (mois)</Label>
                     <Input
                       type="number"
                       value={dcaParams.duration_months}
@@ -590,7 +590,7 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Volatilite attendue (%)</Label>
+                    <Label>Volatilité attendue (%)</Label>
                     <Input
                       type="number"
                       step="0.1"
@@ -627,7 +627,7 @@ export default function SimulationsPage() {
             {dcaResult && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Resultats DCA</CardTitle>
+                  <CardTitle>Résultats DCA</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -655,8 +655,8 @@ export default function SimulationsPage() {
                   </div>
 
                   <div className="p-4 rounded-lg bg-muted">
-                    <p className="text-sm text-muted-foreground mb-1">Unites accumulees</p>
-                    <p className="text-lg font-medium">{dcaResult.total_units.toFixed(4)} unites</p>
+                    <p className="text-sm text-muted-foreground mb-1">Unités accumulées</p>
+                    <p className="text-lg font-medium">{dcaResult.total_units.toFixed(4)} unités</p>
                   </div>
                 </CardContent>
               </Card>
@@ -666,7 +666,7 @@ export default function SimulationsPage() {
           {dcaResult && (
             <Card>
               <CardHeader>
-                <CardTitle>Evolution DCA</CardTitle>
+                <CardTitle>Évolution DCA</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">

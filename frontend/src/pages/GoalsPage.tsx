@@ -12,6 +12,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { formatCurrency } from '@/lib/utils'
 import { goalsApi } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
@@ -47,6 +57,7 @@ export default function GoalsPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [showAdd, setShowAdd] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null)
   const [name, setName] = useState('')
   const [targetAmount, setTargetAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
@@ -61,11 +72,14 @@ export default function GoalsPage() {
     mutationFn: goalsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] })
-      toast({ title: 'Objectif cree' })
+      toast({ title: 'Objectif créé' })
       setShowAdd(false)
       setName('')
       setTargetAmount('')
       setTargetDate('')
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de créer l\'objectif' })
     },
   })
 
@@ -73,7 +87,10 @@ export default function GoalsPage() {
     mutationFn: (id: string) => goalsApi.sync(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] })
-      toast({ title: 'Objectif synchronise avec le portefeuille' })
+      toast({ title: 'Objectif synchronisé avec le portefeuille' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de synchroniser l\'objectif' })
     },
   })
 
@@ -81,7 +98,10 @@ export default function GoalsPage() {
     mutationFn: (id: string) => goalsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] })
-      toast({ title: 'Objectif supprime' })
+      toast({ title: 'Objectif supprimé' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer l\'objectif' })
     },
   })
 
@@ -112,7 +132,7 @@ export default function GoalsPage() {
         <div>
           <h1 className="text-3xl font-bold">Objectifs financiers</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Definissez vos objectifs et suivez votre progression
+            Définissez vos objectifs et suivez votre progression
           </p>
         </div>
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
@@ -125,7 +145,7 @@ export default function GoalsPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nouvel objectif</DialogTitle>
-              <DialogDescription>Definissez un objectif financier a atteindre</DialogDescription>
+              <DialogDescription>Définissez un objectif financier à atteindre</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -146,7 +166,7 @@ export default function GoalsPage() {
               </div>
               <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full">
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Creer
+                Créer
               </Button>
             </div>
           </DialogContent>
@@ -158,7 +178,7 @@ export default function GoalsPage() {
           <CardContent className="py-12 text-center">
             <Target className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold">Aucun objectif</h2>
-            <p className="text-muted-foreground mt-2">Creez votre premier objectif financier pour suivre votre progression.</p>
+            <p className="text-muted-foreground mt-2">Créez votre premier objectif financier pour suivre votre progression.</p>
           </CardContent>
         </Card>
       ) : (
@@ -177,7 +197,7 @@ export default function GoalsPage() {
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => syncMutation.mutate(goal.id)}>
                           <RefreshCw className={`h-3 w-3 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteMutation.mutate(goal.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteTarget(goal)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -242,6 +262,32 @@ export default function GoalsPage() {
           )}
         </>
       )}
+      {/* Delete Goal Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cet objectif ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous êtes sur le point de supprimer l'objectif{' '}
+              <strong>{deleteTarget?.name}</strong>. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteMutation.mutate(deleteTarget.id)
+                  setDeleteTarget(null)
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

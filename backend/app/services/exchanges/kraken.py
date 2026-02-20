@@ -3,11 +3,14 @@
 import base64
 import hashlib
 import hmac
+import logging
 import time
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 import httpx
 
@@ -160,9 +163,6 @@ class KrakenService(BaseExchangeService):
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
-        import logging
-
-        logger = logging.getLogger(__name__)
         try:
             async with httpx.AsyncClient() as client:
                 uri_path = "/0/private/Balance"
@@ -424,7 +424,7 @@ class KrakenService(BaseExchangeService):
                 result = response.json()
 
                 if result.get("error"):
-                    print(f"Ledgers error: {result.get('error')}")
+                    logger.error(f"Ledgers error: {result.get('error')}")
                     break
 
                 ledgers_data = result.get("result", {}).get("ledger", {})
@@ -612,9 +612,9 @@ class KrakenService(BaseExchangeService):
                 )
 
                 processed_refids.add(refid)
-                print(f"Kraken: Found conversion {sell_asset} -> {buy_asset}")
+                logger.debug(f"Kraken: Found conversion {sell_asset} -> {buy_asset}")
 
-        print(f"Kraken: Total crypto conversions found: {len(trades) // 2}")
+        logger.info(f"Kraken: Total crypto conversions found: {len(trades) // 2}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
     async def get_rewards(self, limit: int = 500) -> List[ExchangeTrade]:
@@ -660,6 +660,6 @@ class KrakenService(BaseExchangeService):
                         timestamp=entry["time"],
                     )
                 )
-                print(f"  Kraken reward: {entry_type}/{subtype} - {amount} {asset}")
+                logger.debug(f"Kraken reward: {entry_type}/{subtype} - {amount} {asset}")
 
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)

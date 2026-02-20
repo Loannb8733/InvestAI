@@ -4,7 +4,7 @@ import enum
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -38,6 +38,10 @@ class Transaction(Base):
     currency = Column(String(10), default="EUR", nullable=False)
     executed_at = Column(DateTime(timezone=True), nullable=True)
     exchange = Column(String(50), nullable=True)
-    external_id = Column(String(100), nullable=True)
+    external_id = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
+    conversion_rate = Column(Numeric(precision=18, scale=12), nullable=True)
+    related_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index("ix_transactions_executed_at", "executed_at"),)
