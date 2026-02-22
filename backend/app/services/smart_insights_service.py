@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeResult
 from app.models.asset import Asset
@@ -103,20 +104,24 @@ class PortfolioHealthReport:
 class SmartInsightsService:
     """Service for generating smart portfolio insights and recommendations."""
 
-    # Thresholds for health analysis
-    SHARPE_EXCELLENT = 1.5
-    SHARPE_GOOD = 1.0
-    SHARPE_FAIR = 0.5
-    SHARPE_POOR = 0.0
+    # Thresholds derived from adaptive_thresholds module (centralized)
+    _sharpe = adaptive_th.sharpe_classification()
+    SHARPE_EXCELLENT = _sharpe[0]
+    SHARPE_GOOD = _sharpe[1]
+    SHARPE_FAIR = _sharpe[2]
+    SHARPE_POOR = _sharpe[3]
 
-    CONCENTRATION_WARNING = 0.40  # 40% in single asset
-    CONCENTRATION_CRITICAL = 0.60  # 60% in single asset
+    _conc = adaptive_th.concentration_thresholds()
+    CONCENTRATION_WARNING = _conc[0]
+    CONCENTRATION_CRITICAL = _conc[1]
 
-    VAR_WARNING = 0.10  # 10% daily VaR
-    VAR_CRITICAL = 0.15  # 15% daily VaR
+    _var = adaptive_th.var_warning_thresholds()
+    VAR_WARNING = _var[0]
+    VAR_CRITICAL = _var[1]
 
-    VOLATILITY_HIGH = 0.50  # 50% annualized
-    VOLATILITY_EXTREME = 0.80  # 80% annualized
+    _vol = adaptive_th.volatility_warning_thresholds()
+    VOLATILITY_HIGH = _vol[0] / 100  # convert from % to fraction
+    VOLATILITY_EXTREME = _vol[1] / 100
 
     MIN_REBALANCE_THRESHOLD = 0.05  # 5% weight difference to suggest rebalancing
 
@@ -171,12 +176,21 @@ class SmartInsightsService:
             )
 
         # Extract key metrics from PortfolioAnalytics dataclass (sanitize NaN/Inf)
+        # IMPORTANT: analytics returns volatility & max_drawdown in PERCENT (e.g. 45.0),
+        # and var_95 in EUR.  We convert to fractions (0-1) for threshold comparisons.
         sharpe = self._safe(analytics.sharpe_ratio)
         sortino = self._safe(analytics.sortino_ratio)
-        volatility = self._safe(analytics.portfolio_volatility)
-        var_95 = self._safe(analytics.var_95)
-        max_drawdown = self._safe(analytics.max_drawdown)
         total_value = self._safe(analytics.total_value)
+
+        # Volatility: analytics gives % (e.g. 45.0) → convert to fraction (0.45)
+        volatility = self._safe(analytics.portfolio_volatility) / 100.0
+
+        # Max drawdown: analytics gives % (e.g. -37.19) → convert to positive fraction (0.3719)
+        max_drawdown = abs(self._safe(analytics.max_drawdown)) / 100.0
+
+        # VaR 95: analytics gives EUR amount → convert to fraction of portfolio
+        var_95_eur = self._safe(analytics.var_95)
+        var_95 = var_95_eur / total_value if total_value > 0 else 0.0
 
         # Get diversification data
         try:
@@ -195,9 +209,9 @@ class SmartInsightsService:
         metrics_summary = {
             "sharpe_ratio": sharpe,
             "sortino_ratio": sortino,
-            "volatility": volatility,
-            "var_95": var_95,
-            "max_drawdown": max_drawdown,
+            "volatility": volatility,  # fraction (0-1)
+            "var_95": var_95_eur,  # EUR (for formatCurrency display)
+            "max_drawdown": max_drawdown,  # fraction (0-1), positive
             "hhi": hhi,
             "total_value": total_value,
         }
@@ -211,10 +225,21 @@ class SmartInsightsService:
         # === DIVERSIFICATION INSIGHTS ===
         insights.extend(self._analyze_diversification(hhi, top_holdings))
 
-        # === REBALANCING SUGGESTIONS ===
-        rebalancing_orders = await self._get_rebalancing_suggestions(db, user_id, total_value)
+        # === MARKET REGIME (before rebalancing so regime informs rebalancing) ===
+        market_regime = await self._get_market_regime(db, user_id, top_holdings, days)
+        if market_regime and market_regime.market.dominant_regime != "unknown":
+            regime_insight = self._regime_to_insight(market_regime.market)
+            if regime_insight:
+                insights.append(regime_insight)
+
+        # === REBALANCING SUGGESTIONS (regime-aware) ===
+        rebalancing_orders = await self._get_rebalancing_suggestions(
+            db,
+            user_id,
+            total_value,
+            market_regime=market_regime,
+        )
         if rebalancing_orders:
-            # Calculate potential Sharpe improvement
             insights.append(
                 SmartInsight(
                     category=InsightCategory.REBALANCING,
@@ -250,16 +275,14 @@ class SmartInsightsService:
                 )
             )
 
-        # === MARKET REGIME ===
-        market_regime = await self._get_market_regime(db, user_id, top_holdings, days)
-        if market_regime and market_regime.market.dominant_regime != "unknown":
-            regime_insight = self._regime_to_insight(market_regime.market)
-            if regime_insight:
-                insights.append(regime_insight)
-
         # Calculate overall score
         overall_score, overall_status = self._calculate_overall_score(
-            sharpe, volatility, var_95, hhi, len(anomaly_impacts)
+            sharpe,
+            volatility,
+            var_95,
+            hhi,
+            len(anomaly_impacts),
+            max_drawdown=max_drawdown,
         )
 
         # Sort insights by severity
@@ -280,8 +303,9 @@ class SmartInsightsService:
     def _analyze_sharpe(self, sharpe: float, sortino: float) -> List[SmartInsight]:
         """Analyze Sharpe and Sortino ratios."""
         insights = []
+        s_exc, s_good, s_fair, s_poor = adaptive_th.sharpe_classification()
 
-        if sharpe < self.SHARPE_POOR:
+        if sharpe < s_poor:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.PERFORMANCE,
@@ -290,11 +314,11 @@ class SmartInsightsService:
                     message=f"Votre ratio de Sharpe ({sharpe:.2f}) est négatif. Votre portfolio sous-performe un placement sans risque.",
                     metric_name="sharpe_ratio",
                     current_value=sharpe,
-                    target_value=self.SHARPE_GOOD,
+                    target_value=s_good,
                     potential_improvement="Diversifiez vers des actifs moins corrélés ou réduisez les positions perdantes.",
                 )
             )
-        elif sharpe < self.SHARPE_FAIR:
+        elif sharpe < s_fair:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.PERFORMANCE,
@@ -303,11 +327,11 @@ class SmartInsightsService:
                     message=f"Votre ratio de Sharpe ({sharpe:.2f}) est faible. Le rendement ne compense pas suffisamment le risque pris.",
                     metric_name="sharpe_ratio",
                     current_value=sharpe,
-                    target_value=self.SHARPE_GOOD,
-                    potential_improvement=f"Ciblez un Sharpe > {self.SHARPE_GOOD} via une meilleure allocation.",
+                    target_value=s_good,
+                    potential_improvement=f"Ciblez un Sharpe > {s_good} via une meilleure allocation.",
                 )
             )
-        elif sharpe < self.SHARPE_GOOD:
+        elif sharpe < s_good:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.PERFORMANCE,
@@ -316,7 +340,7 @@ class SmartInsightsService:
                     message=f"Votre ratio de Sharpe ({sharpe:.2f}) est acceptable mais peut être optimisé.",
                     metric_name="sharpe_ratio",
                     current_value=sharpe,
-                    target_value=self.SHARPE_EXCELLENT,
+                    target_value=s_exc,
                 )
             )
         else:
@@ -336,9 +360,12 @@ class SmartInsightsService:
     def _analyze_risk(self, volatility: float, var_95: float, max_drawdown: float) -> List[SmartInsight]:
         """Analyze risk metrics."""
         insights = []
+        vol_high, vol_extreme = adaptive_th.volatility_warning_thresholds()
+        vol_high_frac, vol_extreme_frac = vol_high / 100, vol_extreme / 100
+        var_warn, var_crit = adaptive_th.var_warning_thresholds()
 
         # Volatility analysis
-        if volatility > self.VOLATILITY_EXTREME:
+        if volatility > vol_extreme_frac:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.RISK,
@@ -351,7 +378,7 @@ class SmartInsightsService:
                     potential_improvement="Ajoutez des actifs stables (ETF obligataires, stablecoins) pour réduire la volatilité.",
                 )
             )
-        elif volatility > self.VOLATILITY_HIGH:
+        elif volatility > vol_high_frac:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.RISK,
@@ -365,7 +392,7 @@ class SmartInsightsService:
             )
 
         # VaR analysis
-        if var_95 > self.VAR_CRITICAL:
+        if var_95 > var_crit:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.RISK,
@@ -377,7 +404,7 @@ class SmartInsightsService:
                     target_value=0.05,
                 )
             )
-        elif var_95 > self.VAR_WARNING:
+        elif var_95 > var_warn:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.RISK,
@@ -390,15 +417,33 @@ class SmartInsightsService:
             )
 
         # Max drawdown
-        if max_drawdown > 0.30:
+        if max_drawdown > 0.25:
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.CRITICAL,
+                    title="Drawdown severe",
+                    message=(
+                        f"Votre portfolio a subi une baisse de {max_drawdown*100:.0f}% depuis son pic. "
+                        f"Reduisez l'exposition aux actifs les plus volatils et "
+                        f"constituez une reserve de liquidites."
+                    ),
+                    metric_name="max_drawdown",
+                    current_value=max_drawdown,
+                    target_value=0.15,
+                    potential_improvement="Diversifiez avec des actifs stables pour reduire le drawdown futur.",
+                )
+            )
+        elif max_drawdown > 0.15:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.WARNING,
                     title="Drawdown important",
-                    message=f"Votre portfolio a subi une baisse max de {max_drawdown*100:.0f}% depuis son pic.",
+                    message=f"Votre portfolio a subi une baisse de {max_drawdown*100:.0f}% depuis son pic.",
                     metric_name="max_drawdown",
                     current_value=max_drawdown,
+                    target_value=0.10,
                 )
             )
 
@@ -407,13 +452,14 @@ class SmartInsightsService:
     def _analyze_diversification(self, hhi: float, top_holdings: List[Dict]) -> List[SmartInsight]:
         """Analyze portfolio diversification."""
         insights = []
+        conc_warn, conc_crit = adaptive_th.concentration_thresholds()
 
         # Check concentration in top holdings
         if top_holdings:
             top_weight = top_holdings[0].get("weight", 0) if top_holdings else 0
             top_symbol = top_holdings[0].get("symbol", "?") if top_holdings else "?"
 
-            if top_weight > self.CONCENTRATION_CRITICAL:
+            if top_weight > conc_crit:
                 insights.append(
                     SmartInsight(
                         category=InsightCategory.DIVERSIFICATION,
@@ -422,8 +468,8 @@ class SmartInsightsService:
                         message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio. C'est trop concentré.",
                         metric_name="top_holding_weight",
                         current_value=top_weight,
-                        target_value=0.25,
-                        potential_improvement=f"Réduisez {top_symbol} à max 25% et diversifiez.",
+                        target_value=conc_warn,
+                        potential_improvement=f"Réduisez {top_symbol} à max {conc_warn*100:.0f}% et diversifiez.",
                         actions=[
                             {
                                 "type": "sell",
@@ -433,7 +479,7 @@ class SmartInsightsService:
                         ],
                     )
                 )
-            elif top_weight > self.CONCENTRATION_WARNING:
+            elif top_weight > conc_warn:
                 insights.append(
                     SmartInsight(
                         category=InsightCategory.DIVERSIFICATION,
@@ -442,12 +488,12 @@ class SmartInsightsService:
                         message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio.",
                         metric_name="top_holding_weight",
                         current_value=top_weight,
-                        target_value=0.25,
+                        target_value=conc_warn,
                     )
                 )
 
         # HHI analysis
-        if hhi > 0.25:  # Concentrated
+        if hhi > conc_warn:
             insights.append(
                 SmartInsight(
                     category=InsightCategory.DIVERSIFICATION,
@@ -479,10 +525,23 @@ class SmartInsightsService:
         db: AsyncSession,
         user_id: str,
         total_value: float,
+        market_regime: Optional[MarketRegime] = None,
     ) -> List[RebalancingOrder]:
-        """Get concrete rebalancing orders based on MPT optimization."""
+        """Get concrete rebalancing orders based on MPT optimization.
+
+        In bearish regimes with high confidence, reduces rebalancing urgency
+        and adds defensive recommendations.
+        """
         if total_value <= 0:
             return []
+
+        # Detect bear market regime
+        is_bear_market = False
+        regime_confidence = 0.0
+        if market_regime and market_regime.market.dominant_regime in ("bearish", "top"):
+            regime_confidence = market_regime.market.confidence
+            if regime_confidence > 0.5:
+                is_bear_market = True
 
         try:
             # Get optimal weights from MPT
@@ -508,6 +567,11 @@ class SmartInsightsService:
 
         orders = []
 
+        # In bear market: raise the rebalancing threshold to avoid unnecessary selling
+        rebalance_threshold = self.MIN_REBALANCE_THRESHOLD
+        if is_bear_market:
+            rebalance_threshold = max(0.10, self.MIN_REBALANCE_THRESHOLD * 2)
+
         for symbol, target_weight in optimal_weights.items():
             current = current_holdings.get(symbol, {})
             current_weight = current.get("weight", 0)
@@ -517,10 +581,32 @@ class SmartInsightsService:
             weight_diff = target_weight - current_weight
 
             # Only suggest if difference is significant
-            if abs(weight_diff) >= self.MIN_REBALANCE_THRESHOLD:
+            if abs(weight_diff) >= rebalance_threshold:
                 target_value = total_value * target_weight
                 amount = target_value - current_value
                 action = "buy" if amount > 0 else "sell"
+
+                # In bear market: suppress sell suggestions (avoid locking in losses)
+                if is_bear_market and action == "sell" and regime_confidence > 0.6:
+                    reason = (
+                        f"Marché baissier — vente différée. "
+                        f"Poids actuel {current_weight*100:.1f}% vs optimal {target_weight*100:.1f}%. "
+                        f"Attendre une amélioration du régime avant de rééquilibrer."
+                    )
+                    orders.append(
+                        RebalancingOrder(
+                            symbol=symbol,
+                            name=name,
+                            action="hold",
+                            current_weight=current_weight,
+                            target_weight=target_weight,
+                            current_value_eur=current_value,
+                            target_value_eur=target_value,
+                            amount_eur=abs(amount),
+                            reason=reason,
+                        )
+                    )
+                    continue
 
                 reason = ""
                 if action == "buy":
@@ -543,6 +629,29 @@ class SmartInsightsService:
                         reason=reason,
                     )
                 )
+
+        # In bear market: add cash reserve recommendation
+        if is_bear_market and regime_confidence > 0.5:
+            cash_reserve_pct = min(0.30, regime_confidence * 0.4)
+            cash_amount = total_value * cash_reserve_pct
+            orders.insert(
+                0,
+                RebalancingOrder(
+                    symbol="CASH",
+                    name="Réserve de liquidités",
+                    action="hold",
+                    current_weight=0.0,
+                    target_weight=cash_reserve_pct,
+                    current_value_eur=0.0,
+                    target_value_eur=cash_amount,
+                    amount_eur=cash_amount,
+                    reason=(
+                        f"Marché baissier (confiance {regime_confidence*100:.0f}%) — "
+                        f"Constituez une réserve cash de {cash_reserve_pct*100:.0f}% "
+                        f"({cash_amount:,.0f}€) pour accumuler au creux."
+                    ),
+                ),
+            )
 
         # Sort by absolute amount (biggest changes first)
         orders.sort(key=lambda x: x.amount_eur, reverse=True)
@@ -698,52 +807,84 @@ class SmartInsightsService:
         if prob < 0.30:
             return None  # Too uncertain
 
-        messages = {
-            "bearish": (
-                InsightSeverity.WARNING,
-                "Tendance baissiere detectee",
-                f"Le marche semble baissier ({prob*100:.0f}% de probabilite). "
-                f"Envisagez de securiser vos positions ou d'attendre un meilleur point d'entree.",
-            ),
-            "bottom": (
-                InsightSeverity.INFO,
-                "Creux potentiel detecte",
-                f"Le marche montre des signes de creux ({prob*100:.0f}%). "
-                f"Cela pourrait etre une zone d'accumulation si votre horizon est long terme.",
-            ),
-            "bullish": (
-                InsightSeverity.INFO,
-                "Marche haussier",
-                f"Le marche est en tendance haussiere ({prob*100:.0f}%). " f"Conditions favorables pour vos positions.",
-            ),
-            "top": (
-                InsightSeverity.WARNING,
-                "Sommet potentiel detecte",
-                f"Le marche montre des signes de surchauffe ({prob*100:.0f}%). "
-                f"Envisagez de prendre des profits ou de renforcer vos stop-loss.",
-            ),
-        }
+        if dominant == "bearish":
+            severity = InsightSeverity.CRITICAL if prob > 0.55 else InsightSeverity.WARNING
+            actions = [
+                {"type": "hold", "symbol": "PORTFOLIO", "reason": "Reduire l'exposition aux actifs risques"},
+                {"type": "hold", "symbol": "CASH", "reason": "Constituer une reserve cash (20-30%)"},
+            ]
+            if prob > 0.60:
+                actions.append(
+                    {"type": "sell", "symbol": "PORTFOLIO", "reason": "Eviter le levier et les positions speculatives"}
+                )
+            return SmartInsight(
+                category=InsightCategory.RISK,
+                severity=severity,
+                title="Marche baissier confirme" if prob > 0.55 else "Tendance baissiere detectee",
+                message=(
+                    f"Le marche est en regime baissier ({prob*100:.0f}% de probabilite). "
+                    f"Reduisez l'exposition aux actifs risques, "
+                    f"constituez une reserve de liquidites (20-30% du portefeuille), "
+                    f"evitez le levier et les achats impulsifs. "
+                    f"Privilegiez le DCA progressif si vous souhaitez accumuler."
+                ),
+                metric_name="market_regime",
+                current_value=prob,
+                actions=actions,
+            )
 
-        if dominant not in messages:
-            return None
-
-        severity, title, message = messages[dominant]
-
-        actions = []
-        if dominant == "top":
-            actions = [{"type": "sell", "symbol": "PORTFOLIO", "reason": "Prendre des profits partiels"}]
         elif dominant == "bottom":
-            actions = [{"type": "buy", "symbol": "PORTFOLIO", "reason": "Zone d'accumulation potentielle"}]
+            return SmartInsight(
+                category=InsightCategory.OPPORTUNITY,
+                severity=InsightSeverity.INFO,
+                title="Creux potentiel detecte",
+                message=(
+                    f"Le marche montre des signes de creux ({prob*100:.0f}%). "
+                    f"Cela pourrait etre une zone d'accumulation si votre horizon est long terme. "
+                    f"DCA recommande — ne tentez pas de timer le bottom exact."
+                ),
+                metric_name="market_regime",
+                current_value=prob,
+                actions=[
+                    {"type": "buy", "symbol": "PORTFOLIO", "reason": "Zone d'accumulation potentielle via DCA"},
+                ],
+            )
 
-        return SmartInsight(
-            category=InsightCategory.OPPORTUNITY,
-            severity=severity,
-            title=title,
-            message=message,
-            metric_name="market_regime",
-            current_value=prob,
-            actions=actions,
-        )
+        elif dominant == "bullish":
+            return SmartInsight(
+                category=InsightCategory.OPPORTUNITY,
+                severity=InsightSeverity.INFO,
+                title="Marche haussier",
+                message=(
+                    f"Le marche est en tendance haussiere ({prob*100:.0f}%). "
+                    f"Conditions favorables pour vos positions. "
+                    f"Preparez vos niveaux de prise de profits."
+                ),
+                metric_name="market_regime",
+                current_value=prob,
+                actions=[],
+            )
+
+        elif dominant == "top":
+            severity = InsightSeverity.CRITICAL if prob > 0.55 else InsightSeverity.WARNING
+            return SmartInsight(
+                category=InsightCategory.RISK,
+                severity=severity,
+                title="Sommet potentiel detecte",
+                message=(
+                    f"Le marche montre des signes de surchauffe ({prob*100:.0f}%). "
+                    f"Prenez des profits partiels (20-30%), "
+                    f"renforcez vos stop-loss et evitez les achats impulsifs."
+                ),
+                metric_name="market_regime",
+                current_value=prob,
+                actions=[
+                    {"type": "sell", "symbol": "PORTFOLIO", "reason": "Prendre des profits partiels"},
+                    {"type": "hold", "symbol": "PORTFOLIO", "reason": "Renforcer les stop-loss"},
+                ],
+            )
+
+        return None
 
     def _calculate_overall_score(
         self,
@@ -752,40 +893,58 @@ class SmartInsightsService:
         var_95: float,
         hhi: float,
         anomaly_count: int,
+        max_drawdown: float = 0.0,
     ) -> Tuple[int, str]:
         """Calculate overall portfolio health score (0-100)."""
         score = 100
+        s_exc, s_good, s_fair, s_poor = adaptive_th.sharpe_classification()
+        vol_high, vol_extreme = adaptive_th.volatility_warning_thresholds()
+        vol_high_frac, vol_extreme_frac = vol_high / 100, vol_extreme / 100
+        var_warn, var_crit = adaptive_th.var_warning_thresholds()
+        conc_warn, conc_crit = adaptive_th.concentration_thresholds()
 
         # Sharpe penalty/bonus (-30 to +10)
-        if sharpe < 0:
+        if sharpe < s_poor:
             score -= 30
-        elif sharpe < 0.5:
+        elif sharpe < s_fair:
             score -= 20
-        elif sharpe < 1.0:
+        elif sharpe < s_good:
             score -= 10
-        elif sharpe > 1.5:
+        elif sharpe > s_exc:
             score += 10
 
         # Volatility penalty (0 to -20)
-        if volatility > 0.80:
+        if volatility > vol_extreme_frac:
             score -= 20
-        elif volatility > 0.50:
+        elif volatility > vol_high_frac:
             score -= 10
 
         # VaR penalty (0 to -15)
-        if var_95 > 0.15:
+        if var_95 > var_crit:
             score -= 15
-        elif var_95 > 0.10:
+        elif var_95 > var_warn:
             score -= 10
 
         # Concentration penalty (0 to -15)
-        if hhi > 0.40:
+        if hhi > conc_crit:
             score -= 15
-        elif hhi > 0.25:
+        elif hhi > conc_warn:
             score -= 10
 
         # Anomaly penalty (-5 per anomaly, max -20)
         score -= min(anomaly_count * 5, 20)
+
+        # Max drawdown penalty (0 to -35)
+        # A portfolio down -40% should NOT score "good"
+        abs_dd = abs(max_drawdown)
+        if abs_dd > 0.40:
+            score -= 35
+        elif abs_dd > 0.25:
+            score -= 25
+        elif abs_dd > 0.15:
+            score -= 15
+        elif abs_dd > 0.10:
+            score -= 10
 
         # Clamp score
         score = max(0, min(100, score))

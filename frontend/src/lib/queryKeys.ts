@@ -42,15 +42,18 @@ export const queryKeys = {
       [...queryKeys.analytics.all, 'diversification', ...(portfolioId ? [portfolioId] : ['all']), ...(days !== undefined ? [days] : [])] as const,
     correlation: (portfolioId?: string, days?: number) =>
       [...queryKeys.analytics.all, 'correlation', ...(portfolioId ? [portfolioId] : ['all']), ...(days !== undefined ? [days] : [])] as const,
-    performance: (period?: string) =>
-      [...queryKeys.analytics.all, 'performance', ...(period ? [period] : [])] as const,
-    monteCarlo: ['analytics', 'monteCarlo'] as const,
-    xirr: ['analytics', 'xirr'] as const,
-    optimize: (days?: number) =>
-      [...queryKeys.analytics.all, 'optimize', ...(days !== undefined ? [days] : [])] as const,
-    stressTest: ['analytics', 'stressTest'] as const,
-    beta: (days?: number) =>
-      [...queryKeys.analytics.all, 'beta', ...(days !== undefined ? [days] : [])] as const,
+    performance: (portfolioId?: string, period?: string) =>
+      [...queryKeys.analytics.all, 'performance', ...(portfolioId ? [portfolioId] : ['all']), ...(period ? [period] : [])] as const,
+    monteCarlo: (portfolioId?: string, horizon?: number) =>
+      [...queryKeys.analytics.all, 'monteCarlo', ...(portfolioId ? [portfolioId] : ['all']), ...(horizon !== undefined ? [horizon] : [])] as const,
+    xirr: (portfolioId?: string) =>
+      [...queryKeys.analytics.all, 'xirr', ...(portfolioId ? [portfolioId] : ['all'])] as const,
+    optimize: (portfolioId?: string, days?: number) =>
+      [...queryKeys.analytics.all, 'optimize', ...(portfolioId ? [portfolioId] : ['all']), ...(days !== undefined ? [days] : [])] as const,
+    stressTest: (portfolioId?: string) =>
+      [...queryKeys.analytics.all, 'stressTest', ...(portfolioId ? [portfolioId] : ['all'])] as const,
+    beta: (portfolioId?: string, days?: number) =>
+      [...queryKeys.analytics.all, 'beta', ...(portfolioId ? [portfolioId] : ['all']), ...(days !== undefined ? [days] : [])] as const,
     historicalData: (days?: number) =>
       [...queryKeys.analytics.all, 'historicalData', ...(days !== undefined ? [days] : [])] as const,
   },
@@ -64,6 +67,7 @@ export const queryKeys = {
     anomalies: ['predictions', 'anomalies'] as const,
     marketSentiment: ['predictions', 'marketSentiment'] as const,
     marketEvents: ['predictions', 'marketEvents'] as const,
+    marketCycle: ['predictions', 'marketCycle'] as const,
   },
 
   alerts: {
@@ -125,6 +129,8 @@ export const queryKeys = {
   smartInsights: {
     all: ['smartInsights'] as const,
     health: (days: number) => [...queryKeys.smartInsights.all, 'health', days] as const,
+    rebalancing: ['smartInsights', 'rebalancing'] as const,
+    anomaliesImpact: ['smartInsights', 'anomaliesImpact'] as const,
   },
 
   admin: {

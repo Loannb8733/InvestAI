@@ -39,9 +39,9 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "investai"
 
     # Database pool configuration
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 40
-    DB_POOL_RECYCLE: int = 3600
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 300
 
     @field_validator("SECRET_KEY")
     @classmethod

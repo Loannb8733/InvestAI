@@ -120,9 +120,9 @@ export default function PortfolioAssetList({
                 <p className="text-xl font-bold">
                   {formatCurrency(portfolioMetrics?.cash_from_stablecoins || 0)}
                 </p>
-                {(portfolioMetrics?.stablecoins?.length ?? 0) > 0 && (
+                {(portfolioMetrics?.stablecoins?.filter(sc => sc.value >= 0.01)?.length ?? 0) > 0 && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    {portfolioMetrics!.stablecoins!.map((sc) => (
+                    {portfolioMetrics!.stablecoins!.filter(sc => sc.value >= 0.01).map((sc) => (
                       <span key={sc.id} className="mr-2">{sc.symbol}: {sc.quantity.toFixed(2)}</span>
                     ))}
                   </div>

@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
@@ -36,7 +37,12 @@ import {
   FlaskConical,
   BarChart3,
   Bell,
+  Activity,
+  Droplets,
+  Layers,
+  Repeat,
 } from 'lucide-react'
+import { type DisplayThresholds, DEFAULT_DISPLAY_THRESHOLDS } from '@/types'
 import {
   AreaChart,
   Area,
@@ -72,11 +78,26 @@ interface PortfolioPrediction {
   predictions: PredictionPoint[]
   support_level: number
   resistance_level: number
-  accuracy: number
-  consensus_score: number
+  skill_score: number
+  hit_rate: number
+  hit_rate_significant: boolean
+  hit_rate_n_samples: number
+  reliability_score: number
+  model_confidence: string
   models_agree: boolean
   models_detail?: { name: string; weight_pct: number; trend: string; mape?: number }[]
   explanations?: { feature_name: string; importance: number; direction: string }[]
+  regime_info?: {
+    dominant_regime: string
+    confidence: number
+    probabilities: Record<string, number>
+    timeframe_alignment?: string
+    weekly_regime?: string | null
+    note?: string
+    liquidity_warning?: string
+    regime_price_adjustment?: boolean
+    adjustment_factor?: number
+  }
 }
 
 interface PortfolioPredictionSummary {
@@ -128,27 +149,102 @@ interface WhatIfResult {
   }>
 }
 
+interface MarketCycleData {
+  market_regime: {
+    dominant_regime: string
+    confidence: number
+    probabilities: Record<string, number>
+    description: string
+  } | null
+  market_signals: Array<{
+    name: string
+    value: number
+    signal: string
+    strength: number
+    description: string
+  }>
+  portfolio_regime: {
+    dominant_regime: string
+    probabilities: Record<string, number>
+  }
+  per_asset: Array<{
+    symbol: string
+    name: string
+    asset_type: string
+    value: number
+    dominant_regime: string
+    confidence: number
+    probabilities: Record<string, number>
+  }>
+  cycle_position: number
+  cycle_advice: Array<{
+    title: string
+    description: string
+    action: string
+    priority: string
+  }>
+  fear_greed: number | null
+  btc_dominance: number | null
+  display_thresholds?: DisplayThresholds
+  top_bottom_estimates?: {
+    btc: TopBottomEstimate | null
+    per_asset: TopBottomEstimate[]
+  }
+}
+
+interface TopBottomEstimate {
+  symbol: string
+  current_price: number
+  next_bottom: {
+    estimated_price: number
+    estimated_days: number
+    estimated_date: string
+    confidence: number
+    distance_pct: number
+    method: string
+    support_level: number
+  }
+  next_top: {
+    estimated_price: number
+    estimated_days: number
+    estimated_date: string
+    confidence: number
+    distance_pct: number
+    method: string
+    resistance_level: number
+  }
+  current_regime: string
+  cycle_position: number
+  ou_parameters: {
+    mu: number
+    theta: number
+    sigma: number
+  }
+}
+
 // ── Fear & Greed Arc Gauge (large) ──────────────────────────────────
-const FearGreedGauge = ({ value }: { value: number }) => {
+const FearGreedGauge = ({ value, thresholds }: { value: number; thresholds?: DisplayThresholds['fear_greed'] }) => {
   const clampedValue = Math.max(0, Math.min(100, value))
   const angle = Math.max(1, (clampedValue / 100) * 180) // min 1° to avoid zero-length arc
   const radians = (angle * Math.PI) / 180
   const x = 60 - 45 * Math.cos(radians)
   const y = 55 - 45 * Math.sin(radians)
 
+  const fg = thresholds ?? DEFAULT_DISPLAY_THRESHOLDS.fear_greed
+
   // Gradient colors
   const getColor = (v: number) => {
-    if (v >= 75) return '#22c55e'
-    if (v >= 55) return '#84cc16'
-    if (v >= 45) return '#eab308'
-    if (v >= 25) return '#f97316'
+    if (v >= fg.extreme_greed) return '#22c55e'
+    if (v >= fg.greed) return '#84cc16'
+    if (v >= fg.fear) return '#eab308'
+    if (v >= fg.extreme_fear) return '#f97316'
     return '#ef4444'
   }
   const getLabel = (v: number) => {
-    if (v >= 75) return 'Extrême avidité'
-    if (v >= 55) return 'Avidité'
-    if (v >= 45) return 'Neutre'
-    if (v >= 25) return 'Peur'
+    if (v >= fg.extreme_greed) return 'Extrême avidité'
+    if (v >= fg.greed) return 'Avidité'
+    if (v >= fg.fear) return 'Neutre'
+    if (v >= fg.extreme_fear) return 'Peur'
     return 'Extrême peur'
   }
   const color = getColor(clampedValue)
@@ -182,11 +278,91 @@ const FearGreedGauge = ({ value }: { value: number }) => {
   )
 }
 
-// ── Combined Score (accuracy + consensus) ───────────────────────────
-const CombinedScore = ({ accuracy, consensus }: { accuracy: number; consensus: number }) => {
-  const score = Math.round((accuracy * 0.6 + consensus * 0.4))
-  const color = score >= 70 ? 'bg-green-500' : score >= 45 ? 'bg-yellow-500' : 'bg-red-500'
-  const textColor = score >= 70 ? 'text-green-500' : score >= 45 ? 'text-yellow-500' : 'text-red-500'
+// ── Cycle Position Gauge ──────────────────────────────────────────────
+const CycleGauge = ({ position, regime }: { position: number; regime: string }) => {
+  // 0=bottom, 25=early bull, 50=mid bull, 75=top, 100=deep bear
+  const clampedPos = Math.max(0, Math.min(100, position))
+  const angle = (clampedPos / 100) * 360
+  const radians = ((angle - 90) * Math.PI) / 180
+  const cx = 60, cy = 60, r = 45
+  const nx = cx + r * Math.cos(radians)
+  const ny = cy + r * Math.sin(radians)
+
+  const regimeColors: Record<string, string> = {
+    bottom: '#3b82f6',
+    bullish: '#22c55e',
+    top: '#f59e0b',
+    bearish: '#ef4444',
+  }
+  const regimeLabels: Record<string, string> = {
+    bottom: 'Creux',
+    bullish: 'Haussier',
+    top: 'Sommet',
+    bearish: 'Baissier',
+  }
+  const color = regimeColors[regime] || '#6b7280'
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width="140" height="140" viewBox="0 0 120 120">
+        {/* Background ring */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/20" />
+        {/* Colored quadrants (subtle) */}
+        {[
+          { start: -90, end: 0, c: '#3b82f6' },   // 0-25: Bottom (blue)
+          { start: 0, end: 90, c: '#22c55e' },     // 25-50: Bull (green)
+          { start: 90, end: 180, c: '#f59e0b' },   // 50-75: Top (amber)
+          { start: 180, end: 270, c: '#ef4444' },   // 75-100: Bear (red)
+        ].map(({ start, end, c }, i) => {
+          const s = (start * Math.PI) / 180
+          const e = (end * Math.PI) / 180
+          const x1 = cx + r * Math.cos(s)
+          const y1 = cy + r * Math.sin(s)
+          const x2 = cx + r * Math.cos(e)
+          const y2 = cy + r * Math.sin(e)
+          return (
+            <path
+              key={i}
+              d={`M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`}
+              fill="none"
+              stroke={c}
+              strokeWidth="8"
+              opacity={0.2}
+            />
+          )
+        })}
+        {/* Needle dot */}
+        <circle cx={nx} cy={ny} r="6" fill={color} stroke="white" strokeWidth="2" />
+        {/* Center text */}
+        <text x={cx} y={cy - 4} textAnchor="middle" fill={color} fontSize="16" fontWeight="bold">
+          {regimeLabels[regime] || regime}
+        </text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fill="currentColor" fontSize="10" className="fill-muted-foreground">
+          Position: {clampedPos}
+        </text>
+        {/* Labels */}
+        <text x={cx} y="10" textAnchor="middle" fontSize="7" className="fill-muted-foreground">Creux</text>
+        <text x="112" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Bull</text>
+        <text x={cx} y="116" textAnchor="middle" fontSize="7" className="fill-muted-foreground">Sommet</text>
+        <text x="2" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Bear</text>
+      </svg>
+    </div>
+  )
+}
+
+// ── Reliability Score (skill_score + hit_rate, statistically validated) ──
+const ReliabilityScore = ({ reliabilityScore, skillScore, hitRate, hitRateSignificant, hitRateN, modelConfidence }: {
+  reliabilityScore: number
+  skillScore: number
+  hitRate: number
+  hitRateSignificant: boolean
+  hitRateN: number
+  modelConfidence: string
+}) => {
+  const score = Math.round(reliabilityScore)
+  const color = score >= 60 ? 'bg-green-500' : score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+  const textColor = score >= 60 ? 'text-green-500' : score >= 40 ? 'text-yellow-500' : 'text-red-500'
+  const label = modelConfidence === 'useful' ? 'Utile' : modelConfidence === 'uncertain' ? 'Incertain' : 'Non fiable'
 
   return (
     <TooltipProvider>
@@ -194,13 +370,15 @@ const CombinedScore = ({ accuracy, consensus }: { accuracy: number; consensus: n
         <TooltipTrigger asChild>
           <div className="flex items-center gap-2 cursor-help">
             <div className="w-14 h-2 rounded-full bg-muted overflow-hidden">
-              <div className={`h-full rounded-full ${color}`} style={{ width: `${score}%` }} />
+              <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(score, 100)}%` }} />
             </div>
             <span className={`text-xs font-bold ${textColor}`}>{score}</span>
           </div>
         </TooltipTrigger>
-        <TooltipContent>
-          <p className="text-xs">Fiabilité {accuracy.toFixed(0)}% · Consensus {consensus.toFixed(0)}%</p>
+        <TooltipContent className="max-w-xs">
+          <p className="text-xs font-medium mb-1">{label}</p>
+          <p className="text-xs">Skill: {skillScore.toFixed(0)}% · Direction: {hitRate.toFixed(0)}% ({hitRateN} tests{hitRateSignificant ? ', significatif' : ', non significatif'})</p>
+          <p className="text-xs text-muted-foreground mt-1">Mesure si le modèle fait mieux qu'une prédiction naïve (prix inchangé)</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -232,6 +410,179 @@ const VariationBar = ({ percent }: { percent: number }) => {
   )
 }
 
+// ── Top / Bottom Estimates Card ─────────────────────────────────────
+const TopBottomCard = ({ estimates }: { estimates: MarketCycleData['top_bottom_estimates'] }) => {
+  if (!estimates) return null
+  const { btc, per_asset } = estimates
+  const allEstimates = btc ? [btc, ...per_asset.filter(a => a.symbol !== 'BTC')] : per_asset
+
+  if (allEstimates.length === 0) return null
+
+  const regimeLabels: Record<string, string> = {
+    bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux', neutral: 'Neutre',
+  }
+
+  const formatDate = (d: string) => {
+    const [, m, day] = d.split('-')
+    const months = ['', 'jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc']
+    return `${parseInt(day)} ${months[parseInt(m)]}`
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          Estimations Top / Bottom
+        </CardTitle>
+        <CardDescription>
+          Prix cibles et dates estimés via mean-reversion (Ornstein-Uhlenbeck) + niveaux support/résistance
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                <th className="text-center py-2 px-3 text-xs font-medium">Prix actuel</th>
+                <th className="text-center py-2 px-3 text-xs font-medium">
+                  <span className="flex items-center justify-center gap-1">
+                    <ArrowDown className="h-3 w-3 text-blue-500" />
+                    Bottom estimé
+                  </span>
+                </th>
+                <th className="text-center py-2 px-3 text-xs font-medium">
+                  <span className="flex items-center justify-center gap-1">
+                    <ArrowUp className="h-3 w-3 text-amber-500" />
+                    Top estimé
+                  </span>
+                </th>
+                <th className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allEstimates.map((est) => {
+                const isBtc = est.symbol === 'BTC'
+                return (
+                  <tr key={est.symbol} className={`border-b last:border-0 ${isBtc ? 'bg-primary/5' : ''}`}>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{est.symbol}</span>
+                        {isBtc && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Réf.</Badge>
+                        )}
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                          est.current_regime === 'bearish' ? 'text-red-500 border-red-500/30' :
+                          est.current_regime === 'bullish' ? 'text-green-500 border-green-500/30' :
+                          est.current_regime === 'top' ? 'text-amber-500 border-amber-500/30' :
+                          est.current_regime === 'bottom' ? 'text-blue-500 border-blue-500/30' :
+                          'text-gray-500'
+                        }`}>
+                          {regimeLabels[est.current_regime] || est.current_regime}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="text-sm font-medium tabular-nums">{formatCurrency(est.current_price)}</span>
+                    </td>
+                    {/* Bottom */}
+                    <td className="py-3 px-3">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-sm font-bold text-blue-500 tabular-nums">
+                          {formatCurrency(est.next_bottom.estimated_price)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDate(est.next_bottom.estimated_date)} (~{est.next_bottom.estimated_days}j)
+                          </span>
+                          <span className="text-[10px] font-medium text-blue-500">
+                            -{est.next_bottom.distance_pct}%
+                          </span>
+                        </div>
+                        {/* Visual distance bar */}
+                        <div className="w-20 h-1 rounded-full bg-muted overflow-hidden mt-0.5">
+                          <div
+                            className="h-full rounded-full bg-blue-500"
+                            style={{ width: `${Math.min(100, est.next_bottom.distance_pct * 3)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    {/* Top */}
+                    <td className="py-3 px-3">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-sm font-bold text-amber-500 tabular-nums">
+                          {formatCurrency(est.next_top.estimated_price)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDate(est.next_top.estimated_date)} (~{est.next_top.estimated_days}j)
+                          </span>
+                          <span className="text-[10px] font-medium text-amber-500">
+                            +{est.next_top.distance_pct}%
+                          </span>
+                        </div>
+                        <div className="w-20 h-1 rounded-full bg-muted overflow-hidden mt-0.5">
+                          <div
+                            className="h-full rounded-full bg-amber-500"
+                            style={{ width: `${Math.min(100, est.next_top.distance_pct * 3)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    {/* Confidence */}
+                    <td className="py-3 px-3 text-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex flex-col items-center gap-1 cursor-help">
+                              <div className="w-10 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    est.next_bottom.confidence >= 0.6 ? 'bg-green-500' :
+                                    est.next_bottom.confidence >= 0.3 ? 'bg-yellow-500' : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${(est.next_bottom.confidence * 100).toFixed(0)}%` }}
+                                />
+                              </div>
+                              <span className={`text-[10px] font-medium ${
+                                est.next_bottom.confidence >= 0.6 ? 'text-green-500' :
+                                est.next_bottom.confidence >= 0.3 ? 'text-yellow-500' : 'text-red-500'
+                              }`}>
+                                {(est.next_bottom.confidence * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">
+                              Confiance basée sur : clarté du régime, significativité du theta OU ({est.ou_parameters.theta.toFixed(3)}), et quantité de données historiques
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="mt-4 flex items-start gap-2 p-2 rounded bg-muted/30">
+          <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            Ces estimations sont basées sur un modèle de mean-reversion (Ornstein-Uhlenbeck) et des niveaux support/résistance historiques.
+            Elles représentent des cibles statistiques, pas des prédictions certaines. En conditions extrêmes (crash, euphorie),
+            les prix réels peuvent largement dépasser ces bornes.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function PredictionsPage() {
   const [daysAhead, setDaysAhead] = useState(7)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
@@ -239,6 +590,7 @@ export default function PredictionsPage() {
   const [whatIfChange, setWhatIfChange] = useState<number>(0)
   const [whatIfResult, setWhatIfResult] = useState<WhatIfResult | null>(null)
   const [whatIfLoading, setWhatIfLoading] = useState(false)
+  const { toast } = useToast()
 
   const { data: portfolioPredictions, isLoading: loadingPredictions } = useQuery({
     queryKey: queryKeys.predictions.portfolio(daysAhead),
@@ -246,18 +598,31 @@ export default function PredictionsPage() {
     placeholderData: keepPreviousData,
   })
 
-  const { data: anomalies } = useQuery<Anomaly[]>({
+  const { data: anomalies, isError: anomaliesError } = useQuery<Anomaly[]>({
     queryKey: queryKeys.predictions.anomalies,
     queryFn: predictionsApi.getAnomalies,
   })
 
-  const { data: sentiment, isLoading: loadingSentiment } = useQuery<MarketSentiment>({
+  const { data: sentiment, isLoading: loadingSentiment, isError: sentimentError } = useQuery<MarketSentiment>({
     queryKey: queryKeys.predictions.marketSentiment,
     queryFn: predictionsApi.getMarketSentiment,
   })
 
+  const { data: marketCycle, isLoading: loadingCycle } = useQuery<MarketCycleData>({
+    queryKey: queryKeys.predictions.marketCycle,
+    queryFn: predictionsApi.getMarketCycle,
+  })
+
   const summary = portfolioPredictions?.summary as PortfolioPredictionSummary | undefined
   const predictions = portfolioPredictions?.predictions as PortfolioPrediction[] | undefined
+  const dt: DisplayThresholds = (portfolioPredictions as Record<string, unknown>)?.display_thresholds as DisplayThresholds ?? DEFAULT_DISPLAY_THRESHOLDS
+
+  // Reset What-If state when horizon changes
+  useEffect(() => {
+    setWhatIfResult(null)
+    setWhatIfChange(0)
+    setWhatIfSymbol('')
+  }, [daysAhead])
 
   // Initialize whatIfSymbol when predictions load (via useMemo to avoid setState during render)
   const effectiveWhatIfSymbol = whatIfSymbol || (predictions && predictions.length > 0 ? predictions[0].symbol : '')
@@ -330,12 +695,23 @@ export default function PredictionsPage() {
   const selectedPrediction = predictions?.find(p => p.symbol === selectedAsset)
   const chartData = useMemo(() => {
     if (!selectedPrediction?.predictions) return []
-    return selectedPrediction.predictions.map(p => ({
-      date: p.date.slice(5),
-      price: p.price,
-      confidence_low: p.confidence_low,
-      confidence_high: p.confidence_high,
-    }))
+    // Add current price as day 0 anchor point
+    const today: typeof selectedPrediction.predictions[0] & { isToday?: boolean } = {
+      date: "Auj.",
+      price: selectedPrediction.current_price,
+      confidence_low: selectedPrediction.current_price,
+      confidence_high: selectedPrediction.current_price,
+    }
+    return [
+      { date: today.date, price: today.price, confidence_low: today.confidence_low, confidence_high: today.confidence_high, isToday: true },
+      ...selectedPrediction.predictions.map(p => ({
+        date: p.date.slice(5),
+        price: p.price,
+        confidence_low: p.confidence_low,
+        confidence_high: p.confidence_high,
+        isToday: false,
+      })),
+    ]
   }, [selectedPrediction])
 
   // Smart price formatter for Y axis (handles tiny prices like PEPE)
@@ -368,15 +744,19 @@ export default function PredictionsPage() {
     return s > 0 && r > 0 && s > minP - range * 2 && r < maxP + range * 2
   }, [selectedPrediction, chartData])
 
-  // What-If
+  // What-If (use ref to read latest change value, avoiding race condition)
+  const whatIfChangeRef = useRef(whatIfChange)
+  whatIfChangeRef.current = whatIfChange
+
   const runWhatIf = async () => {
     if (!effectiveWhatIfSymbol) return
+    setWhatIfResult(null)
     setWhatIfLoading(true)
     try {
-      const result = await predictionsApi.whatIf([{ symbol: effectiveWhatIfSymbol, change_percent: whatIfChange }])
+      const result = await predictionsApi.whatIf([{ symbol: effectiveWhatIfSymbol, change_percent: whatIfChangeRef.current }])
       setWhatIfResult(result)
-    } catch {
-      // ignore
+    } catch (err) {
+      toast({ title: 'Erreur', description: 'Impossible de lancer la simulation What-If', variant: 'destructive' })
     }
     setWhatIfLoading(false)
   }
@@ -420,11 +800,44 @@ export default function PredictionsPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Disclaimer banner ── */}
+      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">Analyse exploratoire</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Ces projections sont basées sur des modèles statistiques appliqués aux prix historiques.
+            Elles ne constituent pas des conseils d'investissement. Les marchés crypto sont hautement
+            imprévisibles — aucun modèle ne peut prédire l'avenir de manière fiable.
+          </p>
+        </div>
+      </div>
+
+      {/* Bear market mode banner */}
+      {marketCycle?.market_regime?.dominant_regime === 'bearish' && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
+        <div className="rounded-lg border-2 border-red-500/40 bg-red-500/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-red-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+              Mode marché baissier actif
+              <Badge variant="destructive" className="text-xs">
+                Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
+              </Badge>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Les projections tiennent compte du régime baissier détecté.
+              Les prédictions haussières ont été atténuées et les intervalles de confiance élargis.
+              Privilégiez la prudence et le DCA progressif.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Prédictions IA</h1>
-          <p className="text-muted-foreground">Analyse prédictive et sentiment de marché</p>
+          <h1 className="text-3xl font-bold">Analyse & Projections</h1>
+          <p className="text-muted-foreground">Projections statistiques et sentiment de marché</p>
         </div>
         <Select value={daysAhead.toString()} onValueChange={(v) => setDaysAhead(parseInt(v))}>
           <SelectTrigger className="w-36">
@@ -451,24 +864,33 @@ export default function PredictionsPage() {
               {totalAlerts > 0 && (
                 <Badge variant={highAlerts > 0 ? 'destructive' : 'secondary'} className="text-xs">
                   <Bell className="h-3 w-3 mr-1" />
-                  {totalAlerts} signal{totalAlerts > 1 ? 'x' : ''}
+                  {totalAlerts} {totalAlerts > 1 ? 'signaux' : 'signal'}
                 </Badge>
               )}
             </div>
-            <div className="flex items-center justify-center">
-              <FearGreedGauge value={sentiment?.fear_greed_index ?? 50} />
-            </div>
-            <div className="flex items-center justify-center gap-3 mt-3">
-              <Badge variant={
-                sentiment?.overall_sentiment === 'bullish' ? 'default' :
-                sentiment?.overall_sentiment === 'bearish' ? 'destructive' : 'secondary'
-              }>
-                {sentiment?.overall_sentiment?.replace('_', ' ') ?? 'N/A'}
-              </Badge>
-              <span className="text-sm text-muted-foreground capitalize">
-                {sentiment?.market_phase?.replace('_', ' ') ?? ''}
-              </span>
-            </div>
+            {sentimentError ? (
+              <p className="text-center text-sm text-muted-foreground py-4">Impossible de charger le sentiment</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-center">
+                  <FearGreedGauge value={sentiment?.fear_greed_index ?? 50} thresholds={dt.fear_greed} />
+                </div>
+                <div className="flex items-center justify-center gap-3 mt-3">
+                  <Badge variant={
+                    sentiment?.overall_sentiment === 'bullish' ? 'default' :
+                    sentiment?.overall_sentiment === 'bearish' ? 'destructive' : 'secondary'
+                  }>
+                    {sentiment?.overall_sentiment === 'bullish' ? 'Haussier' :
+                     sentiment?.overall_sentiment === 'bearish' ? 'Baissier' :
+                     sentiment?.overall_sentiment === 'neutral' ? 'Neutre' :
+                     sentiment?.overall_sentiment ?? 'N/A'}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {{ markup: 'Expansion', markdown: 'Contraction', accumulation: 'Accumulation', distribution: 'Distribution' }[sentiment?.market_phase ?? ''] ?? sentiment?.market_phase ?? ''}
+                  </span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -502,26 +924,33 @@ export default function PredictionsPage() {
 
                 {/* Trend distribution bar */}
                 <div className="space-y-2">
-                  <div className="flex h-3 rounded-full overflow-hidden bg-muted">
-                    {summary.bullish_assets > 0 && (
-                      <div
-                        className="bg-green-500 transition-all"
-                        style={{ width: `${(summary.bullish_assets / (summary.bullish_assets + summary.neutral_assets + summary.bearish_assets)) * 100}%` }}
-                      />
-                    )}
-                    {summary.neutral_assets > 0 && (
-                      <div
-                        className="bg-yellow-500 transition-all"
-                        style={{ width: `${(summary.neutral_assets / (summary.bullish_assets + summary.neutral_assets + summary.bearish_assets)) * 100}%` }}
-                      />
-                    )}
-                    {summary.bearish_assets > 0 && (
-                      <div
-                        className="bg-red-500 transition-all"
-                        style={{ width: `${(summary.bearish_assets / (summary.bullish_assets + summary.neutral_assets + summary.bearish_assets)) * 100}%` }}
-                      />
-                    )}
-                  </div>
+                  {(() => {
+                    const total = summary.bullish_assets + summary.neutral_assets + summary.bearish_assets
+                    return total > 0 ? (
+                      <div className="flex h-3 rounded-full overflow-hidden bg-muted">
+                        {summary.bullish_assets > 0 && (
+                          <div
+                            className="bg-green-500 transition-all"
+                            style={{ width: `${(summary.bullish_assets / total) * 100}%` }}
+                          />
+                        )}
+                        {summary.neutral_assets > 0 && (
+                          <div
+                            className="bg-yellow-500 transition-all"
+                            style={{ width: `${(summary.neutral_assets / total) * 100}%` }}
+                          />
+                        )}
+                        {summary.bearish_assets > 0 && (
+                          <div
+                            className="bg-red-500 transition-all"
+                            style={{ width: `${(summary.bearish_assets / total) * 100}%` }}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex h-3 rounded-full overflow-hidden bg-muted" />
+                    )
+                  })()}
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -547,10 +976,14 @@ export default function PredictionsPage() {
 
       {/* ── Zone basse : Tabs ── */}
       <Tabs defaultValue="predictions" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="predictions" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Prédictions
+            Projections
+          </TabsTrigger>
+          <TabsTrigger value="cycles" className="flex items-center gap-2">
+            <Repeat className="h-4 w-4" />
+            Cycles
           </TabsTrigger>
           <TabsTrigger value="signals" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
@@ -567,11 +1000,11 @@ export default function PredictionsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Tab: Prédictions ── */}
+        {/* ── Tab: Projections ── */}
         <TabsContent value="predictions">
           <Card>
             <CardHeader>
-              <CardTitle>Prédictions par actif</CardTitle>
+              <CardTitle>Projections par actif</CardTitle>
               <CardDescription>Cliquez sur un actif pour voir la projection visuelle</CardDescription>
             </CardHeader>
             <CardContent>
@@ -584,7 +1017,7 @@ export default function PredictionsPage() {
                           <th className="text-left py-3 px-4 font-medium">Actif</th>
                           <th className="text-left py-3 px-4 font-medium">Variation</th>
                           <th className="text-center py-3 px-4 font-medium">Signal</th>
-                          <th className="text-center py-3 px-4 font-medium">Score</th>
+                          <th className="text-center py-3 px-4 font-medium">Fiabilité</th>
                           <th className="w-8"></th>
                         </tr>
                       </thead>
@@ -599,8 +1032,26 @@ export default function PredictionsPage() {
                               onClick={() => setSelectedAsset(isSelected ? null : pred.symbol)}
                             >
                               <td className="py-3 px-4">
-                                <p className="font-medium">{pred.symbol}</p>
-                                <p className="text-xs text-muted-foreground">{pred.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <div>
+                                    <p className="font-medium">{pred.symbol}</p>
+                                    {pred.name && pred.name !== pred.symbol && (
+                                      <p className="text-xs text-muted-foreground">{pred.name}</p>
+                                    )}
+                                  </div>
+                                  {pred.model_used === 'random_walk' && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs">Données historiques insuffisantes — prédiction dégradée</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-3 px-4">
                                 <VariationBar percent={pred.change_percent} />
@@ -613,7 +1064,7 @@ export default function PredictionsPage() {
                               </td>
                               <td className="py-3 px-4">
                                 <div className="flex justify-center">
-                                  <CombinedScore accuracy={pred.accuracy} consensus={pred.consensus_score} />
+                                  <ReliabilityScore reliabilityScore={pred.reliability_score} skillScore={pred.skill_score} hitRate={pred.hit_rate} hitRateSignificant={pred.hit_rate_significant} hitRateN={pred.hit_rate_n_samples} modelConfidence={pred.model_confidence} />
                                 </div>
                               </td>
                               <td className="py-3 px-4">
@@ -626,12 +1077,72 @@ export default function PredictionsPage() {
                     </table>
                   </div>
 
-                  {/* Confidence cone chart */}
+                  {/* Expanded asset detail */}
                   {selectedPrediction && chartData.length > 0 && (
                     <div className="mt-6 pt-6 border-t">
                       <h4 className="font-medium mb-1">
                         Projection {selectedPrediction.symbol} — {daysAhead} jours
                       </h4>
+
+                      {/* Prix actuel → prédit + trend strength */}
+                      <div className="flex flex-wrap items-center gap-4 mb-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Actuel:</span>
+                          <span className="font-bold">{formatCurrency(selectedPrediction.current_price)}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className={`font-bold ${selectedPrediction.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {formatCurrency(selectedPrediction.predicted_price)}
+                          </span>
+                          <span className={`text-xs ${selectedPrediction.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            ({selectedPrediction.change_percent >= 0 ? '+' : ''}{selectedPrediction.change_percent.toFixed(2)}%)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Force:</span>
+                          <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                selectedPrediction.trend_strength > dt.trend_strength.strong ? 'bg-green-500' :
+                                selectedPrediction.trend_strength > dt.trend_strength.moderate ? 'bg-yellow-500' : 'bg-gray-400'
+                              }`}
+                              style={{ width: `${Math.min(100, selectedPrediction.trend_strength)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium">{selectedPrediction.trend_strength.toFixed(0)}%</span>
+                        </div>
+                      </div>
+
+                      {/* Model disagreement warning */}
+                      {selectedPrediction.models_agree === false && (
+                        <div className="mb-3 flex items-start gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
+                          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Les modèles divergent sur la direction — fiabilité réduite
+                          </p>
+                        </div>
+                      )}
+
+                      {selectedPrediction.regime_info?.regime_price_adjustment && (
+                        <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                          <ShieldAlert className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                              Correction régime appliquée
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Le régime de marché (
+                              {{ bullish: 'haussier', bearish: 'baissier', top: 'sommet', bottom: 'creux' }[
+                                selectedPrediction.regime_info.dominant_regime
+                              ] || selectedPrediction.regime_info.dominant_regime}
+                              , confiance {(selectedPrediction.regime_info.confidence * 100).toFixed(0)}%)
+                              contredit la prédiction des modèles. La projection a été ajustée de{' '}
+                              {((selectedPrediction.regime_info.adjustment_factor ?? 0) * 100).toFixed(0)}%
+                              vers une direction plus prudente.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <p className="text-sm text-muted-foreground mb-2">
                         Support: {formatCurrency(selectedPrediction.support_level)} · Résistance: {formatCurrency(selectedPrediction.resistance_level)}
                       </p>
@@ -656,7 +1167,15 @@ export default function PredictionsPage() {
                             ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground mb-4">Modèle: {selectedPrediction.model_used}</p>
+                        <div className="flex items-center gap-2 mb-4">
+                          <p className="text-xs text-muted-foreground">Modèle: {selectedPrediction.model_used}</p>
+                          {selectedPrediction.model_used === 'random_walk' && (
+                            <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Données insuffisantes
+                            </Badge>
+                          )}
+                        </div>
                       )}
                       <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
@@ -670,7 +1189,20 @@ export default function PredictionsPage() {
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                             <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                             <YAxis
-                              domain={[(dataMin: number) => dataMin * 0.995, (dataMax: number) => dataMax * 1.005]}
+                              domain={[
+                                (dataMin: number) => {
+                                  const range = chartData.length > 0
+                                    ? Math.max(...chartData.map(d => d.confidence_high)) - Math.min(...chartData.map(d => d.confidence_low))
+                                    : dataMin * 0.1
+                                  return Math.max(0, dataMin - range * 0.1)
+                                },
+                                (dataMax: number) => {
+                                  const range = chartData.length > 0
+                                    ? Math.max(...chartData.map(d => d.confidence_high)) - Math.min(...chartData.map(d => d.confidence_low))
+                                    : dataMax * 0.1
+                                  return dataMax + range * 0.1
+                                },
+                              ]}
                               tickFormatter={formatPrice}
                               tick={{ fontSize: 11 }}
                               width={90}
@@ -687,7 +1219,7 @@ export default function PredictionsPage() {
                               }}
                             />
                             <Area type="monotone" dataKey="confidence_high" stroke="none" fill="url(#confGradient)" fillOpacity={1} />
-                            <Area type="monotone" dataKey="confidence_low" stroke="none" fill="#ffffff" fillOpacity={0.8} />
+                            <Area type="monotone" dataKey="confidence_low" stroke="none" fill="hsl(var(--background))" fillOpacity={1} />
                             <Area type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 3" fill="none" />
                             {showSupportResistance && (
                               <>
@@ -699,17 +1231,32 @@ export default function PredictionsPage() {
                         </ResponsiveContainer>
                       </div>
 
+                      {/* Recommendation */}
+                      {selectedPrediction.recommendation && (
+                        <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/10">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Target className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Recommandation</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {selectedPrediction.recommendation}
+                          </p>
+                        </div>
+                      )}
+
                       {/* SHAP Explanations */}
-                      {selectedPrediction.explanations && selectedPrediction.explanations.length > 0 && (
+                      {selectedPrediction.explanations && selectedPrediction.explanations.length > 0 && (() => {
+                        const explanations = selectedPrediction.explanations
+                        const maxImportance = Math.max(...explanations.map(e => e.importance))
+                        return (
                         <div className="mt-4 p-4 rounded-lg bg-muted/30 border">
                           <div className="flex items-center gap-2 mb-3">
                             <Brain className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Facteurs clés de la prédiction</span>
                           </div>
                           <div className="space-y-2">
-                            {selectedPrediction.explanations.map((exp, i) => {
+                            {explanations.map((exp, i) => {
                               const isUp = exp.direction === 'hausse'
-                              const maxImportance = Math.max(...selectedPrediction.explanations!.map(e => e.importance))
                               const barWidth = maxImportance > 0 ? (exp.importance / maxImportance) * 100 : 0
                               return (
                                 <div key={i} className="flex items-center gap-3">
@@ -740,7 +1287,93 @@ export default function PredictionsPage() {
                             Basé sur l'analyse SHAP du modèle XGBoost
                           </p>
                         </div>
-                      )}
+                        )
+                      })()}
+
+                      {/* Regime Info + Multi-Timeframe + Liquidity */}
+                      {selectedPrediction.regime_info && (() => {
+                        const ri = selectedPrediction.regime_info
+                        const regimeColors: Record<string, string> = {
+                          bullish: 'text-green-500 bg-green-500/10',
+                          bearish: 'text-red-500 bg-red-500/10',
+                          top: 'text-amber-500 bg-amber-500/10',
+                          bottom: 'text-blue-500 bg-blue-500/10',
+                          neutral: 'text-gray-500 bg-gray-500/10',
+                        }
+                        const regimeLabels: Record<string, string> = {
+                          bullish: 'Haussier',
+                          bearish: 'Baissier',
+                          top: 'Sommet',
+                          bottom: 'Creux',
+                          neutral: 'Neutre',
+                        }
+                        const regimeClass = regimeColors[ri.dominant_regime] || regimeColors.neutral
+                        return (
+                          <div className="mt-4 p-4 rounded-lg bg-muted/30 border">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Activity className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">Régime de marché</span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <Badge className={regimeClass}>
+                                {regimeLabels[ri.dominant_regime] || ri.dominant_regime}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Confiance: {(ri.confidence * 100).toFixed(0)}%
+                              </span>
+                              {ri.timeframe_alignment && (
+                                <Badge variant={ri.timeframe_alignment === 'aligned' ? 'outline' : 'destructive'} className="text-xs gap-1">
+                                  <Layers className="h-3 w-3" />
+                                  {ri.timeframe_alignment === 'aligned' ? 'Daily/Weekly alignés' : 'Daily/Weekly divergents'}
+                                </Badge>
+                              )}
+                              {ri.weekly_regime && ri.weekly_regime !== ri.dominant_regime && (
+                                <span className="text-xs text-muted-foreground">
+                                  Weekly: {regimeLabels[ri.weekly_regime] || ri.weekly_regime}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Probability bars */}
+                            {ri.probabilities && (
+                              <div className="space-y-1.5 mb-3">
+                                {Object.entries(ri.probabilities)
+                                  .sort(([, a], [, b]) => b - a)
+                                  .map(([regime, prob]) => (
+                                    <div key={regime} className="flex items-center gap-2">
+                                      <span className="text-xs w-16 text-muted-foreground capitalize">{regimeLabels[regime] || regime}</span>
+                                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${
+                                            regime === 'bullish' ? 'bg-green-500' :
+                                            regime === 'bearish' ? 'bg-red-500' :
+                                            regime === 'top' ? 'bg-amber-500' :
+                                            regime === 'bottom' ? 'bg-blue-500' : 'bg-gray-400'
+                                          }`}
+                                          style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-muted-foreground w-10 text-right">{(prob * 100).toFixed(0)}%</span>
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
+
+                            {ri.note && (
+                              <p className="text-xs text-muted-foreground">{ri.note}</p>
+                            )}
+
+                            {/* Liquidity Warning */}
+                            {ri.liquidity_warning && (
+                              <div className="mt-2 flex items-start gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
+                                <Droplets className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                <p className="text-xs text-amber-600 dark:text-amber-400">{ri.liquidity_warning}</p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </>
@@ -749,6 +1382,334 @@ export default function PredictionsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Tab: Cycles de Marché ── */}
+        <TabsContent value="cycles" className="space-y-4">
+          {loadingCycle ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : marketCycle ? (
+            <>
+              {/* Row 1: Cycle gauge + BTC regime + Portfolio regime */}
+              <div className="grid gap-4 lg:grid-cols-3">
+                {/* Cycle Position */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Repeat className="h-4 w-4 text-primary" />
+                      Position dans le cycle
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CycleGauge
+                      position={marketCycle.cycle_position}
+                      regime={marketCycle.market_regime?.dominant_regime || 'unknown'}
+                    />
+                    <div className="flex justify-center gap-3 mt-2">
+                      {marketCycle.fear_greed != null && (
+                        <span className="text-xs text-muted-foreground">
+                          Fear & Greed: <span className="font-medium">{marketCycle.fear_greed}</span>
+                        </span>
+                      )}
+                      {marketCycle.btc_dominance != null && (
+                        <span className="text-xs text-muted-foreground">
+                          BTC Dom: <span className="font-medium">{marketCycle.btc_dominance}%</span>
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* BTC Market Regime */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      Régime BTC (référence)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {marketCycle.market_regime ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Badge className={
+                            marketCycle.market_regime.dominant_regime === 'bullish' ? 'bg-green-500/10 text-green-500' :
+                            marketCycle.market_regime.dominant_regime === 'bearish' ? 'bg-red-500/10 text-red-500' :
+                            marketCycle.market_regime.dominant_regime === 'top' ? 'bg-amber-500/10 text-amber-500' :
+                            marketCycle.market_regime.dominant_regime === 'bottom' ? 'bg-blue-500/10 text-blue-500' :
+                            'bg-gray-500/10 text-gray-500'
+                          }>
+                            {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[marketCycle.market_regime.dominant_regime] || marketCycle.market_regime.dominant_regime}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Confiance: {(marketCycle.market_regime.confidence * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {Object.entries(marketCycle.market_regime.probabilities)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([phase, prob]) => (
+                              <div key={phase} className="flex items-center gap-2">
+                                <span className="text-xs w-14 text-muted-foreground capitalize">
+                                  {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[phase] || phase}
+                                </span>
+                                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      phase === 'bullish' ? 'bg-green-500' :
+                                      phase === 'bearish' ? 'bg-red-500' :
+                                      phase === 'top' ? 'bg-amber-500' :
+                                      'bg-blue-500'
+                                    }`}
+                                    style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-muted-foreground w-8 text-right">{(prob * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{marketCycle.market_regime.description}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">Données indisponibles</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Portfolio Regime */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      Régime portefeuille
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge className={
+                          marketCycle.portfolio_regime.dominant_regime === 'bullish' ? 'bg-green-500/10 text-green-500' :
+                          marketCycle.portfolio_regime.dominant_regime === 'bearish' ? 'bg-red-500/10 text-red-500' :
+                          marketCycle.portfolio_regime.dominant_regime === 'top' ? 'bg-amber-500/10 text-amber-500' :
+                          marketCycle.portfolio_regime.dominant_regime === 'bottom' ? 'bg-blue-500/10 text-blue-500' :
+                          'bg-gray-500/10 text-gray-500'
+                        }>
+                          {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[marketCycle.portfolio_regime.dominant_regime] || marketCycle.portfolio_regime.dominant_regime}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">Pondéré par valeur</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {Object.entries(marketCycle.portfolio_regime.probabilities)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([phase, prob]) => (
+                            <div key={phase} className="flex items-center gap-2">
+                              <span className="text-xs w-14 text-muted-foreground capitalize">
+                                {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[phase] || phase}
+                              </span>
+                              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    phase === 'bullish' ? 'bg-green-500' :
+                                    phase === 'bearish' ? 'bg-red-500' :
+                                    phase === 'top' ? 'bg-amber-500' :
+                                    'bg-blue-500'
+                                  }`}
+                                  style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground w-8 text-right">{(prob * 100).toFixed(0)}%</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Row 2: Top / Bottom Estimates */}
+              {marketCycle.top_bottom_estimates && (
+                <TopBottomCard estimates={marketCycle.top_bottom_estimates} />
+              )}
+
+              {/* Row 3: Technical Indicators */}
+              {marketCycle.market_signals.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-primary" />
+                      Indicateurs techniques (BTC)
+                    </CardTitle>
+                    <CardDescription>7 indicateurs analysés pour détecter le régime de marché</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {marketCycle.market_signals.map((sig) => {
+                        const sigColor =
+                          sig.signal === 'bullish' ? 'border-green-500/30 bg-green-500/5' :
+                          sig.signal === 'bearish' ? 'border-red-500/30 bg-red-500/5' :
+                          sig.signal === 'top' ? 'border-amber-500/30 bg-amber-500/5' :
+                          sig.signal === 'bottom' ? 'border-blue-500/30 bg-blue-500/5' :
+                          'border-muted bg-muted/20'
+                        const sigLabel =
+                          sig.signal === 'bullish' ? 'Haussier' :
+                          sig.signal === 'bearish' ? 'Baissier' :
+                          sig.signal === 'top' ? 'Sommet' :
+                          sig.signal === 'bottom' ? 'Creux' : 'Neutre'
+                        const sigTextColor =
+                          sig.signal === 'bullish' ? 'text-green-500' :
+                          sig.signal === 'bearish' ? 'text-red-500' :
+                          sig.signal === 'top' ? 'text-amber-500' :
+                          sig.signal === 'bottom' ? 'text-blue-500' : 'text-gray-500'
+
+                        return (
+                          <div key={sig.name} className={`p-3 rounded-lg border ${sigColor}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium truncate">{sig.name}</span>
+                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${sigTextColor}`}>
+                                {sigLabel}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    sig.signal === 'bullish' ? 'bg-green-500' :
+                                    sig.signal === 'bearish' ? 'bg-red-500' :
+                                    sig.signal === 'top' ? 'bg-amber-500' :
+                                    sig.signal === 'bottom' ? 'bg-blue-500' : 'bg-gray-400'
+                                  }`}
+                                  style={{ width: `${(sig.strength * 100).toFixed(0)}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground w-8 text-right">
+                                {(sig.strength * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-tight">{sig.description}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Row 3: Per-asset regime */}
+              {marketCycle.per_asset.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary" />
+                      Régime par actif
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                            <th className="text-center py-2 px-3 text-xs font-medium">Régime</th>
+                            <th className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
+                            <th className="text-left py-2 px-3 text-xs font-medium">Probabilités</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketCycle.per_asset.map((asset) => (
+                            <tr key={asset.symbol} className="border-b last:border-0">
+                              <td className="py-2 px-3">
+                                <div>
+                                  <span className="text-sm font-medium">{asset.symbol}</span>
+                                  {asset.name && asset.name !== asset.symbol && (
+                                    <span className="text-xs text-muted-foreground ml-2">{asset.name}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <Badge className={
+                                  asset.dominant_regime === 'bullish' ? 'bg-green-500/10 text-green-500' :
+                                  asset.dominant_regime === 'bearish' ? 'bg-red-500/10 text-red-500' :
+                                  asset.dominant_regime === 'top' ? 'bg-amber-500/10 text-amber-500' :
+                                  asset.dominant_regime === 'bottom' ? 'bg-blue-500/10 text-blue-500' :
+                                  'bg-gray-500/10 text-gray-500'
+                                } variant="outline">
+                                  {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[asset.dominant_regime] || asset.dominant_regime}
+                                </Badge>
+                              </td>
+                              <td className="py-2 px-3 text-center text-xs">
+                                {(asset.confidence * 100).toFixed(0)}%
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="flex h-2 rounded-full overflow-hidden bg-muted w-32">
+                                  {Object.entries(asset.probabilities)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .map(([phase, prob]) => (
+                                      <div
+                                        key={phase}
+                                        className={
+                                          phase === 'bullish' ? 'bg-green-500' :
+                                          phase === 'bearish' ? 'bg-red-500' :
+                                          phase === 'top' ? 'bg-amber-500' :
+                                          'bg-blue-500'
+                                        }
+                                        style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                        title={`${phase}: ${(prob * 100).toFixed(0)}%`}
+                                      />
+                                    ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Row 4: Advice */}
+              {marketCycle.cycle_advice.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      Conseils adaptés au cycle
+                    </CardTitle>
+                    <CardDescription>Recommandations basées sur la phase de marché actuelle</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {marketCycle.cycle_advice.map((adv, i) => (
+                        <div
+                          key={i}
+                          className={`p-4 rounded-lg border ${
+                            adv.priority === 'high' ? 'border-primary/30 bg-primary/5' :
+                            'border-muted bg-muted/20'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={adv.priority === 'high' ? 'default' : 'secondary'} className="text-[10px]">
+                              {adv.action}
+                            </Badge>
+                            <span className="text-sm font-medium">{adv.title}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{adv.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-muted-foreground">Impossible de charger l'analyse de cycle</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── Tab: Signaux & Alertes (fusionnés) ── */}
@@ -783,7 +1744,9 @@ export default function PredictionsPage() {
                         <p className="font-medium text-sm">{alert.message}</p>
                         <div className="flex items-center gap-2 mt-1">
                           {alert.symbol && <Badge variant="outline" className="text-xs">{alert.symbol}</Badge>}
-                          <span className="text-xs text-muted-foreground capitalize">{alert.type.replace('_', ' ')}</span>
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {{ support_break: 'cassure support', breakout: 'cassure résistance', strong_trend: 'tendance forte', opportunity: 'opportunité', info: 'information', buy: 'achat', sell: 'vente' }[alert.type] || alert.type.replace('_', ' ')}
+                          </span>
                           <span className="text-xs text-muted-foreground">·</span>
                           <span className="text-xs text-muted-foreground">{alert.source === 'signal' ? 'Signal marché' : 'Prédiction'}</span>
                         </div>
@@ -796,114 +1759,16 @@ export default function PredictionsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* ── Tab: Simulation ── */}
-        <TabsContent value="simulation" className="space-y-4">
-          {/* What-If */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-500" />
-                Scénario What-If
-              </CardTitle>
-              <CardDescription>Simulez l'impact d'une variation de prix sur votre portefeuille</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {predictions && predictions.length > 0 ? (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Actif</label>
-                      <Select value={effectiveWhatIfSymbol} onValueChange={setWhatIfSymbol}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {predictions.map(p => (
-                            <SelectItem key={p.symbol} value={p.symbol}>{p.symbol} - {p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Variation: <span className={`font-bold ${whatIfChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {whatIfChange >= 0 ? '+' : ''}{whatIfChange}%
-                        </span>
-                      </label>
-                      <input
-                        type="range"
-                        min="-50"
-                        max="100"
-                        value={whatIfChange}
-                        onChange={(e) => { setWhatIfChange(parseInt(e.target.value)); setWhatIfResult(null) }}
-                        onMouseUp={runWhatIf}
-                        onTouchEnd={runWhatIf}
-                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>-50%</span>
-                        <span>0%</span>
-                        <span>+100%</span>
-                      </div>
-                    </div>
-
-                    {whatIfLoading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-
-                    {whatIfResult && (
-                      <div className="space-y-3 pt-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Valeur actuelle</p>
-                            <p className="text-lg font-bold">{formatCurrency(whatIfResult.current_value)}</p>
-                          </div>
-                          <div className={`p-3 rounded-lg ${whatIfResult.impact_percent >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-                            <p className="text-xs text-muted-foreground">Valeur simulée</p>
-                            <p className={`text-lg font-bold ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              {formatCurrency(whatIfResult.simulated_value)}
-                            </p>
-                          </div>
-                        </div>
-                        <p className={`text-center font-bold text-lg ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {whatIfResult.impact_percent >= 0 ? '+' : ''}{whatIfResult.impact_percent.toFixed(2)}% sur le portefeuille
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {whatIfResult && whatIfResult.per_asset.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Impact par actif</p>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={whatIfResult.per_asset.map(a => ({ name: a.symbol, impact: a.impact }))}
-                            layout="vertical"
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" tickFormatter={(v) => formatCurrency(v).replace('€', '')} />
-                            <YAxis type="category" dataKey="name" width={50} tick={{ fontSize: 12 }} />
-                            <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Bar dataKey="impact" radius={4}>
-                              {whatIfResult.per_asset.map((a, i) => (
-                                <Cell key={i} fill={a.impact >= 0 ? '#10b981' : '#ef4444'} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Aucun actif disponible</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Anomalies */}
+          {/* Anomalies (in Signals tab) */}
+          {anomaliesError && (
+            <Card className="border-yellow-500/20">
+              <CardContent className="py-6 text-center">
+                <AlertTriangle className="h-8 w-8 mx-auto text-yellow-500 mb-2" />
+                <p className="text-sm text-muted-foreground">Impossible de charger les anomalies</p>
+              </CardContent>
+            </Card>
+          )}
           {anomalies && anomalies.filter(a => a.is_anomaly).length > 0 && (
             <Card>
               <CardHeader>
@@ -942,13 +1807,142 @@ export default function PredictionsPage() {
             </Card>
           )}
         </TabsContent>
+
+        {/* ── Tab: Simulation ── */}
+        <TabsContent value="simulation" className="space-y-4">
+          {/* What-If */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-500" />
+                Scénario What-If
+              </CardTitle>
+              <CardDescription>Simulez l'impact d'une variation de prix sur votre portefeuille</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {predictions && predictions.length > 0 ? (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Actif</label>
+                      <Select value={effectiveWhatIfSymbol} onValueChange={setWhatIfSymbol}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {predictions.map(p => (
+                            <SelectItem key={p.symbol} value={p.symbol}>{p.symbol}{p.name && p.name !== p.symbol ? ` - ${p.name}` : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Variation: <span className={`font-bold ${whatIfChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {whatIfChange >= 0 ? '+' : ''}{whatIfChange}%
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {[
+                          { label: 'Crash', value: -50, color: 'bg-red-500/10 text-red-500 hover:bg-red-500/20' },
+                          { label: 'Bear', value: -30, color: 'bg-red-500/10 text-red-400 hover:bg-red-500/20' },
+                          { label: 'Correction', value: -15, color: 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20' },
+                          { label: 'Rebond', value: 20, color: 'bg-green-500/10 text-green-500 hover:bg-green-500/20' },
+                          { label: 'Bull', value: 50, color: 'bg-green-500/10 text-green-400 hover:bg-green-500/20' },
+                          { label: 'Moon', value: 100, color: 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' },
+                        ].map((scenario) => (
+                          <button
+                            key={scenario.value}
+                            onClick={() => {
+                              setWhatIfChange(scenario.value)
+                              setTimeout(runWhatIf, 50)
+                            }}
+                            className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${scenario.color} ${whatIfChange === scenario.value ? 'ring-1 ring-primary' : ''}`}
+                          >
+                            {scenario.label} ({scenario.value > 0 ? '+' : ''}{scenario.value}%)
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="range"
+                        min="-50"
+                        max="100"
+                        value={whatIfChange}
+                        onChange={(e) => setWhatIfChange(parseInt(e.target.value))}
+                        onMouseUp={runWhatIf}
+                        onTouchEnd={runWhatIf}
+                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>-50%</span>
+                        <span>0%</span>
+                        <span>+100%</span>
+                      </div>
+                    </div>
+
+                    {whatIfLoading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+
+                    {whatIfResult && (
+                      <div className="space-y-3 pt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-xs text-muted-foreground">Valeur actuelle</p>
+                            <p className="text-lg font-bold">{formatCurrency(whatIfResult.current_value)}</p>
+                          </div>
+                          <div className={`p-3 rounded-lg ${whatIfResult.impact_percent >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                            <p className="text-xs text-muted-foreground">Valeur simulée</p>
+                            <p className={`text-lg font-bold ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {formatCurrency(whatIfResult.simulated_value)}
+                            </p>
+                          </div>
+                        </div>
+                        <p className={`text-center font-bold text-lg ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {whatIfResult.impact_percent >= 0 ? '+' : ''}{whatIfResult.impact_percent.toFixed(2)}% sur le portefeuille
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {whatIfResult && whatIfResult.per_asset.length > 0 && (() => {
+                    const STABLECOINS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'FDUSD', 'PYUSD']
+                    const filteredAssets = whatIfResult.per_asset.filter(
+                      a => !STABLECOINS.includes(a.symbol.toUpperCase()) || Math.abs(a.impact) > 0.01
+                    )
+                    return filteredAssets.length > 0 ? (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Impact par actif</p>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={filteredAssets.map(a => ({ name: a.symbol, impact: a.impact }))}
+                              layout="vertical"
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis type="number" tickFormatter={(v) => formatCurrency(v).replace('€', '')} />
+                              <YAxis type="category" dataKey="name" width={50} tick={{ fontSize: 12 }} />
+                              <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                              <Bar dataKey="impact" radius={4}>
+                                {filteredAssets.map((a, i) => (
+                                  <Cell key={i} fill={a.impact >= 0 ? '#10b981' : '#ef4444'} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Aucun actif disponible</p>
+              )}
+            </CardContent>
+          </Card>
+
+        </TabsContent>
       </Tabs>
 
-      {/* ── Disclaimer discret ── */}
-      <p className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-        Les prédictions sont basées sur des modèles statistiques et ne constituent pas des conseils financiers.
-      </p>
     </div>
   )
 }

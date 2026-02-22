@@ -390,8 +390,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getPerformance: async (period: string = '30d') => {
-    const response = await api.get('/analytics/performance', { params: { period }, timeout: ANALYTICS_TIMEOUT })
+  getPerformance: async (period: string = '30d', portfolioId?: string) => {
+    const response = await api.get('/analytics/performance', {
+      params: { period, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -400,8 +403,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getMonteCarlo: async (horizon: number = 90) => {
-    const response = await api.get('/analytics/monte-carlo', { params: { horizon }, timeout: ANALYTICS_TIMEOUT })
+  getMonteCarlo: async (horizon: number = 90, portfolioId?: string) => {
+    const response = await api.get('/analytics/monte-carlo', {
+      params: { horizon, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -410,18 +416,27 @@ export const analyticsApi = {
     return response.data
   },
 
-  getOptimize: async (objective: string = 'max_sharpe') => {
-    const response = await api.get('/analytics/optimize', { params: { objective }, timeout: ANALYTICS_TIMEOUT })
+  getOptimize: async (objective: string = 'max_sharpe', days?: number) => {
+    const response = await api.get('/analytics/optimize', {
+      params: { objective, ...(days ? { days } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
-  getStressTest: async () => {
-    const response = await api.get('/analytics/stress-test', { timeout: ANALYTICS_TIMEOUT })
+  getStressTest: async (portfolioId?: string) => {
+    const response = await api.get('/analytics/stress-test', {
+      params: { ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
-  getBeta: async (days: number = 90) => {
-    const response = await api.get('/analytics/beta', { params: { days }, timeout: ANALYTICS_TIMEOUT })
+  getBeta: async (days: number = 90, portfolioId?: string) => {
+    const response = await api.get('/analytics/beta', {
+      params: { days, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -544,6 +559,18 @@ export const predictionsApi = {
 
   getMarketEvents: async () => {
     const response = await api.get('/predictions/events')
+    return response.data
+  },
+
+  getMarketCycle: async () => {
+    const response = await api.get('/predictions/market-cycle')
+    return response.data
+  },
+
+  getTrackRecord: async (symbol: string, limit: number = 20) => {
+    const response = await api.get(`/predictions/track-record/${symbol}`, {
+      params: { limit },
+    })
     return response.data
   },
 }

@@ -29,7 +29,7 @@ const navItems = [
   { icon: ArrowRightLeft, label: 'Transactions', path: '/transactions' },
   { icon: Link2, label: 'Exchanges', path: '/exchanges' },
   { icon: BarChart3, label: 'Analyses', path: '/analytics' },
-  { icon: TrendingUp, label: 'Predictions', path: '/predictions' },
+  { icon: TrendingUp, label: 'Projections', path: '/predictions' },
   { icon: Calculator, label: 'Simulations', path: '/simulations' },
   { icon: Lightbulb, label: 'Insights', path: '/insights' },
   { icon: Brain, label: 'Smart Insights', path: '/smart-insights' },

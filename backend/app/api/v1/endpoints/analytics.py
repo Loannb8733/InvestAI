@@ -48,6 +48,7 @@ class PortfolioAnalyticsResponse(BaseModel):
     max_drawdown: float
     var_95: float
     cvar_95: float
+    var_95_description: str = ""
     diversification_score: float
     concentration_risk: float
     asset_count: int
@@ -167,6 +168,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
         max_drawdown=a.max_drawdown,
         var_95=a.var_95,
         cvar_95=a.cvar_95,
+        var_95_description=getattr(a, "var_95_description", ""),
         diversification_score=a.diversification_score,
         concentration_risk=a.concentration_risk,
         asset_count=a.asset_count,
@@ -200,7 +202,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
 
 @router.get("", response_model=PortfolioAnalyticsResponse)
 async def get_global_analytics(
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -211,7 +213,7 @@ async def get_global_analytics(
 @router.get("/portfolio/{portfolio_id}", response_model=PortfolioAnalyticsResponse)
 async def get_portfolio_analytics(
     portfolio_id: UUID,
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -231,7 +233,7 @@ async def get_portfolio_analytics(
 @router.get("/correlation", response_model=CorrelationResponse)
 async def get_correlation_matrix(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -247,7 +249,7 @@ async def get_correlation_matrix(
 @router.get("/diversification", response_model=DiversificationResponse)
 async def get_diversification_analysis(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -267,11 +269,18 @@ async def get_diversification_analysis(
 
 @router.get("/performance", response_model=PerformanceSummaryResponse)
 async def get_performance_summary(
-    period: str = Query("30d", regex="^(7d|30d|90d|1y|all)$"),
+    period: str = Query("30d", regex="^(1d|7d|30d|90d|1y|all)$"),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    analytics = await analytics_service.get_user_analytics(db, str(current_user.id))
+    period_map = {"1d": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 0}
+    days = period_map.get(period, 60)
+
+    if portfolio_id:
+        analytics = await analytics_service.get_portfolio_analytics(db, portfolio_id, days=days)
+    else:
+        analytics = await analytics_service.get_user_analytics(db, str(current_user.id), days=days)
 
     by_gain = sorted(analytics.assets, key=lambda x: x.gain_loss_percent, reverse=True)
     by_value = sorted(analytics.assets, key=lambda x: x.current_value, reverse=True)
@@ -405,33 +414,40 @@ async def get_risk_metrics(
 
 @router.get("/stress-test", response_model=dict)
 async def get_stress_test(
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Run stress tests simulating historical crash scenarios."""
-    return await analytics_service.stress_test(db, str(current_user.id))
+    return await analytics_service.stress_test(db, str(current_user.id), portfolio_id=portfolio_id)
 
 
 @router.get("/beta", response_model=dict)
 async def get_beta(
     days: int = Query(90, ge=30, le=365),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Compute beta of each asset and portfolio vs benchmarks (BTC, SPY)."""
-    return await analytics_service.compute_beta(db, str(current_user.id), days=days)
+    return await analytics_service.compute_beta(db, str(current_user.id), days=days, portfolio_id=portfolio_id)
 
 
 @router.get("/monte-carlo", response_model=MonteCarloResponse)
 async def get_monte_carlo(
     horizon: int = Query(90, ge=7, le=365),
     simulations: int = Query(5000, ge=1000, le=20000),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Monte Carlo simulation of future portfolio returns."""
     result = await analytics_service.monte_carlo(
-        db, str(current_user.id), horizon_days=horizon, num_simulations=simulations
+        db,
+        str(current_user.id),
+        horizon_days=horizon,
+        num_simulations=simulations,
+        portfolio_id=portfolio_id,
     )
     return MonteCarloResponse(
         percentiles=result.percentiles,
@@ -491,11 +507,12 @@ async def get_rebalance_orders(
 @router.get("/optimize", response_model=OptimizationResponse)
 async def optimize_portfolio(
     objective: str = Query("max_sharpe", regex="^(max_sharpe|min_volatility)$"),
+    days: int = Query(90, ge=30, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """MPT portfolio optimization — find optimal weights."""
-    result = await analytics_service.optimize_portfolio(db, str(current_user.id), objective=objective)
+    result = await analytics_service.optimize_portfolio(db, str(current_user.id), objective=objective, days=days)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

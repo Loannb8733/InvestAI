@@ -83,6 +83,7 @@ interface Analytics {
   max_drawdown: number
   var_95: number
   cvar_95: number
+  var_95_description?: string
   diversification_score: number
   concentration_risk: number
   asset_count: number
@@ -137,6 +138,11 @@ interface PerformanceItem {
   name: string
   asset_type: string
   gain_loss_percent: number
+}
+
+interface PerformanceSummary {
+  top_gainers: PerformanceItem[]
+  top_losers: PerformanceItem[]
 }
 
 interface HistoricalDataPoint {
@@ -273,10 +279,10 @@ export default function AnalyticsPage() {
   const analyticsQueryOpts = { retry: 1, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const
 
   // Map period label to days for all analytics queries
-  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : period === '1y' ? 365 : period === 'all' ? 0 : 365
+  const periodDays = period === '1d' ? 1 : period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : period === '1y' ? 365 : period === 'all' ? 0 : 365
   const portfolioParam = selectedPortfolio === 'all' ? undefined : selectedPortfolio
 
-  const { data: analytics, isLoading: loadingAnalytics } = useQuery<Analytics>({
+  const { data: analytics, isLoading: loadingAnalytics, isError: errorAnalytics } = useQuery<Analytics>({
     queryKey: queryKeys.analytics.global(portfolioParam, periodDays),
     queryFn: () => selectedPortfolio === 'all'
       ? analyticsApi.getGlobal(periodDays)
@@ -299,44 +305,47 @@ export default function AnalyticsPage() {
     placeholderData: keepPreviousData,
   })
 
-  const { data: performance } = useQuery({
-    queryKey: queryKeys.analytics.performance(period),
-    queryFn: () => analyticsApi.getPerformance(period),
+  const { data: performance } = useQuery<PerformanceSummary>({
+    queryKey: queryKeys.analytics.performance(portfolioParam, period),
+    queryFn: () => analyticsApi.getPerformance(period, portfolioParam),
     ...analyticsQueryOpts,
     placeholderData: keepPreviousData,
   })
 
+  const monteCarloHorizon = Math.max(7, periodDays || 90)
   const { data: monteCarlo } = useQuery<MonteCarloData>({
-    queryKey: queryKeys.analytics.monteCarlo,
-    queryFn: () => analyticsApi.getMonteCarlo(90),
-    enabled: !!analytics && analytics.asset_count > 0,
+    queryKey: queryKeys.analytics.monteCarlo(portfolioParam, monteCarloHorizon),
+    queryFn: () => analyticsApi.getMonteCarlo(monteCarloHorizon, portfolioParam),
+    enabled: !!analytics && analytics.asset_count > 0 && periodDays !== 1,
     ...analyticsQueryOpts,
   })
 
   const { data: xirrData } = useQuery<{ xirr: number | null }>({
-    queryKey: queryKeys.analytics.xirr,
+    queryKey: queryKeys.analytics.xirr(portfolioParam),
     queryFn: analyticsApi.getXirr,
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
 
+  const optimizeDays = Math.max(30, periodDays || 90)
   const { data: optimization } = useQuery<OptimizeData>({
-    queryKey: queryKeys.analytics.optimize(periodDays),
-    queryFn: () => analyticsApi.getOptimize('max_sharpe'),
+    queryKey: queryKeys.analytics.optimize(portfolioParam, optimizeDays),
+    queryFn: () => analyticsApi.getOptimize('max_sharpe', optimizeDays),
     enabled: !!analytics && analytics.asset_count >= 2,
     ...analyticsQueryOpts,
   })
 
   const { data: stressTest } = useQuery<StressTestData>({
-    queryKey: queryKeys.analytics.stressTest,
-    queryFn: analyticsApi.getStressTest,
+    queryKey: queryKeys.analytics.stressTest(portfolioParam),
+    queryFn: () => analyticsApi.getStressTest(portfolioParam),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
 
+  const betaDays = Math.max(30, periodDays || 365)
   const { data: betaData } = useQuery<BetaData>({
-    queryKey: queryKeys.analytics.beta(periodDays),
-    queryFn: () => analyticsApi.getBeta(periodDays),
+    queryKey: queryKeys.analytics.beta(portfolioParam, betaDays),
+    queryFn: () => analyticsApi.getBeta(betaDays, portfolioParam),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
@@ -351,6 +360,25 @@ export default function AnalyticsPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (errorAnalytics) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Analyses</h1>
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <Activity className="h-16 w-16 mx-auto text-red-500" />
+              <h2 className="text-xl font-semibold">Erreur de chargement</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Impossible de charger les analyses. Veuillez réessayer.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -374,13 +402,17 @@ export default function AnalyticsPage() {
     )
   }
 
+  // Safe number formatting with fallback for null/undefined values
+  const safeFixed = (v: number | null | undefined, d: number): string =>
+    v == null || isNaN(v) ? '—' : v.toFixed(d)
+
   // Prepare chart data
-  const allocationByTypeData = Object.entries(analytics.allocation_by_type).map(([name, value]) => ({
+  const allocationByTypeData = Object.entries(analytics.allocation_by_type || {}).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value: Math.round(value * 10) / 10,
   }))
 
-  const allocationByAssetData = Object.entries(analytics.allocation_by_asset)
+  const allocationByAssetData = Object.entries(analytics.allocation_by_asset || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([name, value]) => ({
@@ -397,12 +429,33 @@ export default function AnalyticsPage() {
       fill: asset.gain_loss_percent >= 0 ? '#10b981' : '#ef4444',
     }))
 
+  // Radar: each metric normalized to 0-100 where higher = better
   const riskScoreData = [
-    { metric: 'Diversification', value: diversification?.score || 0, fullMark: 100 },
-    { metric: 'Concentration', value: Math.max(0, 100 - (analytics.concentration_risk * 400)), fullMark: 100 },
-    { metric: 'Volatilité', value: Math.max(0, 100 - analytics.portfolio_volatility), fullMark: 100 },
-    { metric: 'Sharpe', value: Math.min(100, Math.max(0, analytics.sharpe_ratio * 33 + 50)), fullMark: 100 },
-    { metric: 'Nb Actifs', value: Math.min(100, analytics.asset_count * 10), fullMark: 100 },
+    {
+      metric: 'Rendement',
+      value: Math.min(100, Math.max(0, analytics.total_gain_loss_percent * 0.5 + 50)),
+      fullMark: 100,
+    },
+    {
+      metric: 'Sharpe',
+      value: Math.min(100, Math.max(0, analytics.sharpe_ratio * 25 + 50)),
+      fullMark: 100,
+    },
+    {
+      metric: 'Diversification',
+      value: diversification?.score || 0,
+      fullMark: 100,
+    },
+    {
+      metric: 'Stabilité',
+      value: Math.min(100, Math.max(0, 100 + analytics.max_drawdown * 1.25)),
+      fullMark: 100,
+    },
+    {
+      metric: 'Sortino',
+      value: Math.min(100, Math.max(0, analytics.sortino_ratio * 25 + 50)),
+      fullMark: 100,
+    },
   ]
 
   const chartHistoricalData = historicalData?.map((point) => ({
@@ -430,27 +483,36 @@ export default function AnalyticsPage() {
   }
 
   const exportToCSV = () => {
-    const headers = ['Actif', 'Type', 'Valeur', 'Performance %', 'Poids %', 'Volatilité', 'Sharpe', 'Sortino', 'Max Drawdown', 'Rendement J']
+    const escapeCSV = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`
+      }
+      return val
+    }
+
+    const headers = ['Actif', 'Type', 'Valeur (EUR)', 'Performance %', 'Poids %', 'Volatilité', 'Sharpe', 'Sortino', 'Max Drawdown', 'Rendement J']
     const rows = analytics.assets.map(a => [
-      a.symbol,
-      a.asset_type,
-      a.current_value.toFixed(2),
-      a.gain_loss_percent.toFixed(2),
-      a.weight.toFixed(2),
-      a.volatility_30d?.toFixed(2) || 'N/A',
-      a.sharpe_ratio?.toFixed(2) || 'N/A',
-      a.sortino_ratio?.toFixed(2) || 'N/A',
-      a.max_drawdown?.toFixed(2) || 'N/A',
-      a.daily_return?.toFixed(2) || 'N/A',
+      escapeCSV(a.symbol),
+      escapeCSV(a.asset_type),
+      safeFixed(a.current_value, 2),
+      safeFixed(a.gain_loss_percent, 2),
+      safeFixed(a.weight, 2),
+      safeFixed(a.volatility_30d, 2),
+      safeFixed(a.sharpe_ratio, 2),
+      safeFixed(a.sortino_ratio, 2),
+      safeFixed(a.max_drawdown, 2),
+      safeFixed(a.daily_return, 2),
     ])
 
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `analyse-portefeuille-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `analyse-portefeuille-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -480,6 +542,7 @@ export default function AnalyticsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="1d">24h</SelectItem>
               <SelectItem value="7d">7 jours</SelectItem>
               <SelectItem value="30d">30 jours</SelectItem>
               <SelectItem value="90d">90 jours</SelectItem>
@@ -507,7 +570,7 @@ export default function AnalyticsPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.portfolio_volatility.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{safeFixed(analytics.portfolio_volatility, 1)}%</div>
             <p className="text-xs text-muted-foreground">
               {analytics.portfolio_volatility < 30 ? 'Faible' : analytics.portfolio_volatility < 60 ? 'Modérée' : 'Élevée'}
             </p>
@@ -522,8 +585,8 @@ export default function AnalyticsPage() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${analytics.sharpe_ratio >= 1 ? 'text-green-500' : analytics.sharpe_ratio >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
-              {analytics.sharpe_ratio.toFixed(2)}
+            <div className={`text-2xl font-bold ${(analytics.sharpe_ratio ?? 0) >= 1 ? 'text-green-500' : (analytics.sharpe_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+              {safeFixed(analytics.sharpe_ratio, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
               {analytics.sharpe_ratio >= 2 ? 'Excellent' : analytics.sharpe_ratio >= 1 ? 'Bon' : analytics.sharpe_ratio >= 0 ? 'Moyen' : 'Faible'}
@@ -539,8 +602,8 @@ export default function AnalyticsPage() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${analytics.sortino_ratio >= 1 ? 'text-green-500' : analytics.sortino_ratio >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
-              {analytics.sortino_ratio.toFixed(2)}
+            <div className={`text-2xl font-bold ${(analytics.sortino_ratio ?? 0) >= 1 ? 'text-green-500' : (analytics.sortino_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+              {safeFixed(analytics.sortino_ratio, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
               Risque baissier uniquement
@@ -557,7 +620,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${(diversification?.score || 0) >= 60 ? 'text-green-500' : (diversification?.score || 0) >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
-              {diversification?.score.toFixed(0)}/100
+              {safeFixed(diversification?.score, 0)}/100
             </div>
             <p className="text-xs text-muted-foreground">{diversification?.rating}</p>
           </CardContent>
@@ -575,9 +638,11 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {formatCurrency(Math.abs(analytics.var_95))}
+              {analytics.var_95 != null ? formatCurrency(Math.abs(analytics.var_95)) : '—'}
             </div>
-            <p className="text-xs text-muted-foreground">Perte max/jour</p>
+            <p className="text-xs text-muted-foreground">
+              {analytics.var_95_description || 'Perte max/jour (95%)'}
+            </p>
           </CardContent>
         </Card>
 
@@ -590,7 +655,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {formatCurrency(Math.abs(analytics.cvar_95))}
+              {analytics.cvar_95 != null ? formatCurrency(Math.abs(analytics.cvar_95)) : '—'}
             </div>
             <p className="text-xs text-muted-foreground">Expected Shortfall</p>
           </CardContent>
@@ -605,10 +670,10 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {analytics.max_drawdown.toFixed(1)}%
+              {safeFixed(analytics.max_drawdown, 1)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              Calmar: {analytics.calmar_ratio.toFixed(2)}
+              Calmar: {safeFixed(analytics.calmar_ratio, 2)}
             </p>
           </CardContent>
         </Card>
@@ -646,27 +711,37 @@ export default function AnalyticsPage() {
             <CardTitle>Répartition par classe d'actifs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={allocationByTypeData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}%`}
-                  >
-                    {allocationByTypeData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {allocationByTypeData.length <= 1 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-center">
+                <div className="h-24 w-24 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: `${COLORS[0]}20` }}>
+                  <span className="text-2xl font-bold" style={{ color: COLORS[0] }}>100%</span>
+                </div>
+                <p className="text-sm font-medium">{allocationByTypeData[0]?.name || 'N/A'}</p>
+                <p className="text-xs text-muted-foreground mt-1">Classe unique — diversifiez pour voir la répartition</p>
+              </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={allocationByTypeData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                    >
+                      {allocationByTypeData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -681,7 +756,7 @@ export default function AnalyticsPage() {
                     <HelpCircle className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    <p className="text-xs">Plus la surface est grande, meilleur est le profil. Chaque axe normalisé sur 100.</p>
+                    <p className="text-xs">Plus la surface est grande, meilleur est le profil. Rendement, Sharpe et Sortino centrés à 50 (neutre). Stabilité = 100 - |drawdown|.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -704,6 +779,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Monte Carlo + Optimization */}
+      {(monteCarlo?.simulations || optimization) && (
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Monte Carlo */}
         {monteCarlo && monteCarlo.simulations > 0 && (
@@ -725,27 +801,42 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="space-y-4">
                 {/* Optimal weights */}
-                <div className="space-y-2">
-                  {Object.entries(optimization.weights)
+                {(() => {
+                  const significantWeights = Object.entries(optimization.weights)
                     .sort((a, b) => b[1] - a[1])
                     .filter(([_, w]) => w >= 0.5)
-                    .map(([symbol, weight]) => {
-                      const current = analytics.allocation_by_asset[symbol] || 0
-                      const diff = weight - current
-                      return (
-                        <div key={symbol} className="flex items-center gap-2">
-                          <span className="text-sm font-medium w-16">{symbol}</span>
-                          <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${weight}%` }} />
-                          </div>
-                          <span className="text-xs font-mono w-12 text-right">{weight.toFixed(1)}%</span>
-                          <span className={`text-xs font-mono w-16 text-right ${diff > 0 ? 'text-green-500' : diff < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                            {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
-                          </span>
+                  const isSingleAsset = significantWeights.length === 1 && significantWeights[0][1] >= 99
+                  return (
+                    <>
+                      {isSingleAsset && (
+                        <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm">
+                          <Info className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                          <p className="text-yellow-600 dark:text-yellow-400">
+                            Avec seulement {Object.keys(optimization.weights).length} actif{Object.keys(optimization.weights).length > 1 ? 's' : ''}, l'optimisation concentre tout sur un seul. Ajoutez des actifs diversifiés pour une allocation plus pertinente.
+                          </p>
                         </div>
-                      )
-                    })}
-                </div>
+                      )}
+                      <div className="space-y-2">
+                        {significantWeights.map(([symbol, weight]) => {
+                          const current = analytics.allocation_by_asset[symbol] || 0
+                          const diff = weight - current
+                          return (
+                            <div key={symbol} className="flex items-center gap-2">
+                              <span className="text-sm font-medium w-16">{symbol}</span>
+                              <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${weight}%` }} />
+                              </div>
+                              <span className="text-xs font-mono w-12 text-right">{weight.toFixed(1)}%</span>
+                              <span className={`text-xs font-mono w-16 text-right ${diff > 0 ? 'text-green-500' : diff < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
                 {/* Expected metrics */}
                 <div className="grid grid-cols-3 gap-3 pt-2 border-t">
                   <div className="text-center">
@@ -766,8 +857,10 @@ export default function AnalyticsPage() {
           </Card>
         )}
       </div>
+      )}
 
       {/* Stress Test + Beta */}
+      {(stressTest?.scenarios?.length || betaData?.assets?.length) && (
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Stress Test */}
         {stressTest && stressTest.scenarios.length > 0 && (
@@ -784,6 +877,11 @@ export default function AnalyticsPage() {
               </CardTitle>
               <CardDescription>
                 Sensibilité de vos actifs par rapport au marché
+                {periodDays > 0 && periodDays < 30 && (
+                  <span className="block text-xs text-yellow-500 mt-1">
+                    Min. 30 jours requis pour le beta (calculé sur {betaDays}j)
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -851,6 +949,7 @@ export default function AnalyticsPage() {
           </Card>
         )}
       </div>
+      )}
 
       {/* Performance Chart */}
       <Card>
@@ -900,7 +999,7 @@ export default function AnalyticsPage() {
 
       {/* Correlation Matrix */}
       {correlation && correlation.symbols.length > 1 && (
-        <CorrelationMatrix correlation={correlation} />
+        <CorrelationMatrix correlation={correlation} days={periodDays || undefined} />
       )}
 
       {/* Recommendations */}

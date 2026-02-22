@@ -153,6 +153,7 @@ services:
     restart: unless-stopped
     environment:
       - VITE_API_URL=/api/v1
+      - VITE_HMR_DISABLE=true
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -20,6 +20,19 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    hmr: process.env.VITE_HMR_DISABLE === 'true'
+      ? false
+      : {
+          ...(process.env.VITE_HMR_PROTOCOL === 'wss'
+            ? { clientPort: 443, protocol: 'wss' as const }
+            : {}),
+        },
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     globals: true,

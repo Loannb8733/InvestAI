@@ -2,11 +2,12 @@
 
 import io
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from openpyxl import load_workbook
 
-from app.services.report_service import AssetReport, PortfolioSummary, ReportService, TaxTransaction
+from app.services.report_service import AssetReport, PortfolioSummary, ReportService, TaxSummary2086, TaxTransaction
 
 
 @pytest.fixture
@@ -171,24 +172,76 @@ class TestPerformanceExcel:
 class TestTaxExcel:
     """Tests for tax report Excel generation."""
 
-    def test_generates_bytes(self, report_service, sample_data):
-        result = report_service.generate_tax_excel(sample_data, 2025)
+    @pytest.fixture
+    def tax_summary_with_cession(self):
+        """TaxSummary2086 with 1 cession."""
+        return TaxSummary2086(
+            year=2025,
+            total_cessions=15000.0,
+            total_acquisitions_fraction=10000.0,
+            total_plus_values=5000.0,
+            total_moins_values=0.0,
+            net_plus_value=5000.0,
+            nb_cessions=1,
+            nb_court_terme=1,
+            nb_long_terme=0,
+            flat_tax_30=1500.0,
+            ir_12_8=640.0,
+            ps_17_2=860.0,
+            events=[],
+        )
+
+    @pytest.fixture
+    def tax_summary_empty(self):
+        """TaxSummary2086 with 0 cessions."""
+        return TaxSummary2086(
+            year=2025,
+            total_cessions=0.0,
+            total_acquisitions_fraction=0.0,
+            total_plus_values=0.0,
+            total_moins_values=0.0,
+            net_plus_value=0.0,
+            nb_cessions=0,
+            nb_court_terme=0,
+            nb_long_terme=0,
+            flat_tax_30=0.0,
+            ir_12_8=0.0,
+            ps_17_2=0.0,
+            events=[],
+        )
+
+    @pytest.mark.asyncio
+    async def test_generates_bytes(self, report_service, tax_summary_with_cession):
+        with patch.object(
+            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+        ):
+            result = await report_service.generate_tax_excel(None, "test_user", 2025)
         assert isinstance(result, bytes)
 
-    def test_sheet_title_contains_year(self, report_service, sample_data):
-        result = report_service.generate_tax_excel(sample_data, 2025)
+    @pytest.mark.asyncio
+    async def test_sheet_title_contains_year(self, report_service, tax_summary_with_cession):
+        with patch.object(
+            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+        ):
+            result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
-        assert "Fiscal 2025" in wb.sheetnames
+        assert "Résumé 2025" in wb.sheetnames
 
-    def test_transaction_count(self, report_service, sample_data):
-        result = report_service.generate_tax_excel(sample_data, 2025)
+    @pytest.mark.asyncio
+    async def test_transaction_count(self, report_service, tax_summary_with_cession):
+        with patch.object(
+            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+        ):
+            result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
         ws = wb.active
-        # B5 = nombre de ventes
+        # B5 = nombre de cessions
         assert ws["B5"].value == 1
 
-    def test_empty_transactions(self, report_service, empty_data):
-        result = report_service.generate_tax_excel(empty_data, 2025)
+    @pytest.mark.asyncio
+    async def test_empty_transactions(self, report_service, tax_summary_empty):
+        with patch.object(report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_empty):
+            result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
         ws = wb.active
-        assert ws["B5"].value == 0  # 0 sell transactions
+        assert ws["B5"].value == 0  # 0 cessions

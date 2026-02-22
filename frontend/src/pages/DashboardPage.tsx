@@ -185,6 +185,7 @@ interface DashboardMetrics {
 // ============== Constants ==============
 
 const PERIOD_OPTIONS = [
+  { label: '24h', value: 1 },
   { label: '7j', value: 7 },
   { label: '30j', value: 30 },
   { label: '90j', value: 90 },
@@ -374,11 +375,6 @@ export default function DashboardPage() {
     return live ? live.price : fallbackValue
   }
 
-  const getLiveChange = (symbol: string, fallbackPercent: number): number => {
-    const live = livePrices[symbol.toUpperCase()]
-    return live ? live.change_24h_percent : fallbackPercent
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -553,6 +549,7 @@ export default function DashboardPage() {
                     dailyChangePercent={metrics.daily_change_percent}
                     isDailyPositive={isDailyPositive}
                     portfoliosCount={metrics.portfolios_count}
+                    selectedPeriod={selectedPeriod}
                   />
                 )
               case 'pnl':
@@ -610,22 +607,21 @@ export default function DashboardPage() {
                 return metrics.index_comparison.length > 0 ? (
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Comparaison avec les indices (24h)</CardTitle>
+                      <CardTitle className="text-sm font-medium">Comparaison avec les indices ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex gap-6 flex-wrap">
-                        {metrics.index_comparison.map((index) => {
-                          const liveIndexPrice = getLivePrice(index.symbol, index.price)
-                          const liveIndexChange = getLiveChange(index.symbol, index.change_percent)
+                        {metrics.index_comparison.map((idx) => {
+                          const liveIndexPrice = getLivePrice(idx.symbol, idx.price)
                           return (
-                          <div key={index.symbol} className="flex items-center gap-3">
-                            <AssetIconCompact symbol={index.symbol} assetType={['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOT', 'AVAX', 'MATIC', 'LINK'].includes(index.symbol.toUpperCase()) ? 'crypto' : 'stock'} size={32} />
+                          <div key={idx.symbol} className="flex items-center gap-3">
+                            <AssetIconCompact symbol={idx.symbol} assetType={['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOT', 'AVAX', 'MATIC', 'LINK'].includes(idx.symbol.toUpperCase()) ? 'crypto' : 'stock'} size={32} />
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-medium">{index.name}</p>
-                                {livePrices[index.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
+                                <p className="text-sm font-medium">{idx.name}</p>
+                                {livePrices[idx.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
                               </div>
-                              <p className={`text-sm ${liveIndexChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{liveIndexChange >= 0 ? '▲ +' : '▼ '}{liveIndexChange.toFixed(2)}%</p>
+                              <p className={`text-sm ${idx.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{idx.change_percent >= 0 ? '▲ +' : '▼ '}{idx.change_percent.toFixed(2)}%</p>
                             </div>
                             <p className="text-sm text-muted-foreground ml-2">{formatCurrency(liveIndexPrice)}</p>
                           </div>)
@@ -667,28 +663,24 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.asset_allocation.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.asset_allocation.slice(0, 6).map((asset) => {
-                              const livePrice = livePrices[asset.symbol.toUpperCase()]
-                              const displayChange = livePrice ? livePrice.change_24h_percent : asset.gain_loss_percent
-                              return (
+                            {metrics.asset_allocation.slice(0, 6).map((asset) => (
                               <div key={asset.symbol} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={32} />
                                   <div>
                                     <div className="flex items-center gap-1.5">
                                       <p className="font-medium text-sm">{asset.symbol}</p>
-                                      {livePrice && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Prix live" />}
+                                      {livePrices[asset.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Prix live" />}
                                     </div>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(asset.value)}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-sm">{asset.percentage.toFixed(1)}%</p>
-                                  <p className={`text-xs ${displayChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>{displayChange >= 0 ? '▲' : '▼'} {formatPercent(displayChange)}</p>
+                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{asset.gain_loss_percent >= 0 ? '▲' : '▼'} {formatPercent(asset.gain_loss_percent)}</p>
                                 </div>
                               </div>
-                              )
-                            })}
+                            ))}
                             {metrics.asset_allocation.length > 6 && (<p className="text-xs text-muted-foreground text-center pt-2">+{metrics.asset_allocation.length - 6} autres actifs</p>)}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-8">Aucun actif</p>)}
@@ -798,9 +790,7 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.top_performers.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.top_performers.map((item, index) => {
-                              const liveChange = getLiveChange(item.symbol, item.gain_loss_percent)
-                              return (
+                            {metrics.top_performers.map((item, index) => (
                               <div key={`top-${item.symbol}-${index}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
@@ -809,9 +799,9 @@ export default function DashboardPage() {
                                     <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(liveChange)}</span></div>
-                              </div>)
-                            })}
+                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
+                              </div>
+                            ))}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-4">Aucun actif en gain</p>)}
                       </CardContent>
@@ -823,9 +813,7 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.worst_performers.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.worst_performers.map((item, index) => {
-                              const liveChange = getLiveChange(item.symbol, item.gain_loss_percent)
-                              return (
+                            {metrics.worst_performers.map((item, index) => (
                               <div key={`worst-${item.symbol}-${index}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
@@ -834,9 +822,9 @@ export default function DashboardPage() {
                                     <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(liveChange)}</span></div>
-                              </div>)
-                            })}
+                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
+                              </div>
+                            ))}
                           </div>
                         ) : (<p className="text-muted-foreground text-center py-4">Aucun actif en perte</p>)}
                       </CardContent>

@@ -1,6 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   TrendingUp,
   TrendingDown,
   Wallet,
@@ -8,6 +14,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Banknote,
+  Info,
 } from 'lucide-react'
 
 interface DashboardMetricsRowProps {
@@ -22,6 +29,7 @@ interface DashboardMetricsRowProps {
   dailyChangePercent: number
   isDailyPositive: boolean
   portfoliosCount: number
+  selectedPeriod: number
 }
 
 export default function DashboardMetricsRow({
@@ -36,7 +44,9 @@ export default function DashboardMetricsRow({
   dailyChangePercent,
   isDailyPositive,
   portfoliosCount,
+  selectedPeriod,
 }: DashboardMetricsRowProps) {
+  const periodLabel = selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <Card>
@@ -51,7 +61,21 @@ export default function DashboardMetricsRow({
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Capital Net</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help inline-flex items-center gap-1">
+                    Capital Net
+                    <Info className="h-3 w-3 text-muted-foreground" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Valeur actuelle de vos actifs + cash. Diffère du montant investi car il reflète les gains/pertes latents.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </CardTitle>
           <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -71,7 +95,7 @@ export default function DashboardMetricsRow({
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Variation 24h</CardTitle>
+          <CardTitle className="text-sm font-medium">Variation {periodLabel}</CardTitle>
           {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
         </CardHeader>
         <CardContent>

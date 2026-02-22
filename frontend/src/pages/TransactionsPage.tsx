@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -408,7 +408,8 @@ export default function TransactionsPage() {
     return sortedTransactions.slice(start, start + ITEMS_PER_PAGE)
   }, [sortedTransactions, currentPage])
 
-  useMemo(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     setCurrentPage(1)
   }, [selectedPortfolio, selectedAsset, selectedPlatform, selectedType, dateRange, searchQuery])
 

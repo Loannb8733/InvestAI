@@ -169,7 +169,7 @@ class MetricsService:
                 }
             )
 
-        # Calculate stablecoin cash value
+        # Calculate stablecoin cash value (filter out dust)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
         for asset in stablecoin_assets:
@@ -178,6 +178,8 @@ class MetricsService:
                 if float(asset.avg_buy_price) > 0
                 else float(asset.quantity)
             )
+            if value < min_value_eur:
+                continue
             cash_from_stablecoins += Decimal(str(value))
             stablecoin_list.append(
                 {
@@ -234,7 +236,10 @@ class MetricsService:
 
         # Map days to CoinGecko price_change_percentage param
         # Available: 1h, 24h, 7d, 14d, 30d, 200d, 1y
-        if days <= 7:
+        if days <= 1:
+            cg_period = "24h"
+            cg_key = "price_change_percentage_24h_in_currency"
+        elif days <= 7:
             cg_period = "7d"
             cg_key = "price_change_percentage_7d_in_currency"
         elif days <= 14:
@@ -473,6 +478,7 @@ class MetricsService:
                 }
                 for a in worst_performers
             ],
+            "period_changes": period_changes,
         }
 
     async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:

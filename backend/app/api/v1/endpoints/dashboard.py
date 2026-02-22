@@ -263,6 +263,7 @@ async def get_dashboard(
     # Get asset-level allocation with avg buy price
     asset_allocation = []
     all_assets_data = []
+    period_changes = metrics.get("period_changes", {})
     if metrics["assets_count"] > 0:
         result = await db.execute(
             select(Portfolio).where(
@@ -279,6 +280,9 @@ async def get_dashboard(
                     percentage = (
                         (asset["current_value"] / metrics["total_value"] * 100) if metrics["total_value"] > 0 else 0
                     )
+                    # Use period-specific change if available, otherwise fall back to all-time
+                    sym_upper = asset["symbol"].upper()
+                    period_change = period_changes.get(sym_upper, asset.get("gain_loss_percent", 0))
                     asset_allocation.append(
                         AssetAllocation(
                             symbol=asset["symbol"],
@@ -286,7 +290,7 @@ async def get_dashboard(
                             asset_type=asset["asset_type"],
                             value=asset["current_value"],
                             percentage=round(percentage, 2),
-                            gain_loss_percent=asset.get("gain_loss_percent", 0),
+                            gain_loss_percent=round(period_change, 2),
                             avg_buy_price=asset.get("avg_buy_price"),
                         )
                     )
@@ -303,7 +307,7 @@ async def get_dashboard(
     upcoming_events = await get_upcoming_events_internal(db, current_user, 30)
 
     # Get index comparison (BTC, ETH, SOL)
-    index_comparison = await get_index_comparison()
+    index_comparison = await get_index_comparison(days)
 
     # ============== Calculate Advanced Metrics ==============
 
@@ -378,9 +382,26 @@ async def get_dashboard(
     )
 
     # Calculate annualized ROI using CAGR formula
+    # Use actual investment duration (from first transaction) rather than the display period,
+    # which otherwise produces absurd extrapolations (e.g. -100% from a 30-day window).
     if metrics["total_invested"] > 0 and metrics["total_value"] > 0:
-        years = max(days, 30) / 365.0
+        first_tx_res = await db.execute(
+            select(func.min(Transaction.executed_at))
+            .join(Asset, Transaction.asset_id == Asset.id)
+            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+            .where(Portfolio.user_id == current_user.id)
+        )
+        first_tx_date = first_tx_res.scalar()
+        if first_tx_date:
+            if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
+                first_tx_date = first_tx_date.replace(tzinfo=None)
+            actual_days = max((datetime.utcnow() - first_tx_date).days, 30)
+        else:
+            actual_days = max(days, 30)
+        years = actual_days / 365.0
         roi_annualized = (pow(metrics["total_value"] / metrics["total_invested"], 1 / years) - 1) * 100
+        # Clamp to reasonable range
+        roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
     else:
         roi_annualized = 0.0
 
@@ -560,47 +581,33 @@ async def get_upcoming_events_internal(db: AsyncSession, current_user: User, day
     ]
 
 
-async def get_index_comparison() -> List[IndexComparison]:
-    """Get comparison with major indices/assets."""
+async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
+    """Get comparison with major indices/assets over the selected period."""
+    index_symbols = [
+        ("BTC", "Bitcoin"),
+        ("ETH", "Ethereum"),
+        ("SOL", "Solana"),
+    ]
     indices = []
 
     try:
-        # Get BTC price and 24h change
-        btc_data = await price_service.get_multiple_crypto_prices(["BTC"])
-        if "BTC" in btc_data:
-            indices.append(
-                IndexComparison(
-                    name="Bitcoin",
-                    symbol="BTC",
-                    change_percent=btc_data["BTC"].get("change_24h", 0),
-                    price=btc_data["BTC"]["price"],
-                )
-            )
+        # Fetch current prices
+        all_data = await price_service.get_multiple_crypto_prices([s for s, _ in index_symbols])
 
-        # Get ETH price and 24h change
-        eth_data = await price_service.get_multiple_crypto_prices(["ETH"])
-        if "ETH" in eth_data:
-            indices.append(
-                IndexComparison(
-                    name="Ethereum",
-                    symbol="ETH",
-                    change_percent=eth_data["ETH"].get("change_24h", 0),
-                    price=eth_data["ETH"]["price"],
-                )
-            )
+        # Fetch period-specific changes
+        period_changes = await metrics_service._fetch_period_changes({"crypto": [s for s, _ in index_symbols]}, days)
 
-        # Get SOL price
-        sol_data = await price_service.get_multiple_crypto_prices(["SOL"])
-        if "SOL" in sol_data:
-            indices.append(
-                IndexComparison(
-                    name="Solana",
-                    symbol="SOL",
-                    change_percent=sol_data["SOL"].get("change_24h", 0),
-                    price=sol_data["SOL"]["price"],
+        for symbol, name in index_symbols:
+            if symbol in all_data:
+                change = period_changes.get(symbol, all_data[symbol].get("change_24h", 0))
+                indices.append(
+                    IndexComparison(
+                        name=name,
+                        symbol=symbol,
+                        change_percent=change,
+                        price=all_data[symbol]["price"],
+                    )
                 )
-            )
-
     except Exception:
         pass
 

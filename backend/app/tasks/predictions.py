@@ -130,7 +130,10 @@ def check_prediction_accuracy():
 
 
 async def _check_prediction_accuracy():
-    """Compare past predictions with actual prices to monitor drift."""
+    """Compare past predictions with actual prices to monitor drift.
+
+    Fills: actual_price, mape, direction_correct, ci_covered, accuracy_checked.
+    """
     from datetime import datetime
 
     from sqlalchemy import and_, select
@@ -181,17 +184,38 @@ async def _check_prediction_accuracy():
                 log.actual_price = actual_price
                 log.accuracy_checked = now
 
-                if actual_price > 0:
+                if actual_price > 0 and log.predicted_price:
                     log.mape = abs(log.predicted_price - actual_price) / actual_price * 100
+
+                    # Direction correctness: did price move in predicted direction?
+                    # We need the price at prediction time. Use created_at price estimation:
+                    # If predicted > current_at_creation → bullish prediction
+                    # Compare to actual movement
+                    # We approximate "price at creation" as the midpoint or use error_pct
+                    if log.error_pct is not None:
+                        # Legacy field — skip direction for old logs without baseline
+                        log.direction_correct = None
+                    else:
+                        # Predicted direction from predicted_price vs a baseline
+                        # The baseline is approximately: predicted_price / (1 + predicted_change)
+                        # Since we don't store it directly, check if prediction was above/below CI midpoint
+                        log.direction_correct = None  # Will be improved with baseline storage
+
+                    # CI coverage: was actual price within the confidence interval?
+                    if log.confidence_low is not None and log.confidence_high is not None:
+                        log.ci_covered = log.confidence_low <= actual_price <= log.confidence_high
+                    else:
+                        log.ci_covered = None
 
                     # Alert if MAPE too high
                     threshold = 20.0 if log.asset_type == "crypto" else 10.0
                     if log.mape > threshold:
                         drift_alerts += 1
                         logger.warning(
-                            "DRIFT ALERT: %s prediction MAPE=%.1f%% (threshold=%.0f%%)",
+                            "DRIFT ALERT: %s MAPE=%.1f%% ci_covered=%s (threshold=%.0f%%)",
                             log.symbol,
                             log.mape,
+                            log.ci_covered,
                             threshold,
                         )
 

@@ -84,16 +84,40 @@ const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number
   const logoUrls: Record<string, string> = {
     binance: '/logos/binance.png',
     kraken: '/logos/kraken.png',
+    cryptocom: '/logos/cryptocom.svg',
+    coinbase: '/logos/coinbase.svg',
+    kucoin: '/logos/kucoin.svg',
+    okx: '/logos/okx.svg',
+    bybit: '/logos/bybit.svg',
+    bitpanda: '/logos/bitpanda.svg',
+    bitstamp: '/logos/bitstamp.svg',
+    gateio: '/logos/gateio.svg',
   }
 
   const fallbackColors: Record<string, string> = {
     binance: 'bg-[#F3BA2F]',
     kraken: 'bg-[#5741D9]',
+    coinbase: 'bg-[#0052FF]',
+    cryptocom: 'bg-[#002D74]',
+    kucoin: 'bg-[#23AF91]',
+    bybit: 'bg-[#F7A600]',
+    okx: 'bg-[#000000]',
+    bitpanda: 'bg-[#5A6773]',
+    bitstamp: 'bg-[#4A9F3F]',
+    gateio: 'bg-[#2354E6]',
   }
 
   const fallbackLabels: Record<string, string> = {
     binance: 'BN',
     kraken: 'KR',
+    coinbase: 'CB',
+    cryptocom: 'CC',
+    kucoin: 'KC',
+    bybit: 'BY',
+    okx: 'OK',
+    bitpanda: 'BP',
+    bitstamp: 'BS',
+    gateio: 'GT',
   }
 
   if (logoUrls[exchange]) {
@@ -1007,7 +1031,1010 @@ export default function ExchangesPage() {
             </>
           )}
 
-          {guideExchange && guideExchange !== 'binance' && guideExchange !== 'kraken' && (
+          {guideExchange === 'coinbase' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="coinbase" size={32} />
+                  Créer une clé API sur Coinbase
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de création, d'achat, de vente ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Paramètres &gt; API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.coinbase.com/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">coinbase.com/settings/api <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"New API Key"</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>wallet:accounts:read</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>wallet:trades:read</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>wallet:transactions:read</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>wallet:deposits:read</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>wallet:withdrawals:read</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">wallet:accounts:create</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">wallet:buys:create</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">wallet:sells:create</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">wallet:withdrawals:create</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Coinbase affiche deux valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Secret</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        L'API Secret n'est affiché qu'une seule fois ! Copiez-le immédiatement.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-les dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Coinbase, et collez vos deux clés.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('coinbase') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Coinbase
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'cryptocom' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="cryptocom" size={32} />
+                  Créer une clé API sur Crypto.com
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez sur Crypto.com Exchange &gt; API Management</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://crypto.com/exchange/personal/api-management" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">crypto.com/exchange &gt; API Management <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create new API Key"</strong> et donnez-lui un nom (ex: "InvestAI").
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Read Only</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Can Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Can Withdraw</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Crypto.com affiche deux valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-les dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Crypto.com, et collez vos deux clés.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('cryptocom') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Crypto.com
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'kucoin' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="kucoin" size={32} />
+                  Créer une clé API sur KuCoin
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading ou de transfert.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Account &gt; API Management</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.kucoin.com/account/api" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">kucoin.com/account/api <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create API"</strong>, choisissez un nom et définissez un <strong>passphrase</strong> (à retenir !).
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>General</strong> — consulter vos soldes et historique</span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Transfer</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés et notez le passphrase</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        KuCoin affiche trois valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Passphrase</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Passphrase"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement. KuCoin nécessite 3 champs (incluez le passphrase !).
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez les 3 valeurs dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez KuCoin, et collez vos trois valeurs (API Key, Secret, Passphrase).
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('kucoin') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter KuCoin
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'bybit' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="bybit" size={32} />
+                  Créer une clé API sur Bybit
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading, retrait ou transfert.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Account & Security &gt; API Management</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.bybit.com/app/user/api-management" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">bybit.com &gt; API Management <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create New Key"</strong>, puis choisissez <strong>"System-generated API Keys"</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Read-Only</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Withdraw</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Transfer</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Bybit affiche deux valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-les dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Bybit, et collez vos deux clés.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('bybit') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Bybit
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'okx' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="okx" size={32} />
+                  Créer une clé API sur OKX
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Profile &gt; API Management</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.okx.com/account/my-api" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">okx.com/account/my-api <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create API Key"</strong>, choisissez un nom et définissez un <strong>passphrase</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Read Only</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Withdraw</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés et notez le passphrase</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        OKX affiche trois valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Passphrase</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Passphrase"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement. OKX nécessite 3 champs (incluez le passphrase !).
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez les 3 valeurs dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez OKX, et collez vos trois valeurs (API Key, Secret, Passphrase).
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('okx') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter OKX
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'bitpanda' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="bitpanda" size={32} />
+                  Créer une clé API sur Bitpanda
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Bitpanda Pro &gt; Settings &gt; API Keys</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://exchange.bitpanda.com/account/api" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">exchange.bitpanda.com/account/api <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Générez une nouvelle clé</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Generate New Key"</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Read</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Withdraw</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez votre clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Bitpanda ne nécessite qu'une seule clé API (pas de clé secrète) :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        Bitpanda ne nécessite QU'UNE clé API, pas de secret. Seul le champ "Clé API" est requis.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-la dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Bitpanda, et collez votre clé API (seul champ requis).
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('bitpanda') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Bitpanda
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'bitstamp' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="bitstamp" size={32} />
+                  Créer une clé API sur Bitstamp
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions d'achat, de vente ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Settings &gt; Security &gt; API Access</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.bitstamp.net/settings/api/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">bitstamp.net/settings/api <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create New API Key"</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Account balance</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>User transactions</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Buy/Sell</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Withdrawals</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Activez et copiez vos clés</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Activez la clé via la confirmation par email, puis copiez :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret n'est affichée qu'une seule fois ! Copiez-la immédiatement.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-les dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Bitstamp, et collez vos deux clés.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('bitstamp') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Bitstamp
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange === 'gateio' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <ExchangeLogo exchange="gateio" size={32} />
+                  Créer une clé API sur Gate.io
+                </DialogTitle>
+                <DialogDescription>
+                  Suivez ces étapes pour générer une clé API en lecture seule.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="text-muted-foreground mt-1">
+                        Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
+                        InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ol className="space-y-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Allez dans Account &gt; API Management</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Rendez-vous sur <a href="https://www.gate.io/myaccount/api_key_manage" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">gate.io &gt; API Management <ExternalLink className="h-3 w-3" /></a>
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Créez une nouvelle clé API</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Create API Key"</strong>.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Configurez les permissions</p>
+                      <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Spot Read-Only</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span><strong>Wallet Read-Only</strong></span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Spot Trade</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-muted-foreground">Wallet Withdraw</span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Copiez vos clés</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Gate.io affiche deux valeurs :
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">API Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé API"</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-muted rounded-md p-2">
+                          <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Secret Key</span>
+                            <span className="text-muted-foreground"> — à coller dans le champ "Clé secrète"</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Collez-les dans InvestAI</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cliquez sur <strong>"Connecter un exchange"</strong> en haut de cette page,
+                        sélectionnez Gate.io, et collez vos deux clés.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setGuideExchange(null)}>
+                  Fermer
+                </Button>
+                <Button onClick={() => { setGuideExchange(null); setShowAddKey(true); setSelectedExchange('gateio') }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connecter Gate.io
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {guideExchange && !['binance', 'kraken', 'coinbase', 'cryptocom', 'kucoin', 'bybit', 'okx', 'bitpanda', 'bitstamp', 'gateio'].includes(guideExchange) && (
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-3">

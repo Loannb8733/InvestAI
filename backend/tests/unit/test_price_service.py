@@ -12,7 +12,6 @@ import pytest
 
 from app.services.price_service import PriceService
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -217,8 +216,8 @@ class TestGetCryptoPrice:
         async def mock_get(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count <= 2:
-                # First calls: CoinGecko search + price (both fail)
+            if call_count <= 1:
+                # First call: CoinGecko price (fails) — BTC is in SYMBOL_MAP so no search call
                 return coingecko_response
             return cryptocompare_response
 
@@ -356,19 +355,19 @@ class TestGetPrice:
     @pytest.mark.asyncio
     async def test_dispatches_stock(self, price_service):
         price_service.get_stock_price = AsyncMock(return_value={"price": Decimal("150")})
-        result = await price_service.get_price("AAPL", "stock")
+        await price_service.get_price("AAPL", "stock")
         price_service.get_stock_price.assert_called_once_with("AAPL")
 
     @pytest.mark.asyncio
     async def test_dispatches_etf(self, price_service):
         price_service.get_stock_price = AsyncMock(return_value={"price": Decimal("50")})
-        result = await price_service.get_price("SPY", "etf")
+        await price_service.get_price("SPY", "etf")
         price_service.get_stock_price.assert_called_once_with("SPY")
 
     @pytest.mark.asyncio
     async def test_dispatches_real_estate(self, price_service):
         price_service.get_real_estate_price = AsyncMock(return_value=None)
-        result = await price_service.get_price("PROP1", "real_estate")
+        await price_service.get_price("PROP1", "real_estate")
         price_service.get_real_estate_price.assert_called_once_with("PROP1")
 
     @pytest.mark.asyncio

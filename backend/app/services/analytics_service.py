@@ -4,14 +4,17 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
+import httpx
 import numpy as np
 from scipy import optimize as sp_optimize
+from scipy.stats import spearmanr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -81,6 +84,9 @@ class PortfolioAnalytics:
     assets: List[AssetPerformance]
     best_performer: Optional[str]
     worst_performer: Optional[str]
+
+    # Human-readable VaR explanation (P12)
+    var_95_description: str = ""
 
 
 @dataclass
@@ -233,19 +239,19 @@ def _cvar_historical(returns: np.ndarray, confidence: float = 0.95) -> float:
     return float(-np.mean(tail) * 100)
 
 
-def _sharpe(return_pct: float, volatility: float) -> float:
+def _sharpe(return_pct: float, volatility: float, risk_free_rate: float = RISK_FREE_RATE) -> float:
     """Sharpe ratio. return_pct and volatility in % (annualized)."""
     if volatility == 0:
         return 0.0
-    excess = return_pct - (RISK_FREE_RATE * 100)
+    excess = return_pct - (risk_free_rate * 100)
     return round(excess / volatility, 2)
 
 
-def _sortino(return_pct: float, downside_dev: float) -> float:
+def _sortino(return_pct: float, downside_dev: float, risk_free_rate: float = RISK_FREE_RATE) -> float:
     """Sortino ratio."""
     if downside_dev == 0:
         return 0.0
-    excess = return_pct - (RISK_FREE_RATE * 100)
+    excess = return_pct - (risk_free_rate * 100)
     return round(excess / downside_dev, 2)
 
 
@@ -257,12 +263,17 @@ def _calmar(return_pct: float, max_dd: float) -> float:
 
 
 def _annualized_return(returns: np.ndarray, asset_type=None) -> float:
-    """Annualized return (%) from daily log returns."""
+    """Annualized return (%) from daily log returns.
+
+    Converts continuous (log) return to discrete % for human-readable display:
+    discrete_annual = (exp(mean_daily * td) - 1) * 100
+    This avoids misleading values like -328% for assets that dropped ~96%.
+    """
     if len(returns) < 2:
         return 0.0
     td = _trading_days(asset_type) if asset_type else 365
     mean_daily = float(np.mean(returns))
-    return mean_daily * td * 100
+    return (np.exp(mean_daily * td) - 1) * 100
 
 
 def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Optional[float]:
@@ -284,22 +295,69 @@ def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Option
     try:
         result = sp_optimize.brentq(npv, -0.99, 10.0, maxiter=200)
         return float(result)
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError, TypeError, OverflowError):
         try:
             result = sp_optimize.newton(npv, guess, maxiter=200)
             return float(result)
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, TypeError, OverflowError):
             return None
 
 
 class AnalyticsService:
     """Service for advanced portfolio analytics."""
 
+    # ECB Data Portal API — deposit facility rate (risk-free proxy for EUR)
+    _ECB_DFR_URL = (
+        "https://data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV" "?lastNObservations=1&format=jsondata"
+    )
+    _ECB_RATE_TTL = 86400  # 24h cache
+
     def __init__(self):
         self.price_service = PriceService()
         # In-memory cache: key -> (timestamp, dates, prices)
         self._history_cache: Dict[str, Tuple[float, List[datetime], List[float]]] = {}
         self._fetch_lock = asyncio.Lock()
+        # ECB risk-free rate cache: (timestamp, rate_decimal)
+        self._ecb_rate_cache: Optional[Tuple[float, float]] = None
+
+    async def _fetch_risk_free_rate(self) -> float:
+        """Fetch ECB deposit facility rate with 24h in-memory cache.
+
+        Returns the rate as a decimal (e.g. 0.035 for 3.5%).
+        Falls back to RISK_FREE_RATE constant on failure.
+        """
+        now = time.time()
+        if self._ecb_rate_cache:
+            ts, rate = self._ecb_rate_cache
+            if now - ts < self._ECB_RATE_TTL:
+                return rate
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(self._ECB_DFR_URL)
+                resp.raise_for_status()
+                data = resp.json()
+
+            # Navigate SDMX-JSON structure to extract the rate value
+            datasets = data.get("dataSets", [{}])
+            if datasets:
+                series = datasets[0].get("series", {})
+                # Single series: key "0:0:0:0:0:0:0"
+                for key, series_data in series.items():
+                    observations = series_data.get("observations", {})
+                    if observations:
+                        # Get the last observation value
+                        last_obs_key = max(observations.keys(), key=int)
+                        rate_pct = float(observations[last_obs_key][0])
+                        rate_decimal = rate_pct / 100.0
+                        self._ecb_rate_cache = (now, rate_decimal)
+                        logger.info("ECB deposit facility rate: %.2f%%", rate_pct)
+                        return rate_decimal
+
+        except Exception as e:
+            logger.warning("Failed to fetch ECB risk-free rate: %s — using fallback %.1f%%", e, RISK_FREE_RATE * 100)
+
+        return RISK_FREE_RATE
 
     # ------------------------------------------------------------------
     # Data fetching
@@ -370,6 +428,53 @@ class AnalyticsService:
             return float(asset.avg_buy_price)
 
     # ------------------------------------------------------------------
+    # Shared: fetch user assets (filtered, deduplicated)
+    # ------------------------------------------------------------------
+
+    async def _get_user_assets(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        exclude_stablecoins: bool = True,
+        min_value: float = 0.10,
+    ) -> List[Asset]:
+        """Get user assets with consistent filtering (no dust, no stablecoins by default)."""
+        if portfolio_id:
+            result = await db.execute(
+                select(Asset).where(
+                    Asset.portfolio_id == portfolio_id,
+                    Asset.quantity > 0,
+                )
+            )
+        else:
+            result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+            portfolios = result.scalars().all()
+            pids = [p.id for p in portfolios]
+            if not pids:
+                return []
+            result = await db.execute(
+                select(Asset).where(
+                    Asset.portfolio_id.in_(pids),
+                    Asset.quantity > 0,
+                )
+            )
+
+        assets = result.scalars().all()
+
+        filtered = []
+        for a in assets:
+            # Filter stablecoins
+            if exclude_stablecoins and PriceService.is_stablecoin(a.symbol):
+                continue
+            # Filter dust by estimated value
+            est_value = float(a.quantity) * float(a.avg_buy_price) if a.avg_buy_price else 0
+            if est_value < min_value:
+                continue
+            filtered.append(a)
+        return filtered
+
+    # ------------------------------------------------------------------
     # Core: build asset-level metrics
     # ------------------------------------------------------------------
 
@@ -403,6 +508,10 @@ class AnalyticsService:
             dr = _daily_return_pct(hist_prices)
 
             is_stable = PriceService.is_stablecoin(asset.symbol)
+
+            # Skip dust positions (value < $0.10)
+            if current_value < 0.10:
+                continue
 
             asset_data.append(
                 {
@@ -537,8 +646,9 @@ class AnalyticsService:
         if not assets:
             return self._empty_analytics()
 
+        risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
-        return self._assemble_analytics(asset_data)
+        return self._assemble_analytics(asset_data, risk_free_rate=risk_free_rate)
 
     async def get_user_analytics(
         self,
@@ -569,6 +679,7 @@ class AnalyticsService:
         if not assets:
             return self._empty_analytics()
 
+        risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
 
         # Aggregate by symbol
@@ -585,19 +696,22 @@ class AnalyticsService:
             d["gain_loss"] = d["current_value"] - d["total_invested"]
             d["gain_loss_percent"] = (d["gain_loss"] / d["total_invested"] * 100) if d["total_invested"] > 0 else 0
 
-        return self._assemble_analytics(list(aggregated.values()))
+        return self._assemble_analytics(list(aggregated.values()), risk_free_rate=risk_free_rate)
 
-    def _assemble_analytics(self, asset_data: list) -> PortfolioAnalytics:
+    def _assemble_analytics(self, asset_data: list, risk_free_rate: float = RISK_FREE_RATE) -> PortfolioAnalytics:
         """From a list of asset dicts, compute all portfolio-level analytics."""
-        total_value = sum(d["current_value"] for d in asset_data)
-        total_invested = sum(d["total_invested"] for d in asset_data)
+        # Separate stablecoins from real assets
+        real_assets = [d for d in asset_data if not d.get("is_stablecoin", False)]
+
+        total_value = sum(d["current_value"] for d in real_assets)
+        total_invested = sum(d["total_invested"] for d in real_assets)
         total_gl = total_value - total_invested
         total_gl_pct = (total_gl / total_invested * 100) if total_invested > 0 else 0
 
         # Weights & allocation
         allocation_by_type: Dict[str, float] = {}
         allocation_by_asset: Dict[str, float] = {}
-        for d in asset_data:
+        for d in real_assets:
             a = d["asset"]
             w = (d["current_value"] / total_value * 100) if total_value > 0 else 0
             d["weight"] = w
@@ -605,8 +719,8 @@ class AnalyticsService:
             allocation_by_type[at] = allocation_by_type.get(at, 0) + w
             allocation_by_asset[a.symbol] = w
 
-        # Portfolio-level risk
-        pm = self._build_portfolio_metrics(asset_data, total_value)
+        # Portfolio-level risk (only real assets)
+        pm = self._build_portfolio_metrics(real_assets, total_value)
 
         vol = pm["volatility"]
         dd_dev = pm["downside_dev"]
@@ -615,19 +729,24 @@ class AnalyticsService:
         var95_pct = pm["var_95_pct"]
         cvar95_pct = pm["cvar_95_pct"]
 
-        sharpe = _sharpe(ann_ret, vol)
-        sortino = _sortino(ann_ret, dd_dev)
+        sharpe = _sharpe(ann_ret, vol, risk_free_rate)
+        sortino = _sortino(ann_ret, dd_dev, risk_free_rate)
         calmar = _calmar(ann_ret, max_dd)
 
         var_95_eur = round(total_value * var95_pct / 100, 2)
         cvar_95_eur = round(total_value * cvar95_pct / 100, 2)
+        var_95_desc = (
+            (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR " f"({var95_pct:.2f}% du portefeuille)")
+            if var95_pct > 0
+            else ""
+        )
 
         concentration = self._hhi(allocation_by_asset)
-        diversification = self._diversification_score(len(asset_data), len(allocation_by_type), concentration)
+        diversification = self._diversification_score(len(real_assets), len(allocation_by_type), concentration)
 
-        # Build per-asset performances
+        # Build per-asset performances (exclude stablecoins)
         perfs = []
-        for d in asset_data:
+        for d in real_assets:
             a = d["asset"]
             v = d["volatility"]
             dd_d = d["downside_dev"]
@@ -644,8 +763,8 @@ class AnalyticsService:
                     weight=d["weight"],
                     daily_return=round(d["daily_return"], 2),
                     volatility_30d=round(v, 1),
-                    sharpe_ratio=_sharpe(ann_r, v),
-                    sortino_ratio=_sortino(ann_r, dd_d),
+                    sharpe_ratio=_sharpe(ann_r, v, risk_free_rate),
+                    sortino_ratio=_sortino(ann_r, dd_d, risk_free_rate),
                     max_drawdown=round(d["max_drawdown"], 2),
                 )
             )
@@ -666,9 +785,10 @@ class AnalyticsService:
             max_drawdown=max_dd,
             var_95=var_95_eur,
             cvar_95=cvar_95_eur,
+            var_95_description=var_95_desc,
             diversification_score=diversification,
             concentration_risk=concentration,
-            asset_count=len(asset_data),
+            asset_count=len(real_assets),
             allocation_by_type=allocation_by_type,
             allocation_by_asset=allocation_by_asset,
             assets=perfs,
@@ -689,34 +809,10 @@ class AnalyticsService:
     ) -> CorrelationData:
         """Calculate correlation matrix from real historical returns."""
 
-        if portfolio_id:
-            result = await db.execute(
-                select(Asset).where(
-                    Asset.portfolio_id == portfolio_id,
-                    Asset.quantity > 0,
-                )
-            )
-        else:
-            result = await db.execute(
-                select(Portfolio).where(
-                    Portfolio.user_id == user_id,
-                )
-            )
-            portfolios = result.scalars().all()
-            pids = [p.id for p in portfolios]
-            result = await db.execute(
-                select(Asset).where(
-                    Asset.portfolio_id.in_(pids),
-                    Asset.quantity > 0,
-                )
-            )
+        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
-        assets = result.scalars().all()
         seen = {}
         for a in assets:
-            # Exclude stablecoins from correlation matrix (near-zero variance)
-            if PriceService.is_stablecoin(a.symbol):
-                continue
             if a.symbol not in seen:
                 seen[a.symbol] = a
         symbols = list(seen.keys())
@@ -747,7 +843,13 @@ class AnalyticsService:
 
         min_len = min(len(returns_map[s]) for s in valid_symbols)
         aligned = {s: returns_map[s][-min_len:] for s in valid_symbols}
-        matrix_np = np.corrcoef([aligned[s] for s in valid_symbols])
+        # P14: Spearman rank correlation — more robust for fat-tailed crypto distributions
+        stacked = np.array([aligned[s] for s in valid_symbols])
+        corr_result = spearmanr(stacked, axis=1)
+        matrix_np = corr_result.statistic
+        # spearmanr returns a scalar for exactly 2 variables — expand to 2x2 matrix
+        if np.ndim(matrix_np) == 0:
+            matrix_np = np.array([[1.0, float(matrix_np)], [float(matrix_np), 1.0]])
 
         full_n = len(symbols)
         matrix = [[0.0] * full_n for _ in range(full_n)]
@@ -762,9 +864,10 @@ class AnalyticsService:
                     corr = 0.0
                 matrix[i][j] = round(corr, 3)
                 if vi < vj:
-                    if corr > 0.7:
+                    strong_pos, neg_th = adaptive_th.correlation_thresholds()
+                    if corr > strong_pos:
                         strongly.append((s1, s2, round(corr, 3)))
-                    elif corr < -0.3:
+                    elif corr < neg_th:
                         negatively.append((s1, s2, round(corr, 3)))
 
         for i in range(full_n):
@@ -793,13 +896,14 @@ class AnalyticsService:
         else:
             analytics = await self.get_user_analytics(db, user_id, days=days)
 
+        conc_warn, conc_crit = adaptive_th.concentration_thresholds()
         recs = []
-        if analytics.concentration_risk > 0.25:
+        if analytics.concentration_risk > conc_warn:
             top = sorted(analytics.allocation_by_asset.items(), key=lambda x: -x[1])[:3]
             recs.append(
                 {
                     "type": "concentration",
-                    "severity": "high" if analytics.concentration_risk > 0.4 else "medium",
+                    "severity": "high" if analytics.concentration_risk > conc_crit else "medium",
                     "message": f"Concentration élevée: {top[0][0]} représente {top[0][1]:.1f}% du portefeuille",
                     "action": "Envisagez de diversifier vers d'autres actifs",
                 }
@@ -853,24 +957,12 @@ class AnalyticsService:
         user_id: str,
         horizon_days: int = 90,
         num_simulations: int = 5000,
+        portfolio_id: Optional[str] = None,
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
         # Get user assets
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
+        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
         if not assets:
             return MonteCarloResult(
@@ -936,8 +1028,9 @@ class AnalyticsService:
             # Fallback: use diagonal (uncorrelated) if Cholesky fails
             L = np.diag(np.sqrt(np.diag(cov_matrix)))
 
-        # Simulate correlated multi-asset returns
-        rng = np.random.default_rng(42)
+        # Simulate correlated multi-asset returns (P13: dynamic seed, not fixed)
+        seed = int(time.time()) ^ (hash(user_id) % (2**31))
+        rng = np.random.default_rng(seed & 0x7FFFFFFF)
         # Z ~ N(0, I) of shape (num_simulations, horizon_days, n_assets)
         Z = rng.standard_normal(size=(num_simulations, horizon_days, n_assets))
         # Correlated returns: each day, R = mu + L @ z
@@ -1025,36 +1118,26 @@ class AnalyticsService:
         db: AsyncSession,
         user_id: str,
         objective: str = "max_sharpe",
+        days: int = 90,
     ) -> Optional[OptimizationResult]:
         """
         Find optimal portfolio weights using Modern Portfolio Theory.
         objective: "max_sharpe" or "min_volatility"
         """
 
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
+        assets = await self._get_user_assets(db, user_id)
 
         seen = {}
         for a in assets:
             if a.symbol not in seen:
                 seen[a.symbol] = a
 
+        risk_free_rate = await self._fetch_risk_free_rate()
+
         symbols = []
         returns_list = []
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=90)
+            _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
             rets = _compute_returns(prices)
             if len(rets) >= 10:
                 symbols.append(sym)
@@ -1077,7 +1160,7 @@ class AnalyticsService:
             vol = np.sqrt(w @ cov @ w)
             if vol == 0:
                 return 0
-            return -(ret - RISK_FREE_RATE) / vol
+            return -(ret - risk_free_rate) / vol
 
         def portfolio_vol(w):
             return np.sqrt(w @ cov @ w)
@@ -1095,9 +1178,12 @@ class AnalyticsService:
             return None
 
         opt_w = res.x
-        opt_ret = float(opt_w @ mu) * 100
+        # Convert annualized log return to discrete % for display
+        # log return * td is continuous; (exp(r) - 1)*100 gives intuitive %
+        ann_log_ret = float(opt_w @ mu)
+        opt_ret = (np.exp(ann_log_ret) - 1) * 100  # discrete annualized %
         opt_vol = float(np.sqrt(opt_w @ cov @ opt_w)) * 100
-        opt_sharpe = _sharpe(opt_ret, opt_vol)
+        opt_sharpe = _sharpe(opt_ret, opt_vol, risk_free_rate)
 
         weights = {sym: round(float(opt_w[i]) * 100, 2) for i, sym in enumerate(symbols)}
 
@@ -1143,38 +1229,44 @@ class AnalyticsService:
         for tx in transactions:
             amount = float(tx.quantity) * float(tx.price)
             fee = float(tx.fee or 0)
+            # Ensure timezone-aware datetime
+            dt = tx.executed_at
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
             if tx.transaction_type in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
                 # Cash outflow (investment) — negative for XIRR convention
-                cashflows.append((tx.executed_at, -(amount + fee)))
+                cashflows.append((dt, -(amount + fee)))
             elif tx.transaction_type in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
                 # Cash inflow — positive
-                cashflows.append((tx.executed_at, amount - fee))
+                cashflows.append((dt, amount - fee))
             elif tx.transaction_type in [TransactionType.STAKING_REWARD, TransactionType.AIRDROP]:
-                cashflows.append((tx.executed_at, amount))
+                cashflows.append((dt, amount))
 
         if not cashflows:
             return None
 
         # Add current portfolio value as final cashflow (positive)
-        asset_result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = asset_result.scalars().all()
+        assets = await self._get_user_assets(db, user_id, exclude_stablecoins=False)
         current_value = 0.0
         for asset in assets:
-            # Use cached history price to avoid extra CoinGecko calls
-            _, hist = await self._fetch_history(asset.symbol, asset.asset_type, days=60)
-            price = hist[-1] if hist and hist[-1] > 0 else float(asset.avg_buy_price)
+            price = await self._get_asset_price(asset)
             current_value += float(asset.quantity) * price
 
-        cashflows.append((datetime.utcnow(), current_value))
+        if current_value <= 0:
+            return None
+
+        cashflows.append((datetime.now(timezone.utc), current_value))
+
+        # Guard: need at least one investment + current value
+        negatives = sum(1 for _, a in cashflows if a < 0)
+        if negatives == 0:
+            return None
 
         rate = _xirr(cashflows)
         if rate is not None:
-            return round(rate * 100, 2)  # as percentage
+            # Clamp to reasonable range: -95% to +1000%
+            rate_pct = round(rate * 100, 2)
+            return max(-95.0, min(rate_pct, 1000.0))
         return None
 
     # ------------------------------------------------------------------
@@ -1185,6 +1277,7 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
+        portfolio_id: Optional[str] = None,
     ) -> dict:
         """Run stress tests simulating historical crash scenarios on the portfolio.
 
@@ -1195,24 +1288,10 @@ class AnalyticsService:
         - Rising rates shock: ~-15% stocks/ETF, ~-20% crypto
         - Flash crash: ~-10% all assets in 1 day
         """
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
+        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
-        if not pids:
+        if not assets:
             return {"scenarios": [], "total_value": 0}
-
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
 
         # Current values
         asset_values: Dict[str, Tuple[str, float]] = {}  # symbol -> (asset_type, value)
@@ -1311,6 +1390,7 @@ class AnalyticsService:
         db: AsyncSession,
         user_id: str,
         days: int = 90,
+        portfolio_id: Optional[str] = None,
     ) -> dict:
         """Compute beta of each asset and the portfolio vs relevant benchmarks.
 
@@ -1318,24 +1398,10 @@ class AnalyticsService:
         - Stock/ETF assets: beta vs SPY (S&P 500)
         Beta = Cov(asset, benchmark) / Var(benchmark)
         """
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
+        raw_assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
-        if not pids:
+        if not raw_assets:
             return {"assets": [], "portfolio_beta_crypto": None, "portfolio_beta_stock": None}
-
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        raw_assets = result.scalars().all()
 
         # Deduplicate
         seen: Dict[str, Asset] = {}
@@ -1428,20 +1494,19 @@ class AnalyticsService:
 
     @staticmethod
     def _interpret_beta(beta: Optional[float]) -> str:
-        """Interpret beta value in French."""
+        """Interpret beta value in French using centralized classification."""
         if beta is None:
             return "Données insuffisantes"
-        if beta > 1.5:
-            return "Très agressif — amplifie les mouvements du marché"
-        if beta > 1.0:
-            return "Agressif — plus volatil que le marché"
-        if beta > 0.8:
-            return "Neutre — suit le marché"
-        if beta > 0.3:
-            return "Défensif — moins volatil que le marché"
-        if beta > -0.1:
-            return "Très défensif — quasi décorrélé du marché"
-        return "Inversement corrélé — se comporte à l'inverse du marché"
+        category = adaptive_th.beta_classification(beta)
+        labels = {
+            "very_aggressive": "Très agressif — amplifie les mouvements du marché",
+            "aggressive": "Agressif — plus volatil que le marché",
+            "neutral": "Neutre — suit le marché",
+            "defensive": "Défensif — moins volatil que le marché",
+            "very_defensive": "Très défensif — quasi décorrélé du marché",
+            "inverse": "Inversement corrélé — se comporte à l'inverse du marché",
+        }
+        return labels.get(category, "Données insuffisantes")
 
     # ------------------------------------------------------------------
     # Parametric VaR (#16)

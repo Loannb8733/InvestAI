@@ -1,5 +1,7 @@
 """Anomaly detection using Isolation Forest and Z-score."""
 
+import asyncio
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -7,13 +9,21 @@ from typing import List, Optional
 
 import numpy as np
 
+from app.ml import adaptive_thresholds as at
+from app.ml.market_context import MarketContext
+
 logger = logging.getLogger(__name__)
+
+
+def _returns_hash(prices: List[float]) -> str:
+    """Hash price data to detect staleness for model caching."""
+    raw = f"{len(prices)}:{prices[-1] if prices else 0}:{prices[0] if prices else 0}"
+    return hashlib.md5(raw.encode()).hexdigest()[:12]
+
 
 # Configurable thresholds
 ISOLATION_FOREST_CONTAMINATION = 0.05
 ISOLATION_FOREST_N_ESTIMATORS = 100
-ZSCORE_THRESHOLD_CRYPTO = 2.5
-ZSCORE_THRESHOLD_DEFAULT = 3.0
 
 
 @dataclass
@@ -54,6 +64,7 @@ class AnomalyDetector:
         current_price: float,
         avg_buy_price: float,
         asset_type: str = "crypto",
+        market_context: Optional[MarketContext] = None,
     ) -> Optional[Anomaly]:
         """Detect anomalies in price data.
 
@@ -66,6 +77,7 @@ class AnomalyDetector:
             current_price: Current market price.
             avg_buy_price: User's average buy price.
             asset_type: Type of asset for threshold calibration.
+            market_context: Pre-computed MarketContext for adaptive thresholds.
         """
         if not prices or current_price == 0:
             return None
@@ -76,14 +88,14 @@ class AnomalyDetector:
             if anomaly:
                 return anomaly
 
-        # Method 2: Z-score on returns
+        # Method 2: Z-score on returns (adaptive threshold)
         if len(prices) >= 10:
-            anomaly = self._zscore_detect(symbol, prices, current_price, asset_type)
+            anomaly = self._zscore_detect(symbol, prices, current_price, asset_type, ctx=market_context)
             if anomaly:
                 return anomaly
 
         # Method 3: Threshold-based (compare current vs avg buy price)
-        return self._threshold_detect(symbol, current_price, avg_buy_price, asset_type)
+        return self._threshold_detect(symbol, current_price, avg_buy_price, asset_type, ctx=market_context)
 
     def _isolation_forest_detect(
         self,
@@ -102,14 +114,21 @@ class AnomalyDetector:
         if len(returns) < 20:
             return None
 
-        # Fit Isolation Forest
-        model = IsolationForest(
-            contamination=ISOLATION_FOREST_CONTAMINATION,
-            random_state=42,
-            n_estimators=ISOLATION_FOREST_N_ESTIMATORS,
-        )
-        X = returns.reshape(-1, 1)
-        model.fit(X)
+        # P7: Try to load cached model from Redis (4h TTL)
+        data_hash = _returns_hash(prices)
+        model = self._get_cached_iforest(symbol, data_hash)
+
+        if model is None:
+            # Fit Isolation Forest
+            model = IsolationForest(
+                contamination=ISOLATION_FOREST_CONTAMINATION,
+                random_state=42,
+                n_estimators=ISOLATION_FOREST_N_ESTIMATORS,
+            )
+            X = returns.reshape(-1, 1)
+            model.fit(X)
+            # Cache the fitted model
+            self._cache_iforest(symbol, data_hash, model)
 
         # Check most recent return
         latest_return = np.log(current_price / max(prices[-1], 1e-10))
@@ -151,8 +170,9 @@ class AnomalyDetector:
         prices: List[float],
         current_price: float,
         asset_type: str,
+        ctx: Optional[MarketContext] = None,
     ) -> Optional[Anomaly]:
-        """Detect anomalies using Z-score on returns."""
+        """Detect anomalies using Z-score on returns with adaptive threshold."""
         arr = np.array(prices, dtype=float)
         returns = np.diff(arr) / arr[:-1]
 
@@ -165,8 +185,8 @@ class AnomalyDetector:
         latest_return = (current_price - prices[-1]) / prices[-1]
         z = (latest_return - mean_return) / std_return
 
-        # Threshold depends on asset type
-        threshold = ZSCORE_THRESHOLD_CRYPTO if asset_type == "crypto" else ZSCORE_THRESHOLD_DEFAULT
+        # Adaptive threshold: higher for fat-tailed distributions (high kurtosis)
+        threshold = at.anomaly_zscore_threshold(ctx) if ctx else (2.5 if asset_type == "crypto" else 3.0)
 
         if abs(z) > threshold:
             pct_change = latest_return * 100
@@ -196,19 +216,56 @@ class AnomalyDetector:
 
         return None
 
+    @staticmethod
+    def _get_cached_iforest(symbol: str, data_hash: str):
+        """Try to load cached Isolation Forest from Redis (sync, via event loop)."""
+        try:
+            from app.core.redis_client import get_cached_model
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're inside an async context — use a thread to avoid blocking
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, get_cached_model(symbol, "iforest", data_hash))
+                    return future.result(timeout=5)
+            else:
+                return loop.run_until_complete(get_cached_model(symbol, "iforest", data_hash))
+        except Exception as e:
+            logger.debug("IForest cache miss for %s: %s", symbol, e)
+            return None
+
+    @staticmethod
+    def _cache_iforest(symbol: str, data_hash: str, model):
+        """Cache fitted Isolation Forest in Redis (4h TTL)."""
+        try:
+            from app.core.redis_client import cache_model
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Schedule as a fire-and-forget task
+                asyncio.ensure_future(cache_model(symbol, "iforest", data_hash, model, ttl=14400))
+            else:
+                loop.run_until_complete(cache_model(symbol, "iforest", data_hash, model, ttl=14400))
+        except Exception as e:
+            logger.debug("Failed to cache IForest for %s: %s", symbol, e)
+
     def _threshold_detect(
         self,
         symbol: str,
         current_price: float,
         avg_buy_price: float,
         asset_type: str,
+        ctx: Optional[MarketContext] = None,
     ) -> Optional[Anomaly]:
-        """Simple threshold-based anomaly detection."""
+        """Threshold-based anomaly detection using adaptive price threshold."""
         if avg_buy_price == 0:
             return None
 
         pct_change = (current_price - avg_buy_price) / avg_buy_price * 100
-        threshold = 20 if asset_type == "crypto" else 10
+        # Adaptive threshold: uses 3σ of monthly returns instead of hardcoded 20%/10%
+        threshold = at.anomaly_price_threshold(ctx) if ctx else (20.0 if asset_type == "crypto" else 10.0)
 
         if abs(pct_change) > threshold:
             anomaly_type = "price_spike" if pct_change > 0 else "price_drop"

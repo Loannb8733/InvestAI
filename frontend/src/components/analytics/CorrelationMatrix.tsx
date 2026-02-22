@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { HelpCircle } from 'lucide-react'
+import { type DisplayThresholds, DEFAULT_DISPLAY_THRESHOLDS } from '@/types'
 
 interface Correlation {
   symbols: string[]
@@ -16,6 +17,8 @@ interface Correlation {
 
 interface CorrelationMatrixProps {
   correlation: Correlation
+  days?: number
+  thresholds?: DisplayThresholds['correlation']
 }
 
 // Build color for correlation value: blue (negative) -> gray (0) -> red (positive)
@@ -33,15 +36,16 @@ const corrTextColor = (v: number) => {
   return ''
 }
 
-const corrLabel = (v: number) => {
-  if (v >= 0.7) return 'Forte +'
-  if (v >= 0.4) return 'Modérée +'
-  if (v <= -0.5) return 'Inverse'
-  if (v <= -0.3) return 'Faible -'
+const corrLabel = (v: number, ct: DisplayThresholds['correlation']) => {
+  if (v >= ct.strong_positive) return 'Forte +'
+  if (v >= ct.moderate_positive) return 'Modérée +'
+  if (v <= ct.strong_negative) return 'Inverse'
+  if (v <= ct.moderate_negative) return 'Faible -'
   return ''
 }
 
-export default function CorrelationMatrix({ correlation }: CorrelationMatrixProps) {
+export default function CorrelationMatrix({ correlation, days, thresholds }: CorrelationMatrixProps) {
+  const ct = thresholds ?? DEFAULT_DISPLAY_THRESHOLDS.correlation
   if (correlation.symbols.length <= 1) return null
 
   return (
@@ -55,7 +59,7 @@ export default function CorrelationMatrix({ correlation }: CorrelationMatrixProp
                 <HelpCircle className="h-4 w-4 text-muted-foreground" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                <p className="text-xs">+1 = parfaitement corrélés, 0 = indépendants, -1 = inversement corrélés. Basé sur 60j de rendements journaliers.</p>
+                <p className="text-xs">+1 = parfaitement corrélés, 0 = indépendants, -1 = inversement corrélés. Basé sur {days || 60}j de rendements journaliers.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -101,7 +105,7 @@ export default function CorrelationMatrix({ correlation }: CorrelationMatrixProp
                               <p className="text-xs font-medium">{sym1} / {sym2}</p>
                               <p className="text-xs text-muted-foreground">
                                 Corrélation: {value.toFixed(3)}
-                                {corrLabel(value) && ` (${corrLabel(value)})`}
+                                {corrLabel(value, ct) && ` (${corrLabel(value, ct)})`}
                               </p>
                             </TooltipContent>
                           )}

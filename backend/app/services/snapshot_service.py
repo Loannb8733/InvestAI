@@ -2,6 +2,7 @@
 
 import logging
 import math
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
@@ -16,6 +17,10 @@ from app.models.transaction import Transaction, TransactionType
 from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
+
+# In-memory price cache: {symbol: (timestamp, {date_str: price})}
+_price_cache: Dict[str, Tuple[float, Dict[str, float]]] = {}
+_PRICE_CACHE_TTL = 300  # 5 minutes
 
 
 class SnapshotService:
@@ -484,7 +489,7 @@ class SnapshotService:
         Fetch historical prices for all symbols.
         Returns: Dict[symbol, Dict[date_str, price_eur]]
 
-        Uses Redis cache first, then falls back to API.
+        Uses in-memory cache first, then Redis cache, then API.
         """
         from app.core.config import settings
         from app.ml.historical_data import HistoricalDataFetcher
@@ -495,13 +500,28 @@ class SnapshotService:
         # Stablecoins: default price of ~1 EUR (close enough)
         STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
 
+        now = time.time()
+        symbols_to_fetch: Dict[str, str] = {}
+
+        # 1. Check in-memory cache first (avoids CoinGecko entirely)
+        for symbol, asset_type in symbols_with_types.items():
+            symbol_upper = symbol.upper()
+            if symbol_upper in _price_cache:
+                ts, cached_series = _price_cache[symbol_upper]
+                if now - ts < _PRICE_CACHE_TTL:
+                    price_series[symbol_upper] = cached_series
+                    continue
+            symbols_to_fetch[symbol_upper] = asset_type
+
+        if not symbols_to_fetch:
+            return price_series
+
+        # 2. Fetch remaining from Redis + API
         coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
         fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
 
         try:
-            for symbol, asset_type in symbols_with_types.items():
-                symbol_upper = symbol.upper()
-
+            for symbol_upper, asset_type in symbols_to_fetch.items():
                 # Try Redis cache first
                 dates, prices = get_cached_history(symbol_upper, days)
 
@@ -519,9 +539,10 @@ class SnapshotService:
                         date_str = d.strftime("%Y-%m-%d")
                         series[date_str] = float(p)
                     price_series[symbol_upper] = series
+                    # Store in in-memory cache
+                    _price_cache[symbol_upper] = (time.time(), series)
                 elif symbol_upper in STABLECOINS:
-                    # Stablecoin fallback — approximate 1 USD ~ 0.92 EUR
-                    price_series[symbol_upper] = {}  # Will use fallback in value computation
+                    price_series[symbol_upper] = {}
                 else:
                     logger.warning("No price data available for %s", symbol_upper)
         finally:
@@ -669,29 +690,35 @@ class SnapshotService:
         days: int = 30,
         history: Optional[List[Dict]] = None,
     ) -> float:
-        """Calculate portfolio volatility based on historical returns."""
+        """Calculate portfolio volatility based on historical log returns.
+
+        Uses log returns and 365-day annualization (crypto trades 24/7)
+        to stay consistent with analytics_service.
+        """
         if history is None:
             history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 2:
             return 0.0
 
-        # Calculate daily returns
+        # Calculate daily log returns (consistent with analytics_service)
         returns = []
         for i in range(1, len(history)):
             prev_value = history[i - 1]["value"]
             curr_value = history[i]["value"]
-            if prev_value > 0:
-                daily_return = (curr_value - prev_value) / prev_value
+            if prev_value > 0 and curr_value > 0:
+                daily_return = math.log(curr_value / prev_value)
                 returns.append(daily_return)
 
         if not returns:
             return 0.0
 
-        # Calculate standard deviation of returns
-        mean_return = sum(returns) / len(returns)
-        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
-        volatility = math.sqrt(variance) * math.sqrt(252) * 100  # Annualized
+        # Annualized volatility: std(log returns) * sqrt(365)
+        # Using 365 for crypto-heavy portfolios (consistent with analytics_service)
+        n = len(returns)
+        mean_return = sum(returns) / n
+        variance = sum((r - mean_return) ** 2 for r in returns) / (n - 1)  # ddof=1
+        volatility = math.sqrt(variance) * math.sqrt(365) * 100
 
         return round(volatility, 2)
 
@@ -700,35 +727,39 @@ class SnapshotService:
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        risk_free_rate: float = 0.02,
+        risk_free_rate: float = 0.035,
         history: Optional[List[Dict]] = None,
     ) -> float:
-        """Calculate Sharpe ratio for the portfolio."""
+        """Calculate Sharpe ratio for the portfolio.
+
+        Uses log returns, 365-day annualization, and 3.5% EUR risk-free rate
+        to stay consistent with analytics_service.
+        """
         if history is None:
             history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 2:
             return 0.0
 
-        # Calculate returns
+        # Calculate daily log returns (consistent with analytics_service)
         returns = []
         for i in range(1, len(history)):
             prev_value = history[i - 1]["value"]
             curr_value = history[i]["value"]
-            if prev_value > 0:
-                daily_return = (curr_value - prev_value) / prev_value
+            if prev_value > 0 and curr_value > 0:
+                daily_return = math.log(curr_value / prev_value)
                 returns.append(daily_return)
 
         if not returns:
             return 0.0
 
-        # Annualized return
-        mean_return = sum(returns) / len(returns)
-        annualized_return = mean_return * 252
+        # Annualized return and volatility using 365 days
+        n = len(returns)
+        mean_return = sum(returns) / n
+        annualized_return = mean_return * 365
 
-        # Volatility
-        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
-        volatility = math.sqrt(variance) * math.sqrt(252)
+        variance = sum((r - mean_return) ** 2 for r in returns) / (n - 1)  # ddof=1
+        volatility = math.sqrt(variance) * math.sqrt(365)
 
         if volatility == 0:
             return 0.0

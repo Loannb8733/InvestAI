@@ -38,7 +38,7 @@ class TestGetHistory:
 
     @pytest.mark.asyncio
     async def test_unknown_asset_type_returns_empty(self, fetcher):
-        dates, prices = await fetcher.get_history("BTC", "real_estate", 30)
+        dates, prices = await fetcher.get_history("BTC", "forex", 30)
         assert dates == []
         assert prices == []
 
