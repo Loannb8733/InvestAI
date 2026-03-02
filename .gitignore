@@ -98,6 +98,6 @@ temp/
 
 # Railway
 .railway/
-backend/nul
 *openapi.json
 .claude/
+.mypy_cache/

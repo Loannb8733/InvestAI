@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -25,6 +27,7 @@ import {
 import { Loader2, Plus } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
+import { EXCHANGES, COLD_WALLETS } from '@/lib/platforms'
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Sélectionnez un actif'),
@@ -42,6 +45,7 @@ const schema = z.object({
   price: z.coerce.number().min(0, 'Prix invalide'),
   fee: z.coerce.number().min(0).default(0),
   executed_at: z.string().optional(),
+  exchange: z.string().max(50).optional(),
   notes: z.string().max(500).optional(),
 })
 
@@ -52,6 +56,7 @@ interface Asset {
   symbol: string
   name: string
   portfolio_id: string
+  exchange?: string
 }
 
 interface Portfolio {
@@ -113,11 +118,28 @@ export default function AddTransactionForm({
   const [newSymbol, setNewSymbol] = useState('')
   const [newName, setNewName] = useState('')
   const [newAssetType, setNewAssetType] = useState('crypto')
+  const [newAssetExchange, setNewAssetExchange] = useState('')
+  // Crowdfunding-specific state
+  const [newInvestedAmount, setNewInvestedAmount] = useState('')
+  const [newInterestRate, setNewInterestRate] = useState('')
+  const [newMaturityDate, setNewMaturityDate] = useState('')
+
+  const [selectedExchange, setSelectedExchange] = useState('')
 
   const filteredAssets = useMemo(() => {
     if (!assets || !selectedPortfolioId) return []
     return assets.filter((a) => a.portfolio_id === selectedPortfolioId)
   }, [assets, selectedPortfolioId])
+
+  const availableExchanges = useMemo(() => {
+    const exchanges = new Set(filteredAssets.map((a) => a.exchange || 'Autre'))
+    return Array.from(exchanges).sort()
+  }, [filteredAssets])
+
+  const exchangeFilteredAssets = useMemo(() => {
+    if (!selectedExchange || selectedExchange === '__all__') return filteredAssets
+    return filteredAssets.filter((a) => (a.exchange || 'Autre') === selectedExchange)
+  }, [filteredAssets, selectedExchange])
 
   const {
     register,
@@ -138,7 +160,7 @@ export default function AddTransactionForm({
   })
 
   const createAssetMutation = useMutation({
-    mutationFn: (data: { portfolio_id: string; symbol: string; name: string; asset_type: string }) =>
+    mutationFn: (data: Parameters<typeof assetsApi.create>[0]) =>
       assetsApi.create(data),
     onSuccess: (newAsset: Asset) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
@@ -146,6 +168,10 @@ export default function AddTransactionForm({
       setShowNewAsset(false)
       setNewSymbol('')
       setNewName('')
+      setNewAssetExchange('')
+      setNewInvestedAmount('')
+      setNewInterestRate('')
+      setNewMaturityDate('')
       toast({ title: 'Actif créé', description: `${newAsset.symbol} ajouté au portefeuille.` })
     },
     onError: (error: unknown) => {
@@ -189,12 +215,37 @@ export default function AddTransactionForm({
   }
 
   const handleCreateAsset = () => {
-    if (!newSymbol.trim() || !selectedPortfolioId) return
+    const isRealEstate = newAssetType === 'real_estate'
+    if (isRealEstate) {
+      if (!newName.trim() || !selectedPortfolioId || !newInvestedAmount) return
+    } else {
+      if (!newSymbol.trim() || !selectedPortfolioId) return
+    }
+    const exchange = newAssetExchange || (selectedExchange && selectedExchange !== '__all__' ? selectedExchange : '')
+
+    // For real estate: auto-generate symbol from name
+    const symbol = isRealEstate
+      ? newName.trim().substring(0, 18).toUpperCase().replace(/\s+/g, '-')
+      : newSymbol.trim().toUpperCase()
+
+    const amount = parseFloat(newInvestedAmount) || 0
+
     createAssetMutation.mutate({
       portfolio_id: selectedPortfolioId,
-      symbol: newSymbol.trim().toUpperCase(),
-      name: newName.trim() || newSymbol.trim().toUpperCase(),
+      symbol,
+      name: newName.trim() || symbol,
       asset_type: newAssetType,
+      ...(exchange ? { exchange } : {}),
+      ...(isRealEstate
+        ? {
+            quantity: 1,
+            avg_buy_price: amount,
+            invested_amount: amount,
+            interest_rate: parseFloat(newInterestRate) || undefined,
+            maturity_date: newMaturityDate || undefined,
+            project_status: 'active',
+          }
+        : {}),
     })
   }
 
@@ -215,6 +266,7 @@ export default function AddTransactionForm({
             value={selectedPortfolioId}
             onValueChange={(value) => {
               setSelectedPortfolioId(value)
+              setSelectedExchange('')
               setValue('asset_id', '')
               setShowNewAsset(false)
             }}
@@ -232,6 +284,30 @@ export default function AddTransactionForm({
           </Select>
         </div>
 
+        {selectedPortfolioId && (
+          <div className="space-y-2">
+            <Label>Plateforme</Label>
+            <Select
+              value={selectedExchange}
+              onValueChange={(value) => {
+                setSelectedExchange(value)
+                setValue('asset_id', '')
+                setShowNewAsset(false)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Toutes les plateformes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Toutes les plateformes</SelectItem>
+                {availableExchanges.map((ex) => (
+                  <SelectItem key={ex} value={ex}>{ex}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {selectedPortfolioId && !showNewAsset && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -241,7 +317,10 @@ export default function AddTransactionForm({
                 variant="ghost"
                 size="sm"
                 className="h-auto py-0 px-1 text-xs text-primary"
-                onClick={() => setShowNewAsset(true)}
+                onClick={() => {
+                  setShowNewAsset(true)
+                  setNewAssetExchange(selectedExchange && selectedExchange !== '__all__' ? selectedExchange : '')
+                }}
               >
                 <Plus className="h-3 w-3 mr-1" />
                 Nouvel actif
@@ -252,10 +331,12 @@ export default function AddTransactionForm({
               onValueChange={(value) => setValue('asset_id', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder={filteredAssets.length ? "Sélectionner un actif" : "Aucun actif — créez-en un"} />
+                <SelectValue placeholder={exchangeFilteredAssets.length ? "Sélectionner un actif" : "Aucun actif — créez-en un"} />
               </SelectTrigger>
               <SelectContent>
-                {filteredAssets.map((asset) => (
+                {exchangeFilteredAssets
+                  .sort((a, b) => a.symbol.localeCompare(b.symbol))
+                  .map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
                     {asset.symbol} - {asset.name}
                   </SelectItem>
@@ -284,42 +365,101 @@ export default function AddTransactionForm({
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs">Symbole *</Label>
-                <Input
-                  placeholder="BTC, AAPL..."
-                  value={newSymbol}
-                  onChange={(e) => setNewSymbol(e.target.value)}
-                />
+                <Label className="text-xs">Type *</Label>
+                <Select value={newAssetType} onValueChange={setNewAssetType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetTypes.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Nom</Label>
+                <Label className="text-xs">Plateforme *</Label>
                 <Input
-                  placeholder="Bitcoin, Apple..."
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={newAssetType === 'real_estate' ? 'Tokimo...' : 'Bitstamp, Binance...'}
+                  value={newAssetExchange}
+                  onChange={(e) => setNewAssetExchange(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Type *</Label>
-              <Select value={newAssetType} onValueChange={setNewAssetType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {assetTypes.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+            {newAssetType === 'real_estate' ? (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nom du projet *</Label>
+                  <Input
+                    placeholder="Résidence Lyon Centre..."
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Montant investi *</Label>
+                    <Input
+                      type="number"
+                      placeholder="2000"
+                      value={newInvestedAmount}
+                      onChange={(e) => setNewInvestedAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Taux annuel (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      placeholder="10.5"
+                      value={newInterestRate}
+                      onChange={(e) => setNewInterestRate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Echéance</Label>
+                    <Input
+                      type="date"
+                      value={newMaturityDate}
+                      onChange={(e) => setNewMaturityDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Symbole *</Label>
+                  <Input
+                    placeholder="BTC, AAPL..."
+                    value={newSymbol}
+                    onChange={(e) => setNewSymbol(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nom</Label>
+                  <Input
+                    placeholder="Bitcoin, Apple..."
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
             <Button
               type="button"
               size="sm"
               className="w-full"
-              disabled={!newSymbol.trim() || createAssetMutation.isPending}
+              disabled={
+                (newAssetType === 'real_estate'
+                  ? !newName.trim() || !newInvestedAmount || !newAssetExchange.trim()
+                  : !newSymbol.trim() || !newAssetExchange.trim()) ||
+                createAssetMutation.isPending
+              }
               onClick={handleCreateAsset}
             >
               {createAssetMutation.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
@@ -396,6 +536,36 @@ export default function AddTransactionForm({
             />
           </div>
         </div>
+
+        {(transactionType === 'transfer_in' || transactionType === 'transfer_out') && (
+          <div className="space-y-2">
+            <Label htmlFor="exchange">
+              {transactionType === 'transfer_in' ? 'Depuis (plateforme source)' : 'Vers (plateforme destination)'}
+            </Label>
+            <Select
+              value={watch('exchange') || ''}
+              onValueChange={(value) => setValue('exchange', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner une plateforme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Exchanges</SelectLabel>
+                  {EXCHANGES.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Cold Wallets</SelectLabel>
+                  {COLD_WALLETS.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="notes">Notes (optionnel)</Label>

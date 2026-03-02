@@ -29,17 +29,22 @@ class BinanceService(BaseExchangeService):
     """Binance exchange integration."""
 
     BASE_URL = "https://api.binance.com"
-    _server_time_offset: int = 0  # Offset between local time and Binance server time
+
+    def __init__(self, api_key, secret_key, passphrase=None):
+        super().__init__(api_key, secret_key, passphrase)
+        self._server_time_offset: int = 0
+        self._all_account_symbols: set = set()
+        self._valid_pairs: set = set()
 
     @property
     def exchange_name(self) -> str:
         return "Binance"
 
     def _get_ssl_context(self) -> ssl.SSLContext:
-        """Create SSL context forcing TLS 1.2 for compatibility with Docker networking."""
+        """Create SSL context with TLS 1.2+ for Binance API."""
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        # Allow TLS 1.3 negotiation (don't cap at 1.2)
         context.check_hostname = True
         context.verify_mode = ssl.CERT_REQUIRED
         context.load_default_certs()
@@ -129,6 +134,9 @@ class BinanceService(BaseExchangeService):
                 locked = Decimal(asset["locked"])
                 total = free + locked
 
+                # Cache all account symbols for trade history lookup
+                self._all_account_symbols.add(asset["asset"])
+
                 if total > 0:
                     balances.append(
                         ExchangeBalance(
@@ -141,14 +149,36 @@ class BinanceService(BaseExchangeService):
 
         return balances
 
+    async def _get_all_account_symbols(self) -> set:
+        """Get ALL symbols from the account (including 0 balance).
+        Uses cached data from get_balances if available, otherwise fetches fresh."""
+        if self._all_account_symbols:
+            return self._all_account_symbols
+
+        await self._sync_server_time()
+
+        async with self._get_http_client(timeout=30.0) as client:
+            params = self._sign_request({})
+            response = await client.get(
+                f"{self.BASE_URL}/api/v3/account",
+                params=params,
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            for asset in data.get("balances", []):
+                self._all_account_symbols.add(asset["asset"])
+
+        return self._all_account_symbols
+
     # Quote currencies to try for each base asset (prioritized by popularity)
     QUOTE_CURRENCIES = ["USDT", "EUR", "USDC", "BTC", "FDUSD"]
 
     # Fiat currencies (not tracked as assets)
     FIAT_CURRENCIES = ["EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD"]
 
-    # Cache for valid trading pairs
-    _valid_pairs: set = set()
+    # These are now initialized in __init__ as instance variables
 
     async def _get_valid_trading_pairs(self) -> set:
         """Fetch all valid trading pairs from Binance exchange info."""
@@ -185,44 +215,65 @@ class BinanceService(BaseExchangeService):
 
         async with semaphore:
             try:
-                params = {"symbol": trading_symbol, "limit": min(limit, 1000)}
+                from_id = None
+                page_limit = min(limit, 1000)
 
-                if start_time:
-                    params["startTime"] = int(start_time.timestamp() * 1000)
-                if end_time:
-                    params["endTime"] = int(end_time.timestamp() * 1000)
+                while True:
+                    params = {"symbol": trading_symbol, "limit": page_limit}
 
-                params = self._sign_request(params)
-                response = await client.get(
-                    f"{self.BASE_URL}/api/v3/myTrades",
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30.0,
-                )
+                    if from_id:
+                        params["fromId"] = from_id
+                    elif start_time:
+                        params["startTime"] = int(start_time.timestamp() * 1000)
 
-                if response.status_code != 200:
-                    return trades
+                    if end_time and not from_id:
+                        params["endTime"] = int(end_time.timestamp() * 1000)
 
-                data = response.json()
-                if data:
-                    logger.debug(f"Binance: Found {len(data)} trades for {trading_symbol}")
-
-                for trade in data:
-                    side = "buy" if trade["isBuyer"] else "sell"
-                    trades.append(
-                        ExchangeTrade(
-                            trade_id=str(trade["id"]),
-                            symbol=trading_symbol,
-                            side=side,
-                            quantity=Decimal(trade["qty"]),
-                            price=Decimal(trade["price"]),
-                            fee=Decimal(trade["commission"]),
-                            fee_currency=trade["commissionAsset"],
-                            timestamp=datetime.fromtimestamp(trade["time"] / 1000),
-                        )
+                    params = self._sign_request(params)
+                    response = await client.get(
+                        f"{self.BASE_URL}/api/v3/myTrades",
+                        params=params,
+                        headers=self._get_headers(),
+                        timeout=30.0,
                     )
-            except Exception:
-                pass
+
+                    if response.status_code != 200:
+                        break
+
+                    data = response.json()
+                    if not data:
+                        break
+
+                    logger.debug(f"Binance: Found {len(data)} trades for {trading_symbol} (page)")
+
+                    for trade in data:
+                        side = "buy" if trade["isBuyer"] else "sell"
+                        trades.append(
+                            ExchangeTrade(
+                                trade_id=str(trade["id"]),
+                                symbol=trading_symbol,
+                                side=side,
+                                quantity=Decimal(trade["qty"]),
+                                price=Decimal(trade["price"]),
+                                fee=Decimal(trade["commission"]),
+                                fee_currency=trade["commissionAsset"],
+                                timestamp=datetime.utcfromtimestamp(trade["time"] / 1000),
+                            )
+                        )
+
+                    # If we got fewer than the limit, no more pages
+                    if len(data) < page_limit:
+                        break
+
+                    # Stop if we've reached the overall limit
+                    if len(trades) >= limit:
+                        break
+
+                    # Paginate using fromId (last trade ID + 1)
+                    from_id = data[-1]["id"] + 1
+
+            except Exception as e:
+                logger.warning(f"Error fetching trades for {trading_symbol}: {e}")
 
         return trades
 
@@ -250,25 +301,22 @@ class BinanceService(BaseExchangeService):
                 if pair in valid_pairs:
                     symbols_to_fetch.add(pair)
         else:
-            # Get ALL assets from user's balances and build trading pairs
+            # Get ALL account symbols (including 0 balance) to capture full trade history
             try:
-                balances = await self.get_balances()
-                logger.info(f"Binance: Found {len(balances)} assets with balance > 0")
+                all_symbols = await self._get_all_account_symbols()
+                logger.info(f"Binance: Account has {len(all_symbols)} symbols (including 0 balance)")
 
-                for balance in balances:
-                    # Skip fiat currencies
-                    if balance.symbol in self.FIAT_CURRENCIES:
+                for asset_symbol in all_symbols:
+                    if asset_symbol in self.FIAT_CURRENCIES:
                         continue
-
-                    # Try quote currencies for each asset - only if pair exists
                     for quote in self.QUOTE_CURRENCIES:
-                        if balance.symbol != quote:
-                            pair = f"{balance.symbol}{quote}"
+                        if asset_symbol != quote:
+                            pair = f"{asset_symbol}{quote}"
                             if pair in valid_pairs:
                                 symbols_to_fetch.add(pair)
 
             except Exception as e:
-                logger.error(f"Error fetching balances for trade pairs: {e}")
+                logger.error(f"Error fetching account symbols for trade pairs: {e}")
 
         symbols_list = list(symbols_to_fetch)
         logger.info(f"Binance: Fetching trades for {len(symbols_list)} valid trading pairs (parallel)...")
@@ -334,7 +382,7 @@ class BinanceService(BaseExchangeService):
                         deposit_id=deposit.get("id", deposit.get("txId", "")),
                         symbol=deposit["coin"],
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.fromtimestamp(deposit["insertTime"] / 1000),
+                        timestamp=datetime.utcfromtimestamp(deposit["insertTime"] / 1000),
                         status=status_map.get(deposit["status"], "unknown"),
                         tx_id=deposit.get("txId"),
                     )
@@ -497,7 +545,7 @@ class BinanceService(BaseExchangeService):
                                         price=price,
                                         fee=Decimal(str(order.get("totalFee", 0))),
                                         status=order.get("status", "unknown"),
-                                        timestamp=datetime.fromtimestamp(order.get("createTime", 0) / 1000),
+                                        timestamp=datetime.utcfromtimestamp(order.get("createTime", 0) / 1000),
                                     )
                                 )
                                 total_orders_for_type += 1
@@ -534,35 +582,53 @@ class BinanceService(BaseExchangeService):
 
         async with self._get_http_client() as client:
             try:
-                params = {
-                    "limit": min(limit, 1000),
-                }
+                # Paginate: keep fetching until we get fewer than page_size results
+                page_size = min(limit, 1000)
+                all_conversions = []
 
-                # Add time range if specified
-                if start_time:
-                    params["startTime"] = int(start_time.timestamp() * 1000)
-                if end_time:
-                    params["endTime"] = int(end_time.timestamp() * 1000)
+                while len(all_conversions) < limit:
+                    params = {
+                        "limit": page_size,
+                    }
 
-                params = self._sign_request(params)
-                response = await client.get(
-                    f"{self.BASE_URL}/sapi/v1/convert/tradeFlow",
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30.0,
-                )
+                    # Add time range if specified
+                    if start_time:
+                        params["startTime"] = int(start_time.timestamp() * 1000)
+                    if end_time:
+                        params["endTime"] = int(end_time.timestamp() * 1000)
 
-                if response.status_code != 200:
-                    logger.error(f"Convert history API error: {response.status_code} - {response.text[:200]}")
-                    return orders
+                    params = self._sign_request(params)
+                    response = await client.get(
+                        f"{self.BASE_URL}/sapi/v1/convert/tradeFlow",
+                        params=params,
+                        headers=self._get_headers(),
+                        timeout=30.0,
+                    )
 
-                data = response.json()
-                convert_list = data.get("list", [])
+                    if response.status_code != 200:
+                        logger.error(f"Convert history API error: {response.status_code} - {response.text[:200]}")
+                        break
 
-                if convert_list:
-                    logger.info(f"Convert history: {len(convert_list)} conversions found")
+                    data = response.json()
+                    convert_list = data.get("list", [])
 
-                for conv in convert_list:
+                    if not convert_list:
+                        break
+
+                    all_conversions.extend(convert_list)
+
+                    # If fewer than page_size, no more pages
+                    if len(convert_list) < page_size:
+                        break
+
+                    # Move end_time to the oldest conversion in this batch for next page
+                    oldest_time = min(c.get("createTime", 0) for c in convert_list)
+                    end_time = datetime.utcfromtimestamp((oldest_time - 1) / 1000)
+
+                if all_conversions:
+                    logger.info(f"Convert history: {len(all_conversions)} conversions found")
+
+                for conv in all_conversions:
                     # Determine which is crypto and which is fiat
                     from_asset = conv.get("fromAsset", "")
                     to_asset = conv.get("toAsset", "")
@@ -585,7 +651,7 @@ class BinanceService(BaseExchangeService):
                                 price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
                             )
                         )
                     # If from is crypto and to is fiat/stablecoin -> SELL
@@ -601,7 +667,7 @@ class BinanceService(BaseExchangeService):
                                 price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
                             )
                         )
                     # Crypto to crypto conversion (e.g., BTC -> ETH)
@@ -618,7 +684,7 @@ class BinanceService(BaseExchangeService):
                                 price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
                             )
                         )
                         # And buy of to_asset
@@ -633,7 +699,7 @@ class BinanceService(BaseExchangeService):
                                 price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
                             )
                         )
 
@@ -702,7 +768,7 @@ class BinanceService(BaseExchangeService):
                         from_amount = Decimal(str(conv.get("fromAmount", 0)))
                         to_amount = Decimal(str(conv.get("toAmount", 0)))
                         order_id = str(conv.get("quoteId", conv.get("orderId", "")))
-                        timestamp = datetime.fromtimestamp(conv.get("createTime", 0) / 1000)
+                        timestamp = datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000)
 
                         # Skip if from is fiat (can't convert from fiat here)
                         if from_asset in fiat_currencies:
@@ -810,67 +876,84 @@ class BinanceService(BaseExchangeService):
         self,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        limit: int = 100,
+        limit: int = 5000,
     ) -> List[ExchangeFiatOrder]:
-        """Get Auto-Invest (DCA) history from Binance."""
+        """Get Auto-Invest (DCA) history from Binance with pagination."""
         orders = []
 
         async with self._get_http_client() as client:
-            try:
-                params = {
-                    "size": min(limit, 100),
-                }
+            page = 1
+            max_pages = 50  # Safety limit
 
-                if start_time:
-                    params["startTime"] = int(start_time.timestamp() * 1000)
-                if end_time:
-                    params["endTime"] = int(end_time.timestamp() * 1000)
+            while page <= max_pages and len(orders) < limit:
+                try:
+                    params = {
+                        "size": 100,
+                        "current": page,
+                    }
 
-                params = self._sign_request(params)
-                response = await client.get(
-                    f"{self.BASE_URL}/sapi/v1/lending/auto-invest/history/list",
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30.0,
-                )
+                    if start_time:
+                        params["startTime"] = int(start_time.timestamp() * 1000)
+                    if end_time:
+                        params["endTime"] = int(end_time.timestamp() * 1000)
 
-                if response.status_code != 200:
-                    # API might not be available for this user
-                    return orders
+                    params = self._sign_request(params)
+                    response = await client.get(
+                        f"{self.BASE_URL}/sapi/v1/lending/auto-invest/history/list",
+                        params=params,
+                        headers=self._get_headers(),
+                        timeout=30.0,
+                    )
 
-                data = response.json()
-                invest_list = data.get("list", [])
+                    if response.status_code != 200:
+                        break
 
-                if invest_list:
-                    logger.info(f"Auto-invest history: {len(invest_list)} orders found")
+                    data = response.json()
+                    invest_list = data.get("list", [])
 
-                for invest in invest_list:
-                    if invest.get("status") != "SUCCESS":
-                        continue
+                    if not invest_list:
+                        break
 
-                    target_asset = invest.get("targetAsset", "")
-                    source_asset = invest.get("sourceAsset", "EUR")
-                    executed_amount = Decimal(str(invest.get("executedAmount", 0)))
-                    source_amount = Decimal(str(invest.get("sourceAssetAmount", 0)))
+                    if page == 1:
+                        logger.info(f"Auto-invest history: fetching page {page}...")
 
-                    if executed_amount > 0:
-                        orders.append(
-                            ExchangeFiatOrder(
-                                order_id=f"autoinvest_{invest.get('id', invest.get('transactionTime', ''))}",
-                                crypto_symbol=target_asset,
-                                fiat_currency=source_asset,
-                                side="buy",
-                                crypto_amount=executed_amount,
-                                fiat_amount=source_amount,
-                                price=source_amount / executed_amount if executed_amount > 0 else Decimal("0"),
-                                fee=Decimal("0"),
-                                status="Completed",
-                                timestamp=datetime.fromtimestamp(invest.get("transactionTime", 0) / 1000),
+                    for invest in invest_list:
+                        if invest.get("status") != "SUCCESS":
+                            continue
+
+                        target_asset = invest.get("targetAsset", "")
+                        source_asset = invest.get("sourceAsset", "EUR")
+                        executed_amount = Decimal(str(invest.get("executedAmount", 0)))
+                        source_amount = Decimal(str(invest.get("sourceAssetAmount", 0)))
+
+                        if executed_amount > 0:
+                            orders.append(
+                                ExchangeFiatOrder(
+                                    order_id=f"autoinvest_{invest.get('id', invest.get('transactionTime', ''))}",
+                                    crypto_symbol=target_asset,
+                                    fiat_currency=source_asset,
+                                    side="buy",
+                                    crypto_amount=executed_amount,
+                                    fiat_amount=source_amount,
+                                    price=source_amount / executed_amount if executed_amount > 0 else Decimal("0"),
+                                    fee=Decimal("0"),
+                                    status="Completed",
+                                    timestamp=datetime.utcfromtimestamp(invest.get("transactionTime", 0) / 1000),
+                                )
                             )
-                        )
 
-            except Exception as e:
-                logger.error(f"Error fetching auto-invest history: {e}")
+                    # If fewer than 100 results, no more pages
+                    if len(invest_list) < 100:
+                        break
+
+                    page += 1
+
+                except Exception as e:
+                    logger.error(f"Error fetching auto-invest history: {e}")
+                    break
+
+        if orders:
+            logger.info(f"Auto-invest history: {len(orders)} orders found total")
 
         return orders
 
@@ -927,7 +1010,7 @@ class BinanceService(BaseExchangeService):
                             price=Decimal("0"),
                             fee=Decimal("0"),
                             status="Completed",
-                            timestamp=datetime.fromtimestamp(row.get("time", 0) / 1000),
+                            timestamp=datetime.utcfromtimestamp(row.get("time", 0) / 1000),
                         )
                     )
 

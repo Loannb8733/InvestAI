@@ -166,6 +166,8 @@ interface DashboardMetrics {
   net_gain_loss_percent: number
   daily_change: number
   daily_change_percent: number
+  period_change?: number
+  period_change_percent?: number
   portfolios_count: number
   assets_count: number
   allocation: Array<{ type: string; value: number; percentage: number }>
@@ -397,7 +399,14 @@ export default function DashboardPage() {
 
   const netGainLoss = metrics?.net_gain_loss ?? metrics?.total_gain_loss ?? 0
   const isPositive = netGainLoss >= 0
-  const isDailyPositive = (metrics?.daily_change ?? 0) >= 0
+  // Use period change when not viewing 24h/1d, fall back to daily change
+  const variationChange = selectedPeriod > 1
+    ? (metrics?.period_change ?? metrics?.daily_change ?? 0)
+    : (metrics?.daily_change ?? 0)
+  const variationPercent = selectedPeriod > 1
+    ? (metrics?.period_change_percent ?? metrics?.daily_change_percent ?? 0)
+    : (metrics?.daily_change_percent ?? 0)
+  const isDailyPositive = variationChange >= 0
 
   // Empty state
   if (!metrics || metrics.assets_count === 0) {
@@ -423,8 +432,9 @@ export default function DashboardPage() {
     )
   }
 
-  const { advanced_metrics } = metrics
-  const { risk_metrics, concentration, stress_tests, pnl_breakdown } = advanced_metrics
+  const advanced_metrics = metrics.advanced_metrics ?? ({} as NonNullable<typeof metrics.advanced_metrics>)
+  const { risk_metrics, stress_tests = [], pnl_breakdown } = advanced_metrics
+  const concentration = advanced_metrics.concentration ?? { is_concentrated: false, hhi: 0, interpretation: 'N/A', top_asset: '', top_concentration: 0 }
 
   return (
     <div className="space-y-6">
@@ -545,8 +555,8 @@ export default function DashboardPage() {
                     netGainLoss={netGainLoss}
                     netGainLossPercent={metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent}
                     isPositive={isPositive}
-                    dailyChange={metrics.daily_change}
-                    dailyChangePercent={metrics.daily_change_percent}
+                    dailyChange={variationChange}
+                    dailyChangePercent={variationPercent}
                     isDailyPositive={isDailyPositive}
                     portfoliosCount={metrics.portfolios_count}
                     selectedPeriod={selectedPeriod}
@@ -594,7 +604,7 @@ export default function DashboardPage() {
                             {stress_tests.map((test) => (
                               <div key={test.scenario_name} className="flex justify-between items-center">
                                 <span className="text-sm">{test.scenario_name}</span>
-                                <span className="text-sm font-medium text-red-500">-{formatCurrency(test.potential_loss)}</span>
+                                <span className="text-sm font-medium text-red-500">-{formatCurrency(Math.abs(test.potential_loss))}</span>
                               </div>
                             ))}
                           </div>
@@ -630,7 +640,7 @@ export default function DashboardPage() {
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><Wallet className="h-4 w-4 text-primary" /></div>
                           <div>
                             <p className="text-sm font-medium">Votre portefeuille</p>
-                            <p className={`text-sm ${metrics.daily_change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{metrics.daily_change_percent >= 0 ? '▲ +' : '▼ '}{metrics.daily_change_percent.toFixed(2)}%</p>
+                            <p className={`text-sm ${variationPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{variationPercent >= 0 ? '▲ +' : '▼ '}{variationPercent.toFixed(2)}%</p>
                           </div>
                         </div>
                       </div>
@@ -644,7 +654,7 @@ export default function DashboardPage() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          Évolution du patrimoine ({selectedPeriod}j)
+                          Évolution du patrimoine ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})
                           {metrics.is_data_estimated && (<Badge variant="outline" className="text-yellow-600 border-yellow-500">Estimé</Badge>)}
                         </CardTitle>
                       </CardHeader>
@@ -663,21 +673,21 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.asset_allocation.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.asset_allocation.slice(0, 6).map((asset) => (
-                              <div key={asset.symbol} className="flex items-center justify-between">
+                            {metrics.asset_allocation.slice(0, 6).map((asset, i) => (
+                              <div key={`${asset.symbol}-${i}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={32} />
                                   <div>
                                     <div className="flex items-center gap-1.5">
                                       <p className="font-medium text-sm">{asset.symbol}</p>
-                                      {livePrices[asset.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Prix live" />}
+                                      {/* Live indicator removed: asset.value is server-computed, not updated with WS prices */}
                                     </div>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(asset.value)}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-sm">{asset.percentage.toFixed(1)}%</p>
-                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{asset.gain_loss_percent >= 0 ? '▲' : '▼'} {formatPercent(asset.gain_loss_percent)}</p>
+                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{asset.gain_loss_percent >= 0 ? '▲ +' : '▼ -'}{formatPercent(Math.abs(asset.gain_loss_percent))}</p>
                                 </div>
                               </div>
                             ))}
@@ -799,7 +809,7 @@ export default function DashboardPage() {
                                     <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
+                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">+{formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>
@@ -822,7 +832,7 @@ export default function DashboardPage() {
                                     <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">{formatPercent(item.gain_loss_percent)}</span></div>
+                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">-{formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>

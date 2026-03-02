@@ -76,17 +76,19 @@ async def create_asset(
             detail="Portfolio not found",
         )
 
-    # Check if asset with same symbol already exists in portfolio
+    # Check if asset with same symbol AND exchange already exists in portfolio
+    asset_exchange = asset_in.exchange or ""
     existing_result = await db.execute(
         select(Asset).where(
             Asset.portfolio_id == asset_in.portfolio_id,
             Asset.symbol == asset_in.symbol.upper(),
+            Asset.exchange == asset_exchange,
         )
     )
     if existing_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Asset with this symbol already exists in portfolio",
+            detail="Asset with this symbol already exists on this platform",
         )
 
     asset = Asset(
@@ -97,7 +99,7 @@ async def create_asset(
         quantity=asset_in.quantity,
         avg_buy_price=asset_in.avg_buy_price,
         currency=asset_in.currency,
-        exchange=asset_in.exchange,
+        exchange=asset_in.exchange or "",
     )
 
     db.add(asset)
@@ -178,6 +180,9 @@ async def update_asset(
         )
 
     update_data = asset_in.model_dump(exclude_unset=True)
+    # Normalize exchange: always use empty string instead of null
+    if "exchange" in update_data and update_data["exchange"] is None:
+        update_data["exchange"] = ""
     for field, value in update_data.items():
         setattr(asset, field, value)
 

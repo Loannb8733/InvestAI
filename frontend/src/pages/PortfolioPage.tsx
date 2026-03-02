@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,8 +34,13 @@ import {
   TrendingUp,
   PiggyBank,
   AlertTriangle,
+  Shield,
+  Building2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import { isColdWallet } from '@/lib/platforms'
 import PortfolioAssetList from '@/components/portfolio/PortfolioAssetList'
 import CreatePortfolioForm from '@/components/portfolio/CreatePortfolioForm'
 
@@ -84,6 +89,7 @@ interface HistoricalAsset {
   symbol: string
   name?: string
   asset_type: string
+  exchange?: string | null
   current_quantity: number
   total_bought: number
   total_bought_value: number
@@ -118,6 +124,17 @@ export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState('current')
   const [deleteAsset, setDeleteAsset] = useState<AssetMetrics | null>(null)
   const [deletePortfolio, setDeletePortfolio] = useState<Portfolio | null>(null)
+  const [historyPlatformFilter, setHistoryPlatformFilter] = useState<string | null>(null)
+  const [historyExpandedSymbols, setHistoryExpandedSymbols] = useState<Set<string>>(new Set())
+
+  const toggleHistoryExpanded = (symbol: string) => {
+    setHistoryExpandedSymbols(prev => {
+      const next = new Set(prev)
+      if (next.has(symbol)) next.delete(symbol)
+      else next.add(symbol)
+      return next
+    })
+  }
 
   // Fetch portfolios
   const { data: portfolios, isLoading: loadingPortfolios } = useQuery<Portfolio[]>({
@@ -135,7 +152,7 @@ export default function PortfolioPage() {
   })
 
   // Fetch portfolio history (including sold assets)
-  const { data: portfolioHistory, isLoading: loadingHistory } = useQuery<PortfolioHistory>({
+  const { data: portfolioHistory, isLoading: loadingHistory, isPlaceholderData: isHistoryStale } = useQuery<PortfolioHistory>({
     queryKey: queryKeys.portfolios.history(selectedPortfolio),
     queryFn: () => dashboardApi.getPortfolioHistory(selectedPortfolio!),
     enabled: !!selectedPortfolio && activeTab === 'history',
@@ -153,6 +170,19 @@ export default function PortfolioPage() {
     onError: () => {
       setDeleteAsset(null)
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer l\'actif' })
+    },
+  })
+
+  // Update asset exchange mutation
+  const updateAssetExchangeMutation = useMutation({
+    mutationFn: ({ id, exchange }: { id: string; exchange: string | null }) =>
+      assetsApi.update(id, { exchange }),
+    onSuccess: () => {
+      invalidateAllFinancialData(queryClient)
+      toast({ title: 'Plateforme mise à jour' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de modifier la plateforme' })
     },
   })
 
@@ -240,7 +270,11 @@ export default function PortfolioPage() {
           <Button
             key={portfolio.id}
             variant={selectedPortfolio === portfolio.id ? 'default' : 'outline'}
-            onClick={() => setSelectedPortfolio(portfolio.id)}
+            onClick={() => {
+              setSelectedPortfolio(portfolio.id)
+              setHistoryPlatformFilter(null)
+              setHistoryExpandedSymbols(new Set())
+            }}
           >
             {portfolio.name}
           </Button>
@@ -266,7 +300,13 @@ export default function PortfolioPage() {
               <div className="flex items-center gap-4">
                 {portfolioMetrics && (
                   <div className="text-right">
-                    <p className="text-2xl font-bold">{formatCurrency(portfolioMetrics.total_value)}</p>
+                    <p className="text-2xl font-bold">
+                      {formatCurrency(
+                        portfolioMetrics.total_value
+                        + (portfolioMetrics.cash_from_stablecoins || 0)
+                        + (portfolioMetrics.cash_from_fiat || 0)
+                      )}
+                    </p>
                     <p className={`text-sm ${portfolioMetrics.total_gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {portfolioMetrics.total_gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(portfolioMetrics.total_gain_loss)} ({formatPercent(portfolioMetrics.total_gain_loss_percent)})
                     </p>
@@ -308,6 +348,7 @@ export default function PortfolioPage() {
                   onAddTransaction={(aId, aSym) => setShowAddTransaction({ assetId: aId, assetSymbol: aSym })}
                   onDeleteAsset={(asset) => setDeleteAsset(asset)}
                   onOpenCashBalance={() => setShowCashBalance(true)}
+                  onUpdateAssetExchange={(id, exchange) => updateAssetExchangeMutation.mutate({ id, exchange })}
                 />
               </TabsContent>
 
@@ -318,7 +359,13 @@ export default function PortfolioPage() {
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </div>
                 ) : portfolioHistory ? (
-                  <div className="space-y-6">
+                  <div className={`space-y-6 ${isHistoryStale ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {isHistoryStale && (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
+                        <span className="text-sm text-muted-foreground">Chargement...</span>
+                      </div>
+                    )}
                     {/* Summary cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
@@ -365,12 +412,75 @@ export default function PortfolioPage() {
                     {/* Sold assets table */}
                     {portfolioHistory.sold_assets.length > 0 ? (
                       <div>
-                        <h3 className="text-lg font-semibold mb-3">Actifs vendus ({portfolioHistory.sold_assets_count})</h3>
+                        <h3 className="text-lg font-semibold mb-3">
+                          Actifs vendus ({(() => {
+                            const filtered = historyPlatformFilter
+                              ? portfolioHistory.sold_assets.filter(a => (a.exchange || 'Non assigné') === historyPlatformFilter)
+                              : portfolioHistory.sold_assets
+                            return new Set(filtered.map(a => a.symbol)).size
+                          })()})
+                        </h3>
+                        {/* Platform filter cards */}
+                        {(() => {
+                          const platforms = new Map<string, { value: number; count: number }>()
+                          portfolioHistory.sold_assets.forEach((a) => {
+                            const p = a.exchange || 'Non assigné'
+                            const entry = platforms.get(p) || { value: 0, count: 0 }
+                            entry.value += a.total_sold_value
+                            entry.count += 1
+                            platforms.set(p, entry)
+                          })
+                          if (platforms.size === 0) return null
+                          return (
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                              {Array.from(platforms.entries())
+                                .sort((a, b) => b[1].value - a[1].value)
+                                .map(([platform, data]) => {
+                                  const isWallet = isColdWallet(platform)
+                                  const isUnassigned = platform === 'Non assigné'
+                                  const isActive = historyPlatformFilter === platform
+                                  return (
+                                    <Card
+                                      key={platform}
+                                      className={`cursor-pointer transition-all ${
+                                        isActive
+                                          ? 'ring-2 ring-primary border-primary'
+                                          : historyPlatformFilter
+                                            ? 'opacity-50 hover:opacity-75'
+                                            : isWallet
+                                              ? 'border-blue-500/20 hover:border-blue-500/40'
+                                              : 'hover:bg-muted/50'
+                                      }`}
+                                      onClick={() => setHistoryPlatformFilter(isActive ? null : platform)}
+                                    >
+                                      <CardContent className="py-3 px-4">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                          {isWallet ? (
+                                            <Shield className="h-4 w-4 text-blue-500 shrink-0" />
+                                          ) : isUnassigned ? null : (
+                                            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                                          )}
+                                          <span className={`text-sm font-medium truncate ${isWallet ? 'text-blue-500' : ''}`}>
+                                            {platform}
+                                          </span>
+                                        </div>
+                                        <p className="text-lg font-bold">{formatCurrency(data.value)}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {data.count} actif{data.count > 1 ? 's' : ''}
+                                        </p>
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                            </div>
+                          )
+                        })()}
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">
                                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
+                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
                                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Qté achetée</th>
                                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Total investi</th>
                                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Qté vendue</th>
@@ -379,27 +489,111 @@ export default function PortfolioPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {portfolioHistory.sold_assets.map((asset) => (
-                                <tr key={asset.id} className="border-b last:border-0">
-                                  <td className="py-3 text-center">
-                                    <div className="flex justify-center">
-                                      <AssetIconCompact
-                                        symbol={asset.symbol}
-                                        name={asset.name}
-                                        assetType={asset.asset_type}
-                                        size={36}
-                                      />
-                                    </div>
-                                  </td>
-                                  <td className="text-center py-3">{asset.total_bought.toFixed(asset.total_bought < 1 ? 8 : 2)}</td>
-                                  <td className="text-center py-3">{formatCurrency(asset.total_bought_value)}</td>
-                                  <td className="text-center py-3">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
-                                  <td className="text-center py-3">{formatCurrency(asset.total_sold_value)}</td>
-                                  <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
-                                  </td>
-                                </tr>
-                              ))}
+                              {(() => {
+                                const filtered = portfolioHistory.sold_assets
+                                  .filter((asset) => !historyPlatformFilter || (asset.exchange || 'Non assigné') === historyPlatformFilter)
+                                // Group by symbol
+                                const groups = new Map<string, { symbol: string; name: string | undefined; asset_type: string; assets: typeof filtered; totalBought: number; totalBoughtValue: number; totalSold: number; totalSoldValue: number; realizedGain: number }>()
+                                for (const asset of filtered) {
+                                  const existing = groups.get(asset.symbol)
+                                  if (existing) {
+                                    existing.assets.push(asset)
+                                    existing.totalBought += asset.total_bought
+                                    existing.totalBoughtValue += asset.total_bought_value
+                                    existing.totalSold += asset.total_sold
+                                    existing.totalSoldValue += asset.total_sold_value
+                                    existing.realizedGain += asset.realized_gain
+                                  } else {
+                                    groups.set(asset.symbol, {
+                                      symbol: asset.symbol,
+                                      name: asset.name,
+                                      asset_type: asset.asset_type,
+                                      assets: [asset],
+                                      totalBought: asset.total_bought,
+                                      totalBoughtValue: asset.total_bought_value,
+                                      totalSold: asset.total_sold,
+                                      totalSoldValue: asset.total_sold_value,
+                                      realizedGain: asset.realized_gain,
+                                    })
+                                  }
+                                }
+                                return Array.from(groups.values())
+                                  .sort((a, b) => b.totalBoughtValue - a.totalBoughtValue)
+                                  .map((group) => {
+                                    const isMulti = group.assets.length > 1
+                                    const isExpanded = historyExpandedSymbols.has(group.symbol)
+
+                                    if (!isMulti) {
+                                      const asset = group.assets[0]
+                                      return (
+                                        <tr key={asset.id} className="border-b last:border-0">
+                                          <td className="py-3 text-center">
+                                            <div className="flex justify-center">
+                                              <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={36} />
+                                            </div>
+                                          </td>
+                                          <td className="text-center py-3">
+                                            <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                                              {asset.exchange || '-'}
+                                            </span>
+                                          </td>
+                                          <td className="text-center py-3">{asset.total_bought.toFixed(asset.total_bought < 1 ? 8 : 2)}</td>
+                                          <td className="text-center py-3">{formatCurrency(asset.total_bought_value)}</td>
+                                          <td className="text-center py-3">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
+                                          <td className="text-center py-3">{formatCurrency(asset.total_sold_value)}</td>
+                                          <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                            {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
+                                          </td>
+                                        </tr>
+                                      )
+                                    }
+
+                                    return (
+                                      <Fragment key={group.symbol}>
+                                        <tr
+                                          className="border-b cursor-pointer hover:bg-muted/30 transition-colors"
+                                          onClick={() => toggleHistoryExpanded(group.symbol)}
+                                        >
+                                          <td className="py-3 text-center">
+                                            <div className="flex justify-center">
+                                              <AssetIconCompact symbol={group.symbol} name={group.name} assetType={group.asset_type} size={36} />
+                                            </div>
+                                          </td>
+                                          <td className="text-center py-3">
+                                            <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                              <span>{group.assets.length} plateformes</span>
+                                            </div>
+                                          </td>
+                                          <td className="text-center py-3 font-medium">{group.totalBought.toFixed(group.totalBought < 1 ? 8 : 2)}</td>
+                                          <td className="text-center py-3 font-medium">{formatCurrency(group.totalBoughtValue)}</td>
+                                          <td className="text-center py-3 font-medium">{group.totalSold.toFixed(group.totalSold < 1 ? 8 : 2)}</td>
+                                          <td className="text-center py-3 font-medium">{formatCurrency(group.totalSoldValue)}</td>
+                                          <td className={`text-center py-3 font-medium ${group.realizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                            {group.realizedGain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.realizedGain)}
+                                          </td>
+                                        </tr>
+                                        {isExpanded && group.assets.map((asset) => (
+                                          <tr key={asset.id} className="border-b last:border-0 bg-muted/20">
+                                            <td className="py-2 text-center" />
+                                            <td className="text-center py-2">
+                                              <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                                                {asset.exchange || '-'}
+                                              </span>
+                                            </td>
+                                            <td className="text-center py-2 text-sm">{asset.total_bought.toFixed(asset.total_bought < 1 ? 8 : 2)}</td>
+                                            <td className="text-center py-2 text-sm">{formatCurrency(asset.total_bought_value)}</td>
+                                            <td className="text-center py-2 text-sm">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
+                                            <td className="text-center py-2 text-sm">{formatCurrency(asset.total_sold_value)}</td>
+                                            <td className={`text-center py-2 text-sm ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                              {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </Fragment>
+                                    )
+                                  })
+                              })()}
                             </tbody>
                           </table>
                         </div>
@@ -448,8 +642,7 @@ export default function PortfolioPage() {
         portfolioId={selectedPortfolio || undefined}
         onSuccess={() => {
           setShowImportCSV(false)
-          queryClient.invalidateQueries({ queryKey: queryKeys.portfolios.all })
-          queryClient.invalidateQueries({ queryKey: queryKeys.portfolios.all })
+          invalidateAllFinancialData(queryClient)
         }}
       />
 

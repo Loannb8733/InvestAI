@@ -36,7 +36,7 @@ import {
   Legend,
   ResponsiveContainer,
   Area,
-  AreaChart,
+  ComposedChart,
 } from 'recharts'
 
 interface FIREResult {
@@ -355,7 +355,7 @@ export default function SimulationsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={fireResult.projected_values}>
+                    <ComposedChart data={fireResult.projected_values}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" />
                       <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
@@ -379,7 +379,7 @@ export default function SimulationsPage() {
                         stroke="#ef4444"
                         strokeDasharray="5 5"
                       />
-                    </AreaChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -498,7 +498,7 @@ export default function SimulationsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={projectionResult.projections}>
+                    <ComposedChart data={projectionResult.projections}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" />
                       <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
@@ -530,7 +530,7 @@ export default function SimulationsPage() {
                         stroke="#a855f7"
                         strokeDasharray="5 5"
                       />
-                    </AreaChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -644,7 +644,7 @@ export default function SimulationsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 rounded-lg bg-blue-500/10">
                       <p className="text-sm text-muted-foreground">Prix moyen</p>
-                      <p className="text-xl font-bold">{dcaResult.average_cost.toFixed(2)}</p>
+                      <p className="text-xl font-bold">{formatCurrency(dcaResult.average_cost)}</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-orange-500/10">
                       <p className="text-sm text-muted-foreground">Rendement</p>

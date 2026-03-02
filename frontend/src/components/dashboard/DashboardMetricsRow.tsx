@@ -71,7 +71,7 @@ export default function DashboardMetricsRow({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Valeur actuelle de vos actifs + cash. Diffère du montant investi car il reflète les gains/pertes latents.</p>
+                  <p className="text-sm">Capital net = Total investi − Total vendu. Représente le capital réellement engagé, après déduction des ventes.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

@@ -33,6 +33,11 @@ export interface Asset {
   avgBuyPrice: number
   currency: string
   exchange?: string
+  // Crowdfunding fields
+  interestRate?: number
+  maturityDate?: string
+  projectStatus?: 'active' | 'completed' | 'delayed' | 'defaulted'
+  investedAmount?: number
   createdAt: string
   updatedAt: string
 }

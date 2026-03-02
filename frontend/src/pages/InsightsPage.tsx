@@ -440,8 +440,11 @@ function DcaBacktest() {
   })
 
   const handleRun = () => {
-    setStarted(true)
-    refetch()
+    if (started) {
+      refetch()
+    } else {
+      setStarted(true)
+    }
   }
 
   const chartData = data?.monthly_history?.map((m: { month: string; invested: number; value: number }) => ({

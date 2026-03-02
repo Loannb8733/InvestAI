@@ -35,6 +35,7 @@ import { apiKeysApi } from '@/services/api'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDate } from '@/lib/utils'
+import { COLD_WALLETS } from '@/lib/platforms'
 import {
   Plus,
   Key,
@@ -50,6 +51,7 @@ import {
   Wallet,
   ExternalLink,
   ShieldCheck,
+  Shield,
   Copy,
   ChevronRight,
   Info,
@@ -510,6 +512,63 @@ export default function ExchangesPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Cold Wallets section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-500" />
+            Mes wallets
+          </CardTitle>
+          <CardDescription>
+            Portefeuilles matériels et wallets auto-custodial. Suivi manuel de vos actifs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {COLD_WALLETS.map((wallet) => {
+              const walletColors: Record<string, string> = {
+                Tangem: 'bg-[#000000]',
+                Ledger: 'bg-[#000000]',
+                Trezor: 'bg-[#00854D]',
+                SafePal: 'bg-[#4A33D0]',
+                Metamask: 'bg-[#E2761B]',
+              }
+              const walletLabels: Record<string, string> = {
+                Tangem: 'TG',
+                Ledger: 'LG',
+                Trezor: 'TZ',
+                SafePal: 'SP',
+                Metamask: 'MM',
+              }
+              return (
+                <div
+                  key={wallet}
+                  className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30"
+                >
+                  <div
+                    className={`${walletColors[wallet] || 'bg-blue-500/20'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
+                    style={{ width: 40, height: 40, fontSize: 14 }}
+                  >
+                    {walletLabels[wallet] || <Shield style={{ width: 20, height: 20 }} />}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium">{wallet}</h3>
+                    <p className="text-xs text-muted-foreground">Suivi manuel</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs text-blue-500 border-blue-500/30">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Self-custody
+                  </Badge>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Pour ajouter des actifs sur un wallet, allez dans votre portefeuille et enregistrez un transfert entrant avec la plateforme source.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Actions explanation */}
       <Card className="bg-muted/30">

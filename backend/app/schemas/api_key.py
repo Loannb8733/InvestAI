@@ -37,7 +37,7 @@ class APIKeyResponse(APIKeyBase):
 
     id: UUID
     is_active: bool
-    last_sync_at: Optional[str]
+    last_sync_at: Optional[datetime]
     last_error: Optional[str]
     created_at: datetime
 

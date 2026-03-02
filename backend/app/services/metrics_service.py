@@ -1,5 +1,6 @@
 """Metrics calculation service for portfolio analysis."""
 
+import asyncio
 import logging
 from decimal import Decimal
 from typing import Dict, List, Optional
@@ -103,10 +104,17 @@ class MetricsService:
         # Filter out dust positions (worth less than min_value_eur)
         assets = []
         for asset in all_assets:
-            # Estimate value: quantity * avg_buy_price (as approximation)
-            est_value = float(asset.quantity) * float(asset.avg_buy_price) if asset.avg_buy_price else 0
-            if est_value >= min_value_eur or include_zero_quantity:
-                assets.append(asset)
+            if not include_zero_quantity:
+                qty = float(asset.quantity)
+                avg_price = float(asset.avg_buy_price) if asset.avg_buy_price else 0.0
+                if avg_price > 0:
+                    est_value = qty * avg_price
+                    if est_value < min_value_eur:
+                        continue
+                elif qty < 0.01:
+                    # No buy price and tiny quantity — almost certainly dust
+                    continue
+            assets.append(asset)
 
         if not assets:
             return {
@@ -137,47 +145,123 @@ class MetricsService:
         if crypto_symbols:
             crypto_prices = await price_service.get_multiple_crypto_prices(crypto_symbols, currency.lower())
             for symbol, data in crypto_prices.items():
-                prices[symbol] = data["price"]
-                price_changes[symbol] = float(data.get("change_percent_24h", 0) or 0)
+                prices[symbol.upper()] = data["price"]
+                price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
 
-        for symbol in stock_symbols:
-            stock_data = await price_service.get_stock_price(symbol)
-            if stock_data:
-                prices[symbol] = stock_data["price"]
-                price_changes[symbol] = float(stock_data.get("change_percent_24h", 0) or 0)
+        if stock_symbols:
+
+            async def _fetch_stock(sym):
+                data = await price_service.get_stock_price(sym)
+                return sym, data
+
+            results = await asyncio.gather(*[_fetch_stock(s) for s in stock_symbols], return_exceptions=True)
+            for res in results:
+                if isinstance(res, Exception):
+                    continue
+                symbol, stock_data = res
+                if stock_data:
+                    prices[symbol.upper()] = stock_data["price"]
+                    price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
 
         # Calculate metrics for each investment asset
         total_value = Decimal("0")
         total_invested = Decimal("0")
         asset_metrics = []
+        crowdfunding_active = 0
+        crowdfunding_completed = 0
+        crowdfunding_total_invested = Decimal("0")
+        crowdfunding_projected_interest = Decimal("0")
+        crowdfunding_next_maturity = None
 
         for asset in investment_assets:
-            current_price = prices.get(asset.symbol.upper())
-            metrics = await self.get_asset_metrics(asset, current_price)
+            # Crowdfunding / real estate with invested_amount: no live price
+            is_crowdfunding = asset.asset_type == AssetType.REAL_ESTATE and asset.invested_amount is not None
+
+            if is_crowdfunding:
+                inv_amount = Decimal(str(asset.invested_amount))
+                status = asset.project_status or "active"
+
+                if status == "completed":
+                    current_value = Decimal("0")
+                    crowdfunding_completed += 1
+                else:
+                    current_value = inv_amount
+                    crowdfunding_active += 1
+
+                crowdfunding_total_invested += inv_amount
+
+                # Projected annual interest
+                rate = Decimal(str(asset.interest_rate)) if asset.interest_rate else Decimal("0")
+                if status == "active" and rate > 0:
+                    crowdfunding_projected_interest += inv_amount * rate / 100
+
+                # Track next maturity
+                if status == "active" and asset.maturity_date:
+                    if crowdfunding_next_maturity is None or asset.maturity_date < crowdfunding_next_maturity:
+                        crowdfunding_next_maturity = asset.maturity_date
+
+                metrics = {
+                    "quantity": float(asset.quantity),
+                    "avg_buy_price": float(inv_amount),
+                    "total_invested": float(inv_amount),
+                    "current_price": float(inv_amount) if status != "completed" else 0.0,
+                    "current_value": float(current_value),
+                    "gain_loss": 0.0,
+                    "gain_loss_percent": 0.0,
+                }
+            else:
+                current_price = prices.get(asset.symbol.upper())
+                metrics = await self.get_asset_metrics(asset, current_price)
+
+                # Post-filter: skip dust positions based on actual current value
+                if (
+                    not include_zero_quantity
+                    and metrics["current_value"] < min_value_eur
+                    and metrics["total_invested"] < min_value_eur
+                ):
+                    continue
 
             total_value += Decimal(str(metrics["current_value"]))
             total_invested += Decimal(str(metrics["total_invested"]))
 
-            asset_metrics.append(
-                {
-                    "id": str(asset.id),
-                    "symbol": asset.symbol,
-                    "name": asset.name,
-                    "asset_type": asset.asset_type.value,
-                    "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
-                    **metrics,
-                }
-            )
+            asset_entry = {
+                "id": str(asset.id),
+                "symbol": asset.symbol,
+                "name": asset.name,
+                "asset_type": asset.asset_type.value,
+                "exchange": asset.exchange,
+                "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
+                **metrics,
+            }
+            # Include crowdfunding fields if present
+            if is_crowdfunding:
+                asset_entry["interest_rate"] = float(asset.interest_rate) if asset.interest_rate else None
+                asset_entry["maturity_date"] = asset.maturity_date.isoformat() if asset.maturity_date else None
+                asset_entry["project_status"] = asset.project_status
+                asset_entry["invested_amount"] = float(asset.invested_amount) if asset.invested_amount else None
+
+            asset_metrics.append(asset_entry)
+
+        # Fetch live USD→EUR rate for stablecoin valuation
+        usd_eur_rate = 0.92  # fallback
+        try:
+            forex_rate = await price_service.get_forex_rate("USD", "EUR")
+            if forex_rate:
+                usd_eur_rate = float(forex_rate)
+        except Exception:
+            pass
 
         # Calculate stablecoin cash value (filter out dust)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
         for asset in stablecoin_assets:
-            value = (
-                float(asset.quantity) * float(asset.avg_buy_price)
-                if float(asset.avg_buy_price) > 0
-                else float(asset.quantity)
-            )
+            # Stablecoins are valued at ~1:1 with their denomination
+            usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD"}
+            if asset.symbol.upper() in usd_stablecoins:
+                unit_price = usd_eur_rate
+            else:
+                unit_price = 1.0  # EUR-denominated stablecoins
+            value = float(asset.quantity) * unit_price
             if value < min_value_eur:
                 continue
             cash_from_stablecoins += Decimal(str(value))
@@ -211,18 +295,30 @@ class MetricsService:
         total_gain_loss = total_value - total_invested
         total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
-        return {
+        result = {
             "total_value": float(total_value),
             "total_invested": float(total_invested),
             "total_gain_loss": float(total_gain_loss),
             "total_gain_loss_percent": total_gain_loss_percent,
-            "assets_count": len(investment_assets),
+            "assets_count": len(asset_metrics),
             "assets": asset_metrics,
             "cash_from_stablecoins": float(cash_from_stablecoins),
             "stablecoins": stablecoin_list,
             "cash_from_fiat": float(cash_from_fiat),
             "fiat_assets": fiat_list,
         }
+
+        # Include crowdfunding summary if relevant
+        if crowdfunding_active > 0 or crowdfunding_completed > 0:
+            result["crowdfunding_summary"] = {
+                "total_invested": float(crowdfunding_total_invested),
+                "active_projects": crowdfunding_active,
+                "completed_projects": crowdfunding_completed,
+                "projected_annual_interest": float(crowdfunding_projected_interest),
+                "next_maturity": crowdfunding_next_maturity.isoformat() if crowdfunding_next_maturity else None,
+            }
+
+        return result
 
     async def _fetch_period_changes(self, symbols_by_type: Dict[str, List[str]], days: int) -> Dict[str, float]:
         """Fetch price change percentage over a period for each symbol.
@@ -236,6 +332,7 @@ class MetricsService:
 
         # Map days to CoinGecko price_change_percentage param
         # Available: 1h, 24h, 7d, 14d, 30d, 200d, 1y
+        # Note: there is no 90d — 30d is closest without overshoot
         if days <= 1:
             cg_period = "24h"
             cg_key = "price_change_percentage_24h_in_currency"
@@ -245,7 +342,7 @@ class MetricsService:
         elif days <= 14:
             cg_period = "14d"
             cg_key = "price_change_percentage_14d_in_currency"
-        elif days <= 30:
+        elif days <= 90:
             cg_period = "30d"
             cg_key = "price_change_percentage_30d_in_currency"
         elif days <= 200:
@@ -291,10 +388,14 @@ class MetricsService:
                     for coin in data:
                         coin_id = coin.get("id", "")
                         symbol = id_to_symbol.get(coin_id, coin.get("symbol", "").upper())
-                        pct = coin.get(cg_key, {})
+                        pct = coin.get(cg_key)
+                        if pct is None:
+                            continue  # Skip coins with no period data instead of defaulting to 0%
                         if isinstance(pct, dict):
-                            pct = pct.get("eur", 0) or 0
-                        changes[symbol.upper()] = float(pct or 0)
+                            pct = pct.get("eur")
+                            if pct is None:
+                                continue
+                        changes[symbol.upper()] = float(pct)
 
             except Exception as e:
                 logger.warning("Failed to fetch crypto period changes: %s", e)
@@ -307,7 +408,7 @@ class MetricsService:
                 for symbol in stock_symbols:
                     try:
                         _, prices = await fetcher.get_stock_history(symbol, days=days)
-                        if prices and len(prices) >= 2:
+                        if prices and len(prices) >= 2 and prices[0] != 0:
                             change = (prices[-1] - prices[0]) / prices[0] * 100
                             changes[symbol.upper()] = change
                     except Exception:
@@ -367,7 +468,11 @@ class MetricsService:
             all_assets.extend(portfolio_metrics["assets"])
 
         total_gain_loss = total_value - total_invested
-        total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
+        # total_gain_loss_percent: gain/loss relative to total amount ever invested
+        if total_invested > 0:
+            total_gain_loss_percent = float(total_gain_loss / total_invested * 100)
+        else:
+            total_gain_loss_percent = 0.0
 
         # Calculate allocation by asset type
         allocation = {}
@@ -441,9 +546,17 @@ class MetricsService:
         period_change = float(total_value) * period_change_percent / 100 if period_change_percent else 0.0
 
         # Net capital = money injected - money withdrawn (actual cash still in play)
+        # Don't clamp to 0: negative net_capital means user recovered more than invested
+        # which is a valid state (profitable sells). Clamping masks real P&L.
         net_capital = total_invested - total_sold
         net_gain_loss = total_value - net_capital
-        net_gain_loss_percent = float(net_gain_loss / net_capital * 100) if net_capital > 0 else 0.0
+        if net_capital > 0:
+            net_gain_loss_percent = float(net_gain_loss / net_capital * 100)
+        elif net_capital < 0:
+            # User recovered more than invested: show gain relative to total_invested
+            net_gain_loss_percent = float(net_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
+        else:
+            net_gain_loss_percent = 0.0
 
         return {
             "total_value": float(total_value),
@@ -453,10 +566,16 @@ class MetricsService:
             "total_gain_loss_percent": total_gain_loss_percent,
             "net_gain_loss": float(net_gain_loss),
             "net_gain_loss_percent": net_gain_loss_percent,
-            "daily_change": period_change,
-            "daily_change_percent": period_change_percent,
+            "daily_change": sum(a["current_value"] * a.get("change_percent_24h", 0) / 100 for a in all_assets),
+            "daily_change_percent": sum(
+                (a["current_value"] / float(total_value)) * a.get("change_percent_24h", 0) for a in all_assets
+            )
+            if float(total_value) > 0
+            else 0.0,
+            "period_change": period_change,
+            "period_change_percent": period_change_percent,
             "portfolios_count": len(portfolios),
-            "assets_count": len(all_assets),
+            "assets_count": len({a["symbol"] for a in all_assets}),
             "allocation": allocation_list,
             "top_performers": [
                 {
@@ -500,10 +619,11 @@ class MetricsService:
             return {
                 "total_invested_all_time": 0.0,
                 "total_sold": 0.0,
+                "total_fees": 0.0,
                 "realized_gains": 0.0,
                 "current_holdings_count": 0,
                 "sold_assets_count": 0,
-                "historical_assets": [],
+                "sold_assets": [],
             }
 
         # Get all transactions for these assets
@@ -524,9 +644,13 @@ class MetricsService:
                 "symbol": asset.symbol,
                 "name": asset.name,
                 "asset_type": asset.asset_type.value,
+                "exchange": asset.exchange,
                 "current_quantity": float(asset.quantity),
                 "total_bought": Decimal("0"),
                 "total_bought_value": Decimal("0"),
+                "total_bought_with_cost": Decimal("0"),  # Only transactions with price > 0
+                "total_bought_cost_value": Decimal("0"),  # Only transactions with price > 0
+                "total_bought_fiat_value": Decimal("0"),  # Only BUY+TRANSFER_IN (real money in, not conversions)
                 "total_sold": Decimal("0"),
                 "total_sold_value": Decimal("0"),
                 "total_fees": Decimal("0"),
@@ -543,23 +667,39 @@ class MetricsService:
             ah = asset_history[asset_id]
             tx_type = tx.transaction_type.value.upper()
 
-            # Track dates
+            # Track dates (skip if executed_at is None)
             tx_date = tx.executed_at
-            if ah["last_transaction"] is None or tx_date > ah["last_transaction"]:
-                ah["last_transaction"] = tx_date
-            if ah["first_transaction"] is None or tx_date < ah["first_transaction"]:
-                ah["first_transaction"] = tx_date
+            if tx_date is not None:
+                if ah["last_transaction"] is None or tx_date > ah["last_transaction"]:
+                    ah["last_transaction"] = tx_date
+                if ah["first_transaction"] is None or tx_date < ah["first_transaction"]:
+                    ah["first_transaction"] = tx_date
 
-            # Track fees
-            ah["total_fees"] += Decimal(str(tx.fee or 0))
+            # Track fees — FEE-type transactions use quantity*price as the fee amount,
+            # so we do NOT also add tx.fee for them (would double-count)
+            if tx_type == "FEE":
+                ah["total_fees"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
+            else:
+                ah["total_fees"] += Decimal(str(tx.fee or 0))
 
-            # Track buys
-            if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN"]:
-                ah["total_bought"] += Decimal(str(tx.quantity))
-                ah["total_bought_value"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
+            # Track buys (including dividend/interest which add quantity)
+            if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN", "DIVIDEND", "INTEREST"]:
+                tx_price = Decimal(str(tx.price))
+                tx_qty = Decimal(str(tx.quantity))
+                ah["total_bought"] += tx_qty
+                ah["total_bought_value"] += tx_qty * tx_price
+                # Track cost basis separately: only include transactions with a real price
+                # so that free tokens (airdrops, transfers at price=0) don't deflate avg cost
+                if tx_price > 0:
+                    ah["total_bought_with_cost"] += tx_qty
+                    ah["total_bought_cost_value"] += tx_qty * tx_price
+                # Track real money in (BUY + TRANSFER_IN with price) for total_invested
+                # CONVERSION_IN is excluded: it's a form change (crypto→crypto), not new capital
+                if tx_type in ["BUY", "TRANSFER_IN"] and tx_price > 0:
+                    ah["total_bought_fiat_value"] += tx_qty * tx_price
 
-            # Track sells
-            elif tx_type in ["SELL", "TRANSFER_OUT", "CONVERSION_OUT"]:
+            # Track sells (TRANSFER_OUT excluded: user still owns the asset on cold wallet)
+            elif tx_type in ["SELL", "CONVERSION_OUT"]:
                 ah["total_sold"] += Decimal(str(tx.quantity))
                 ah["total_sold_value"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
 
@@ -574,7 +714,9 @@ class MetricsService:
             # Exclude stablecoins/fiat from investment totals
             if is_cash_like(ah["symbol"]):
                 continue
-            total_invested_all_time += ah["total_bought_value"]
+            # total_invested: only count BUY transactions (real money in)
+            # CONVERSION_IN is a form change (crypto→crypto), not new capital
+            total_invested_all_time += ah["total_bought_fiat_value"]
             total_sold_value += ah["total_sold_value"]
             total_fees += ah["total_fees"]
 
@@ -584,6 +726,7 @@ class MetricsService:
                 "symbol": ah["symbol"],
                 "name": ah["name"],
                 "asset_type": ah["asset_type"],
+                "exchange": ah["exchange"],
                 "current_quantity": ah["current_quantity"],
                 "total_bought": float(ah["total_bought"]),
                 "total_bought_value": float(ah["total_bought_value"]),
@@ -591,24 +734,32 @@ class MetricsService:
                 "total_sold_value": float(ah["total_sold_value"]),
                 "total_fees": float(ah["total_fees"]),
                 "realized_gain": float(
-                    ah["total_sold_value"] - (ah["total_bought_value"] * ah["total_sold"] / ah["total_bought"])
+                    ah["total_sold_value"]
+                    - (ah["total_bought_cost_value"] * ah["total_sold"] / ah["total_bought_with_cost"])
                 )
-                if ah["total_bought"] > 0 and ah["total_sold"] > 0
+                if ah["total_bought_with_cost"] > 0 and ah["total_sold"] > 0
                 else 0.0,
                 "first_transaction": ah["first_transaction"].isoformat() if ah["first_transaction"] else None,
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
 
-            # Consider as "sold" if quantity is 0 or value is less than 0.10€
-            est_value = (
-                float(ah["current_quantity"]) * float(ah["total_bought_value"] / ah["total_bought"])
-                if ah["total_bought"] > 0
-                else 0
-            )
-            if ah["current_quantity"] > 0 and est_value >= 0.10:
-                current_holdings.append(asset_data)
-            else:
+            # Consider as "sold" only if quantity is 0 AND has actual sells
+            # Dust positions with no sells stay in current_holdings (not shown as "sold")
+            if ah["current_quantity"] <= 0:
                 sold_assets.append(asset_data)
+            elif ah["total_sold"] > 0:
+                # Partially sold: estimate remaining value
+                est_value = (
+                    float(ah["current_quantity"]) * float(ah["total_bought_value"] / ah["total_bought"])
+                    if ah["total_bought"] > 0 and ah["total_bought_value"] > 0
+                    else float(ah["current_quantity"])
+                )
+                if est_value < 0.10:
+                    sold_assets.append(asset_data)
+                else:
+                    current_holdings.append(asset_data)
+            else:
+                current_holdings.append(asset_data)
 
         # Sort by total invested
         sold_assets.sort(key=lambda x: x["total_bought_value"], reverse=True)
@@ -665,16 +816,14 @@ class MetricsService:
             history = await self.get_portfolio_history(db, str(portfolio.id), currency)
             metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
 
-            # Realized gains from sold assets
             total_fees += Decimal(str(history.get("total_fees", 0)))
 
-            # Calculate realized P&L from sold assets
-            for sold_asset in history.get("sold_assets", []):
-                realized_gain = Decimal(str(sold_asset.get("realized_gain", 0)))
-                total_realized += realized_gain
+            # Realized P&L: from sold_assets AND current_holdings with partial sells
+            total_realized += Decimal(str(history.get("realized_gains", 0)))
 
-            # Unrealized P&L from current holdings
-            total_unrealized += Decimal(str(metrics.get("total_gain_loss", 0)))
+            # Unrealized P&L from current holdings (total_gain_loss = current_value - total_invested)
+            portfolio_gain_loss = Decimal(str(metrics.get("total_gain_loss", 0)))
+            total_unrealized += portfolio_gain_loss
 
         return {
             "realized_pnl": float(total_realized),

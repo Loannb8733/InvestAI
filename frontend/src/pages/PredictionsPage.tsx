@@ -279,8 +279,8 @@ const FearGreedGauge = ({ value, thresholds }: { value: number; thresholds?: Dis
 }
 
 // ── Cycle Position Gauge ──────────────────────────────────────────────
-const CycleGauge = ({ position, regime }: { position: number; regime: string }) => {
-  // 0=bottom, 25=early bull, 50=mid bull, 75=top, 100=deep bear
+const CycleGauge = ({ position }: { position: number }) => {
+  // 0=creux, 15=accumulation, 40=expansion, 65=distribution, 85=baissier
   const clampedPos = Math.max(0, Math.min(100, position))
   const angle = (clampedPos / 100) * 360
   const radians = ((angle - 90) * Math.PI) / 180
@@ -288,31 +288,28 @@ const CycleGauge = ({ position, regime }: { position: number; regime: string }) 
   const nx = cx + r * Math.cos(radians)
   const ny = cy + r * Math.sin(radians)
 
-  const regimeColors: Record<string, string> = {
-    bottom: '#3b82f6',
-    bullish: '#22c55e',
-    top: '#f59e0b',
-    bearish: '#ef4444',
+  // Map cycle_position to phase label and color
+  const getPhase = (pos: number): { label: string; color: string } => {
+    if (pos < 15) return { label: 'Creux', color: '#3b82f6' }
+    if (pos < 40) return { label: 'Accumulation', color: '#06b6d4' }
+    if (pos < 65) return { label: 'Expansion', color: '#22c55e' }
+    if (pos < 85) return { label: 'Distribution', color: '#f59e0b' }
+    return { label: 'Euphorie', color: '#ef4444' }
   }
-  const regimeLabels: Record<string, string> = {
-    bottom: 'Creux',
-    bullish: 'Haussier',
-    top: 'Sommet',
-    bearish: 'Baissier',
-  }
-  const color = regimeColors[regime] || '#6b7280'
+  const phase = getPhase(clampedPos)
 
   return (
     <div className="flex flex-col items-center">
       <svg width="140" height="140" viewBox="0 0 120 120">
         {/* Background ring */}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/20" />
-        {/* Colored quadrants (subtle) */}
+        {/* Colored segments (subtle) */}
         {[
-          { start: -90, end: 0, c: '#3b82f6' },   // 0-25: Bottom (blue)
-          { start: 0, end: 90, c: '#22c55e' },     // 25-50: Bull (green)
-          { start: 90, end: 180, c: '#f59e0b' },   // 50-75: Top (amber)
-          { start: 180, end: 270, c: '#ef4444' },   // 75-100: Bear (red)
+          { start: -90, end: -36, c: '#3b82f6' },   // 0-15: Creux (blue)
+          { start: -36, end: 54, c: '#06b6d4' },     // 15-40: Accumulation (cyan)
+          { start: 54, end: 144, c: '#22c55e' },     // 40-65: Expansion (green)
+          { start: 144, end: 216, c: '#f59e0b' },    // 65-85: Distribution (amber)
+          { start: 216, end: 270, c: '#ef4444' },     // 85-100: Euphorie (red)
         ].map(({ start, end, c }, i) => {
           const s = (start * Math.PI) / 180
           const e = (end * Math.PI) / 180
@@ -320,10 +317,11 @@ const CycleGauge = ({ position, regime }: { position: number; regime: string }) 
           const y1 = cy + r * Math.sin(s)
           const x2 = cx + r * Math.cos(e)
           const y2 = cy + r * Math.sin(e)
+          const largeArc = (end - start) > 180 ? 1 : 0
           return (
             <path
               key={i}
-              d={`M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`}
+              d={`M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`}
               fill="none"
               stroke={c}
               strokeWidth="8"
@@ -332,19 +330,19 @@ const CycleGauge = ({ position, regime }: { position: number; regime: string }) 
           )
         })}
         {/* Needle dot */}
-        <circle cx={nx} cy={ny} r="6" fill={color} stroke="white" strokeWidth="2" />
+        <circle cx={nx} cy={ny} r="6" fill={phase.color} stroke="white" strokeWidth="2" />
         {/* Center text */}
-        <text x={cx} y={cy - 4} textAnchor="middle" fill={color} fontSize="16" fontWeight="bold">
-          {regimeLabels[regime] || regime}
+        <text x={cx} y={cy - 4} textAnchor="middle" fill={phase.color} fontSize="14" fontWeight="bold">
+          {phase.label}
         </text>
         <text x={cx} y={cy + 14} textAnchor="middle" fill="currentColor" fontSize="10" className="fill-muted-foreground">
           Position: {clampedPos}
         </text>
         {/* Labels */}
         <text x={cx} y="10" textAnchor="middle" fontSize="7" className="fill-muted-foreground">Creux</text>
-        <text x="112" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Bull</text>
-        <text x={cx} y="116" textAnchor="middle" fontSize="7" className="fill-muted-foreground">Sommet</text>
-        <text x="2" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Bear</text>
+        <text x="112" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Expansion</text>
+        <text x={cx} y="116" textAnchor="middle" fontSize="7" className="fill-muted-foreground">Distribution</text>
+        <text x="2" y={cy + 3} textAnchor="start" fontSize="7" className="fill-muted-foreground">Euphorie</text>
       </svg>
     </div>
   )
@@ -497,7 +495,7 @@ const TopBottomCard = ({ estimates }: { estimates: MarketCycleData['top_bottom_e
                             {formatDate(est.next_bottom.estimated_date)} (~{est.next_bottom.estimated_days}j)
                           </span>
                           <span className="text-[10px] font-medium text-blue-500">
-                            -{est.next_bottom.distance_pct}%
+                            -{est.next_bottom.distance_pct.toFixed(1)}%
                           </span>
                         </div>
                         {/* Visual distance bar */}
@@ -520,7 +518,7 @@ const TopBottomCard = ({ estimates }: { estimates: MarketCycleData['top_bottom_e
                             {formatDate(est.next_top.estimated_date)} (~{est.next_top.estimated_days}j)
                           </span>
                           <span className="text-[10px] font-medium text-amber-500">
-                            +{est.next_top.distance_pct}%
+                            +{est.next_top.distance_pct.toFixed(1)}%
                           </span>
                         </div>
                         <div className="w-20 h-1 rounded-full bg-muted overflow-hidden mt-0.5">
@@ -1405,7 +1403,6 @@ export default function PredictionsPage() {
                   <CardContent>
                     <CycleGauge
                       position={marketCycle.cycle_position}
-                      regime={marketCycle.market_regime?.dominant_regime || 'unknown'}
                     />
                     <div className="flex justify-center gap-3 mt-2">
                       {marketCycle.fear_greed != null && (
@@ -1463,10 +1460,10 @@ export default function PredictionsPage() {
                                       phase === 'top' ? 'bg-amber-500' :
                                       'bg-blue-500'
                                     }`}
-                                    style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                    style={{ width: `${(prob * 100).toFixed(1)}%` }}
                                   />
                                 </div>
-                                <span className="text-xs text-muted-foreground w-8 text-right">{(prob * 100).toFixed(0)}%</span>
+                                <span className="text-xs text-muted-foreground w-10 text-right">{(prob * 100).toFixed(1)}%</span>
                               </div>
                             ))}
                         </div>
@@ -1498,7 +1495,9 @@ export default function PredictionsPage() {
                         }>
                           {{ bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux' }[marketCycle.portfolio_regime.dominant_regime] || marketCycle.portfolio_regime.dominant_regime}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">Pondéré par valeur</span>
+                        <span className="text-xs text-muted-foreground">
+                          {marketCycle.per_asset.length} actif{marketCycle.per_asset.length > 1 ? 's' : ''} analysé{marketCycle.per_asset.length > 1 ? 's' : ''}
+                        </span>
                       </div>
                       <div className="space-y-1.5">
                         {Object.entries(marketCycle.portfolio_regime.probabilities)
@@ -1516,10 +1515,10 @@ export default function PredictionsPage() {
                                     phase === 'top' ? 'bg-amber-500' :
                                     'bg-blue-500'
                                   }`}
-                                  style={{ width: `${(prob * 100).toFixed(0)}%` }}
+                                  style={{ width: `${(prob * 100).toFixed(1)}%` }}
                                 />
                               </div>
-                              <span className="text-xs text-muted-foreground w-8 text-right">{(prob * 100).toFixed(0)}%</span>
+                              <span className="text-xs text-muted-foreground w-10 text-right">{(prob * 100).toFixed(1)}%</span>
                             </div>
                           ))}
                       </div>

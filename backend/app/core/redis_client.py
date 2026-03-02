@@ -139,6 +139,27 @@ async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, t
         logger.warning("Failed to cache ensemble: %s", e)
 
 
+async def get_cached_reliability(symbol: str, days: int) -> Optional[dict]:
+    """Get cached reliability scores."""
+    try:
+        r = await _get_redis_txt()
+        data = await r.get(f"reliability:{symbol}:{days}")
+        if data:
+            return json.loads(data)
+    except Exception:
+        pass
+    return None
+
+
+async def cache_reliability(symbol: str, days: int, result: dict, ttl: int = 86400):
+    """Cache reliability scores (default 24h TTL)."""
+    try:
+        r = await _get_redis_txt()
+        await r.setex(f"reliability:{symbol}:{days}", ttl, json.dumps(result))
+    except Exception as e:
+        logger.warning("Failed to cache reliability: %s", e)
+
+
 # ── Binary caches (use binary client for pickle) ─────────────────────
 # Note: pickle is used ONLY for internally-generated ML model objects.
 # No untrusted data is ever deserialized.

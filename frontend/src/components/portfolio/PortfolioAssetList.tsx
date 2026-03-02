@@ -1,3 +1,4 @@
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import {
@@ -6,15 +7,22 @@ import {
   Trash2,
   ArrowRightLeft,
   Banknote,
+  Shield,
+  Building2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import { ALL_PLATFORMS, isColdWallet } from '@/lib/platforms'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 interface AssetMetrics {
   id: string
   symbol: string
   name?: string
   asset_type: string
+  exchange?: string | null
   quantity: number
   avg_buy_price: number
   current_price?: number
@@ -22,6 +30,11 @@ interface AssetMetrics {
   total_invested: number
   gain_loss: number
   gain_loss_percent: number
+  // Crowdfunding fields
+  interest_rate?: number
+  maturity_date?: string
+  project_status?: string
+  invested_amount?: number
 }
 
 interface StablecoinEntry {
@@ -43,6 +56,21 @@ interface PortfolioMetrics {
   fiat_assets?: StablecoinEntry[]
 }
 
+interface GroupedAsset {
+  symbol: string
+  name?: string
+  asset_type: string
+  assets: AssetMetrics[]
+  totalQuantity: number
+  totalValue: number
+  totalInvested: number
+  totalGainLoss: number
+  totalGainLossPercent: number
+  currentPrice?: number
+  avgBuyPrice: number
+  isMultiPlatform: boolean
+}
+
 interface PortfolioAssetListProps {
   portfolioMetrics: PortfolioMetrics | undefined
   loadingMetrics: boolean
@@ -53,6 +81,7 @@ interface PortfolioAssetListProps {
   onAddTransaction: (assetId: string, assetSymbol: string) => void
   onDeleteAsset: (asset: AssetMetrics) => void
   onOpenCashBalance: () => void
+  onUpdateAssetExchange?: (assetId: string, exchange: string | null) => void
 }
 
 export default function PortfolioAssetList({
@@ -65,7 +94,189 @@ export default function PortfolioAssetList({
   onAddTransaction,
   onDeleteAsset,
   onOpenCashBalance,
+  onUpdateAssetExchange,
 }: PortfolioAssetListProps) {
+  const [platformPopover, setPlatformPopover] = useState<string | null>(null)
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null)
+  const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
+
+  // Reset filters when portfolio changes
+  useEffect(() => {
+    setPlatformFilter(null)
+    setExpandedSymbols(new Set())
+  }, [portfolioId])
+
+  const toggleExpanded = (symbol: string) => {
+    setExpandedSymbols(prev => {
+      const next = new Set(prev)
+      if (next.has(symbol)) next.delete(symbol)
+      else next.add(symbol)
+      return next
+    })
+  }
+
+  // Group assets by platform for distribution view
+  const platformDistribution = useMemo(() => {
+    if (!portfolioMetrics?.assets?.length) return []
+    const map = new Map<string, { value: number; assets: { symbol: string; value: number }[] }>()
+    for (const asset of portfolioMetrics.assets) {
+      const platform = asset.exchange || 'Non assigné'
+      const entry = map.get(platform) || { value: 0, assets: [] }
+      entry.value += asset.current_value
+      entry.assets.push({ symbol: asset.symbol, value: asset.current_value })
+      map.set(platform, entry)
+    }
+    return Array.from(map.entries())
+      .map(([platform, data]) => ({ platform, ...data }))
+      .sort((a, b) => b.value - a.value)
+  }, [portfolioMetrics?.assets])
+
+  // Group assets by symbol for aggregated view
+  const groupedAssets = useMemo(() => {
+    if (!portfolioMetrics?.assets?.length) return []
+    const filtered = portfolioMetrics.assets.filter((asset) =>
+      !platformFilter || (asset.exchange || 'Non assigné') === platformFilter
+    )
+    const map = new Map<string, GroupedAsset>()
+    for (const asset of filtered) {
+      const existing = map.get(asset.symbol)
+      if (existing) {
+        existing.assets.push(asset)
+        existing.totalQuantity += asset.quantity
+        existing.totalValue += asset.current_value
+        existing.totalInvested += asset.total_invested
+        existing.totalGainLoss += asset.gain_loss
+        existing.isMultiPlatform = true
+        // Weighted avg buy price
+        const totalQty = existing.assets.reduce((s, a) => s + a.quantity, 0)
+        existing.avgBuyPrice = totalQty > 0
+          ? existing.assets.reduce((s, a) => s + a.avg_buy_price * a.quantity, 0) / totalQty
+          : 0
+        existing.totalGainLossPercent = existing.totalInvested > 0
+          ? ((existing.totalValue - existing.totalInvested) / existing.totalInvested) * 100
+          : 0
+      } else {
+        map.set(asset.symbol, {
+          symbol: asset.symbol,
+          name: asset.name,
+          asset_type: asset.asset_type,
+          assets: [asset],
+          totalQuantity: asset.quantity,
+          totalValue: asset.current_value,
+          totalInvested: asset.total_invested,
+          totalGainLoss: asset.gain_loss,
+          totalGainLossPercent: asset.total_invested > 0
+            ? ((asset.current_value - asset.total_invested) / asset.total_invested) * 100
+            : 0,
+          currentPrice: asset.current_price,
+          avgBuyPrice: asset.avg_buy_price,
+          isMultiPlatform: false,
+        })
+      }
+    }
+    // Use same current price across grouped assets
+    for (const group of map.values()) {
+      const priced = group.assets.find(a => a.current_price && a.current_price > 0)
+      if (priced) group.currentPrice = priced.current_price
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalValue - a.totalValue)
+  }, [portfolioMetrics?.assets, platformFilter])
+
+  const hasPlatformData = platformDistribution.some((p) => p.platform !== 'Non assigné')
+
+  // Detect if this is a crowdfunding portfolio (all assets are real_estate with invested_amount)
+  const isCrowdfundingPortfolio = useMemo(() => {
+    if (!portfolioMetrics?.assets?.length) return false
+    return portfolioMetrics.assets.every((a) => a.asset_type === 'real_estate' && a.invested_amount != null)
+  }, [portfolioMetrics?.assets])
+
+  const statusBadge = (status?: string) => {
+    switch (status) {
+      case 'active':
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-500">En cours</span>
+      case 'completed':
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">Remboursé</span>
+      case 'delayed':
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-500">Retardé</span>
+      case 'defaulted':
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-500">Défaut</span>
+      default:
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{status || '-'}</span>
+    }
+  }
+
+  const formatMaturityDate = (dateStr?: string) => {
+    if (!dateStr) return '-'
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+  }
+
+  const renderPlatformBadge = (asset: AssetMetrics) => {
+    if (onUpdateAssetExchange) {
+      return (
+        <Popover open={platformPopover === asset.id} onOpenChange={(open) => setPlatformPopover(open ? asset.id : null)}>
+          <PopoverTrigger asChild>
+            <button className={`text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
+              asset.exchange
+                ? isColdWallet(asset.exchange)
+                  ? 'bg-blue-500/10 text-blue-500'
+                  : 'bg-muted text-muted-foreground'
+                : 'bg-muted/50 text-muted-foreground'
+            }`}>
+              {asset.exchange && isColdWallet(asset.exchange) && <Shield className="h-3 w-3" />}
+              {asset.exchange || 'Non assigné'}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-44 p-1" align="center">
+            <div className="max-h-52 overflow-y-auto">
+              {ALL_PLATFORMS.map((platform) => (
+                <button
+                  key={platform}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-2 hover:bg-muted transition-colors ${
+                    asset.exchange === platform ? 'bg-muted font-medium' : ''
+                  }`}
+                  onClick={() => {
+                    onUpdateAssetExchange(asset.id, platform)
+                    setPlatformPopover(null)
+                  }}
+                >
+                  {isColdWallet(platform) && <Shield className="h-3 w-3 text-blue-500 shrink-0" />}
+                  {!isColdWallet(platform) && <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />}
+                  {platform}
+                </button>
+              ))}
+              {asset.exchange && (
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
+                  onClick={() => {
+                    onUpdateAssetExchange(asset.id, null)
+                    setPlatformPopover(null)
+                  }}
+                >
+                  Retirer la plateforme
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )
+    }
+    if (asset.exchange) {
+      return (
+        <span className={`text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 ${
+          isColdWallet(asset.exchange)
+            ? 'bg-blue-500/10 text-blue-500'
+            : 'bg-muted text-muted-foreground'
+        }`}>
+          {isColdWallet(asset.exchange) && <Shield className="h-3 w-3" />}
+          {asset.exchange}
+        </span>
+      )
+    }
+    return <span className="text-xs text-muted-foreground">-</span>
+  }
+
   return (
     <>
       {/* Cash + Stablecoins cards side by side */}
@@ -133,16 +344,104 @@ export default function PortfolioAssetList({
         </Card>
       </div>
 
+      {/* Platform distribution */}
+      {hasPlatformData && platformDistribution.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {platformDistribution.map(({ platform, value, assets }) => {
+            const isWallet = isColdWallet(platform)
+            const isUnassigned = platform === 'Non assigné'
+            const isActive = platformFilter === platform
+            return (
+              <Card
+                key={platform}
+                className={`cursor-pointer transition-all ${
+                  isActive
+                    ? 'ring-2 ring-primary border-primary'
+                    : platformFilter
+                      ? 'opacity-50 hover:opacity-75'
+                      : isWallet
+                        ? 'border-blue-500/20 hover:border-blue-500/40'
+                        : 'hover:bg-muted/50'
+                }`}
+                onClick={() => setPlatformFilter(isActive ? null : platform)}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {isWallet ? (
+                      <Shield className="h-4 w-4 text-blue-500 shrink-0" />
+                    ) : isUnassigned ? null : (
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <span className={`text-sm font-medium truncate ${isWallet ? 'text-blue-500' : ''}`}>
+                      {platform}
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold">{formatCurrency(value)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {assets.length} actif{assets.length > 1 ? 's' : ''}
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
       {loadingMetrics ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      ) : portfolioMetrics && portfolioMetrics.assets.length > 0 ? (
+      ) : portfolioMetrics && isCrowdfundingPortfolio && portfolioMetrics.assets.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Projet</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Montant</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Taux</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Echéance</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Statut</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {portfolioMetrics.assets
+                .filter((a) => !platformFilter || (a.exchange || 'Non assigné') === platformFilter)
+                .map((asset) => (
+                <tr key={asset.id} className="border-b last:border-0">
+                  <td className="py-3 text-center">
+                    <div className="flex flex-col items-center">
+                      <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={32} />
+                      <span className="text-xs text-muted-foreground mt-1 max-w-[120px] truncate">{asset.name || asset.symbol}</span>
+                    </div>
+                  </td>
+                  <td className="text-center py-3">{renderPlatformBadge(asset)}</td>
+                  <td className="text-center py-3 font-medium">{formatCurrency(asset.invested_amount || asset.total_invested)}</td>
+                  <td className="text-center py-3">
+                    {asset.interest_rate != null ? `${asset.interest_rate}%` : '-'}
+                  </td>
+                  <td className="text-center py-3 text-sm">{formatMaturityDate(asset.maturity_date)}</td>
+                  <td className="text-center py-3">{statusBadge(asset.project_status)}</td>
+                  <td className="text-center py-3">
+                    <div className="flex justify-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => onDeleteAsset(asset)} title="Supprimer">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : portfolioMetrics && groupedAssets.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Quantité</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">PRA</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Prix actuel</th>
@@ -152,59 +451,129 @@ export default function PortfolioAssetList({
               </tr>
             </thead>
             <tbody>
-              {portfolioMetrics.assets.map((asset) => (
-                <tr key={asset.id} className="border-b last:border-0">
-                  <td className="py-3 text-center">
-                    <div className="flex justify-center">
-                      <AssetIconCompact
-                        symbol={asset.symbol}
-                        name={asset.name}
-                        assetType={asset.asset_type}
-                        size={36}
-                      />
-                    </div>
-                  </td>
-                  <td className="text-center py-3">{asset.quantity.toFixed(asset.quantity < 1 ? 8 : 2)}</td>
-                  <td className="text-center py-3 text-muted-foreground">
-                    {asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}
-                  </td>
-                  <td className="text-center py-3">
-                    {asset.current_price ? formatCurrency(asset.current_price) : '-'}
-                  </td>
-                  <td className="text-center py-3 font-medium">{formatCurrency(asset.current_value)}</td>
-                  <td className={`text-center py-3 ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    <div>
-                      <p>{asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.gain_loss)}</p>
-                      <p className="text-xs">
-                        {asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'}{' '}
-                        {asset.avg_buy_price > 0 && asset.current_price
-                          ? `${((asset.current_price - asset.avg_buy_price) / asset.avg_buy_price * 100).toFixed(2)}%`
-                          : formatPercent(asset.gain_loss_percent)}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="text-center py-3">
-                    <div className="flex justify-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onAddTransaction(asset.id, asset.symbol)}
-                        title="Ajouter une transaction"
-                      >
-                        <ArrowRightLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDeleteAsset(asset)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {groupedAssets.map((group) => {
+                const isExpanded = expandedSymbols.has(group.symbol)
+                const isSingle = !group.isMultiPlatform
+
+                return isSingle ? (
+                  // Single platform — render as before
+                  <tr key={group.assets[0].id} className="border-b last:border-0">
+                    <td className="py-3 text-center">
+                      <div className="flex justify-center">
+                        <AssetIconCompact
+                          symbol={group.symbol}
+                          name={group.name}
+                          assetType={group.asset_type}
+                          size={36}
+                        />
+                      </div>
+                    </td>
+                    <td className="text-center py-3">{renderPlatformBadge(group.assets[0])}</td>
+                    <td className="text-center py-3">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
+                    <td className="text-center py-3 text-muted-foreground">
+                      {group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}
+                    </td>
+                    <td className="text-center py-3">
+                      {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
+                    </td>
+                    <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
+                    <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      <div>
+                        <p>{group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.totalGainLoss)}</p>
+                        <p className="text-xs">
+                          {group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'}{' '}
+                          {group.avgBuyPrice > 0 && group.currentPrice
+                            ? `${((group.currentPrice - group.avgBuyPrice) / group.avgBuyPrice * 100).toFixed(2)}%`
+                            : formatPercent(group.totalGainLossPercent)}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="text-center py-3">
+                      <div className="flex justify-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => onAddTransaction(group.assets[0].id, group.symbol)} title="Ajouter une transaction">
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => onDeleteAsset(group.assets[0])} title="Supprimer">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  // Multi-platform — grouped row + expandable sub-rows
+                  <Fragment key={group.symbol}>
+                    <tr
+                      className="border-b cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleExpanded(group.symbol)}
+                    >
+                      <td className="py-3 text-center">
+                        <div className="flex justify-center items-center gap-1">
+                          <AssetIconCompact
+                            symbol={group.symbol}
+                            name={group.name}
+                            assetType={group.asset_type}
+                            size={36}
+                          />
+                        </div>
+                      </td>
+                      <td className="text-center py-3">
+                        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          {isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5" />
+                            : <ChevronRight className="h-3.5 w-3.5" />
+                          }
+                          <span>{group.assets.length} plateformes</span>
+                        </div>
+                      </td>
+                      <td className="text-center py-3 font-medium">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
+                      <td className="text-center py-3 text-muted-foreground">
+                        {group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}
+                      </td>
+                      <td className="text-center py-3">
+                        {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
+                      </td>
+                      <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
+                      <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <div>
+                          <p>{group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.totalGainLoss)}</p>
+                          <p className="text-xs">
+                            {group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'}{' '}
+                            {formatPercent(group.totalGainLossPercent)}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="text-center py-3" />
+                    </tr>
+                    {isExpanded && group.assets.map((asset) => (
+                      <tr key={asset.id} className="border-b last:border-0 bg-muted/20">
+                        <td className="py-2 text-center" />
+                        <td className="text-center py-2">{renderPlatformBadge(asset)}</td>
+                        <td className="text-center py-2 text-sm">{asset.quantity.toFixed(asset.quantity < 1 ? 8 : 2)}</td>
+                        <td className="text-center py-2 text-sm text-muted-foreground">
+                          {asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}
+                        </td>
+                        <td className="text-center py-2 text-sm">
+                          {asset.current_price ? formatCurrency(asset.current_price) : '-'}
+                        </td>
+                        <td className="text-center py-2 text-sm">{formatCurrency(asset.current_value)}</td>
+                        <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.gain_loss)}
+                        </td>
+                        <td className="text-center py-2">
+                          <div className="flex justify-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddTransaction(asset.id, asset.symbol)} title="Ajouter une transaction">
+                              <ArrowRightLeft className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDeleteAsset(asset)} title="Supprimer">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

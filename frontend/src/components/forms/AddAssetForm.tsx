@@ -1,6 +1,4 @@
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +6,9 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -24,17 +24,7 @@ import { useToast } from '@/hooks/use-toast'
 import { assetsApi } from '@/services/api'
 import { Loader2 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
-
-const schema = z.object({
-  symbol: z.string().min(1, 'Symbole requis').max(20).toUpperCase(),
-  name: z.string().max(200).optional(),
-  asset_type: z.enum(['crypto', 'stock', 'etf', 'real_estate', 'bond', 'other']),
-  quantity: z.coerce.number().min(0, 'Quantité invalide'),
-  avg_buy_price: z.coerce.number().min(0, 'Prix invalide'),
-  currency: z.string().default('EUR'),
-})
-
-type FormData = z.infer<typeof schema>
+import { EXCHANGES, COLD_WALLETS, CROWDFUNDING_PLATFORMS } from '@/lib/platforms'
 
 interface AddAssetFormProps {
   open: boolean
@@ -68,22 +58,25 @@ export default function AddAssetForm({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
+  } = useForm<Record<string, unknown>>({
     defaultValues: {
       asset_type: 'crypto',
       quantity: 0,
       avg_buy_price: 0,
       currency: 'EUR',
+      project_name: '',
+      invested_amount: 0,
+      interest_rate: 0,
+      maturity_date: '',
     },
   })
 
+  const assetType = watch('asset_type') as string
+  const isCrowdfunding = assetType === 'real_estate'
+
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
-      assetsApi.create({
-        ...data,
-        portfolio_id: portfolioId,
-      }),
+    mutationFn: (data: Parameters<typeof assetsApi.create>[0]) =>
+      assetsApi.create(data),
     onSuccess: () => {
       invalidateAllFinancialData(queryClient)
       toast({
@@ -103,11 +96,56 @@ export default function AddAssetForm({
     },
   })
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data)
-  }
+  const onSubmit = (data: Record<string, unknown>) => {
+    if (isCrowdfunding) {
+      const projectName = data.project_name as string
+      const investedAmount = Number(data.invested_amount)
+      const interestRate = Number(data.interest_rate) || undefined
+      const maturityDate = (data.maturity_date as string) || undefined
+      const symbol = projectName
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 20)
 
-  const assetType = watch('asset_type')
+      if (!projectName || investedAmount <= 0) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Nom du projet et montant requis.' })
+        return
+      }
+
+      mutation.mutate({
+        portfolio_id: portfolioId,
+        symbol,
+        name: projectName,
+        asset_type: 'real_estate',
+        quantity: 1,
+        avg_buy_price: investedAmount,
+        currency: 'EUR',
+        exchange: (data.exchange as string) || undefined,
+        invested_amount: investedAmount,
+        interest_rate: interestRate,
+        maturity_date: maturityDate,
+        project_status: 'active',
+      })
+    } else {
+      const symbol = (data.symbol as string || '').toUpperCase()
+      if (!symbol) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Symbole requis.' })
+        return
+      }
+      mutation.mutate({
+        portfolio_id: portfolioId,
+        symbol,
+        name: (data.name as string) || undefined,
+        asset_type: data.asset_type as string,
+        quantity: Number(data.quantity),
+        avg_buy_price: Number(data.avg_buy_price),
+        currency: 'EUR',
+        exchange: (data.exchange as string) || undefined,
+      })
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,7 +162,7 @@ export default function AddAssetForm({
               <Label htmlFor="asset_type">Type d'actif</Label>
               <Select
                 value={assetType}
-                onValueChange={(value) => setValue('asset_type', value as FormData['asset_type'])}
+                onValueChange={(value) => setValue('asset_type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un type" />
@@ -139,56 +177,149 @@ export default function AddAssetForm({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="symbol">Symbole</Label>
-                <Input
-                  id="symbol"
-                  placeholder={assetType === 'crypto' ? 'BTC, ETH...' : 'AAPL, MSFT...'}
-                  {...register('symbol')}
-                />
-                {errors.symbol && (
-                  <p className="text-sm text-destructive">{errors.symbol.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom (optionnel)</Label>
-                <Input
-                  id="name"
-                  placeholder="Bitcoin, Apple..."
-                  {...register('name')}
-                />
-              </div>
-            </div>
+            {isCrowdfunding ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="project_name">Nom du projet</Label>
+                  <Input
+                    id="project_name"
+                    placeholder="Résidence Lyon, Bureau Paris..."
+                    {...register('project_name')}
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantité</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  {...register('quantity')}
-                />
-                {errors.quantity && (
-                  <p className="text-sm text-destructive">{errors.quantity.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="avg_buy_price">Prix moyen d'achat (€)</Label>
-                <Input
-                  id="avg_buy_price"
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  {...register('avg_buy_price')}
-                />
-                {errors.avg_buy_price && (
-                  <p className="text-sm text-destructive">{errors.avg_buy_price.message}</p>
-                )}
-              </div>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invested_amount">Montant investi (€)</Label>
+                    <Input
+                      id="invested_amount"
+                      type="number"
+                      step="any"
+                      placeholder="2000"
+                      {...register('invested_amount')}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interest_rate">Taux annuel (%)</Label>
+                    <Input
+                      id="interest_rate"
+                      type="number"
+                      step="0.1"
+                      placeholder="10.5"
+                      {...register('interest_rate')}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="maturity_date">Date d'échéance</Label>
+                  <Input
+                    id="maturity_date"
+                    type="date"
+                    {...register('maturity_date')}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Plateforme</Label>
+                  <Select
+                    value={(watch('exchange') as string) || ''}
+                    onValueChange={(value) => setValue('exchange', value || undefined)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une plateforme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Crowdfunding</SelectLabel>
+                        {CROWDFUNDING_PLATFORMS.map((p) => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="symbol">Symbole</Label>
+                    <Input
+                      id="symbol"
+                      placeholder={assetType === 'crypto' ? 'BTC, ETH...' : 'AAPL, MSFT...'}
+                      {...register('symbol')}
+                    />
+                    {errors.symbol && (
+                      <p className="text-sm text-destructive">{errors.symbol?.message as string}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nom (optionnel)</Label>
+                    <Input
+                      id="name"
+                      placeholder="Bitcoin, Apple..."
+                      {...register('name')}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantité</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="any"
+                      placeholder="0.00"
+                      {...register('quantity')}
+                    />
+                    {errors.quantity && (
+                      <p className="text-sm text-destructive">{errors.quantity?.message as string}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="avg_buy_price">Prix moyen d'achat (€)</Label>
+                    <Input
+                      id="avg_buy_price"
+                      type="number"
+                      step="any"
+                      placeholder="0.00"
+                      {...register('avg_buy_price')}
+                    />
+                    {errors.avg_buy_price && (
+                      <p className="text-sm text-destructive">{errors.avg_buy_price?.message as string}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Plateforme (optionnel)</Label>
+                  <Select
+                    value={(watch('exchange') as string) || ''}
+                    onValueChange={(value) => setValue('exchange', value || undefined)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Où est stocké cet actif ?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Exchanges</SelectLabel>
+                        {EXCHANGES.map((ex) => (
+                          <SelectItem key={ex} value={ex}>{ex}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Cold Wallets</SelectLabel>
+                        {COLD_WALLETS.map((w) => (
+                          <SelectItem key={w} value={w}>{w}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

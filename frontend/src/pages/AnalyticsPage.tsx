@@ -448,7 +448,7 @@ export default function AnalyticsPage() {
     },
     {
       metric: 'Stabilité',
-      value: Math.min(100, Math.max(0, 100 + analytics.max_drawdown * 1.25)),
+      value: Math.min(100, Math.max(0, 100 - Math.abs(analytics.max_drawdown) * 1.25)),
       fullMark: 100,
     },
     {
@@ -689,7 +689,7 @@ export default function AnalyticsPage() {
             {xirrData?.xirr != null ? (
               <>
                 <div className={`text-2xl font-bold ${xirrData.xirr >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {xirrData.xirr > 0 ? '+' : ''}{xirrData.xirr.toFixed(1)}%
+                  {xirrData.xirr > 0 ? '+' : ''}{xirrData.xirr.toFixed(2)}%
                 </div>
                 <p className="text-xs text-muted-foreground">Rendement annualisé réel</p>
               </>

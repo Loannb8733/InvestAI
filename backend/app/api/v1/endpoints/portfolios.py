@@ -4,7 +4,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -140,14 +140,23 @@ async def delete_portfolio(
         # Get all assets in this portfolio
         assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id))
         assets = assets_result.scalars().all()
+        asset_ids = [asset.id for asset in assets]
 
-        # Delete all transactions for each asset
-        for asset in assets:
-            trans_result = await db.execute(select(Transaction).where(Transaction.asset_id == asset.id))
-            transactions = trans_result.scalars().all()
-            for transaction in transactions:
-                await db.delete(transaction)
-            await db.delete(asset)
+        if asset_ids:
+            # Nullify related_transaction_id references before deleting transactions
+            await db.execute(
+                update(Transaction)
+                .where(
+                    Transaction.related_transaction_id.in_(
+                        select(Transaction.id).where(Transaction.asset_id.in_(asset_ids))
+                    )
+                )
+                .values(related_transaction_id=None)
+            )
+            # Delete all transactions for these assets
+            await db.execute(delete(Transaction).where(Transaction.asset_id.in_(asset_ids)))
+            # Delete the assets
+            await db.execute(delete(Asset).where(Asset.id.in_(asset_ids)))
 
     # Hard delete the portfolio
     await db.delete(portfolio)

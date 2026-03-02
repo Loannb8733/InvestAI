@@ -252,6 +252,10 @@ export const assetsApi = {
     avg_buy_price?: number
     currency?: string
     exchange?: string
+    interest_rate?: number
+    maturity_date?: string
+    project_status?: string
+    invested_amount?: number
   }) => {
     const response = await api.post('/assets', data)
     return response.data
@@ -266,6 +270,11 @@ export const assetsApi = {
     name?: string
     quantity?: number
     avg_buy_price?: number
+    exchange?: string | null
+    interest_rate?: number
+    maturity_date?: string
+    project_status?: string
+    invested_amount?: number
   }) => {
     const response = await api.patch(`/assets/${id}`, data)
     return response.data
@@ -291,6 +300,7 @@ export const transactionsApi = {
     fee?: number
     currency?: string
     executed_at?: string
+    exchange?: string
     notes?: string
   }) => {
     const response = await api.post('/transactions', data)

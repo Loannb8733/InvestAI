@@ -566,7 +566,7 @@ class AnalyticsService:
         if len(valid) >= 2:
             min_len = min(len(r) for _, r in valid)
             aligned = np.array([r[-min_len:] for _, r in valid])
-            cov_matrix = np.cov(aligned)  # covariance matrix
+            cov_matrix = np.atleast_2d(np.cov(aligned))  # covariance matrix
             valid_weights = np.array([weights[i] for i, _ in valid])
             # Renormalize valid weights
             vw_sum = valid_weights.sum()
@@ -608,9 +608,10 @@ class AnalyticsService:
                     w = d.get("current_value", 0) / total_value
                     portfolio_dd += w * d.get("max_drawdown", 0)
 
-        # --- Annualized portfolio return from daily returns ---
+        # --- Annualized portfolio return from daily returns (geometric) ---
         if len(port_returns) >= 5:
-            port_ann_ret = float(np.mean(port_returns) * port_td * 100)
+            mean_daily = float(np.mean(port_returns))
+            port_ann_ret = float((np.exp(mean_daily * port_td) - 1) * 100)
         else:
             port_ann_ret = 0.0
 
@@ -771,7 +772,7 @@ class AnalyticsService:
 
         sorted_p = sorted(perfs, key=lambda x: x.gain_loss_percent, reverse=True)
         best = sorted_p[0].symbol if sorted_p else None
-        worst = sorted_p[-1].symbol if sorted_p else None
+        worst = sorted_p[-1].symbol if len(sorted_p) > 1 else None
 
         return PortfolioAnalytics(
             total_value=total_value,

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 REDIS_HISTORY_PREFIX = "hist:"
 REDIS_HISTORY_TTL = 3600  # 1 hour
+REDIS_HISTORY_FALLBACK_TTL = 86400  # 24 hours — stale-but-usable fallback
 
 
 def _get_redis() -> Redis:
@@ -86,6 +87,7 @@ async def _fetch_and_cache_all():
                         }
                     )
                     redis.setex(cache_key, REDIS_HISTORY_TTL, payload)
+                    redis.setex(f"{cache_key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
                     cached_count += 1
                     logger.info("Cached %d data points for %s", len(prices), symbol)
                 else:
@@ -134,6 +136,7 @@ async def _cache_single(symbol: str, asset_type: str):
                 }
             )
             redis.setex(cache_key, REDIS_HISTORY_TTL, payload)
+            redis.setex(f"{cache_key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
             logger.info("Cached %d data points for %s (on-demand)", len(prices), symbol)
             return True
     except Exception as e:
@@ -153,7 +156,7 @@ def get_cached_history(symbol: str, days: int = 90):
     """Read cached history from Redis. Returns (dates, prices) or ([], [])."""
     redis = _get_redis()
     cache_key = f"{REDIS_HISTORY_PREFIX}{symbol.upper()}_90"
-    raw = redis.get(cache_key)
+    raw = redis.get(cache_key) or redis.get(f"{cache_key}:fallback")
     if not raw:
         return [], []
     try:

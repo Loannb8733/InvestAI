@@ -22,7 +22,7 @@ class PriceService:
     YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
     # Cache TTL in seconds
-    CACHE_TTL_CRYPTO = 60  # 1 minute
+    CACHE_TTL_CRYPTO = 120  # 2 minutes
     CACHE_TTL_STOCK = 300  # 5 minutes
     CACHE_TTL_FOREX = 3600  # 1 hour
 
@@ -134,6 +134,10 @@ class PriceService:
         "FET": "fetch-ai",
         "USDC": "usd-coin",
         "USDT": "tether",
+        "KAITO": "kaito",
+        "OM": "mantra-dao",
+        "ONDO": "ondo-finance",
+        "PENDLE": "pendle",
     }
 
     def __init__(self):
@@ -152,6 +156,7 @@ class PriceService:
         }
 
         # Add API key header if available
+        self._api_key_invalid = False
         if self.coingecko_api_key:
             headers["x-cg-demo-api-key"] = self.coingecko_api_key
 
@@ -159,6 +164,13 @@ class PriceService:
 
         # Dynamic symbol cache (discovered from API)
         self._dynamic_symbol_cache: Dict[str, str] = {}
+
+    def _handle_401(self):
+        """Handle invalid CoinGecko API key — strip it and retry without."""
+        if not self._api_key_invalid:
+            logger.warning("CoinGecko API key invalid, disabling for future requests")
+            self._api_key_invalid = True
+            self.http_client.headers.pop("x-cg-demo-api-key", None)
 
     async def close(self):
         """Close HTTP client."""
@@ -192,6 +204,13 @@ class PriceService:
                 f"{self.COINGECKO_BASE_URL}/search",
                 params={"query": symbol_upper},
             )
+            if response.status_code == 401:
+                self._handle_401()
+                # Retry once without API key
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/search",
+                    params={"query": symbol_upper},
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -334,6 +353,18 @@ class PriceService:
                     "include_market_cap": "true",
                 },
             )
+            if response.status_code == 401:
+                self._handle_401()
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/simple/price",
+                    params={
+                        "ids": coin_id,
+                        "vs_currencies": currency,
+                        "include_24hr_change": "true",
+                        "include_24hr_vol": "true",
+                        "include_market_cap": "true",
+                    },
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -342,10 +373,14 @@ class PriceService:
                 price = Decimal(str(coin_data.get(currency, 0)))
                 # Only use if price is valid (> 0)
                 if price > 0:
+                    change_pct = coin_data.get(f"{currency}_24h_change", 0) or 0
+                    # CoinGecko simple/price returns percentage in _24h_change field
+                    # Compute absolute change from percentage and current price
+                    change_abs = float(price) * float(change_pct) / 100.0 if change_pct else 0
                     result = {
                         "price": price,
-                        "change_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
-                        "change_percent_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
+                        "change_24h": change_abs,
+                        "change_percent_24h": change_pct,
                         "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                         "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                     }
@@ -544,6 +579,18 @@ class PriceService:
                     "include_market_cap": "true",
                 },
             )
+            if response.status_code == 401:
+                self._handle_401()
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/simple/price",
+                    params={
+                        "ids": ",".join(coin_ids),
+                        "vs_currencies": currency,
+                        "include_24hr_change": "true",
+                        "include_24hr_vol": "true",
+                        "include_market_cap": "true",
+                    },
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -553,10 +600,13 @@ class PriceService:
 
             for coin_id, coin_data in data.items():
                 symbol = id_to_symbol.get(coin_id, coin_id.upper())
+                coin_price = Decimal(str(coin_data.get(currency, 0)))
+                change_pct = coin_data.get(f"{currency}_24h_change", 0) or 0
+                change_abs = float(coin_price) * float(change_pct) / 100.0 if change_pct else 0
                 result = {
-                    "price": Decimal(str(coin_data.get(currency, 0))),
-                    "change_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
-                    "change_percent_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
+                    "price": coin_price,
+                    "change_24h": change_abs,
+                    "change_percent_24h": change_pct,
                     "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                     "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                 }

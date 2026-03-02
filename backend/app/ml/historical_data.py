@@ -11,11 +11,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Global semaphore: max 2 concurrent CoinGecko requests to stay under 30 req/min
-_coingecko_semaphore = asyncio.Semaphore(2)
+# Global semaphore: max 5 concurrent CoinGecko requests (~50 req/min free tier)
+_coingecko_semaphore = asyncio.Semaphore(5)
 # Minimum delay between CoinGecko calls (seconds)
-_COINGECKO_MIN_DELAY = 2.5
+_COINGECKO_MIN_DELAY = 1.2
 _last_coingecko_call = 0.0
+# Flag to remember if the API key is invalid (avoid wasting rate-limited slots)
+_api_key_invalid = False
 
 
 async def _coingecko_throttle():
@@ -81,7 +83,7 @@ class HistoricalDataFetcher:
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
         }
-        if coingecko_api_key:
+        if coingecko_api_key and not _api_key_invalid:
             headers["x-cg-demo-api-key"] = coingecko_api_key
 
         self.http_client = httpx.AsyncClient(timeout=30.0, headers=headers)
@@ -104,7 +106,12 @@ class HistoricalDataFetcher:
                     await asyncio.sleep(wait)
                     continue
                 if response.status_code == 401:
-                    logger.warning("CoinGecko 401 for %s — invalid API key", symbol)
+                    global _api_key_invalid
+                    if not _api_key_invalid:
+                        logger.warning("CoinGecko 401 for %s — API key invalid, retrying without key", symbol)
+                        _api_key_invalid = True
+                        self.http_client.headers.pop("x-cg-demo-api-key", None)
+                        continue  # retry this attempt without the key
                     return None
                 response.raise_for_status()
             except httpx.HTTPStatusError:

@@ -250,22 +250,67 @@ def ci_safety_margin(ctx: MarketContext) -> float:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def cycle_position(ctx: MarketContext) -> float:
-    """Return cycle position 0-100 from market context.
+def cycle_position(ctx: MarketContext, regime_probs: Optional[dict] = None) -> float:
+    """Return cycle position 0-100 representing the market cycle phase.
 
-    Instead of hardcoded map {bottom:10, bullish:40, top:75, bearish:85}.
-    Derived from:
-    - 52-week price position (60% weight)
-    - Normalized momentum (15% weight)
-    - Fear & Greed (15% weight)
-    - Base offset (10)
+    The cycle goes clockwise:
+      Creux (0-15) → Accumulation (15-40) → Expansion (40-65) →
+      Distribution (65-85) → Euphorie/Bear (85-100)
+
+    Strategy: use the dominant regime to set the zone, then refine
+    position within that zone using secondary probabilities and context.
     """
-    pos_52w = ctx.position_in_52w_range  # 0=bottom, 1=top
-    norm_mom = np.clip(ctx.momentum_30d / max(ctx.daily_vol, 1e-8), -2, 2)
-    fg = ((ctx.fear_greed - 50) / 50) if ctx.fear_greed is not None else 0
+    if not regime_probs:
+        return 50.0
 
-    position = pos_52w * 60 + norm_mom * 15 + fg * 15 + 10
-    return float(np.clip(position, 0, 100))
+    # Sort regimes by probability (highest first)
+    sorted_regimes = sorted(regime_probs.items(), key=lambda x: x[1], reverse=True)
+    dominant = sorted_regimes[0][0]
+    dominant_prob = sorted_regimes[0][1]
+    secondary = sorted_regimes[1][0] if len(sorted_regimes) > 1 else dominant
+    secondary_prob = sorted_regimes[1][1] if len(sorted_regimes) > 1 else 0
+
+    # Zone ranges for each regime
+    zone_map = {
+        "bottom": (0, 15),  # Creux
+        "bullish": (25, 60),  # Accumulation → Expansion
+        "top": (60, 82),  # Distribution
+        "bearish": (82, 100),  # Late-cycle bear
+    }
+
+    zone_lo, zone_hi = zone_map.get(dominant, (40, 60))
+
+    # Position within zone: higher confidence → deeper into zone center
+    # dominant_prob typically 0.3-0.7
+    confidence_factor = min(1.0, dominant_prob / 0.5)  # normalize to 0-1
+    base_pos = zone_lo + (zone_hi - zone_lo) * 0.5 * confidence_factor
+
+    # Adjust based on which direction secondary regime pulls
+    # Adjacent phases in cycle: bottom↔bullish, bullish↔top, top↔bearish, bearish↔bottom
+    pull_toward = {
+        ("bearish", "bottom"): -5,  # bear + bottom = late bear, moving toward creux
+        ("bearish", "top"): +3,  # bear + top = early bear
+        ("bearish", "bullish"): -2,
+        ("bottom", "bearish"): +5,  # bottom + bear = early bottom
+        ("bottom", "bullish"): -3,  # bottom + bull = late bottom, moving to accumulation
+        ("bullish", "bottom"): +3,  # bull + bottom = early bull
+        ("bullish", "top"): -3,  # bull + top = late bull
+        ("top", "bullish"): +3,  # top + bull = early distribution
+        ("top", "bearish"): -3,  # top + bear = late distribution
+    }
+    adj = pull_toward.get((dominant, secondary), 0) * secondary_prob
+    base_pos += adj
+
+    # Small F&G refinement (±5 max)
+    if ctx.fear_greed is not None:
+        fg_adj = ((ctx.fear_greed - 50) / 50) * 5  # -5 to +5
+        # In bear zone, low F&G pushes higher (deeper bear); in bull zone, high F&G pushes lower
+        if dominant in ("bearish", "top"):
+            base_pos -= fg_adj  # low F&G → higher position (deeper bear)
+        else:
+            base_pos -= fg_adj  # high F&G → lower position (deeper bull)
+
+    return float(np.clip(base_pos, 0, 100))
 
 
 # ═══════════════════════════════════════════════════════════════════════════

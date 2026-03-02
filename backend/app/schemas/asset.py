@@ -1,6 +1,6 @@
 """Asset schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -26,6 +26,11 @@ class AssetCreate(AssetBase):
     quantity: Decimal = Field(default=Decimal("0"), ge=0)
     avg_buy_price: Decimal = Field(default=Decimal("0"), ge=0)
     exchange: Optional[str] = Field(None, max_length=50)
+    # Crowdfunding fields
+    interest_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    maturity_date: Optional[date] = None
+    project_status: Optional[str] = Field(None, max_length=20)
+    invested_amount: Optional[Decimal] = Field(None, ge=0)
 
 
 class AssetUpdate(BaseModel):
@@ -35,6 +40,10 @@ class AssetUpdate(BaseModel):
     quantity: Optional[Decimal] = Field(None, ge=0)
     avg_buy_price: Optional[Decimal] = Field(None, ge=0)
     exchange: Optional[str] = Field(None, max_length=50)
+    interest_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    maturity_date: Optional[date] = None
+    project_status: Optional[str] = Field(None, max_length=20)
+    invested_amount: Optional[Decimal] = Field(None, ge=0)
 
 
 class AssetResponse(AssetBase):
@@ -45,6 +54,10 @@ class AssetResponse(AssetBase):
     quantity: Decimal
     avg_buy_price: Decimal
     exchange: Optional[str]
+    interest_rate: Optional[Decimal] = None
+    maturity_date: Optional[date] = None
+    project_status: Optional[str] = None
+    invested_amount: Optional[Decimal] = None
     created_at: datetime
     updated_at: datetime
 

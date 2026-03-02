@@ -76,7 +76,7 @@ class ExchangeFiatOrder:
 class BaseExchangeService(ABC):
     """Abstract base class for exchange services."""
 
-    def __init__(self, api_key: str, secret_key: str, passphrase: Optional[str] = None):
+    def __init__(self, api_key: str, secret_key: Optional[str] = None, passphrase: Optional[str] = None):
         """Initialize exchange service with credentials."""
         self.api_key = api_key
         self.secret_key = secret_key

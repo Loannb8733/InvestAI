@@ -69,16 +69,19 @@ class BaseCSVParser(ABC):
         transactions = []
         errors = []
 
-        # Try different delimiters
-        for delimiter in [",", ";", "\t"]:
+        # Try different delimiters — pick the one that produces the most columns
+        reader = None
+        best_col_count = 0
+        for delimiter in [";", ",", "\t"]:
             try:
-                reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
-                if reader.fieldnames and len(reader.fieldnames) > 1:
-                    break
+                candidate = csv.DictReader(io.StringIO(content), delimiter=delimiter)
+                if candidate.fieldnames and len(candidate.fieldnames) > best_col_count:
+                    best_col_count = len(candidate.fieldnames)
+                    reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
             except Exception:
                 continue
 
-        if not reader.fieldnames:
+        if reader is None or not reader.fieldnames:
             errors.append("Could not parse CSV headers")
             return transactions, errors
 
@@ -154,8 +157,25 @@ class CryptoComCSVParser(BaseCSVParser):
             return transactions
 
         # Handle conversions (crypto_exchange)
-        if kind == "crypto_exchange" and to_currency:
-            # This is a crypto-to-crypto conversion
+        if kind == "crypto_exchange" and to_currency and amount > 0:
+            # Received side of a conversion with to_currency set
+            # currency=received crypto, amount=received qty, to_currency=counterpart
+            price = abs(native_amount / amount) if amount != 0 else Decimal("0")
+            transactions.append(
+                ParsedTransaction(
+                    symbol=currency,
+                    transaction_type="conversion_in",
+                    quantity=amount,
+                    price=price,
+                    fee=Decimal("0"),
+                    currency=native_currency,
+                    timestamp=timestamp,
+                    notes=f"Crypto.com: {description}",
+                )
+            )
+
+        elif kind == "crypto_exchange" and to_currency:
+            # This is a crypto-to-crypto conversion with pair info
             # Create CONVERSION_OUT for the source
             if amount < 0:
                 price = abs(native_amount / amount) if amount != 0 else Decimal("0")
@@ -188,6 +208,22 @@ class CryptoComCSVParser(BaseCSVParser):
                         notes=f"Crypto.com: {description}",
                     )
                 )
+
+        # Handle crypto_exchange with positive amount but no to_currency (received side)
+        elif kind == "crypto_exchange" and not to_currency and amount > 0:
+            price = abs(native_amount / amount) if amount != 0 else Decimal("0")
+            transactions.append(
+                ParsedTransaction(
+                    symbol=currency,
+                    transaction_type="conversion_in",
+                    quantity=amount,
+                    price=price,
+                    fee=Decimal("0"),
+                    currency=native_currency,
+                    timestamp=timestamp,
+                    notes=f"Crypto.com: {description}",
+                )
+            )
 
         # Handle purchases (viban_purchase, google_pay, etc.)
         elif trans_type == "buy" and to_currency and to_amount > 0:
@@ -534,13 +570,30 @@ class GenericCSVParser(BaseCSVParser):
 
         # Parse date
         timestamp = datetime.now()
+        date_parsed = False
         if date_str:
-            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y"]:
+            for fmt in [
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d",
+                "%d/%m/%Y %H:%M:%S",
+                "%d/%m/%Y",
+                "%m/%d/%Y %H:%M:%S",
+                "%m/%d/%Y",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%dT%H:%M:%SZ",
+                "%d-%m-%Y %H:%M:%S",
+                "%d-%m-%Y",
+            ]:
                 try:
                     timestamp = datetime.strptime(date_str, fmt)
+                    date_parsed = True
                     break
                 except ValueError:
                     continue
+            if not date_parsed:
+                import logging
+
+                logging.getLogger(__name__).warning(f"Unrecognized date format: '{date_str}', using current date")
 
         # Map transaction types
         type_mapping = {
@@ -593,6 +646,7 @@ AVAILABLE_PARSERS: List[Type[BaseCSVParser]] = [
 def detect_csv_format(content: str) -> Optional[BaseCSVParser]:
     """Auto-detect the CSV format based on headers."""
     # Try different delimiters
+    headers = []
     for delimiter in [",", ";", "\t"]:
         try:
             reader = csv.reader(io.StringIO(content), delimiter=delimiter)

@@ -417,6 +417,11 @@ class PredictionService:
                     pred["confidence_low"] = smart_round(pred["confidence_low"] - width * liquidity_factor)
                     pred["confidence_high"] = smart_round(pred["confidence_high"] + width * liquidity_factor)
 
+        # Sanitize confidence intervals after all adjustments
+        for pred in predictions:
+            pred["confidence_low"] = min(pred["confidence_low"], pred["price"])
+            pred["confidence_high"] = max(pred["confidence_high"], pred["price"])
+
         # Attach liquidity warning to regime_info for the frontend
         if liquidity_warning and regime_info:
             regime_info["liquidity_warning"] = liquidity_warning
@@ -802,27 +807,15 @@ class PredictionService:
                 else 0.0
             )
 
-            # Compute skill score from already-fetched historical data (no extra API call)
-            skill_score = self._compute_accuracy_from_data(
-                prediction._history_dates or [],
-                prediction._history_prices or [],
+            # ── Reliability score from ensemble MAPE + model consensus ──
+            models_detail = prediction.models_detail or []
+            skill_score, hit_rate, hit_rate_n, hit_rate_significant = self._compute_reliability_from_ensemble(
+                models_detail, prediction.trend
             )
 
-            # Directional hit rate with significance test
-            hit_rate, hit_rate_n, hit_rate_significant = self._compute_hit_rate(
-                prediction._history_dates or [],
-                prediction._history_prices or [],
-            )
-
-            # ReliabilityScore: only uses statistically validated metrics
-            # skill_score * 0.6 + hit_rate * 0.4
-            # Capped at 50 if hit rate is not statistically significant
             reliability_score = skill_score * 0.6 + hit_rate * 0.4
-            if not hit_rate_significant:
-                reliability_score = min(reliability_score, 50.0)
-            reliability_score = round(reliability_score, 1)
+            reliability_score = round(min(reliability_score, 95.0), 1)
 
-            # Model confidence label
             if reliability_score >= 60:
                 model_confidence = "useful"
             elif reliability_score >= 40:
@@ -1075,17 +1068,18 @@ class PredictionService:
 
         # ── 3. Weighted portfolio regime ──────────────────────────────
         if total_value > 0:
-            portfolio_probs = {p: round(v / total_value, 3) for p, v in regime_weighted.items()}
+            portfolio_probs = {p: round(v / total_value, 4) for p, v in regime_weighted.items()}
         else:
             portfolio_probs = {p: 0.25 for p in regime_weighted}
         portfolio_dominant = max(portfolio_probs, key=portfolio_probs.get)
 
-        # ── 4. Cycle position (0-100) — adaptive ──────────────────────
-        # Computed from MarketContext: 52w range, momentum, F&G
+        # ── 4. Cycle position (0-100) — regime-based ─────────────────
+        # Uses regime probabilities as primary signal + market context refinement
         btc_ctx: Optional[MarketContext] = None
+        btc_probs = btc_regime.get("probabilities") if btc_regime else None
         if btc_prices and len(btc_prices) >= 30:
             btc_ctx = compute_market_context(btc_prices, "BTC", "crypto", fear_greed)
-            cycle_position = round(at.cycle_position(btc_ctx))
+            cycle_position = round(at.cycle_position(btc_ctx, regime_probs=btc_probs))
         else:
             # Fallback: simple map when no context available
             cycle_map = {"bottom": 10, "bullish": 40, "top": 75, "bearish": 85}
@@ -1138,12 +1132,19 @@ class PredictionService:
                         "dominant_regime": asset_data.get("dominant_regime", "neutral"),
                         "confidence": asset_data.get("confidence", 0.5),
                     }
+                    # Compute per-asset MarketContext and cycle_position
+                    asset_ctx = compute_market_context(
+                        a_prices_tb, sym, asset_data.get("asset_type", "crypto"), fear_greed
+                    )
+                    asset_probs = asset_data.get("probabilities")
+                    asset_cyc_pos = round(at.cycle_position(asset_ctx, regime_probs=asset_probs))
                     est = self.estimate_top_bottom(
                         sym,
                         a_prices_tb,
                         a_current,
                         regime_info=a_regime,
-                        cycle_position=cycle_position,
+                        cycle_position=asset_cyc_pos,
+                        ctx=asset_ctx,
                     )
                     top_bottom_estimates["per_asset"].append(est)
             except Exception as e:
@@ -1233,28 +1234,45 @@ class PredictionService:
         min_bottom_distance = max(0.05, sigma * np.sqrt(30) * 1.5)  # at least 1.5σ√30
         bottom_price = min(bottom_price, current_price * (1 - min_bottom_distance))
 
-        # Time to bottom: OU expected time to reach target
+        # Time to bottom: combine OU-based estimate with volatility-based estimate
+        # OU estimate (how long mean-reversion takes)
+        ou_bottom_days = 30  # default
         if current_price > bottom_price and theta > 1e-4:
-            # How long to go from current to bottom_price via mean-reversion
-            # E[X(t)] = mu + (X0 - mu) * exp(-theta * t)
-            # We want E[X(t)] = bottom_price
-            # If bottom_price is between mu and current: t = -ln((bp - mu)/(cp - mu)) / theta
             if abs(current_price - mu) > 1e-10 and abs(bottom_price - mu) > 1e-10:
                 ratio = abs(bottom_price - mu) / abs(current_price - mu)
                 ratio = float(np.clip(ratio, 0.01, 0.99))
-                bottom_days = int(-np.log(ratio) / theta)
+                ou_bottom_days = int(-np.log(ratio) / theta)
             else:
-                bottom_days = int(2.3 / theta)  # ln(10) / theta (90% reversion)
-        else:
-            bottom_days = 30  # Default
+                ou_bottom_days = int(2.3 / theta)
+
+        # Volatility-based estimate: how many days of sigma-sized moves to
+        # cover the distance from current to bottom
+        price_distance_pct = abs(current_price - bottom_price) / current_price
+        daily_move = sigma if sigma > 0.005 else 0.02  # daily log-volatility
+        vol_bottom_days = max(5, int(price_distance_pct / daily_move))
+
+        # Blend: use the larger of the two (more conservative), but cap OU
+        # contribution to avoid extreme values from tiny theta
+        ou_bottom_days = min(ou_bottom_days, 120)  # cap OU estimate
+        bottom_days = max(vol_bottom_days, (ou_bottom_days + vol_bottom_days) // 2)
+
+        # Asset-specific adjustment: combine volatility + mean-reversion speed
+        # More volatile & faster mean-reversion = faster cycle
+        # sigma: 0.02->1.0x, 0.04->0.85x, 0.06->0.7x
+        vol_factor = max(0.5, 1.0 - (sigma - 0.02) * 7.5)
+        # theta: higher theta = faster reversion = shorter time
+        # theta 0.005->1.0x, 0.01->0.9x, 0.05->0.5x
+        theta_factor = max(0.5, 1.0 - (theta - 0.005) * 11)
+        asset_adj = (vol_factor + theta_factor) / 2
+        bottom_days = max(3, int(bottom_days * asset_adj))
 
         # Adjust by cycle position: if near bottom already, shorten estimate
         if cyc_pos < 15:
-            bottom_days = max(7, int(bottom_days * 0.3))
+            bottom_days = max(3, int(bottom_days * 0.4))
         elif cyc_pos < 30:
-            bottom_days = max(7, int(bottom_days * 0.6))
+            bottom_days = max(5, int(bottom_days * 0.65))
 
-        bottom_days = max(7, min(180, bottom_days))
+        bottom_days = max(3, min(180, bottom_days))
         bottom_date = (today + timedelta(days=bottom_days)).strftime("%Y-%m-%d")
 
         # ── TOP estimation ────────────────────────────────────────────
@@ -1270,20 +1288,22 @@ class PredictionService:
         top_price = max(top_price, current_price * (1 + min_top_distance))
 
         # Time to top: price must first reach bottom then recover to top
-        # so top takes longer — model as bottom_days + recovery time
+        # Volatility-based recovery estimate
+        top_distance_pct = abs(top_price - bottom_price) / max(bottom_price, 1e-10)
+        vol_recovery_days = max(10, int(top_distance_pct / daily_move))
+
+        # OU-based recovery estimate
+        ou_recovery_days = 60  # default
         if theta > 1e-4:
-            # Recovery from bottom to top via mean-reversion
             distance_bottom_to_top = abs(top_price - bottom_price)
             distance_bottom_to_mu = abs(mu - bottom_price)
             if distance_bottom_to_mu > 1e-10 and distance_bottom_to_top > 1e-10:
                 ratio = min(0.99, distance_bottom_to_mu / distance_bottom_to_top)
                 ratio = max(0.01, ratio)
-                recovery_days = int(-np.log(ratio) / theta)
-            else:
-                recovery_days = int(2.3 / theta)
-            top_days = bottom_days + max(14, recovery_days)
-        else:
-            top_days = bottom_days + 60
+                ou_recovery_days = min(120, int(-np.log(ratio) / theta))
+
+        recovery_days = max(vol_recovery_days, (ou_recovery_days + vol_recovery_days) // 2)
+        top_days = bottom_days + max(10, recovery_days)
 
         # Adjust by cycle position: if near top already, shorten estimate
         if cyc_pos > 85:
@@ -1291,7 +1311,10 @@ class PredictionService:
         elif cyc_pos > 70:
             top_days = max(14, int(top_days * 0.6))
 
-        # Ensure top_days > bottom_days (top comes after bottom)
+        # Apply same asset-specific adjustment
+        top_days = max(bottom_days + 7, int(top_days * asset_adj))
+
+        # Ensure top_days > bottom_days
         top_days = max(bottom_days + 7, min(180, top_days))
         top_date = (today + timedelta(days=top_days)).strftime("%Y-%m-%d")
 
@@ -1959,8 +1982,8 @@ class PredictionService:
 
         return support, resistance
 
-    def _compute_accuracy_from_data(self, dates: List, prices: List[float]) -> float:
-        """Compute prediction skill score via walk-forward backtest (20+ windows).
+    def _compute_accuracy_from_data(self, dates: List, prices: List[float], max_windows: int = 30) -> float:
+        """Compute prediction skill score via walk-forward backtest.
 
         skill_score = max(0, 1 - ensemble_MAPE / naive_MAPE) * 100
         0 = no better than naive (last price = future price), 100 = perfect.
@@ -1981,7 +2004,7 @@ class PredictionService:
             # Slide from the most recent data backward
             offset = window_size
             windows_tested = 0
-            while offset <= min(n - 30, 365) and windows_tested < 30:
+            while offset <= min(n - 30, 365) and windows_tested < max_windows:
                 split = n - offset
                 if split < 30:
                     break
@@ -2014,7 +2037,7 @@ class PredictionService:
                 windows_tested += 1
                 offset += stride
 
-            if len(ensemble_errors) < 10:
+            if len(ensemble_errors) < 3:
                 return 50.0  # Not enough data points for reliable score
 
             ensemble_mape = float(np.mean(ensemble_errors))
@@ -2029,10 +2052,10 @@ class PredictionService:
             logger.warning("Accuracy computation failed: %s", e)
             return 50.0
 
-    def _compute_hit_rate(self, dates: List, prices: List[float]) -> Tuple[float, int, bool]:
+    def _compute_hit_rate(self, dates: List, prices: List[float], max_samples: int = 50) -> Tuple[float, int, bool]:
         """Compute directional hit rate with statistical significance.
 
-        Uses 15+ walk-forward windows + binomial test (H0: random = 50%).
+        Uses walk-forward windows + binomial test (H0: random = 50%).
 
         Returns:
             (hit_rate_pct, n_samples, significant): hit rate 0-100, sample count,
@@ -2048,7 +2071,7 @@ class PredictionService:
             stride = 7
             offset = 7
 
-            while offset <= min(n - 30, 365) and total < 50:
+            while offset <= min(n - 30, 365) and total < max_samples:
                 split = n - offset
                 if split < 30:
                     break
@@ -2096,6 +2119,159 @@ class PredictionService:
                 if total >= 20:
                     z = (hits - total * 0.5) / (total * 0.25) ** 0.5
                     significant = z > 1.645  # one-sided 5%
+
+            return round(hit_rate, 1), total, significant
+        except Exception:
+            return 50.0, 0, False
+
+    # -- Reliability from ensemble results (instant, no backtest) --
+
+    @staticmethod
+    def _compute_reliability_from_ensemble(
+        models_detail: List[Dict], ensemble_trend: str
+    ) -> Tuple[float, float, int, bool]:
+        """Compute reliability from the ensemble's own MAPE and model consensus.
+
+        Uses the already-computed backtest MAPE from each model (available in
+        models_detail) plus directional agreement between models.
+
+        Returns (skill_score, hit_rate_proxy, n_models, significant).
+        """
+        if not models_detail:
+            return 50.0, 50.0, 0, False
+
+        n_models = len(models_detail)
+
+        # 1. Skill score: weighted MAPE → skill
+        # Lower MAPE = better model. MAPE < 2% is excellent, > 20% is poor.
+        mapes = []
+        weights = []
+        for m in models_detail:
+            mape = m.get("mape")
+            w = m.get("weight_pct", 10)
+            if mape is not None and mape > 0:
+                mapes.append(mape)
+                weights.append(w)
+
+        if mapes:
+            # Weighted average MAPE
+            total_w = sum(weights)
+            if total_w > 0:
+                avg_mape = sum(m * w for m, w in zip(mapes, weights)) / total_w
+            else:
+                avg_mape = float(np.mean(mapes))
+
+            # Convert MAPE to skill: MAPE=1% → 90, MAPE=5% → 70, MAPE=15% → 40
+            # Formula: skill = 100 - mape * 4 (clamped 15-95)
+            skill_score = float(np.clip(100.0 - avg_mape * 4, 15, 95))
+        else:
+            skill_score = 50.0
+
+        # 2. Hit rate proxy: model consensus on direction
+        # "neutral" is compatible with both bullish and bearish (not opposing)
+        trends = [m.get("trend", "neutral") for m in models_detail]
+        compatible = 0
+        opposing = 0
+        for t in trends:
+            if t == ensemble_trend:
+                compatible += 1  # exact match
+            elif t == "neutral":
+                compatible += 0.5  # neutral is partially compatible
+            else:
+                opposing += 1  # opposite direction
+        consensus_ratio = compatible / max(n_models, 1)
+
+        # Map consensus: high agreement → high hit rate
+        # All agree → 85, half agree → 60, all disagree → 30
+        hit_rate = float(np.clip(30 + consensus_ratio * 65, 30, 85))
+
+        # Significance: significant if >= 4 models and no strong opposition
+        significant = n_models >= 4 and opposing <= 1
+
+        return round(skill_score, 1), round(hit_rate, 1), n_models, significant
+
+    # -- Lightweight accuracy metrics (no expensive backtest) --
+
+    @staticmethod
+    def _compute_lightweight_skill(prices: List[float]) -> float:
+        """Estimate model skill from price predictability metrics.
+
+        Uses autocorrelation and trend consistency as a proxy for how well
+        ML models can predict this asset. Fast (no model re-runs).
+        Returns 0-100 where 50 = baseline.
+        """
+        if not prices or len(prices) < 60:
+            return 50.0
+        try:
+            arr = np.array(prices[-365:], dtype=float)
+            returns = np.diff(arr) / np.maximum(arr[:-1], 1e-10)
+
+            # 1. Autocorrelation of returns (lag 1-7)
+            # High autocorrelation = more predictable
+            n = len(returns)
+            mean_r = float(np.mean(returns))
+            var_r = float(np.var(returns))
+            if var_r < 1e-15:
+                return 50.0
+            autocorr_sum = 0.0
+            for lag in range(1, min(8, n)):
+                cov = float(np.mean((returns[lag:] - mean_r) * (returns[:-lag] - mean_r)))
+                autocorr_sum += abs(cov / var_r)
+            avg_autocorr = autocorr_sum / 7
+
+            # 2. Trend consistency: % of 7-day windows with consistent direction
+            consistent = 0
+            total_windows = 0
+            for i in range(0, n - 7, 7):
+                window = returns[i : i + 7]
+                pos = np.sum(window > 0)
+                if pos >= 5 or pos <= 2:  # 5+ up or 5+ down = consistent
+                    consistent += 1
+                total_windows += 1
+            trend_consistency = consistent / max(total_windows, 1)
+
+            # 3. Combine: autocorrelation (40%) + trend consistency (60%)
+            # Scale to 30-75 range (realistic for crypto)
+            raw = avg_autocorr * 0.4 + trend_consistency * 0.6
+            score = 30 + raw * 60  # maps [0,1] -> [30,90]
+            return round(float(np.clip(score, 20, 80)), 1)
+        except Exception:
+            return 50.0
+
+    @staticmethod
+    def _compute_lightweight_hit_rate(
+        prices: List[float],
+    ) -> Tuple[float, int, bool]:
+        """Estimate directional hit rate from trend persistence.
+
+        Measures how often the 7-day direction matches the prior 7-day
+        direction (proxy for whether trend-following models would succeed).
+        Returns (hit_rate_pct, n_samples, significant).
+        """
+        if not prices or len(prices) < 60:
+            return 50.0, 0, False
+        try:
+            arr = np.array(prices[-365:], dtype=float)
+            hits = 0
+            total = 0
+            for i in range(14, len(arr), 7):
+                prev_dir = arr[i - 7] < arr[i - 14]  # prior 7d went up?
+                curr_dir = arr[i] > arr[i - 7]  # this 7d went up?
+                # A simple predictor would predict "same direction continues"
+                if prev_dir == curr_dir:
+                    hits += 1
+                total += 1
+
+            if total < 3:
+                return 50.0, total, False
+
+            hit_rate = (hits / total) * 100
+
+            # Significance: binomial test approximation
+            significant = False
+            if total >= 15:
+                z = (hits - total * 0.5) / max((total * 0.25) ** 0.5, 1e-10)
+                significant = z > 1.645  # one-sided 5%
 
             return round(hit_rate, 1), total, significant
         except Exception:

@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -21,21 +23,7 @@ import { useToast } from '@/hooks/use-toast'
 import { portfoliosApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { Loader2, Trash2 } from 'lucide-react'
-
-const COMMON_EXCHANGES = [
-  'Crypto.com',
-  'Binance',
-  'Kraken',
-  'Coinbase',
-  'Bitstamp',
-  'KuCoin',
-  'Bybit',
-  'OKX',
-  'Gate.io',
-  'Revolut',
-  'Trade Republic',
-  'Autre',
-]
+import { EXCHANGES, COLD_WALLETS } from '@/lib/platforms'
 
 interface CashBalanceFormProps {
   portfolioId: string
@@ -153,11 +141,19 @@ export default function CashBalanceForm({
                 <SelectValue placeholder="Sélectionner une plateforme" />
               </SelectTrigger>
               <SelectContent>
-                {COMMON_EXCHANGES.map((ex) => (
-                  <SelectItem key={ex} value={ex}>
-                    {ex}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel>Exchanges</SelectLabel>
+                  {EXCHANGES.map((ex) => (
+                    <SelectItem key={ex} value={ex}>{ex}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Cold Wallets</SelectLabel>
+                  {COLD_WALLETS.map((ex) => (
+                    <SelectItem key={ex} value={ex}>{ex}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectItem value="Autre">Autre</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -45,6 +45,7 @@ async def _get_or_create_asset(
     portfolio_id: str,
     symbol: str,
     existing_assets: Dict[str, Asset],
+    exchange: str = "",
 ) -> Asset:
     """Get or create an asset in the portfolio."""
     if symbol in existing_assets:
@@ -58,6 +59,7 @@ async def _get_or_create_asset(
         quantity=0,
         avg_buy_price=0,
         currency="EUR",
+        exchange=exchange,
     )
     db.add(asset)
     await db.flush()
@@ -183,7 +185,9 @@ async def _sync_detailed_transactions(
                     continue
 
                 # Get or create the asset
-                asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 is_sell = trade.trade_id.startswith("convert_sell_")
                 qty = float(trade.quantity)
@@ -206,6 +210,7 @@ async def _sync_detailed_transactions(
                         notes=f"Conversion {base_asset} -> autre crypto",
                     )
                     db.add(transaction)
+                    existing_external_ids.add(trade.trade_id)
                     asset.quantity = max(0, float(asset.quantity) - qty)
                     logger.info(f"Created CONVERSION_OUT: {base_asset} qty={qty}")
                 else:
@@ -228,6 +233,7 @@ async def _sync_detailed_transactions(
                         notes=f"Conversion autre crypto -> {base_asset}",
                     )
                     db.add(transaction)
+                    existing_external_ids.add(trade.trade_id)
                     asset.quantity = float(asset.quantity) + qty
                     logger.info(f"Created CONVERSION_IN: {base_asset} qty={qty}")
 
@@ -256,7 +262,9 @@ async def _sync_detailed_transactions(
                 if not base_asset or base_asset in fiat_currencies:
                     continue
 
-                asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 qty = float(trade.quantity)
                 price = float(trade.price) if trade.price else 0
@@ -296,14 +304,18 @@ async def _sync_detailed_transactions(
             logger.info(f"Found {len(fiat_orders)} fiat orders from {service.exchange_name}")
 
             for order in fiat_orders:
-                if order.order_id in existing_external_ids:
+                # Use fiat_ prefix to match api_keys.py format and avoid duplicates
+                ext_id = f"fiat_{order.order_id}"
+                if ext_id in existing_external_ids or order.order_id in existing_external_ids:
                     continue
 
                 base_asset = order.crypto_symbol
                 if not base_asset or base_asset in fiat_currencies:
                     continue
 
-                asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 trans_type = TransactionType.BUY if order.side == "buy" else TransactionType.SELL
                 qty = float(order.crypto_amount)
@@ -318,11 +330,12 @@ async def _sync_detailed_transactions(
                     fee_currency=order.fiat_currency,
                     currency="EUR",
                     executed_at=order.timestamp,
-                    external_id=order.order_id,
+                    external_id=ext_id,
                     exchange=service.exchange_name,
                     notes="Fiat Order",
                 )
                 db.add(transaction)
+                existing_external_ids.add(ext_id)
 
                 if trans_type == TransactionType.BUY:
                     old_qty = float(asset.quantity)
@@ -346,14 +359,18 @@ async def _sync_detailed_transactions(
             logger.info(f"Found {len(auto_invest)} auto-invest orders from {service.exchange_name}")
 
             for order in auto_invest:
-                if order.order_id in existing_external_ids:
+                # Use fiat_ prefix to match api_keys.py format and avoid duplicates
+                ext_id = f"fiat_{order.order_id}"
+                if ext_id in existing_external_ids or order.order_id in existing_external_ids:
                     continue
 
                 base_asset = order.crypto_symbol
                 if not base_asset or base_asset in fiat_currencies:
                     continue
 
-                asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 qty = float(order.crypto_amount)
                 price = float(order.price) if order.price else 0
@@ -367,11 +384,12 @@ async def _sync_detailed_transactions(
                     fee_currency=order.fiat_currency,
                     currency="EUR",
                     executed_at=order.timestamp,
-                    external_id=order.order_id,
+                    external_id=ext_id,
                     exchange=service.exchange_name,
                     notes="Auto-Invest DCA",
                 )
                 db.add(transaction)
+                existing_external_ids.add(ext_id)
 
                 old_qty = float(asset.quantity)
                 old_avg = float(asset.avg_buy_price)
@@ -414,7 +432,9 @@ async def _sync_detailed_transactions(
                 continue
 
             # Get or create asset
-            asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+            asset = await _get_or_create_asset(
+                db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+            )
 
             trans_type = TransactionType.BUY if trade.side == "buy" else TransactionType.SELL
             qty = float(trade.quantity)
@@ -433,6 +453,7 @@ async def _sync_detailed_transactions(
                 exchange=service.exchange_name,
             )
             db.add(transaction)
+            existing_external_ids.add(trade.trade_id)
 
             # Update asset quantity and avg price
             if trans_type == TransactionType.BUY:
@@ -469,7 +490,9 @@ async def _sync_detailed_transactions(
                 if reward_asset in fiat_currencies:
                     continue
 
-                asset = await _get_or_create_asset(db, portfolio.id, reward_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, reward_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 # Determine transaction type
                 if "staking" in reward.trade_id.lower():
@@ -491,6 +514,7 @@ async def _sync_detailed_transactions(
                     notes=f"Reward from {service.exchange_name}",
                 )
                 db.add(transaction)
+                existing_external_ids.add(reward.trade_id)
 
                 # Add to quantity
                 asset.quantity = float(asset.quantity) + qty
@@ -519,7 +543,9 @@ async def _sync_detailed_transactions(
                 if not base_asset or base_asset in fiat_currencies:
                     continue
 
-                asset = await _get_or_create_asset(db, portfolio.id, base_asset, existing_assets)
+                asset = await _get_or_create_asset(
+                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                )
 
                 qty = float(deposit.amount)
                 # Get current price for the deposit
@@ -538,6 +564,7 @@ async def _sync_detailed_transactions(
                     notes=f"Dépôt depuis externe ({deposit.tx_id[:16]}...)" if deposit.tx_id else "Dépôt externe",
                 )
                 db.add(transaction)
+                existing_external_ids.add(ext_id)
 
                 # Update quantity and avg_buy_price
                 old_qty = float(asset.quantity)
@@ -589,31 +616,51 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                 await db.commit()
                 return {"success": True, "synced": 0}
 
-            # Get or create portfolio for this exchange
+            # Get or create unified "Crypto" portfolio (same logic as import-history)
             portfolio_result = await db.execute(
                 select(Portfolio).where(
                     Portfolio.user_id == api_key.user_id,
-                    Portfolio.name == f"{service.exchange_name}",
+                    Portfolio.name == "Crypto",
                 )
             )
             portfolio = portfolio_result.scalar_one_or_none()
 
             if not portfolio:
+                # Check for legacy per-exchange portfolio
+                legacy_result = await db.execute(
+                    select(Portfolio).where(
+                        Portfolio.user_id == api_key.user_id,
+                        Portfolio.name == f"{service.exchange_name}",
+                    )
+                )
+                portfolio = legacy_result.scalar_one_or_none()
+                if portfolio:
+                    portfolio.name = "Crypto"
+                    portfolio.description = "Portefeuille crypto consolidé"
+
+            if not portfolio:
                 portfolio = Portfolio(
                     user_id=api_key.user_id,
-                    name=f"{service.exchange_name}",
-                    description=f"Portefeuille synchronisé depuis {service.exchange_name}",
+                    name="Crypto",
+                    description="Portefeuille crypto consolidé",
                 )
                 db.add(portfolio)
                 await db.flush()
 
-            # Get existing assets
+            # Get existing assets (match by exchange or transferred assets)
             assets_result = await db.execute(
                 select(Asset).where(
                     Asset.portfolio_id == portfolio.id,
                 )
             )
-            existing_assets = {a.symbol: a for a in assets_result.scalars().all()}
+            all_portfolio_assets = assets_result.scalars().all()
+            existing_assets = {}
+            for a in all_portfolio_assets:
+                # Only include assets belonging to this exchange (or unassigned)
+                if a.exchange == service.exchange_name:
+                    existing_assets[a.symbol] = a
+                elif a.exchange == "" and a.symbol not in existing_assets:
+                    existing_assets[a.symbol] = a
 
             # === STEP 1: Sync detailed transactions (trades, conversions, rewards) ===
             detailed_synced = await _sync_detailed_transactions(db, service, portfolio, existing_assets)
@@ -621,7 +668,13 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
             # Refresh existing_assets after detailed sync (new assets may have been created)
             assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
-            existing_assets = {a.symbol: a for a in assets_result.scalars().all()}
+            all_portfolio_assets = assets_result.scalars().all()
+            existing_assets = {}
+            for a in all_portfolio_assets:
+                if a.exchange == service.exchange_name:
+                    existing_assets[a.symbol] = a
+                elif a.exchange == "" and a.symbol not in existing_assets:
+                    existing_assets[a.symbol] = a
 
             # === STEP 2: Sync remaining balance discrepancies ===
             synced_count = detailed_synced
@@ -640,6 +693,11 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                 if balance.symbol in existing_assets:
                     # Adjust for any remaining discrepancy (deposits/withdrawals not captured by trades)
                     asset = existing_assets[balance.symbol]
+
+                    # Skip assets transferred to cold wallets (exchange != this exchange)
+                    if asset.exchange and asset.exchange != service.exchange_name:
+                        continue
+
                     our_quantity = float(asset.quantity)
                     exchange_quantity = float(balance.total)
 
@@ -692,6 +750,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         quantity=float(balance.total),
                         avg_buy_price=current_price,
                         currency="EUR",
+                        exchange=service.exchange_name,
                     )
                     db.add(asset)
                     await db.flush()

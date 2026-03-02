@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -226,18 +226,20 @@ async def get_dashboard(
     user_id = str(current_user.id)
 
     # Resolve days=0 ("all time") to actual days since first transaction
+    # Cache first_tx_date for reuse in CAGR calculation below
+    _first_tx_result = await db.execute(
+        select(func.min(Transaction.executed_at))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(Portfolio.user_id == current_user.id)
+    )
+    _first_tx_date_cached = _first_tx_result.scalar()
+    if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is not None:
+        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=None)
+
     if days == 0:
-        first_tx = await db.execute(
-            select(func.min(Transaction.executed_at))
-            .join(Asset, Transaction.asset_id == Asset.id)
-            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
-            .where(Portfolio.user_id == current_user.id)
-        )
-        first_date = first_tx.scalar()
-        if first_date:
-            if hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
-                first_date = first_date.replace(tzinfo=None)
-            days = max((datetime.utcnow() - first_date).days + 1, 7)
+        if _first_tx_date_cached:
+            days = max((datetime.utcnow() - _first_tx_date_cached).days + 1, 7)
         else:
             days = 30
 
@@ -246,19 +248,27 @@ async def get_dashboard(
 
     # Get historical data — always use real price-based series
     historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
-    is_data_estimated = False
+    # Data is estimated when we have very few data points compared to the requested period
+    # (e.g. only 2 points for a 90-day period means most values are interpolated)
+    expected_points = max(days // 3, 5)  # At minimum expect 1 point per 3 days
+    is_data_estimated = len(historical_data) < expected_points and days > 7
     for point in historical_data:
-        point["is_estimated"] = False
+        point["is_estimated"] = is_data_estimated
 
     # Calculate period change from historical data
     if historical_data and len(historical_data) >= 2:
-        start_value = historical_data[0].get("value", 0)
+        # Find the first data point with a non-zero value (skip days before first purchase)
+        start_value = 0
+        for point in historical_data:
+            if point.get("value", 0) > 0:
+                start_value = point["value"]
+                break
         end_value = metrics["total_value"]
         if start_value > 0:
             period_change = end_value - start_value
             period_change_percent = (period_change / start_value) * 100
-            metrics["daily_change"] = period_change
-            metrics["daily_change_percent"] = round(period_change_percent, 2)
+            metrics["period_change"] = period_change
+            metrics["period_change_percent"] = round(period_change_percent, 2)
 
     # Get asset-level allocation with avg buy price
     asset_allocation = []
@@ -311,13 +321,14 @@ async def get_dashboard(
 
     # ============== Calculate Advanced Metrics ==============
 
-    # Risk metrics (builds price series once, shared across all 4 metric functions)
+    # Risk metrics — reuse the historical_data already built above to avoid double API calls
     risk_data = await snapshot_service.get_all_risk_metrics(
         db,
         user_id,
         metrics["total_value"],
         [{"symbol": a.symbol, "value": a.value} for a in asset_allocation],
         days,
+        history=historical_data,
     )
 
     volatility = risk_data["volatility"]
@@ -325,12 +336,9 @@ async def get_dashboard(
     mdd_data = risk_data["max_drawdown"]
     var_data = risk_data["var_95"]
 
-    # Beta and Alpha calculation (vs BTC as benchmark for crypto-heavy portfolios)
+    # Beta and Alpha — not yet computed, return null instead of misleading hardcoded values
     beta = None
     alpha = None
-    if historical_data and len(historical_data) > 5:
-        beta = 1.0
-        alpha = 0.0
 
     max_drawdown = MaxDrawdown(
         max_drawdown_percent=mdd_data["max_drawdown_percent"],
@@ -382,24 +390,20 @@ async def get_dashboard(
     )
 
     # Calculate annualized ROI using CAGR formula
-    # Use actual investment duration (from first transaction) rather than the display period,
-    # which otherwise produces absurd extrapolations (e.g. -100% from a 30-day window).
-    if metrics["total_invested"] > 0 and metrics["total_value"] > 0:
-        first_tx_res = await db.execute(
-            select(func.min(Transaction.executed_at))
-            .join(Asset, Transaction.asset_id == Asset.id)
-            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
-            .where(Portfolio.user_id == current_user.id)
-        )
-        first_tx_date = first_tx_res.scalar()
-        if first_tx_date:
-            if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
-                first_tx_date = first_tx_date.replace(tzinfo=None)
-            actual_days = max((datetime.utcnow() - first_tx_date).days, 30)
+    # total_return = current_value + total_sold (all recovered capital)
+    # This gives the true return even when user sold most of their position.
+    # net_capital = total_invested - total_sold, so total_sold = total_invested - net_capital
+    cagr_base = metrics["total_invested"]
+    total_sold_value = cagr_base - metrics.get("net_capital", cagr_base)
+    total_return = metrics["total_value"] + max(0, total_sold_value)
+    if cagr_base > 0 and total_return > 0:
+        # Reuse cached first transaction date
+        if _first_tx_date_cached:
+            actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
         else:
             actual_days = max(days, 30)
         years = actual_days / 365.0
-        roi_annualized = (pow(metrics["total_value"] / metrics["total_invested"], 1 / years) - 1) * 100
+        roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
         # Clamp to reasonable range
         roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
     else:
@@ -416,19 +420,22 @@ async def get_dashboard(
     # Create snapshot for today if we have assets (max 1 per day)
     if metrics["assets_count"] > 0:
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        existing_today = await db.execute(
-            select(func.count())
-            .select_from(PortfolioSnapshot)
-            .where(
-                and_(
-                    PortfolioSnapshot.user_id == user_id,
-                    PortfolioSnapshot.snapshot_date >= today_start,
-                    PortfolioSnapshot.portfolio_id.is_(None),
+        try:
+            existing_today = await db.execute(
+                select(func.count())
+                .select_from(PortfolioSnapshot)
+                .where(
+                    and_(
+                        PortfolioSnapshot.user_id == user_id,
+                        PortfolioSnapshot.snapshot_date >= today_start,
+                        PortfolioSnapshot.portfolio_id.is_(None),
+                    )
                 )
             )
-        )
-        if existing_today.scalar() == 0:
-            await snapshot_service.create_user_snapshot(db, user_id)
+            if existing_today.scalar() == 0:
+                await snapshot_service.create_user_snapshot(db, user_id)
+        except Exception:
+            pass  # Ignore duplicate snapshot race condition
 
     return EnhancedDashboardResponse(
         total_value=metrics["total_value"],
@@ -490,9 +497,8 @@ async def get_recent_transactions_internal(
     for t in transactions:
         asset = asset_map.get(t.asset_id)
         price = float(t.price)
-        # Fallback to avg_buy_price for transfers/airdrops where price is 0
-        if price == 0 and asset:
-            price = float(asset.avg_buy_price)
+        # For airdrops/transfers/staking_rewards where price is 0,
+        # show 0 as total — don't fake a cost with avg_buy_price
         result_list.append(
             RecentTransaction(
                 id=str(t.id),
@@ -502,7 +508,7 @@ async def get_recent_transactions_internal(
                 quantity=float(t.quantity),
                 price=price,
                 total=float(t.quantity) * price,
-                executed_at=t.executed_at.isoformat(),
+                executed_at=(t.executed_at or t.created_at or datetime.utcnow()).isoformat(),
             )
         )
     return result_list
@@ -520,22 +526,32 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
     )
     alerts = result.scalars().all()
 
+    # Collect all asset IDs to batch-fetch
+    alert_asset_ids = [alert.asset_id for alert in alerts if alert.asset_id]
+    asset_map = {}
+    if alert_asset_ids:
+        asset_result = await db.execute(select(Asset).where(Asset.id.in_(alert_asset_ids)))
+        asset_map = {a.id: a for a in asset_result.scalars().all()}
+
+    # Batch-fetch all prices in one API call
+    all_symbols = list({a.symbol for a in asset_map.values()})
+    price_map = {}
+    if all_symbols:
+        try:
+            price_data = await price_service.get_multiple_crypto_prices(all_symbols)
+            price_map = {sym.upper(): d["price"] for sym, d in price_data.items()}
+        except Exception:
+            pass
+
     active_alerts = []
     for alert in alerts:
         symbol = None
         current_price = None
 
-        if alert.asset_id:
-            asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
-            asset = asset_result.scalar_one_or_none()
-            if asset:
-                symbol = asset.symbol
-                try:
-                    prices = await price_service.get_multiple_crypto_prices([symbol])
-                    if symbol.upper() in prices:
-                        current_price = prices[symbol.upper()]["price"]
-                except Exception:
-                    pass
+        if alert.asset_id and alert.asset_id in asset_map:
+            asset = asset_map[alert.asset_id]
+            symbol = asset.symbol
+            current_price = price_map.get(symbol.upper())
 
         active_alerts.append(
             ActiveAlert(
@@ -599,7 +615,7 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
 
         for symbol, name in index_symbols:
             if symbol in all_data:
-                change = period_changes.get(symbol, all_data[symbol].get("change_24h", 0))
+                change = period_changes.get(symbol, all_data[symbol].get("change_percent_24h", 0))
                 indices.append(
                     IndexComparison(
                         name=name,
@@ -624,6 +640,15 @@ async def get_portfolio_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     """Get dashboard metrics for a specific portfolio."""
+    portfolio_result = await db.execute(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
+        )
+    )
+    if not portfolio_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
     metrics = await metrics_service.get_portfolio_metrics(db, portfolio_id)
     return metrics
 
@@ -635,6 +660,15 @@ async def get_portfolio_history(
     db: AsyncSession = Depends(get_db),
 ):
     """Get historical investment metrics for a portfolio (including sold assets)."""
+    portfolio_result = await db.execute(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
+        )
+    )
+    if not portfolio_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
     history = await metrics_service.get_portfolio_history(db, portfolio_id)
     return history
 
