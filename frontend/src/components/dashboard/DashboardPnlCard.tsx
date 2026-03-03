@@ -36,13 +36,14 @@ interface PnLBreakdown {
 
 interface DashboardPnlCardProps {
   pnlBreakdown: PnLBreakdown
+  periodLabel?: string
 }
 
-export default function DashboardPnlCard({ pnlBreakdown }: DashboardPnlCardProps) {
+export default function DashboardPnlCard({ pnlBreakdown, periodLabel }: DashboardPnlCardProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2"><Scale className="h-4 w-4" />Répartition des Plus/Moins-values</CardTitle>
+        <CardTitle className="text-sm font-medium flex items-center gap-2"><Scale className="h-4 w-4" />Répartition des Plus/Moins-values <span className="text-xs font-normal text-muted-foreground">({periodLabel ?? 'Depuis le début'})</span></CardTitle>
         <CardDescription>Distinction entre gains réalisés et latents (fiscalité)</CardDescription>
       </CardHeader>
       <CardContent>

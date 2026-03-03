@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
+import time
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,10 @@ from app.models.transaction import Transaction
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
+
+# In-memory cache for dashboard metrics: {(user_id, days): (timestamp, result)}
+_dashboard_cache: Dict[Tuple[str, int], Tuple[float, Dict]] = {}
+_DASHBOARD_CACHE_TTL = 120  # 2 minutes
 
 # Fiat currencies -> counted as cash
 FIAT_SYMBOLS = {"EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY"}
@@ -324,83 +329,82 @@ class MetricsService:
         """Fetch price change percentage over a period for each symbol.
 
         Returns {SYMBOL: change_percent} using CoinGecko /coins/markets
-        (single batch call) for crypto and Yahoo Finance for stocks.
+        (single batch call) for crypto when an exact period is available,
+        or historical price data for any period (crypto + stocks).
         """
         import httpx
 
+        from app.core.timeframe import get_coingecko_period
+
         changes: Dict[str, float] = {}
 
-        # Map days to CoinGecko price_change_percentage param
-        # Available: 1h, 24h, 7d, 14d, 30d, 200d, 1y
-        # Note: there is no 90d — 30d is closest without overshoot
-        if days <= 1:
-            cg_period = "24h"
-            cg_key = "price_change_percentage_24h_in_currency"
-        elif days <= 7:
-            cg_period = "7d"
-            cg_key = "price_change_percentage_7d_in_currency"
-        elif days <= 14:
-            cg_period = "14d"
-            cg_key = "price_change_percentage_14d_in_currency"
-        elif days <= 90:
-            cg_period = "30d"
-            cg_key = "price_change_percentage_30d_in_currency"
-        elif days <= 200:
-            cg_period = "200d"
-            cg_key = "price_change_percentage_200d_in_currency"
-        else:
-            cg_period = "1y"
-            cg_key = "price_change_percentage_1y_in_currency"
+        # Determine if CoinGecko has a pre-computed period close to `days`
+        cg_period, cg_key = get_coingecko_period(days)
 
-        # Crypto: batch call via /coins/markets
+        # Crypto: use batch API when CoinGecko has a matching period,
+        # otherwise fall back to historical price data for accuracy.
         crypto_symbols = symbols_by_type.get("crypto", [])
         if crypto_symbols:
-            try:
-                # Build coin IDs
-                from app.ml.historical_data import HistoricalDataFetcher as HDF
+            if cg_period is not None:
+                # Batch call via /coins/markets (1 API call for all coins)
+                try:
+                    from app.ml.historical_data import HistoricalDataFetcher as HDF
 
-                coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in crypto_symbols]
+                    coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in crypto_symbols]
 
-                headers = {
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "application/json",
-                }
-                coingecko_key = getattr(price_service, "coingecko_api_key", None)
-                if coingecko_key:
-                    headers["x-cg-demo-api-key"] = coingecko_key
+                    headers = {
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "application/json",
+                    }
+                    coingecko_key = getattr(price_service, "coingecko_api_key", None)
+                    if coingecko_key:
+                        headers["x-cg-demo-api-key"] = coingecko_key
 
-                async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
-                    response = await client.get(
-                        "https://api.coingecko.com/api/v3/coins/markets",
-                        params={
-                            "vs_currency": "eur",
-                            "ids": ",".join(coin_ids),
-                            "price_change_percentage": cg_period,
-                            "per_page": 250,
-                        },
-                    )
-                    response.raise_for_status()
-                    data = response.json()
+                    async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+                        response = await client.get(
+                            "https://api.coingecko.com/api/v3/coins/markets",
+                            params={
+                                "vs_currency": "eur",
+                                "ids": ",".join(coin_ids),
+                                "price_change_percentage": cg_period,
+                                "per_page": 250,
+                            },
+                        )
+                        response.raise_for_status()
+                        data = response.json()
 
-                    # Reverse map coin_id -> symbol
-                    id_to_symbol = {v: k for k, v in HDF.SYMBOL_MAP.items()}
+                        id_to_symbol = {v: k for k, v in HDF.SYMBOL_MAP.items()}
 
-                    for coin in data:
-                        coin_id = coin.get("id", "")
-                        symbol = id_to_symbol.get(coin_id, coin.get("symbol", "").upper())
-                        pct = coin.get(cg_key)
-                        if pct is None:
-                            continue  # Skip coins with no period data instead of defaulting to 0%
-                        if isinstance(pct, dict):
-                            pct = pct.get("eur")
+                        for coin in data:
+                            coin_id = coin.get("id", "")
+                            symbol = id_to_symbol.get(coin_id, coin.get("symbol", "").upper())
+                            pct = coin.get(cg_key)
                             if pct is None:
                                 continue
-                        changes[symbol.upper()] = float(pct)
+                            if isinstance(pct, dict):
+                                pct = pct.get("eur")
+                                if pct is None:
+                                    continue
+                            changes[symbol.upper()] = float(pct)
 
-            except Exception as e:
-                logger.warning("Failed to fetch crypto period changes: %s", e)
+                except Exception as e:
+                    logger.warning("Failed to fetch crypto period changes (batch): %s", e)
+            else:
+                # No matching CoinGecko period (e.g. 90j) → use historical data
+                fetcher = HistoricalDataFetcher()
+                try:
+                    for symbol in crypto_symbols:
+                        try:
+                            _, prices = await fetcher.get_crypto_history(symbol, days=days)
+                            if prices and len(prices) >= 2 and prices[0] != 0:
+                                change = (prices[-1] - prices[0]) / prices[0] * 100
+                                changes[symbol.upper()] = change
+                        except Exception:
+                            pass
+                finally:
+                    await fetcher.close()
 
-        # Stocks/ETFs: use Yahoo Finance chart for each symbol
+        # Stocks/ETFs: always use historical price data (no batch API)
         stock_symbols = symbols_by_type.get("stock", []) + symbols_by_type.get("etf", [])
         if stock_symbols:
             fetcher = HistoricalDataFetcher()
@@ -426,6 +430,14 @@ class MetricsService:
         days: int = 30,
     ) -> Dict:
         """Calculate dashboard metrics for a user's entire portfolio."""
+        # Check in-memory cache
+        cache_key = (user_id, days)
+        now = time.time()
+        if cache_key in _dashboard_cache:
+            ts, cached = _dashboard_cache[cache_key]
+            if now - ts < _DASHBOARD_CACHE_TTL:
+                return cached
+
         # Get all user portfolios
         result = await db.execute(
             select(Portfolio).where(
@@ -456,6 +468,8 @@ class MetricsService:
         total_value = Decimal("0")
         total_invested = Decimal("0")
         total_sold = Decimal("0")
+        total_realized = Decimal("0")
+        total_pnl_fees = Decimal("0")
         all_assets = []
 
         for portfolio in portfolios:
@@ -465,6 +479,8 @@ class MetricsService:
             total_value += Decimal(str(portfolio_metrics["total_value"]))
             total_invested += Decimal(str(portfolio_history["total_invested_all_time"]))
             total_sold += Decimal(str(portfolio_history.get("total_sold", 0)))
+            total_realized += Decimal(str(portfolio_history.get("realized_gains", 0)))
+            total_pnl_fees += Decimal(str(portfolio_history.get("total_fees", 0)))
             all_assets.extend(portfolio_metrics["assets"])
 
         total_gain_loss = total_value - total_invested
@@ -504,9 +520,11 @@ class MetricsService:
                     "current_price": a.get("current_price"),
                     "total_invested": 0.0,
                     "current_value": 0.0,
+                    "total_quantity": 0.0,
                 }
             symbol_agg[sym]["total_invested"] += a["total_invested"]
             symbol_agg[sym]["current_value"] += a["current_value"]
+            symbol_agg[sym]["total_quantity"] += a.get("quantity", 0)
 
         # Fetch period change percentages (batch API call)
         symbols_by_type: Dict[str, List[str]] = {}
@@ -558,7 +576,7 @@ class MetricsService:
         else:
             net_gain_loss_percent = 0.0
 
-        return {
+        result = {
             "total_value": float(total_value),
             "total_invested": float(total_invested),
             "net_capital": float(net_capital),
@@ -598,7 +616,36 @@ class MetricsService:
                 for a in worst_performers
             ],
             "period_changes": period_changes,
+            # Pre-built asset allocation (avoids N+1 re-fetch in dashboard endpoint)
+            "aggregated_assets": [
+                {
+                    "symbol": a["symbol"],
+                    "name": a["name"],
+                    "asset_type": a["asset_type"],
+                    "current_value": a["current_value"],
+                    "total_invested": a["total_invested"],
+                    "avg_buy_price": (a["total_invested"] / a["total_quantity"] if a["total_quantity"] > 0 else 0.0),
+                    "gain_loss_percent": round(a.get("period_change_percent", 0), 2),
+                    "percentage": round(
+                        (a["current_value"] / float(total_value) * 100) if float(total_value) > 0 else 0, 2
+                    ),
+                }
+                for a in aggregated
+                if a["current_value"] > 0
+            ],
+            # P&L breakdown (avoids separate calculate_realized_unrealized_pnl call)
+            "pnl_data": {
+                "realized_pnl": float(total_realized),
+                "unrealized_pnl": float(total_gain_loss),
+                "total_pnl": float(total_realized + total_gain_loss),
+                "total_fees": float(total_pnl_fees),
+                "net_pnl": float(total_realized + total_gain_loss - total_pnl_fees),
+            },
         }
+
+        # Cache the result
+        _dashboard_cache[cache_key] = (time.time(), result)
+        return result
 
     async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:
         """
@@ -698,8 +745,11 @@ class MetricsService:
                 if tx_type in ["BUY", "TRANSFER_IN"] and tx_price > 0:
                     ah["total_bought_fiat_value"] += tx_qty * tx_price
 
-            # Track sells (TRANSFER_OUT excluded: user still owns the asset on cold wallet)
-            elif tx_type in ["SELL", "CONVERSION_OUT"]:
+            # Track sells (real capital out)
+            # TRANSFER_OUT excluded: user still owns the asset on cold wallet
+            # CONVERSION_OUT excluded: crypto→crypto swap, not real capital leaving
+            #   (symmetric with CONVERSION_IN being excluded from total_invested)
+            elif tx_type == "SELL":
                 ah["total_sold"] += Decimal(str(tx.quantity))
                 ah["total_sold_value"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
 

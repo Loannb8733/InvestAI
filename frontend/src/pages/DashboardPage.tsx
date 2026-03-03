@@ -181,6 +181,8 @@ interface DashboardMetrics {
   upcoming_events: UpcomingEvent[]
   index_comparison: IndexComparison[]
   advanced_metrics: AdvancedMetrics
+  period_days?: number
+  period_label?: string
   last_updated: string
 }
 
@@ -435,6 +437,8 @@ export default function DashboardPage() {
   const advanced_metrics = metrics.advanced_metrics ?? ({} as NonNullable<typeof metrics.advanced_metrics>)
   const { risk_metrics, stress_tests = [], pnl_breakdown } = advanced_metrics
   const concentration = advanced_metrics.concentration ?? { is_concentrated: false, hhi: 0, interpretation: 'N/A', top_asset: '', top_concentration: 0 }
+  // Always derive periodLabel from local selectedPeriod (not API) so it updates instantly on click
+  const periodLabel = selectedPeriod === 0 ? 'Depuis le début' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1 an' : `${selectedPeriod}j`
 
   return (
     <div className="space-y-6">
@@ -564,11 +568,11 @@ export default function DashboardPage() {
                 )
               case 'pnl':
                 return (
-                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} />
+                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel={periodLabel} />
                 )
               case 'risk':
                 return (
-                  <DashboardRiskCards riskMetrics={risk_metrics} />
+                  <DashboardRiskCards riskMetrics={risk_metrics} periodLabel={periodLabel} />
                 )
               case 'roi-concentration':
                 return (
@@ -604,7 +608,7 @@ export default function DashboardPage() {
                             {stress_tests.map((test) => (
                               <div key={test.scenario_name} className="flex justify-between items-center">
                                 <span className="text-sm">{test.scenario_name}</span>
-                                <span className="text-sm font-medium text-red-500">-{formatCurrency(Math.abs(test.potential_loss))}</span>
+                                <span className="text-sm font-medium text-red-500">{formatCurrency(test.potential_loss)}</span>
                               </div>
                             ))}
                           </div>
@@ -625,7 +629,7 @@ export default function DashboardPage() {
                           const liveIndexPrice = getLivePrice(idx.symbol, idx.price)
                           return (
                           <div key={idx.symbol} className="flex items-center gap-3">
-                            <AssetIconCompact symbol={idx.symbol} assetType={['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOT', 'AVAX', 'MATIC', 'LINK'].includes(idx.symbol.toUpperCase()) ? 'crypto' : 'stock'} size={32} />
+                            <AssetIconCompact symbol={idx.symbol} assetType="crypto" size={32} />
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <p className="text-sm font-medium">{idx.name}</p>
@@ -667,7 +671,7 @@ export default function DashboardPage() {
                     </Card>
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Répartition par actif</CardTitle>
+                        <CardTitle>Répartition par actif <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/analytics')}>Voir plus<ChevronRight className="h-4 w-4 ml-1" /></Button>
                       </CardHeader>
                       <CardContent>
@@ -711,7 +715,7 @@ export default function DashboardPage() {
                     </Card>
                     <Card className="lg:col-span-1">
                       <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Transactions récentes</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Transactions récentes <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/transactions')}>Voir tout<ChevronRight className="h-4 w-4 ml-1" /></Button>
                       </CardHeader>
                       <CardContent>
@@ -795,7 +799,7 @@ export default function DashboardPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-green-500 flex items-center gap-2"><TrendingUp className="h-5 w-5" />Meilleures performances</CardTitle>
+                        <CardTitle className="text-green-500 flex items-center gap-2"><TrendingUp className="h-5 w-5" />Meilleures performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>
                       <CardContent>
                         {metrics.top_performers.length > 0 ? (
@@ -818,7 +822,7 @@ export default function DashboardPage() {
                     </Card>
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-red-500 flex items-center gap-2"><TrendingDown className="h-5 w-5" />Moins bonnes performances</CardTitle>
+                        <CardTitle className="text-red-500 flex items-center gap-2"><TrendingDown className="h-5 w-5" />Moins bonnes performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>
                       <CardContent>
                         {metrics.worst_performers.length > 0 ? (

@@ -73,6 +73,30 @@ class SnapshotService:
             currency=currency,
         )
 
+    async def create_user_snapshot_if_missing(
+        self, db: AsyncSession, user_id: str, currency: str = "EUR"
+    ) -> Optional[PortfolioSnapshot]:
+        """Create today's snapshot only if one doesn't exist yet.
+
+        Uses a single-query check to avoid TOCTOU race conditions.
+        Reuses metrics already computed by the caller if available.
+        """
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        existing = await db.execute(
+            select(func.count())
+            .select_from(PortfolioSnapshot)
+            .where(
+                and_(
+                    PortfolioSnapshot.user_id == user_id,
+                    PortfolioSnapshot.snapshot_date >= today_start,
+                    PortfolioSnapshot.portfolio_id.is_(None),
+                )
+            )
+        )
+        if existing.scalar() > 0:
+            return None
+        return await self.create_user_snapshot(db, user_id, currency)
+
     async def _get_invested_timeline(
         self,
         db: AsyncSession,

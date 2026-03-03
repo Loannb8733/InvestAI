@@ -59,9 +59,10 @@ interface RiskMetrics {
 interface DashboardRiskCardsProps {
   riskMetrics: RiskMetrics
   thresholds?: DisplayThresholds
+  periodLabel?: string
 }
 
-export default function DashboardRiskCards({ riskMetrics, thresholds }: DashboardRiskCardsProps) {
+export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabel }: DashboardRiskCardsProps) {
   const st = thresholds?.sharpe ?? DEFAULT_DISPLAY_THRESHOLDS.sharpe
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -71,7 +72,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds }: Dashboar
             <div>
               <MetricTooltip content="Mesure de la dispersion des rendements. Plus la volatilité est élevée, plus le risque est important."><p className="text-sm text-muted-foreground">Volatilité</p></MetricTooltip>
               <p className="text-xl font-bold">{riskMetrics.volatility.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground">annualisée</p>
+              <p className="text-xs text-muted-foreground">annualisée {periodLabel ? `(sur ${periodLabel})` : ''}</p>
             </div>
             <Activity className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -95,7 +96,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds }: Dashboar
             <div>
               <MetricTooltip content="Perte maximale historique entre un pic et un creux. Mesure le pire scénario passé."><p className="text-sm text-muted-foreground">Max Drawdown</p></MetricTooltip>
               <p className="text-xl font-bold text-red-500">-{riskMetrics.max_drawdown.max_drawdown_percent.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground">pire baisse</p>
+              <p className="text-xs text-muted-foreground">pire baisse {periodLabel ? `(${periodLabel})` : ''}</p>
             </div>
             <TrendDown className="h-8 w-8 text-red-500" />
           </div>

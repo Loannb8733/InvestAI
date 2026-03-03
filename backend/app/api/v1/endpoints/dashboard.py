@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -14,7 +14,6 @@ from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
 from app.models.portfolio import Portfolio
-from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.metrics_service import metrics_service
@@ -206,6 +205,10 @@ class EnhancedDashboardResponse(BaseModel):
     # Advanced metrics (includes risk, concentration, stress tests, P&L breakdown)
     advanced_metrics: AdvancedMetrics
 
+    # Period context
+    period_days: int = 30
+    period_label: str = "30j"
+
     # Metadata
     last_updated: str
 
@@ -224,6 +227,7 @@ async def get_dashboard(
     days=0 means "all time" (from oldest transaction).
     """
     user_id = str(current_user.id)
+    original_days = days  # Preserve for period label before resolution
 
     # Resolve days=0 ("all time") to actual days since first transaction
     # Cache first_tx_date for reuse in CAGR calculation below
@@ -270,51 +274,30 @@ async def get_dashboard(
             metrics["period_change"] = period_change
             metrics["period_change_percent"] = round(period_change_percent, 2)
 
-    # Get asset-level allocation with avg buy price
-    asset_allocation = []
-    all_assets_data = []
-    period_changes = metrics.get("period_changes", {})
-    if metrics["assets_count"] > 0:
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == current_user.id,
-            )
+    # Build asset-level allocation from pre-aggregated data (no extra DB/API calls)
+    asset_allocation = [
+        AssetAllocation(
+            symbol=a["symbol"],
+            name=a.get("name"),
+            asset_type=a["asset_type"],
+            value=a["current_value"],
+            percentage=a["percentage"],
+            gain_loss_percent=a["gain_loss_percent"],
+            avg_buy_price=a.get("avg_buy_price"),
         )
-        portfolios = result.scalars().all()
+        for a in metrics.get("aggregated_assets", [])
+    ]
+    asset_allocation.sort(key=lambda x: x.value, reverse=True)
 
-        for portfolio in portfolios:
-            portfolio_metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id))
-            for asset in portfolio_metrics.get("assets", []):
-                all_assets_data.append(asset)
-                if asset["current_value"] > 0:
-                    percentage = (
-                        (asset["current_value"] / metrics["total_value"] * 100) if metrics["total_value"] > 0 else 0
-                    )
-                    # Use period-specific change if available, otherwise fall back to all-time
-                    sym_upper = asset["symbol"].upper()
-                    period_change = period_changes.get(sym_upper, asset.get("gain_loss_percent", 0))
-                    asset_allocation.append(
-                        AssetAllocation(
-                            symbol=asset["symbol"],
-                            name=asset.get("name"),
-                            asset_type=asset["asset_type"],
-                            value=asset["current_value"],
-                            percentage=round(percentage, 2),
-                            gain_loss_percent=round(period_change, 2),
-                            avg_buy_price=asset.get("avg_buy_price"),
-                        )
-                    )
-
-        asset_allocation.sort(key=lambda x: x.value, reverse=True)
-
-    # Get recent transactions (last 5)
-    recent_transactions = await get_recent_transactions_internal(db, current_user, 5)
+    # Get recent transactions (filtered by period)
+    recent_transactions = await get_recent_transactions_internal(db, current_user, 5, days=days)
 
     # Get active alerts
     active_alerts = await get_active_alerts_internal(db, current_user)
 
-    # Get upcoming events (next 30 days)
-    upcoming_events = await get_upcoming_events_internal(db, current_user, 30)
+    # Get upcoming events (adapted to selected period window)
+    events_window = min(days, 90) if days > 0 else 90
+    upcoming_events = await get_upcoming_events_internal(db, current_user, events_window)
 
     # Get index comparison (BTC, ETH, SOL)
     index_comparison = await get_index_comparison(days)
@@ -379,14 +362,14 @@ async def get_dashboard(
         StressTest(**risk_data["stress_test_40"]),
     ]
 
-    # P&L breakdown (realized vs unrealized)
-    pnl_data = await metrics_service.calculate_realized_unrealized_pnl(db, user_id)
+    # P&L breakdown (realized vs unrealized) — pre-computed in metrics
+    pnl_data = metrics.get("pnl_data", {})
     pnl_breakdown = PnLBreakdown(
-        realized_pnl=pnl_data["realized_pnl"],
-        unrealized_pnl=pnl_data["unrealized_pnl"],
-        total_pnl=pnl_data["total_pnl"],
-        total_fees=pnl_data["total_fees"],
-        net_pnl=pnl_data["net_pnl"],
+        realized_pnl=pnl_data.get("realized_pnl", 0),
+        unrealized_pnl=pnl_data.get("unrealized_pnl", 0),
+        total_pnl=pnl_data.get("total_pnl", 0),
+        total_fees=pnl_data.get("total_fees", 0),
+        net_pnl=pnl_data.get("net_pnl", 0),
     )
 
     # Calculate annualized ROI using CAGR formula
@@ -418,24 +401,14 @@ async def get_dashboard(
     )
 
     # Create snapshot for today if we have assets (max 1 per day)
+    # Fire-and-forget: don't block the response on snapshot creation
     if metrics["assets_count"] > 0:
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         try:
-            existing_today = await db.execute(
-                select(func.count())
-                .select_from(PortfolioSnapshot)
-                .where(
-                    and_(
-                        PortfolioSnapshot.user_id == user_id,
-                        PortfolioSnapshot.snapshot_date >= today_start,
-                        PortfolioSnapshot.portfolio_id.is_(None),
-                    )
-                )
-            )
-            if existing_today.scalar() == 0:
-                await snapshot_service.create_user_snapshot(db, user_id)
+            await snapshot_service.create_user_snapshot_if_missing(db, user_id)
         except Exception:
-            pass  # Ignore duplicate snapshot race condition
+            pass
+
+    from app.core.timeframe import get_period_label_fr
 
     return EnhancedDashboardResponse(
         total_value=metrics["total_value"],
@@ -460,6 +433,8 @@ async def get_dashboard(
         upcoming_events=upcoming_events,
         index_comparison=index_comparison,
         advanced_metrics=advanced_metrics,
+        period_days=days,
+        period_label=get_period_label_fr(original_days),
         last_updated=datetime.utcnow().isoformat(),
     )
 
@@ -468,9 +443,16 @@ async def get_dashboard(
 
 
 async def get_recent_transactions_internal(
-    db: AsyncSession, current_user: User, limit: int = 5
+    db: AsyncSession, current_user: User, limit: int = 5, days: int = 0
 ) -> List[RecentTransaction]:
-    """Get recent transactions for dashboard."""
+    """Get recent transactions for dashboard.
+
+    Args:
+        days: If > 0, only return transactions within this period.
+              If 0, return the most recent transactions regardless of date.
+    """
+    from app.core.timeframe import get_period_start_date
+
     portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
@@ -485,12 +467,17 @@ async def get_recent_transactions_internal(
     if not asset_ids:
         return []
 
-    result = await db.execute(
+    query = (
         select(Transaction)
         .where(Transaction.asset_id.in_(asset_ids))
         .order_by(Transaction.executed_at.desc())
         .limit(limit)
     )
+    if days > 0:
+        start_date = get_period_start_date(days)
+        query = query.where(Transaction.executed_at >= start_date)
+
+    result = await db.execute(query)
     transactions = result.scalars().all()
 
     result_list = []

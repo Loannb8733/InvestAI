@@ -25,12 +25,13 @@ export default defineConfig({
       : {
           ...(process.env.VITE_HMR_PROTOCOL === 'wss'
             ? { clientPort: 443, protocol: 'wss' as const }
-            : {}),
+            : { clientPort: Number(process.env.VITE_HMR_PORT) || 3001 }),
         },
     proxy: {
       '/api': {
         target: 'http://backend:8000',
         changeOrigin: true,
+        ws: true,
       },
     },
   },
