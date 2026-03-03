@@ -277,7 +277,7 @@ export default function TransactionsPage() {
     queryFn: () =>
       transactionsApi.list({
         portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
-        limit: 10000,
+        limit: 500,
       }),
     placeholderData: keepPreviousData,
   })

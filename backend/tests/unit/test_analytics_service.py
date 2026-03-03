@@ -5,14 +5,14 @@ parametric), CVaR, max drawdown, correlation matrix edge cases,
 diversification scoring, XIRR, and various helper utilities.
 """
 
+from datetime import datetime
+
 import numpy as np
 import pytest
-from datetime import datetime
 
 from app.services.analytics_service import (
     RISK_FREE_RATE,
     AnalyticsService,
-    CorrelationData,
     _annualized_return,
     _annualized_volatility,
     _calmar,
@@ -389,10 +389,10 @@ class TestAnnualizedReturn:
     """Tests for _annualized_return."""
 
     def test_positive_mean_return(self):
-        returns = np.array([0.001] * 100)  # ~0.1% per day
+        returns = np.array([0.001] * 100)  # ~0.1% daily log-return
         ann = _annualized_return(returns)
-        # 0.001 * 365 * 100 = 36.5%
-        assert pytest.approx(ann, abs=0.1) == 36.5
+        # Discrete compound: (exp(0.001 * 365) - 1) * 100 ≈ 44.05%
+        assert pytest.approx(ann, abs=0.1) == 44.05
 
     def test_empty_returns_zero(self):
         assert _annualized_return(np.array([])) == 0.0

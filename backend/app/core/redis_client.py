@@ -1,14 +1,18 @@
 """Redis client for caching predictions and fitted models."""
 
 import hashlib
+import hmac
 import json
 import logging
-import pickle  # nosec B403 — used for ML model caching (trusted internal data only)
+import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization
 from typing import Optional
 
 import redis.asyncio as aioredis
 
 from app.core.config import settings
+
+# HMAC key derived from SECRET_KEY for pickle integrity verification
+_HMAC_KEY: bytes = settings.SECRET_KEY.encode() if isinstance(settings.SECRET_KEY, str) else settings.SECRET_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +51,19 @@ async def get_redis() -> aioredis.Redis:
 
 
 def _data_hash(prices: list) -> str:
-    """Hash price data to detect staleness."""
-    raw = f"{len(prices)}:{prices[-1] if prices else 0}:{prices[0] if prices else 0}"
-    return hashlib.md5(raw.encode()).hexdigest()[:12]
+    """Hash price data to detect staleness.
+
+    Samples 10 evenly-spaced points plus extremes so that two series with
+    identical length/first/last but different intermediate data produce
+    different hashes.
+    """
+    if not prices:
+        return "empty"
+    n = len(prices)
+    indices = sorted(set([0, n - 1] + [i * n // 10 for i in range(10)]))
+    sample = [round(prices[i], 8) for i in indices if i < n]
+    raw = f"{n}:{sum(sample):.8f}:{':'.join(str(s) for s in sample)}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 # ── JSON-based caches (use text client) ──────────────────────────────
@@ -161,30 +175,55 @@ async def cache_reliability(symbol: str, days: int, result: dict, ttl: int = 864
 
 
 # ── Binary caches (use binary client for pickle) ─────────────────────
-# Note: pickle is used ONLY for internally-generated ML model objects.
-# No untrusted data is ever deserialized.
+# Pickle payloads are HMAC-signed on write and verified before deserialization
+# to prevent arbitrary code execution if Redis is compromised.
+
+_HMAC_SIG_LEN = 32  # SHA-256 digest length
+
+
+def _sign_payload(data: bytes) -> bytes:
+    """Prepend HMAC-SHA256 signature to pickle payload."""
+    sig = hmac.new(_HMAC_KEY, data, hashlib.sha256).digest()
+    return sig + data
+
+
+def _verify_and_extract(data: bytes) -> Optional[bytes]:
+    """Verify HMAC signature and return raw pickle payload, or None if invalid."""
+    if len(data) <= _HMAC_SIG_LEN:
+        return None
+    sig = data[:_HMAC_SIG_LEN]
+    payload = data[_HMAC_SIG_LEN:]
+    expected = hmac.new(_HMAC_KEY, payload, hashlib.sha256).digest()
+    if hmac.compare_digest(sig, expected):
+        return payload
+    return None
 
 
 async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> Optional[object]:
-    """Get cached fitted model from Redis."""
+    """Get cached fitted model from Redis (HMAC-verified before deserialization)."""
     try:
         r = await _get_redis_bin()
         data = await r.get(f"model:{symbol}:{model_name}:{data_hash}")
         if data:
-            return pickle.loads(data)  # nosec B301 — trusted internal data
+            payload = _verify_and_extract(data)
+            if payload is None:
+                logger.warning("HMAC verification failed for model %s:%s — discarding", symbol, model_name)
+                return None
+            return pickle.loads(payload)  # nosec B301 — HMAC-verified internal data
     except Exception as e:
         logger.debug("Redis model cache miss: %s", e)
     return None
 
 
 async def cache_model(symbol: str, model_name: str, data_hash: str, model: object, ttl: int = 86400):
-    """Cache fitted model in Redis (default 24h TTL)."""
+    """Cache fitted model in Redis with HMAC signature (default 24h TTL)."""
     try:
         r = await _get_redis_bin()
+        raw = pickle.dumps(model)
         await r.setex(
             f"model:{symbol}:{model_name}:{data_hash}",
             ttl,
-            pickle.dumps(model),
+            _sign_payload(raw),
         )
     except Exception as e:
         logger.warning("Failed to cache model: %s", e)

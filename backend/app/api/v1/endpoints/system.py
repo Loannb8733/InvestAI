@@ -189,8 +189,8 @@ async def trigger_weekly_report(
             )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            detail="An internal error occurred. Please try again later.",
         )

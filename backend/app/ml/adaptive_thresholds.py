@@ -308,7 +308,7 @@ def cycle_position(ctx: MarketContext, regime_probs: Optional[dict] = None) -> f
         if dominant in ("bearish", "top"):
             base_pos -= fg_adj  # low F&G → higher position (deeper bear)
         else:
-            base_pos -= fg_adj  # high F&G → lower position (deeper bull)
+            base_pos += fg_adj  # high F&G → lower position (deeper bull)
 
     return float(np.clip(base_pos, 0, 100))
 

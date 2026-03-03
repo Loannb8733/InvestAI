@@ -58,6 +58,7 @@ def tune_xgboost(prices: List[float], n_trials: int = 30) -> Dict:
                 learning_rate=learning_rate,
                 subsample=subsample,
                 colsample_bytree=colsample_bytree,
+                random_state=42,
                 verbosity=0,
             )
             model.fit(X, y_train)
@@ -114,6 +115,7 @@ def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
             changepoint_prior_scale=cps,
             seasonality_mode=seasonality_mode,
             interval_width=0.95,
+            mcmc_samples=0,  # MAP estimation — fully deterministic
         )
         model.fit(train_df)
         future = model.make_future_dataframe(periods=7)

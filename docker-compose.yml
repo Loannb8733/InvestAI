@@ -29,6 +29,7 @@ services:
     image: redis:7-alpine
     container_name: investai-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
@@ -63,6 +64,7 @@ services:
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       # Security (no defaults - must be in .env)
       - SECRET_KEY=${SECRET_KEY}
       - FERNET_KEY=${FERNET_KEY}
@@ -106,6 +108,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-investai}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - SECRET_KEY=${SECRET_KEY}
       - FERNET_KEY=${FERNET_KEY}
     volumes:
@@ -135,6 +138,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-investai}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - SECRET_KEY=${SECRET_KEY}
       - FERNET_KEY=${FERNET_KEY}
     volumes:

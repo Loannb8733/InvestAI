@@ -16,9 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 def _returns_hash(prices: List[float]) -> str:
-    """Hash price data to detect staleness for model caching."""
-    raw = f"{len(prices)}:{prices[-1] if prices else 0}:{prices[0] if prices else 0}"
-    return hashlib.md5(raw.encode()).hexdigest()[:12]
+    """Hash price data to detect staleness for model caching.
+
+    Samples 10 evenly-spaced points plus extremes so that two series with
+    identical length/first/last but different intermediate data produce
+    different hashes.
+    """
+    if not prices:
+        return "empty"
+    n = len(prices)
+    indices = sorted(set([0, n - 1] + [i * n // 10 for i in range(10)]))
+    sample = [round(prices[i], 8) for i in indices if i < n]
+    raw = f"{n}:{sum(sample):.8f}:{':'.join(str(s) for s in sample)}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 # Configurable thresholds

@@ -12,7 +12,7 @@ from typing import Dict, Optional, Set
 
 import aiohttp
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 
 from app.core.config import settings
@@ -223,11 +223,11 @@ async def heartbeat_loop(websocket: WebSocket) -> None:
 @router.websocket("/ws/prices")
 async def websocket_prices(
     websocket: WebSocket,
-    token: str = Query(default=""),
 ) -> None:
     """WebSocket endpoint for real-time asset prices (all types).
 
-    Connect with: ws://host/api/v1/ws/prices?token=JWT_TOKEN
+    Connect with: ws://host/api/v1/ws/prices
+    First message must be auth: {"action": "auth", "token": "JWT_TOKEN"}
     Send JSON to subscribe: {"action": "subscribe", "symbols": ["BTC", "ETH", "AAPL"]}
     Send JSON to unsubscribe: {"action": "unsubscribe", "symbols": ["BTC"]}
     Responds to: {"action": "pong"} for heartbeat acknowledgement
@@ -238,12 +238,21 @@ async def websocket_prices(
     Heartbeat: Server sends {"type": "ping"} every 30s.
     Client should respond with {"action": "pong"}.
     """
-    # Auth
-    if not token or not await verify_ws_token(token):
-        await websocket.close(code=4001, reason="Unauthorized")
-        return
-
     await websocket.accept()
+
+    # Auth: expect token as first message (avoids JWT in URL / server logs)
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=10)
+        msg = json.loads(raw)
+        token = msg.get("token", "")
+        if not token or not await verify_ws_token(token):
+            await websocket.send_text(json.dumps({"type": "error", "message": "Unauthorized"}))
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+        await websocket.send_text(json.dumps({"type": "auth", "status": "ok"}))
+    except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
+        await websocket.close(code=4001, reason="Auth timeout or invalid")
+        return
     active_connections[websocket] = set()
 
     # Ensure Redis pub/sub listener is running (for Celery price updates)

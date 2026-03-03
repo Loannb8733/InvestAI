@@ -188,18 +188,17 @@ async def _check_prediction_accuracy():
                     log.mape = abs(log.predicted_price - actual_price) / actual_price * 100
 
                     # Direction correctness: did price move in predicted direction?
-                    # We need the price at prediction time. Use created_at price estimation:
-                    # If predicted > current_at_creation → bullish prediction
-                    # Compare to actual movement
-                    # We approximate "price at creation" as the midpoint or use error_pct
-                    if log.error_pct is not None:
-                        # Legacy field — skip direction for old logs without baseline
-                        log.direction_correct = None
+                    if log.price_at_creation is not None:
+                        baseline = float(log.price_at_creation)
+                        if baseline > 0:
+                            predicted_up = log.predicted_price > baseline
+                            actual_up = actual_price > baseline
+                            log.direction_correct = predicted_up == actual_up
+                        else:
+                            log.direction_correct = None
                     else:
-                        # Predicted direction from predicted_price vs a baseline
-                        # The baseline is approximately: predicted_price / (1 + predicted_change)
-                        # Since we don't store it directly, check if prediction was above/below CI midpoint
-                        log.direction_correct = None  # Will be improved with baseline storage
+                        # Legacy entries without price_at_creation
+                        log.direction_correct = None
 
                     # CI coverage: was actual price within the confidence interval?
                     if log.confidence_low is not None and log.confidence_high is not None:
@@ -229,6 +228,60 @@ async def _check_prediction_accuracy():
             checked,
             drift_alerts,
         )
+
+
+@celery_app.task(name="app.tasks.predictions.check_data_drift")
+def check_data_drift():
+    """Check for data drift across all tracked assets (PSI-based)."""
+    run_async(_check_data_drift())
+
+
+async def _check_data_drift():
+    """Compute PSI-based data drift for each tracked symbol."""
+    import numpy as np
+
+    from app.ml.drift_detector import check_drift
+    from app.ml.historical_data import HistoricalDataFetcher
+
+    fetcher = HistoricalDataFetcher()
+
+    async with async_session_factory() as db:
+        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
+        assets = result.all()
+
+    drift_count = 0
+    warning_count = 0
+
+    for symbol, asset_type in assets:
+        try:
+            dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+            if not prices or len(prices) < 60:
+                continue
+
+            prices_arr = np.array(prices, dtype=float)
+
+            # Reference = first 80%, current = last 20%
+            split = max(int(len(prices_arr) * 0.8), 30)
+            ref = prices_arr[:split]
+            cur = prices_arr[split:]
+
+            if len(cur) < 10:
+                continue
+
+            dr = check_drift(ref, cur, symbol=symbol)
+            if dr.status == "drift":
+                drift_count += 1
+            elif dr.status == "warning":
+                warning_count += 1
+        except Exception as e:
+            logger.error("Drift check failed for %s: %s", symbol, e)
+
+    logger.info(
+        "Data drift check complete: %d drift, %d warning, %d total assets",
+        drift_count,
+        warning_count,
+        len(assets),
+    )
 
 
 @celery_app.task(name="app.tasks.predictions.tune_hyperparameters")

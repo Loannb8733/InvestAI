@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.sql import func
 
@@ -21,6 +21,7 @@ class PredictionLog(Base):
 
     # Calibration fields
     predicted_price = Column(Float, nullable=True)
+    price_at_creation = Column(Numeric(18, 8), nullable=True)  # Baseline for direction tracking
     target_date = Column(DateTime, nullable=True, index=True)
     horizon_days = Column(Integer, nullable=True)
     actual_price = Column(Float, nullable=True)  # Filled later by calibration task

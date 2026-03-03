@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""  # Set in production for authenticated Redis
 
     @property
     def REDIS_URL(self) -> str:
@@ -93,6 +94,8 @@ class Settings(BaseSettings):
         external = os.environ.get("REDIS_URL", "")
         if external:
             return external
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     # CORS - Restricted methods and headers

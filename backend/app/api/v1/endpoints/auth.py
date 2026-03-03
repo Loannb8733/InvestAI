@@ -258,15 +258,41 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ) -> Token:
     """Authenticate user and return tokens."""
+    from app.core.redis_client import _get_redis_txt
+
     # Find user by email
     result = await db.execute(select(User).where(User.email == login_data.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(login_data.password, user.password_hash):
+        # Track per-account failed attempts (even if user not found, use email hash)
+        if user:
+            try:
+                r = await _get_redis_txt()
+                fail_key = f"login_fail:{user.id}"
+                await r.incr(fail_key)
+                await r.expire(fail_key, 900)  # 15-minute window
+            except Exception:
+                pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    # Check per-account lockout (10 failures in 15 minutes)
+    try:
+        r = await _get_redis_txt()
+        fail_key = f"login_fail:{user.id}"
+        fails = int(await r.get(fail_key) or 0)
+        if fails >= 10:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Account temporarily locked. Please try again in 15 minutes.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis down — fail open
 
     if not user.is_active:
         raise HTTPException(
@@ -282,9 +308,28 @@ async def login(
                 detail="MFA code required",
             )
 
+        # Anti-replay: reject TOTP codes already used within this window
+        try:
+            r = await _get_redis_txt()
+            used_key = f"totp_used:{user.id}:{login_data.mfa_code}"
+            if await r.exists(used_key):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="MFA code already used. Wait for the next code.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Redis down — fail open
+
         totp = pyotp.TOTP(user.mfa_secret)
         if totp.verify(login_data.mfa_code):
-            pass  # TOTP valid
+            # Mark code as used to prevent replay
+            try:
+                r = await _get_redis_txt()
+                await r.setex(f"totp_used:{user.id}:{login_data.mfa_code}", 90, "1")
+            except Exception:
+                pass
         elif user.mfa_backup_codes:
             # Try backup codes
             codes = json.loads(user.mfa_backup_codes)
@@ -308,6 +353,13 @@ async def login(
 
         # Persist backup code consumption if one was used
         await db.commit()
+
+    # Clear failed login counter on success
+    try:
+        r = await _get_redis_txt()
+        await r.delete(f"login_fail:{user.id}")
+    except Exception:
+        pass
 
     # Generate tokens with fingerprint binding
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))

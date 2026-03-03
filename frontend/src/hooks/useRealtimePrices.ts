@@ -26,21 +26,25 @@ export function useRealtimePrices(symbols: string[]) {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const url = `${protocol}//${host}/api/v1/ws/prices?token=${token}`
+    const url = `${protocol}//${host}/api/v1/ws/prices`
 
     const ws = new WebSocket(url)
     wsRef.current = ws
 
     ws.onopen = () => {
-      setConnected(true)
-      ws.send(JSON.stringify({ action: 'subscribe', symbols }))
+      // Send auth token as first message (not in URL to avoid server log leaks)
+      ws.send(JSON.stringify({ action: 'auth', token }))
     }
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
 
-        if (data.type === 'price') {
+        if (data.type === 'auth' && data.status === 'ok') {
+          // Auth succeeded — now subscribe to symbols
+          setConnected(true)
+          ws.send(JSON.stringify({ action: 'subscribe', symbols }))
+        } else if (data.type === 'price') {
           setPrices((prev) => ({
             ...prev,
             [data.symbol]: {

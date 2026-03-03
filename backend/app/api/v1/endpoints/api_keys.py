@@ -1120,7 +1120,7 @@ async def import_trade_history(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de l'import: {str(e)}",
+            detail="Erreur lors de l'import des transactions. Veuillez réessayer.",
         )
 
 
@@ -1305,5 +1305,5 @@ async def sync_exchange(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la synchronisation: {str(e)}",
+            detail="Erreur lors de la synchronisation. Veuillez réessayer.",
         )

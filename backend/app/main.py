@@ -4,6 +4,7 @@ Plateforme multi-utilisateurs de gestion et d'analyse d'investissements
 """
 
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -51,11 +52,15 @@ if settings.sentry_enabled:
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware for logging HTTP requests with timing."""
+    """Middleware for logging HTTP requests with timing and trace_id."""
 
     async def dispatch(self, request: Request, call_next):
         """Log request details and timing."""
         start_time = time.perf_counter()
+
+        # Generate or accept trace_id for request correlation
+        trace_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
+        request.state.trace_id = trace_id
 
         # Set Sentry user context from JWT if available
         if settings.sentry_enabled:
@@ -76,6 +81,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Process the request
             response = await call_next(request)
 
+            # Echo trace_id in response header
+            response.headers["X-Request-ID"] = trace_id
+
             # Calculate duration
             duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -86,10 +94,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 "status": response.status_code,
                 "duration_ms": round(duration_ms, 2),
                 "client_ip": request.client.host if request.client else "unknown",
+                "trace_id": trace_id,
             }
 
             # Skip health check logs to reduce noise
-            if request.url.path != "/health":
+            if not request.url.path.startswith("/health"):
                 if response.status_code >= 500:
                     logger.error("Request failed", extra=log_data)
                 elif response.status_code >= 400:
@@ -216,7 +225,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Traceback:\n{traceback.format_exc()}")
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}"},
+        content={"detail": "An internal error occurred. Please try again later."},
     )
 
 
@@ -231,7 +240,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=settings.CORS_ALLOWED_METHODS,  # Restricted, not "*"
     allow_headers=settings.CORS_ALLOWED_HEADERS,  # Restricted, not "*"
-    expose_headers=["X-Total-Count"],  # For pagination
+    expose_headers=["X-Total-Count", "X-Request-ID"],  # Pagination + tracing
     max_age=600,  # Cache preflight for 10 minutes
 )
 
@@ -244,17 +253,25 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint with DB and Redis connectivity."""
-    status = {"app": settings.APP_NAME, "status": "healthy"}
+    """Liveness probe — returns 200 if the process is running."""
+    return {"app": settings.APP_NAME, "status": "alive"}
+
+
+@app.get("/health/ready")
+async def readiness_check():
+    """Readiness probe — checks DB and Redis connectivity."""
+    checks = {"app": settings.APP_NAME, "status": "ready"}
+    http_status = 200
 
     # Check database
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        status["database"] = "ok"
+        checks["database"] = "ok"
     except Exception:
-        status["database"] = "error"
-        status["status"] = "degraded"
+        checks["database"] = "error"
+        checks["status"] = "degraded"
+        http_status = 503
 
     # Check Redis
     try:
@@ -263,9 +280,10 @@ async def health_check():
         r = aioredis.from_url(settings.REDIS_URL, socket_timeout=2)
         await r.ping()
         await r.aclose()
-        status["redis"] = "ok"
+        checks["redis"] = "ok"
     except Exception:
-        status["redis"] = "error"
-        status["status"] = "degraded"
+        checks["redis"] = "error"
+        checks["status"] = "degraded"
+        http_status = 503
 
-    return status
+    return JSONResponse(content=checks, status_code=http_status)

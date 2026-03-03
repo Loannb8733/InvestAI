@@ -139,29 +139,12 @@ async def get_available_years(
     from app.models.portfolio import Portfolio
     from app.models.transaction import Transaction
 
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    portfolio_ids = list(portfolio_result.scalars().all())
-
-    if not portfolio_ids:
-        return {"years": [datetime.now().year]}
-
-    asset_result = await db.execute(
-        select(Asset.id).where(
-            Asset.portfolio_id.in_(portfolio_ids),
-        )
-    )
-    asset_ids = list(asset_result.scalars().all())
-
-    if not asset_ids:
-        return {"years": [datetime.now().year]}
-
+    # Single joined query instead of 3 sequential queries
     years_result = await db.execute(
         select(distinct(extract("year", Transaction.executed_at)))
-        .where(Transaction.asset_id.in_(asset_ids))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(Portfolio.user_id == current_user.id)
         .order_by(extract("year", Transaction.executed_at).desc())
     )
     years = [int(y) for y in years_result.scalars().all() if y]

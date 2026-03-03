@@ -452,17 +452,26 @@ class PredictionService:
                     asset_type=asset_type.value,
                     model_name=model_used,
                     predicted_price=float(last_pred["price"]),
+                    price_at_creation=float(current_price),
                     target_date=datetime.strptime(last_pred["date"], "%Y-%m-%d"),
                     horizon_days=days_ahead,
                     models_detail=models_detail,
                     confidence_low=float(last_pred.get("confidence_low", 0)),
                     confidence_high=float(last_pred.get("confidence_high", 0)),
+                    prediction_data={
+                        "current_price": float(current_price),
+                        "fear_greed": fear_greed,
+                        "btc_dominance": btc_dominance,
+                        "regime": regime_info.get("dominant_regime") if regime_info else None,
+                        "history_days": len(prices) if prices else 0,
+                        "model_weights": models_detail.get("weights") if models_detail else None,
+                    },
                 )
                 async with AsyncSessionLocal() as log_db:
                     log_db.add(log_entry)
                     await log_db.commit()
         except Exception as e:
-            logger.debug("Failed to log prediction: %s", e)
+            logger.warning("Failed to log prediction for %s: %s", symbol, e)
 
         # Cache the result
         result_dict = {

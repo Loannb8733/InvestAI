@@ -72,6 +72,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.predictions.tune_hyperparameters",
         "schedule": 604800.0,  # Every 7 days
     },
+    "check-data-drift": {
+        "task": "app.tasks.predictions.check_data_drift",
+        "schedule": 86400.0,  # Every 24 hours
+    },
     # === Snapshots ===
     "create-daily-snapshots": {
         "task": "app.tasks.snapshots.create_daily_snapshots",

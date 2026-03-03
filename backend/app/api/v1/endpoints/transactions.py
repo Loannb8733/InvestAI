@@ -581,10 +581,10 @@ async def import_transactions_csv(
     try:
         content = await file.read()
         content_str = content.decode("utf-8-sig")  # Handle BOM
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read file: {str(e)}",
+            detail="Failed to read the uploaded file. Please check the file format.",
         )
 
     # Get or detect parser
@@ -611,7 +611,7 @@ async def import_transactions_csv(
         logger.error(f"Error detecting parser: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error detecting CSV format: {str(e)}",
+            detail="Error detecting CSV format. Please specify the platform.",
         )
 
     # Parse CSV
@@ -622,7 +622,7 @@ async def import_transactions_csv(
         logger.error(f"Error parsing CSV: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error parsing CSV file: {str(e)}",
+            detail="Error parsing CSV file. Please check the file format and content.",
         )
 
     success_count = 0
@@ -790,7 +790,7 @@ async def import_transactions_csv(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}",
+            detail="A database error occurred. Please try again.",
         )
 
     # Recalculate asset quantities from transactions (incremental updates lose precision)

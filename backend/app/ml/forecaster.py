@@ -299,6 +299,7 @@ class PriceForecaster:
             changepoint_prior_scale=prophet_params.get("changepoint_prior_scale", 0.1),
             seasonality_mode=prophet_params.get("seasonality_mode", "additive"),
             interval_width=0.95,
+            mcmc_samples=0,  # MAP estimation — fully deterministic
         )
         if has_volume:
             model.add_regressor("volume")
@@ -439,13 +440,16 @@ class PriceForecaster:
         if btc_arr is not None and len(btc_arr) > len(arr):
             btc_arr = btc_arr[-len(arr) :]
 
+        # Pre-compute RSI array once (O(N) instead of O(N²) per call)
+        rsi_array = self._precompute_rsi(arr, period=14)
+
         # Build feature matrix
         features = []
         targets = []
         lookback = 7
 
         for i in range(lookback + 14, len(arr)):
-            row = self._build_features(arr, i, vol_arr, btc_arr)
+            row = self._build_features(arr, i, vol_arr, btc_arr, rsi_array=rsi_array)
             features.append(row)
             targets.append(arr[i])
 
@@ -453,14 +457,29 @@ class PriceForecaster:
         y = np.array(targets)
 
         xgb_params = self._hyperparams.get("xgboost", {})
-        model = XGBRegressor(
+        xgb_base_params = dict(
             n_estimators=xgb_params.get("n_estimators", 100),
             max_depth=xgb_params.get("max_depth", 4),
             learning_rate=xgb_params.get("learning_rate", 0.1),
             subsample=xgb_params.get("subsample", 1.0),
             colsample_bytree=xgb_params.get("colsample_bytree", 1.0),
+            random_state=42,
             verbosity=0,
         )
+
+        # --- Honest CI: train/val split for residual estimation ---
+        split_idx = max(int(len(X) * 0.8), 1)
+        if split_idx < len(X):
+            model_val = XGBRegressor(**xgb_base_params)
+            model_val.fit(X[:split_idx], y[:split_idx])
+            val_preds = model_val.predict(X[split_idx:])
+            residuals = y[split_idx:] - val_preds
+        else:
+            # Not enough data for split — fall back to in-sample (rare)
+            residuals = np.array([0.0])
+
+        # --- Final model: refit on ALL data for predictions ---
+        model = XGBRegressor(**xgb_base_params)
         model.fit(X, y)
 
         # Iterative prediction with decay dampening (P5: reduce error propagation)
@@ -482,10 +501,9 @@ class PriceForecaster:
             extended.append(pred)
             result_dates.append((last_date + timedelta(days=d)).strftime("%Y-%m-%d"))
 
-        # Fat-tailed confidence from residuals, widened by step number (P5)
-        train_preds = model.predict(X)
-        residuals = y - train_preds
-        residual_std = float(np.std(residuals)) * 1.2  # FIX2: compensate higher decay variance
+        # Fat-tailed confidence from honest held-out residuals (P5)
+        residual_std = float(np.std(residuals)) if len(residuals) > 1 else float(np.abs(residuals).mean())
+        residual_std *= 1.2  # Widen slightly to compensate for decay variance
         z = self._fat_tail_z(residuals)
         result_low = [max(0.0, result_prices[i] - z * residual_std * np.sqrt(i + 1)) for i in range(len(result_prices))]
         result_high = [result_prices[i] + z * residual_std * np.sqrt(i + 1) for i in range(len(result_prices))]
@@ -566,11 +584,31 @@ class PriceForecaster:
     ]
 
     @staticmethod
+    def _precompute_rsi(prices: np.ndarray, period: int = 14) -> np.ndarray:
+        """Pre-compute RSI for all indices in O(N) using Wilder's smoothing."""
+        n = len(prices)
+        rsi = np.full(n, 50.0)
+        if n < period + 2:
+            return rsi
+        deltas = np.diff(prices)
+        gains = np.maximum(deltas, 0.0)
+        losses = np.maximum(-deltas, 0.0)
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+        for k in range(period, len(deltas)):
+            avg_gain = (avg_gain * (period - 1) + gains[k]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[k]) / period
+            rs = avg_gain / max(avg_loss, 1e-10)
+            rsi[k + 1] = 100 - 100 / (1 + rs)
+        return rsi
+
+    @staticmethod
     def _build_features(
         prices: np.ndarray,
         idx: int,
         volumes: Optional[np.ndarray] = None,
         btc_prices: Optional[np.ndarray] = None,
+        rsi_array: Optional[np.ndarray] = None,
     ) -> List[float]:
         """Build feature vector for XGBoost at given index.
 
@@ -592,8 +630,10 @@ class PriceForecaster:
         else:
             feats.append(0.0)
 
-        # --- RSI 14 (1 feature) --- Wilder's smoothing (P8)
-        if idx >= 15:
+        # --- RSI 14 (1 feature) --- use pre-computed array if available (P8)
+        if rsi_array is not None and idx < len(rsi_array):
+            feats.append(float(rsi_array[idx]))
+        elif idx >= 15:
             period = 14
             all_deltas = [prices[j] - prices[j - 1] for j in range(1, idx)]
             all_gains = [max(d, 0) for d in all_deltas]
@@ -1039,7 +1079,9 @@ class PriceForecaster:
         current = prices[-1]
         vol = np.std(prices) / np.mean(prices) if len(prices) > 1 else 0.03
         daily_vol = vol / np.sqrt(max(len(prices), 1))
-        drift = (prices[-1] / prices[0]) ** (1 / len(prices)) - 1 if len(prices) >= 2 else 0.0
+        drift = 0.0
+        if len(prices) >= 2 and prices[0] > 1e-10:
+            drift = (prices[-1] / prices[0]) ** (1 / len(prices)) - 1
 
         now = datetime.utcnow()
         result_dates, result_prices, result_low, result_high = [], [], [], []

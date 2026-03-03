@@ -312,13 +312,28 @@ class AnalyticsService:
     )
     _ECB_RATE_TTL = 86400  # 24h cache
 
+    _MAX_CACHE_ENTRIES = 200
+
     def __init__(self):
         self.price_service = PriceService()
-        # In-memory cache: key -> (timestamp, dates, prices)
+        # In-memory cache: key -> (timestamp, dates, prices) — bounded with LRU eviction
         self._history_cache: Dict[str, Tuple[float, List[datetime], List[float]]] = {}
-        self._fetch_lock = asyncio.Lock()
+        self._fetch_locks: Dict[str, asyncio.Lock] = {}  # Per-symbol locks
         # ECB risk-free rate cache: (timestamp, rate_decimal)
         self._ecb_rate_cache: Optional[Tuple[float, float]] = None
+
+    def _get_fetch_lock(self, symbol: str) -> asyncio.Lock:
+        """Get or create a per-symbol lock to allow parallel fetches for different symbols."""
+        if symbol not in self._fetch_locks:
+            self._fetch_locks[symbol] = asyncio.Lock()
+        return self._fetch_locks[symbol]
+
+    def _cache_put(self, key: str, value: Tuple[float, List[datetime], List[float]]) -> None:
+        """Insert into cache with bounded size — evict oldest entry if full."""
+        if len(self._history_cache) >= self._MAX_CACHE_ENTRIES:
+            oldest_key = min(self._history_cache, key=lambda k: self._history_cache[k][0])
+            del self._history_cache[oldest_key]
+        self._history_cache[key] = value
 
     async def _fetch_risk_free_rate(self) -> float:
         """Fetch ECB deposit facility rate with 24h in-memory cache.
@@ -381,13 +396,13 @@ class AnalyticsService:
         # 2. Redis cache (filled by Celery task every 30 min)
         dates, prices = get_cached_history(symbol, days=fetch_days)
         if dates and prices:
-            self._history_cache[cache_key] = (now, dates, prices)
+            self._cache_put(cache_key, (now, dates, prices))
             if days < fetch_days and len(dates) > days:
                 return [d.timestamp() for d in dates[-days:]], prices[-days:]
             return [d.timestamp() for d in dates], prices
 
-        # 3. Live API fallback (with lock + rate limit)
-        async with self._fetch_lock:
+        # 3. Live API fallback (per-symbol lock so different symbols fetch in parallel)
+        async with self._get_fetch_lock(symbol):
             # Double-check after lock
             if cache_key in self._history_cache:
                 ts, dates, prices = self._history_cache[cache_key]
@@ -401,7 +416,7 @@ class AnalyticsService:
                 at = asset_type.value if isinstance(asset_type, AssetType) else asset_type
                 dates, prices = await fetcher.get_history(symbol, at, days=fetch_days)
                 if dates and prices:
-                    self._history_cache[cache_key] = (time.time(), dates, prices)
+                    self._cache_put(cache_key, (time.time(), dates, prices))
                 await asyncio.sleep(1.5)
                 if days < fetch_days and len(dates) > days:
                     return [d.timestamp() for d in dates[-days:]], prices[-days:]
@@ -1029,20 +1044,42 @@ class AnalyticsService:
             # Fallback: use diagonal (uncorrelated) if Cholesky fails
             L = np.diag(np.sqrt(np.diag(cov_matrix)))
 
-        # Simulate correlated multi-asset returns (P13: dynamic seed, not fixed)
+        # Offload CPU-heavy simulation to a thread pool to avoid blocking
+        # the async event loop.
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._monte_carlo_compute,
+            mu_vec,
+            L,
+            w,
+            num_simulations,
+            horizon_days,
+            n_assets,
+            user_id,
+        )
+
+    @staticmethod
+    def _monte_carlo_compute(
+        mu_vec: np.ndarray,
+        L: np.ndarray,
+        w: np.ndarray,
+        num_simulations: int,
+        horizon_days: int,
+        n_assets: int,
+        user_id: str,
+    ) -> "MonteCarloResult":
+        """CPU-bound Monte Carlo in thread pool — capped at ~200 MB."""
+        # Cap allocation: 200 MB / 8 bytes per float64
+        max_elements = 200_000_000 // 8
+        capped_sims = min(num_simulations, max_elements // max(horizon_days * n_assets, 1))
+        capped_sims = max(capped_sims, 100)  # At least 100 simulations
+
         seed = int(time.time()) ^ (hash(user_id) % (2**31))
         rng = np.random.default_rng(seed & 0x7FFFFFFF)
-        # Z ~ N(0, I) of shape (num_simulations, horizon_days, n_assets)
-        Z = rng.standard_normal(size=(num_simulations, horizon_days, n_assets))
-        # Correlated returns: each day, R = mu + L @ z
-        # Shape: (num_simulations, horizon_days, n_assets)
+        Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
         correlated_returns = mu_vec + np.einsum("ij,...j->...i", L, Z)
-
-        # Portfolio return per day = weighted sum across assets
-        # Shape: (num_simulations, horizon_days)
         port_daily_returns = correlated_returns @ w
-
-        # Cumulative log return over horizon
         cumulative = np.sum(port_daily_returns, axis=1)
         total_returns_pct = (np.exp(cumulative) - 1) * 100
 
@@ -1057,7 +1094,7 @@ class AnalyticsService:
             expected_return=round(float(np.mean(total_returns_pct)), 2),
             prob_positive=round(float(np.mean(total_returns_pct > 0) * 100), 1),
             prob_loss_10=round(float(np.mean(total_returns_pct < -10) * 100), 1),
-            simulations=num_simulations,
+            simulations=capped_sims,
             horizon_days=horizon_days,
         )
 
