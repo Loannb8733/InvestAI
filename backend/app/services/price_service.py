@@ -1,14 +1,18 @@
 """Price fetching service for various asset types."""
 
 import asyncio
-from datetime import datetime, timedelta
+import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from redis import Redis
 
 from app.core.config import settings
+from app.core.symbol_map import COINGECKO_SYMBOL_MAP
 
 
 class PriceService:
@@ -19,119 +23,12 @@ class PriceService:
     YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
     # Cache TTL in seconds
-    CACHE_TTL_CRYPTO = 60  # 1 minute
+    CACHE_TTL_CRYPTO = 120  # 2 minutes
     CACHE_TTL_STOCK = 300  # 5 minutes
     CACHE_TTL_FOREX = 3600  # 1 hour
 
-    # Unified symbol map for CoinGecko IDs
-    SYMBOL_MAP = {
-        "BTC": "bitcoin",
-        "ETH": "ethereum",
-        "SOL": "solana",
-        "BNB": "binancecoin",
-        "XRP": "ripple",
-        "ADA": "cardano",
-        "DOGE": "dogecoin",
-        "DOT": "polkadot",
-        "MATIC": "matic-network",
-        "LINK": "chainlink",
-        "AVAX": "avalanche-2",
-        "UNI": "uniswap",
-        "ATOM": "cosmos",
-        "LTC": "litecoin",
-        "ETC": "ethereum-classic",
-        "PEPE": "pepe",
-        "PAXG": "pax-gold",
-        "SHIB": "shiba-inu",
-        "ARB": "arbitrum",
-        "OP": "optimism",
-        "APT": "aptos",
-        "INJ": "injective-protocol",
-        "NEAR": "near",
-        "FTM": "fantom",
-        "ALGO": "algorand",
-        "XLM": "stellar",
-        "VET": "vechain",
-        "FIL": "filecoin",
-        "HBAR": "hedera-hashgraph",
-        "ICP": "internet-computer",
-        "SAND": "the-sandbox",
-        "MANA": "decentraland",
-        "AXS": "axie-infinity",
-        "AAVE": "aave",
-        "GRT": "the-graph",
-        "CRV": "curve-dao-token",
-        "MKR": "maker",
-        "SNX": "synthetix-network-token",
-        "COMP": "compound-governance-token",
-        "SUSHI": "sushi",
-        "YFI": "yearn-finance",
-        "1INCH": "1inch",
-        "ENJ": "enjincoin",
-        "CHZ": "chiliz",
-        "BAT": "basic-attention-token",
-        "ZRX": "0x",
-        "OCEAN": "ocean-protocol",
-        "RNDR": "render-token",
-        "IMX": "immutable-x",
-        "LDO": "lido-dao",
-        "RPL": "rocket-pool",
-        "CRO": "crypto-com-chain",
-        "KAVA": "kava",
-        "RUNE": "thorchain",
-        "ZEC": "zcash",
-        "XMR": "monero",
-        "DASH": "dash",
-        "QTUM": "qtum",
-        "ZIL": "zilliqa",
-        "ENS": "ethereum-name-service",
-        "GALA": "gala",
-        "FLOW": "flow",
-        "THETA": "theta-token",
-        "EGLD": "elrond-erd-2",
-        "XTZ": "tezos",
-        "EOS": "eos",
-        "NEO": "neo",
-        "IOTA": "iota",
-        "KSM": "kusama",
-        "WAVES": "waves",
-        "CELO": "celo",
-        "ONE": "harmony",
-        "ANKR": "ankr",
-        "AUDIO": "audius",
-        "BAND": "band-protocol",
-        "STORJ": "storj",
-        "SKL": "skale",
-        "CTSI": "cartesi",
-        "NMR": "numeraire",
-        "OGN": "origin-protocol",
-        "CELR": "celer-network",
-        "SPELL": "spell-token",
-        "JASMY": "jasmycoin",
-        "TRX": "tron",
-        "SUI": "sui",
-        "SEI": "sei-network",
-        "TIA": "celestia",
-        "JUP": "jupiter-exchange-solana",
-        "WIF": "dogwifcoin",
-        "BONK": "bonk",
-        "FLOKI": "floki",
-        "BOME": "book-of-meme",
-        "WLD": "worldcoin-wld",
-        "STRK": "starknet",
-        "BLUR": "blur",
-        "PYTH": "pyth-network",
-        "JTO": "jito-governance-token",
-        "ORDI": "ordi",
-        "STX": "stacks",
-        "INS": "insure-defi",
-        "TAO": "bittensor",
-        "CGPT": "chaingpt",
-        "USDG": "first-digital-usd",
-        "FET": "fetch-ai",
-        "USDC": "usd-coin",
-        "USDT": "tether",
-    }
+    # Unified symbol map for CoinGecko IDs (single source of truth)
+    SYMBOL_MAP = COINGECKO_SYMBOL_MAP
 
     def __init__(self):
         self.redis = Redis(
@@ -140,7 +37,7 @@ class PriceService:
             decode_responses=True,
         )
         # CoinGecko API key (optional, for higher rate limits)
-        self.coingecko_api_key = getattr(settings, 'COINGECKO_API_KEY', None) or None
+        self.coingecko_api_key = getattr(settings, "COINGECKO_API_KEY", None) or None
 
         # Build headers
         headers = {
@@ -149,6 +46,7 @@ class PriceService:
         }
 
         # Add API key header if available
+        self._api_key_invalid = False
         if self.coingecko_api_key:
             headers["x-cg-demo-api-key"] = self.coingecko_api_key
 
@@ -156,6 +54,13 @@ class PriceService:
 
         # Dynamic symbol cache (discovered from API)
         self._dynamic_symbol_cache: Dict[str, str] = {}
+
+    def _handle_401(self):
+        """Handle invalid CoinGecko API key — strip it and retry without."""
+        if not self._api_key_invalid:
+            logger.warning("CoinGecko API key invalid, disabling for future requests")
+            self._api_key_invalid = True
+            self.http_client.headers.pop("x-cg-demo-api-key", None)
 
     async def close(self):
         """Close HTTP client."""
@@ -189,6 +94,13 @@ class PriceService:
                 f"{self.COINGECKO_BASE_URL}/search",
                 params={"query": symbol_upper},
             )
+            if response.status_code == 401:
+                self._handle_401()
+                # Retry once without API key
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/search",
+                    params={"query": symbol_upper},
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -205,13 +117,13 @@ class PriceService:
                         except Exception:
                             pass
                         self._dynamic_symbol_cache[symbol_upper] = coin_id
-                        print(f"Discovered CoinGecko ID for {symbol_upper}: {coin_id}")
+                        logger.debug(f"Discovered CoinGecko ID for {symbol_upper}: {coin_id}")
                         return coin_id
 
-            print(f"No exact match found on CoinGecko for symbol: {symbol_upper}")
+            logger.warning(f"No exact match found on CoinGecko for symbol: {symbol_upper}")
 
         except Exception as e:
-            print(f"Error searching CoinGecko for {symbol}: {e}")
+            logger.error(f"Error searching CoinGecko for {symbol}: {e}")
 
         return None
 
@@ -234,7 +146,7 @@ class PriceService:
                     "last_updated": data.get("last_updated"),
                 }
         except Exception as e:
-            print(f"Redis cache read error for {symbol}: {e}")
+            logger.warning(f"Redis cache read error for {symbol}: {e}")
         return None
 
     def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
@@ -252,24 +164,24 @@ class PriceService:
             self.redis.hset(key, mapping=cache_data)
             self.redis.expire(key, ttl)
         except Exception as e:
-            print(f"Redis cache write error for {symbol}: {e}")
+            logger.warning(f"Redis cache write error for {symbol}: {e}")
 
     # Stablecoins: peg currency (USD or EUR)
     STABLECOINS: Dict[str, str] = {
-        "USDT": "USD",   # Tether
-        "USDC": "USD",   # USD Coin
-        "BUSD": "USD",   # Binance USD
-        "DAI": "USD",    # Dai
-        "TUSD": "USD",   # TrueUSD
-        "USDP": "USD",   # Pax Dollar
-        "GUSD": "USD",   # Gemini Dollar
-        "FRAX": "USD",   # Frax
-        "LUSD": "USD",   # Liquity USD
-        "USDD": "USD",   # USDD
+        "USDT": "USD",  # Tether
+        "USDC": "USD",  # USD Coin
+        "BUSD": "USD",  # Binance USD
+        "DAI": "USD",  # Dai
+        "TUSD": "USD",  # TrueUSD
+        "USDP": "USD",  # Pax Dollar
+        "GUSD": "USD",  # Gemini Dollar
+        "FRAX": "USD",  # Frax
+        "LUSD": "USD",  # Liquity USD
+        "USDD": "USD",  # USDD
         "PYUSD": "USD",  # PayPal USD
         "FDUSD": "USD",  # First Digital USD
-        "USDG": "USD",   # Global Dollar (Paxos)
-        "EURT": "EUR",   # Euro Tether
+        "USDG": "USD",  # Global Dollar (Paxos)
+        "EURT": "EUR",  # Euro Tether
         "EUROC": "EUR",  # Euro Coin
     }
 
@@ -285,6 +197,7 @@ class PriceService:
     async def _get_eur_usd_rate(self) -> Decimal:
         """Get EUR/USD rate with 1h cache."""
         import time
+
         now = time.time()
         if self._eur_usd_rate and now - self._eur_usd_rate_ts < 3600:
             return self._eur_usd_rate
@@ -330,6 +243,18 @@ class PriceService:
                     "include_market_cap": "true",
                 },
             )
+            if response.status_code == 401:
+                self._handle_401()
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/simple/price",
+                    params={
+                        "ids": coin_id,
+                        "vs_currencies": currency,
+                        "include_24hr_change": "true",
+                        "include_24hr_vol": "true",
+                        "include_market_cap": "true",
+                    },
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -338,10 +263,14 @@ class PriceService:
                 price = Decimal(str(coin_data.get(currency, 0)))
                 # Only use if price is valid (> 0)
                 if price > 0:
+                    change_pct = coin_data.get(f"{currency}_24h_change", 0) or 0
+                    # CoinGecko simple/price returns percentage in _24h_change field
+                    # Compute absolute change from percentage and current price
+                    change_abs = float(price) * float(change_pct) / 100.0 if change_pct else 0
                     result = {
                         "price": price,
-                        "change_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
-                        "change_percent_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
+                        "change_24h": change_abs,
+                        "change_percent_24h": change_pct,
                         "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                         "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                     }
@@ -349,7 +278,7 @@ class PriceService:
                     return result
 
         except Exception as e:
-            print(f"CoinGecko failed for {symbol}: {e}, trying CryptoCompare...")
+            logger.warning(f"CoinGecko failed for {symbol}: {e}, trying CryptoCompare...")
 
         # Fallback to CryptoCompare
         try:
@@ -379,14 +308,14 @@ class PriceService:
                     return result
 
         except Exception as e:
-            print(f"CryptoCompare also failed for {symbol}: {e}")
+            logger.error(f"CryptoCompare also failed for {symbol}: {e}")
 
         # Fallback to live forex rate for stablecoins if APIs failed
         if is_stablecoin:
             base_price = await self._stablecoin_price_eur(symbol_upper)
             if currency.lower() == "usd":
                 base_price = Decimal("1.00")
-            print(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
+            logger.info(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
             result = {
                 "price": base_price,
                 "change_24h": 0,
@@ -413,9 +342,7 @@ class PriceService:
                     "interval": "1d",
                     "range": "2d",
                 },
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             )
             response.raise_for_status()
             data = response.json()
@@ -440,7 +367,7 @@ class PriceService:
             return result
 
         except Exception as e:
-            print(f"Error fetching stock price for {symbol}: {e}")
+            logger.error(f"Error fetching stock price for {symbol}: {e}")
 
         return None
 
@@ -467,9 +394,7 @@ class PriceService:
             return await self.get_real_estate_price(symbol)
         return None
 
-    async def _fetch_from_cryptocompare(
-        self, symbols: List[str], currency: str = "EUR"
-    ) -> Dict[str, Dict]:
+    async def _fetch_from_cryptocompare(self, symbols: List[str], currency: str = "EUR") -> Dict[str, Dict]:
         """Fallback: Fetch prices from CryptoCompare API."""
         results = {}
         try:
@@ -501,13 +426,11 @@ class PriceService:
                     results[symbol.upper()] = result
 
         except Exception as e:
-            print(f"Error fetching from CryptoCompare: {e}")
+            logger.error(f"Error fetching from CryptoCompare: {e}")
 
         return results
 
-    async def get_multiple_crypto_prices(
-        self, symbols: List[str], currency: str = "eur"
-    ) -> Dict[str, Dict]:
+    async def get_multiple_crypto_prices(self, symbols: List[str], currency: str = "eur") -> Dict[str, Dict]:
         """Fetch multiple cryptocurrency prices at once."""
         results = {}
 
@@ -546,6 +469,18 @@ class PriceService:
                     "include_market_cap": "true",
                 },
             )
+            if response.status_code == 401:
+                self._handle_401()
+                response = await self.http_client.get(
+                    f"{self.COINGECKO_BASE_URL}/simple/price",
+                    params={
+                        "ids": ",".join(coin_ids),
+                        "vs_currencies": currency,
+                        "include_24hr_change": "true",
+                        "include_24hr_vol": "true",
+                        "include_market_cap": "true",
+                    },
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -555,10 +490,13 @@ class PriceService:
 
             for coin_id, coin_data in data.items():
                 symbol = id_to_symbol.get(coin_id, coin_id.upper())
+                coin_price = Decimal(str(coin_data.get(currency, 0)))
+                change_pct = coin_data.get(f"{currency}_24h_change", 0) or 0
+                change_abs = float(coin_price) * float(change_pct) / 100.0 if change_pct else 0
                 result = {
-                    "price": Decimal(str(coin_data.get(currency, 0))),
-                    "change_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
-                    "change_percent_24h": coin_data.get(f"{currency}_24h_change", 0) or 0,
+                    "price": coin_price,
+                    "change_24h": change_abs,
+                    "change_percent_24h": change_pct,
                     "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                     "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                 }
@@ -566,12 +504,12 @@ class PriceService:
                 results[symbol.upper()] = result
 
         except Exception as e:
-            print(f"CoinGecko failed: {e}, falling back to CryptoCompare...")
+            logger.warning(f"CoinGecko failed: {e}, falling back to CryptoCompare...")
 
         # Check which symbols still don't have prices and try CryptoCompare
         missing_symbols = [s for s in uncached_symbols if s.upper() not in results]
         if missing_symbols:
-            print(f"Trying CryptoCompare for missing symbols: {missing_symbols}")
+            logger.info(f"Trying CryptoCompare for missing symbols: {missing_symbols}")
             fallback_results = await self._fetch_from_cryptocompare(missing_symbols, currency)
             results.update(fallback_results)
 
@@ -583,7 +521,7 @@ class PriceService:
                     base_price = await self._stablecoin_price_eur(symbol_upper)
                     if currency.lower() == "usd":
                         base_price = Decimal("1.00")
-                    print(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
+                    logger.info(f"Using forex fallback price for stablecoin {symbol_upper}: {base_price}")
                     results[symbol_upper] = {
                         "price": base_price,
                         "change_24h": 0,
@@ -602,12 +540,10 @@ class PriceService:
             if cached:
                 return Decimal(cached)
         except Exception as e:
-            print(f"Redis cache read error for forex: {e}")
+            logger.warning(f"Redis cache read error for forex: {e}")
 
         try:
-            response = await self.http_client.get(
-                f"https://api.exchangerate-api.com/v4/latest/{from_currency}"
-            )
+            response = await self.http_client.get(f"https://api.exchangerate-api.com/v4/latest/{from_currency}")
             response.raise_for_status()
             data = response.json()
 
@@ -616,14 +552,13 @@ class PriceService:
                 try:
                     self.redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
                 except Exception as e:
-                    print(f"Redis cache write error for forex: {e}")
+                    logger.warning(f"Redis cache write error for forex: {e}")
                 return Decimal(str(rate))
 
         except Exception as e:
-            print(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
+            logger.error(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
 
         return None
-
 
     async def get_historical_crypto_price(
         self, symbol: str, date: datetime, currency: str = "eur"
@@ -650,7 +585,7 @@ class PriceService:
             if cached:
                 return Decimal(cached)
         except Exception as e:
-            print(f"Redis cache read error for historical price: {e}")
+            logger.warning(f"Redis cache read error for historical price: {e}")
 
         try:
             response = await self.http_client.get(
@@ -673,18 +608,16 @@ class PriceService:
                 try:
                     self.redis.setex(cache_key, 86400, str(price_decimal))
                 except Exception as e:
-                    print(f"Redis cache write error for historical price: {e}")
+                    logger.warning(f"Redis cache write error for historical price: {e}")
                 return price_decimal
 
         except Exception as e:
-            print(f"Error fetching historical price for {symbol} on {date_str}: {e}")
+            logger.error(f"Error fetching historical price for {symbol} on {date_str}: {e}")
 
         return None
 
     async def get_multiple_historical_prices(
-        self,
-        requests: list[tuple[str, datetime]],
-        currency: str = "eur"
+        self, requests: list[tuple[str, datetime]], currency: str = "eur"
     ) -> dict[str, Decimal]:
         """Fetch multiple historical prices with rate limiting.
 

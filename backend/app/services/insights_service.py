@@ -1,16 +1,15 @@
 """Advanced analysis service: fees, tax-loss harvesting, passive income, DCA backtest."""
 
 import logging
-from datetime import datetime, timedelta
-from decimal import Decimal
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, Optional
 
-from sqlalchemy import select, func, extract
+from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset, AssetType
-from app.models.transaction import Transaction, TransactionType
 from app.models.portfolio import Portfolio
+from app.models.transaction import Transaction, TransactionType
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
@@ -23,9 +22,7 @@ class InsightsService:
     # Fee Analysis
     # ------------------------------------------------------------------
 
-    async def get_fee_analysis(
-        self, db: AsyncSession, user_id: str
-    ) -> dict:
+    async def get_fee_analysis(self, db: AsyncSession, user_id: str) -> dict:
         """Analyse complète des frais payés : par exchange, par actif, par mois."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
@@ -38,10 +35,12 @@ class InsightsService:
 
         # All transactions with fees
         result = await db.execute(
-            select(Transaction).where(
+            select(Transaction)
+            .where(
                 Transaction.asset_id.in_(asset_ids),
                 Transaction.fee > 0,
-            ).order_by(Transaction.executed_at.desc())
+            )
+            .order_by(Transaction.executed_at.desc())
         )
         txns = result.scalars().all()
 
@@ -63,20 +62,22 @@ class InsightsService:
             symbol = asset.symbol if asset else "?"
             by_asset[symbol] = by_asset.get(symbol, 0) + fee
 
-            tx_type = tx.transaction_type.value if hasattr(tx.transaction_type, 'value') else str(tx.transaction_type)
+            tx_type = tx.transaction_type.value if hasattr(tx.transaction_type, "value") else str(tx.transaction_type)
             by_type[tx_type] = by_type.get(tx_type, 0) + fee
 
             month = tx.executed_at.strftime("%Y-%m") if tx.executed_at else "?"
             by_month[month] = by_month.get(month, 0) + fee
 
-            fee_list.append({
-                "date": tx.executed_at.isoformat() if tx.executed_at else None,
-                "symbol": symbol,
-                "exchange": exchange,
-                "type": tx_type,
-                "fee": round(fee, 2),
-                "fee_currency": tx.fee_currency or "EUR",
-            })
+            fee_list.append(
+                {
+                    "date": tx.executed_at.isoformat() if tx.executed_at else None,
+                    "symbol": symbol,
+                    "exchange": exchange,
+                    "type": tx_type,
+                    "fee": round(fee, 2),
+                    "fee_currency": tx.fee_currency or "EUR",
+                }
+            )
 
         # Sort by_month chronologically
         by_month_sorted = dict(sorted(by_month.items()))
@@ -99,9 +100,7 @@ class InsightsService:
     # Tax-Loss Harvesting
     # ------------------------------------------------------------------
 
-    async def get_tax_loss_harvesting(
-        self, db: AsyncSession, user_id: str
-    ) -> dict:
+    async def get_tax_loss_harvesting(self, db: AsyncSession, user_id: str) -> dict:
         """Identify positions with unrealized losses that could be sold for tax optimization."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
@@ -140,19 +139,21 @@ class InsightsService:
                 tax_saving = abs(unrealized_pnl) * 0.30  # Flat tax 30%
                 total_harvestable += unrealized_pnl
 
-                opportunities.append({
-                    "symbol": asset.symbol,
-                    "name": asset.name,
-                    "asset_type": at,
-                    "quantity": round(qty, 8),
-                    "avg_buy_price": round(avg_price, 2),
-                    "current_price": round(current_price, 2),
-                    "cost_basis": round(cost_basis, 2),
-                    "current_value": round(current_value, 2),
-                    "unrealized_loss": round(unrealized_pnl, 2),
-                    "unrealized_loss_pct": round(unrealized_pnl_pct, 2),
-                    "potential_tax_saving": round(tax_saving, 2),
-                })
+                opportunities.append(
+                    {
+                        "symbol": asset.symbol,
+                        "name": asset.name,
+                        "asset_type": at,
+                        "quantity": round(qty, 8),
+                        "avg_buy_price": round(avg_price, 2),
+                        "current_price": round(current_price, 2),
+                        "cost_basis": round(cost_basis, 2),
+                        "current_value": round(current_value, 2),
+                        "unrealized_loss": round(unrealized_pnl, 2),
+                        "unrealized_loss_pct": round(unrealized_pnl_pct, 2),
+                        "potential_tax_saving": round(tax_saving, 2),
+                    }
+                )
 
         # Sort by biggest loss first
         opportunities.sort(key=lambda x: x["unrealized_loss"])
@@ -164,16 +165,14 @@ class InsightsService:
             "estimated_tax_saving": round(estimated_tax_saving, 2),
             "nb_candidates": len(opportunities),
             "note": "Vendre ces positions cristallise les moins-values, réduisant l'impôt sur les plus-values. "
-                    "Attention au wash sale — ne rachetez pas immédiatement le même actif.",
+            "Attention au wash sale — ne rachetez pas immédiatement le même actif.",
         }
 
     # ------------------------------------------------------------------
     # Passive Income Tracker
     # ------------------------------------------------------------------
 
-    async def get_passive_income(
-        self, db: AsyncSession, user_id: str, year: Optional[int] = None
-    ) -> dict:
+    async def get_passive_income(self, db: AsyncSession, user_id: str, year: Optional[int] = None) -> dict:
         """Track dividends, staking rewards, interest — by month and by asset."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
@@ -194,7 +193,7 @@ class InsightsService:
             Transaction.transaction_type.in_(passive_types),
         )
         if year:
-            query = query.where(extract('year', Transaction.executed_at) == year)
+            query = query.where(extract("year", Transaction.executed_at) == year)
 
         result = await db.execute(query.order_by(Transaction.executed_at.desc()))
         txns = result.scalars().all()
@@ -209,7 +208,7 @@ class InsightsService:
             value = float(tx.quantity * tx.price) if tx.price else 0
             total += value
 
-            tx_type = tx.transaction_type.value if hasattr(tx.transaction_type, 'value') else str(tx.transaction_type)
+            tx_type = tx.transaction_type.value if hasattr(tx.transaction_type, "value") else str(tx.transaction_type)
             by_type[tx_type] = by_type.get(tx_type, 0) + value
 
             asset = asset_map.get(str(tx.asset_id))
@@ -219,14 +218,16 @@ class InsightsService:
             month = tx.executed_at.strftime("%Y-%m") if tx.executed_at else "?"
             by_month[month] = by_month.get(month, 0) + value
 
-            history.append({
-                "date": tx.executed_at.isoformat() if tx.executed_at else None,
-                "symbol": symbol,
-                "type": tx_type,
-                "quantity": round(float(tx.quantity), 8),
-                "price": round(float(tx.price), 4) if tx.price else 0,
-                "value": round(value, 2),
-            })
+            history.append(
+                {
+                    "date": tx.executed_at.isoformat() if tx.executed_at else None,
+                    "symbol": symbol,
+                    "type": tx_type,
+                    "quantity": round(float(tx.quantity), 8),
+                    "price": round(float(tx.price), 4) if tx.price else 0,
+                    "value": round(value, 2),
+                }
+            )
 
         by_month_sorted = dict(sorted(by_month.items()))
         months_count = max(len(by_month), 1)
@@ -266,12 +267,10 @@ class InsightsService:
 
         Returns what the portfolio would be worth today.
         """
-        from app.ml.historical_data import HistoricalDataFetcher
         from app.core.config import settings
+        from app.ml.historical_data import HistoricalDataFetcher
 
-        fetcher = HistoricalDataFetcher(
-            coingecko_api_key=getattr(settings, 'COINGECKO_API_KEY', None)
-        )
+        fetcher = HistoricalDataFetcher(coingecko_api_key=getattr(settings, "COINGECKO_API_KEY", None))
 
         now = datetime.utcnow()
         start_date = datetime(start_year, start_month, 1)
@@ -307,13 +306,15 @@ class InsightsService:
                 units_bought = monthly_amount / price
                 total_invested += monthly_amount
                 total_units += units_bought
-                monthly_buys.append({
-                    "month": key,
-                    "price": round(price, 4),
-                    "units": round(units_bought, 8),
-                    "invested": round(total_invested, 2),
-                    "value": round(total_units * price, 2),
-                })
+                monthly_buys.append(
+                    {
+                        "month": key,
+                        "price": round(price, 4),
+                        "units": round(units_bought, 8),
+                        "invested": round(total_invested, 2),
+                        "value": round(total_units * price, 2),
+                    }
+                )
 
             # Next month
             if current.month == 12:
@@ -371,17 +372,27 @@ class InsightsService:
     @staticmethod
     def _empty_fees():
         return {
-            "total_fees": 0, "nb_transactions_with_fees": 0,
-            "avg_monthly_fee": 0, "by_exchange": {}, "by_asset": {},
-            "by_type": {}, "by_month": {}, "recent_fees": [],
+            "total_fees": 0,
+            "nb_transactions_with_fees": 0,
+            "avg_monthly_fee": 0,
+            "by_exchange": {},
+            "by_asset": {},
+            "by_type": {},
+            "by_month": {},
+            "recent_fees": [],
         }
 
     @staticmethod
     def _empty_passive_income():
         return {
-            "total_income": 0, "avg_monthly": 0, "projected_annual": 0,
-            "by_type": {}, "by_asset": {}, "by_month": {},
-            "nb_events": 0, "history": [],
+            "total_income": 0,
+            "avg_monthly": 0,
+            "projected_annual": 0,
+            "by_type": {},
+            "by_asset": {},
+            "by_month": {},
+            "nb_events": 0,
+            "history": [],
         }
 
 

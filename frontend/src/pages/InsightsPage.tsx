@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { insightsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   BarChart,
   Bar,
@@ -37,6 +38,17 @@ import {
   Lightbulb,
   Play,
 } from 'lucide-react'
+
+interface TaxLossOpportunity {
+  symbol: string
+  asset_type: string
+  avg_buy_price: number
+  current_price: number
+  current_value: number
+  unrealized_loss: number
+  unrealized_loss_pct: number
+  potential_tax_saving: number
+}
 
 type Tab = 'fees' | 'harvest' | 'income' | 'dca'
 
@@ -85,7 +97,7 @@ export default function InsightsPage() {
 // ──────────────────────────────────────────────────────
 function FeeAnalysis() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-fees'],
+    queryKey: queryKeys.insights.fees,
     queryFn: insightsApi.getFees,
     staleTime: 5 * 60 * 1000,
   })
@@ -96,12 +108,12 @@ function FeeAnalysis() {
     return <EmptyState message="Aucun frais enregistré" />
   }
 
-  const monthlyData = Object.entries(data.by_month as Record<string, number>).map(([month, value]) => ({
+  const monthlyData = Object.entries((data.by_month ?? {}) as Record<string, number>).map(([month, value]) => ({
     month,
     fees: value,
   }))
 
-  const exchangeData = Object.entries(data.by_exchange as Record<string, number>).map(([name, value]) => ({
+  const exchangeData = Object.entries((data.by_exchange ?? {}) as Record<string, number>).map(([name, value]) => ({
     name,
     fees: value,
   }))
@@ -199,7 +211,7 @@ function FeeAnalysis() {
 // ──────────────────────────────────────────────────────
 function TaxLossHarvesting() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-harvest'],
+    queryKey: queryKeys.insights.taxLossHarvesting,
     queryFn: insightsApi.getTaxLossHarvesting,
     staleTime: 5 * 60 * 1000,
   })
@@ -276,18 +288,18 @@ function TaxLossHarvesting() {
                 </tr>
               </thead>
               <tbody>
-                {data.opportunities.map((op: Record<string, number | string>) => (
-                  <tr key={op.symbol as string} className="border-b last:border-b-0">
+                {(data.opportunities as TaxLossOpportunity[]).map((op) => (
+                  <tr key={op.symbol} className="border-b last:border-b-0">
                     <td className="p-2">
                       <span className="font-medium">{op.symbol}</span>
                       <Badge variant="outline" className="ml-1 text-xs">{op.asset_type}</Badge>
                     </td>
-                    <td className="text-right p-2">{formatCurrency(op.avg_buy_price as number)}</td>
-                    <td className="text-right p-2">{formatCurrency(op.current_price as number)}</td>
-                    <td className="text-right p-2">{formatCurrency(op.current_value as number)}</td>
-                    <td className="text-right p-2 text-red-500 font-medium">{formatCurrency(op.unrealized_loss as number)}</td>
-                    <td className="text-right p-2 text-red-500">{(op.unrealized_loss_pct as number).toFixed(1)}%</td>
-                    <td className="text-right p-2 text-green-500">{formatCurrency(op.potential_tax_saving as number)}</td>
+                    <td className="text-right p-2">{formatCurrency(op.avg_buy_price)}</td>
+                    <td className="text-right p-2">{formatCurrency(op.current_price)}</td>
+                    <td className="text-right p-2">{formatCurrency(op.current_value)}</td>
+                    <td className="text-right p-2 text-red-500 font-medium">{formatCurrency(op.unrealized_loss)}</td>
+                    <td className="text-right p-2 text-red-500">{op.unrealized_loss_pct.toFixed(1)}%</td>
+                    <td className="text-right p-2 text-green-500">{formatCurrency(op.potential_tax_saving)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -304,7 +316,7 @@ function TaxLossHarvesting() {
 // ──────────────────────────────────────────────────────
 function PassiveIncome() {
   const { data, isLoading } = useQuery({
-    queryKey: ['insights-income'],
+    queryKey: queryKeys.insights.passiveIncome,
     queryFn: () => insightsApi.getPassiveIncome(),
     staleTime: 5 * 60 * 1000,
   })
@@ -315,7 +327,7 @@ function PassiveIncome() {
     return <EmptyState message="Aucun revenu passif enregistré (staking, airdrops)" />
   }
 
-  const monthlyData = Object.entries(data.by_month as Record<string, number>).map(([month, value]) => ({
+  const monthlyData = Object.entries((data.by_month ?? {}) as Record<string, number>).map(([month, value]) => ({
     month,
     income: value,
   }))
@@ -383,17 +395,17 @@ function PassiveIncome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {Object.entries(data.by_type as Record<string, number>).map(([type, value]) => (
+              {Object.entries((data.by_type ?? {}) as Record<string, number>).map(([type, value]) => (
                 <div key={type} className="flex items-center justify-between">
                   <span className="text-sm font-medium">{typeLabels[type] || type}</span>
                   <span className="text-sm font-mono text-green-500">{formatCurrency(value)}</span>
                 </div>
               ))}
-              {Object.keys(data.by_asset as Record<string, number>).length > 0 && (
+              {Object.keys((data.by_asset ?? {}) as Record<string, number>).length > 0 && (
                 <>
                   <div className="border-t pt-3 mt-3">
                     <p className="text-xs text-muted-foreground mb-2">Par actif :</p>
-                    {Object.entries(data.by_asset as Record<string, number>).map(([sym, val]) => (
+                    {Object.entries((data.by_asset ?? {}) as Record<string, number>).map(([sym, val]) => (
                       <div key={sym} className="flex items-center justify-between py-1">
                         <span className="text-sm">{sym}</span>
                         <span className="text-xs font-mono">{formatCurrency(val)}</span>
@@ -421,15 +433,18 @@ function DcaBacktest() {
   const [started, setStarted] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['insights-dca', symbol, assetType, amount, startYear],
+    queryKey: queryKeys.insights.dcaBacktest(symbol, assetType, amount, startYear),
     queryFn: () => insightsApi.backtestDca(symbol, assetType, amount, startYear),
     enabled: started,
     staleTime: 10 * 60 * 1000,
   })
 
   const handleRun = () => {
-    setStarted(true)
-    refetch()
+    if (started) {
+      refetch()
+    } else {
+      setStarted(true)
+    }
   }
 
   const chartData = data?.monthly_history?.map((m: { month: string; invested: number; value: number }) => ({
@@ -474,7 +489,7 @@ function DcaBacktest() {
             </div>
             <div>
               <Label>Depuis</Label>
-              <Input type="number" value={startYear} onChange={(e) => { setStartYear(+e.target.value); setStarted(false) }} min={2010} max={2025} />
+              <Input type="number" value={startYear} onChange={(e) => { setStartYear(+e.target.value); setStarted(false) }} min={2010} max={new Date().getFullYear()} />
             </div>
             <div className="flex items-end">
               <Button onClick={handleRun} disabled={isLoading} className="w-full">
@@ -517,7 +532,7 @@ function DcaBacktest() {
                 <div className={`text-xl font-bold ${data.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {data.gain_loss >= 0 ? '+' : ''}{formatCurrency(data.gain_loss)}
                 </div>
-                <p className="text-xs text-muted-foreground">{data.gain_loss_pct >= 0 ? '+' : ''}{data.gain_loss_pct}%</p>
+                <p className="text-xs text-muted-foreground">{data.gain_loss_pct >= 0 ? '+' : ''}{Number(data.gain_loss_pct).toFixed(2)}%</p>
               </CardContent>
             </Card>
             <Card>

@@ -98,6 +98,12 @@ temp/
 
 # Railway
 .railway/
-backend/nul
 *openapi.json
 .claude/
+.mypy_cache/
+
+# Debug artifacts
+.playwright-mcp/
+/*.png
+/*.txt
+!README.txt

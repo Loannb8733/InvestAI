@@ -94,24 +94,23 @@ def setup_logging() -> None:
     console_handler.setLevel(log_level)
 
     # Use JSON formatter in production, colored in development
+    fmt: logging.Formatter
     if settings.is_production:
-        formatter = JSONFormatter()
+        fmt = JSONFormatter()
     else:
-        formatter = ColoredFormatter(
+        fmt = ColoredFormatter(
             fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(fmt)
     root_logger.addHandler(console_handler)
 
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(
-        logging.DEBUG if settings.DEBUG else logging.WARNING
-    )
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG if settings.DEBUG else logging.WARNING)
     logging.getLogger("celery").setLevel(logging.INFO)
 
 

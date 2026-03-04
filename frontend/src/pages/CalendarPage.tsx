@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { calendarApi, predictionsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Plus,
   Loader2,
@@ -100,46 +101,46 @@ export default function CalendarPage() {
 
   // Fetch event types
   const { data: eventTypes } = useQuery<EventType[]>({
-    queryKey: ['event-types'],
+    queryKey: queryKeys.calendar.eventTypes,
     queryFn: calendarApi.getEventTypes,
+    staleTime: 10 * 60_000,
   })
 
   // Fetch events
   const { data: events, isLoading } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar-events', showCompleted],
+    queryKey: queryKeys.calendar.events(showCompleted),
     queryFn: () => calendarApi.list({ show_completed: showCompleted }),
   })
 
   // Fetch upcoming events
   const { data: upcomingEvents } = useQuery<CalendarEvent[]>({
-    queryKey: ['upcoming-events'],
+    queryKey: queryKeys.calendar.upcoming(),
     queryFn: () => calendarApi.getUpcoming(30),
   })
 
   // Fetch summary
   const { data: summary } = useQuery<CalendarSummary>({
-    queryKey: ['calendar-summary'],
+    queryKey: queryKeys.calendar.summary,
     queryFn: calendarApi.getSummary,
   })
 
   // Fetch market events
   const { data: marketEvents } = useQuery<MarketEvent[]>({
-    queryKey: ['market-events'],
+    queryKey: queryKeys.calendar.marketEvents,
     queryFn: predictionsApi.getMarketEvents,
+    staleTime: 5 * 60_000,
   })
 
   // Create event mutation
   const createMutation = useMutation({
     mutationFn: calendarApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       setShowAddEvent(false)
-      toast({ title: 'Evenement cree', description: 'L\'evenement a ete ajoute.' })
+      toast({ title: 'Événement créé', description: 'L\'événement a été ajouté.' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de creer l\'evenement.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de créer l\'événement.' })
     },
   })
 
@@ -148,14 +149,12 @@ export default function CalendarPage() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof calendarApi.update>[1] }) =>
       calendarApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       setEditingEvent(null)
-      toast({ title: 'Evenement mis a jour' })
+      toast({ title: 'Événement mis à jour' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de modifier l\'evenement.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de modifier l\'événement.' })
     },
   })
 
@@ -163,13 +162,11 @@ export default function CalendarPage() {
   const completeMutation = useMutation({
     mutationFn: calendarApi.complete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
-      toast({ title: 'Evenement complete' })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+      toast({ title: 'Événement complété' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de completer l\'evenement.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de compléter l\'événement.' })
     },
   })
 
@@ -177,13 +174,11 @@ export default function CalendarPage() {
   const deleteMutation = useMutation({
     mutationFn: calendarApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
-      queryClient.invalidateQueries({ queryKey: ['upcoming-events'] })
-      queryClient.invalidateQueries({ queryKey: ['calendar-summary'] })
-      toast({ title: 'Evenement supprime' })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+      toast({ title: 'Événement supprimé' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer l\'evenement.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer l\'événement.' })
     },
   })
 
@@ -240,12 +235,12 @@ export default function CalendarPage() {
         <div>
           <h1 className="text-3xl font-bold">Calendrier</h1>
           <p className="text-muted-foreground">
-            Gerez vos echeances et evenements financiers.
+            Gérez vos échéances et événements financiers.
           </p>
         </div>
         <Button onClick={() => setShowAddEvent(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Nouvel evenement
+          Nouvel événement
         </Button>
       </div>
 
@@ -255,7 +250,7 @@ export default function CalendarPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Evenements a venir
+                Événements à venir
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -287,7 +282,7 @@ export default function CalendarPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Completes
+                Complétés
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -352,7 +347,7 @@ export default function CalendarPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Prochains evenements (30 jours)
+              Prochains événements (30 jours)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -410,7 +405,7 @@ export default function CalendarPage() {
             checked={showCompleted}
             onCheckedChange={(checked) => setShowCompleted(checked === true)}
           />
-          <Label htmlFor="show-completed">Afficher les completes</Label>
+          <Label htmlFor="show-completed">Afficher les complétés</Label>
         </div>
       </div>
 
@@ -445,7 +440,7 @@ export default function CalendarPage() {
                           {event.is_recurring && (
                             <Badge variant="outline" className="text-xs">
                               <RefreshCw className="h-3 w-3 mr-1" />
-                              Recurrent
+                              Récurrent
                             </Badge>
                           )}
                           {overdue && (
@@ -477,7 +472,7 @@ export default function CalendarPage() {
                             size="icon"
                             variant="outline"
                             onClick={() => completeMutation.mutate(event.id)}
-                            title="Marquer comme complete"
+                            title="Marquer comme complété"
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -493,7 +488,7 @@ export default function CalendarPage() {
                           size="icon"
                           variant="ghost"
                           onClick={() => {
-                            if (confirm('Supprimer cet evenement ?')) {
+                            if (confirm('Supprimer cet événement ?')) {
                               deleteMutation.mutate(event.id)
                             }
                           }}
@@ -513,13 +508,13 @@ export default function CalendarPage() {
           <CardContent className="py-12">
             <div className="text-center space-y-4">
               <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Aucun evenement</h2>
+              <h2 className="text-xl font-semibold">Aucun événement</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Ajoutez des evenements pour suivre vos dividendes, loyers et echeances.
+                Ajoutez des événements pour suivre vos dividendes, loyers et échéances.
               </p>
               <Button onClick={() => setShowAddEvent(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Creer un evenement
+                Créer un événement
               </Button>
             </div>
           </CardContent>
@@ -536,15 +531,15 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingEvent ? 'Modifier l\'evenement' : 'Nouvel evenement'}
+              {editingEvent ? 'Modifier l\'événement' : 'Nouvel événement'}
             </DialogTitle>
             <DialogDescription>
               {editingEvent
-                ? 'Modifiez les informations de l\'evenement.'
-                : 'Ajoutez un nouvel evenement a votre calendrier.'}
+                ? 'Modifiez les informations de l\'événement.'
+                : 'Ajoutez un nouvel événement à votre calendrier.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -567,7 +562,7 @@ export default function CalendarPage() {
                   defaultValue={editingEvent?.event_type || 'dividend'}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selectionnez un type" />
+                    <SelectValue placeholder="Sélectionnez un type" />
                   </SelectTrigger>
                   <SelectContent>
                     {eventTypes?.map((type) => (
@@ -633,7 +628,7 @@ export default function CalendarPage() {
                   id="description"
                   name="description"
                   defaultValue={editingEvent?.description || ''}
-                  placeholder="Details de l'evenement..."
+                  placeholder="Détails de l'événement..."
                   rows={2}
                 />
               </div>
@@ -644,17 +639,17 @@ export default function CalendarPage() {
                   name="is_recurring"
                   defaultChecked={editingEvent?.is_recurring || false}
                 />
-                <Label htmlFor="is_recurring">Evenement recurrent</Label>
+                <Label htmlFor="is_recurring">Événement récurrent</Label>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="recurrence_rule">Frequence de recurrence</Label>
+                <Label htmlFor="recurrence_rule">Fréquence de récurrence</Label>
                 <Select
                   name="recurrence_rule"
                   defaultValue={editingEvent?.recurrence_rule || ''}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selectionnez une frequence" />
+                    <SelectValue placeholder="Sélectionnez une fréquence" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DAILY">Quotidien</SelectItem>
@@ -683,7 +678,7 @@ export default function CalendarPage() {
                 {(createMutation.isPending || updateMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {editingEvent ? 'Enregistrer' : 'Creer'}
+                {editingEvent ? 'Enregistrer' : 'Créer'}
               </Button>
             </DialogFooter>
           </form>

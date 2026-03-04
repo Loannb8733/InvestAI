@@ -3,7 +3,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,9 +17,11 @@ from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AssetResponse])
+@router.get("", response_model=List[AssetResponse])
 async def list_assets(
     portfolio_id: UUID = None,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[AssetResponse]:
@@ -47,12 +49,12 @@ async def list_assets(
             )
         query = query.where(Asset.portfolio_id == portfolio_id)
 
-    result = await db.execute(query.order_by(Asset.symbol))
+    result = await db.execute(query.order_by(Asset.symbol).offset(skip).limit(limit))
     assets = result.scalars().all()
     return assets
 
 
-@router.post("/", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
 async def create_asset(
     asset_in: AssetCreate,
     current_user: User = Depends(get_current_user),
@@ -74,17 +76,19 @@ async def create_asset(
             detail="Portfolio not found",
         )
 
-    # Check if asset with same symbol already exists in portfolio
+    # Check if asset with same symbol AND exchange already exists in portfolio
+    asset_exchange = asset_in.exchange or ""
     existing_result = await db.execute(
         select(Asset).where(
             Asset.portfolio_id == asset_in.portfolio_id,
             Asset.symbol == asset_in.symbol.upper(),
+            Asset.exchange == asset_exchange,
         )
     )
     if existing_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Asset with this symbol already exists in portfolio",
+            detail="Asset with this symbol already exists on this platform",
         )
 
     asset = Asset(
@@ -95,7 +99,7 @@ async def create_asset(
         quantity=asset_in.quantity,
         avg_buy_price=asset_in.avg_buy_price,
         currency=asset_in.currency,
-        exchange=asset_in.exchange,
+        exchange=asset_in.exchange or "",
     )
 
     db.add(asset)
@@ -105,6 +109,7 @@ async def create_asset(
     # Pre-cache historical data for this asset (background)
     try:
         from app.tasks.history_cache import cache_single_asset
+
         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
     except Exception:
         pass  # Non-critical
@@ -175,6 +180,9 @@ async def update_asset(
         )
 
     update_data = asset_in.model_dump(exclude_unset=True)
+    # Normalize exchange: always use empty string instead of null
+    if "exchange" in update_data and update_data["exchange"] is None:
+        update_data["exchange"] = ""
     for field, value in update_data.items():
         setattr(asset, field, value)
 

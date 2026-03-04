@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { reportsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   FileText,
   FileSpreadsheet,
@@ -29,8 +30,9 @@ export default function ReportsPage() {
   const [loadingReport, setLoadingReport] = useState<string | null>(null)
 
   const { data: yearsData } = useQuery({
-    queryKey: ['available-years'],
+    queryKey: queryKeys.reports.availableYears,
     queryFn: reportsApi.getAvailableYears,
+    staleTime: 10 * 60_000,
   })
 
   const years = yearsData?.years || [new Date().getFullYear()]

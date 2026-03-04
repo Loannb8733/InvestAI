@@ -3,11 +3,14 @@
 import base64
 import hashlib
 import hmac
+import logging
 import time
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 import httpx
 
@@ -64,11 +67,11 @@ class KrakenService(BaseExchangeService):
         - PEPE.S, ETH2.S -> PEPE, ETH (.S suffix for staked assets)
         - Modern assets use standard names: SOL, DOT, ADA, etc.
         """
-        # Remove staking/reward suffixes first
-        # Kraken uses .S for staked, .M for margin, .F for flex staking
-        for suffix in [".S", ".M", ".F", ".P", "2.S"]:
+        # Remove staking/reward/bonded suffixes first
+        # Kraken uses .S for staked, .M for margin, .F for flex staking, .B for bonded
+        for suffix in ["2.S", ".S", ".M", ".F", ".P", ".B"]:
             if asset.endswith(suffix):
-                asset = asset[:-len(suffix)]
+                asset = asset[: -len(suffix)]
                 break
 
         # Check known mappings first
@@ -117,7 +120,7 @@ class KrakenService(BaseExchangeService):
         # Try to find and remove quote currency
         for quote in self.QUOTE_CURRENCIES:
             if pair.endswith(quote):
-                base = pair[:-len(quote)]
+                base = pair[: -len(quote)]
                 normalized_base = self._normalize_asset(base)
                 normalized_quote = self._normalize_asset(quote)
                 return normalized_base, normalized_quote
@@ -127,7 +130,7 @@ class KrakenService(BaseExchangeService):
         for quote in ["EUR", "USD", "GBP"]:
             zquote = f"Z{quote}"
             if pair.endswith(zquote):
-                base = pair[:-len(zquote)]
+                base = pair[: -len(zquote)]
                 return self._normalize_asset(base), quote
 
         # Last resort: return first 3-4 chars normalized, assume EUR
@@ -160,8 +163,6 @@ class KrakenService(BaseExchangeService):
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
-        import logging
-        logger = logging.getLogger(__name__)
         try:
             async with httpx.AsyncClient() as client:
                 uri_path = "/0/private/Balance"
@@ -225,9 +226,9 @@ class KrakenService(BaseExchangeService):
         symbol: Optional[str] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        limit: int = 500,
+        limit: int = 10000,
     ) -> List[ExchangeTrade]:
-        """Get trade history from Kraken with pagination."""
+        """Get trade history from Kraken with full pagination."""
         trades = []
         offset = 0
 
@@ -280,7 +281,7 @@ class KrakenService(BaseExchangeService):
                             price=Decimal(trade["price"]),
                             fee=Decimal(trade["fee"]),
                             fee_currency=quote_currency,
-                            timestamp=datetime.fromtimestamp(trade["time"]),
+                            timestamp=datetime.utcfromtimestamp(trade["time"]),
                         )
                     )
 
@@ -328,7 +329,7 @@ class KrakenService(BaseExchangeService):
                         deposit_id=deposit.get("refid", ""),
                         symbol=self._normalize_asset(deposit["asset"]),
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.fromtimestamp(deposit["time"]),
+                        timestamp=datetime.utcfromtimestamp(deposit["time"]),
                         status=deposit["status"],
                         tx_id=deposit.get("txid"),
                     )
@@ -372,7 +373,7 @@ class KrakenService(BaseExchangeService):
                         symbol=self._normalize_asset(withdrawal["asset"]),
                         amount=Decimal(withdrawal["amount"]),
                         fee=Decimal(withdrawal.get("fee", 0)),
-                        timestamp=datetime.fromtimestamp(withdrawal["time"]),
+                        timestamp=datetime.utcfromtimestamp(withdrawal["time"]),
                         status=withdrawal["status"],
                         tx_id=withdrawal.get("txid"),
                     )
@@ -386,7 +387,7 @@ class KrakenService(BaseExchangeService):
         ledger_type: Optional[str] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        limit: int = 500,
+        limit: int = 10000,
     ) -> List[dict]:
         """Get ledger entries from Kraken.
 
@@ -423,7 +424,7 @@ class KrakenService(BaseExchangeService):
                 result = response.json()
 
                 if result.get("error"):
-                    print(f"Ledgers error: {result.get('error')}")
+                    logger.error(f"Ledgers error: {result.get('error')}")
                     break
 
                 ledgers_data = result.get("result", {}).get("ledger", {})
@@ -435,18 +436,20 @@ class KrakenService(BaseExchangeService):
                     if len(ledgers) >= limit:
                         break
 
-                    ledgers.append({
-                        "ledger_id": ledger_id,
-                        "refid": entry.get("refid", ""),
-                        "time": datetime.fromtimestamp(entry["time"]),
-                        "type": entry["type"],
-                        "subtype": entry.get("subtype", ""),
-                        "aclass": entry.get("aclass", ""),
-                        "asset": self._normalize_asset(entry["asset"]),
-                        "amount": Decimal(entry["amount"]),
-                        "fee": Decimal(entry["fee"]),
-                        "balance": Decimal(entry["balance"]),
-                    })
+                    ledgers.append(
+                        {
+                            "ledger_id": ledger_id,
+                            "refid": entry.get("refid", ""),
+                            "time": datetime.utcfromtimestamp(entry["time"]),
+                            "type": entry["type"],
+                            "subtype": entry.get("subtype", ""),
+                            "aclass": entry.get("aclass", ""),
+                            "asset": self._normalize_asset(entry["asset"]),
+                            "amount": Decimal(entry["amount"]),
+                            "fee": Decimal(entry["fee"]),
+                            "balance": Decimal(entry["balance"]),
+                        }
+                    )
 
                 offset += len(ledgers_data)
 
@@ -455,16 +458,20 @@ class KrakenService(BaseExchangeService):
 
         return sorted(ledgers, key=lambda x: x["time"], reverse=True)
 
-    async def get_instant_buys(self, limit: int = 500) -> List[ExchangeTrade]:
+    async def get_instant_buys(self, limit: int = 500, ledgers: list = None) -> tuple[List[ExchangeTrade], set]:
         """Extract Instant Buy transactions from ledgers.
 
         Instant Buy shows as paired 'spend' (EUR) and 'receive' (crypto) entries
-        with the same refid.
+        with the same refid. Only captures FIAT-to-crypto purchases.
+
+        Returns:
+            tuple: (trades, processed_refids) — processed_refids allows dedup with conversions.
         """
         trades = []
 
-        # Get all ledger entries
-        ledgers = await self.get_ledgers(limit=limit * 2)
+        # Get all ledger entries (use cached if provided)
+        if ledgers is None:
+            ledgers = await self.get_ledgers(limit=limit * 2)
 
         # Group by refid to find paired transactions
         by_refid = {}
@@ -475,13 +482,17 @@ class KrakenService(BaseExchangeService):
                     by_refid[refid] = []
                 by_refid[refid].append(entry)
 
-        # Find spend/receive pairs (Instant Buy)
+        fiat_currencies = ["EUR", "USD", "GBP", "CAD", "JPY", "CHF", "AUD"]
+
+        # Find spend/receive pairs (Instant Buy) — ONLY fiat-to-crypto
         processed_refids = set()
         for refid, entries in by_refid.items():
             if refid in processed_refids:
                 continue
 
             # Look for spend (negative fiat) + receive (positive crypto) pairs
+            # When >2 entries share a refid (e.g. fee entries), pick the one
+            # with the largest absolute amount for each role.
             spend_entry = None
             receive_entry = None
 
@@ -490,49 +501,66 @@ class KrakenService(BaseExchangeService):
                 asset = entry["asset"]
                 entry_type = entry["type"]
 
-                # Spend is negative fiat (EUR, USD)
-                if entry_type == "spend" or (amount < 0 and asset in ["EUR", "USD", "GBP"]):
-                    spend_entry = entry
-                # Receive is positive crypto
-                elif entry_type == "receive" or (amount > 0 and asset not in ["EUR", "USD", "GBP"]):
-                    receive_entry = entry
+                # Spend is negative fiat (EUR, USD, GBP)
+                if (entry_type == "spend" or amount < 0) and asset in fiat_currencies:
+                    if spend_entry is None or abs(amount) > abs(spend_entry["amount"]):
+                        spend_entry = entry
+                # Receive is positive crypto (NOT fiat)
+                elif (entry_type == "receive" or amount > 0) and asset not in fiat_currencies:
+                    if receive_entry is None or abs(amount) > abs(receive_entry["amount"]):
+                        receive_entry = entry
 
-            # If we have both, it's an Instant Buy
-            if spend_entry and receive_entry:
+            # If we have FIAT spend + crypto receive, it's an Instant Buy
+            if spend_entry and receive_entry and spend_entry["asset"] in fiat_currencies:
                 crypto_amount = abs(receive_entry["amount"])
                 fiat_amount = abs(spend_entry["amount"])
+                fiat_currency = spend_entry["asset"]
 
                 if crypto_amount > 0:
                     price = fiat_amount / crypto_amount
 
+                    # Fee from fiat side is in fiat, fee from crypto side is in crypto
+                    # Only use the fiat-side fee (it's already in EUR/USD)
+                    fiat_fee = spend_entry["fee"]
+
                     trades.append(
                         ExchangeTrade(
                             trade_id=f"instant_{refid}",
-                            symbol=f"{receive_entry['asset']}EUR",
+                            symbol=f"{receive_entry['asset']}{fiat_currency}",
                             side="buy",
                             quantity=crypto_amount,
                             price=price,
-                            fee=spend_entry["fee"] + receive_entry["fee"],
-                            fee_currency="EUR",
+                            fee=fiat_fee,
+                            fee_currency=fiat_currency,
                             timestamp=receive_entry["time"],
                         )
                     )
                     processed_refids.add(refid)
 
-        return sorted(trades, key=lambda x: x.timestamp, reverse=True)
+        return sorted(trades, key=lambda x: x.timestamp, reverse=True), processed_refids
 
-    async def get_crypto_conversions(self, limit: int = 500) -> List[ExchangeTrade]:
+    async def get_crypto_conversions(
+        self, limit: int = 500, exclude_refids: set = None, ledgers: list = None
+    ) -> List[ExchangeTrade]:
         """Extract crypto-to-crypto conversions from ledgers.
 
         Conversions show as paired entries with the same refid:
         - One negative amount (crypto sold)
         - One positive amount (crypto received)
         Both assets are crypto (not fiat).
+
+        Args:
+            limit: Max ledger entries to fetch.
+            exclude_refids: Set of refids already processed (e.g. by get_instant_buys) to avoid duplicates.
+            ledgers: Pre-fetched ledger entries to avoid duplicate API calls.
         """
         trades = []
+        if exclude_refids is None:
+            exclude_refids = set()
 
-        # Get all ledger entries
-        ledgers = await self.get_ledgers(limit=limit * 2)
+        # Get all ledger entries (use cached if provided)
+        if ledgers is None:
+            ledgers = await self.get_ledgers(limit=limit * 2)
 
         # Group by refid to find paired transactions
         by_refid = {}
@@ -548,7 +576,7 @@ class KrakenService(BaseExchangeService):
         # Find crypto-to-crypto pairs
         processed_refids = set()
         for refid, entries in by_refid.items():
-            if refid in processed_refids:
+            if refid in processed_refids or refid in exclude_refids:
                 continue
 
             # Look for pairs where both are crypto
@@ -577,31 +605,33 @@ class KrakenService(BaseExchangeService):
                 sell_asset = sell_entry["asset"]
                 buy_asset = buy_entry["asset"]
 
-                # Calculate implied price (how much of sell_asset per buy_asset)
-                price = sell_amount / buy_amount if buy_amount > 0 else Decimal("0")
+                # Store the conversion ratio for reference
+                conversion_ratio = sell_amount / buy_amount if buy_amount > 0 else Decimal("0")
 
-                # Create SELL trade for the source crypto
+                # Create CONVERSION_OUT trade for the source crypto
+                # Price = 0 initially; the import endpoint will fetch EUR price from CoinGecko
                 trades.append(
                     ExchangeTrade(
                         trade_id=f"convert_sell_{refid}",
-                        symbol=f"{sell_asset}{buy_asset}",
+                        symbol=f"{sell_asset}EUR",
                         side="sell",
                         quantity=sell_amount,
-                        price=price,
+                        price=Decimal("0"),  # EUR price set by import endpoint
                         fee=sell_entry["fee"],
                         fee_currency=sell_asset,
                         timestamp=sell_entry["time"],
                     )
                 )
 
-                # Create BUY trade for the destination crypto
+                # Create CONVERSION_IN trade for the destination crypto
+                # Price = 0 initially; the import endpoint will fetch EUR price from CoinGecko
                 trades.append(
                     ExchangeTrade(
                         trade_id=f"convert_buy_{refid}",
-                        symbol=f"{buy_asset}{sell_asset}",
+                        symbol=f"{buy_asset}EUR",
                         side="buy",
                         quantity=buy_amount,
-                        price=Decimal("1") / price if price > 0 else Decimal("0"),
+                        price=Decimal("0"),  # EUR price set by import endpoint
                         fee=buy_entry["fee"],
                         fee_currency=buy_asset,
                         timestamp=buy_entry["time"],
@@ -609,12 +639,14 @@ class KrakenService(BaseExchangeService):
                 )
 
                 processed_refids.add(refid)
-                print(f"Kraken: Found conversion {sell_asset} -> {buy_asset}")
+                logger.debug(
+                    f"Kraken: Found conversion {sell_asset} -> {buy_asset} (ratio: {float(conversion_ratio):.8f})"
+                )
 
-        print(f"Kraken: Total crypto conversions found: {len(trades) // 2}")
+        logger.info(f"Kraken: Total crypto conversions found: {len(trades) // 2}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
-    async def get_rewards(self, limit: int = 500) -> List[ExchangeTrade]:
+    async def get_rewards(self, limit: int = 500, ledgers: list = None) -> List[ExchangeTrade]:
         """Extract staking rewards and other rewards from ledgers.
 
         Rewards appear as single entries with positive amounts.
@@ -622,8 +654,9 @@ class KrakenService(BaseExchangeService):
         """
         trades = []
 
-        # Get all ledger entries
-        ledgers = await self.get_ledgers(limit=limit)
+        # Get all ledger entries (use cached if provided)
+        if ledgers is None:
+            ledgers = await self.get_ledgers(limit=limit)
 
         # Reward types from Kraken (including promotional rewards like Spin & Win)
         reward_types = ["reward", "staking", "credit", "airdrop", "bonus", "earn"]
@@ -657,6 +690,6 @@ class KrakenService(BaseExchangeService):
                         timestamp=entry["time"],
                     )
                 )
-                print(f"  Kraken reward: {entry_type}/{subtype} - {amount} {asset}")
+                logger.debug(f"Kraken reward: {entry_type}/{subtype} - {amount} {asset}")
 
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)

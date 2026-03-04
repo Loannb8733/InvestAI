@@ -19,6 +19,7 @@ router = APIRouter()
 
 # ── Response Models ──────────────────────────────────────────────────
 
+
 class AssetPerformanceResponse(BaseModel):
     symbol: str
     name: str
@@ -47,6 +48,7 @@ class PortfolioAnalyticsResponse(BaseModel):
     max_drawdown: float
     var_95: float
     cvar_95: float
+    var_95_description: str = ""
     diversification_score: float
     concentration_risk: float
     asset_count: int
@@ -55,6 +57,7 @@ class PortfolioAnalyticsResponse(BaseModel):
     assets: List[AssetPerformanceResponse]
     best_performer: Optional[str]
     worst_performer: Optional[str]
+    interpretations: Dict[str, str] = {}
 
 
 class CorrelationResponse(BaseModel):
@@ -86,6 +89,7 @@ class MonteCarloResponse(BaseModel):
     expected_return: float
     prob_positive: float
     prob_loss_10: float
+    prob_ruin: float
     simulations: int
     horizon_days: int
 
@@ -110,7 +114,49 @@ class OptimizationResponse(BaseModel):
     sharpe_ratio: float
 
 
+class PerformanceSummaryItem(BaseModel):
+    symbol: str
+    name: str
+    asset_type: str
+    gain_loss_percent: Optional[float] = None
+    current_value: Optional[float] = None
+    weight: Optional[float] = None
+    volatility: Optional[float] = None
+
+
+class PerformanceSummaryMetrics(BaseModel):
+    total_value: float
+    total_gain_loss: float
+    total_gain_loss_percent: float
+    volatility: float
+    sharpe_ratio: float
+    sortino_ratio: float
+    calmar_ratio: float
+    max_drawdown: float
+    cvar_95: float
+
+
+class PerformanceSummaryResponse(BaseModel):
+    period: str
+    summary: PerformanceSummaryMetrics
+    top_gainers: List[PerformanceSummaryItem]
+    top_losers: List[PerformanceSummaryItem]
+    largest_positions: List[PerformanceSummaryItem]
+    most_volatile: List[PerformanceSummaryItem]
+
+
+class RebalanceResponse(BaseModel):
+    orders: List[Dict]
+
+
+class XIRRResponse(BaseModel):
+    xirr: Optional[float]
+    currency: str = "EUR"
+    description: str
+
+
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
     return PortfolioAnalyticsResponse(
@@ -125,6 +171,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
         max_drawdown=a.max_drawdown,
         var_95=a.var_95,
         cvar_95=a.cvar_95,
+        var_95_description=getattr(a, "var_95_description", ""),
         diversification_score=a.diversification_score,
         concentration_risk=a.concentration_risk,
         asset_count=a.asset_count,
@@ -132,25 +179,34 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
         allocation_by_asset=a.allocation_by_asset,
         assets=[
             AssetPerformanceResponse(
-                symbol=x.symbol, name=x.name, asset_type=x.asset_type,
-                current_value=x.current_value, total_invested=x.total_invested,
-                gain_loss=x.gain_loss, gain_loss_percent=x.gain_loss_percent,
-                weight=x.weight, daily_return=x.daily_return,
-                volatility_30d=x.volatility_30d, sharpe_ratio=x.sharpe_ratio,
-                sortino_ratio=x.sortino_ratio, max_drawdown=x.max_drawdown,
+                symbol=x.symbol,
+                name=x.name,
+                asset_type=x.asset_type,
+                current_value=x.current_value,
+                total_invested=x.total_invested,
+                gain_loss=x.gain_loss,
+                gain_loss_percent=x.gain_loss_percent,
+                weight=x.weight,
+                daily_return=x.daily_return,
+                volatility_30d=x.volatility_30d,
+                sharpe_ratio=x.sharpe_ratio,
+                sortino_ratio=x.sortino_ratio,
+                max_drawdown=x.max_drawdown,
             )
             for x in a.assets
         ],
         best_performer=a.best_performer,
         worst_performer=a.worst_performer,
+        interpretations=getattr(a, "interpretations", {}),
     )
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
 
-@router.get("/", response_model=PortfolioAnalyticsResponse)
+
+@router.get("", response_model=PortfolioAnalyticsResponse)
 async def get_global_analytics(
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -161,7 +217,7 @@ async def get_global_analytics(
 @router.get("/portfolio/{portfolio_id}", response_model=PortfolioAnalyticsResponse)
 async def get_portfolio_analytics(
     portfolio_id: UUID,
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -181,15 +237,14 @@ async def get_portfolio_analytics(
 @router.get("/correlation", response_model=CorrelationResponse)
 async def get_correlation_matrix(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    c = await analytics_service.get_correlation_matrix(
-        db, str(current_user.id), portfolio_id=portfolio_id, days=days
-    )
+    c = await analytics_service.get_correlation_matrix(db, str(current_user.id), portfolio_id=portfolio_id, days=days)
     return CorrelationResponse(
-        symbols=c.symbols, matrix=c.matrix,
+        symbols=c.symbols,
+        matrix=c.matrix,
         strongly_correlated=[(s1, s2, v) for s1, s2, v in c.strongly_correlated],
         negatively_correlated=[(s1, s2, v) for s1, s2, v in c.negatively_correlated],
     )
@@ -198,7 +253,7 @@ async def get_correlation_matrix(
 @router.get("/diversification", response_model=DiversificationResponse)
 async def get_diversification_analysis(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=7, le=365),
+    days: int = Query(60, ge=1, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -206,21 +261,30 @@ async def get_diversification_analysis(
         db, str(current_user.id), portfolio_id=portfolio_id, days=days
     )
     return DiversificationResponse(
-        score=a["score"], concentration_risk=a["concentration_risk"],
-        asset_count=a["asset_count"], type_count=a["type_count"],
+        score=a["score"],
+        concentration_risk=a["concentration_risk"],
+        asset_count=a["asset_count"],
+        type_count=a["type_count"],
         allocation_by_type=a["allocation_by_type"],
         recommendations=[RecommendationResponse(**r) for r in a["recommendations"]],
         rating=a["rating"],
     )
 
 
-@router.get("/performance")
+@router.get("/performance", response_model=PerformanceSummaryResponse)
 async def get_performance_summary(
-    period: str = Query("30d", regex="^(7d|30d|90d|1y|all)$"),
+    period: str = Query("30d", regex="^(1d|7d|30d|90d|1y|all)$"),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    analytics = await analytics_service.get_user_analytics(db, str(current_user.id))
+    period_map = {"1d": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 0}
+    days = period_map.get(period, 60)
+
+    if portfolio_id:
+        analytics = await analytics_service.get_portfolio_analytics(db, portfolio_id, days=days)
+    else:
+        analytics = await analytics_service.get_user_analytics(db, str(current_user.id), days=days)
 
     by_gain = sorted(analytics.assets, key=lambda x: x.gain_loss_percent, reverse=True)
     by_value = sorted(analytics.assets, key=lambda x: x.current_value, reverse=True)
@@ -241,14 +305,22 @@ async def get_performance_summary(
         },
         "top_gainers": [
             {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
-            for a in by_gain[:5] if a.gain_loss_percent > 0
+            for a in by_gain[:5]
+            if a.gain_loss_percent > 0
         ],
         "top_losers": [
             {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
-            for a in reversed(by_gain[-5:]) if a.gain_loss_percent < 0
+            for a in reversed(by_gain[-5:])
+            if a.gain_loss_percent < 0
         ],
         "largest_positions": [
-            {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "current_value": a.current_value, "weight": a.weight}
+            {
+                "symbol": a.symbol,
+                "name": a.name,
+                "asset_type": a.asset_type,
+                "current_value": a.current_value,
+                "weight": a.weight,
+            }
             for a in by_value[:5]
         ],
         "most_volatile": [
@@ -258,7 +330,7 @@ async def get_performance_summary(
     }
 
 
-@router.get("/risk-metrics")
+@router.get("/risk-metrics", response_model=dict)
 async def get_risk_metrics(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -274,7 +346,7 @@ async def get_risk_metrics(
         risk_level = "medium"
 
     # Compute parametric VaR from portfolio returns (reuse internal data)
-    from app.services.analytics_service import _var_parametric, _compute_returns
+
     # We need portfolio returns — rebuild them quickly
     var_parametric_pct = 0.0
     var_parametric_eur = 0.0
@@ -299,7 +371,10 @@ async def get_risk_metrics(
         "var_95": {
             "historical": analytics.var_95,
             "parametric": var_parametric_eur,
-            "description": f"Perte max journalière (95%): historique {analytics.var_95:.2f}€ / paramétrique {var_parametric_eur:.2f}€",
+            "description": (
+                f"Perte max journalière (95%): historique {analytics.var_95:.2f}€"
+                f" / paramétrique {var_parametric_eur:.2f}€"
+            ),
         },
         "cvar_95": {
             "value": analytics.cvar_95,
@@ -341,57 +416,75 @@ async def get_risk_metrics(
     }
 
 
-@router.get("/stress-test")
+@router.get("/stress-test", response_model=dict)
 async def get_stress_test(
+    portfolio_id: Optional[str] = Query(None),
+    scenario_ids: Optional[str] = Query(None, description="Comma-separated scenario IDs to filter"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Run stress tests simulating historical crash scenarios."""
-    return await analytics_service.stress_test(db, str(current_user.id))
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    ids = [s.strip() for s in scenario_ids.split(",") if s.strip()] if scenario_ids else None
+    return await analytics_service.stress_test(
+        db, str(current_user.id), portfolio_id=portfolio_id, currency=currency, scenario_ids=ids
+    )
 
 
-@router.get("/beta")
+@router.get("/beta", response_model=dict)
 async def get_beta(
     days: int = Query(90, ge=30, le=365),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Compute beta of each asset and portfolio vs benchmarks (BTC, SPY)."""
-    return await analytics_service.compute_beta(db, str(current_user.id), days=days)
+    return await analytics_service.compute_beta(db, str(current_user.id), days=days, portfolio_id=portfolio_id)
 
 
 @router.get("/monte-carlo", response_model=MonteCarloResponse)
 async def get_monte_carlo(
     horizon: int = Query(90, ge=7, le=365),
     simulations: int = Query(5000, ge=1000, le=20000),
+    portfolio_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Monte Carlo simulation of future portfolio returns."""
     result = await analytics_service.monte_carlo(
-        db, str(current_user.id), horizon_days=horizon, num_simulations=simulations
+        db,
+        str(current_user.id),
+        horizon_days=horizon,
+        num_simulations=simulations,
+        portfolio_id=portfolio_id,
     )
     return MonteCarloResponse(
         percentiles=result.percentiles,
         expected_return=result.expected_return,
         prob_positive=result.prob_positive,
         prob_loss_10=result.prob_loss_10,
+        prob_ruin=result.prob_ruin,
         simulations=result.simulations,
         horizon_days=result.horizon_days,
     )
 
 
-@router.get("/xirr")
+@router.get("/xirr", response_model=XIRRResponse)
 async def get_xirr(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Compute XIRR (time-weighted internal rate of return)."""
-    rate = await analytics_service.compute_xirr(db, str(current_user.id))
-    return {"xirr": rate, "description": "Taux de rendement interne annualisé (XIRR) en %"}
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    rate = await analytics_service.compute_xirr(db, str(current_user.id), currency=currency)
+    return {
+        "xirr": rate,
+        "currency": currency,
+        "description": "Taux de rendement interne annualisé (XIRR) en %",
+    }
 
 
-@router.post("/rebalance")
+@router.post("/rebalance", response_model=RebalanceResponse)
 async def get_rebalance_orders(
     target_weights: Dict[str, float],
     current_user: User = Depends(get_current_user),
@@ -406,16 +499,19 @@ async def get_rebalance_orders(
             detail=f"Les poids cibles doivent sommer à 100% (actuellement {total:.1f}%)",
         )
 
-    orders = await analytics_service.get_rebalance_orders(
-        db, str(current_user.id), target_weights
-    )
+    orders = await analytics_service.get_rebalance_orders(db, str(current_user.id), target_weights)
     return {
         "orders": [
             RebalanceOrderResponse(
-                symbol=o.symbol, name=o.name, asset_type=o.asset_type,
-                current_weight=o.current_weight, target_weight=o.target_weight,
-                diff_weight=o.diff_weight, current_value=o.current_value,
-                target_value=o.target_value, diff_value=o.diff_value,
+                symbol=o.symbol,
+                name=o.name,
+                asset_type=o.asset_type,
+                current_weight=o.current_weight,
+                target_weight=o.target_weight,
+                diff_weight=o.diff_weight,
+                current_value=o.current_value,
+                target_value=o.target_value,
+                diff_value=o.diff_value,
                 action=o.action,
             ).model_dump()
             for o in orders
@@ -426,13 +522,12 @@ async def get_rebalance_orders(
 @router.get("/optimize", response_model=OptimizationResponse)
 async def optimize_portfolio(
     objective: str = Query("max_sharpe", regex="^(max_sharpe|min_volatility)$"),
+    days: int = Query(90, ge=30, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """MPT portfolio optimization — find optimal weights."""
-    result = await analytics_service.optimize_portfolio(
-        db, str(current_user.id), objective=objective
-    )
+    result = await analytics_service.optimize_portfolio(db, str(current_user.id), objective=objective, days=days)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -448,31 +543,42 @@ async def optimize_portfolio(
 
 # ── Risk recommendations ─────────────────────────────────────────────
 
+
 def _get_risk_recommendations(analytics, risk_level: str) -> list:
     recs = []
     if risk_level == "high":
-        recs.append({
-            "type": "volatility",
-            "message": "Volatilité élevée — ajoutez des actifs moins volatils (ETF, obligations)",
-        })
+        recs.append(
+            {
+                "type": "volatility",
+                "message": "Volatilité élevée — ajoutez des actifs moins volatils (ETF, obligations)",
+            }
+        )
     if analytics.sharpe_ratio < 0.5:
-        recs.append({
-            "type": "sharpe",
-            "message": "Sharpe faible — le rendement ne compense pas le risque pris",
-        })
+        recs.append(
+            {
+                "type": "sharpe",
+                "message": "Sharpe faible — le rendement ne compense pas le risque pris",
+            }
+        )
     if analytics.sortino_ratio < 0.5 and analytics.sortino_ratio != 0:
-        recs.append({
-            "type": "sortino",
-            "message": "Sortino faible — trop de volatilité baissière",
-        })
+        recs.append(
+            {
+                "type": "sortino",
+                "message": "Sortino faible — trop de volatilité baissière",
+            }
+        )
     if analytics.concentration_risk > 0.25:
-        recs.append({
-            "type": "concentration",
-            "message": "Concentration élevée — diversifiez davantage",
-        })
+        recs.append(
+            {
+                "type": "concentration",
+                "message": "Concentration élevée — diversifiez davantage",
+            }
+        )
     if analytics.max_drawdown < -30:
-        recs.append({
-            "type": "drawdown",
-            "message": f"Max drawdown important ({analytics.max_drawdown:.1f}%) — envisagez des stop-loss",
-        })
+        recs.append(
+            {
+                "type": "drawdown",
+                "message": f"Max drawdown important ({analytics.max_drawdown:.1f}%) — envisagez des stop-loss",
+            }
+        )
     return recs

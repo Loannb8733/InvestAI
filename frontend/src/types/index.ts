@@ -33,6 +33,11 @@ export interface Asset {
   avgBuyPrice: number
   currency: string
   exchange?: string
+  // Crowdfunding fields
+  interestRate?: number
+  maturityDate?: string
+  projectStatus?: 'active' | 'completed' | 'delayed' | 'defaulted'
+  investedAmount?: number
   createdAt: string
   updatedAt: string
 }
@@ -135,4 +140,59 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   detail: string
   status: number
+}
+
+// Display thresholds (adaptive, from backend)
+export interface DisplayThresholds {
+  fear_greed: {
+    extreme_greed: number
+    greed: number
+    fear: number
+    extreme_fear: number
+  }
+  trend_strength: {
+    strong: number
+    moderate: number
+  }
+  prediction_score: {
+    good: number
+    poor: number
+  }
+  sharpe: {
+    excellent: number
+    good: number
+    fair: number
+    neutral: number
+  }
+  volatility: {
+    low: number
+    high: number
+    extreme: number
+  }
+  diversification: {
+    good: number
+    poor: number
+  }
+  beta: {
+    high: number
+    low: number
+  }
+  correlation: {
+    strong_positive: number
+    moderate_positive: number
+    moderate_negative: number
+    strong_negative: number
+  }
+}
+
+// Default display thresholds (fallback when backend doesn't provide them)
+export const DEFAULT_DISPLAY_THRESHOLDS: DisplayThresholds = {
+  fear_greed: { extreme_greed: 75, greed: 55, fear: 45, extreme_fear: 25 },
+  trend_strength: { strong: 4.0, moderate: 2.0 },
+  prediction_score: { good: 70, poor: 45 },
+  sharpe: { excellent: 1.5, good: 1.0, fair: 0.5, neutral: 0.0 },
+  volatility: { low: 30, high: 50, extreme: 80 },
+  diversification: { good: 60, poor: 40 },
+  beta: { high: 1.0, low: 0.5 },
+  correlation: { strong_positive: 0.7, moderate_positive: 0.4, moderate_negative: -0.3, strong_negative: -0.5 },
 }

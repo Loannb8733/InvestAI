@@ -12,12 +12,11 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout=120 -r requirements.txt
 
-# Install CmdStan for Prophet
-RUN python -m cmdstanpy.install_cmdstan --cores 2 --dir /opt/cmdstan && \
-    CMDSTAN_VERSION=$(ls /opt/cmdstan/ | head -1) && \
-    echo "CMDSTAN=/opt/cmdstan/$CMDSTAN_VERSION" >> /etc/environment
+# Install CmdStan for Prophet (pinned version for reproducibility)
+RUN python -m cmdstanpy.install_cmdstan --version 2.38.0 --cores 2 --dir /opt/cmdstan && \
+    echo "CMDSTAN=/opt/cmdstan/cmdstan-2.38.0" >> /etc/environment
 ENV CMDSTAN=/opt/cmdstan/cmdstan-2.38.0
 
 # Copy application code

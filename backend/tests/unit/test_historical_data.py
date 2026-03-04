@@ -16,7 +16,6 @@ class TestSymbolMap:
 
     def test_unknown_symbol_fallback(self):
         """Unknown symbols should use lowercase as coin_id."""
-        fetcher = HistoricalDataFetcher()
         # Verify the logic in get_crypto_history uses .lower() for unknown
         coin_id = HistoricalDataFetcher.SYMBOL_MAP.get("UNKNOWN", "unknown")
         assert coin_id == "unknown"
@@ -39,7 +38,7 @@ class TestGetHistory:
 
     @pytest.mark.asyncio
     async def test_unknown_asset_type_returns_empty(self, fetcher):
-        dates, prices = await fetcher.get_history("BTC", "real_estate", 30)
+        dates, prices = await fetcher.get_history("BTC", "forex", 30)
         assert dates == []
         assert prices == []
 

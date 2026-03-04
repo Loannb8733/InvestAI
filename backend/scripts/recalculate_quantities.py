@@ -8,6 +8,7 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text
+
 from app.core.config import settings
 
 
@@ -20,12 +21,16 @@ def recalculate_quantities():
 
     with engine.connect() as conn:
         # Get all assets
-        result = conn.execute(text("""
+        result = conn.execute(
+            text(
+                """
             SELECT a.id, a.symbol, a.portfolio_id, p.name as portfolio_name
             FROM assets a
             JOIN portfolios p ON a.portfolio_id = p.id
             ORDER BY p.name, a.symbol
-        """))
+        """
+            )
+        )
         assets = result.fetchall()
 
         print(f"\nFound {len(assets)} assets to process\n")
@@ -36,12 +41,17 @@ def recalculate_quantities():
             portfolio_name = asset[3]
 
             # Get all transactions for this asset, ordered by date
-            tx_result = conn.execute(text("""
+            tx_result = conn.execute(
+                text(
+                    """
                 SELECT transaction_type, quantity, price
                 FROM transactions
                 WHERE asset_id = :asset_id
                 ORDER BY executed_at ASC
-            """), {"asset_id": asset_id})
+            """
+                ),
+                {"asset_id": asset_id},
+            )
             transactions = tx_result.fetchall()
 
             # Calculate quantities
@@ -69,15 +79,16 @@ def recalculate_quantities():
                 total_quantity = Decimal("0")
 
             # Update asset
-            conn.execute(text("""
+            conn.execute(
+                text(
+                    """
                 UPDATE assets
                 SET quantity = :quantity, avg_buy_price = :avg_price, updated_at = NOW()
                 WHERE id = :asset_id
-            """), {
-                "asset_id": asset_id,
-                "quantity": float(total_quantity),
-                "avg_price": float(avg_price)
-            })
+            """
+                ),
+                {"asset_id": asset_id, "quantity": float(total_quantity), "avg_price": float(avg_price)},
+            )
 
             print(f"[{portfolio_name}] {symbol}: {float(total_quantity):.8f} (avg: {float(avg_price):.2f})")
 

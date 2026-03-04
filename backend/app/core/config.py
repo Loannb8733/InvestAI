@@ -1,7 +1,6 @@
 """Application configuration."""
 
 import os
-import secrets
 from typing import List, Optional, Union
 
 from pydantic import field_validator
@@ -26,6 +25,20 @@ class Settings(BaseSettings):
 
     # Encryption for API keys - Required for production
     FERNET_KEY: str  # Required - no default
+    FERNET_OLD_KEYS: Optional[str] = None  # Comma-separated old keys for rotation
+
+    # Cookie settings
+    COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
+    COOKIE_SECURE: bool = True  # Secure by default; overridden to False in dev via .env
+
+    @field_validator("COOKIE_SECURE", mode="before")
+    @classmethod
+    def auto_cookie_secure(cls, v, info):
+        """Force COOKIE_SECURE=False only when APP_ENV=development."""
+        app_env = info.data.get("APP_ENV", "development")
+        if app_env == "development":
+            return False
+        return True
 
     # Database - Credentials must come from environment
     POSTGRES_HOST: str = "localhost"
@@ -35,9 +48,9 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "investai"
 
     # Database pool configuration
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 40
-    DB_POOL_RECYCLE: int = 3600
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 300
 
     @field_validator("SECRET_KEY")
     @classmethod
@@ -82,6 +95,7 @@ class Settings(BaseSettings):
     # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""  # Set in production for authenticated Redis
 
     @property
     def REDIS_URL(self) -> str:
@@ -89,11 +103,15 @@ class Settings(BaseSettings):
         external = os.environ.get("REDIS_URL", "")
         if external:
             return external
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     # CORS - Restricted methods and headers
     # Override with comma-separated env var: CORS_ORIGINS=https://mysite.com,https://www.mysite.com
-    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    CORS_ORIGINS: Union[
+        str, List[str]
+    ] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -114,6 +132,16 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
 
+    # Sentry
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
+
+    @property
+    def sentry_enabled(self) -> bool:
+        """Check if Sentry is configured."""
+        return bool(self.SENTRY_DSN)
+
     # Email (SMTP)
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -127,6 +155,15 @@ class Settings(BaseSettings):
     def email_enabled(self) -> bool:
         """Check if email is configured."""
         return bool(self.SMTP_HOST and self.SMTP_USER)
+
+    # Telegram
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""  # Admin fallback channel (optional)
+
+    @property
+    def telegram_bot_enabled(self) -> bool:
+        """Check if the Telegram bot is configured (token present)."""
+        return bool(self.TELEGRAM_BOT_TOKEN)
 
     @property
     def is_production(self) -> bool:

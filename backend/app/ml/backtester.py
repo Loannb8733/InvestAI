@@ -1,8 +1,8 @@
 """Walk-forward backtesting framework for ML models."""
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Dict, List
 
 import numpy as np
 
@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestMetrics:
     """Comprehensive backtest metrics."""
+
     mape: float = 0.0
     rmse: float = 0.0
     mae: float = 0.0
@@ -101,9 +102,7 @@ def walk_forward_backtest(
             if model_name == "ensemble":
                 result = forecaster.ensemble_forecast(train_prices, train_dates, horizon)
             else:
-                result = forecaster._run_model_by_name(
-                    model_name, train_prices, train_dates, horizon
-                )
+                result = forecaster._run_model_by_name(model_name, train_prices, train_dates, horizon)
 
             for i in range(min(len(result.prices), horizon)):
                 if split + i < n:
@@ -140,9 +139,7 @@ def backtest_all_models(
 
     for model_name in models:
         try:
-            metrics = walk_forward_backtest(
-                forecaster, prices, dates, model_name=model_name
-            )
+            metrics = walk_forward_backtest(forecaster, prices, dates, model_name=model_name)
             results[model_name] = metrics
         except Exception as e:
             logger.debug("Backtest failed for %s: %s", model_name, e)

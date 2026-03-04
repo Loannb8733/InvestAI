@@ -44,7 +44,9 @@ function loadLayout(): DashboardLayout {
       }
       return parsed
     }
-  } catch {}
+  } catch {
+    // Ignore malformed localStorage data
+  }
   return { order: [...ALL_WIDGETS], hidden: [] }
 }
 

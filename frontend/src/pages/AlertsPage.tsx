@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Table,
   TableBody,
   TableCell,
@@ -31,7 +41,9 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
-import { alertsApi, assetsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
+import { alertsApi, assetsApi, profileApi, notificationsApi } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 import {
   Bell,
   BellOff,
@@ -44,6 +56,7 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
+  Send,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
@@ -88,8 +101,21 @@ interface Asset {
 export default function AlertsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { user, fetchCurrentUser } = useAuthStore()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [telegramChatId, setTelegramChatId] = useState(user?.telegramChatId || '')
+  const [telegramEnabled, setTelegramEnabled] = useState(user?.telegramEnabled || false)
+
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [])
+
+  useEffect(() => {
+    setTelegramChatId(user?.telegramChatId || '')
+    setTelegramEnabled(user?.telegramEnabled || false)
+  }, [user?.telegramChatId, user?.telegramEnabled])
   const [, setSelectedAlert] = useState<Alert | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Alert | null>(null)
   const [formData, setFormData] = useState({
     asset_id: '',
     name: '',
@@ -101,30 +127,32 @@ export default function AlertsPage() {
   })
 
   const { data: alerts, isLoading: loadingAlerts } = useQuery<Alert[]>({
-    queryKey: ['alerts'],
+    queryKey: queryKeys.alerts.list(),
     queryFn: () => alertsApi.list(),
   })
 
   const { data: conditions } = useQuery<AlertCondition[]>({
-    queryKey: ['alert-conditions'],
+    queryKey: queryKeys.alerts.conditions,
     queryFn: alertsApi.listConditions,
+    staleTime: 10 * 60_000,
   })
 
   const { data: summary } = useQuery<AlertSummary>({
-    queryKey: ['alert-summary'],
+    queryKey: queryKeys.alerts.summary,
     queryFn: alertsApi.getSummary,
   })
 
   const { data: assets } = useQuery<Asset[]>({
-    queryKey: ['assets'],
+    queryKey: queryKeys.assets.list(),
     queryFn: () => assetsApi.list(),
+    staleTime: 60_000,
   })
 
   const createMutation = useMutation({
     mutationFn: alertsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       setIsCreateOpen(false)
       resetForm()
       toast({ title: 'Alerte créée avec succès' })
@@ -137,8 +165,8 @@ export default function AlertsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof alertsApi.update>[1] }) => alertsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       setSelectedAlert(null)
       toast({ title: 'Alerte mise à jour' })
     },
@@ -150,8 +178,8 @@ export default function AlertsPage() {
   const deleteMutation = useMutation({
     mutationFn: alertsApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       toast({ title: 'Alerte supprimée' })
     },
     onError: () => {
@@ -162,8 +190,8 @@ export default function AlertsPage() {
   const checkMutation = useMutation({
     mutationFn: alertsApi.checkAlerts,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      queryClient.invalidateQueries({ queryKey: ['alert-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.summary })
       if (data.length > 0) {
         toast({ title: `${data.length} alerte(s) déclenchée(s)` })
       } else {
@@ -174,6 +202,31 @@ export default function AlertsPage() {
       toast({ title: 'Erreur lors de la vérification', variant: 'destructive' })
     },
   })
+
+  const telegramMutation = useMutation({
+    mutationFn: () => profileApi.updateProfile({ telegram_chat_id: telegramChatId, telegram_enabled: telegramEnabled }),
+    onSuccess: () => {
+      fetchCurrentUser()
+      toast({ title: 'Configuration Telegram enregistr\u00e9e' })
+    },
+    onError: () => {
+      toast({ title: 'Erreur lors de la sauvegarde', variant: 'destructive' })
+    },
+  })
+
+  const telegramTestMutation = useMutation({
+    mutationFn: notificationsApi.sendTelegramTest,
+    onSuccess: () => {
+      toast({ title: 'Message de test envoy\u00e9 sur Telegram' })
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : '\u00c9chec de l\'envoi'
+      toast({ title: msg, variant: 'destructive' })
+    },
+  })
+
+  const isTelegramConnected = user?.telegramEnabled && user?.telegramChatId
+  const isChatIdValid = /^-?\d+$/.test(telegramChatId)
 
   const resetForm = () => {
     setFormData({
@@ -188,8 +241,13 @@ export default function AlertsPage() {
   }
 
   const handleCreate = () => {
-    if (!formData.asset_id || !formData.name || !formData.condition || !formData.threshold) {
+    const auto = isAutoCondition(formData.condition)
+    if (!formData.asset_id || !formData.name || !formData.condition) {
       toast({ title: 'Veuillez remplir tous les champs obligatoires', variant: 'destructive' })
+      return
+    }
+    if (!auto && !formData.threshold) {
+      toast({ title: 'Veuillez remplir le seuil', variant: 'destructive' })
       return
     }
 
@@ -197,7 +255,7 @@ export default function AlertsPage() {
       asset_id: formData.asset_id,
       name: formData.name,
       condition: formData.condition,
-      threshold: parseFloat(formData.threshold),
+      threshold: auto ? 0 : parseFloat(formData.threshold),
       currency: formData.currency,
       notify_email: formData.notify_email,
       notify_in_app: formData.notify_in_app,
@@ -217,11 +275,20 @@ export default function AlertsPage() {
   }
 
   const getConditionIcon = (conditionValue: string) => {
+    if (conditionValue === 'target_break_even') {
+      return <CheckCircle className="h-4 w-4 text-green-500" />
+    }
+    if (conditionValue === 'volatility_spike') {
+      return <AlertTriangle className="h-4 w-4 text-orange-500" />
+    }
     if (conditionValue.includes('up') || conditionValue.includes('above')) {
       return <TrendingUp className="h-4 w-4 text-green-500" />
     }
     return <TrendingDown className="h-4 w-4 text-red-500" />
   }
+
+  const isAutoCondition = (condition: string) =>
+    condition === 'target_break_even' || condition === 'volatility_spike'
 
   if (loadingAlerts) {
     return (
@@ -313,6 +380,7 @@ export default function AlertsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {!isAutoCondition(formData.condition) && (
                 <div className="grid gap-2">
                   <Label htmlFor="threshold">Seuil</Label>
                   <div className="flex gap-2">
@@ -340,6 +408,16 @@ export default function AlertsPage() {
                     </Select>
                   </div>
                 </div>
+                )}
+                {isAutoCondition(formData.condition) && formData.condition && (
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    {formData.condition === 'target_break_even'
+                      ? 'Le seuil est calculé automatiquement à partir du prix de revient (frais inclus).'
+                      : 'Alerte déclenchée si la contribution au risque augmente de plus de 20% en 24h.'}
+                  </p>
+                </div>
+                )}
                 <div className="flex items-center justify-between">
                   <Label htmlFor="notify_email">Notification email</Label>
                   <Switch
@@ -471,9 +549,13 @@ export default function AlertsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {alert.condition.includes('percent') || alert.condition.includes('change')
-                        ? `${alert.threshold}%`
-                        : formatCurrency(alert.threshold, alert.currency)}
+                      {alert.condition === 'target_break_even'
+                        ? <span className="text-xs text-muted-foreground">Auto (BE)</span>
+                        : alert.condition === 'volatility_spike'
+                          ? <span className="text-xs text-muted-foreground">Auto (&gt;20%)</span>
+                          : alert.condition.includes('percent') || alert.condition.includes('change')
+                            ? `${alert.threshold}%`
+                            : formatCurrency(alert.threshold, alert.currency)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
@@ -502,7 +584,7 @@ export default function AlertsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteMutation.mutate(alert.id)}
+                          onClick={() => setDeleteTarget(alert)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -526,6 +608,73 @@ export default function AlertsPage() {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Telegram Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              <div>
+                <CardTitle>Notifications Telegram</CardTitle>
+                <CardDescription>
+                  Recevez vos alertes directement sur Telegram
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant={isTelegramConnected ? 'default' : 'secondary'}>
+              {isTelegramConnected ? 'Connect\u00e9' : 'Non configur\u00e9'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">
+              1. Envoyez un message \u00e0 <strong>@investai_alerts_bot</strong> sur Telegram<br />
+              2. Entrez votre Chat ID ci-dessous et activez les notifications
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="telegram_chat_id">Chat ID Telegram</Label>
+            <Input
+              id="telegram_chat_id"
+              placeholder="Ex: 6504620108"
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.target.value)}
+            />
+            {telegramChatId && !isChatIdValid && (
+              <p className="text-xs text-destructive">Le Chat ID doit \u00eatre un nombre</p>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="telegram_enabled">Activer les notifications Telegram</Label>
+            <Switch
+              id="telegram_enabled"
+              checked={telegramEnabled}
+              onCheckedChange={setTelegramEnabled}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => telegramMutation.mutate()}
+              disabled={telegramMutation.isPending || (telegramChatId !== '' && !isChatIdValid)}
+            >
+              {telegramMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Enregistrer
+            </Button>
+            {isTelegramConnected && (
+              <Button
+                variant="outline"
+                onClick={() => telegramTestMutation.mutate()}
+                disabled={telegramTestMutation.isPending}
+              >
+                {telegramTestMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Envoyer un test
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -556,6 +705,32 @@ export default function AlertsPage() {
           </div>
         </CardContent>
       </Card>
+      {/* Delete Alert Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette alerte ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous êtes sur le point de supprimer l'alerte{' '}
+              <strong>{deleteTarget?.name}</strong>. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteMutation.mutate(deleteTarget.id)
+                  setDeleteTarget(null)
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -18,7 +19,9 @@ import {
   Lightbulb,
   Target,
   Brain,
+  X,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -26,7 +29,7 @@ const navItems = [
   { icon: ArrowRightLeft, label: 'Transactions', path: '/transactions' },
   { icon: Link2, label: 'Exchanges', path: '/exchanges' },
   { icon: BarChart3, label: 'Analyses', path: '/analytics' },
-  { icon: TrendingUp, label: 'Predictions', path: '/predictions' },
+  { icon: TrendingUp, label: 'Projections', path: '/predictions' },
   { icon: Calculator, label: 'Simulations', path: '/simulations' },
   { icon: Lightbulb, label: 'Insights', path: '/insights' },
   { icon: Brain, label: 'Smart Insights', path: '/smart-insights' },
@@ -42,24 +45,47 @@ const adminItems = [
   { icon: Users, label: 'Utilisateurs', path: '/admin' },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const user = useAuthStore((state) => state.user)
   const isAdmin = user?.role === 'admin'
 
-  return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col">
+  const handleNavClick = useCallback(() => {
+    // Close sidebar on mobile when a nav link is clicked
+    onClose?.()
+  }, [onClose])
+
+  const sidebarContent = (
+    <aside className="w-64 bg-card border-r border-border flex flex-col h-full">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-border">
-        <TrendingUp className="h-8 w-8 text-primary mr-2" />
-        <span className="text-xl font-bold">InvestAI</span>
+      <div className="h-16 flex items-center justify-between px-6 border-b border-border">
+        <div className="flex items-center">
+          <TrendingUp className="h-8 w-8 text-primary mr-2" />
+          <span className="text-xl font-bold">InvestAI</span>
+        </div>
+        {/* Close button visible only on mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden"
+          onClick={onClose}
+          aria-label="Fermer le menu"
+        >
+          <X className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-1" role="navigation" aria-label="Menu principal">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={handleNavClick}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
@@ -86,6 +112,7 @@ export default function Sidebar() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={handleNavClick}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
@@ -118,5 +145,35 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar: always visible, static */}
+      <div className="hidden lg:flex lg:flex-shrink-0">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar: overlay with backdrop */}
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 transition-opacity lg:hidden',
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Sliding panel */}
+      <div
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out lg:hidden',
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {sidebarContent}
+      </div>
+    </>
   )
 }

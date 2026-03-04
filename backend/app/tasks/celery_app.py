@@ -60,6 +60,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.alerts.check_all_alerts",
         "schedule": 300.0,  # Every 5 minutes
     },
+    "seed-risk-weight-snapshots": {
+        "task": "app.tasks.alerts.seed_risk_weight_snapshots",
+        "schedule": crontab(hour=0, minute=5),  # Daily at 00:05 UTC
+    },
     "check-prediction-accuracy": {
         "task": "app.tasks.predictions.check_prediction_accuracy",
         "schedule": 86400.0,  # Every 24 hours
@@ -68,39 +72,51 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.history_cache.cache_historical_data",
         "schedule": 1800.0,  # Every 30 minutes
     },
+    "deep-backfill-prices": {
+        "task": "app.tasks.history_cache.deep_backfill_prices",
+        "schedule": 86400.0,  # Every 24 hours — fills gaps + refreshes recent data
+    },
     "tune-hyperparameters": {
         "task": "app.tasks.predictions.tune_hyperparameters",
         "schedule": 604800.0,  # Every 7 days
     },
+    "check-data-drift": {
+        "task": "app.tasks.predictions.check_data_drift",
+        "schedule": 86400.0,  # Every 24 hours
+    },
+    "check-bottom-zones": {
+        "task": "app.tasks.predictions.check_bottom_zones",
+        "schedule": 21600.0,  # Every 6 hours
+    },
     # === Snapshots ===
     "create-daily-snapshots": {
-        "task": "tasks.create_daily_snapshots",
+        "task": "app.tasks.snapshots.create_daily_snapshots",
         "schedule": crontab(hour=0, minute=0),  # Every day at 00:00 UTC
     },
     "cleanup-old-snapshots": {
-        "task": "tasks.cleanup_old_snapshots",
+        "task": "app.tasks.snapshots.cleanup_old_snapshots",
         "schedule": crontab(hour=1, minute=0, day_of_month=1),  # 1st of each month at 01:00 UTC
     },
     # === Email Reports ===
     "send-weekly-reports": {
-        "task": "tasks.send_weekly_reports",
+        "task": "app.tasks.emails.send_weekly_reports",
         "schedule": crontab(hour=18, minute=0, day_of_week=0),  # Sunday at 18:00 UTC (19:00 Paris)
     },
     "send-monthly-reports": {
-        "task": "tasks.send_monthly_reports",
+        "task": "app.tasks.emails.send_monthly_reports",
         "schedule": crontab(hour=8, minute=0, day_of_month=1),  # 1st of month at 08:00 UTC
     },
     "send-daily-digest": {
-        "task": "tasks.send_daily_digest",
+        "task": "app.tasks.emails.send_daily_digest",
         "schedule": crontab(hour=7, minute=0),  # Every day at 07:00 UTC (08:00 Paris)
     },
     # === Data Cleanup ===
     "run-weekly-cleanup": {
-        "task": "tasks.run_weekly_cleanup",
+        "task": "app.tasks.cleanup.run_weekly_cleanup",
         "schedule": crontab(hour=3, minute=0, day_of_week=1),  # Monday at 03:00 UTC
     },
     "validate-portfolio-consistency": {
-        "task": "tasks.validate_portfolio_consistency",
+        "task": "app.tasks.cleanup.validate_portfolio_consistency",
         "schedule": crontab(hour=4, minute=0),  # Every day at 04:00 UTC
     },
 }

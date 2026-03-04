@@ -20,9 +20,7 @@ from app.models.user import User, UserRole
 async def create_admin():
     """Create an admin user interactively."""
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
-    AsyncSessionLocal = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
+    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     # Create tables if they don't exist
     async with engine.begin() as conn:
@@ -30,9 +28,7 @@ async def create_admin():
 
     async with AsyncSessionLocal() as session:
         # Check if admin already exists
-        result = await session.execute(
-            select(User).where(User.role == UserRole.ADMIN)
-        )
+        result = await session.execute(select(User).where(User.role == UserRole.ADMIN))
         existing_admin = result.scalar_one_or_none()
 
         if existing_admin:

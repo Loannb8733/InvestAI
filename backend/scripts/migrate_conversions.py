@@ -7,7 +7,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text
+
 from app.core.config import settings
+
 
 def run_migration():
     database_url = settings.DATABASE_URL_SYNC
@@ -28,20 +30,28 @@ def run_migration():
 
         print("Adding new columns...")
         try:
-            conn.execute(text("""
+            conn.execute(
+                text(
+                    """
                 ALTER TABLE transactions
                 ADD COLUMN IF NOT EXISTS related_transaction_id UUID REFERENCES transactions(id)
-            """))
+            """
+                )
+            )
             conn.commit()
             print("  - related_transaction_id column added")
         except Exception as e:
             print(f"  - Column may already exist: {e}")
 
         try:
-            conn.execute(text("""
+            conn.execute(
+                text(
+                    """
                 ALTER TABLE transactions
                 ADD COLUMN IF NOT EXISTS conversion_rate NUMERIC(18, 12)
-            """))
+            """
+                )
+            )
             conn.commit()
             print("  - conversion_rate column added")
         except Exception as e:
@@ -49,10 +59,14 @@ def run_migration():
 
         print("Creating index...")
         try:
-            conn.execute(text("""
+            conn.execute(
+                text(
+                    """
                 CREATE INDEX IF NOT EXISTS ix_transactions_related_transaction_id
                 ON transactions(related_transaction_id)
-            """))
+            """
+                )
+            )
             conn.commit()
             print("  - Index created")
         except Exception as e:
@@ -60,6 +74,7 @@ def run_migration():
 
     print("\nMigration completed successfully!")
     return True
+
 
 if __name__ == "__main__":
     run_migration()

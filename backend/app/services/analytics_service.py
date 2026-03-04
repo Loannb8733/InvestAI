@@ -2,18 +2,19 @@
 
 import asyncio
 import logging
-import math
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from decimal import Decimal
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
+import httpx
 import numpy as np
 from scipy import optimize as sp_optimize
+from scipy.stats import spearmanr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -84,6 +85,16 @@ class PortfolioAnalytics:
     best_performer: Optional[str]
     worst_performer: Optional[str]
 
+    # Human-readable VaR explanation (P12)
+    var_95_description: str = ""
+
+    # Contextual interpretations for ratios
+    interpretations: Dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self):
+        if self.interpretations is None:
+            self.interpretations = {}
+
 
 @dataclass
 class CorrelationData:
@@ -103,6 +114,7 @@ class MonteCarloResult:
     expected_return: float
     prob_positive: float  # probability of positive return
     prob_loss_10: float  # probability of >10% loss
+    prob_ruin: float  # probability of portfolio reaching zero
     simulations: int
     horizon_days: int
 
@@ -136,6 +148,7 @@ class OptimizationResult:
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
 
 def _compute_returns(prices: List[float]) -> np.ndarray:
     """Compute daily log returns from price series."""
@@ -175,7 +188,7 @@ def _downside_deviation(returns: np.ndarray, threshold: float = 0.0, asset_type=
     if len(neg) == 0:
         return 0.0
     td = _trading_days(asset_type) if asset_type else 365
-    return float(np.sqrt(np.mean(neg ** 2)) * np.sqrt(td) * 100)
+    return float(np.sqrt(np.mean(neg**2)) * np.sqrt(td) * 100)
 
 
 def _max_drawdown(prices: List[float]) -> float:
@@ -215,6 +228,7 @@ def _var_parametric(returns: np.ndarray, confidence: float = 0.95) -> float:
     if len(returns) < 5:
         return 0.0
     from scipy.stats import norm
+
     mu = float(np.mean(returns))
     sigma = float(np.std(returns, ddof=1))
     z = norm.ppf(1 - confidence)  # negative, e.g. -1.645 for 95%
@@ -233,19 +247,19 @@ def _cvar_historical(returns: np.ndarray, confidence: float = 0.95) -> float:
     return float(-np.mean(tail) * 100)
 
 
-def _sharpe(return_pct: float, volatility: float) -> float:
+def _sharpe(return_pct: float, volatility: float, risk_free_rate: float = RISK_FREE_RATE) -> float:
     """Sharpe ratio. return_pct and volatility in % (annualized)."""
     if volatility == 0:
         return 0.0
-    excess = return_pct - (RISK_FREE_RATE * 100)
+    excess = return_pct - (risk_free_rate * 100)
     return round(excess / volatility, 2)
 
 
-def _sortino(return_pct: float, downside_dev: float) -> float:
+def _sortino(return_pct: float, downside_dev: float, risk_free_rate: float = RISK_FREE_RATE) -> float:
     """Sortino ratio."""
     if downside_dev == 0:
         return 0.0
-    excess = return_pct - (RISK_FREE_RATE * 100)
+    excess = return_pct - (risk_free_rate * 100)
     return round(excess / downside_dev, 2)
 
 
@@ -257,12 +271,17 @@ def _calmar(return_pct: float, max_dd: float) -> float:
 
 
 def _annualized_return(returns: np.ndarray, asset_type=None) -> float:
-    """Annualized return (%) from daily log returns."""
+    """Annualized return (%) from daily log returns.
+
+    Converts continuous (log) return to discrete % for human-readable display:
+    discrete_annual = (exp(mean_daily * td) - 1) * 100
+    This avoids misleading values like -328% for assets that dropped ~96%.
+    """
     if len(returns) < 2:
         return 0.0
     td = _trading_days(asset_type) if asset_type else 365
     mean_daily = float(np.mean(returns))
-    return mean_daily * td * 100
+    return (np.exp(mean_daily * td) - 1) * 100
 
 
 def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Optional[float]:
@@ -279,38 +298,95 @@ def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Option
     d0 = min(dates)
 
     def npv(rate: float) -> float:
-        return sum(
-            amt / (1.0 + rate) ** ((d - d0).days / 365.25)
-            for d, amt in zip(dates, amounts)
-        )
+        return sum(amt / (1.0 + rate) ** ((d - d0).days / 365.25) for d, amt in zip(dates, amounts))
 
     try:
         result = sp_optimize.brentq(npv, -0.99, 10.0, maxiter=200)
         return float(result)
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError, TypeError, OverflowError):
         try:
             result = sp_optimize.newton(npv, guess, maxiter=200)
             return float(result)
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, TypeError, OverflowError):
             return None
 
 
 class AnalyticsService:
     """Service for advanced portfolio analytics."""
 
+    # ECB Data Portal API — deposit facility rate (risk-free proxy for EUR)
+    _ECB_DFR_URL = (
+        "https://data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV" "?lastNObservations=1&format=jsondata"
+    )
+    _ECB_RATE_TTL = 86400  # 24h cache
+
+    _MAX_CACHE_ENTRIES = 200
+
     def __init__(self):
         self.price_service = PriceService()
-        # In-memory cache: key -> (timestamp, dates, prices)
+        # In-memory cache: key -> (timestamp, dates, prices) — bounded with LRU eviction
         self._history_cache: Dict[str, Tuple[float, List[datetime], List[float]]] = {}
-        self._fetch_lock = asyncio.Lock()
+        self._fetch_locks: Dict[str, asyncio.Lock] = {}  # Per-symbol locks
+        # ECB risk-free rate cache: (timestamp, rate_decimal)
+        self._ecb_rate_cache: Optional[Tuple[float, float]] = None
+
+    def _get_fetch_lock(self, symbol: str) -> asyncio.Lock:
+        """Get or create a per-symbol lock to allow parallel fetches for different symbols."""
+        if symbol not in self._fetch_locks:
+            self._fetch_locks[symbol] = asyncio.Lock()
+        return self._fetch_locks[symbol]
+
+    def _cache_put(self, key: str, value: Tuple[float, List[datetime], List[float]]) -> None:
+        """Insert into cache with bounded size — evict oldest entry if full."""
+        if len(self._history_cache) >= self._MAX_CACHE_ENTRIES:
+            oldest_key = min(self._history_cache, key=lambda k: self._history_cache[k][0])
+            del self._history_cache[oldest_key]
+        self._history_cache[key] = value
+
+    async def _fetch_risk_free_rate(self) -> float:
+        """Fetch ECB deposit facility rate with 24h in-memory cache.
+
+        Returns the rate as a decimal (e.g. 0.035 for 3.5%).
+        Falls back to RISK_FREE_RATE constant on failure.
+        """
+        now = time.time()
+        if self._ecb_rate_cache:
+            ts, rate = self._ecb_rate_cache
+            if now - ts < self._ECB_RATE_TTL:
+                return rate
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(self._ECB_DFR_URL)
+                resp.raise_for_status()
+                data = resp.json()
+
+            # Navigate SDMX-JSON structure to extract the rate value
+            datasets = data.get("dataSets", [{}])
+            if datasets:
+                series = datasets[0].get("series", {})
+                # Single series: key "0:0:0:0:0:0:0"
+                for key, series_data in series.items():
+                    observations = series_data.get("observations", {})
+                    if observations:
+                        # Get the last observation value
+                        last_obs_key = max(observations.keys(), key=int)
+                        rate_pct = float(observations[last_obs_key][0])
+                        rate_decimal = rate_pct / 100.0
+                        self._ecb_rate_cache = (now, rate_decimal)
+                        logger.info("ECB deposit facility rate: %.2f%%", rate_pct)
+                        return rate_decimal
+
+        except Exception as e:
+            logger.warning("Failed to fetch ECB risk-free rate: %s — using fallback %.1f%%", e, RISK_FREE_RATE * 100)
+
+        return RISK_FREE_RATE
 
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
 
-    async def _fetch_history(
-        self, symbol: str, asset_type, days: int = 60
-    ) -> Tuple[List[float], List[float]]:
+    async def _fetch_history(self, symbol: str, asset_type, days: int = 60) -> Tuple[List[float], List[float]]:
         """Fetch historical prices. Returns (timestamps, prices).
         Priority: in-memory cache → Redis cache → live API (with rate limiting)."""
         fetch_days = 90
@@ -328,13 +404,13 @@ class AnalyticsService:
         # 2. Redis cache (filled by Celery task every 30 min)
         dates, prices = get_cached_history(symbol, days=fetch_days)
         if dates and prices:
-            self._history_cache[cache_key] = (now, dates, prices)
+            self._cache_put(cache_key, (now, dates, prices))
             if days < fetch_days and len(dates) > days:
                 return [d.timestamp() for d in dates[-days:]], prices[-days:]
             return [d.timestamp() for d in dates], prices
 
-        # 3. Live API fallback (with lock + rate limit)
-        async with self._fetch_lock:
+        # 3. Live API fallback (per-symbol lock so different symbols fetch in parallel)
+        async with self._get_fetch_lock(symbol):
             # Double-check after lock
             if cache_key in self._history_cache:
                 ts, dates, prices = self._history_cache[cache_key]
@@ -348,7 +424,7 @@ class AnalyticsService:
                 at = asset_type.value if isinstance(asset_type, AssetType) else asset_type
                 dates, prices = await fetcher.get_history(symbol, at, days=fetch_days)
                 if dates and prices:
-                    self._history_cache[cache_key] = (time.time(), dates, prices)
+                    self._cache_put(cache_key, (time.time(), dates, prices))
                 await asyncio.sleep(1.5)
                 if days < fetch_days and len(dates) > days:
                     return [d.timestamp() for d in dates[-days:]], prices[-days:]
@@ -373,6 +449,53 @@ class AnalyticsService:
         except Exception as e:
             logger.warning("Price fetch failed for %s: %s", asset.symbol, e)
             return float(asset.avg_buy_price)
+
+    # ------------------------------------------------------------------
+    # Shared: fetch user assets (filtered, deduplicated)
+    # ------------------------------------------------------------------
+
+    async def _get_user_assets(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        exclude_stablecoins: bool = True,
+        min_value: float = 0.10,
+    ) -> List[Asset]:
+        """Get user assets with consistent filtering (no dust, no stablecoins by default)."""
+        if portfolio_id:
+            result = await db.execute(
+                select(Asset).where(
+                    Asset.portfolio_id == portfolio_id,
+                    Asset.quantity > 0,
+                )
+            )
+        else:
+            result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+            portfolios = result.scalars().all()
+            pids = [p.id for p in portfolios]
+            if not pids:
+                return []
+            result = await db.execute(
+                select(Asset).where(
+                    Asset.portfolio_id.in_(pids),
+                    Asset.quantity > 0,
+                )
+            )
+
+        assets = result.scalars().all()
+
+        filtered = []
+        for a in assets:
+            # Filter stablecoins
+            if exclude_stablecoins and PriceService.is_stablecoin(a.symbol):
+                continue
+            # Filter dust by estimated value
+            est_value = float(a.quantity) * float(a.avg_buy_price) if a.avg_buy_price else 0
+            if est_value < min_value:
+                continue
+            filtered.append(a)
+        return filtered
 
     # ------------------------------------------------------------------
     # Core: build asset-level metrics
@@ -409,27 +532,31 @@ class AnalyticsService:
 
             is_stable = PriceService.is_stablecoin(asset.symbol)
 
-            asset_data.append({
-                "asset": asset,
-                "price": price,
-                "current_value": current_value,
-                "total_invested": total_invested,
-                "gain_loss": gain_loss,
-                "gain_loss_percent": gain_loss_pct,
-                "hist_prices": hist_prices,
-                "returns": rets,
-                "volatility": vol,
-                "downside_dev": dd_dev,
-                "annualized_return": ann_ret,
-                "max_drawdown": dd,
-                "daily_return": dr,
-                "is_stablecoin": is_stable,
-            })
+            # Skip dust positions (value < $0.10)
+            if current_value < 0.10:
+                continue
+
+            asset_data.append(
+                {
+                    "asset": asset,
+                    "price": price,
+                    "current_value": current_value,
+                    "total_invested": total_invested,
+                    "gain_loss": gain_loss,
+                    "gain_loss_percent": gain_loss_pct,
+                    "hist_prices": hist_prices,
+                    "returns": rets,
+                    "volatility": vol,
+                    "downside_dev": dd_dev,
+                    "annualized_return": ann_ret,
+                    "max_drawdown": dd,
+                    "daily_return": dr,
+                    "is_stablecoin": is_stable,
+                }
+            )
         return asset_data
 
-    def _build_portfolio_metrics(
-        self, asset_data_list: list, total_value: float
-    ) -> dict:
+    def _build_portfolio_metrics(self, asset_data_list: list, total_value: float) -> dict:
         """Compute portfolio-level risk metrics from asset data."""
         # --- weights (exclude stablecoins from risk computations) ---
         weights = []
@@ -462,7 +589,7 @@ class AnalyticsService:
         if len(valid) >= 2:
             min_len = min(len(r) for _, r in valid)
             aligned = np.array([r[-min_len:] for _, r in valid])
-            cov_matrix = np.cov(aligned)  # covariance matrix
+            cov_matrix = np.atleast_2d(np.cov(aligned))  # covariance matrix
             valid_weights = np.array([weights[i] for i, _ in valid])
             # Renormalize valid weights
             vw_sum = valid_weights.sum()
@@ -484,7 +611,7 @@ class AnalyticsService:
             # Override with portfolio trading days
             neg = port_returns[port_returns < 0]
             if len(neg) > 0:
-                port_dd_dev = float(np.sqrt(np.mean(neg ** 2)) * np.sqrt(port_td) * 100)
+                port_dd_dev = float(np.sqrt(np.mean(neg**2)) * np.sqrt(port_td) * 100)
         else:
             port_dd_dev = 0.0
 
@@ -504,9 +631,10 @@ class AnalyticsService:
                     w = d.get("current_value", 0) / total_value
                     portfolio_dd += w * d.get("max_drawdown", 0)
 
-        # --- Annualized portfolio return from daily returns ---
+        # --- Annualized portfolio return from daily returns (geometric) ---
         if len(port_returns) >= 5:
-            port_ann_ret = float(np.mean(port_returns) * port_td * 100)
+            mean_daily = float(np.mean(port_returns))
+            port_ann_ret = float((np.exp(mean_daily * port_td) - 1) * 100)
         else:
             port_ann_ret = 0.0
 
@@ -542,8 +670,9 @@ class AnalyticsService:
         if not assets:
             return self._empty_analytics()
 
+        risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
-        return self._assemble_analytics(asset_data)
+        return self._assemble_analytics(asset_data, risk_free_rate=risk_free_rate)
 
     async def get_user_analytics(
         self,
@@ -574,6 +703,7 @@ class AnalyticsService:
         if not assets:
             return self._empty_analytics()
 
+        risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
 
         # Aggregate by symbol
@@ -588,24 +718,98 @@ class AnalyticsService:
 
         for sym, d in aggregated.items():
             d["gain_loss"] = d["current_value"] - d["total_invested"]
-            d["gain_loss_percent"] = (
-                (d["gain_loss"] / d["total_invested"] * 100)
-                if d["total_invested"] > 0 else 0
+            d["gain_loss_percent"] = (d["gain_loss"] / d["total_invested"] * 100) if d["total_invested"] > 0 else 0
+
+        return self._assemble_analytics(list(aggregated.values()), risk_free_rate=risk_free_rate)
+
+    @staticmethod
+    def _build_interpretations(
+        sharpe: float,
+        sortino: float,
+        calmar: float,
+        volatility: float,
+        max_dd: float,
+        asset_data: list,
+    ) -> Dict[str, str]:
+        """Build contextual, human-readable interpretations for portfolio ratios."""
+        interp: Dict[str, str] = {}
+
+        # Detect actual data depth (min data points across non-stablecoin assets)
+        data_lengths = [
+            len(d.get("returns", []))
+            for d in asset_data
+            if not d.get("is_stablecoin", False) and len(d.get("returns", [])) > 0
+        ]
+        min_days = min(data_lengths) if data_lengths else 0
+
+        # ── Short history warning ──
+        if min_days < 20:
+            short_msg = (
+                "Donnée non significative (échantillon < 20 jours). "
+                "Les ratios nécessitent au moins 30 jours d'historique pour être fiables."
             )
+            interp["sharpe"] = short_msg
+            interp["sortino"] = short_msg
+            interp["calmar"] = short_msg
+            interp["global"] = "Historique trop court pour des conclusions fiables."
+            return interp
 
-        return self._assemble_analytics(list(aggregated.values()))
+        # ── Sharpe ──
+        if sharpe > 3:
+            interp["sharpe"] = (
+                "Performance atypique (Sharpe > 3) : probablement liée à une volatilité "
+                "extrême ou un pump récent. Ne pas extrapoler."
+            )
+        elif sharpe >= 2:
+            interp["sharpe"] = "Excellent rapport rendement/risque. Vérifiez que la période est représentative."
+        elif sharpe >= 1:
+            interp["sharpe"] = "Bon ratio — le portefeuille rémunère correctement le risque pris."
+        elif sharpe >= 0:
+            interp["sharpe"] = "Rendement positif mais faible par rapport au risque. Marge d'optimisation possible."
+        else:
+            interp["sharpe"] = "Rendement inférieur au taux sans risque. Le portefeuille ne compense pas sa volatilité."
 
-    def _assemble_analytics(self, asset_data: list) -> PortfolioAnalytics:
+        # ── Sortino vs Sharpe ──
+        if sortino > sharpe + 0.5 and sortino > 0:
+            interp["sortino"] = (
+                "Sortino nettement supérieur au Sharpe : votre volatilité est principalement "
+                "positive (hausses). C'est un signe de force — le Sortino est plus pertinent "
+                "en crypto car il ne punit pas les gains explosifs."
+            )
+        elif sortino > 0:
+            interp["sortino"] = (
+                "Ratio positif. Le Sortino est le ratio de référence en crypto car il "
+                "ne pénalise que la volatilité baissière, pas les hausses brutales."
+            )
+        else:
+            interp["sortino"] = "Sortino négatif : les pertes dominent. Le risque baissier dépasse le rendement."
+
+        # ── Calmar ──
+        if calmar > 2:
+            interp["calmar"] = "Excellente récupération : le rendement compense largement le pire drawdown subi."
+        elif calmar > 1:
+            interp["calmar"] = "Le rendement annualisé dépasse le max drawdown. Bonne résilience."
+        elif calmar > 0:
+            interp["calmar"] = "Rendement positif mais inférieur au max drawdown. Récupération lente."
+        else:
+            interp["calmar"] = "Le portefeuille n'a pas récupéré de sa plus grosse perte."
+
+        return interp
+
+    def _assemble_analytics(self, asset_data: list, risk_free_rate: float = RISK_FREE_RATE) -> PortfolioAnalytics:
         """From a list of asset dicts, compute all portfolio-level analytics."""
-        total_value = sum(d["current_value"] for d in asset_data)
-        total_invested = sum(d["total_invested"] for d in asset_data)
+        # Separate stablecoins from real assets
+        real_assets = [d for d in asset_data if not d.get("is_stablecoin", False)]
+
+        total_value = sum(d["current_value"] for d in real_assets)
+        total_invested = sum(d["total_invested"] for d in real_assets)
         total_gl = total_value - total_invested
         total_gl_pct = (total_gl / total_invested * 100) if total_invested > 0 else 0
 
         # Weights & allocation
         allocation_by_type: Dict[str, float] = {}
         allocation_by_asset: Dict[str, float] = {}
-        for d in asset_data:
+        for d in real_assets:
             a = d["asset"]
             w = (d["current_value"] / total_value * 100) if total_value > 0 else 0
             d["weight"] = w
@@ -613,8 +817,8 @@ class AnalyticsService:
             allocation_by_type[at] = allocation_by_type.get(at, 0) + w
             allocation_by_asset[a.symbol] = w
 
-        # Portfolio-level risk
-        pm = self._build_portfolio_metrics(asset_data, total_value)
+        # Portfolio-level risk (only real assets)
+        pm = self._build_portfolio_metrics(real_assets, total_value)
 
         vol = pm["volatility"]
         dd_dev = pm["downside_dev"]
@@ -623,44 +827,59 @@ class AnalyticsService:
         var95_pct = pm["var_95_pct"]
         cvar95_pct = pm["cvar_95_pct"]
 
-        sharpe = _sharpe(ann_ret, vol)
-        sortino = _sortino(ann_ret, dd_dev)
+        sharpe = _sharpe(ann_ret, vol, risk_free_rate)
+        sortino = _sortino(ann_ret, dd_dev, risk_free_rate)
         calmar = _calmar(ann_ret, max_dd)
 
         var_95_eur = round(total_value * var95_pct / 100, 2)
         cvar_95_eur = round(total_value * cvar95_pct / 100, 2)
-
-        concentration = self._hhi(allocation_by_asset)
-        diversification = self._diversification_score(
-            len(asset_data), len(allocation_by_type), concentration
+        var_95_desc = (
+            (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR " f"({var95_pct:.2f}% du portefeuille)")
+            if var95_pct > 0
+            else ""
         )
 
-        # Build per-asset performances
+        concentration = self._hhi(allocation_by_asset)
+        diversification = self._diversification_score(len(real_assets), len(allocation_by_type), concentration)
+
+        # Build per-asset performances (exclude stablecoins)
         perfs = []
-        for d in asset_data:
+        for d in real_assets:
             a = d["asset"]
             v = d["volatility"]
             dd_d = d["downside_dev"]
             ann_r = d.get("annualized_return", 0.0)
-            perfs.append(AssetPerformance(
-                symbol=a.symbol,
-                name=a.name or a.symbol,
-                asset_type=a.asset_type.value,
-                current_value=d["current_value"],
-                total_invested=d["total_invested"],
-                gain_loss=d["gain_loss"],
-                gain_loss_percent=d["gain_loss_percent"],
-                weight=d["weight"],
-                daily_return=round(d["daily_return"], 2),
-                volatility_30d=round(v, 1),
-                sharpe_ratio=_sharpe(ann_r, v),
-                sortino_ratio=_sortino(ann_r, dd_d),
-                max_drawdown=round(d["max_drawdown"], 2),
-            ))
+            perfs.append(
+                AssetPerformance(
+                    symbol=a.symbol,
+                    name=a.name or a.symbol,
+                    asset_type=a.asset_type.value,
+                    current_value=d["current_value"],
+                    total_invested=d["total_invested"],
+                    gain_loss=d["gain_loss"],
+                    gain_loss_percent=d["gain_loss_percent"],
+                    weight=d["weight"],
+                    daily_return=round(d["daily_return"], 2),
+                    volatility_30d=round(v, 1),
+                    sharpe_ratio=_sharpe(ann_r, v, risk_free_rate),
+                    sortino_ratio=_sortino(ann_r, dd_d, risk_free_rate),
+                    max_drawdown=round(d["max_drawdown"], 2),
+                )
+            )
 
         sorted_p = sorted(perfs, key=lambda x: x.gain_loss_percent, reverse=True)
         best = sorted_p[0].symbol if sorted_p else None
-        worst = sorted_p[-1].symbol if sorted_p else None
+        worst = sorted_p[-1].symbol if len(sorted_p) > 1 else None
+
+        # ── Contextual interpretations ──
+        interpretations = self._build_interpretations(
+            sharpe=sharpe,
+            sortino=sortino,
+            calmar=calmar,
+            volatility=vol,
+            max_dd=max_dd,
+            asset_data=real_assets,
+        )
 
         return PortfolioAnalytics(
             total_value=total_value,
@@ -674,14 +893,16 @@ class AnalyticsService:
             max_drawdown=max_dd,
             var_95=var_95_eur,
             cvar_95=cvar_95_eur,
+            var_95_description=var_95_desc,
             diversification_score=diversification,
             concentration_risk=concentration,
-            asset_count=len(asset_data),
+            asset_count=len(real_assets),
             allocation_by_type=allocation_by_type,
             allocation_by_asset=allocation_by_asset,
             assets=perfs,
             best_performer=best,
             worst_performer=worst,
+            interpretations=interpretations,
         )
 
     # ------------------------------------------------------------------
@@ -697,34 +918,10 @@ class AnalyticsService:
     ) -> CorrelationData:
         """Calculate correlation matrix from real historical returns."""
 
-        if portfolio_id:
-            result = await db.execute(
-                select(Asset).where(
-                    Asset.portfolio_id == portfolio_id,
-                    Asset.quantity > 0,
-                )
-            )
-        else:
-            result = await db.execute(
-                select(Portfolio).where(
-                    Portfolio.user_id == user_id,
-                )
-            )
-            portfolios = result.scalars().all()
-            pids = [p.id for p in portfolios]
-            result = await db.execute(
-                select(Asset).where(
-                    Asset.portfolio_id.in_(pids),
-                    Asset.quantity > 0,
-                )
-            )
+        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
-        assets = result.scalars().all()
         seen = {}
         for a in assets:
-            # Exclude stablecoins from correlation matrix (near-zero variance)
-            if PriceService.is_stablecoin(a.symbol):
-                continue
             if a.symbol not in seen:
                 seen[a.symbol] = a
         symbols = list(seen.keys())
@@ -755,7 +952,13 @@ class AnalyticsService:
 
         min_len = min(len(returns_map[s]) for s in valid_symbols)
         aligned = {s: returns_map[s][-min_len:] for s in valid_symbols}
-        matrix_np = np.corrcoef([aligned[s] for s in valid_symbols])
+        # P14: Spearman rank correlation — more robust for fat-tailed crypto distributions
+        stacked = np.array([aligned[s] for s in valid_symbols])
+        corr_result = spearmanr(stacked, axis=1)
+        matrix_np = corr_result.statistic
+        # spearmanr returns a scalar for exactly 2 variables — expand to 2x2 matrix
+        if np.ndim(matrix_np) == 0:
+            matrix_np = np.array([[1.0, float(matrix_np)], [float(matrix_np), 1.0]])
 
         full_n = len(symbols)
         matrix = [[0.0] * full_n for _ in range(full_n)]
@@ -770,9 +973,10 @@ class AnalyticsService:
                     corr = 0.0
                 matrix[i][j] = round(corr, 3)
                 if vi < vj:
-                    if corr > 0.7:
+                    strong_pos, neg_th = adaptive_th.correlation_thresholds()
+                    if corr > strong_pos:
                         strongly.append((s1, s2, round(corr, 3)))
-                    elif corr < -0.3:
+                    elif corr < neg_th:
                         negatively.append((s1, s2, round(corr, 3)))
 
         for i in range(full_n):
@@ -801,37 +1005,46 @@ class AnalyticsService:
         else:
             analytics = await self.get_user_analytics(db, user_id, days=days)
 
+        conc_warn, conc_crit = adaptive_th.concentration_thresholds()
         recs = []
-        if analytics.concentration_risk > 0.25:
+        if analytics.concentration_risk > conc_warn:
             top = sorted(analytics.allocation_by_asset.items(), key=lambda x: -x[1])[:3]
-            recs.append({
-                "type": "concentration",
-                "severity": "high" if analytics.concentration_risk > 0.4 else "medium",
-                "message": f"Concentration élevée: {top[0][0]} représente {top[0][1]:.1f}% du portefeuille",
-                "action": "Envisagez de diversifier vers d'autres actifs",
-            })
+            recs.append(
+                {
+                    "type": "concentration",
+                    "severity": "high" if analytics.concentration_risk > conc_crit else "medium",
+                    "message": f"Concentration élevée: {top[0][0]} représente {top[0][1]:.1f}% du portefeuille",
+                    "action": "Envisagez de diversifier vers d'autres actifs",
+                }
+            )
         if len(analytics.allocation_by_type) < 3:
-            recs.append({
-                "type": "asset_types",
-                "severity": "medium",
-                "message": f"Seulement {len(analytics.allocation_by_type)} classe(s) d'actifs",
-                "action": "Diversifiez entre crypto, actions, ETF et immobilier",
-            })
+            recs.append(
+                {
+                    "type": "asset_types",
+                    "severity": "medium",
+                    "message": f"Seulement {len(analytics.allocation_by_type)} classe(s) d'actifs",
+                    "action": "Diversifiez entre crypto, actions, ETF et immobilier",
+                }
+            )
         for at, w in analytics.allocation_by_type.items():
             if w > 70:
-                recs.append({
-                    "type": "overweight",
-                    "severity": "medium",
-                    "message": f"{at} représente {w:.1f}% du portefeuille",
-                    "action": f"Réduisez l'exposition à {at}",
-                })
+                recs.append(
+                    {
+                        "type": "overweight",
+                        "severity": "medium",
+                        "message": f"{at} représente {w:.1f}% du portefeuille",
+                        "action": f"Réduisez l'exposition à {at}",
+                    }
+                )
         if analytics.asset_count < 5:
-            recs.append({
-                "type": "asset_count",
-                "severity": "low",
-                "message": f"Seulement {analytics.asset_count} actif(s) en portefeuille",
-                "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
-            })
+            recs.append(
+                {
+                    "type": "asset_count",
+                    "severity": "low",
+                    "message": f"Seulement {analytics.asset_count} actif(s) en portefeuille",
+                    "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
+                }
+            )
 
         return {
             "score": analytics.diversification_score,
@@ -853,24 +1066,12 @@ class AnalyticsService:
         user_id: str,
         horizon_days: int = 90,
         num_simulations: int = 5000,
+        portfolio_id: Optional[str] = None,
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
         # Get user assets
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
+        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
         if not assets:
             return MonteCarloResult(
@@ -878,6 +1079,7 @@ class AnalyticsService:
                 expected_return=0,
                 prob_positive=0,
                 prob_loss_10=0,
+                prob_ruin=0,
                 simulations=0,
                 horizon_days=horizon_days,
             )
@@ -907,6 +1109,7 @@ class AnalyticsService:
                 expected_return=0,
                 prob_positive=0,
                 prob_loss_10=0,
+                prob_ruin=0,
                 simulations=0,
                 horizon_days=horizon_days,
             )
@@ -920,7 +1123,7 @@ class AnalyticsService:
 
         # Per-asset mean and covariance matrix
         mu_vec = np.mean(aligned, axis=1)  # (n_assets,)
-        cov_matrix = np.cov(aligned)       # (n_assets, n_assets)
+        cov_matrix = np.cov(aligned)  # (n_assets, n_assets)
 
         # Ensure cov_matrix is 2D even for single asset
         if cov_matrix.ndim == 0:
@@ -936,20 +1139,76 @@ class AnalyticsService:
             # Fallback: use diagonal (uncorrelated) if Cholesky fails
             L = np.diag(np.sqrt(np.diag(cov_matrix)))
 
-        # Simulate correlated multi-asset returns
-        rng = np.random.default_rng(42)
-        # Z ~ N(0, I) of shape (num_simulations, horizon_days, n_assets)
-        Z = rng.standard_normal(size=(num_simulations, horizon_days, n_assets))
-        # Correlated returns: each day, R = mu + L @ z
-        # Shape: (num_simulations, horizon_days, n_assets)
-        correlated_returns = mu_vec + np.einsum("ij,...j->...i", L, Z)
+        # Offload CPU-heavy simulation to a thread pool to avoid blocking
+        # the async event loop.
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._monte_carlo_compute,
+            mu_vec,
+            L,
+            w,
+            num_simulations,
+            horizon_days,
+            n_assets,
+            user_id,
+        )
 
-        # Portfolio return per day = weighted sum across assets
-        # Shape: (num_simulations, horizon_days)
-        port_daily_returns = correlated_returns @ w
+    @staticmethod
+    def _monte_carlo_compute(
+        mu_vec: np.ndarray,
+        L: np.ndarray,
+        w: np.ndarray,
+        num_simulations: int,
+        horizon_days: int,
+        n_assets: int,
+        user_id: str,
+    ) -> "MonteCarloResult":
+        """CPU-bound Monte Carlo with volatility shrinkage and ruin probability.
 
-        # Cumulative log return over horizon
-        cumulative = np.sum(port_daily_returns, axis=1)
+        Volatility shrinkage: for horizons > 90 days, the Cholesky factor (L)
+        is blended towards a long-term average volatility (~20% annualized)
+        using a linear shrinkage schedule.  This prevents unrealistic
+        extreme outcomes when short-term crypto vol (80%+) is extrapolated
+        over multi-year horizons.
+
+        Ruin probability: tracks the fraction of simulated paths where the
+        cumulative portfolio value drops to zero (total return <= -100%).
+        """
+        # Cap allocation: 200 MB / 8 bytes per float64
+        max_elements = 200_000_000 // 8
+        capped_sims = min(num_simulations, max_elements // max(horizon_days * n_assets, 1))
+        capped_sims = max(capped_sims, 100)  # At least 100 simulations
+
+        # --- Volatility shrinkage (mean reversion) ---
+        # Long-term daily vol target: ~20% annualized = 0.20 / sqrt(252) ≈ 0.0126
+        LONG_TERM_DAILY_VOL = 0.20 / np.sqrt(252)
+        # Shrinkage ramps from 0 at 90 days to 1 at 1825 days (5 years)
+        shrinkage = np.clip((horizon_days - 90) / (1825 - 90), 0.0, 1.0)
+
+        if shrinkage > 0:
+            # Build a long-term L: diagonal matrix with uniform long-term vol
+            L_longterm = np.eye(n_assets) * LONG_TERM_DAILY_VOL
+            L_blended = (1 - shrinkage) * L + shrinkage * L_longterm
+        else:
+            L_blended = L
+
+        seed = int(time.time()) ^ (hash(user_id) % (2**31))
+        rng = np.random.default_rng(seed & 0x7FFFFFFF)
+        Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
+        correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)
+        port_daily_returns = correlated_returns @ w  # (capped_sims, horizon_days)
+
+        # --- Ruin probability: track cumulative path ---
+        cumulative_path = np.cumsum(port_daily_returns, axis=1)  # (sims, days)
+        # Portfolio value at each step = exp(cum_log_return)
+        # Ruin = value drops to 0, i.e. cum_log_return → -inf, practically <= -100%
+        portfolio_values = np.exp(cumulative_path)  # relative to initial (1.0)
+        ruin_mask = np.any(portfolio_values <= 0.01, axis=1)  # touched <= 1% of initial
+        prob_ruin = float(np.mean(ruin_mask) * 100)
+
+        # Total returns from final cumulative value
+        cumulative = cumulative_path[:, -1]
         total_returns_pct = (np.exp(cumulative) - 1) * 100
 
         return MonteCarloResult(
@@ -963,7 +1222,8 @@ class AnalyticsService:
             expected_return=round(float(np.mean(total_returns_pct)), 2),
             prob_positive=round(float(np.mean(total_returns_pct > 0) * 100), 1),
             prob_loss_10=round(float(np.mean(total_returns_pct < -10) * 100), 1),
-            simulations=num_simulations,
+            prob_ruin=round(prob_ruin, 1),
+            simulations=capped_sims,
             horizon_days=horizon_days,
         )
 
@@ -999,18 +1259,20 @@ class AnalyticsService:
             elif diff_val < -total_value * 0.005:
                 action = "sell"
 
-            orders.append(RebalanceOrder(
-                symbol=a.symbol,
-                name=a.name,
-                asset_type=a.asset_type,
-                current_weight=round(a.weight, 2),
-                target_weight=round(target_w, 2),
-                diff_weight=round(diff_w, 2),
-                current_value=round(a.current_value, 2),
-                target_value=round(target_val, 2),
-                diff_value=round(diff_val, 2),
-                action=action,
-            ))
+            orders.append(
+                RebalanceOrder(
+                    symbol=a.symbol,
+                    name=a.name,
+                    asset_type=a.asset_type,
+                    current_weight=round(a.weight, 2),
+                    target_weight=round(target_w, 2),
+                    diff_weight=round(diff_w, 2),
+                    current_value=round(a.current_value, 2),
+                    target_value=round(target_val, 2),
+                    diff_value=round(diff_val, 2),
+                    action=action,
+                )
+            )
 
         return sorted(orders, key=lambda x: abs(x.diff_value), reverse=True)
 
@@ -1023,36 +1285,26 @@ class AnalyticsService:
         db: AsyncSession,
         user_id: str,
         objective: str = "max_sharpe",
+        days: int = 90,
     ) -> Optional[OptimizationResult]:
         """
         Find optimal portfolio weights using Modern Portfolio Theory.
         objective: "max_sharpe" or "min_volatility"
         """
 
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
+        assets = await self._get_user_assets(db, user_id)
 
         seen = {}
         for a in assets:
             if a.symbol not in seen:
                 seen[a.symbol] = a
 
+        risk_free_rate = await self._fetch_risk_free_rate()
+
         symbols = []
         returns_list = []
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=90)
+            _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
             rets = _compute_returns(prices)
             if len(rets) >= 10:
                 symbols.append(sym)
@@ -1075,7 +1327,7 @@ class AnalyticsService:
             vol = np.sqrt(w @ cov @ w)
             if vol == 0:
                 return 0
-            return -(ret - RISK_FREE_RATE) / vol
+            return -(ret - risk_free_rate) / vol
 
         def portfolio_vol(w):
             return np.sqrt(w @ cov @ w)
@@ -1093,9 +1345,12 @@ class AnalyticsService:
             return None
 
         opt_w = res.x
-        opt_ret = float(opt_w @ mu) * 100
+        # Convert annualized log return to discrete % for display
+        # log return * td is continuous; (exp(r) - 1)*100 gives intuitive %
+        ann_log_ret = float(opt_w @ mu)
+        opt_ret = (np.exp(ann_log_ret) - 1) * 100  # discrete annualized %
         opt_vol = float(np.sqrt(opt_w @ cov @ opt_w)) * 100
-        opt_sharpe = _sharpe(opt_ret, opt_vol)
+        opt_sharpe = _sharpe(opt_ret, opt_vol, risk_free_rate)
 
         weights = {sym: round(float(opt_w[i]) * 100, 2) for i, sym in enumerate(symbols)}
 
@@ -1110,10 +1365,15 @@ class AnalyticsService:
     # XIRR
     # ------------------------------------------------------------------
 
-    async def compute_xirr(
-        self, db: AsyncSession, user_id: str
-    ) -> Optional[float]:
-        """Compute XIRR across all user portfolios."""
+    async def compute_xirr(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Optional[float]:
+        """Compute XIRR across all user portfolios.
+
+        Uses metrics_service for current portfolio value (single source of truth)
+        and converts transaction amounts to the user's preferred currency.
+        Returns annualized rate as percentage, or None if not computable.
+        """
+        from app.services.metrics_service import metrics_service
+
         result = await db.execute(
             select(Portfolio).where(
                 Portfolio.user_id == user_id,
@@ -1139,163 +1399,284 @@ class AnalyticsService:
         if not transactions:
             return None
 
+        # ── Forex rate for multi-currency conversion ──
+        # Transaction amounts are stored in the asset's quote currency (usually USD).
+        # Convert to user's preferred currency for accurate XIRR.
+        usd_to_target = 1.0
+        target = currency.upper()
+        if target != "USD":
+            try:
+                rate = await self.price_service.get_forex_rate("USD", target)
+                usd_to_target = float(rate) if rate else 1.0
+            except Exception:
+                logger.warning("Forex USD→%s unavailable, using 1.0", target)
+
         cashflows: List[Tuple[datetime, float]] = []
+        skipped = 0
         for tx in transactions:
-            amount = float(tx.quantity) * float(tx.price)
-            fee = float(tx.fee or 0)
+            # Guard: skip transactions without a date (data integrity issue)
+            dt = tx.executed_at
+            if dt is None:
+                skipped += 1
+                continue
+
+            amount = float(tx.quantity) * float(tx.price) * usd_to_target
+            fee = float(tx.fee or 0) * usd_to_target
+
+            # Ensure timezone-aware datetime
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+
             if tx.transaction_type in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
                 # Cash outflow (investment) — negative for XIRR convention
-                cashflows.append((tx.executed_at, -(amount + fee)))
+                cashflows.append((dt, -(amount + fee)))
             elif tx.transaction_type in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
                 # Cash inflow — positive
-                cashflows.append((tx.executed_at, amount - fee))
+                cashflows.append((dt, amount - fee))
             elif tx.transaction_type in [TransactionType.STAKING_REWARD, TransactionType.AIRDROP]:
-                cashflows.append((tx.executed_at, amount))
+                cashflows.append((dt, amount))
+
+        if skipped > 0:
+            logger.warning("XIRR: skipped %d transactions with NULL executed_at", skipped)
 
         if not cashflows:
             return None
 
         # Add current portfolio value as final cashflow (positive)
-        asset_result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = asset_result.scalars().all()
-        current_value = 0.0
-        for asset in assets:
-            # Use cached history price to avoid extra CoinGecko calls
-            _, hist = await self._fetch_history(asset.symbol, asset.asset_type, days=60)
-            price = hist[-1] if hist and hist[-1] > 0 else float(asset.avg_buy_price)
-            current_value += float(asset.quantity) * price
+        # Use metrics_service for live, currency-converted value
+        try:
+            dashboard = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=0)
+            current_value = float(dashboard.get("total_value", 0.0))
+        except Exception as exc:
+            logger.warning("XIRR: metrics_service fallback to _get_asset_price: %s", exc)
+            assets = await self._get_user_assets(db, user_id, exclude_stablecoins=False)
+            current_value = 0.0
+            for asset in assets:
+                price = await self._get_asset_price(asset)
+                current_value += float(asset.quantity) * price
+            current_value *= usd_to_target
 
-        cashflows.append((datetime.utcnow(), current_value))
+        if current_value <= 0:
+            return None
+
+        cashflows.append((datetime.now(timezone.utc), current_value))
+
+        # Guard: need at least one investment + current value
+        negatives = sum(1 for _, a in cashflows if a < 0)
+        if negatives == 0:
+            return None
 
         rate = _xirr(cashflows)
         if rate is not None:
-            return round(rate * 100, 2)  # as percentage
+            # Clamp to reasonable range: -95% to +1000%
+            rate_pct = round(rate * 100, 2)
+            return max(-95.0, min(rate_pct, 1000.0))
         return None
 
     # ------------------------------------------------------------------
     # Stress Tests (#15)
     # ------------------------------------------------------------------
 
+    # Historical crisis scenario definitions
+    HISTORICAL_SCENARIOS = [
+        {
+            "id": "covid_2020",
+            "name": "COVID-19 (Mars 2020)",
+            "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs en 30 jours",
+            "shocks": {"crypto": -50, "stock": -35, "etf": -30, "real_estate": -10, "crowdfunding": -5},
+            "duration_days": 30,
+            "historical_recovery_months": 5,
+        },
+        {
+            "id": "luna_ftx_2022",
+            "name": "LUNA/FTX (2022)",
+            "description": "Effondrement crypto (Luna Mai + FTX Nov) — altcoins -60%, BTC -40%",
+            "shocks": {"crypto": -60, "stock": -20, "etf": -15, "real_estate": -5, "crowdfunding": -3},
+            "duration_days": 60,
+            "historical_recovery_months": 18,
+        },
+        {
+            "id": "crisis_2008",
+            "name": "Crise financière 2008",
+            "description": "Crise systémique bancaire — chute massive des actions et immobilier",
+            "shocks": {"crypto": -30, "stock": -50, "etf": -45, "real_estate": -25, "crowdfunding": -15},
+            "duration_days": 180,
+            "historical_recovery_months": 48,
+        },
+        {
+            "id": "bull_run_2021",
+            "name": "Bull Run 2021",
+            "description": "Hausse généralisée — crypto +100%, actions +25%, ETF +20%",
+            "shocks": {"crypto": 100, "stock": 25, "etf": 20, "real_estate": 10, "crowdfunding": 5},
+            "duration_days": 365,
+            "historical_recovery_months": 0,
+        },
+        {
+            "id": "rate_hike",
+            "name": "Hausse des taux (+300bp)",
+            "description": "Resserrement monétaire brutal — impact sur les valorisations",
+            "shocks": {"crypto": -25, "stock": -18, "etf": -15, "real_estate": -10, "crowdfunding": -5},
+            "duration_days": 90,
+            "historical_recovery_months": 12,
+        },
+        {
+            "id": "flash_crash",
+            "name": "Flash Crash",
+            "description": "Chute éclair intra-journalière sur tous les marchés",
+            "shocks": {"crypto": -15, "stock": -10, "etf": -8, "real_estate": -3, "crowdfunding": -1},
+            "duration_days": 1,
+            "historical_recovery_months": 1,
+        },
+    ]
+
     async def stress_test(
         self,
         db: AsyncSession,
         user_id: str,
+        portfolio_id: Optional[str] = None,
+        currency: str = "EUR",
+        scenario_ids: Optional[List[str]] = None,
     ) -> dict:
         """Run stress tests simulating historical crash scenarios on the portfolio.
 
-        Scenarios:
-        - COVID-19 crash (Mar 2020): ~-35% stocks, ~-50% crypto
-        - 2022 Crypto Winter: ~-65% crypto, ~-20% stocks
-        - 2008 Financial Crisis: ~-50% stocks, ~-10% crypto (not existed)
-        - Rising rates shock: ~-15% stocks/ETF, ~-20% crypto
-        - Flash crash: ~-10% all assets in 1 day
+        Uses metrics_service for live prices and risk_weight per asset.
+        Shocks are modulated by each asset's volatility-based risk_weight:
+        high-risk assets receive proportionally larger shocks.
+
+        Returns MaxDD (worst-case drawdown) and estimated recovery time.
         """
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
+        from app.services.metrics_service import metrics_service
+
+        # Fetch live portfolio data from metrics_service (single source of truth)
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
         portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
 
-        if not pids:
-            return {"scenarios": [], "total_value": 0}
+        if not portfolios:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        assets = result.scalars().all()
+        # Collect per-asset live data with risk_weight
+        all_assets = []
+        for portfolio in portfolios:
+            if portfolio_id and str(portfolio.id) != portfolio_id:
+                continue
+            pm = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), currency=currency)
+            all_assets.extend(pm.get("assets", []))
 
-        # Current values
-        asset_values: Dict[str, Tuple[str, float]] = {}  # symbol -> (asset_type, value)
-        total_value = 0.0
-        for asset in assets:
-            _, hist = await self._fetch_history(asset.symbol, asset.asset_type, days=60)
-            price = hist[-1] if hist and hist[-1] > 0 else float(asset.avg_buy_price)
-            val = float(asset.quantity) * price
-            at = asset.asset_type.value if isinstance(asset.asset_type, AssetType) else asset.asset_type
-            if asset.symbol in asset_values:
-                old_at, old_val = asset_values[asset.symbol]
-                asset_values[asset.symbol] = (old_at, old_val + val)
-            else:
-                asset_values[asset.symbol] = (at, val)
-            total_value += val
+        if not all_assets:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
-        if total_value == 0:
-            return {"scenarios": [], "total_value": 0}
+        total_value = sum(a.get("current_value", 0) for a in all_assets)
+        if total_value <= 0:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
-        # Scenario definitions: {name, description, shocks: {asset_type: pct_change}}
-        scenarios_def = [
-            {
-                "name": "COVID-19 (Mars 2020)",
-                "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs",
-                "shocks": {"crypto": -50, "stock": -35, "etf": -30, "real_estate": -10},
-            },
-            {
-                "name": "Crypto Winter 2022",
-                "description": "Effondrement du marché crypto (Luna/FTX) — actions modérément affectées",
-                "shocks": {"crypto": -65, "stock": -20, "etf": -15, "real_estate": -5},
-            },
-            {
-                "name": "Crise financière 2008",
-                "description": "Crise systémique bancaire — chute massive des actions",
-                "shocks": {"crypto": -30, "stock": -50, "etf": -45, "real_estate": -25},
-            },
-            {
-                "name": "Hausse des taux (+300bp)",
-                "description": "Resserrement monétaire brutal — impact sur les valorisations",
-                "shocks": {"crypto": -25, "stock": -18, "etf": -15, "real_estate": -10},
-            },
-            {
-                "name": "Flash Crash",
-                "description": "Chute éclair intra-journalière sur tous les marchés",
-                "shocks": {"crypto": -15, "stock": -10, "etf": -8, "real_estate": -3},
-            },
-        ]
+        # Compute risk-weight statistics for modulation
+        n_assets = len(all_assets)
+        total_risk_weight = sum(a.get("risk_weight", 0) for a in all_assets) or 1.0
+        avg_risk_weight = total_risk_weight / n_assets if n_assets > 0 else 1.0
+
+        # Filter scenarios if specific IDs requested
+        scenarios_to_run = self.HISTORICAL_SCENARIOS
+        if scenario_ids:
+            scenarios_to_run = [s for s in self.HISTORICAL_SCENARIOS if s["id"] in scenario_ids]
 
         scenarios = []
-        for scenario in scenarios_def:
+        worst_loss_pct = 0.0
+        worst_scenario_name = ""
+        worst_recovery_months = 0
+
+        for scenario_def in scenarios_to_run:
             stressed_value = 0.0
             per_asset = []
-            for sym, (at, val) in asset_values.items():
-                shock_pct = scenario["shocks"].get(at, -10)
+            is_bullish = any(v > 0 for v in scenario_def["shocks"].values())
+
+            for asset in all_assets:
+                val = asset.get("current_value", 0)
+                symbol = asset.get("symbol", "")
+                asset_type = asset.get("asset_type", "crypto")
+                risk_weight = asset.get("risk_weight", 0)
+
+                # Base shock from asset class
+                base_shock = scenario_def["shocks"].get(asset_type, -10)
+
+                # Apply risk-weight modulation (only for negative shocks)
+                if not is_bullish and avg_risk_weight > 0 and risk_weight > 0:
+                    multiplier = risk_weight / avg_risk_weight
+                    multiplier = min(max(multiplier, 0.3), 2.5)
+                    shock_pct = base_shock * multiplier
+                else:
+                    shock_pct = base_shock
+                # Cap to prevent negative asset values or absurd gains
+                shock_pct = max(min(shock_pct, 300.0), -95.0)
+
                 stressed = val * (1 + shock_pct / 100)
                 loss = stressed - val
                 stressed_value += stressed
-                per_asset.append({
-                    "symbol": sym,
-                    "current_value": round(val, 2),
-                    "stressed_value": round(stressed, 2),
-                    "loss": round(loss, 2),
-                    "shock_pct": shock_pct,
-                })
+                per_asset.append(
+                    {
+                        "symbol": symbol,
+                        "name": asset.get("name", ""),
+                        "current_value": round(val, 2),
+                        "stressed_value": round(stressed, 2),
+                        "loss": round(loss, 2),
+                        "shock_pct": round(shock_pct, 1),
+                        "risk_weight": risk_weight,
+                    }
+                )
 
             total_loss = stressed_value - total_value
             total_loss_pct = (total_loss / total_value * 100) if total_value > 0 else 0
 
-            scenarios.append({
-                "name": scenario["name"],
-                "description": scenario["description"],
-                "stressed_value": round(stressed_value, 2),
-                "total_loss": round(total_loss, 2),
-                "total_loss_pct": round(total_loss_pct, 2),
-                "per_asset": sorted(per_asset, key=lambda x: x["loss"]),
-            })
+            # Track worst drawdown for MaxDD calculation
+            if total_loss_pct < worst_loss_pct:
+                worst_loss_pct = total_loss_pct
+                worst_scenario_name = scenario_def["name"]
+                worst_recovery_months = scenario_def["historical_recovery_months"]
 
-        # Sort by worst-case first
+            # Estimated recovery time: scale historical recovery by avg risk weight
+            # Higher average risk = longer recovery
+            base_recovery = scenario_def["historical_recovery_months"]
+            if base_recovery > 0 and avg_risk_weight > 0:
+                # Normalize: risk_weight is a percentage (sum=100), avg across N assets
+                # Scale: if avg risk is 2x the baseline, recovery takes ~1.5x longer
+                risk_factor = 1.0 + (avg_risk_weight - (100 / max(n_assets, 1))) / 100
+                risk_factor = min(max(risk_factor, 0.5), 3.0)
+                estimated_recovery = round(base_recovery * risk_factor)
+            else:
+                estimated_recovery = base_recovery
+
+            scenarios.append(
+                {
+                    "id": scenario_def["id"],
+                    "name": scenario_def["name"],
+                    "description": scenario_def["description"],
+                    "duration_days": scenario_def["duration_days"],
+                    "stressed_value": round(stressed_value, 2),
+                    "total_loss": round(total_loss, 2),
+                    "total_loss_pct": round(total_loss_pct, 2),
+                    "estimated_recovery_months": estimated_recovery,
+                    "per_asset": sorted(per_asset, key=lambda x: x["loss"]),
+                }
+            )
+
+        # Sort by worst-case first (negative values first)
         scenarios.sort(key=lambda s: s["total_loss"])
+
+        # MaxDD: worst theoretical drawdown across all scenarios
+        max_drawdown = (
+            {
+                "value": round(abs(worst_loss_pct), 2),
+                "scenario": worst_scenario_name,
+                "estimated_recovery_months": worst_recovery_months,
+            }
+            if worst_loss_pct < 0
+            else None
+        )
 
         return {
             "total_value": round(total_value, 2),
+            "currency": currency,
             "scenarios": scenarios,
+            "max_drawdown": max_drawdown,
         }
 
     # ------------------------------------------------------------------
@@ -1307,6 +1688,7 @@ class AnalyticsService:
         db: AsyncSession,
         user_id: str,
         days: int = 90,
+        portfolio_id: Optional[str] = None,
     ) -> dict:
         """Compute beta of each asset and the portfolio vs relevant benchmarks.
 
@@ -1314,24 +1696,10 @@ class AnalyticsService:
         - Stock/ETF assets: beta vs SPY (S&P 500)
         Beta = Cov(asset, benchmark) / Var(benchmark)
         """
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        pids = [p.id for p in portfolios]
+        raw_assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
-        if not pids:
+        if not raw_assets:
             return {"assets": [], "portfolio_beta_crypto": None, "portfolio_beta_stock": None}
-
-        result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(pids),
-                Asset.quantity > 0,
-            )
-        )
-        raw_assets = result.scalars().all()
 
         # Deduplicate
         seen: Dict[str, Asset] = {}
@@ -1376,14 +1744,16 @@ class AnalyticsService:
 
             beta = self._calc_beta(rets, bench_returns)
 
-            asset_betas.append({
-                "symbol": sym,
-                "asset_type": at,
-                "beta": round(beta, 3) if beta is not None else None,
-                "benchmark": bench_name,
-                "interpretation": self._interpret_beta(beta),
-                "value": round(val, 2),
-            })
+            asset_betas.append(
+                {
+                    "symbol": sym,
+                    "asset_type": at,
+                    "beta": round(beta, 3) if beta is not None else None,
+                    "benchmark": bench_name,
+                    "interpretation": self._interpret_beta(beta),
+                    "value": round(val, 2),
+                }
+            )
 
             if beta is not None:
                 if at == "crypto":
@@ -1422,28 +1792,25 @@ class AnalyticsService:
 
     @staticmethod
     def _interpret_beta(beta: Optional[float]) -> str:
-        """Interpret beta value in French."""
+        """Interpret beta value in French using centralized classification."""
         if beta is None:
             return "Données insuffisantes"
-        if beta > 1.5:
-            return "Très agressif — amplifie les mouvements du marché"
-        if beta > 1.0:
-            return "Agressif — plus volatil que le marché"
-        if beta > 0.8:
-            return "Neutre — suit le marché"
-        if beta > 0.3:
-            return "Défensif — moins volatil que le marché"
-        if beta > -0.1:
-            return "Très défensif — quasi décorrélé du marché"
-        return "Inversement corrélé — se comporte à l'inverse du marché"
+        category = adaptive_th.beta_classification(beta)
+        labels = {
+            "very_aggressive": "Très agressif — amplifie les mouvements du marché",
+            "aggressive": "Agressif — plus volatil que le marché",
+            "neutral": "Neutre — suit le marché",
+            "defensive": "Défensif — moins volatil que le marché",
+            "very_defensive": "Très défensif — quasi décorrélé du marché",
+            "inverse": "Inversement corrélé — se comporte à l'inverse du marché",
+        }
+        return labels.get(category, "Données insuffisantes")
 
     # ------------------------------------------------------------------
     # Parametric VaR (#16)
     # ------------------------------------------------------------------
 
-    def _build_portfolio_var_parametric(
-        self, port_returns: np.ndarray, total_value: float
-    ) -> dict:
+    def _build_portfolio_var_parametric(self, port_returns: np.ndarray, total_value: float) -> dict:
         """Compute parametric VaR alongside historical VaR for comparison."""
         var_hist = _var_historical(port_returns) if len(port_returns) >= 5 else 0.0
         var_param = _var_parametric(port_returns) if len(port_returns) >= 5 else 0.0
@@ -1464,13 +1831,25 @@ class AnalyticsService:
 
     def _empty_analytics(self) -> PortfolioAnalytics:
         return PortfolioAnalytics(
-            total_value=0, total_invested=0, total_gain_loss=0,
-            total_gain_loss_percent=0, portfolio_volatility=0,
-            sharpe_ratio=0, sortino_ratio=0, calmar_ratio=0,
-            max_drawdown=0, var_95=0, cvar_95=0,
-            diversification_score=0, concentration_risk=0, asset_count=0,
-            allocation_by_type={}, allocation_by_asset={},
-            assets=[], best_performer=None, worst_performer=None,
+            total_value=0,
+            total_invested=0,
+            total_gain_loss=0,
+            total_gain_loss_percent=0,
+            portfolio_volatility=0,
+            sharpe_ratio=0,
+            sortino_ratio=0,
+            calmar_ratio=0,
+            max_drawdown=0,
+            var_95=0,
+            cvar_95=0,
+            diversification_score=0,
+            concentration_risk=0,
+            asset_count=0,
+            allocation_by_type={},
+            allocation_by_asset={},
+            assets=[],
+            best_performer=None,
+            worst_performer=None,
         )
 
     @staticmethod

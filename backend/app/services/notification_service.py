@@ -55,8 +55,7 @@ class NotificationService:
             if user and user.email:
                 await self._send_email(
                     to_email=user.email,
-                    to_name=f"{user.first_name or ''} {user.last_name or ''}".strip()
-                    or user.email,
+                    to_name=f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
                     subject=title,
                     body=message,
                     priority=priority,
@@ -74,6 +73,7 @@ class NotificationService:
         alert_id: UUID,
         notify_email: bool = True,
         notify_in_app: bool = True,
+        priority: NotificationPriority = NotificationPriority.HIGH,
     ) -> Optional[Notification]:
         """Send an alert triggered notification."""
         title = f"Alerte: {alert_name}"
@@ -84,7 +84,7 @@ class NotificationService:
             notification_type=NotificationType.ALERT_TRIGGERED,
             title=title,
             message=message,
-            priority=NotificationPriority.HIGH,
+            priority=priority,
             reference_type="alert",
             reference_id=alert_id,
             send_email=notify_email,

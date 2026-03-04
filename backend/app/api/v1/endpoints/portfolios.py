@@ -3,21 +3,23 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.portfolio import Portfolio
 from app.models.user import User
-from app.schemas.portfolio import PortfolioCreate, PortfolioResponse, PortfolioUpdate, CashBalanceUpdate
+from app.schemas.portfolio import CashBalanceUpdate, PortfolioCreate, PortfolioResponse, PortfolioUpdate
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[PortfolioResponse])
+@router.get("", response_model=List[PortfolioResponse])
 async def list_portfolios(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[PortfolioResponse]:
@@ -26,12 +28,14 @@ async def list_portfolios(
         select(Portfolio)
         .where(Portfolio.user_id == current_user.id)
         .order_by(Portfolio.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     portfolios = result.scalars().all()
     return portfolios
 
 
-@router.post("/", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     portfolio_in: PortfolioCreate,
     current_user: User = Depends(get_current_user),
@@ -134,20 +138,25 @@ async def delete_portfolio(
 
     if delete_assets:
         # Get all assets in this portfolio
-        assets_result = await db.execute(
-            select(Asset).where(Asset.portfolio_id == portfolio_id)
-        )
+        assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id))
         assets = assets_result.scalars().all()
+        asset_ids = [asset.id for asset in assets]
 
-        # Delete all transactions for each asset
-        for asset in assets:
-            trans_result = await db.execute(
-                select(Transaction).where(Transaction.asset_id == asset.id)
+        if asset_ids:
+            # Nullify related_transaction_id references before deleting transactions
+            await db.execute(
+                update(Transaction)
+                .where(
+                    Transaction.related_transaction_id.in_(
+                        select(Transaction.id).where(Transaction.asset_id.in_(asset_ids))
+                    )
+                )
+                .values(related_transaction_id=None)
             )
-            transactions = trans_result.scalars().all()
-            for transaction in transactions:
-                await db.delete(transaction)
-            await db.delete(asset)
+            # Delete all transactions for these assets
+            await db.execute(delete(Transaction).where(Transaction.asset_id.in_(asset_ids)))
+            # Delete the assets
+            await db.execute(delete(Asset).where(Asset.id.in_(asset_ids)))
 
     # Hard delete the portfolio
     await db.delete(portfolio)

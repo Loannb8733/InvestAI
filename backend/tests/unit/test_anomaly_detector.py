@@ -120,7 +120,7 @@ class TestZscoreDetect:
         # Both or neither is also acceptable depending on z-score magnitude
 
     def test_insufficient_data(self, detector):
-        result = detector._zscore_detect("BTC", [100, 101, 102], 105, "crypto")
+        detector._zscore_detect("BTC", [100, 101, 102], 105, "crypto")
         # Only 3 prices, but method requires returns (len-1 = 2) - should still work
         # The method checks len(prices) >= 10 in detect(), but _zscore_detect itself doesn't
         # It will compute but likely won't flag anomaly with so few points

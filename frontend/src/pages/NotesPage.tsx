@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { notesApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Select,
   SelectContent,
@@ -75,16 +76,17 @@ export default function NotesPage() {
 
   // Fetch notes
   const { data: notes, isLoading } = useQuery<Note[]>({
-    queryKey: ['notes', searchTerm, selectedTag],
+    queryKey: queryKeys.notes.list(searchTerm, selectedTag),
     queryFn: () => notesApi.list({
       search: searchTerm || undefined,
       tag: selectedTag || undefined,
     }),
+    placeholderData: keepPreviousData,
   })
 
   // Fetch summary
   const { data: summary } = useQuery<NoteSummary>({
-    queryKey: ['notes-summary'],
+    queryKey: queryKeys.notes.summary,
     queryFn: notesApi.getSummary,
   })
 
@@ -92,13 +94,13 @@ export default function NotesPage() {
   const createMutation = useMutation({
     mutationFn: notesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
       setShowAddNote(false)
-      toast({ title: 'Note creee', description: 'La note a ete ajoutee avec succes.' })
+      toast({ title: 'Note créée', description: 'La note a été ajoutée avec succès.' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de creer la note.' })
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de créer la note.' })
     },
   })
 
@@ -107,10 +109,10 @@ export default function NotesPage() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof notesApi.update>[1] }) =>
       notesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
       setEditingNote(null)
-      toast({ title: 'Note mise a jour' })
+      toast({ title: 'Note mise à jour' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de modifier la note.' })
@@ -121,9 +123,9 @@ export default function NotesPage() {
   const deleteMutation = useMutation({
     mutationFn: notesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({ queryKey: ['notes-summary'] })
-      toast({ title: 'Note supprimee' })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
+      toast({ title: 'Note supprimée' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la note.' })
@@ -179,7 +181,7 @@ export default function NotesPage() {
         <div>
           <h1 className="text-3xl font-bold">Journal</h1>
           <p className="text-muted-foreground">
-            Prenez des notes sur vos investissements et strategies.
+            Prenez des notes sur vos investissements et stratégies.
           </p>
         </div>
         <Button onClick={() => setShowAddNote(true)}>
@@ -214,7 +216,7 @@ export default function NotesPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Tags utilises
+                Tags utilisés
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -341,11 +343,11 @@ export default function NotesPage() {
               <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
               <h2 className="text-xl font-semibold">Aucune note</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Commencez a documenter vos decisions d'investissement.
+                Commencez à documenter vos décisions d'investissement.
               </p>
               <Button onClick={() => setShowAddNote(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Creer une note
+                Créer une note
               </Button>
             </div>
           </CardContent>
@@ -362,7 +364,7 @@ export default function NotesPage() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {editingNote ? 'Modifier la note' : 'Nouvelle note'}
@@ -370,7 +372,7 @@ export default function NotesPage() {
             <DialogDescription>
               {editingNote
                 ? 'Modifiez les informations de votre note.'
-                : 'Ajoutez une nouvelle note a votre journal.'}
+                : 'Ajoutez une nouvelle note à votre journal.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -392,18 +394,18 @@ export default function NotesPage() {
                   id="content"
                   name="content"
                   defaultValue={editingNote?.content || ''}
-                  placeholder="Ecrivez votre note ici..."
+                  placeholder="Écrivez votre note ici..."
                   rows={6}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tags">Tags (separes par des virgules)</Label>
+                <Label htmlFor="tags">Tags (séparés par des virgules)</Label>
                 <Input
                   id="tags"
                   name="tags"
                   defaultValue={editingNote?.tags || ''}
-                  placeholder="strategie, analyse, crypto"
+                  placeholder="stratégie, analyse, crypto"
                 />
               </div>
 
@@ -444,7 +446,7 @@ export default function NotesPage() {
                 {(createMutation.isPending || updateMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {editingNote ? 'Enregistrer' : 'Creer'}
+                {editingNote ? 'Enregistrer' : 'Créer'}
               </Button>
             </DialogFooter>
           </form>

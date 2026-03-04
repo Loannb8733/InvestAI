@@ -83,10 +83,7 @@ async def get_notes_summary(
 
     # Count notes this month
     now = datetime.utcnow()
-    notes_this_month = sum(
-        1 for n in notes
-        if n.created_at.year == now.year and n.created_at.month == now.month
-    )
+    notes_this_month = sum(1 for n in notes if n.created_at.year == now.year and n.created_at.month == now.month)
 
     # Collect unique tags
     all_tags = set()
@@ -129,11 +126,13 @@ async def list_tags(
     return sorted(list(all_tags))
 
 
-@router.get("/", response_model=List[NoteResponse])
+@router.get("", response_model=List[NoteResponse])
 async def list_notes(
     tag: Optional[str] = None,
     asset_id: Optional[UUID] = None,
     search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[NoteResponse]:
@@ -146,23 +145,18 @@ async def list_notes(
     if asset_id:
         query = query.where(Note.asset_id == asset_id)
 
-    result = await db.execute(query.order_by(Note.created_at.desc()))
+    result = await db.execute(query.order_by(Note.created_at.desc()).offset(skip).limit(limit))
     notes = result.scalars().all()
 
     # Filter by tag if specified
     if tag:
-        notes = [
-            n for n in notes
-            if n.tags and tag.lower() in n.tags.lower()
-        ]
+        notes = [n for n in notes if n.tags and tag.lower() in n.tags.lower()]
 
     # Filter by search term
     if search:
         search_lower = search.lower()
         notes = [
-            n for n in notes
-            if search_lower in n.title.lower()
-            or (n.content and search_lower in n.content.lower())
+            n for n in notes if search_lower in n.title.lower() or (n.content and search_lower in n.content.lower())
         ]
 
     # Build response with asset info
@@ -172,9 +166,7 @@ async def list_notes(
         asset_name = None
 
         if note.asset_id:
-            asset_result = await db.execute(
-                select(Asset).where(Asset.id == note.asset_id)
-            )
+            asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
             asset = asset_result.scalar_one_or_none()
             if asset:
                 asset_symbol = asset.symbol
@@ -200,7 +192,7 @@ async def list_notes(
     return response
 
 
-@router.post("/", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(
     note_in: NoteCreate,
     current_user: User = Depends(get_current_user),
@@ -292,9 +284,7 @@ async def get_note(
     asset_name = None
 
     if note.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == note.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol
@@ -382,9 +372,7 @@ async def update_note(
     asset_name = None
 
     if note.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == note.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol

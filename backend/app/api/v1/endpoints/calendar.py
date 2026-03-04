@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -101,32 +101,25 @@ async def get_calendar_summary(
     db: AsyncSession = Depends(get_db),
 ) -> CalendarSummaryResponse:
     """Get summary of user's calendar events."""
-    result = await db.execute(
-        select(CalendarEvent).where(CalendarEvent.user_id == current_user.id)
-    )
+    result = await db.execute(select(CalendarEvent).where(CalendarEvent.user_id == current_user.id))
     events = result.scalars().all()
 
     now = datetime.utcnow()
 
     # Count upcoming events (not completed, date >= now)
-    upcoming = sum(
-        1 for e in events
-        if not e.is_completed and e.event_date >= now
-    )
+    upcoming = sum(1 for e in events if not e.is_completed and e.event_date >= now)
 
     # Count completed events
     completed = sum(1 for e in events if e.is_completed)
 
     # Events this month
-    events_this_month = sum(
-        1 for e in events
-        if e.event_date.year == now.year and e.event_date.month == now.month
-    )
+    events_this_month = sum(1 for e in events if e.event_date.year == now.year and e.event_date.month == now.month)
 
     # Total expected income (from dividends, rent, interest)
     income_types = [EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]
     total_income = sum(
-        float(e.amount or 0) for e in events
+        float(e.amount or 0)
+        for e in events
         if e.event_type in income_types and not e.is_completed and e.event_date >= now
     )
 
@@ -142,6 +135,8 @@ async def get_calendar_summary(
 @router.get("/upcoming", response_model=List[EventResponse])
 async def list_upcoming_events(
     days: int = 30,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[EventResponse]:
@@ -150,12 +145,16 @@ async def list_upcoming_events(
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
-        select(CalendarEvent).where(
+        select(CalendarEvent)
+        .where(
             CalendarEvent.user_id == current_user.id,
             CalendarEvent.is_completed == False,
             CalendarEvent.event_date >= now,
             CalendarEvent.event_date <= end_date,
-        ).order_by(CalendarEvent.event_date.asc())
+        )
+        .order_by(CalendarEvent.event_date.asc())
+        .offset(skip)
+        .limit(limit)
     )
     events = result.scalars().all()
 
@@ -178,12 +177,14 @@ async def list_upcoming_events(
     ]
 
 
-@router.get("/", response_model=List[EventResponse])
+@router.get("", response_model=List[EventResponse])
 async def list_events(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     event_type: Optional[EventType] = None,
     show_completed: bool = True,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[EventResponse]:
@@ -199,7 +200,7 @@ async def list_events(
     if not show_completed:
         query = query.where(CalendarEvent.is_completed == False)
 
-    result = await db.execute(query.order_by(CalendarEvent.event_date.asc()))
+    result = await db.execute(query.order_by(CalendarEvent.event_date.asc()).offset(skip).limit(limit))
     events = result.scalars().all()
 
     return [
@@ -221,7 +222,7 @@ async def list_events(
     ]
 
 
-@router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(
     event_in: EventCreate,
     current_user: User = Depends(get_current_user),

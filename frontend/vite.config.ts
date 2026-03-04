@@ -16,13 +16,22 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    allowedHosts: 'all',
     watch: {
       usePolling: true,
     },
+    hmr: process.env.VITE_HMR_DISABLE === 'true'
+      ? false
+      : {
+          ...(process.env.VITE_HMR_PROTOCOL === 'wss'
+            ? { clientPort: 443, protocol: 'wss' as const }
+            : { host: 'localhost', clientPort: Number(process.env.VITE_HMR_PORT) || 3001 }),
+        },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://backend:8000',
         changeOrigin: true,
+        ws: true,
       },
     },
   },

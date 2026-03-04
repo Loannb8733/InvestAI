@@ -91,17 +91,13 @@ async def test_list_assets(client: AsyncClient, regular_user: User):
 
 
 @pytest.mark.asyncio
-async def test_list_assets_filtered_by_portfolio(
-    client: AsyncClient, regular_user: User
-):
+async def test_list_assets_filtered_by_portfolio(client: AsyncClient, regular_user: User):
     """Test listing assets filtered by portfolio ID."""
     token = create_access_token(subject=str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
-    response = await client.get(
-        f"/api/v1/assets/?portfolio_id={portfolio_id}", headers=headers
-    )
+    response = await client.get(f"/api/v1/assets/?portfolio_id={portfolio_id}", headers=headers)
     assert response.status_code == 200
 
 

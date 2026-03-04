@@ -5,7 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,10 +26,21 @@ class AlertCreate(BaseModel):
     asset_id: UUID
     name: str = Field(..., min_length=1, max_length=100)
     condition: AlertCondition
-    threshold: float = Field(..., gt=0)
+    threshold: float = Field(default=0, ge=0)
     currency: str = Field(default="EUR", max_length=10)
     notify_email: bool = True
     notify_in_app: bool = True
+
+    @model_validator(mode="after")
+    def validate_threshold(self):
+        """Threshold must be > 0 except for auto-computed conditions."""
+        auto_conditions = {
+            AlertCondition.TARGET_BREAK_EVEN,
+            AlertCondition.VOLATILITY_SPIKE,
+        }
+        if self.condition not in auto_conditions and self.threshold <= 0:
+            raise ValueError("Le seuil doit être supérieur à 0 pour cette condition")
+        return self
 
 
 class AlertUpdate(BaseModel):
@@ -125,6 +136,16 @@ async def list_alert_conditions() -> List[AlertConditionInfo]:
             "label": "Baisse journalière de X%",
             "description": "Alerte sur la variation journalière négative",
         },
+        {
+            "value": "target_break_even",
+            "label": "Retour au break-even",
+            "description": "Alerte quand le prix dépasse le seuil de rentabilité (calculé automatiquement)",
+        },
+        {
+            "value": "volatility_spike",
+            "label": "Pic de volatilité",
+            "description": "Alerte quand la contribution au risque augmente fortement en 24h",
+        },
     ]
     return [AlertConditionInfo(**c) for c in conditions]
 
@@ -139,9 +160,11 @@ async def get_alert_summary(
     return AlertSummaryResponse(**summary)
 
 
-@router.get("/", response_model=List[AlertResponse])
+@router.get("", response_model=List[AlertResponse])
 async def list_alerts(
     active_only: bool = False,
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[AlertResponse]:
@@ -151,7 +174,7 @@ async def list_alerts(
     if active_only:
         query = query.where(Alert.is_active == True)
 
-    result = await db.execute(query.order_by(Alert.created_at.desc()))
+    result = await db.execute(query.order_by(Alert.created_at.desc()).offset(skip).limit(limit))
     alerts = result.scalars().all()
 
     # Get asset info for each alert
@@ -161,9 +184,7 @@ async def list_alerts(
         asset_name = None
 
         if alert.asset_id:
-            asset_result = await db.execute(
-                select(Asset).where(Asset.id == alert.asset_id)
-            )
+            asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
             asset = asset_result.scalar_one_or_none()
             if asset:
                 asset_symbol = asset.symbol
@@ -178,7 +199,7 @@ async def list_alerts(
                 threshold=float(alert.threshold),
                 currency=alert.currency,
                 is_active=alert.is_active,
-                triggered_at=alert.triggered_at,
+                triggered_at=alert.triggered_at.isoformat() if alert.triggered_at else None,
                 triggered_count=int(alert.triggered_count or 0),
                 notify_email=alert.notify_email,
                 notify_in_app=alert.notify_in_app,
@@ -191,7 +212,7 @@ async def list_alerts(
     return response
 
 
-@router.post("/", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(
     alert_in: AlertCreate,
     current_user: User = Depends(get_current_user),
@@ -245,7 +266,7 @@ async def create_alert(
         threshold=float(alert.threshold),
         currency=alert.currency,
         is_active=alert.is_active,
-        triggered_at=alert.triggered_at,
+        triggered_at=alert.triggered_at.isoformat() if alert.triggered_at else None,
         triggered_count=int(alert.triggered_count or 0),
         notify_email=alert.notify_email,
         notify_in_app=alert.notify_in_app,
@@ -280,9 +301,7 @@ async def get_alert(
     asset_name = None
 
     if alert.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == alert.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol
@@ -296,7 +315,7 @@ async def get_alert(
         threshold=float(alert.threshold),
         currency=alert.currency,
         is_active=alert.is_active,
-        triggered_at=alert.triggered_at,
+        triggered_at=alert.triggered_at.isoformat() if alert.triggered_at else None,
         triggered_count=int(alert.triggered_count or 0),
         notify_email=alert.notify_email,
         notify_in_app=alert.notify_in_app,
@@ -346,9 +365,7 @@ async def update_alert(
     asset_name = None
 
     if alert.asset_id:
-        asset_result = await db.execute(
-            select(Asset).where(Asset.id == alert.asset_id)
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = asset_result.scalar_one_or_none()
         if asset:
             asset_symbol = asset.symbol
@@ -362,7 +379,7 @@ async def update_alert(
         threshold=float(alert.threshold),
         currency=alert.currency,
         is_active=alert.is_active,
-        triggered_at=alert.triggered_at,
+        triggered_at=alert.triggered_at.isoformat() if alert.triggered_at else None,
         triggered_count=int(alert.triggered_count or 0),
         notify_email=alert.notify_email,
         notify_in_app=alert.notify_in_app,

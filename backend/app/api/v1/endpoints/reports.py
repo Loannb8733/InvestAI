@@ -1,15 +1,16 @@
 """Reports endpoints for PDF and Excel exports."""
 
+import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-import io
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.user import User
 from app.services.report_service import report_service
 
@@ -17,12 +18,15 @@ router = APIRouter()
 
 
 @router.get("/performance/pdf")
+@limiter.limit("10/minute")
 async def get_performance_report_pdf(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download a PDF performance report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id))
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), currency=currency)
     pdf_content = report_service.generate_performance_pdf(data)
 
     filename = f"rapport_performance_{datetime.now().strftime('%Y%m%d')}.pdf"
@@ -35,12 +39,15 @@ async def get_performance_report_pdf(
 
 
 @router.get("/performance/excel")
+@limiter.limit("10/minute")
 async def get_performance_report_excel(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download an Excel performance report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id))
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), currency=currency)
     excel_content = report_service.generate_performance_excel(data)
 
     filename = f"rapport_performance_{datetime.now().strftime('%Y%m%d')}.xlsx"
@@ -53,7 +60,9 @@ async def get_performance_report_excel(
 
 
 @router.get("/tax/{year}/pdf")
+@limiter.limit("10/minute")
 async def get_tax_report_pdf(
+    request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -62,9 +71,7 @@ async def get_tax_report_pdf(
     if year < 2015 or year > datetime.now().year:
         year = datetime.now().year - 1
 
-    pdf_content = await report_service.generate_tax_report_2086(
-        db, str(current_user.id), year
-    )
+    pdf_content = await report_service.generate_tax_report_2086(db, str(current_user.id), year)
 
     filename = f"declaration_fiscale_crypto_{year}.pdf"
 
@@ -76,7 +83,9 @@ async def get_tax_report_pdf(
 
 
 @router.get("/tax/{year}/excel")
+@limiter.limit("10/minute")
 async def get_tax_report_excel(
+    request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -85,9 +94,7 @@ async def get_tax_report_excel(
     if year < 2015 or year > datetime.now().year:
         year = datetime.now().year - 1
 
-    excel_content = await report_service.generate_tax_excel(
-        db, str(current_user.id), year
-    )
+    excel_content = await report_service.generate_tax_excel(db, str(current_user.id), year)
 
     filename = f"declaration_fiscale_crypto_{year}.xlsx"
 
@@ -99,13 +106,16 @@ async def get_tax_report_excel(
 
 
 @router.get("/transactions/pdf")
+@limiter.limit("10/minute")
 async def get_transactions_report_pdf(
+    request: Request,
     year: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download a PDF transactions report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id), year)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), year, currency=currency)
     pdf_content = report_service.generate_performance_pdf(data)
 
     year_str = str(year) if year else "all"
@@ -119,40 +129,26 @@ async def get_transactions_report_pdf(
 
 
 @router.get("/available-years")
+@limiter.limit("10/minute")
 async def get_available_years(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get list of years with transactions for reporting."""
-    from sqlalchemy import select, extract, distinct
-    from app.models.transaction import Transaction
+    from sqlalchemy import distinct, extract, select
+
     from app.models.asset import Asset
     from app.models.portfolio import Portfolio
+    from app.models.transaction import Transaction
 
-    portfolio_result = await db.execute(
-        select(Portfolio.id).where(
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    portfolio_ids = list(portfolio_result.scalars().all())
-
-    if not portfolio_ids:
-        return {"years": [datetime.now().year]}
-
-    asset_result = await db.execute(
-        select(Asset.id).where(
-            Asset.portfolio_id.in_(portfolio_ids),
-        )
-    )
-    asset_ids = list(asset_result.scalars().all())
-
-    if not asset_ids:
-        return {"years": [datetime.now().year]}
-
+    # Single joined query instead of 3 sequential queries
     years_result = await db.execute(
-        select(distinct(extract('year', Transaction.executed_at)))
-        .where(Transaction.asset_id.in_(asset_ids))
-        .order_by(extract('year', Transaction.executed_at).desc())
+        select(distinct(extract("year", Transaction.executed_at)))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(Portfolio.user_id == current_user.id)
+        .order_by(extract("year", Transaction.executed_at).desc())
     )
     years = [int(y) for y in years_result.scalars().all() if y]
 

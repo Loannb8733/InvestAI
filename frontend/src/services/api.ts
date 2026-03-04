@@ -8,6 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 // Request interceptor to add auth token
@@ -110,9 +111,17 @@ export const authApi = {
     return response.data
   },
 
-  refresh: async (refreshToken: string) => {
-    const response = await api.post('/auth/refresh', { refresh_token: refreshToken })
+  refresh: async (refreshToken?: string) => {
+    const response = await api.post('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : {})
     return response.data
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Ignore errors on logout
+    }
   },
 
   getCurrentUser: async () => {
@@ -163,6 +172,11 @@ export const dashboardApi = {
     return response.data
   },
 
+  getPortfolioSparklines: async (portfolioId: string, days: number = 30) => {
+    const response = await api.get(`/dashboard/portfolio/${portfolioId}/sparklines`, { params: { days } })
+    return response.data as { symbol: string; prices: number[]; change_pct: number }[]
+  },
+
   getHistoricalData: async (days: number = 30) => {
     const response = await api.get('/dashboard/historical-data', { params: { days } })
     return response.data
@@ -186,6 +200,16 @@ export const dashboardApi = {
   getBenchmarks: async (days: number = 90) => {
     const response = await api.get('/dashboard/benchmarks', { params: { days } })
     return response.data
+  },
+
+  triggerBackfill: async () => {
+    const response = await api.post('/dashboard/backfill-prices')
+    return response.data
+  },
+
+  getBackfillStatus: async () => {
+    const response = await api.get('/dashboard/backfill-status')
+    return response.data as { total_price_points: number; symbols_covered: number; total_active_symbols: number; is_complete: boolean }
   },
 }
 
@@ -243,6 +267,10 @@ export const assetsApi = {
     avg_buy_price?: number
     currency?: string
     exchange?: string
+    interest_rate?: number
+    maturity_date?: string
+    project_status?: string
+    invested_amount?: number
   }) => {
     const response = await api.post('/assets', data)
     return response.data
@@ -257,6 +285,11 @@ export const assetsApi = {
     name?: string
     quantity?: number
     avg_buy_price?: number
+    exchange?: string | null
+    interest_rate?: number
+    maturity_date?: string
+    project_status?: string
+    invested_amount?: number
   }) => {
     const response = await api.patch(`/assets/${id}`, data)
     return response.data
@@ -282,6 +315,7 @@ export const transactionsApi = {
     fee?: number
     currency?: string
     executed_at?: string
+    exchange?: string
     notes?: string
   }) => {
     const response = await api.post('/transactions', data)
@@ -381,8 +415,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getPerformance: async (period: string = '30d') => {
-    const response = await api.get('/analytics/performance', { params: { period }, timeout: ANALYTICS_TIMEOUT })
+  getPerformance: async (period: string = '30d', portfolioId?: string) => {
+    const response = await api.get('/analytics/performance', {
+      params: { period, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -391,8 +428,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getMonteCarlo: async (horizon: number = 90) => {
-    const response = await api.get('/analytics/monte-carlo', { params: { horizon }, timeout: ANALYTICS_TIMEOUT })
+  getMonteCarlo: async (horizon: number = 90, portfolioId?: string) => {
+    const response = await api.get('/analytics/monte-carlo', {
+      params: { horizon, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -401,18 +441,27 @@ export const analyticsApi = {
     return response.data
   },
 
-  getOptimize: async (objective: string = 'max_sharpe') => {
-    const response = await api.get('/analytics/optimize', { params: { objective }, timeout: ANALYTICS_TIMEOUT })
+  getOptimize: async (objective: string = 'max_sharpe', days?: number) => {
+    const response = await api.get('/analytics/optimize', {
+      params: { objective, ...(days ? { days } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
-  getStressTest: async () => {
-    const response = await api.get('/analytics/stress-test', { timeout: ANALYTICS_TIMEOUT })
+  getStressTest: async (portfolioId?: string) => {
+    const response = await api.get('/analytics/stress-test', {
+      params: { ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
-  getBeta: async (days: number = 90) => {
-    const response = await api.get('/analytics/beta', { params: { days }, timeout: ANALYTICS_TIMEOUT })
+  getBeta: async (days: number = 90, portfolioId?: string) => {
+    const response = await api.get('/analytics/beta', {
+      params: { days, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -535,6 +584,23 @@ export const predictionsApi = {
 
   getMarketEvents: async () => {
     const response = await api.get('/predictions/events')
+    return response.data
+  },
+
+  getMarketCycle: async () => {
+    const response = await api.get('/predictions/market-cycle')
+    return response.data
+  },
+
+  getTrackRecord: async (symbol: string, limit: number = 20) => {
+    const response = await api.get(`/predictions/track-record/${symbol}`, {
+      params: { limit },
+    })
+    return response.data
+  },
+
+  getBacktest: async (days: number = 7) => {
+    const response = await api.get('/predictions/backtest', { params: { days } })
     return response.data
   },
 }
@@ -896,11 +962,16 @@ export const notificationsApi = {
     const response = await api.post('/notifications/read-all')
     return response.data
   },
+
+  sendTelegramTest: async () => {
+    const response = await api.post('/notifications/telegram/test')
+    return response.data
+  },
 }
 
 // Profile API (user self-service)
 export const profileApi = {
-  updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string }) => {
+  updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string; telegram_chat_id?: string; telegram_enabled?: boolean }) => {
     const response = await api.patch('/auth/me', data)
     return response.data
   },

@@ -1,4 +1,4 @@
-import { Component, type ReactNode, type ErrorInfo } from 'react'
+import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
@@ -19,7 +19,9 @@ class RouteErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Route error:', error, errorInfo)
+    if (import.meta.env.DEV) {
+      console.error('Route error:', error, errorInfo)
+    }
   }
 
   componentDidUpdate(prevProps: { resetKey: string }) {
@@ -50,12 +52,21 @@ class RouteErrorBoundary extends Component<
 
 export default function Layout() {
   const location = useLocation()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const handleCloseSidebar = useCallback(() => {
+    setSidebarOpen(false)
+  }, [])
+
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev)
+  }, [])
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
+        <Header onMenuClick={handleToggleSidebar} />
         <main className="flex-1 overflow-y-auto p-6">
           <RouteErrorBoundary resetKey={location.pathname}>
             <Outlet />

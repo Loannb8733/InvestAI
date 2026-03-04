@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { notificationsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { cn } from '@/lib/utils'
 
 interface Notification {
@@ -31,13 +32,13 @@ export default function NotificationBell() {
   const queryClient = useQueryClient()
 
   const { data: countData } = useQuery<NotificationCount>({
-    queryKey: ['notifications-count'],
+    queryKey: queryKeys.notifications.unreadCount,
     queryFn: notificationsApi.getUnreadCount,
     refetchInterval: 30000, // Poll every 30s
   })
 
   const { data: notifications } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
+    queryKey: queryKeys.notifications.list,
     queryFn: () => notificationsApi.list(false, 20),
     enabled: open,
   })
@@ -45,16 +46,14 @@ export default function NotificationBell() {
   const markReadMutation = useMutation({
     mutationFn: (id: string) => notificationsApi.markAsRead(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['notifications-count'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
     },
   })
 
   const markAllReadMutation = useMutation({
     mutationFn: notificationsApi.markAllAsRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['notifications-count'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
     },
   })
 
@@ -83,7 +82,7 @@ export default function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label={unreadCount > 0 ? `Notifications (${unreadCount} non lues)` : 'Notifications'}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
@@ -130,6 +129,7 @@ export default function NotificationBell() {
                     size="icon"
                     className="h-6 w-6 shrink-0"
                     onClick={() => markReadMutation.mutate(n.id)}
+                    aria-label="Marquer comme lu"
                   >
                     <Check className="h-3 w-3" />
                   </Button>

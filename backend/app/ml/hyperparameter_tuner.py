@@ -1,7 +1,7 @@
 """Hyperparameter tuning for ML models using Optuna."""
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 
@@ -58,6 +58,7 @@ def tune_xgboost(prices: List[float], n_trials: int = 30) -> Dict:
                 learning_rate=learning_rate,
                 subsample=subsample,
                 colsample_bytree=colsample_bytree,
+                random_state=42,
                 verbosity=0,
             )
             model.fit(X, y_train)
@@ -90,8 +91,8 @@ def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
     """Tune Prophet hyperparameters."""
     try:
         import optuna
-        from prophet import Prophet
         import pandas as pd
+        from prophet import Prophet
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
@@ -114,6 +115,7 @@ def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
             changepoint_prior_scale=cps,
             seasonality_mode=seasonality_mode,
             interval_width=0.95,
+            mcmc_samples=0,  # MAP estimation — fully deterministic
         )
         model.fit(train_df)
         future = model.make_future_dataframe(periods=7)

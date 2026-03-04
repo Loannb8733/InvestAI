@@ -1,27 +1,35 @@
 """System administration endpoints."""
 
 from typing import Optional
-from pydantic import BaseModel, EmailStr
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.config import settings
 from app.api.deps import get_current_active_user
+from app.core.config import settings
+from app.core.database import get_db
 from app.models.user import User, UserRole
 from app.services.email_service import email_service
 
 router = APIRouter()
 
 
+class MessageResponse(BaseModel):
+    """Simple message response."""
+
+    message: str
+
+
 class EmailTestRequest(BaseModel):
     """Request to send a test email."""
+
     to_email: Optional[EmailStr] = None
 
 
 class EmailTestResponse(BaseModel):
     """Response from email test."""
+
     success: bool
     message: str
     email_configured: bool
@@ -30,6 +38,7 @@ class EmailTestResponse(BaseModel):
 
 class SystemStatusResponse(BaseModel):
     """System status response."""
+
     email_enabled: bool
     smtp_host: str
     smtp_port: int
@@ -129,7 +138,7 @@ async def test_email(
         )
 
 
-@router.post("/trigger-weekly-report")
+@router.post("/trigger-weekly-report", response_model=MessageResponse)
 async def trigger_weekly_report(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -153,9 +162,7 @@ async def trigger_weekly_report(
                 detail="No portfolio value to report",
             )
 
-        history = await snapshot_service.get_historical_values(
-            db, str(current_user.id), days=7
-        )
+        history = await snapshot_service.build_portfolio_value_series(db, str(current_user.id), days=7)
 
         week_start_value = history[0]["value"] if history else metrics["total_value"]
         week_change = metrics["total_value"] - week_start_value
@@ -163,7 +170,8 @@ async def trigger_weekly_report(
 
         success = await email_service.send_weekly_report(
             to_email=current_user.email,
-            user_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email.split("@")[0],
+            user_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip()
+            or current_user.email.split("@")[0],
             total_value=metrics["total_value"],
             total_invested=metrics["total_invested"],
             week_change=week_change,
@@ -181,8 +189,8 @@ async def trigger_weekly_report(
             )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            detail="An internal error occurred. Please try again later.",
         )

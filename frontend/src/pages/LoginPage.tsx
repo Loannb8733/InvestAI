@@ -137,7 +137,7 @@ export default function LoginPage() {
 
           {/* Footer */}
           <p className="text-white/50 text-sm">
-            © 2025 InvestAI. Tous droits réservés.
+            © 2026 InvestAI. Tous droits réservés.
           </p>
         </div>
       </div>

@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text
+
 from app.core.config import settings
 
 
@@ -19,10 +20,14 @@ def run_migration():
     with engine.connect() as conn:
         print("Adding cash_balances column to portfolios...")
         try:
-            conn.execute(text("""
+            conn.execute(
+                text(
+                    """
                 ALTER TABLE portfolios
                 ADD COLUMN IF NOT EXISTS cash_balances JSONB NOT NULL DEFAULT '{}'
-            """))
+            """
+                )
+            )
             conn.commit()
             print("  - cash_balances column added")
         except Exception as e:

@@ -10,6 +10,8 @@ interface User {
   lastName?: string
   preferredCurrency?: string
   mfaEnabled: boolean
+  telegramChatId?: string
+  telegramEnabled?: boolean
 }
 
 interface AuthState {
@@ -57,6 +59,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        // Clear server-side cookies
+        authApi.logout()
         set({
           user: null,
           accessToken: null,
@@ -67,14 +71,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async () => {
-        const { refreshToken } = get()
-        if (!refreshToken) {
-          get().logout()
-          return
-        }
-
         try {
-          const response = await authApi.refresh(refreshToken)
+          // Try cookie-based refresh first (no token needed), fall back to stored token
+          const { refreshToken } = get()
+          const response = await authApi.refresh(refreshToken || undefined)
           set({
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
@@ -96,6 +96,8 @@ export const useAuthStore = create<AuthState>()(
               lastName: user.last_name,
               preferredCurrency: user.preferred_currency || 'EUR',
               mfaEnabled: user.mfa_enabled,
+              telegramChatId: user.telegram_chat_id || undefined,
+              telegramEnabled: user.telegram_enabled ?? false,
             },
           })
         } catch {
@@ -119,9 +121,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Do NOT persist tokens to localStorage — they are already in httpOnly cookies.
+      // Storing JWTs in JS-accessible storage exposes them to XSS attacks.
       partialize: (state) => ({
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
         user: state.user,
       }),

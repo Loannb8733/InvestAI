@@ -1,6 +1,9 @@
 """Celery tasks for alert checking."""
 
 import logging
+from datetime import date
+
+from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.services.alert_service import alert_service
@@ -49,3 +52,47 @@ def check_user_alerts(user_id: str):
     result = run_async(_check_user())
     logger.info(f"User {user_id}: {len(result)} alerts triggered")
     return result
+
+
+@celery_app.task(name="app.tasks.alerts.seed_risk_weight_snapshots")
+def seed_risk_weight_snapshots():
+    """Pre-seed daily risk weight snapshots for all users' assets.
+
+    Runs once daily at 00:05 UTC. Ensures that VOLATILITY_SPIKE alerts
+    have a 'yesterday' baseline to compare against.
+    """
+    logger.info("Seeding daily risk weight snapshots...")
+
+    async def _seed():
+        from app.models.portfolio import Portfolio
+        from app.models.user import User
+        from app.services.metrics_service import metrics_service
+
+        seeded = 0
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(User.id).where(User.is_active == True))
+            user_ids = [str(uid) for uid in result.scalars().all()]
+
+            for user_id in user_ids:
+                try:
+                    port_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == user_id))
+                    portfolio_ids = [str(pid) for pid in port_result.scalars().all()]
+
+                    today_str = date.today().isoformat()
+                    for pid in portfolio_ids:
+                        try:
+                            data = await metrics_service.get_portfolio_metrics(db, pid)
+                            for am in data.get("assets", []):
+                                rw = am.get("risk_weight", 0.0)
+                                await alert_service._cache_risk_weight(am["symbol"], today_str, rw)
+                                seeded += 1
+                        except Exception as e:
+                            logger.debug("Skip portfolio %s: %s", pid, e)
+                except Exception as e:
+                    logger.error("Failed to seed risk weights for user %s: %s", user_id, e)
+
+        return seeded
+
+    count = run_async(_seed())
+    logger.info("Risk weight seeding complete: %d snapshots cached", count)
+    return {"seeded": count}

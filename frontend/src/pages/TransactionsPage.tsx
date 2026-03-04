@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
+import { queryKeys } from '@/lib/queryKeys'
 import { transactionsApi, portfoliosApi } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -70,8 +71,10 @@ import {
   SlidersHorizontal,
   FileSpreadsheet,
   MoreVertical,
+  Shield,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import { isColdWallet } from '@/lib/platforms'
 import AddTransactionForm from '@/components/forms/AddTransactionForm'
 import ImportCSVForm from '@/components/forms/ImportCSVForm'
 import EditTransactionForm from '@/components/forms/EditTransactionForm'
@@ -122,6 +125,9 @@ const typeLabels: Record<string, string> = {
   airdrop: 'Airdrop',
   conversion_in: 'Conversion entrante',
   conversion_out: 'Conversion sortante',
+  dividend: 'Dividende',
+  interest: 'Intérêts',
+  fee: 'Frais',
 }
 
 const typeColors: Record<string, string> = {
@@ -133,6 +139,9 @@ const typeColors: Record<string, string> = {
   airdrop: 'text-pink-500',
   conversion_in: 'text-teal-500',
   conversion_out: 'text-amber-500',
+  dividend: 'text-emerald-500',
+  interest: 'text-cyan-500',
+  fee: 'text-red-400',
 }
 
 const typeOptions = [
@@ -144,6 +153,9 @@ const typeOptions = [
   { value: 'staking_reward', label: 'Staking' },
   { value: 'airdrop', label: 'Airdrops' },
   { value: 'conversions', label: 'Conversions' },
+  { value: 'dividend', label: 'Dividendes' },
+  { value: 'interest', label: 'Intérêts' },
+  { value: 'fee', label: 'Frais' },
 ]
 
 const dateOptions = [
@@ -151,7 +163,7 @@ const dateOptions = [
   { value: '7', label: '7 derniers jours' },
   { value: '30', label: '30 derniers jours' },
   { value: '90', label: '90 derniers jours' },
-  { value: '365', label: 'Cette année' },
+  { value: 'ytd', label: 'Cette année' },
 ]
 
 const conversionTypes = ['conversion_out', 'conversion_in']
@@ -178,8 +190,14 @@ function formatQuantity(quantity: number): string {
   }
 }
 
-function getDateRangeStart(days: number): Date | null {
-  if (days === 0) return null
+function getDateRangeStart(value: string): Date | null {
+  if (value === '0') return null
+  if (value === 'ytd') {
+    const now = new Date()
+    return new Date(now.getFullYear(), 0, 1)  // January 1st of current year
+  }
+  const days = parseInt(value)
+  if (isNaN(days) || days === 0) return null
   const date = new Date()
   date.setDate(date.getDate() - days)
   date.setHours(0, 0, 0, 0)
@@ -187,29 +205,16 @@ function getDateRangeStart(days: number): Date | null {
 }
 
 function generateCSV(transactions: Transaction[]): string {
-  const headers = [
-    'Date',
-    'Type',
-    'Actif',
-    'Quantité',
-    'Prix unitaire',
-    'Total',
-    'Frais',
-    'Devise',
-    'Plateforme',
-    'Notes',
-  ]
+  // Use backend-compatible format: machine-readable types, ISO dates, period decimals
+  const headers = ['symbol', 'type', 'quantity', 'price', 'fee', 'date', 'notes']
 
   const rows = transactions.map((tx) => [
-    new Date(tx.executed_at || tx.created_at).toLocaleString('fr-FR'),
-    typeLabels[tx.transaction_type] || tx.transaction_type,
     tx.asset_symbol,
-    tx.quantity.toString().replace('.', ','),
-    tx.price.toString().replace('.', ','),
-    (tx.quantity * tx.price).toFixed(2).replace('.', ','),
-    (tx.fee || 0).toString().replace('.', ','),
-    tx.currency || 'EUR',
-    tx.exchange || 'Manuel',
+    tx.transaction_type,
+    tx.quantity.toString(),
+    tx.price.toString(),
+    (tx.fee || 0).toString(),
+    new Date(tx.executed_at || tx.created_at).toISOString().replace('T', ' ').substring(0, 19),
     (tx.notes || '').replace(/;/g, ',').replace(/\n/g, ' '),
   ])
 
@@ -262,16 +267,19 @@ export default function TransactionsPage() {
   // ============== Queries ==============
 
   const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ['portfolios'],
+    queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
+    staleTime: 60_000,
   })
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
-    queryKey: ['transactions', selectedPortfolio],
+    queryKey: queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined),
     queryFn: () =>
       transactionsApi.list({
         portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
+        limit: 500,
       }),
+    placeholderData: keepPreviousData,
   })
 
   // ============== Derived Data ==============
@@ -306,7 +314,7 @@ export default function TransactionsPage() {
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return []
-    const dateStart = getDateRangeStart(parseInt(dateRange))
+    const dateStart = getDateRangeStart(dateRange)
 
     return transactions.filter((tx) => {
       if (selectedAsset !== 'all' && tx.asset_symbol !== selectedAsset) return false
@@ -399,14 +407,23 @@ export default function TransactionsPage() {
     return { totalBought, totalSold, totalFees, countByType, netFlow: totalBought - totalSold }
   }, [filteredTransactions])
 
-  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE))
+
+  // Reset to last valid page if current page exceeds total after deletion
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
   const paginatedTransactions = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
     return sortedTransactions.slice(start, start + ITEMS_PER_PAGE)
   }, [sortedTransactions, currentPage])
 
-  useMemo(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     setCurrentPage(1)
+    setSelectedIds(new Set())
   }, [selectedPortfolio, selectedAsset, selectedPlatform, selectedType, dateRange, searchQuery])
 
   // ============== Mutations ==============
@@ -425,14 +442,25 @@ export default function TransactionsPage() {
 
   const deleteMultipleMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      let deleted = 0
+      const errors: string[] = []
       for (const id of ids) {
-        await transactionsApi.delete(id)
+        try {
+          await transactionsApi.delete(id)
+          deleted++
+        } catch {
+          errors.push(id)
+        }
       }
-      return { deleted_count: ids.length }
+      return { deleted_count: deleted, errors }
     },
     onSuccess: (data) => {
       invalidateAllFinancialData(queryClient)
-      toast({ title: `${data.deleted_count} transactions supprimées` })
+      if (data.errors.length > 0) {
+        toast({ title: `${data.deleted_count} supprimées, ${data.errors.length} erreurs`, variant: 'destructive' })
+      } else {
+        toast({ title: `${data.deleted_count} transactions supprimées` })
+      }
       setSelectedIds(new Set())
     },
     onError: () => {
@@ -497,12 +525,18 @@ export default function TransactionsPage() {
   )
 
   const handleSelectAll = useCallback(() => {
-    if (selectedIds.size === paginatedTransactions.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(paginatedTransactions.map((tx) => tx.id)))
-    }
-  }, [paginatedTransactions, selectedIds.size])
+    const currentPageIds = paginatedTransactions.map((tx) => tx.id)
+    const allSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id))
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev)
+      if (allSelected) {
+        currentPageIds.forEach((id) => newSet.delete(id))
+      } else {
+        currentPageIds.forEach((id) => newSet.add(id))
+      }
+      return newSet
+    })
+  }, [paginatedTransactions, selectedIds])
 
   const handleSelectOne = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -625,7 +659,7 @@ export default function TransactionsPage() {
                 portfolioId={selectedPortfolio !== 'all' ? selectedPortfolio : undefined}
                 onSuccess={() => {
                   setIsImportOpen(false)
-                  queryClient.invalidateQueries({ queryKey: ['transactions'] })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all })
                 }}
               />
             </DialogContent>
@@ -638,7 +672,7 @@ export default function TransactionsPage() {
                 <span className="hidden sm:inline">Nouvelle</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
               <DialogHeader>
                 <DialogTitle>Ajouter une transaction</DialogTitle>
                 <DialogDescription>Enregistrez une nouvelle transaction</DialogDescription>
@@ -646,8 +680,8 @@ export default function TransactionsPage() {
               <AddTransactionForm
                 onSuccess={() => {
                   setIsAddOpen(false)
-                  queryClient.invalidateQueries({ queryKey: ['transactions'] })
-                  queryClient.invalidateQueries({ queryKey: ['assets'] })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all })
+                  queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
                 }}
               />
             </DialogContent>
@@ -665,7 +699,7 @@ export default function TransactionsPage() {
                   <TrendingUp className="h-4 w-4 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total achats</p>
+                  <p className="text-xs text-muted-foreground">Total achats{hasActiveFilters ? ' (filtrés)' : ''}</p>
                   <p className="text-lg font-semibold text-green-600">{formatCurrency(stats.totalBought)}</p>
                 </div>
               </div>
@@ -679,7 +713,7 @@ export default function TransactionsPage() {
                   <TrendingDown className="h-4 w-4 text-red-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total ventes</p>
+                  <p className="text-xs text-muted-foreground">Total ventes{hasActiveFilters ? ' (filtrés)' : ''}</p>
                   <p className="text-lg font-semibold text-red-600">{formatCurrency(stats.totalSold)}</p>
                 </div>
               </div>
@@ -693,7 +727,7 @@ export default function TransactionsPage() {
                   <Receipt className="h-4 w-4 text-orange-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total frais</p>
+                  <p className="text-xs text-muted-foreground">Total frais{hasActiveFilters ? ' (filtrés)' : ''}</p>
                   <p className="text-lg font-semibold text-orange-600">{formatCurrency(stats.totalFees)}</p>
                 </div>
               </div>
@@ -707,7 +741,7 @@ export default function TransactionsPage() {
                   <Coins className={`h-4 w-4 ${stats.netFlow >= 0 ? 'text-blue-500' : 'text-purple-500'}`} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Flux net</p>
+                  <p className="text-xs text-muted-foreground">Flux net{hasActiveFilters ? ' (filtrés)' : ''}</p>
                   <p className={`text-lg font-semibold ${stats.netFlow >= 0 ? 'text-blue-600' : 'text-purple-600'}`}>
                     {formatCurrency(stats.netFlow)}
                   </p>
@@ -937,7 +971,8 @@ export default function TransactionsPage() {
                       <th className="text-center py-3 w-10">
                         <Checkbox
                           checked={
-                            selectedIds.size === paginatedTransactions.length && paginatedTransactions.length > 0
+                            paginatedTransactions.length > 0 &&
+                            paginatedTransactions.every((tx) => selectedIds.has(tx.id))
                           }
                           onCheckedChange={handleSelectAll}
                         />
@@ -1000,7 +1035,14 @@ export default function TransactionsPage() {
                           </div>
                         </td>
                         <td className="py-3 text-center">
-                          <span className="text-xs px-2 py-1 rounded bg-muted">{tx.exchange || 'Manuel'}</span>
+                          <span className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${
+                            tx.exchange && isColdWallet(tx.exchange)
+                              ? 'bg-blue-500/10 text-blue-500'
+                              : 'bg-muted'
+                          }`}>
+                            {tx.exchange && isColdWallet(tx.exchange) && <Shield className="h-3 w-3" />}
+                            {tx.exchange || 'Manuel'}
+                          </span>
                         </td>
                         <td className="text-center py-3 font-mono text-sm">{formatQuantity(tx.quantity)}</td>
                         <td className="text-center py-3 text-sm">{formatCurrency(tx.price, tx.currency)}</td>

@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(value: number | null | undefined, currency = "EUR"): string {
-  if (value == null) return "—"
+  if (value == null || !Number.isFinite(value)) return "—"
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
@@ -16,7 +16,7 @@ export function formatCurrency(value: number | null | undefined, currency = "EUR
 }
 
 export function formatPercent(value: number | null | undefined): string {
-  if (value == null) return "—"
+  if (value == null || !Number.isFinite(value)) return "—"
   return new Intl.NumberFormat("fr-FR", {
     style: "percent",
     minimumFractionDigits: 2,

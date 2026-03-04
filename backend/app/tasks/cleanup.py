@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, delete, func, and_
+from sqlalchemy import and_, delete, func, select
 
 from app.core.database import AsyncSessionLocal
 
@@ -16,6 +16,8 @@ def run_async(coro):
         return loop.run_until_complete(coro)
     finally:
         loop.close()
+
+
 from app.models.notification import Notification
 from app.models.prediction_log import PredictionLog
 from app.tasks.celery_app import celery_app
@@ -61,18 +63,12 @@ async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
 
         # Count predictions to delete
         count_result = await db.execute(
-            select(func.count(PredictionLog.id)).where(
-                PredictionLog.created_at < cutoff_date
-            )
+            select(func.count(PredictionLog.id)).where(PredictionLog.created_at < cutoff_date)
         )
         count_to_delete = count_result.scalar()
 
         if count_to_delete > 0:
-            await db.execute(
-                delete(PredictionLog).where(
-                    PredictionLog.created_at < cutoff_date
-                )
-            )
+            await db.execute(delete(PredictionLog).where(PredictionLog.created_at < cutoff_date))
             await db.commit()
             logger.info(f"Deleted {count_to_delete} old predictions (older than {days_to_keep} days)")
 
@@ -85,15 +81,11 @@ async def _cleanup_duplicate_transactions_async() -> dict:
 
     async with AsyncSessionLocal() as db:
         # Find duplicate external_ids
-        dup_query = select(
-            Transaction.external_id,
-            func.count(Transaction.id).label("cnt")
-        ).where(
-            Transaction.external_id.isnot(None)
-        ).group_by(
-            Transaction.external_id
-        ).having(
-            func.count(Transaction.id) > 1
+        dup_query = (
+            select(Transaction.external_id, func.count(Transaction.id).label("cnt"))
+            .where(Transaction.external_id.isnot(None))
+            .group_by(Transaction.external_id)
+            .having(func.count(Transaction.id) > 1)
         )
 
         result = await db.execute(dup_query)
@@ -104,9 +96,7 @@ async def _cleanup_duplicate_transactions_async() -> dict:
             ext_id = dup.external_id
             # Get all transactions with this external_id, keep the oldest
             trans_result = await db.execute(
-                select(Transaction).where(
-                    Transaction.external_id == ext_id
-                ).order_by(Transaction.created_at.asc())
+                select(Transaction).where(Transaction.external_id == ext_id).order_by(Transaction.created_at.asc())
             )
             transactions = trans_result.scalars().all()
 
@@ -125,8 +115,8 @@ async def _cleanup_duplicate_transactions_async() -> dict:
 async def _validate_portfolio_consistency_async() -> dict:
     """Validate that asset quantities match transaction sums."""
     from app.models.asset import Asset
-    from app.models.transaction import Transaction, TransactionType
     from app.models.portfolio import Portfolio
+    from app.models.transaction import Transaction, TransactionType
 
     async with AsyncSessionLocal() as db:
         # Get all assets with their calculated quantities from transactions
@@ -148,27 +138,40 @@ async def _validate_portfolio_consistency_async() -> dict:
                     func.coalesce(
                         func.sum(
                             func.case(
-                                (Transaction.transaction_type.in_([
-                                    TransactionType.BUY,
-                                    TransactionType.TRANSFER_IN,
-                                    TransactionType.CONVERSION_IN,
-                                    TransactionType.AIRDROP,
-                                    TransactionType.STAKING_REWARD,
-                                ]), Transaction.quantity),
-                                else_=0
+                                (
+                                    Transaction.transaction_type.in_(
+                                        [
+                                            TransactionType.BUY,
+                                            TransactionType.TRANSFER_IN,
+                                            TransactionType.CONVERSION_IN,
+                                            TransactionType.AIRDROP,
+                                            TransactionType.STAKING_REWARD,
+                                        ]
+                                    ),
+                                    Transaction.quantity,
+                                ),
+                                else_=0,
                             )
-                        ), 0
-                    ) - func.coalesce(
+                        ),
+                        0,
+                    )
+                    - func.coalesce(
                         func.sum(
                             func.case(
-                                (Transaction.transaction_type.in_([
-                                    TransactionType.SELL,
-                                    TransactionType.TRANSFER_OUT,
-                                    TransactionType.CONVERSION_OUT,
-                                ]), Transaction.quantity),
-                                else_=0
+                                (
+                                    Transaction.transaction_type.in_(
+                                        [
+                                            TransactionType.SELL,
+                                            TransactionType.TRANSFER_OUT,
+                                            TransactionType.CONVERSION_OUT,
+                                        ]
+                                    ),
+                                    Transaction.quantity,
+                                ),
+                                else_=0,
                             )
-                        ), 0
+                        ),
+                        0,
                     )
                 ).where(Transaction.asset_id == asset.id)
             )
@@ -176,14 +179,16 @@ async def _validate_portfolio_consistency_async() -> dict:
             stored_qty = float(asset.quantity)
 
             if abs(calc_qty - stored_qty) > 0.00001:
-                inconsistencies.append({
-                    "asset_id": str(asset.id),
-                    "symbol": asset.symbol,
-                    "portfolio": asset.portfolio_name,
-                    "stored_qty": stored_qty,
-                    "calculated_qty": calc_qty,
-                    "difference": stored_qty - calc_qty,
-                })
+                inconsistencies.append(
+                    {
+                        "asset_id": str(asset.id),
+                        "symbol": asset.symbol,
+                        "portfolio": asset.portfolio_name,
+                        "stored_qty": stored_qty,
+                        "calculated_qty": calc_qty,
+                        "difference": stored_qty - calc_qty,
+                    }
+                )
 
         if inconsistencies:
             logger.warning(f"Found {len(inconsistencies)} portfolio inconsistencies")
@@ -227,31 +232,32 @@ async def _run_all_cleanup_async() -> dict:
 
 # === Celery Tasks ===
 
-@celery_app.task(name="tasks.cleanup_old_notifications")
+
+@celery_app.task(name="app.tasks.cleanup.cleanup_old_notifications")
 def cleanup_old_notifications(days_to_keep: int = 30) -> dict:
     """Celery task: Delete old read notifications."""
     return run_async(_cleanup_old_notifications_async(days_to_keep))
 
 
-@celery_app.task(name="tasks.cleanup_old_predictions")
+@celery_app.task(name="app.tasks.cleanup.cleanup_old_predictions")
 def cleanup_old_predictions(days_to_keep: int = 90) -> dict:
     """Celery task: Delete old prediction records."""
     return run_async(_cleanup_old_predictions_async(days_to_keep))
 
 
-@celery_app.task(name="tasks.cleanup_duplicate_transactions")
+@celery_app.task(name="app.tasks.cleanup.cleanup_duplicate_transactions")
 def cleanup_duplicate_transactions() -> dict:
     """Celery task: Remove duplicate transactions."""
     return run_async(_cleanup_duplicate_transactions_async())
 
 
-@celery_app.task(name="tasks.validate_portfolio_consistency")
+@celery_app.task(name="app.tasks.cleanup.validate_portfolio_consistency")
 def validate_portfolio_consistency() -> dict:
     """Celery task: Validate portfolio quantities match transactions."""
     return run_async(_validate_portfolio_consistency_async())
 
 
-@celery_app.task(name="tasks.run_weekly_cleanup")
+@celery_app.task(name="app.tasks.cleanup.run_weekly_cleanup")
 def run_weekly_cleanup() -> dict:
     """Celery task: Run all cleanup tasks."""
     return run_async(_run_all_cleanup_async())

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
 import { smartInsightsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import {
   Activity,
   AlertTriangle,
@@ -120,13 +121,24 @@ interface PortfolioHealth {
   generated_at: string
 }
 
+function formatMetric(name: string | undefined, value: number): string {
+  if (!name) return value.toFixed(2)
+  const n = name.toLowerCase()
+  if (n.includes('volatil') || n.includes('drawdown') || n.includes('hhi'))
+    return `${(value * 100).toFixed(1)}%`
+  if (n.includes('var'))
+    return formatCurrency(value)
+  return value.toFixed(2)
+}
+
 export default function SmartInsightsPage() {
   const [days, setDays] = useState(30)
 
-  const { data, isLoading, refetch, isFetching } = useQuery<PortfolioHealth>({
-    queryKey: ['smart-insights-health', days],
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<PortfolioHealth>({
+    queryKey: queryKeys.smartInsights.health(days),
     queryFn: () => smartInsightsApi.getHealth(days),
     staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 
   const getScoreColor = (score: number) => {
@@ -172,7 +184,7 @@ export default function SmartInsightsPage() {
             Smart Insights
           </h1>
           <p className="text-muted-foreground">
-            Analyse IA de votre portefeuille avec recommandations personnalisees
+            Analyse IA de votre portefeuille avec recommandations personnalisées
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -197,6 +209,17 @@ export default function SmartInsightsPage() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-3" />
+            <p className="text-muted-foreground">Erreur lors du chargement des données</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
       ) : data ? (
         <>
           {/* Score global + Metriques */}
@@ -227,7 +250,7 @@ export default function SmartInsightsPage() {
                       {(data.metrics_summary.sharpe_ratio ?? 0).toFixed(2)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {(data.metrics_summary.sharpe_ratio ?? 0) >= 1 ? 'Bon' : (data.metrics_summary.sharpe_ratio ?? 0) >= 0.5 ? 'Correct' : 'A ameliorer'}
+                      {(data.metrics_summary.sharpe_ratio ?? 0) >= 1 ? 'Bon' : (data.metrics_summary.sharpe_ratio ?? 0) >= 0.5 ? 'Correct' : 'À améliorer'}
                     </p>
                   </div>
                   <TooltipProvider>
@@ -236,7 +259,7 @@ export default function SmartInsightsPage() {
                         <Target className="h-8 w-8 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Rendement ajuste au risque. Objectif: &gt;1</p>
+                        <p>Rendement ajusté au risque. Objectif: &gt;1</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -278,10 +301,10 @@ export default function SmartInsightsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Concentration (HHI)</p>
                     <div className={`text-3xl font-bold ${(data.metrics_summary.hhi ?? 0) < 0.15 ? 'text-green-500' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'text-yellow-500' : 'text-red-500'}`}>
-                      {((data.metrics_summary.hhi ?? 0) * 100).toFixed(0)}%
+                      {((data.metrics_summary.hhi ?? 0) * 10000).toFixed(0)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {(data.metrics_summary.hhi ?? 0) < 0.15 ? 'Bien diversifie' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'Moderement concentre' : 'Tres concentre'}
+                      {(data.metrics_summary.hhi ?? 0) < 0.15 ? 'Bien diversifié' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'Modérément concentré' : 'Très concentré'}
                     </p>
                   </div>
                   <TooltipProvider>
@@ -290,7 +313,34 @@ export default function SmartInsightsPage() {
                         <BarChart3 className="h-8 w-8 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Indice Herfindahl-Hirschman. Plus bas = plus diversifie</p>
+                        <p>Indice Herfindahl-Hirschman. Plus bas = plus diversifié</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Max Drawdown */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Max Drawdown</p>
+                    <div className={`text-3xl font-bold ${Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.25 ? 'text-red-500' : Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.15 ? 'text-yellow-500' : 'text-green-500'}`}>
+                      {(Math.abs(data.metrics_summary.max_drawdown ?? 0) * 100).toFixed(0)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.25 ? 'Drawdown sévère' : Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.15 ? 'Drawdown notable' : 'Acceptable'}
+                    </p>
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <TrendingDown className="h-8 w-8 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Baisse maximale depuis le dernier pic. Objectif: &lt;15%</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -313,7 +363,7 @@ export default function SmartInsightsPage() {
                   Recommandations IA
                 </CardTitle>
                 <CardDescription>
-                  Actions suggérees pour améliorer votre portefeuille
+                  Actions suggérées pour améliorer votre portefeuille
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -333,9 +383,9 @@ export default function SmartInsightsPage() {
 
                           {insight.current_value != null && insight.target_value != null && (
                             <div className="mt-2 flex items-center gap-4 text-sm">
-                              <span>Actuel: <strong>{(insight.current_value ?? 0).toFixed(2)}</strong></span>
+                              <span>Actuel: <strong>{formatMetric(insight.metric_name, insight.current_value)}</strong></span>
                               <ArrowUpRight className="h-4 w-4" />
-                              <span>Objectif: <strong>{(insight.target_value ?? 0).toFixed(2)}</strong></span>
+                              <span>Objectif: <strong>{formatMetric(insight.metric_name, insight.target_value)}</strong></span>
                             </div>
                           )}
 
@@ -376,10 +426,10 @@ export default function SmartInsightsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5 text-blue-500" />
-                  Suggestions de reequilibrage
+                  Suggestions de rééquilibrage
                 </CardTitle>
                 <CardDescription>
-                  Ordres suggeres pour optimiser le ratio de Sharpe (MPT)
+                  Ordres suggérés pour optimiser le ratio de Sharpe (MPT)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -403,20 +453,23 @@ export default function SmartInsightsPage() {
                             <div className="text-xs text-muted-foreground">{order.name}</div>
                           </td>
                           <td className="p-2 text-center">
-                            <Badge variant={order.action === 'buy' ? 'default' : 'destructive'}>
+                            <Badge variant={order.action === 'buy' ? 'default' : order.action === 'hold' ? 'outline' : 'destructive'}
+                              className={order.action === 'hold' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : ''}>
                               {order.action === 'buy' ? (
                                 <ArrowUpRight className="h-3 w-3 mr-1" />
+                              ) : order.action === 'hold' ? (
+                                <Shield className="h-3 w-3 mr-1" />
                               ) : (
                                 <ArrowDownRight className="h-3 w-3 mr-1" />
                               )}
-                              {order.action === 'buy' ? 'Acheter' : 'Vendre'}
+                              {order.action === 'buy' ? 'Acheter' : order.action === 'hold' ? 'Conserver' : 'Vendre'}
                             </Badge>
                           </td>
                           <td className="p-2 text-right">{((order.current_weight ?? 0) * 100).toFixed(1)}%</td>
                           <td className="p-2 text-right">{((order.target_weight ?? 0) * 100).toFixed(1)}%</td>
                           <td className="p-2 text-right font-mono">
-                            <span className={order.action === 'buy' ? 'text-green-500' : 'text-red-500'}>
-                              {order.action === 'buy' ? '+' : '-'}{formatCurrency(Math.abs(order.amount_eur ?? 0))}
+                            <span className={order.action === 'buy' ? 'text-green-500' : order.action === 'hold' ? 'text-amber-500' : 'text-red-500'}>
+                              {order.action === 'buy' ? '+' : order.action === 'hold' ? '~' : '-'}{formatCurrency(Math.abs(order.amount_eur ?? 0))}
                             </span>
                           </td>
                           <td className="p-2 text-xs text-muted-foreground max-w-[200px]">{order.reason}</td>
@@ -435,7 +488,7 @@ export default function SmartInsightsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  Anomalies detectees
+                  Anomalies détectées
                 </CardTitle>
                 <CardDescription>
                   Mouvements inhabituels sur vos positions avec impact en EUR
@@ -471,7 +524,7 @@ export default function SmartInsightsPage() {
                       <p className="text-sm text-muted-foreground">{anomaly.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Position: {formatCurrency(anomaly.position_value_eur ?? 0)} |
-                        Detecte: {new Date(anomaly.detected_at).toLocaleDateString('fr-FR')}
+                        Détecté : {new Date(anomaly.detected_at).toLocaleDateString('fr-FR')}
                       </p>
                     </div>
                   ))}
@@ -485,9 +538,9 @@ export default function SmartInsightsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <CheckCircle2 className="h-16 w-16 mx-auto text-green-500 mb-4" />
-                <h3 className="text-xl font-semibold">Votre portefeuille est en bonne sante !</h3>
+                <h3 className="text-xl font-semibold">Votre portefeuille est en bonne santé !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Aucune recommandation ou anomalie detectee pour le moment.
+                  Aucune recommandation ou anomalie détectée pour le moment.
                 </p>
               </CardContent>
             </Card>
@@ -495,14 +548,14 @@ export default function SmartInsightsPage() {
 
           {/* Footer */}
           <p className="text-xs text-muted-foreground text-center">
-            Analyse generee le {new Date(data.generated_at).toLocaleString('fr-FR')}
+            Analyse générée le {new Date(data.generated_at).toLocaleString('fr-FR')}
           </p>
         </>
       ) : (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Impossible de charger les donnees</p>
+            <p className="text-muted-foreground">Impossible de charger les données</p>
           </CardContent>
         </Card>
       )}
@@ -516,10 +569,10 @@ export default function SmartInsightsPage() {
 // ──────────────────────────────────────────────────────
 
 const REGIME_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  bearish: { label: 'Bearish', color: '#ef4444', bg: 'bg-red-500/10', icon: <TrendingDown className="h-5 w-5 text-red-500" /> },
-  bottom: { label: 'Bottom', color: '#f97316', bg: 'bg-orange-500/10', icon: <ArrowUpRight className="h-5 w-5 text-orange-500" /> },
-  bullish: { label: 'Bullish', color: '#22c55e', bg: 'bg-green-500/10', icon: <TrendingUp className="h-5 w-5 text-green-500" /> },
-  top: { label: 'Top', color: '#a855f7', bg: 'bg-purple-500/10', icon: <ArrowDownRight className="h-5 w-5 text-purple-500" /> },
+  bearish: { label: 'Baissier', color: '#ef4444', bg: 'bg-red-500/10', icon: <TrendingDown className="h-5 w-5 text-red-500" /> },
+  bottom: { label: 'Creux', color: '#f97316', bg: 'bg-orange-500/10', icon: <ArrowUpRight className="h-5 w-5 text-orange-500" /> },
+  bullish: { label: 'Haussier', color: '#22c55e', bg: 'bg-green-500/10', icon: <TrendingUp className="h-5 w-5 text-green-500" /> },
+  top: { label: 'Sommet', color: '#a855f7', bg: 'bg-purple-500/10', icon: <ArrowDownRight className="h-5 w-5 text-purple-500" /> },
 }
 
 const SIGNAL_COLORS: Record<string, string> = {
@@ -567,10 +620,10 @@ function MarketRegimeCard({ regime }: { regime: MarketRegime }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-primary" />
-          Regime de Marche
+          Régime de Marché
         </CardTitle>
         <CardDescription>
-          Analyse basee sur 7 indicateurs techniques (BTC comme proxy)
+          Analyse basée sur 7 indicateurs techniques (BTC comme proxy)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

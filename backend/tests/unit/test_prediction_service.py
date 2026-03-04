@@ -1,11 +1,8 @@
 """Tests for prediction service helper methods."""
 
-from datetime import datetime
 
-import numpy as np
 import pytest
 
-from app.ml.forecaster import PriceForecaster
 from app.services.prediction_service import PredictionService, PricePrediction
 
 
@@ -48,15 +45,18 @@ class TestGetDailyVolatility:
         svc = object.__new__(PredictionService)
         return svc
 
-    def test_crypto_highest_volatility(self, svc):
+    @pytest.mark.asyncio
+    async def test_crypto_highest_volatility(self, svc):
         from app.models.asset import AssetType
-        crypto = svc._get_daily_volatility(AssetType.CRYPTO)
-        stock = svc._get_daily_volatility(AssetType.STOCK)
-        etf = svc._get_daily_volatility(AssetType.ETF)
+
+        crypto = await svc._get_daily_volatility("BTC", AssetType.CRYPTO)
+        stock = await svc._get_daily_volatility("AAPL", AssetType.STOCK)
+        etf = await svc._get_daily_volatility("SPY", AssetType.ETF)
         assert crypto > stock > etf
 
-    def test_unknown_type_default(self, svc):
-        result = svc._get_daily_volatility("unknown_type")
+    @pytest.mark.asyncio
+    async def test_unknown_type_default(self, svc):
+        result = await svc._get_daily_volatility("X", "unknown_type")
         assert result == 0.02
 
 
@@ -68,27 +68,33 @@ class TestRandomWalkFallback:
         svc = object.__new__(PredictionService)
         return svc
 
-    def test_returns_correct_structure(self, svc):
+    @pytest.mark.asyncio
+    async def test_returns_correct_structure(self, svc):
         from app.models.asset import AssetType
-        predictions, trend, strength = svc._random_walk_fallback(100.0, AssetType.CRYPTO, 7)
+
+        predictions, trend, strength = await svc._random_walk_fallback("BTC", 100.0, AssetType.CRYPTO, 7)
         assert len(predictions) == 7
         assert trend in ("bullish", "bearish", "neutral")
         assert isinstance(strength, float)
 
-    def test_predictions_have_required_keys(self, svc):
+    @pytest.mark.asyncio
+    async def test_predictions_have_required_keys(self, svc):
         from app.models.asset import AssetType
-        predictions, _, _ = svc._random_walk_fallback(100.0, AssetType.STOCK, 3)
+
+        predictions, _, _ = await svc._random_walk_fallback("AAPL", 100.0, AssetType.STOCK, 3)
         for p in predictions:
             assert "date" in p
             assert "price" in p
             assert "confidence_low" in p
             assert "confidence_high" in p
 
-    def test_no_negative_prices(self, svc):
+    @pytest.mark.asyncio
+    async def test_no_negative_prices(self, svc):
         from app.models.asset import AssetType
+
         # Run multiple times to reduce randomness
         for _ in range(10):
-            predictions, _, _ = svc._random_walk_fallback(1.0, AssetType.CRYPTO, 7)
+            predictions, _, _ = await svc._random_walk_fallback("BTC", 1.0, AssetType.CRYPTO, 7)
             for p in predictions:
                 assert p["confidence_low"] >= 0
 
