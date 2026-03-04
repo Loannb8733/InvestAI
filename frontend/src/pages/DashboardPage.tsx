@@ -33,7 +33,6 @@ import {
   BarChart3,
   ArrowRightLeft,
   ChevronRight,
-  AlertTriangle,
   ShieldAlert,
   Info,
   Target,
@@ -174,7 +173,7 @@ interface DashboardMetrics {
   asset_allocation: AssetAllocation[]
   top_performers: Array<{ symbol: string; name: string; asset_type: string; gain_loss_percent: number; current_value: number }>
   worst_performers: Array<{ symbol: string; name: string; asset_type: string; gain_loss_percent: number; current_value: number }>
-  historical_data: Array<{ date: string; value: number; is_estimated?: boolean }>
+  historical_data: Array<{ date: string; value: number }>
   is_data_estimated: boolean
   recent_transactions: RecentTransaction[]
   active_alerts: ActiveAlert[]
@@ -326,7 +325,7 @@ const OnboardingWizard = lazy(() => import('@/components/OnboardingWizard'))
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [selectedPeriod, setSelectedPeriod] = useState(30)
+  const [selectedPeriod, setSelectedPeriod] = useState(0)
   const { showOnboarding, markDone } = useOnboarding()
   const [onboardingVisible, setOnboardingVisible] = useState(showOnboarding)
   const { exportToPdf } = useExportPdf()
@@ -399,15 +398,19 @@ export default function DashboardPage() {
     )
   }
 
-  const netGainLoss = metrics?.net_gain_loss ?? metrics?.total_gain_loss ?? 0
+  // P&L: always use net_gain_loss (total_value - net_capital), never fall back to total_gain_loss
+  // total_gain_loss uses all-time invested as denominator which is wrong for users with sells
+  const netGainLoss = metrics?.net_gain_loss ?? 0
   const isPositive = netGainLoss >= 0
-  // Use period change when not viewing 24h/1d, fall back to daily change
-  const variationChange = selectedPeriod > 1
-    ? (metrics?.period_change ?? metrics?.daily_change ?? 0)
-    : (metrics?.daily_change ?? 0)
-  const variationPercent = selectedPeriod > 1
-    ? (metrics?.period_change_percent ?? metrics?.daily_change_percent ?? 0)
-    : (metrics?.daily_change_percent ?? 0)
+  // Use period change for all periods except 24h (selectedPeriod=1)
+  // selectedPeriod=0 ("Tout") needs period_change (true P&L vs cost basis)
+  // Do NOT fall back to daily_change for non-24h periods — it's from a different data source
+  const variationChange = selectedPeriod === 1
+    ? (metrics?.daily_change ?? 0)
+    : (metrics?.period_change ?? 0)
+  const variationPercent = selectedPeriod === 1
+    ? (metrics?.daily_change_percent ?? 0)
+    : (metrics?.period_change_percent ?? 0)
   const isDailyPositive = variationChange >= 0
 
   // Empty state
@@ -506,25 +509,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Alerts Section */}
-      {(metrics.is_data_estimated || concentration.is_concentrated) && (
+      {concentration.is_concentrated && (
         <div className="space-y-2">
-          {metrics.is_data_estimated && (
-            <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <AlertDescription className="text-yellow-600 dark:text-yellow-400">
-                Les données historiques sont estimées. Les valeurs réelles seront enregistrées à partir d'aujourd'hui.
-              </AlertDescription>
-            </Alert>
-          )}
-          {concentration.is_concentrated && (
-            <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertDescription>
-                Alerte concentration : {concentration.top_asset} représente {concentration.top_concentration}% de votre portefeuille.
-                Envisagez de diversifier vos investissements.
-              </AlertDescription>
-            </Alert>
-          )}
+          <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              Alerte concentration : {concentration.top_asset} représente {concentration.top_concentration}% de votre portefeuille.
+              Envisagez de diversifier vos investissements.
+            </AlertDescription>
+          </Alert>
         </div>
       )}
 
@@ -554,10 +547,10 @@ export default function DashboardPage() {
                   <DashboardMetricsRow
                     totalValue={metrics.total_value}
                     assetsCount={metrics.assets_count}
-                    netCapital={metrics.net_capital ?? metrics.total_invested}
+                    netCapital={metrics.net_capital}
                     totalInvested={metrics.total_invested}
                     netGainLoss={netGainLoss}
-                    netGainLossPercent={metrics.net_gain_loss_percent ?? metrics.total_gain_loss_percent}
+                    netGainLossPercent={metrics.net_gain_loss_percent}
                     isPositive={isPositive}
                     dailyChange={variationChange}
                     dailyChangePercent={variationPercent}
@@ -568,7 +561,9 @@ export default function DashboardPage() {
                 )
               case 'pnl':
                 return (
-                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel={periodLabel} />
+                  // P&L breakdown is always all-time (realized gains are cumulative)
+                  // Show "Depuis le début" regardless of selected period to avoid misleading labels
+                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel="Depuis le début" />
                 )
               case 'risk':
                 return (
@@ -659,7 +654,6 @@ export default function DashboardPage() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           Évolution du patrimoine ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})
-                          {metrics.is_data_estimated && (<Badge variant="outline" className="text-yellow-600 border-yellow-500">Estimé</Badge>)}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>

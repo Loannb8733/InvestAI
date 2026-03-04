@@ -2,11 +2,14 @@
 
 import asyncio
 import logging
+import math
 import time
+from collections import defaultdict
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ml.historical_data import HistoricalDataFetcher
@@ -20,6 +23,18 @@ logger = logging.getLogger(__name__)
 # In-memory cache for dashboard metrics: {(user_id, days): (timestamp, result)}
 _dashboard_cache: Dict[Tuple[str, int], Tuple[float, Dict]] = {}
 _DASHBOARD_CACHE_TTL = 120  # 2 minutes
+_MAX_DASHBOARD_CACHE = 200  # max entries before eviction
+
+
+def _cache_put_dashboard(key: Tuple, value: Tuple) -> None:
+    """Insert into bounded dashboard cache, evicting oldest entries if full."""
+    if len(_dashboard_cache) >= _MAX_DASHBOARD_CACHE:
+        evict_count = max(1, _MAX_DASHBOARD_CACHE // 4)
+        sorted_keys = sorted(_dashboard_cache, key=lambda k: _dashboard_cache[k][0])
+        for k in sorted_keys[:evict_count]:
+            del _dashboard_cache[k]
+    _dashboard_cache[key] = value
+
 
 # Fiat currencies -> counted as cash
 FIAT_SYMBOLS = {"EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY"}
@@ -87,6 +102,74 @@ class MetricsService:
             "gain_loss_percent": gain_loss_percent,
         }
 
+    async def _compute_risk_weights(
+        self,
+        db: AsyncSession,
+        symbols: List[str],
+        symbol_values: Dict[str, float],
+        total_value: float,
+        days: int = 90,
+    ) -> Dict[str, float]:
+        """Compute risk weight per symbol based on historical volatility contribution."""
+        if not symbols or total_value <= 0:
+            return {}
+
+        from app.models.asset_price_history import AssetPriceHistory
+
+        cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+
+        result = await db.execute(
+            select(
+                AssetPriceHistory.symbol,
+                AssetPriceHistory.price_date,
+                AssetPriceHistory.price_eur,
+            )
+            .where(
+                AssetPriceHistory.symbol.in_([s.upper() for s in symbols]),
+                AssetPriceHistory.price_date >= cutoff,
+            )
+            .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
+        )
+        rows = result.all()
+
+        # Group prices by symbol
+        symbol_prices: Dict[str, List[float]] = defaultdict(list)
+        for row in rows:
+            symbol_prices[row[0]].append(float(row[2]))
+
+        # Compute annualized volatility per symbol
+        volatilities: Dict[str, float] = {}
+        for symbol, prices in symbol_prices.items():
+            if len(prices) < 10:
+                volatilities[symbol] = 0.0
+                continue
+            daily_returns = [
+                (prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices)) if prices[i - 1] > 0
+            ]
+            if not daily_returns:
+                volatilities[symbol] = 0.0
+                continue
+            mean_ret = sum(daily_returns) / len(daily_returns)
+            variance = sum((r - mean_ret) ** 2 for r in daily_returns) / len(daily_returns)
+            volatilities[symbol] = math.sqrt(variance) * math.sqrt(252)
+
+        # Weighted risk contributions
+        total_weighted = 0.0
+        weighted_vols: Dict[str, float] = {}
+        for symbol in symbols:
+            s = symbol.upper()
+            weight = symbol_values.get(s, 0) / total_value if total_value > 0 else 0
+            wv = weight * volatilities.get(s, 0)
+            weighted_vols[s] = wv
+            total_weighted += wv
+
+        # Normalize to percentages
+        risk_weights: Dict[str, float] = {}
+        for symbol, wv in weighted_vols.items():
+            risk_weights[symbol] = round((wv / total_weighted * 100) if total_weighted > 0 else 0, 2)
+
+        return risk_weights
+
     async def get_portfolio_metrics(
         self,
         db: AsyncSession,
@@ -139,6 +222,30 @@ class MetricsService:
         investment_assets = [a for a in assets if not is_cash_like(a.symbol)]
         stablecoin_assets = [a for a in assets if is_stablecoin(a.symbol)]
         fiat_assets = [a for a in assets if is_fiat(a.symbol)]
+
+        # Batch-fetch total fees per asset from transactions
+        inv_asset_ids = [a.id for a in investment_assets]
+        fees_map: Dict[str, float] = {}
+        if inv_asset_ids:
+            from app.models.transaction import TransactionType as TxType
+
+            fee_result = await db.execute(
+                select(
+                    Transaction.asset_id,
+                    func.sum(
+                        case(
+                            (
+                                Transaction.transaction_type == TxType.FEE,
+                                Transaction.quantity * Transaction.price,
+                            ),
+                            else_=func.coalesce(Transaction.fee, 0),
+                        )
+                    ).label("total_fees"),
+                )
+                .where(Transaction.asset_id.in_(inv_asset_ids))
+                .group_by(Transaction.asset_id)
+            )
+            fees_map = {str(r[0]): float(r[1] or 0) for r in fee_result.all()}
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -229,6 +336,11 @@ class MetricsService:
             total_value += Decimal(str(metrics["current_value"]))
             total_invested += Decimal(str(metrics["total_invested"]))
 
+            # Per-asset fees and break-even price
+            asset_fees = fees_map.get(str(asset.id), 0.0)
+            qty = metrics["quantity"]
+            breakeven_price = (metrics["total_invested"] + asset_fees) / qty if qty > 0 else None
+
             asset_entry = {
                 "id": str(asset.id),
                 "symbol": asset.symbol,
@@ -236,6 +348,8 @@ class MetricsService:
                 "asset_type": asset.asset_type.value,
                 "exchange": asset.exchange,
                 "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
+                "total_fees": asset_fees,
+                "breakeven_price": round(breakeven_price, 2) if breakeven_price is not None else None,
                 **metrics,
             }
             # Include crowdfunding fields if present
@@ -297,6 +411,17 @@ class MetricsService:
         # Sort by value descending
         asset_metrics.sort(key=lambda x: x["current_value"], reverse=True)
 
+        # Compute risk weights (volatility contribution per symbol)
+        symbol_values: Dict[str, float] = {}
+        for am in asset_metrics:
+            s = am["symbol"].upper()
+            symbol_values[s] = symbol_values.get(s, 0) + am["current_value"]
+        risk_weights = await self._compute_risk_weights(
+            db, list(symbol_values.keys()), symbol_values, float(total_value)
+        )
+        for am in asset_metrics:
+            am["risk_weight"] = risk_weights.get(am["symbol"].upper(), 0.0)
+
         total_gain_loss = total_value - total_invested
         total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
@@ -328,34 +453,54 @@ class MetricsService:
     async def _fetch_period_changes(self, symbols_by_type: Dict[str, List[str]], days: int) -> Dict[str, float]:
         """Fetch price change percentage over a period for each symbol.
 
-        Returns {SYMBOL: change_percent} using CoinGecko /coins/markets
-        (single batch call) for crypto when an exact period is available,
-        or historical price data for any period (crypto + stocks).
-        """
-        import httpx
+        Strategy (prioritized):
+        1. Cached historical data (Redis/PostgreSQL) — fast, no API calls
+        2. CoinGecko batch API for crypto — single call, pre-computed periods
+        3. Live historical fetch — last resort, one API call per symbol
 
-        from app.core.timeframe import get_coingecko_period
+        Returns {SYMBOL: change_percent}.
+        """
+        from app.tasks.history_cache import get_cached_history
 
         changes: Dict[str, float] = {}
+        uncached_crypto: list[str] = []
+        uncached_stocks: list[str] = []
 
-        # Determine if CoinGecko has a pre-computed period close to `days`
-        cg_period, cg_key = get_coingecko_period(days)
+        # ── Step 1: Try cached historical data first (no API calls) ──
+        all_symbols = []
+        for syms in symbols_by_type.values():
+            all_symbols.extend(syms)
 
-        # Crypto: use batch API when CoinGecko has a matching period,
-        # otherwise fall back to historical price data for accuracy.
-        crypto_symbols = symbols_by_type.get("crypto", [])
-        if crypto_symbols:
+        for symbol in all_symbols:
+            dates, prices = get_cached_history(symbol.upper(), days=max(days, 2))
+            if prices and len(prices) >= 2 and prices[0] != 0:
+                change = (prices[-1] - prices[0]) / prices[0] * 100
+                changes[symbol.upper()] = change
+            else:
+                # Track uncached symbols by type for live fallback
+                sym_upper = symbol.upper()
+                if sym_upper in [s.upper() for s in symbols_by_type.get("crypto", [])]:
+                    uncached_crypto.append(symbol)
+                else:
+                    uncached_stocks.append(symbol)
+
+        # If all symbols resolved from cache, return early
+        if not uncached_crypto and not uncached_stocks:
+            return changes
+
+        # ── Step 2: CoinGecko batch API for uncached crypto ──
+        if uncached_crypto:
+            import httpx
+
+            from app.core.timeframe import get_coingecko_period
+
+            cg_period, cg_key = get_coingecko_period(days)
             if cg_period is not None:
-                # Batch call via /coins/markets (1 API call for all coins)
                 try:
                     from app.ml.historical_data import HistoricalDataFetcher as HDF
 
-                    coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in crypto_symbols]
-
-                    headers = {
-                        "User-Agent": "Mozilla/5.0",
-                        "Accept": "application/json",
-                    }
+                    coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in uncached_crypto]
+                    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
                     coingecko_key = getattr(price_service, "coingecko_api_key", None)
                     if coingecko_key:
                         headers["x-cg-demo-api-key"] = coingecko_key
@@ -372,9 +517,7 @@ class MetricsService:
                         )
                         response.raise_for_status()
                         data = response.json()
-
                         id_to_symbol = {v: k for k, v in HDF.SYMBOL_MAP.items()}
-
                         for coin in data:
                             coin_id = coin.get("id", "")
                             symbol = id_to_symbol.get(coin_id, coin.get("symbol", "").upper())
@@ -386,35 +529,26 @@ class MetricsService:
                                 if pct is None:
                                     continue
                             changes[symbol.upper()] = float(pct)
-
+                            # Remove from uncached since we got data
+                            uncached_crypto = [s for s in uncached_crypto if s.upper() != symbol.upper()]
                 except Exception as e:
                     logger.warning("Failed to fetch crypto period changes (batch): %s", e)
-            else:
-                # No matching CoinGecko period (e.g. 90j) → use historical data
-                fetcher = HistoricalDataFetcher()
-                try:
-                    for symbol in crypto_symbols:
-                        try:
-                            _, prices = await fetcher.get_crypto_history(symbol, days=days)
-                            if prices and len(prices) >= 2 and prices[0] != 0:
-                                change = (prices[-1] - prices[0]) / prices[0] * 100
-                                changes[symbol.upper()] = change
-                        except Exception:
-                            pass
-                finally:
-                    await fetcher.close()
 
-        # Stocks/ETFs: always use historical price data (no batch API)
-        stock_symbols = symbols_by_type.get("stock", []) + symbols_by_type.get("etf", [])
-        if stock_symbols:
+        # ── Step 3: Live historical fetch for remaining uncached symbols ──
+        remaining = uncached_crypto + uncached_stocks
+        if remaining:
             fetcher = HistoricalDataFetcher()
             try:
-                for symbol in stock_symbols:
+                for symbol in remaining:
                     try:
-                        _, prices = await fetcher.get_stock_history(symbol, days=days)
+                        sym_upper = symbol.upper()
+                        if sym_upper in [s.upper() for s in symbols_by_type.get("crypto", [])]:
+                            _, prices = await fetcher.get_crypto_history(symbol, days=days)
+                        else:
+                            _, prices = await fetcher.get_stock_history(symbol, days=days)
                         if prices and len(prices) >= 2 and prices[0] != 0:
                             change = (prices[-1] - prices[0]) / prices[0] * 100
-                            changes[symbol.upper()] = change
+                            changes[sym_upper] = change
                     except Exception:
                         pass
             finally:
@@ -469,6 +603,7 @@ class MetricsService:
         total_invested = Decimal("0")
         total_sold = Decimal("0")
         total_realized = Decimal("0")
+        total_unrealized = Decimal("0")
         total_pnl_fees = Decimal("0")
         all_assets = []
 
@@ -480,11 +615,15 @@ class MetricsService:
             total_invested += Decimal(str(portfolio_history["total_invested_all_time"]))
             total_sold += Decimal(str(portfolio_history.get("total_sold", 0)))
             total_realized += Decimal(str(portfolio_history.get("realized_gains", 0)))
+            # Unrealized P&L from portfolio_metrics: correctly uses cost basis
+            # of CURRENT holdings only (qty * avg_buy_price), not all-time invested
+            total_unrealized += Decimal(str(portfolio_metrics["total_gain_loss"]))
             total_pnl_fees += Decimal(str(portfolio_history.get("total_fees", 0)))
             all_assets.extend(portfolio_metrics["assets"])
 
+        # total_gain_loss: gain/loss relative to total ever invested (includes sold positions)
+        # This is used for the "brut" view; net_gain_loss below is the primary P&L metric
         total_gain_loss = total_value - total_invested
-        # total_gain_loss_percent: gain/loss relative to total amount ever invested
         if total_invested > 0:
             total_gain_loss_percent = float(total_gain_loss / total_invested * 100)
         else:
@@ -563,16 +702,15 @@ class MetricsService:
                 period_change_percent += a.get("period_change_percent", 0) * weight
         period_change = float(total_value) * period_change_percent / 100 if period_change_percent else 0.0
 
-        # Net capital = money injected - money withdrawn (actual cash still in play)
-        # Don't clamp to 0: negative net_capital means user recovered more than invested
-        # which is a valid state (profitable sells). Clamping masks real P&L.
+        # Net capital = money injected - money withdrawn (informational only)
         net_capital = total_invested - total_sold
-        net_gain_loss = total_value - net_capital
-        if net_capital > 0:
-            net_gain_loss_percent = float(net_gain_loss / net_capital * 100)
-        elif net_capital < 0:
-            # User recovered more than invested: show gain relative to total_invested
-            net_gain_loss_percent = float(net_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
+
+        # Unified P&L: ALL indicators use the same root formula:
+        #   net_gain_loss = total_value - total_invested
+        # This is the single source of truth. No "Richesse vs Comptable" split.
+        net_gain_loss = total_value - total_invested
+        if total_invested > 0:
+            net_gain_loss_percent = float(net_gain_loss / total_invested * 100)
         else:
             net_gain_loss_percent = 0.0
 
@@ -633,18 +771,23 @@ class MetricsService:
                 for a in aggregated
                 if a["current_value"] > 0
             ],
-            # P&L breakdown (avoids separate calculate_realized_unrealized_pnl call)
+            # P&L breakdown: always all-time, unified on the same root as net_gain_loss.
+            # total_pnl = total_value - total_invested (single source of truth)
+            # unrealized = total_pnl - realized (residual, ensures perfect reconciliation)
+            # Guarantee: realized + unrealized = total_pnl (by construction)
+            # net_pnl = total_pnl - fees (fees deducted exactly once)
             "pnl_data": {
                 "realized_pnl": float(total_realized),
-                "unrealized_pnl": float(total_gain_loss),
-                "total_pnl": float(total_realized + total_gain_loss),
+                "unrealized_pnl": float((total_value - total_invested) - total_realized),
+                "total_pnl": float(total_value - total_invested),
                 "total_fees": float(total_pnl_fees),
-                "net_pnl": float(total_realized + total_gain_loss - total_pnl_fees),
+                "net_pnl": float(total_value - total_invested - total_pnl_fees),
+                "is_all_time": True,  # P&L breakdown is always cumulative
             },
         }
 
-        # Cache the result
-        _dashboard_cache[cache_key] = (time.time(), result)
+        # Cache the result (bounded)
+        _cache_put_dashboard(cache_key, (time.time(), result))
         return result
 
     async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:

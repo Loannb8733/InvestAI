@@ -264,6 +264,23 @@ async def login(
     result = await db.execute(select(User).where(User.email == login_data.email))
     user = result.scalar_one_or_none()
 
+    # Check per-account lockout BEFORE password verification to avoid
+    # wasting bcrypt CPU on locked accounts and prevent timing attacks
+    if user:
+        try:
+            r = await _get_redis_txt()
+            fail_key = f"login_fail:{user.id}"
+            fails = int(await r.get(fail_key) or 0)
+            if fails >= 10:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Account temporarily locked. Please try again in 15 minutes.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Redis down — fail open
+
     if not user or not verify_password(login_data.password, user.password_hash):
         # Track per-account failed attempts (even if user not found, use email hash)
         if user:
@@ -278,21 +295,6 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-
-    # Check per-account lockout (10 failures in 15 minutes)
-    try:
-        r = await _get_redis_txt()
-        fail_key = f"login_fail:{user.id}"
-        fails = int(await r.get(fail_key) or 0)
-        if fails >= 10:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Account temporarily locked. Please try again in 15 minutes.",
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        pass  # Redis down — fail open
 
     if not user.is_active:
         raise HTTPException(
@@ -405,6 +407,23 @@ async def refresh_token(
             detail="Invalid refresh token",
         )
 
+    # Check if this refresh token has been revoked (blocklisted on logout)
+    from app.core.redis_client import _get_redis_txt
+
+    jti = payload.get("jti")
+    if jti:
+        try:
+            r = await _get_redis_txt()
+            if await r.exists(f"token_blocklist:{jti}"):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Redis down — fail open
+
     user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -441,8 +460,25 @@ async def refresh_token(
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(response: Response) -> dict:
-    """Clear auth cookies."""
+async def logout(request: Request, response: Response) -> dict:
+    """Clear auth cookies and revoke refresh token."""
+    # Blocklist the refresh token's jti so it can't be reused
+    raw_refresh = request.cookies.get("refresh_token")
+    if raw_refresh:
+        try:
+            payload = decode_token(raw_refresh)
+            if payload and payload.get("jti"):
+                from app.core.redis_client import _get_redis_txt
+
+                r = await _get_redis_txt()
+                # TTL = remaining token lifetime (exp - now), capped at 7 days
+                exp = payload.get("exp", 0)
+                ttl = max(1, int(exp - datetime.utcnow().timestamp()))
+                ttl = min(ttl, 7 * 86400)
+                await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
+        except Exception:
+            pass  # Best-effort revocation; cookie deletion still provides baseline protection
+
     response.delete_cookie("access_token", path="/api")
     response.delete_cookie("refresh_token", path="/api/v1/auth")
     return {"message": "Déconnexion réussie"}

@@ -61,11 +61,11 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel }: Dashboar
             <p className="text-lg font-bold text-orange-500">-{formatCurrency(pnlBreakdown.total_fees)}</p>
           </div>
           <div>
-            <MetricTooltip content="P&L total (latent + réalisé)."><p className="text-xs text-muted-foreground">P&L Total</p></MetricTooltip>
+            <MetricTooltip content="Latent + Réalisé (avant frais)."><p className="text-xs text-muted-foreground">P&L Total</p></MetricTooltip>
             <p className={`text-lg font-bold ${pnlBreakdown.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.total_pnl >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(pnlBreakdown.total_pnl)}</p>
           </div>
           <div>
-            <MetricTooltip content="P&L net après déduction des frais."><p className="text-xs text-muted-foreground">P&L Net</p></MetricTooltip>
+            <MetricTooltip content="Latent + Réalisé − Frais. Diffère de la Plus-value Nette (Patrimoine − Capital Net) qui inclut aussi les flux de ventes."><p className="text-xs text-muted-foreground">P&L Net</p></MetricTooltip>
             <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(pnlBreakdown.net_pnl)}</p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 """Security utilities: password hashing, JWT, encryption."""
 
 import hashlib
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -61,7 +62,7 @@ def create_refresh_token(
     expires_delta: Optional[timedelta] = None,
     fingerprint: Optional[str] = None,
 ) -> str:
-    """Create a JWT refresh token."""
+    """Create a JWT refresh token with a unique jti for revocation support."""
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -71,6 +72,7 @@ def create_refresh_token(
         "sub": str(subject),
         "exp": expire,
         "type": "refresh",
+        "jti": uuid.uuid4().hex,
     }
     if fingerprint:
         to_encode["fp"] = fingerprint

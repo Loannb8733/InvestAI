@@ -18,13 +18,26 @@ from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
 
-# In-memory price cache: {symbol: (timestamp, {date_str: price})}
-_price_cache: Dict[str, Tuple[float, Dict[str, float]]] = {}
+# In-memory price cache: {(symbol, days): (timestamp, {date_str: price})}
+_price_cache: Dict[Tuple[str, int], Tuple[float, Dict[str, float]]] = {}
 _PRICE_CACHE_TTL = 1800  # 30 minutes — historical daily prices don't change
+_MAX_PRICE_CACHE = 500  # max entries before eviction
 
 # In-memory cache for full portfolio value series: {(user_id, days): (timestamp, result)}
 _series_cache: Dict[Tuple[str, int], Tuple[float, List[Dict]]] = {}
 _SERIES_CACHE_TTL = 120  # 2 minutes — caches the entire computed series
+_MAX_SERIES_CACHE = 200  # max entries before eviction
+
+
+def _cache_put(cache: dict, key, value, max_size: int) -> None:
+    """Insert into a bounded cache, evicting oldest entries if full."""
+    if len(cache) >= max_size:
+        # Evict oldest 25% by timestamp (first element of value tuple)
+        evict_count = max(1, max_size // 4)
+        sorted_keys = sorted(cache, key=lambda k: cache[k][0])
+        for k in sorted_keys[:evict_count]:
+            del cache[k]
+    cache[key] = value
 
 
 class SnapshotService:
@@ -285,7 +298,7 @@ class SnapshotService:
                                 "value": value,
                                 "invested": invested,
                                 "net_capital": net_cap,
-                                "gain_loss": value - net_cap,
+                                "gain_loss": value - invested,
                             }
                         )
 
@@ -320,7 +333,7 @@ class SnapshotService:
                         "value": value,
                         "invested": invested,
                         "net_capital": net_cap,
-                        "gain_loss": value - net_cap,
+                        "gain_loss": value - invested,
                     }
                 )
 
@@ -484,14 +497,15 @@ class SnapshotService:
                     symbol = tx.symbol.upper()
                     quantity = float(tx.quantity)
                     price = float(tx.price)
-                    fee = float(tx.fee or 0)
                     tx_type = tx.transaction_type
                     tx_amount = quantity * price
 
                     if tx_type in (TransactionType.BUY,):
                         holdings[symbol] = holdings.get(symbol, 0.0) + quantity
-                        cumulative_invested += tx_amount + fee
-                        cumulative_net_capital += tx_amount + fee
+                        # Fees tracked separately — NOT included in invested/net_capital
+                        # to match metrics_service.get_portfolio_history and _get_invested_timeline
+                        cumulative_invested += tx_amount
+                        cumulative_net_capital += tx_amount
                     elif tx_type in (
                         TransactionType.TRANSFER_IN,
                         TransactionType.AIRDROP,
@@ -509,11 +523,15 @@ class SnapshotService:
                         # Don't reduce net_capital: user still owns the asset on cold wallet
                     elif tx_type == TransactionType.CONVERSION_OUT:
                         holdings[symbol] = max(0.0, holdings.get(symbol, 0.0) - quantity)
+                        # Conversion = form change, reduce net_capital (symmetric with CONVERSION_IN)
+                        cumulative_net_capital -= tx_amount
                     elif tx_type == TransactionType.CONVERSION_IN:
                         holdings[symbol] = holdings.get(symbol, 0.0) + quantity
+                        # Conversion = form change, add to net_capital (not to invested)
+                        cumulative_net_capital += tx_amount
 
-                    if cumulative_net_capital < 0:
-                        cumulative_net_capital = 0.0
+                    # Don't clamp cumulative_net_capital to 0: negative means user
+                    # recovered more than invested, which is valid and needed for TWR.
 
             # Record snapshot of holdings for this day (only non-zero)
             daily_holdings[date_str] = {s: q for s, q in holdings.items() if q > 1e-10}
@@ -528,15 +546,18 @@ class SnapshotService:
         self,
         symbols_with_types: Dict[str, str],
         days: int,
+        db: Optional["AsyncSession"] = None,
     ) -> Dict[str, Dict[str, float]]:
         """
         Fetch historical prices for all symbols.
         Returns: Dict[symbol, Dict[date_str, price_eur]]
 
-        Uses in-memory cache first, then Redis cache, then API.
+        Priority: in-memory cache → PostgreSQL → Redis → CoinGecko/Yahoo API.
+        PostgreSQL is the primary persistent source after deep backfill.
         """
         from app.core.config import settings
         from app.ml.historical_data import HistoricalDataFetcher
+        from app.models.asset_price_history import AssetPriceHistory
         from app.tasks.history_cache import get_cached_history
 
         price_series: Dict[str, Dict[str, float]] = {}
@@ -547,11 +568,12 @@ class SnapshotService:
         now = time.time()
         symbols_to_fetch: Dict[str, str] = {}
 
-        # 1. Check in-memory cache first (avoids CoinGecko entirely)
+        # 1. Check in-memory cache first (avoids DB/API entirely)
         for symbol, asset_type in symbols_with_types.items():
             symbol_upper = symbol.upper()
-            if symbol_upper in _price_cache:
-                ts, cached_series = _price_cache[symbol_upper]
+            cache_key = (symbol_upper, days)
+            if cache_key in _price_cache:
+                ts, cached_series = _price_cache[cache_key]
                 if now - ts < _PRICE_CACHE_TTL:
                     price_series[symbol_upper] = cached_series
                     continue
@@ -560,62 +582,112 @@ class SnapshotService:
         if not symbols_to_fetch:
             return price_series
 
-        # 2. Check Redis cache for ALL remaining symbols before any API call
+        # 2. Check PostgreSQL first (persistent, complete after backfill)
+        symbols_need_redis: Dict[str, str] = {}
+        if db is not None:
+            cutoff_date = (datetime.utcnow() - timedelta(days=days + 5)).date()
+            for symbol_upper, asset_type in symbols_to_fetch.items():
+                if symbol_upper in STABLECOINS:
+                    price_series[symbol_upper] = {}
+                    continue
+                try:
+                    result = await db.execute(
+                        select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
+                        .where(
+                            AssetPriceHistory.symbol == symbol_upper,
+                            AssetPriceHistory.price_date >= cutoff_date,
+                        )
+                        .order_by(AssetPriceHistory.price_date)
+                    )
+                    rows = result.all()
+                    if rows and len(rows) >= max(days * 0.5, 5):
+                        series: Dict[str, float] = {}
+                        for row in rows:
+                            series[row[0].strftime("%Y-%m-%d")] = float(row[1])
+                        price_series[symbol_upper] = series
+                        _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                        continue
+                except Exception as e:
+                    logger.warning("DB price lookup failed for %s: %s", symbol_upper, e)
+                symbols_need_redis[symbol_upper] = asset_type
+        else:
+            symbols_need_redis = {s: t for s, t in symbols_to_fetch.items() if s not in STABLECOINS}
+            for s in symbols_to_fetch:
+                if s in STABLECOINS:
+                    price_series[s] = {}
+
+        if not symbols_need_redis:
+            return price_series
+
+        # 3. Check Redis cache for remaining symbols
         symbols_need_api: Dict[str, str] = {}
-        for symbol_upper, asset_type in symbols_to_fetch.items():
-            if symbol_upper in STABLECOINS:
-                price_series[symbol_upper] = {}
-                continue
+        for symbol_upper, asset_type in symbols_need_redis.items():
             dates, prices = get_cached_history(symbol_upper, days)
             if dates and prices:
-                series: Dict[str, float] = {}
+                series = {}
                 for d, p in zip(dates, prices):
                     series[d.strftime("%Y-%m-%d")] = float(p)
                 price_series[symbol_upper] = series
-                _price_cache[symbol_upper] = (time.time(), series)
+                _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
             else:
                 symbols_need_api[symbol_upper] = asset_type
 
         if not symbols_need_api:
             return price_series
 
-        # 3. Fetch missing symbols from CoinGecko API concurrently
+        # 4. Fetch missing symbols from API with concurrency limit
+        # Use a semaphore to avoid saturating CoinGecko (50 req/min free tier)
         import asyncio as _asyncio
 
-        from app.tasks.history_cache import cache_single_asset
+        from app.tasks.history_cache import _persist_prices_to_db, cache_single_asset
 
         coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
         fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
 
+        # Limit to 3 concurrent API calls to respect rate limits
+        _api_semaphore = _asyncio.Semaphore(3)
+
+        async def _fetch_one(sym: str, at: str) -> Tuple[str, Optional[Tuple]]:
+            async with _api_semaphore:
+                try:
+                    result = await fetcher.get_history(sym, at, days)
+                    return (sym, result)
+                except Exception as e:
+                    logger.warning("Failed to fetch prices for %s: %s", sym, e)
+                    return (sym, None)
+
         try:
-            api_tasks = {
-                sym: _asyncio.create_task(fetcher.get_history(sym, at, days)) for sym, at in symbols_need_api.items()
-            }
-            results = await _asyncio.gather(*api_tasks.values(), return_exceptions=True)
+            tasks = [_fetch_one(sym, at) for sym, at in symbols_need_api.items()]
+            results = await _asyncio.gather(*tasks)
 
             symbols_failed = []
-            for symbol_upper, result in zip(api_tasks.keys(), results):
-                if isinstance(result, Exception):
-                    logger.warning("Failed to fetch prices for %s: %s", symbol_upper, result)
+            for symbol_upper, result in results:
+                if result is None:
                     symbols_failed.append(symbol_upper)
                     continue
                 dates, prices = result
                 if dates and prices:
                     series = {d.strftime("%Y-%m-%d"): float(p) for d, p in zip(dates, prices)}
                     price_series[symbol_upper] = series
-                    _price_cache[symbol_upper] = (time.time(), series)
+                    _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                    # Persist to PostgreSQL for future requests
+                    try:
+                        await _persist_prices_to_db(symbol_upper, dates, prices)
+                    except Exception:
+                        pass
                 else:
                     symbols_failed.append(symbol_upper)
 
             # Fallback for failed symbols: use stale in-memory cache if available
             for symbol_upper in symbols_failed:
-                if symbol_upper in _price_cache:
-                    _, stale_series = _price_cache[symbol_upper]
+                stale_key = (symbol_upper, days)
+                if stale_key in _price_cache:
+                    _, stale_series = _price_cache[stale_key]
                     price_series[symbol_upper] = stale_series
                     logger.info("Using stale cache for %s", symbol_upper)
                 else:
                     logger.warning("No price data available for %s", symbol_upper)
-                # Trigger background cache warming for next request
+                # Trigger background deep backfill for this symbol
                 try:
                     asset_type = symbols_need_api.get(symbol_upper, "crypto")
                     cache_single_asset.delay(symbol_upper, asset_type)
@@ -684,12 +756,19 @@ class SnapshotService:
             return []
 
         # Fetch price data
-        # Use max(days, days_since_first_tx) but cap at 365 (CoinGecko free tier limit)
+        # Use max(days, days_since_first_tx) — cap at 1825 (5 years)
         days_since_first = (today - replay_start).days + 5  # extra buffer
-        # CoinGecko free tier: up to 365 days of daily data per request,
-        # but we can extend to 1825 (5 years) since _fetch_all_price_series handles chunking
         fetch_days = min(max(days, days_since_first, 90), 1825)
-        price_series = await self._fetch_all_price_series(all_symbols, fetch_days)
+        price_series = await self._fetch_all_price_series(all_symbols, fetch_days, db=db)
+
+        # Fetch live USD→EUR rate for stablecoin pricing (fallback to 0.92)
+        try:
+            from app.services.price_service import PriceService
+
+            _ps = PriceService()
+            stablecoin_eur_rate = float(await _ps.get_forex_rate("USD", "EUR") or 0.92)
+        except Exception:
+            stablecoin_eur_rate = 0.92
 
         # Fallback: if most symbols have no price data (API down), use DB snapshots
         STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
@@ -777,9 +856,9 @@ class SnapshotService:
                 # LOCF: use last known price
                 elif symbol in last_known_prices:
                     price = last_known_prices[symbol]
-                # Stablecoin fallback
+                # Stablecoin fallback (live forex rate)
                 elif symbol in STABLECOINS:
-                    price = 0.92  # ~1 USD in EUR
+                    price = stablecoin_eur_rate
                     last_known_prices[symbol] = price
                 # Try to find nearest price in series
                 elif symbol in price_series:
@@ -806,12 +885,12 @@ class SnapshotService:
                     "value": round(daily_value, 2),
                     "invested": round(invested, 2),
                     "net_capital": round(net_capital, 2),
-                    "gain_loss": round(daily_value - net_capital, 2),
+                    "gain_loss": round(daily_value - invested, 2),
                 }
             )
 
-        # Cache the result for subsequent calls
-        _series_cache[cache_key] = (time.time(), result)
+        # Cache the result for subsequent calls (bounded)
+        _cache_put(_series_cache, cache_key, (time.time(), result), _MAX_SERIES_CACHE)
         return result
 
     def _estimate_interval_days(self, history: List[Dict]) -> float:
@@ -841,6 +920,40 @@ class SnapshotService:
 
         return 1.0
 
+    def _compute_twr_log_returns(self, history: List[Dict]) -> List[float]:
+        """Compute Time-Weighted log returns that exclude capital flow effects.
+
+        Standard log returns (log(V_t / V_{t-1})) are inflated by DCA buys
+        because new money in looks like positive returns. TWR adjusts for this:
+        return_t = log((V_t - capital_flow_t) / V_{t-1})
+        where capital_flow_t = net_capital_t - net_capital_{t-1}.
+
+        Returns are clipped to [-1.0, +1.0] per interval to prevent outliers
+        (e.g. from missing price data) from inflating volatility/Sharpe.
+        """
+        # Max log-return per interval: ±1.0 ≈ ±172% gain / -63% loss
+        MAX_LOG_RETURN = 1.0
+
+        returns = []
+        for i in range(1, len(history)):
+            prev_value = history[i - 1]["value"]
+            curr_value = history[i]["value"]
+            if prev_value <= 0:
+                continue
+            # Exclude capital flows (buys add capital, sells remove it)
+            prev_net_cap = history[i - 1].get("net_capital", 0)
+            curr_net_cap = history[i].get("net_capital", 0)
+            capital_flow = curr_net_cap - prev_net_cap
+            adjusted_value = curr_value - capital_flow
+            # Skip interval when TWR is undefined (adjusted value non-positive)
+            if adjusted_value <= 0:
+                continue
+            log_return = math.log(adjusted_value / prev_value)
+            # Clip extreme returns to prevent single outliers from dominating
+            log_return = max(-MAX_LOG_RETURN, min(MAX_LOG_RETURN, log_return))
+            returns.append(log_return)
+        return returns
+
     async def calculate_volatility(
         self,
         db: AsyncSession,
@@ -848,10 +961,10 @@ class SnapshotService:
         days: int = 30,
         history: Optional[List[Dict]] = None,
     ) -> float:
-        """Calculate portfolio volatility based on historical log returns.
+        """Calculate portfolio volatility based on TWR log returns.
 
-        Uses log returns and annualization adjusted for the actual data
-        interval (daily, every 3 days, weekly, etc.).
+        Uses Time-Weighted Returns (excludes capital flow effects) and
+        annualization adjusted for the actual data interval.
         """
         if history is None:
             history = await self.build_portfolio_value_series(db, user_id, days)
@@ -859,14 +972,7 @@ class SnapshotService:
         if len(history) < 2:
             return 0.0
 
-        # Calculate log returns between consecutive data points
-        returns = []
-        for i in range(1, len(history)):
-            prev_value = history[i - 1]["value"]
-            curr_value = history[i]["value"]
-            if prev_value > 0 and curr_value > 0:
-                daily_return = math.log(curr_value / prev_value)
-                returns.append(daily_return)
+        returns = self._compute_twr_log_returns(history)
 
         if len(returns) < 2:
             return 0.0
@@ -890,11 +996,13 @@ class SnapshotService:
         days: int = 30,
         risk_free_rate: float = 0.035,
         history: Optional[List[Dict]] = None,
+        roi_annualized: Optional[float] = None,
     ) -> float:
         """Calculate Sharpe ratio for the portfolio.
 
-        Uses log returns, annualization adjusted for data interval, and
-        3.5% EUR risk-free rate.
+        Uses roi_annualized (CAGR) as the return component to ensure
+        consistency: a negative CAGR always produces a negative Sharpe.
+        Volatility is computed from TWR log returns.
         """
         if history is None:
             history = await self.build_portfolio_value_series(db, user_id, days)
@@ -902,31 +1010,29 @@ class SnapshotService:
         if len(history) < 2:
             return 0.0
 
-        # Calculate log returns between consecutive data points
-        returns = []
-        for i in range(1, len(history)):
-            prev_value = history[i - 1]["value"]
-            curr_value = history[i]["value"]
-            if prev_value > 0 and curr_value > 0:
-                daily_return = math.log(curr_value / prev_value)
-                returns.append(daily_return)
+        returns = self._compute_twr_log_returns(history)
 
         if len(returns) < 2:
             return 0.0
 
-        # Annualized return and volatility adjusted for data interval
+        # Volatility from TWR log returns (annualized)
         interval_days = self._estimate_interval_days(history)
         periods_per_year = 365.0 / interval_days
 
         n = len(returns)
         mean_return = sum(returns) / n
-        annualized_return = mean_return * periods_per_year
-
         variance = sum((r - mean_return) ** 2 for r in returns) / (n - 1)  # ddof=1
         volatility = math.sqrt(variance) * math.sqrt(periods_per_year)
 
         if volatility == 0:
             return 0.0
+
+        # Use roi_annualized (CAGR) when available for return component.
+        # This ensures a portfolio with negative CAGR always gets a negative Sharpe.
+        if roi_annualized is not None:
+            annualized_return = roi_annualized / 100.0  # convert percentage to decimal
+        else:
+            annualized_return = mean_return * periods_per_year
 
         sharpe = (annualized_return - risk_free_rate) / volatility
         return round(sharpe, 2)
@@ -996,14 +1102,9 @@ class SnapshotService:
         if len(history) < 5:
             return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
 
-        # Calculate daily returns
-        returns = []
-        for i in range(1, len(history)):
-            prev_value = history[i - 1]["value"]
-            curr_value = history[i]["value"]
-            if prev_value > 0:
-                daily_return = (curr_value - prev_value) / prev_value
-                returns.append(daily_return)
+        # Use TWR log returns (consistent with Sharpe/Volatility calculations)
+        # Raw simple returns are distorted by capital flows (DCA buys appear as gains)
+        returns = self._compute_twr_log_returns(history)
 
         if not returns:
             return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
@@ -1012,11 +1113,11 @@ class SnapshotService:
         sorted_returns = sorted(returns)
         n = len(sorted_returns)
         # For VaR at 95%, we want the 5th percentile of returns
-        # With 20 returns, index = int(0.05 * 20) = 1 (2nd worst day)
         # With < 20 returns, we don't have enough data for reliable VaR
         if n < 20:
             return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
-        var_index = int((1 - confidence_level) * n)
+        # Use ceil-based index for correct empirical percentile
+        var_index = max(0, math.ceil((1 - confidence_level) * n) - 1)
         var_percent = abs(sorted_returns[var_index]) * 100
 
         # Calculate VaR amount
@@ -1051,12 +1152,13 @@ class SnapshotService:
         port_mean = sum(portfolio_returns) / len(portfolio_returns)
         bench_mean = sum(benchmark_returns) / len(benchmark_returns)
 
-        # Calculate covariance and variance
-        covariance = sum(
-            (p - port_mean) * (b - bench_mean) for p, b in zip(portfolio_returns, benchmark_returns)
-        ) / len(portfolio_returns)
+        # Calculate covariance and variance (unbiased, ddof=1, consistent with Sharpe/Volatility)
+        n = len(portfolio_returns)
+        covariance = sum((p - port_mean) * (b - bench_mean) for p, b in zip(portfolio_returns, benchmark_returns)) / (
+            n - 1
+        )
 
-        bench_variance = sum((b - bench_mean) ** 2 for b in benchmark_returns) / len(benchmark_returns)
+        bench_variance = sum((b - bench_mean) ** 2 for b in benchmark_returns) / (n - 1)
 
         if bench_variance == 0:
             return 1.0
@@ -1176,13 +1278,14 @@ class SnapshotService:
         allocations: List[Dict],
         days: int = 30,
         history: Optional[List[Dict]] = None,
+        roi_annualized: Optional[float] = None,
     ) -> Dict:
         """Get all risk metrics in one call (builds price series once)."""
         # Build portfolio value series once and share across all metric functions
         if history is None:
             history = await self.build_portfolio_value_series(db, user_id, days)
         volatility = await self.calculate_volatility(db, user_id, days, history=history)
-        sharpe = await self.calculate_sharpe_ratio(db, user_id, days, history=history)
+        sharpe = await self.calculate_sharpe_ratio(db, user_id, days, history=history, roi_annualized=roi_annualized)
         mdd = await self.calculate_max_drawdown(db, user_id, days, history=history)
         var = await self.calculate_var(db, user_id, days, 0.95, current_value, history=history)
         hhi = self.calculate_hhi(allocations)

@@ -85,7 +85,14 @@ export default function DashboardMetricsRow({
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Plus-value Nette</CardTitle>
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CardTitle className="text-sm font-medium cursor-help inline-flex items-center gap-1">Plus-value Nette <Info className="h-3 w-3 text-muted-foreground" /></CardTitle>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs"><p className="text-sm">Patrimoine Total − Capital Net. Mesure la variation de richesse globale (inclut ventes passées).</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           {isPositive ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
         </CardHeader>
         <CardContent>

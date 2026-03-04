@@ -175,6 +175,8 @@ class EnhancedDashboardResponse(BaseModel):
     net_gain_loss_percent: float
     daily_change: float
     daily_change_percent: float
+    period_change: float = 0.0
+    period_change_percent: float = 0.0
     portfolios_count: int
     assets_count: int
 
@@ -252,27 +254,28 @@ async def get_dashboard(
 
     # Get historical data — always use real price-based series
     historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
-    # Data is estimated when we have very few data points compared to the requested period
-    # (e.g. only 2 points for a 90-day period means most values are interpolated)
-    expected_points = max(days // 3, 5)  # At minimum expect 1 point per 3 days
-    is_data_estimated = len(historical_data) < expected_points and days > 7
+
+    # Data quality: check actual coverage vs expected data points.
+    # With deep backfill, PostgreSQL should have full coverage.
+    # Only flag as estimated if coverage is truly poor (< 30% of expected).
+    data_interval = snapshot_service._get_data_point_interval(days)
+    expected_points = max(days // data_interval, 5)
+    coverage_ratio = len(historical_data) / expected_points if expected_points > 0 else 1.0
+    is_data_estimated = coverage_ratio < 0.3 and days > 7
     for point in historical_data:
         point["is_estimated"] = is_data_estimated
 
-    # Calculate period change from historical data
-    if historical_data and len(historical_data) >= 2:
-        # Find the first data point with a non-zero value (skip days before first purchase)
-        start_value = 0
-        for point in historical_data:
-            if point.get("value", 0) > 0:
-                start_value = point["value"]
-                break
-        end_value = metrics["total_value"]
-        if start_value > 0:
-            period_change = end_value - start_value
-            period_change_percent = (period_change / start_value) * 100
-            metrics["period_change"] = period_change
-            metrics["period_change_percent"] = round(period_change_percent, 2)
+    # Period change calculation:
+    # - "Tout" (days=0): true P&L vs total_invested (unified root: Patrimoine - Investi)
+    # - Other periods: keep metrics_service weighted average of market price changes
+    if original_days == 0:
+        total_inv = metrics["total_invested"]
+        if total_inv > 0:
+            metrics["period_change"] = metrics["total_value"] - total_inv
+            metrics["period_change_percent"] = round(((metrics["total_value"] - total_inv) / total_inv) * 100, 2)
+        else:
+            metrics["period_change"] = 0.0
+            metrics["period_change_percent"] = 0.0
 
     # Build asset-level allocation from pre-aggregated data (no extra DB/API calls)
     asset_allocation = [
@@ -304,7 +307,24 @@ async def get_dashboard(
 
     # ============== Calculate Advanced Metrics ==============
 
-    # Risk metrics — reuse the historical_data already built above to avoid double API calls
+    # Calculate annualized ROI (CAGR) FIRST — needed by Sharpe ratio
+    # total_return = current_value + total_sell_proceeds (all capital recovered via sells)
+    cagr_base = metrics["total_invested"]
+    net_cap = metrics.get("net_capital", cagr_base)
+    total_sold_value = max(0, cagr_base - net_cap)
+    total_return = metrics["total_value"] + total_sold_value
+    if cagr_base > 0 and total_return > 0:
+        if _first_tx_date_cached:
+            actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
+        else:
+            actual_days = max(days, 30)
+        years = actual_days / 365.0
+        roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
+        roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+    else:
+        roi_annualized = 0.0
+
+    # Risk metrics — pass roi_annualized so Sharpe uses the real CAGR
     risk_data = await snapshot_service.get_all_risk_metrics(
         db,
         user_id,
@@ -312,6 +332,7 @@ async def get_dashboard(
         [{"symbol": a.symbol, "value": a.value} for a in asset_allocation],
         days,
         history=historical_data,
+        roi_annualized=roi_annualized,
     )
 
     volatility = risk_data["volatility"]
@@ -319,7 +340,6 @@ async def get_dashboard(
     mdd_data = risk_data["max_drawdown"]
     var_data = risk_data["var_95"]
 
-    # Beta and Alpha — not yet computed, return null instead of misleading hardcoded values
     beta = None
     alpha = None
 
@@ -372,26 +392,6 @@ async def get_dashboard(
         net_pnl=pnl_data.get("net_pnl", 0),
     )
 
-    # Calculate annualized ROI using CAGR formula
-    # total_return = current_value + total_sold (all recovered capital)
-    # This gives the true return even when user sold most of their position.
-    # net_capital = total_invested - total_sold, so total_sold = total_invested - net_capital
-    cagr_base = metrics["total_invested"]
-    total_sold_value = cagr_base - metrics.get("net_capital", cagr_base)
-    total_return = metrics["total_value"] + max(0, total_sold_value)
-    if cagr_base > 0 and total_return > 0:
-        # Reuse cached first transaction date
-        if _first_tx_date_cached:
-            actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
-        else:
-            actual_days = max(days, 30)
-        years = actual_days / 365.0
-        roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
-        # Clamp to reasonable range
-        roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
-    else:
-        roi_annualized = 0.0
-
     advanced_metrics = AdvancedMetrics(
         roi_annualized=round(roi_annualized, 2),
         risk_metrics=risk_metrics,
@@ -420,6 +420,8 @@ async def get_dashboard(
         net_gain_loss_percent=metrics.get("net_gain_loss_percent", metrics["total_gain_loss_percent"]),
         daily_change=metrics["daily_change"],
         daily_change_percent=metrics["daily_change_percent"],
+        period_change=metrics.get("period_change", 0.0),
+        period_change_percent=metrics.get("period_change_percent", 0.0),
         portfolios_count=metrics["portfolios_count"],
         assets_count=metrics["assets_count"],
         allocation=metrics["allocation"],
@@ -660,6 +662,87 @@ async def get_portfolio_history(
     return history
 
 
+class SparklineData(BaseModel):
+    """Sparkline price data for a single symbol."""
+
+    symbol: str
+    prices: List[float]
+    change_pct: float
+
+
+@router.get("/portfolio/{portfolio_id}/sparklines", response_model=List[SparklineData])
+async def get_portfolio_sparklines(
+    portfolio_id: str,
+    days: int = Query(30, ge=7, le=90),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[SparklineData]:
+    """Get sparkline price data for all assets in a portfolio."""
+    from collections import defaultdict
+
+    from app.models.asset_price_history import AssetPriceHistory
+    from app.services.metrics_service import is_cash_like
+
+    # Verify ownership
+    portfolio_result = await db.execute(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
+        )
+    )
+    if not portfolio_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    # Get unique non-stablecoin symbols
+    assets_result = await db.execute(
+        select(Asset.symbol).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0).distinct()
+    )
+    symbols = [row[0].upper() for row in assets_result.all() if not is_cash_like(row[0])]
+    if not symbols:
+        return []
+
+    # Batch fetch from AssetPriceHistory
+    cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+    result = await db.execute(
+        select(
+            AssetPriceHistory.symbol,
+            AssetPriceHistory.price_date,
+            AssetPriceHistory.price_eur,
+        )
+        .where(
+            AssetPriceHistory.symbol.in_(symbols),
+            AssetPriceHistory.price_date >= cutoff,
+        )
+        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
+    )
+    rows = result.all()
+
+    symbol_data: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        symbol_data[row[0]].append(float(row[2]))
+
+    sparklines = []
+    for symbol in symbols:
+        prices = symbol_data.get(symbol, [])
+        if len(prices) < 2:
+            continue
+        # Normalize to [0, 1] for consistent rendering
+        min_p, max_p = min(prices), max(prices)
+        range_p = max_p - min_p
+        normalized = [(p - min_p) / range_p if range_p > 0 else 0.5 for p in prices]
+        change = ((prices[-1] - prices[0]) / prices[0] * 100) if prices[0] > 0 else 0.0
+
+        sparklines.append(
+            SparklineData(
+                symbol=symbol,
+                prices=normalized,
+                change_pct=round(change, 2),
+            )
+        )
+
+    return sparklines
+
+
 @router.get("/recent-transactions", response_model=List[RecentTransaction])
 async def get_recent_transactions(
     limit: int = Query(10, ge=1, le=50),
@@ -798,3 +881,45 @@ async def get_benchmark_data(
         result.append(BenchmarkSeries(name="Mon portefeuille", symbol="PORTFOLIO", data=points))
 
     return result
+
+
+# ============== Backfill Endpoints ==============
+
+
+@router.post("/backfill-prices")
+async def trigger_price_backfill(
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger a deep backfill of historical prices for all assets."""
+    from app.tasks.history_cache import deep_backfill_prices
+
+    task = deep_backfill_prices.delay()
+    return {"status": "started", "task_id": str(task.id)}
+
+
+@router.get("/backfill-status")
+async def get_backfill_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check the status of historical price data coverage."""
+    from app.models.asset_price_history import AssetPriceHistory
+
+    # Count total price points in DB
+    count_result = await db.execute(select(func.count()).select_from(AssetPriceHistory))
+    total_points = count_result.scalar() or 0
+
+    # Count unique symbols with data
+    symbols_result = await db.execute(select(func.count(func.distinct(AssetPriceHistory.symbol))))
+    symbols_covered = symbols_result.scalar() or 0
+
+    # Count total active symbols
+    active_result = await db.execute(select(func.count(func.distinct(Asset.symbol))).where(Asset.quantity > 0))
+    total_active = active_result.scalar() or 0
+
+    return {
+        "total_price_points": total_points,
+        "symbols_covered": symbols_covered,
+        "total_active_symbols": total_active,
+        "is_complete": total_points > 0 and symbols_covered >= total_active,
+    }
