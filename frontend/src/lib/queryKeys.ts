@@ -69,6 +69,10 @@ export const queryKeys = {
     marketSentiment: ['predictions', 'marketSentiment'] as const,
     marketEvents: ['predictions', 'marketEvents'] as const,
     marketCycle: ['predictions', 'marketCycle'] as const,
+    backtest: (days?: number) =>
+      ['predictions', 'backtest', ...(days !== undefined ? [days] : [])] as const,
+    trackRecord: (symbol: string) =>
+      ['predictions', 'trackRecord', symbol] as const,
   },
 
   alerts: {

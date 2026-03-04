@@ -29,7 +29,16 @@ class Settings(BaseSettings):
 
     # Cookie settings
     COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
-    COOKIE_SECURE: bool = False  # True in production (requires HTTPS)
+    COOKIE_SECURE: bool = True  # Secure by default; overridden to False in dev via .env
+
+    @field_validator("COOKIE_SECURE", mode="before")
+    @classmethod
+    def auto_cookie_secure(cls, v, info):
+        """Force COOKIE_SECURE=False only when APP_ENV=development."""
+        app_env = info.data.get("APP_ENV", "development")
+        if app_env == "development":
+            return False
+        return True
 
     # Database - Credentials must come from environment
     POSTGRES_HOST: str = "localhost"
@@ -146,6 +155,15 @@ class Settings(BaseSettings):
     def email_enabled(self) -> bool:
         """Check if email is configured."""
         return bool(self.SMTP_HOST and self.SMTP_USER)
+
+    # Telegram
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""  # Admin fallback channel (optional)
+
+    @property
+    def telegram_bot_enabled(self) -> bool:
+        """Check if the Telegram bot is configured (token present)."""
+        return bool(self.TELEGRAM_BOT_TOKEN)
 
     @property
     def is_production(self) -> bool:

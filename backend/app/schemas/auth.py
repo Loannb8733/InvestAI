@@ -1,17 +1,34 @@
 """Authentication schemas."""
 
+import re
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _validate_password_complexity(password: str) -> str:
+    """Enforce password complexity: min 10 chars, 1 uppercase, 1 digit."""
+    if len(password) < 10:
+        raise ValueError("Le mot de passe doit contenir au moins 10 caractères")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+    if not re.search(r"\d", password):
+        raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+    return password
 
 
 class RegisterRequest(BaseModel):
     """Schema for registration request."""
 
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=10)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 class LoginRequest(BaseModel):
@@ -62,7 +79,12 @@ class PasswordChangeRequest(BaseModel):
     """Schema for password change request."""
 
     current_password: str
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=10)
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 class PasswordResetRequest(BaseModel):
@@ -75,4 +97,9 @@ class PasswordResetConfirm(BaseModel):
     """Schema for password reset confirmation."""
 
     token: str
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=10)
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)

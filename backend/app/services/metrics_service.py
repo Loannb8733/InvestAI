@@ -36,6 +36,17 @@ def _cache_put_dashboard(key: Tuple, value: Tuple) -> None:
     _dashboard_cache[key] = value
 
 
+def invalidate_dashboard_cache(user_id: str) -> None:
+    """Evict all cached dashboard entries for a given user.
+
+    Call after any mutation (create/update/delete transaction) so the next
+    dashboard or report request picks up fresh data immediately.
+    """
+    keys_to_delete = [k for k in _dashboard_cache if k[0] == user_id]
+    for k in keys_to_delete:
+        del _dashboard_cache[k]
+
+
 # Fiat currencies -> counted as cash
 FIAT_SYMBOLS = {"EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY"}
 
@@ -361,25 +372,36 @@ class MetricsService:
 
             asset_metrics.append(asset_entry)
 
-        # Fetch live USD→EUR rate for stablecoin valuation
-        usd_eur_rate = 0.92  # fallback
+        # Fetch forex rates for stablecoin/fiat valuation in target currency
+        # USD stablecoins → target currency, EUR fiat → target currency
+        target = currency.upper()
+        usd_to_target = 1.0  # fallback if target is USD
+        eur_to_target = 1.0  # fallback if target is EUR
+        _FALLBACK_RATES = {
+            "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
+            "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
+        }
         try:
-            forex_rate = await price_service.get_forex_rate("USD", "EUR")
-            if forex_rate:
-                usd_eur_rate = float(forex_rate)
+            if target != "USD":
+                rate = await price_service.get_forex_rate("USD", target)
+                usd_to_target = float(rate) if rate else _FALLBACK_RATES.get("USD", {}).get(target, 1.0)
+            if target != "EUR":
+                rate = await price_service.get_forex_rate("EUR", target)
+                eur_to_target = float(rate) if rate else _FALLBACK_RATES.get("EUR", {}).get(target, 1.0)
         except Exception:
-            pass
+            usd_to_target = _FALLBACK_RATES.get("USD", {}).get(target, 1.0) if target != "USD" else 1.0
+            eur_to_target = _FALLBACK_RATES.get("EUR", {}).get(target, 1.0) if target != "EUR" else 1.0
 
         # Calculate stablecoin cash value (filter out dust)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
+        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD"}
         for asset in stablecoin_assets:
             # Stablecoins are valued at ~1:1 with their denomination
-            usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD"}
             if asset.symbol.upper() in usd_stablecoins:
-                unit_price = usd_eur_rate
+                unit_price = usd_to_target
             else:
-                unit_price = 1.0  # EUR-denominated stablecoins
+                unit_price = eur_to_target  # EUR-denominated stablecoins
             value = float(asset.quantity) * unit_price
             if value < min_value_eur:
                 continue
@@ -396,8 +418,19 @@ class MetricsService:
         # Calculate fiat cash value
         cash_from_fiat = Decimal("0")
         fiat_list = []
+        _fiat_rates = {"EUR": eur_to_target, "USD": usd_to_target, "GBP": 1.0, "CHF": 1.0}
+        # Fetch additional rates for non-target fiat if needed
+        for sym in {"GBP", "CHF"} - {target}:
+            try:
+                rate = await price_service.get_forex_rate(sym, target)
+                if rate:
+                    _fiat_rates[sym] = float(rate)
+            except Exception:
+                pass
+        _fiat_rates[target] = 1.0  # target currency = 1:1
         for asset in fiat_assets:
-            value = float(asset.quantity)  # 1 EUR = 1 EUR
+            rate = _fiat_rates.get(asset.symbol.upper(), eur_to_target)
+            value = float(asset.quantity) * rate
             cash_from_fiat += Decimal(str(value))
             fiat_list.append(
                 {
@@ -565,7 +598,7 @@ class MetricsService:
     ) -> Dict:
         """Calculate dashboard metrics for a user's entire portfolio."""
         # Check in-memory cache
-        cache_key = (user_id, days)
+        cache_key = (user_id, days, currency)
         now = time.time()
         if cache_key in _dashboard_cache:
             ts, cached = _dashboard_cache[cache_key]

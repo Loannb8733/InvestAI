@@ -282,13 +282,27 @@ async def get_market_cycle(
     return await prediction_service.get_market_cycle(db, str(current_user.id))
 
 
-@router.get("/events", response_model=dict)
+@router.get("/events", response_model=list)
 async def get_market_events(
     current_user: User = Depends(get_current_user),
 ):
     """Get upcoming market events that may impact predictions."""
     events = await prediction_service.get_market_events()
     return events
+
+
+@router.get("/backtest", response_model=dict)
+async def get_portfolio_backtest(
+    days: int = Query(7, ge=1, le=30),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compare past predictions with actual prices across the portfolio.
+
+    Returns per-asset and aggregate MAPE, direction accuracy, and a
+    flag indicating whether model retraining is recommended (MAPE > 10%).
+    """
+    return await prediction_service.get_portfolio_backtest(db, str(current_user.id), days)
 
 
 @router.get("/track-record/{symbol}", response_model=dict)

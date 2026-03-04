@@ -85,6 +85,16 @@ interface DCAResult {
   }>
 }
 
+const INFLATION_BY_CURRENCY: Record<string, { rate: number; label: string }> = {
+  EUR: { rate: 2.0, label: '2.0% (zone euro)' },
+  USD: { rate: 2.5, label: '2.5% (US)' },
+  GBP: { rate: 2.0, label: '2.0% (UK)' },
+  CHF: { rate: 0.5, label: '0.5% (Suisse)' },
+  JPY: { rate: 1.0, label: '1.0% (Japon)' },
+  CAD: { rate: 2.0, label: '2.0% (Canada)' },
+  AUD: { rate: 2.5, label: '2.5% (Australie)' },
+}
+
 export default function SimulationsPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('fire')
@@ -95,6 +105,7 @@ export default function SimulationsPage() {
     monthly_contribution: 1000,
     monthly_expenses: 3000,
     expected_annual_return: 7,
+    expense_ratio: 0.25,
     inflation_rate: 2,
     withdrawal_rate: 4,
     target_years: 30,
@@ -105,6 +116,7 @@ export default function SimulationsPage() {
   const [projectionParams, setProjectionParams] = useState({
     years: 10,
     expected_return: 7,
+    expense_ratio: 0.25,
     monthly_contribution: 500,
     inflation_rate: 2,
   })
@@ -242,17 +254,46 @@ export default function SimulationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Inflation (%)</Label>
+                    <Label>Frais annuels / TER (%)</Label>
                     <Input
                       type="number"
-                      step="0.1"
-                      value={fireParams.inflation_rate}
-                      onChange={(e) => setFireParams({ ...fireParams, inflation_rate: parseFloat(e.target.value) || 0 })}
+                      step="0.05"
+                      value={fireParams.expense_ratio}
+                      onChange={(e) => setFireParams({ ...fireParams, expense_ratio: parseFloat(e.target.value) || 0 })}
                     />
+                    <p className="text-xs text-muted-foreground">Déduit du rendement brut</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Inflation (%)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={fireParams.inflation_rate}
+                        onChange={(e) => setFireParams({ ...fireParams, inflation_rate: parseFloat(e.target.value) || 0 })}
+                        className="flex-1"
+                      />
+                      <Select
+                        onValueChange={(currency) => {
+                          const info = INFLATION_BY_CURRENCY[currency]
+                          if (info) setFireParams({ ...fireParams, inflation_rate: info.rate })
+                        }}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Devise" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(INFLATION_BY_CURRENCY).map(([code, info]) => (
+                            <SelectItem key={code} value={code}>{code} ({info.rate}%)</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Sélectionnez une devise pour un taux suggéré</p>
+                  </div>
                   <div className="space-y-2">
                     <Label>Taux de retrait (%)</Label>
                     <Input
@@ -262,14 +303,15 @@ export default function SimulationsPage() {
                       onChange={(e) => setFireParams({ ...fireParams, withdrawal_rate: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Horizon (années)</Label>
-                    <Input
-                      type="number"
-                      value={fireParams.target_years}
-                      onChange={(e) => setFireParams({ ...fireParams, target_years: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Horizon (années)</Label>
+                  <Input
+                    type="number"
+                    value={fireParams.target_years}
+                    onChange={(e) => setFireParams({ ...fireParams, target_years: parseInt(e.target.value) || 0 })}
+                  />
                 </div>
 
                 <Button
@@ -423,6 +465,16 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label>Frais annuels / TER (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.05"
+                      value={projectionParams.expense_ratio}
+                      onChange={(e) => setProjectionParams({ ...projectionParams, expense_ratio: parseFloat(e.target.value) || 0 })}
+                    />
+                    <p className="text-xs text-muted-foreground">Déduit du rendement brut</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Contribution mensuelle</Label>
                     <Input
                       type="number"
@@ -430,15 +482,35 @@ export default function SimulationsPage() {
                       onChange={(e) => setProjectionParams({ ...projectionParams, monthly_contribution: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Inflation (%)</Label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Inflation (%)</Label>
+                  <div className="flex gap-2">
                     <Input
                       type="number"
                       step="0.1"
                       value={projectionParams.inflation_rate}
                       onChange={(e) => setProjectionParams({ ...projectionParams, inflation_rate: parseFloat(e.target.value) || 0 })}
+                      className="flex-1"
                     />
+                    <Select
+                      onValueChange={(currency) => {
+                        const info = INFLATION_BY_CURRENCY[currency]
+                        if (info) setProjectionParams({ ...projectionParams, inflation_rate: info.rate })
+                      }}
+                    >
+                      <SelectTrigger className="w-24">
+                        <SelectValue placeholder="Devise" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(INFLATION_BY_CURRENCY).map(([code, info]) => (
+                          <SelectItem key={code} value={code}>{code} ({info.rate}%)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                  <p className="text-xs text-muted-foreground">Sélectionnez une devise pour un taux suggéré</p>
                 </div>
 
                 <Button

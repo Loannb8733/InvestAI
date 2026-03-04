@@ -19,8 +19,35 @@ from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
 from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
+from app.services.metrics_service import invalidate_dashboard_cache
 
 router = APIRouter()
+
+
+def _classify_and_mark_error(api_key, exc: Exception) -> None:
+    """Classify an exchange error and update api_key status accordingly."""
+    import httpx
+
+    error_msg = str(exc)
+
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        if code in (401, 403):
+            api_key.mark_auth_failure(error_msg)
+            logger.warning("API key %s: auth failure (%d)", api_key.id, code)
+            return
+        if code == 429:
+            api_key.mark_rate_limited(error_msg)
+            logger.warning("API key %s: rate limited (429)", api_key.id)
+            return
+
+    lower_msg = error_msg.lower()
+    if "invalid key" in lower_msg or "invalid signature" in lower_msg or "permission denied" in lower_msg:
+        api_key.mark_auth_failure(error_msg)
+        logger.warning("API key %s: auth failure (json)", api_key.id)
+        return
+
+    api_key.mark_error(error_msg)
 
 
 @router.get("/exchanges", response_model=List[ExchangeInfo])
@@ -1088,9 +1115,11 @@ async def import_trade_history(
 
         # Update last sync time
         api_key.last_sync_at = datetime.now(timezone.utc)
-        api_key.last_error = None
+        api_key.mark_success()
 
         await db.commit()
+
+        invalidate_dashboard_cache(str(current_user.id))
 
         return {
             "message": "Import de l'historique réussi",
@@ -1115,7 +1144,7 @@ async def import_trade_history(
         logger.error(f"Import error: {type(e).__name__}: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-        api_key.last_error = str(e)[:500]
+        _classify_and_mark_error(api_key, e)
         await db.commit()
 
         raise HTTPException(
@@ -1242,6 +1271,7 @@ async def sync_exchange(
                     # Create adjustment transaction
                     diff = new_quantity - old_quantity
                     trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
+                    sync_ts = int(datetime.now(timezone.utc).timestamp())
 
                     transaction = Transaction(
                         asset_id=asset.id,
@@ -1250,6 +1280,7 @@ async def sync_exchange(
                         price=0,
                         fee=0,
                         currency="EUR",
+                        external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
                         notes=f"Sync auto depuis {service.exchange_name}",
                     )
                     db.add(transaction)
@@ -1273,6 +1304,7 @@ async def sync_exchange(
 
                 # Create initial transfer transaction
                 if float(balance.total) > 0:
+                    init_ts = int(datetime.now(timezone.utc).timestamp())
                     transaction = Transaction(
                         asset_id=asset.id,
                         transaction_type=TransactionType.TRANSFER_IN,
@@ -1280,6 +1312,7 @@ async def sync_exchange(
                         price=0,
                         fee=0,
                         currency="EUR",
+                        external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
                         notes=f"Import initial depuis {service.exchange_name}",
                     )
                     db.add(transaction)
@@ -1288,9 +1321,11 @@ async def sync_exchange(
 
         # Update last sync time
         api_key.last_sync_at = datetime.now(timezone.utc)
-        api_key.last_error = None
+        api_key.mark_success()
 
         await db.commit()
+
+        invalidate_dashboard_cache(str(current_user.id))
 
         return {
             "message": "Synchronisation réussie",
@@ -1300,7 +1335,7 @@ async def sync_exchange(
         }
 
     except Exception as e:
-        api_key.last_error = str(e)[:500]
+        _classify_and_mark_error(api_key, e)
         await db.commit()
 
         raise HTTPException(

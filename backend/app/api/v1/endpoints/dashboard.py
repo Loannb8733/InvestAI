@@ -249,8 +249,9 @@ async def get_dashboard(
         else:
             days = 30
 
-    # Get basic metrics (period-aware)
-    metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, days=days)
+    # Get basic metrics (period-aware, currency-aware)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=days)
 
     # Get historical data — always use real price-based series
     historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
@@ -638,7 +639,8 @@ async def get_portfolio_dashboard(
     if not portfolio_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
-    metrics = await metrics_service.get_portfolio_metrics(db, portfolio_id)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    metrics = await metrics_service.get_portfolio_metrics(db, portfolio_id, currency=currency)
     return metrics
 
 
@@ -658,7 +660,8 @@ async def get_portfolio_history(
     if not portfolio_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
-    history = await metrics_service.get_portfolio_history(db, portfolio_id)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    history = await metrics_service.get_portfolio_history(db, portfolio_id, currency=currency)
     return history
 
 

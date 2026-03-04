@@ -150,7 +150,13 @@ class AlertService:
         user_id: str,
     ) -> List[AlertTrigger]:
         """Check all active alerts for a user and return triggered ones."""
+        from app.models.user import User
+
         triggered = []
+
+        # Fetch user for Telegram preferences
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user_obj = user_result.scalar_one_or_none()
 
         # Get user's active alerts
         result = await db.execute(
@@ -189,6 +195,23 @@ class AlertService:
                     notify_in_app=alert.notify_in_app,
                     priority=priority,
                 )
+
+                # Send Telegram alert (best-effort, per-user, with cooldown)
+                try:
+                    if user_obj and user_obj.telegram_enabled and user_obj.telegram_chat_id:
+                        from app.services.telegram_service import telegram_service
+
+                        tg_priority = "critical" if priority == NotificationPriority.URGENT else "high"
+                        await telegram_service.send_smart_alert(
+                            message=trigger.message,
+                            chat_id=user_obj.telegram_chat_id,
+                            user_id=str(user_obj.id),
+                            priority=tg_priority,
+                            symbol=trigger.symbol,
+                            alert_type=trigger.condition,
+                        )
+                except Exception as e:
+                    logger.debug("Telegram alert failed for %s: %s", trigger.symbol, e)
 
         if triggered:
             await db.commit()

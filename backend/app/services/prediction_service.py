@@ -760,7 +760,20 @@ class PredictionService:
         portfolio_ids = [p.id for p in portfolios]
 
         if not portfolio_ids:
-            return {"predictions": [], "summary": {}}
+            return {
+                "predictions": [],
+                "summary": {
+                    "total_current_value": 0.0,
+                    "total_predicted_value": 0.0,
+                    "expected_change_percent": 0.0,
+                    "overall_sentiment": "neutral",
+                    "bullish_assets": 0,
+                    "bearish_assets": 0,
+                    "neutral_assets": 0,
+                    "days_ahead": days_ahead,
+                },
+                "display_thresholds": at.build_display_thresholds(None),
+            }
 
         result = await db.execute(
             select(Asset).where(
@@ -769,6 +782,22 @@ class PredictionService:
             )
         )
         raw_assets = result.scalars().all()
+
+        if not raw_assets:
+            return {
+                "predictions": [],
+                "summary": {
+                    "total_current_value": 0.0,
+                    "total_predicted_value": 0.0,
+                    "expected_change_percent": 0.0,
+                    "overall_sentiment": "neutral",
+                    "bullish_assets": 0,
+                    "bearish_assets": 0,
+                    "neutral_assets": 0,
+                    "days_ahead": days_ahead,
+                },
+                "display_thresholds": at.build_display_thresholds(None),
+            }
 
         # Deduplicate by symbol: aggregate quantities
         asset_map: Dict[str, object] = {}
@@ -1901,6 +1930,97 @@ class PredictionService:
                     "ci_coverage": None,
                 },
             }
+
+    async def get_portfolio_backtest(self, db: AsyncSession, user_id: str, days: int = 7) -> Dict:
+        """Aggregate backtest across all portfolio assets.
+
+        Compares predictions made *days* ago with actual prices recorded
+        in PredictionLog.  Returns per-asset MAPE, direction accuracy,
+        an overall MAPE, and a ``needs_retraining`` flag (MAPE > 10%).
+        """
+        from app.models.prediction_log import PredictionLog
+
+        # Fetch user assets (same pattern as get_portfolio_predictions)
+        port_result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = port_result.scalars().all()
+        if not portfolios:
+            return {
+                "assets": [],
+                "overall_mape": None,
+                "overall_direction_accuracy": None,
+                "needs_retraining": False,
+                "days": days,
+            }
+        asset_result = await db.execute(
+            select(Asset).where(
+                Asset.portfolio_id.in_([p.id for p in portfolios]),
+                Asset.quantity > 0,
+            )
+        )
+        symbols = list({a.symbol.upper() for a in asset_result.scalars().all()})
+
+        if not symbols:
+            return {
+                "assets": [],
+                "overall_mape": None,
+                "overall_direction_accuracy": None,
+                "needs_retraining": False,
+                "days": days,
+            }
+
+        result = await db.execute(
+            select(PredictionLog)
+            .where(
+                PredictionLog.symbol.in_(symbols),
+                PredictionLog.accuracy_checked.isnot(None),
+                PredictionLog.horizon_days == days,
+            )
+            .order_by(PredictionLog.created_at.desc())
+            .limit(len(symbols) * 20)
+        )
+        logs = result.scalars().all()
+
+        # Group by symbol
+        by_symbol: Dict[str, list] = {}
+        for log in logs:
+            by_symbol.setdefault(log.symbol, []).append(log)
+
+        asset_results = []
+        all_mapes: List[float] = []
+        dir_hits = 0
+        dir_total = 0
+
+        for sym in symbols:
+            sym_logs = by_symbol.get(sym, [])
+            mapes = [entry.mape for entry in sym_logs if entry.mape is not None]
+            dirs = [entry.direction_correct for entry in sym_logs if entry.direction_correct is not None]
+            avg_mape = float(np.mean(mapes)) if mapes else None
+            dir_acc = sum(1 for d in dirs if d) / len(dirs) * 100 if dirs else None
+
+            if avg_mape is not None:
+                all_mapes.append(avg_mape)
+            dir_hits += sum(1 for d in dirs if d)
+            dir_total += len(dirs)
+
+            asset_results.append(
+                {
+                    "symbol": sym,
+                    "samples": len(sym_logs),
+                    "avg_mape": round(avg_mape, 1) if avg_mape is not None else None,
+                    "direction_accuracy": round(dir_acc, 1) if dir_acc is not None else None,
+                }
+            )
+
+        overall_mape = float(np.mean(all_mapes)) if all_mapes else None
+        overall_dir = dir_hits / dir_total * 100 if dir_total > 0 else None
+
+        return {
+            "assets": asset_results,
+            "overall_mape": round(overall_mape, 1) if overall_mape is not None else None,
+            "overall_direction_accuracy": round(overall_dir, 1) if overall_dir is not None else None,
+            "needs_retraining": overall_mape is not None and overall_mape > 10.0,
+            "days": days,
+        }
 
     @staticmethod
     def _compute_support_resistance(prices: List[float], current_price: float) -> Tuple[float, float]:

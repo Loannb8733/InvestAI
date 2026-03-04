@@ -81,8 +81,8 @@ async def get_cached_prediction(symbol: str, days: int) -> Optional[dict]:
     return None
 
 
-async def cache_prediction(symbol: str, days: int, result: dict, ttl: int = 21600):
-    """Cache prediction result (default 6h TTL)."""
+async def cache_prediction(symbol: str, days: int, result: dict, ttl: int = 1800):
+    """Cache prediction result (default 30min TTL)."""
     try:
         r = await _get_redis_txt()
         await r.setex(f"pred:{symbol}:{days}", ttl, json.dumps(result, default=str))

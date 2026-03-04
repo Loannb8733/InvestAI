@@ -21,6 +21,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate, TransactionWithAsset
+from app.services.metrics_service import invalidate_dashboard_cache
 
 router = APIRouter()
 
@@ -218,6 +219,8 @@ async def create_transaction(
     await db.commit()
     await db.refresh(transaction)
 
+    invalidate_dashboard_cache(str(current_user.id))
+
     return transaction
 
 
@@ -409,6 +412,8 @@ async def update_transaction(
     await db.commit()
     await db.refresh(transaction)
 
+    invalidate_dashboard_cache(str(current_user.id))
+
     return transaction
 
 
@@ -458,6 +463,8 @@ async def delete_all_transactions(
         asset.avg_buy_price = 0
 
     await db.commit()
+
+    invalidate_dashboard_cache(str(current_user.id))
 
     return DeleteAllResult(deleted_count=deleted_count)
 
@@ -511,6 +518,8 @@ async def delete_transaction(
     await _recalculate_avg_buy_price(db, asset)
 
     await db.commit()
+
+    invalidate_dashboard_cache(str(current_user.id))
 
 
 @router.post("/import-csv", response_model=CSVImportResult)
@@ -661,15 +670,16 @@ async def import_transactions_csv(
                 Transaction.transaction_type,
                 Transaction.executed_at,
                 Asset.symbol,
+                Transaction.price,
             )
             .join(Asset, Transaction.asset_id == Asset.id)
             .where(Transaction.asset_id.in_(dedup_asset_ids))
         )
         for row in existing_tx_result.all():
-            qty, tx_type, exec_at, sym = row
+            qty, tx_type, exec_at, sym, price = row
             if exec_at:
-                ts_key = int(exec_at.timestamp()) // 60  # Round to minute
-                existing_tx_keys.add((sym.upper(), tx_type.value, f"{float(qty):.8f}", ts_key))
+                ts_key = int(exec_at.timestamp())  # Second precision
+                existing_tx_keys.add((sym.upper(), tx_type.value, f"{float(qty):.8f}", f"{float(price):.8f}", ts_key))
 
     for parsed in parsed_transactions:
         try:
@@ -725,8 +735,14 @@ async def import_transactions_csv(
                 continue
 
             # Deduplication: skip if a matching transaction already exists
-            ts_key = int(parsed.timestamp.timestamp()) // 60
-            dedup_key = (symbol, trans_type.value, f"{float(parsed.quantity):.8f}", ts_key)
+            ts_key = int(parsed.timestamp.timestamp())  # Second precision
+            dedup_key = (
+                symbol,
+                trans_type.value,
+                f"{float(parsed.quantity):.8f}",
+                f"{float(parsed.price):.8f}",
+                ts_key,
+            )
             if dedup_key in existing_tx_keys:
                 continue  # Skip duplicate
             existing_tx_keys.add(dedup_key)  # Prevent duplicates within same import
@@ -873,6 +889,9 @@ async def import_transactions_csv(
             logger.info("Recalculated asset quantities from transactions")
         except Exception as e:
             logger.warning(f"Failed to recalculate quantities: {e}")
+
+    if success_count > 0:
+        invalidate_dashboard_cache(str(current_user.id))
 
     # Trigger historical price cache for imported assets (background Celery tasks)
     if success_count > 0:

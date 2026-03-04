@@ -29,6 +29,8 @@ class User(Base):
     mfa_secret = Column(String(255), nullable=True)
     mfa_backup_codes = Column(Text, nullable=True)  # JSON array of hashed backup codes
     preferred_currency = Column(String(10), default="EUR", nullable=False)
+    telegram_chat_id = Column(String(100), nullable=True)
+    telegram_enabled = Column(Boolean, default=False, nullable=False)
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verification_token = Column(String(255), nullable=True)
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)

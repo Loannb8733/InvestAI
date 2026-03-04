@@ -17,6 +17,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { portfoliosApi, assetsApi, dashboardApi, transactionsApi } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 import AddPortfolioForm from '@/components/forms/AddPortfolioForm'
 import AddAssetForm from '@/components/forms/AddAssetForm'
 import AddTransactionForm from '@/components/forms/AddTransactionForm'
@@ -117,6 +118,7 @@ interface PortfolioHistory {
 export default function PortfolioPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
 
   const [showAddPortfolio, setShowAddPortfolio] = useState(false)
   const [showAddAsset, setShowAddAsset] = useState<{ portfolioId: string; portfolioName: string } | null>(null)
@@ -148,7 +150,7 @@ export default function PortfolioPage() {
 
   // Fetch portfolio metrics (current holdings)
   const { data: portfolioMetrics, isLoading: loadingMetrics } = useQuery<PortfolioMetrics>({
-    queryKey: queryKeys.portfolios.metrics(selectedPortfolio),
+    queryKey: [...queryKeys.portfolios.metrics(selectedPortfolio), currency],
     queryFn: () => dashboardApi.getPortfolioMetrics(selectedPortfolio!),
     enabled: !!selectedPortfolio,
     placeholderData: keepPreviousData,
@@ -156,7 +158,7 @@ export default function PortfolioPage() {
 
   // Fetch portfolio history (including sold assets)
   const { data: portfolioHistory, isLoading: loadingHistory, isPlaceholderData: isHistoryStale } = useQuery<PortfolioHistory>({
-    queryKey: queryKeys.portfolios.history(selectedPortfolio),
+    queryKey: [...queryKeys.portfolios.history(selectedPortfolio), currency],
     queryFn: () => dashboardApi.getPortfolioHistory(selectedPortfolio!),
     enabled: !!selectedPortfolio && activeTab === 'history',
     placeholderData: keepPreviousData,

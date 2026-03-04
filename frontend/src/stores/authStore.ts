@@ -10,6 +10,8 @@ interface User {
   lastName?: string
   preferredCurrency?: string
   mfaEnabled: boolean
+  telegramChatId?: string
+  telegramEnabled?: boolean
 }
 
 interface AuthState {
@@ -94,6 +96,8 @@ export const useAuthStore = create<AuthState>()(
               lastName: user.last_name,
               preferredCurrency: user.preferred_currency || 'EUR',
               mfaEnabled: user.mfa_enabled,
+              telegramChatId: user.telegram_chat_id || undefined,
+              telegramEnabled: user.telegram_enabled ?? false,
             },
           })
         } catch {

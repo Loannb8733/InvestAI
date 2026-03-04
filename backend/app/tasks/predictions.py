@@ -99,12 +99,13 @@ async def _detect_anomalies():
     from app.models.user import User
 
     async with async_session_factory() as db:
-        result = await db.execute(select(User.id).where(User.is_active.is_(True)))
-        user_ids = [str(uid) for (uid,) in result.all()]
+        result = await db.execute(select(User).where(User.is_active.is_(True)))
+        users = result.scalars().all()
 
         total_anomalies = 0
 
-        for user_id in user_ids:
+        for user in users:
+            user_id = str(user.id)
             try:
                 anomalies = await prediction_service.detect_anomalies(db, user_id)
                 total_anomalies += len(anomalies)
@@ -117,6 +118,23 @@ async def _detect_anomalies():
                         anomaly.anomaly_type,
                         anomaly.price_change_percent,
                     )
+
+                    # Send Telegram alert (best-effort, per-user, with cooldown)
+                    try:
+                        if user.telegram_enabled and user.telegram_chat_id:
+                            from app.services.telegram_service import telegram_service
+
+                            await telegram_service.alert_anomaly(
+                                symbol=anomaly.symbol,
+                                anomaly_type=anomaly.anomaly_type,
+                                severity=anomaly.severity,
+                                description=anomaly.description,
+                                price_change_pct=anomaly.price_change_percent,
+                                chat_id=user.telegram_chat_id,
+                                user_id=user_id,
+                            )
+                    except Exception as tg_err:
+                        logger.debug("Telegram anomaly alert failed: %s", tg_err)
             except Exception as e:
                 logger.error("Anomaly detection failed for user %s: %s", user_id, e)
 
@@ -322,3 +340,84 @@ async def _tune_hyperparameters():
             logger.info("Tuned hyperparameters for %s", symbol)
         except Exception as e:
             logger.error("Tuning failed for %s: %s", symbol, e)
+
+
+@celery_app.task(name="app.tasks.predictions.check_bottom_zones")
+def check_bottom_zones():
+    """Check for bottom zone opportunities and send Telegram alerts."""
+    run_async(_check_bottom_zones())
+
+
+async def _check_bottom_zones():
+    """Detect assets in bottom zone with confidence > 80% and alert via Telegram."""
+    from app.ml.historical_data import HistoricalDataFetcher
+    from app.models.portfolio import Portfolio
+    from app.models.user import User
+    from app.services.telegram_service import telegram_service
+
+    fetcher = HistoricalDataFetcher()
+
+    async with async_session_factory() as db:
+        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
+        assets = result.all()
+
+        alerts_sent = 0
+
+        for symbol, asset_type in assets:
+            try:
+                dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+                if not prices or len(prices) < 30:
+                    continue
+
+                current_price = prices[-1]
+
+                estimate = prediction_service.estimate_top_bottom(
+                    symbol=symbol,
+                    prices=prices,
+                    current_price=current_price,
+                )
+
+                bottom = estimate.get("next_bottom", {})
+                confidence = bottom.get("confidence", 0)
+                distance_pct = abs(bottom.get("distance_pct", 100))
+
+                # Alert if confidence > 80% AND price is close to bottom (< 5%)
+                if confidence > 0.80 and distance_pct < 5.0:
+                    # Fan-out: send to all users holding this asset with Telegram enabled
+                    holders_result = await db.execute(
+                        select(User)
+                        .join(Portfolio, Portfolio.user_id == User.id)
+                        .join(Asset, Asset.portfolio_id == Portfolio.id)
+                        .where(
+                            Asset.symbol == symbol,
+                            Asset.quantity > 0,
+                            User.telegram_enabled.is_(True),
+                            User.telegram_chat_id.isnot(None),
+                        )
+                        .distinct()
+                    )
+                    holders = holders_result.scalars().all()
+
+                    for holder in holders:
+                        sent = await telegram_service.alert_bottom_zone(
+                            symbol=symbol,
+                            current_price=current_price,
+                            estimated_bottom=bottom.get("estimated_price", 0),
+                            confidence=confidence,
+                            distance_pct=distance_pct,
+                            chat_id=holder.telegram_chat_id,
+                            user_id=str(holder.id),
+                        )
+                        if sent:
+                            alerts_sent += 1
+                            logger.info(
+                                "Bottom zone alert sent for %s to user %s (conf=%.0f%%, dist=%.1f%%)",
+                                symbol,
+                                holder.id,
+                                confidence * 100,
+                                distance_pct,
+                            )
+            except Exception as e:
+                logger.debug("Bottom zone check failed for %s: %s", symbol, e)
+
+    logger.info("Bottom zone check complete: %d alerts sent", alerts_sent)

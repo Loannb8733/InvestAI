@@ -1,6 +1,7 @@
 """Report generation service for PDF and Excel exports."""
 
 import io
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -14,13 +15,16 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.services.price_service import price_service
+from app.services.metrics_service import metrics_service
+from app.services.snapshot_service import snapshot_service
+
+logger = logging.getLogger(__name__)
 
 # ── Data classes ────────────────────────────────────────────────────
 
@@ -47,6 +51,10 @@ class AssetReport:
     current_value: float
     gain_loss: float
     gain_loss_percent: float
+    breakeven_price: Optional[float] = None
+    risk_weight: Optional[float] = None
+    total_fees: float = 0.0
+    exchange: Optional[str] = None
 
 
 @dataclass
@@ -137,104 +145,57 @@ def _gain_color(v: float):
 class ReportService:
     """Service for generating various reports."""
 
-    # ── Portfolio data fetch ────────────────────────────────────────
+    # ── Report data (single source of truth: metrics_service) ──────
 
-    async def get_portfolio_data(
+    async def get_report_data(
         self,
         db: AsyncSession,
         user_id: str,
         year: Optional[int] = None,
+        currency: str = "EUR",
     ) -> Dict[str, Any]:
-        """Get comprehensive portfolio data for reports."""
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-        portfolio_ids = [p.id for p in portfolios]
+        """Get comprehensive portfolio data for reports.
 
-        if not portfolio_ids:
+        Delegates ALL calculations to metrics_service and snapshot_service.
+        This method only reshapes their output into report-friendly structures.
+        """
+        # 1. Dashboard-level summary (includes pnl_data, allocation)
+        dashboard = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency)
+
+        # 2. Per-portfolio metrics for detailed asset breakdown
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = result.scalars().all()
+
+        if not portfolios:
             return {
                 "portfolios": [],
                 "assets": [],
                 "transactions": [],
-                "summary": {"total_value": 0, "total_invested": 0, "gain_loss": 0, "gain_loss_percent": 0},
+                "summary": {
+                    "total_value": 0.0,
+                    "total_invested": 0.0,
+                    "gain_loss": 0.0,
+                    "gain_loss_percent": 0.0,
+                },
+                "pnl_data": {},
+                "risk_metrics": {},
+                "platform_analysis": [],
+                "generated_at": datetime.utcnow(),
+                "year": year,
             }
 
-        asset_result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(portfolio_ids),
-            )
-        )
-        assets = asset_result.scalars().all()
-        asset_ids = [a.id for a in assets]
+        portfolio_summaries: List[PortfolioSummary] = []
+        all_asset_reports: List[AssetReport] = []
+        all_asset_ids: List[str] = []
 
-        trans_query = select(Transaction).where(Transaction.asset_id.in_(asset_ids))
-        if year:
-            trans_query = trans_query.where(
-                Transaction.executed_at >= datetime(year, 1, 1),
-                Transaction.executed_at <= datetime(year, 12, 31, 23, 59, 59),
-            )
-        trans_query = trans_query.order_by(Transaction.executed_at.desc())
-        trans_result = await db.execute(trans_query)
-        transactions = trans_result.scalars().all()
-
-        # Fetch prices
-        crypto_symbols = [a.symbol for a in assets if a.asset_type == AssetType.CRYPTO]
-        prices_map = {}
-        if crypto_symbols:
-            try:
-                prices_map = await price_service.get_multiple_crypto_prices(crypto_symbols)
-            except Exception:
-                pass
-
-        total_value = 0
-        total_invested = 0
-        asset_reports = []
-
-        for asset in assets:
-            quantity = float(asset.quantity)
-            avg_price = float(asset.avg_buy_price)
-            price_data = prices_map.get(asset.symbol.upper())
-            current_price = float(price_data["price"]) if price_data and price_data.get("price") else avg_price
-
-            invested = quantity * avg_price
-            current_val = quantity * current_price
-            gain = current_val - invested
-            gain_pct = (gain / invested * 100) if invested > 0 else 0
-
-            total_invested += invested
-            total_value += current_val
-
-            asset_reports.append(
-                AssetReport(
-                    symbol=asset.symbol,
-                    name=asset.name or asset.symbol,
-                    asset_type=asset.asset_type.value,
-                    quantity=quantity,
-                    avg_buy_price=avg_price,
-                    current_price=current_price,
-                    total_invested=invested,
-                    current_value=current_val,
-                    gain_loss=gain,
-                    gain_loss_percent=gain_pct,
-                )
-            )
-
-        total_gain = total_value - total_invested
-        total_gain_pct = (total_gain / total_invested * 100) if total_invested > 0 else 0
-
-        asset_report_map = {ar.symbol: ar for ar in asset_reports}
-        portfolio_summaries = []
         for portfolio in portfolios:
-            p_assets = [a for a in assets if a.portfolio_id == portfolio.id]
-            p_invested = sum(
-                asset_report_map[a.symbol].total_invested for a in p_assets if a.symbol in asset_report_map
-            )
-            p_value = sum(asset_report_map[a.symbol].current_value for a in p_assets if a.symbol in asset_report_map)
+            pm = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), currency=currency)
+
+            p_value = pm["total_value"]
+            p_invested = pm["total_invested"]
             p_gain = p_value - p_invested
             p_gain_pct = (p_gain / p_invested * 100) if p_invested > 0 else 0
+
             portfolio_summaries.append(
                 PortfolioSummary(
                     name=portfolio.name,
@@ -242,38 +203,136 @@ class ReportService:
                     total_invested=p_invested,
                     gain_loss=p_gain,
                     gain_loss_percent=p_gain_pct,
-                    asset_count=len(p_assets),
+                    asset_count=pm.get("assets_count", len(pm.get("assets", []))),
                 )
             )
 
-        asset_map = {a.id: a for a in assets}
-        tax_transactions = []
-        for trans in transactions:
-            asset = asset_map.get(trans.asset_id)
-            if asset:
-                tax_transactions.append(
-                    TaxTransaction(
-                        date=trans.executed_at,
-                        symbol=asset.symbol,
-                        transaction_type=trans.transaction_type.value,
-                        quantity=float(trans.quantity),
-                        price=float(trans.price),
-                        total=float(trans.quantity) * float(trans.price),
-                        fee=float(trans.fee) if trans.fee else 0,
-                        gain_loss=None,
+            for a in pm.get("assets", []):
+                all_asset_ids.append(a["id"])
+                all_asset_reports.append(
+                    AssetReport(
+                        symbol=a["symbol"],
+                        name=a.get("name") or a["symbol"],
+                        asset_type=a["asset_type"],
+                        quantity=a["quantity"],
+                        avg_buy_price=a["avg_buy_price"],
+                        current_price=a.get("current_price") or a["avg_buy_price"],
+                        total_invested=a["total_invested"],
+                        current_value=a["current_value"],
+                        gain_loss=a["gain_loss"],
+                        gain_loss_percent=a["gain_loss_percent"],
+                        breakeven_price=a.get("breakeven_price"),
+                        risk_weight=a.get("risk_weight"),
+                        total_fees=a.get("total_fees", 0.0),
+                        exchange=a.get("exchange"),
                     )
                 )
 
+        # 3. Transaction list (direct query — metrics_service doesn't expose rows)
+        tax_transactions: List[TaxTransaction] = []
+        if all_asset_ids:
+            trans_query = select(Transaction).where(Transaction.asset_id.in_(all_asset_ids))
+            if year:
+                trans_query = trans_query.where(
+                    Transaction.executed_at >= datetime(year, 1, 1),
+                    Transaction.executed_at <= datetime(year, 12, 31, 23, 59, 59),
+                )
+            trans_query = trans_query.order_by(Transaction.executed_at.desc())
+            trans_result = await db.execute(trans_query)
+            transactions = trans_result.scalars().all()
+
+            # Build asset id → symbol map from DB
+            asset_id_result = await db.execute(select(Asset.id, Asset.symbol).where(Asset.id.in_(all_asset_ids)))
+            id_to_symbol = {str(row[0]): row[1] for row in asset_id_result.all()}
+
+            for trans in transactions:
+                symbol = id_to_symbol.get(str(trans.asset_id), "")
+                if symbol:
+                    tax_transactions.append(
+                        TaxTransaction(
+                            date=trans.executed_at,
+                            symbol=symbol,
+                            transaction_type=trans.transaction_type.value,
+                            quantity=float(trans.quantity),
+                            price=float(trans.price),
+                            total=float(trans.quantity) * float(trans.price),
+                            fee=float(trans.fee) if trans.fee else 0,
+                            gain_loss=None,
+                        )
+                    )
+
+        # 4. Risk metrics (for Excel "Analyse de Risque" sheet)
+        # Use the same allocations as the Dashboard (filtered: current_value > 0)
+        # and the same days resolution (days=0 → actual days since first tx)
+        # to ensure HHI, VaR, etc. match exactly.
+        risk_metrics: Dict[str, Any] = {}
+        try:
+            allocations = [
+                {"symbol": a["symbol"], "value": a["current_value"]} for a in dashboard.get("aggregated_assets", [])
+            ]
+            # Resolve days like the Dashboard does for days=0 ("all time")
+            first_tx_result = await db.execute(
+                select(func.min(Transaction.executed_at)).where(Transaction.asset_id.in_(all_asset_ids))
+            )
+            first_tx_date = first_tx_result.scalar()
+            if first_tx_date:
+                if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
+                    first_tx_date = first_tx_date.replace(tzinfo=None)
+                risk_days = max((datetime.utcnow() - first_tx_date).days + 1, 7)
+            else:
+                risk_days = 30
+
+            risk_metrics = await snapshot_service.get_all_risk_metrics(
+                db,
+                user_id,
+                current_value=dashboard["total_value"],
+                allocations=allocations,
+                days=risk_days,
+            )
+        except Exception:
+            logger.warning("Failed to compute risk metrics for report", exc_info=True)
+
+        # 5. Platform analysis (GROUP BY exchange)
+        platform_map: Dict[str, Dict[str, Any]] = {}
+        for ar in all_asset_reports:
+            ex = ar.exchange or "Autre"
+            if ex not in platform_map:
+                platform_map[ex] = {
+                    "exchange": ex,
+                    "total_value": 0.0,
+                    "total_invested": 0.0,
+                    "total_fees": 0.0,
+                    "count": 0,
+                }
+            platform_map[ex]["total_value"] += ar.current_value
+            platform_map[ex]["total_invested"] += ar.total_invested
+            platform_map[ex]["total_fees"] += ar.total_fees
+            platform_map[ex]["count"] += 1
+
+        platform_analysis = []
+        for p in platform_map.values():
+            invested = p["total_invested"]
+            p["roi_percent"] = ((p["total_value"] - invested) / invested * 100) if invested > 0 else 0
+            p["net_pnl"] = p["total_value"] - invested - p["total_fees"]
+            platform_analysis.append(p)
+        platform_analysis.sort(key=lambda x: x["total_value"], reverse=True)
+
+        # 6. Build result
+        pnl_data = dashboard.get("pnl_data", {})
+
         return {
             "portfolios": portfolio_summaries,
-            "assets": asset_reports,
+            "assets": all_asset_reports,
             "transactions": tax_transactions,
             "summary": {
-                "total_value": total_value,
-                "total_invested": total_invested,
-                "gain_loss": total_gain,
-                "gain_loss_percent": total_gain_pct,
+                "total_value": dashboard["total_value"],
+                "total_invested": dashboard["total_invested"],
+                "gain_loss": dashboard.get("net_gain_loss", 0),
+                "gain_loss_percent": dashboard.get("net_gain_loss_percent", 0),
             },
+            "pnl_data": pnl_data,
+            "risk_metrics": risk_metrics,
+            "platform_analysis": platform_analysis,
             "generated_at": datetime.utcnow(),
             "year": year,
         }
@@ -540,6 +599,7 @@ class ReportService:
         elements.append(Spacer(1, 20))
 
         summary = data.get("summary", {})
+        pnl = data.get("pnl_data", {})
         elements.append(Paragraph("Résumé Global", heading_style))
         summary_data = [
             ["Indicateur", "Valeur"],
@@ -548,24 +608,36 @@ class ReportService:
             ["Plus/Moins-value", _money(summary.get("gain_loss", 0))],
             ["Performance", _pct(summary.get("gain_loss_percent", 0))],
         ]
-        t = Table(summary_data, colWidths=[8 * cm, 6 * cm])
-        t.setStyle(
-            TableStyle(
+        if pnl:
+            summary_data.extend(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 11),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                    ("BACKGROUND", (0, 1), (-1, -1), _LIGHT_BG),
-                    ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
-                    ("FONTSIZE", (0, 1), (-1, -1), 10),
-                    ("TOPPADDING", (0, 1), (-1, -1), 8),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
+                    ["", ""],
+                    ["P&L Latent", _money(pnl.get("unrealized_pnl", 0))],
+                    ["P&L Réalisé", _money(pnl.get("realized_pnl", 0))],
+                    ["Total Frais", _money(pnl.get("total_fees", 0))],
+                    ["P&L Net", _money(pnl.get("net_pnl", 0))],
                 ]
             )
-        )
+        t = Table(summary_data, colWidths=[8 * cm, 6 * cm])
+        summary_style_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 11),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("BACKGROUND", (0, 1), (-1, -1), _LIGHT_BG),
+            ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+            ("FONTSIZE", (0, 1), (-1, -1), 10),
+            ("TOPPADDING", (0, 1), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
+        ]
+        if pnl:
+            # Bold + color on P&L Net row (last row)
+            net_pnl = pnl.get("net_pnl", 0)
+            summary_style_cmds.append(("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"))
+            summary_style_cmds.append(("TEXTCOLOR", (1, -1), (1, -1), _gain_color(net_pnl)))
+        t.setStyle(TableStyle(summary_style_cmds))
         elements.append(t)
         elements.append(Spacer(1, 20))
 
@@ -608,7 +680,7 @@ class ReportService:
         assets = data.get("assets", [])
         if assets:
             elements.append(Paragraph("Détail des Actifs", heading_style))
-            rows = [["Symbole", "Type", "Qté", "PRU", "Valeur", "+/- Value", "Perf."]]
+            rows = [["Symbole", "Type", "Qté", "PRU", "Valeur", "+/- Value", "Perf.", "Break-even", "Risque"]]
             for a in assets:
                 rows.append(
                     [
@@ -619,9 +691,24 @@ class ReportService:
                         _money(a.current_value),
                         _money(a.gain_loss),
                         _pct(a.gain_loss_percent),
+                        _money(a.breakeven_price) if a.breakeven_price else "N/A",
+                        f"{a.risk_weight:.1f}%" if a.risk_weight else "N/A",
                     ]
                 )
-            t = Table(rows, colWidths=[2.2 * cm, 1.8 * cm, 2 * cm, 2.5 * cm, 2.8 * cm, 2.5 * cm, 1.8 * cm])
+            t = Table(
+                rows,
+                colWidths=[
+                    2.0 * cm,
+                    1.5 * cm,
+                    1.6 * cm,
+                    2.0 * cm,
+                    2.2 * cm,
+                    2.0 * cm,
+                    1.6 * cm,
+                    2.0 * cm,
+                    1.5 * cm,
+                ],
+            )
             t.setStyle(
                 TableStyle(
                     [
@@ -648,10 +735,11 @@ class ReportService:
     def generate_performance_excel(self, data: Dict[str, Any]) -> bytes:
         wb = Workbook()
 
-        # Summary
+        # ── Résumé sheet ─────────────────────────────────────────────
         ws = wb.active
         ws.title = "Résumé"
         summary = data.get("summary", {})
+        pnl = data.get("pnl_data", {})
         ws["A1"] = "Rapport de Performance InvestAI"
         ws["A1"].font = Font(bold=True, size=16)
         ws["A2"] = f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
@@ -662,21 +750,38 @@ class ReportService:
         ws["A4"] = "Indicateur"
         ws["B4"] = "Valeur"
 
-        rows = [
-            ("Valeur totale", summary.get("total_value", 0)),
-            ("Total investi", summary.get("total_invested", 0)),
-            ("Plus/Moins-value", summary.get("gain_loss", 0)),
-            ("Performance (%)", summary.get("gain_loss_percent", 0) / 100),
+        summary_rows = [
+            ("Valeur totale", summary.get("total_value", 0), _XL_MONEY),
+            ("Total investi", summary.get("total_invested", 0), _XL_MONEY),
+            ("Plus/Moins-value", summary.get("gain_loss", 0), _XL_MONEY),
+            ("Performance (%)", summary.get("gain_loss_percent", 0) / 100, _XL_PERCENT),
         ]
-        for i, (label, value) in enumerate(rows, start=5):
+        if pnl:
+            summary_rows.extend(
+                [
+                    ("", "", None),
+                    ("P&L Latent", pnl.get("unrealized_pnl", 0), _XL_MONEY),
+                    ("P&L Réalisé", pnl.get("realized_pnl", 0), _XL_MONEY),
+                    ("Total Frais", pnl.get("total_fees", 0), _XL_MONEY),
+                    ("P&L Net", pnl.get("net_pnl", 0), _XL_MONEY),
+                ]
+            )
+        for i, (label, value, fmt) in enumerate(summary_rows, start=5):
             ws[f"A{i}"] = label
-            ws[f"B{i}"] = value
-            ws[f"B{i}"].number_format = _XL_MONEY if i < 8 else _XL_PERCENT
+            if value != "":
+                ws[f"B{i}"] = value
+            if fmt:
+                ws[f"B{i}"].number_format = fmt
+        # Bold P&L Net row
+        if pnl:
+            net_row = 5 + len(summary_rows) - 1
+            ws[f"A{net_row}"].font = Font(bold=True)
+            ws[f"B{net_row}"].font = Font(bold=True)
 
-        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["A"].width = 22
         ws.column_dimensions["B"].width = 18
 
-        # Portfolios
+        # ── Portefeuilles sheet ──────────────────────────────────────
         portfolios = data.get("portfolios", [])
         if portfolios:
             ws2 = wb.create_sheet("Portefeuilles")
@@ -698,7 +803,7 @@ class ReportService:
             for col in range(1, 7):
                 ws2.column_dimensions[get_column_letter(col)].width = 15
 
-        # Assets
+        # ── Actifs sheet (enrichi) ───────────────────────────────────
         assets = data.get("assets", [])
         if assets:
             ws3 = wb.create_sheet("Actifs")
@@ -706,43 +811,53 @@ class ReportService:
                 "Symbole",
                 "Nom",
                 "Type",
+                "Plateforme",
                 "Quantité",
                 "PRU",
                 "Prix actuel",
+                "Break-even",
                 "Investi",
                 "Valeur",
                 "+/- Value",
                 "Perf.",
+                "Frais",
+                "Risque",
             ]
             for col, h in enumerate(headers, 1):
                 c = ws3.cell(row=1, column=col, value=h)
                 c.font = _XL_HEADER_FONT
                 c.fill = _XL_HEADER_FILL
                 c.border = _XL_BORDER
+            money_cols = {6, 7, 8, 9, 10, 11, 13}  # PRU, Prix, Break-even, Investi, Valeur, +/-, Frais
+            pct_cols = {12, 14}  # Perf., Risque
             for row, a in enumerate(assets, 2):
                 vals = [
                     a.symbol,
                     a.name,
                     a.asset_type,
+                    a.exchange or "",
                     a.quantity,
                     a.avg_buy_price,
                     a.current_price,
+                    a.breakeven_price if a.breakeven_price else "",
                     a.total_invested,
                     a.current_value,
                     a.gain_loss,
                     a.gain_loss_percent / 100,
+                    a.total_fees,
+                    a.risk_weight / 100 if a.risk_weight else "",
                 ]
                 for col, v in enumerate(vals, 1):
                     c = ws3.cell(row=row, column=col, value=v)
                     c.border = _XL_BORDER
-                    if col in (5, 6, 7, 8, 9):
+                    if col in money_cols and v != "":
                         c.number_format = _XL_MONEY
-                    elif col == 10:
+                    elif col in pct_cols and v != "":
                         c.number_format = _XL_PERCENT
-            for col in range(1, 11):
+            for col in range(1, len(headers) + 1):
                 ws3.column_dimensions[get_column_letter(col)].width = 14
 
-        # Transactions
+        # ── Transactions sheet ───────────────────────────────────────
         transactions = data.get("transactions", [])
         if transactions:
             ws4 = wb.create_sheet("Transactions")
@@ -753,7 +868,8 @@ class ReportService:
                 c.fill = _XL_HEADER_FILL
                 c.border = _XL_BORDER
             for row, t in enumerate(transactions, 2):
-                ws4.cell(row=row, column=1, value=t.date.strftime("%d/%m/%Y")).border = _XL_BORDER
+                date_str = t.date.strftime("%d/%m/%Y") if t.date else ""
+                ws4.cell(row=row, column=1, value=date_str).border = _XL_BORDER
                 ws4.cell(row=row, column=2, value=t.symbol).border = _XL_BORDER
                 ws4.cell(row=row, column=3, value=t.transaction_type).border = _XL_BORDER
                 ws4.cell(row=row, column=4, value=t.quantity).border = _XL_BORDER
@@ -764,6 +880,84 @@ class ReportService:
                     ws4.cell(row=row, column=col).border = _XL_BORDER
             for col in range(1, 8):
                 ws4.column_dimensions[get_column_letter(col)].width = 14
+
+        # ── Analyse de Risque sheet ──────────────────────────────────
+        risk = data.get("risk_metrics", {})
+        if risk:
+            ws_risk = wb.create_sheet("Analyse de Risque")
+            for cell_ref in ["A1", "B1"]:
+                ws_risk[cell_ref].font = _XL_HEADER_FONT
+                ws_risk[cell_ref].fill = _XL_HEADER_FILL
+                ws_risk[cell_ref].border = _XL_BORDER
+            ws_risk["A1"] = "Indicateur"
+            ws_risk["B1"] = "Valeur"
+
+            mdd = risk.get("max_drawdown", {})
+            var95 = risk.get("var_95", {})
+            conc = risk.get("concentration", {})
+            st20 = risk.get("stress_test_20", {})
+            st40 = risk.get("stress_test_40", {})
+
+            risk_rows = [
+                ("Volatilité annualisée", risk.get("volatility", 0) / 100, _XL_PERCENT),
+                ("Ratio de Sharpe", risk.get("sharpe_ratio", 0), "0.00"),
+                ("Max Drawdown", mdd.get("max_drawdown_percent", 0) / 100, _XL_PERCENT),
+                ("Max Drawdown — Pic", mdd.get("peak_date", ""), None),
+                ("Max Drawdown — Creux", mdd.get("trough_date", ""), None),
+                ("VaR 95% (%)", var95.get("var_percent", 0) / 100, _XL_PERCENT),
+                ("VaR 95% (montant)", var95.get("var_amount", 0), _XL_MONEY),
+                ("", "", None),
+                ("Indice HHI", conc.get("hhi", 0), "0"),
+                ("Concentration", conc.get("interpretation", ""), None),
+                ("Actif dominant", conc.get("top_asset", ""), None),
+                ("Poids actif dominant", (conc.get("top_concentration", 0) or 0) / 100, _XL_PERCENT),
+                ("", "", None),
+                ("Stress Test -20% (perte)", st20.get("potential_loss", 0), _XL_MONEY),
+                ("Stress Test -20% (valeur)", st20.get("stressed_value", 0), _XL_MONEY),
+                ("Stress Test -40% (perte)", st40.get("potential_loss", 0), _XL_MONEY),
+                ("Stress Test -40% (valeur)", st40.get("stressed_value", 0), _XL_MONEY),
+            ]
+            for i, (label, value, fmt) in enumerate(risk_rows, start=2):
+                ws_risk[f"A{i}"] = label
+                ws_risk[f"A{i}"].border = _XL_BORDER
+                if value != "":
+                    ws_risk[f"B{i}"] = value
+                ws_risk[f"B{i}"].border = _XL_BORDER
+                if fmt:
+                    ws_risk[f"B{i}"].number_format = fmt
+
+            ws_risk.column_dimensions["A"].width = 28
+            ws_risk.column_dimensions["B"].width = 18
+
+        # ── Performance par Plateforme sheet ─────────────────────────
+        platforms = data.get("platform_analysis", [])
+        if platforms:
+            ws_plat = wb.create_sheet("Perf. par Plateforme")
+            plat_headers = ["Plateforme", "Nb Actifs", "Valeur", "Investi", "Frais", "P&L Net", "ROI %"]
+            for col, h in enumerate(plat_headers, 1):
+                c = ws_plat.cell(row=1, column=col, value=h)
+                c.font = _XL_HEADER_FONT
+                c.fill = _XL_HEADER_FILL
+                c.border = _XL_BORDER
+            for row, p in enumerate(platforms, 2):
+                vals = [
+                    p["exchange"],
+                    p["count"],
+                    p["total_value"],
+                    p["total_invested"],
+                    p["total_fees"],
+                    p["net_pnl"],
+                    p["roi_percent"] / 100,
+                ]
+                for col, v in enumerate(vals, 1):
+                    c = ws_plat.cell(row=row, column=col, value=v)
+                    c.border = _XL_BORDER
+                    if col in (3, 4, 5, 6):
+                        c.number_format = _XL_MONEY
+                    elif col == 7:
+                        c.number_format = _XL_PERCENT
+            for col in range(1, len(plat_headers) + 1):
+                ws_plat.column_dimensions[get_column_letter(col)].width = 16
 
         buffer = io.BytesIO()
         wb.save(buffer)

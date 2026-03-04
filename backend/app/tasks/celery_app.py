@@ -84,6 +84,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.predictions.check_data_drift",
         "schedule": 86400.0,  # Every 24 hours
     },
+    "check-bottom-zones": {
+        "task": "app.tasks.predictions.check_bottom_zones",
+        "schedule": 21600.0,  # Every 6 hours
+    },
     # === Snapshots ===
     "create-daily-snapshots": {
         "task": "app.tasks.snapshots.create_daily_snapshots",

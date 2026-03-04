@@ -88,6 +88,13 @@ class PortfolioAnalytics:
     # Human-readable VaR explanation (P12)
     var_95_description: str = ""
 
+    # Contextual interpretations for ratios
+    interpretations: Dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self):
+        if self.interpretations is None:
+            self.interpretations = {}
+
 
 @dataclass
 class CorrelationData:
@@ -107,6 +114,7 @@ class MonteCarloResult:
     expected_return: float
     prob_positive: float  # probability of positive return
     prob_loss_10: float  # probability of >10% loss
+    prob_ruin: float  # probability of portfolio reaching zero
     simulations: int
     horizon_days: int
 
@@ -714,6 +722,80 @@ class AnalyticsService:
 
         return self._assemble_analytics(list(aggregated.values()), risk_free_rate=risk_free_rate)
 
+    @staticmethod
+    def _build_interpretations(
+        sharpe: float,
+        sortino: float,
+        calmar: float,
+        volatility: float,
+        max_dd: float,
+        asset_data: list,
+    ) -> Dict[str, str]:
+        """Build contextual, human-readable interpretations for portfolio ratios."""
+        interp: Dict[str, str] = {}
+
+        # Detect actual data depth (min data points across non-stablecoin assets)
+        data_lengths = [
+            len(d.get("returns", []))
+            for d in asset_data
+            if not d.get("is_stablecoin", False) and len(d.get("returns", [])) > 0
+        ]
+        min_days = min(data_lengths) if data_lengths else 0
+
+        # ── Short history warning ──
+        if min_days < 20:
+            short_msg = (
+                "Donnée non significative (échantillon < 20 jours). "
+                "Les ratios nécessitent au moins 30 jours d'historique pour être fiables."
+            )
+            interp["sharpe"] = short_msg
+            interp["sortino"] = short_msg
+            interp["calmar"] = short_msg
+            interp["global"] = "Historique trop court pour des conclusions fiables."
+            return interp
+
+        # ── Sharpe ──
+        if sharpe > 3:
+            interp["sharpe"] = (
+                "Performance atypique (Sharpe > 3) : probablement liée à une volatilité "
+                "extrême ou un pump récent. Ne pas extrapoler."
+            )
+        elif sharpe >= 2:
+            interp["sharpe"] = "Excellent rapport rendement/risque. Vérifiez que la période est représentative."
+        elif sharpe >= 1:
+            interp["sharpe"] = "Bon ratio — le portefeuille rémunère correctement le risque pris."
+        elif sharpe >= 0:
+            interp["sharpe"] = "Rendement positif mais faible par rapport au risque. Marge d'optimisation possible."
+        else:
+            interp["sharpe"] = "Rendement inférieur au taux sans risque. Le portefeuille ne compense pas sa volatilité."
+
+        # ── Sortino vs Sharpe ──
+        if sortino > sharpe + 0.5 and sortino > 0:
+            interp["sortino"] = (
+                "Sortino nettement supérieur au Sharpe : votre volatilité est principalement "
+                "positive (hausses). C'est un signe de force — le Sortino est plus pertinent "
+                "en crypto car il ne punit pas les gains explosifs."
+            )
+        elif sortino > 0:
+            interp["sortino"] = (
+                "Ratio positif. Le Sortino est le ratio de référence en crypto car il "
+                "ne pénalise que la volatilité baissière, pas les hausses brutales."
+            )
+        else:
+            interp["sortino"] = "Sortino négatif : les pertes dominent. Le risque baissier dépasse le rendement."
+
+        # ── Calmar ──
+        if calmar > 2:
+            interp["calmar"] = "Excellente récupération : le rendement compense largement le pire drawdown subi."
+        elif calmar > 1:
+            interp["calmar"] = "Le rendement annualisé dépasse le max drawdown. Bonne résilience."
+        elif calmar > 0:
+            interp["calmar"] = "Rendement positif mais inférieur au max drawdown. Récupération lente."
+        else:
+            interp["calmar"] = "Le portefeuille n'a pas récupéré de sa plus grosse perte."
+
+        return interp
+
     def _assemble_analytics(self, asset_data: list, risk_free_rate: float = RISK_FREE_RATE) -> PortfolioAnalytics:
         """From a list of asset dicts, compute all portfolio-level analytics."""
         # Separate stablecoins from real assets
@@ -789,6 +871,16 @@ class AnalyticsService:
         best = sorted_p[0].symbol if sorted_p else None
         worst = sorted_p[-1].symbol if len(sorted_p) > 1 else None
 
+        # ── Contextual interpretations ──
+        interpretations = self._build_interpretations(
+            sharpe=sharpe,
+            sortino=sortino,
+            calmar=calmar,
+            volatility=vol,
+            max_dd=max_dd,
+            asset_data=real_assets,
+        )
+
         return PortfolioAnalytics(
             total_value=total_value,
             total_invested=total_invested,
@@ -810,6 +902,7 @@ class AnalyticsService:
             assets=perfs,
             best_performer=best,
             worst_performer=worst,
+            interpretations=interpretations,
         )
 
     # ------------------------------------------------------------------
@@ -986,6 +1079,7 @@ class AnalyticsService:
                 expected_return=0,
                 prob_positive=0,
                 prob_loss_10=0,
+                prob_ruin=0,
                 simulations=0,
                 horizon_days=horizon_days,
             )
@@ -1015,6 +1109,7 @@ class AnalyticsService:
                 expected_return=0,
                 prob_positive=0,
                 prob_loss_10=0,
+                prob_ruin=0,
                 simulations=0,
                 horizon_days=horizon_days,
             )
@@ -1069,18 +1164,51 @@ class AnalyticsService:
         n_assets: int,
         user_id: str,
     ) -> "MonteCarloResult":
-        """CPU-bound Monte Carlo in thread pool — capped at ~200 MB."""
+        """CPU-bound Monte Carlo with volatility shrinkage and ruin probability.
+
+        Volatility shrinkage: for horizons > 90 days, the Cholesky factor (L)
+        is blended towards a long-term average volatility (~20% annualized)
+        using a linear shrinkage schedule.  This prevents unrealistic
+        extreme outcomes when short-term crypto vol (80%+) is extrapolated
+        over multi-year horizons.
+
+        Ruin probability: tracks the fraction of simulated paths where the
+        cumulative portfolio value drops to zero (total return <= -100%).
+        """
         # Cap allocation: 200 MB / 8 bytes per float64
         max_elements = 200_000_000 // 8
         capped_sims = min(num_simulations, max_elements // max(horizon_days * n_assets, 1))
         capped_sims = max(capped_sims, 100)  # At least 100 simulations
 
+        # --- Volatility shrinkage (mean reversion) ---
+        # Long-term daily vol target: ~20% annualized = 0.20 / sqrt(252) ≈ 0.0126
+        LONG_TERM_DAILY_VOL = 0.20 / np.sqrt(252)
+        # Shrinkage ramps from 0 at 90 days to 1 at 1825 days (5 years)
+        shrinkage = np.clip((horizon_days - 90) / (1825 - 90), 0.0, 1.0)
+
+        if shrinkage > 0:
+            # Build a long-term L: diagonal matrix with uniform long-term vol
+            L_longterm = np.eye(n_assets) * LONG_TERM_DAILY_VOL
+            L_blended = (1 - shrinkage) * L + shrinkage * L_longterm
+        else:
+            L_blended = L
+
         seed = int(time.time()) ^ (hash(user_id) % (2**31))
         rng = np.random.default_rng(seed & 0x7FFFFFFF)
         Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
-        correlated_returns = mu_vec + np.einsum("ij,...j->...i", L, Z)
-        port_daily_returns = correlated_returns @ w
-        cumulative = np.sum(port_daily_returns, axis=1)
+        correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)
+        port_daily_returns = correlated_returns @ w  # (capped_sims, horizon_days)
+
+        # --- Ruin probability: track cumulative path ---
+        cumulative_path = np.cumsum(port_daily_returns, axis=1)  # (sims, days)
+        # Portfolio value at each step = exp(cum_log_return)
+        # Ruin = value drops to 0, i.e. cum_log_return → -inf, practically <= -100%
+        portfolio_values = np.exp(cumulative_path)  # relative to initial (1.0)
+        ruin_mask = np.any(portfolio_values <= 0.01, axis=1)  # touched <= 1% of initial
+        prob_ruin = float(np.mean(ruin_mask) * 100)
+
+        # Total returns from final cumulative value
+        cumulative = cumulative_path[:, -1]
         total_returns_pct = (np.exp(cumulative) - 1) * 100
 
         return MonteCarloResult(
@@ -1094,6 +1222,7 @@ class AnalyticsService:
             expected_return=round(float(np.mean(total_returns_pct)), 2),
             prob_positive=round(float(np.mean(total_returns_pct > 0) * 100), 1),
             prob_loss_10=round(float(np.mean(total_returns_pct < -10) * 100), 1),
+            prob_ruin=round(prob_ruin, 1),
             simulations=capped_sims,
             horizon_days=horizon_days,
         )
@@ -1236,8 +1365,15 @@ class AnalyticsService:
     # XIRR
     # ------------------------------------------------------------------
 
-    async def compute_xirr(self, db: AsyncSession, user_id: str) -> Optional[float]:
-        """Compute XIRR across all user portfolios."""
+    async def compute_xirr(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Optional[float]:
+        """Compute XIRR across all user portfolios.
+
+        Uses metrics_service for current portfolio value (single source of truth)
+        and converts transaction amounts to the user's preferred currency.
+        Returns annualized rate as percentage, or None if not computable.
+        """
+        from app.services.metrics_service import metrics_service
+
         result = await db.execute(
             select(Portfolio).where(
                 Portfolio.user_id == user_id,
@@ -1263,14 +1399,34 @@ class AnalyticsService:
         if not transactions:
             return None
 
+        # ── Forex rate for multi-currency conversion ──
+        # Transaction amounts are stored in the asset's quote currency (usually USD).
+        # Convert to user's preferred currency for accurate XIRR.
+        usd_to_target = 1.0
+        target = currency.upper()
+        if target != "USD":
+            try:
+                rate = await self.price_service.get_forex_rate("USD", target)
+                usd_to_target = float(rate) if rate else 1.0
+            except Exception:
+                logger.warning("Forex USD→%s unavailable, using 1.0", target)
+
         cashflows: List[Tuple[datetime, float]] = []
+        skipped = 0
         for tx in transactions:
-            amount = float(tx.quantity) * float(tx.price)
-            fee = float(tx.fee or 0)
-            # Ensure timezone-aware datetime
+            # Guard: skip transactions without a date (data integrity issue)
             dt = tx.executed_at
+            if dt is None:
+                skipped += 1
+                continue
+
+            amount = float(tx.quantity) * float(tx.price) * usd_to_target
+            fee = float(tx.fee or 0) * usd_to_target
+
+            # Ensure timezone-aware datetime
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
+
             if tx.transaction_type in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
                 # Cash outflow (investment) — negative for XIRR convention
                 cashflows.append((dt, -(amount + fee)))
@@ -1280,15 +1436,25 @@ class AnalyticsService:
             elif tx.transaction_type in [TransactionType.STAKING_REWARD, TransactionType.AIRDROP]:
                 cashflows.append((dt, amount))
 
+        if skipped > 0:
+            logger.warning("XIRR: skipped %d transactions with NULL executed_at", skipped)
+
         if not cashflows:
             return None
 
         # Add current portfolio value as final cashflow (positive)
-        assets = await self._get_user_assets(db, user_id, exclude_stablecoins=False)
-        current_value = 0.0
-        for asset in assets:
-            price = await self._get_asset_price(asset)
-            current_value += float(asset.quantity) * price
+        # Use metrics_service for live, currency-converted value
+        try:
+            dashboard = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=0)
+            current_value = float(dashboard.get("total_value", 0.0))
+        except Exception as exc:
+            logger.warning("XIRR: metrics_service fallback to _get_asset_price: %s", exc)
+            assets = await self._get_user_assets(db, user_id, exclude_stablecoins=False)
+            current_value = 0.0
+            for asset in assets:
+                price = await self._get_asset_price(asset)
+                current_value += float(asset.quantity) * price
+            current_value *= usd_to_target
 
         if current_value <= 0:
             return None
@@ -1311,112 +1477,206 @@ class AnalyticsService:
     # Stress Tests (#15)
     # ------------------------------------------------------------------
 
+    # Historical crisis scenario definitions
+    HISTORICAL_SCENARIOS = [
+        {
+            "id": "covid_2020",
+            "name": "COVID-19 (Mars 2020)",
+            "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs en 30 jours",
+            "shocks": {"crypto": -50, "stock": -35, "etf": -30, "real_estate": -10, "crowdfunding": -5},
+            "duration_days": 30,
+            "historical_recovery_months": 5,
+        },
+        {
+            "id": "luna_ftx_2022",
+            "name": "LUNA/FTX (2022)",
+            "description": "Effondrement crypto (Luna Mai + FTX Nov) — altcoins -60%, BTC -40%",
+            "shocks": {"crypto": -60, "stock": -20, "etf": -15, "real_estate": -5, "crowdfunding": -3},
+            "duration_days": 60,
+            "historical_recovery_months": 18,
+        },
+        {
+            "id": "crisis_2008",
+            "name": "Crise financière 2008",
+            "description": "Crise systémique bancaire — chute massive des actions et immobilier",
+            "shocks": {"crypto": -30, "stock": -50, "etf": -45, "real_estate": -25, "crowdfunding": -15},
+            "duration_days": 180,
+            "historical_recovery_months": 48,
+        },
+        {
+            "id": "bull_run_2021",
+            "name": "Bull Run 2021",
+            "description": "Hausse généralisée — crypto +100%, actions +25%, ETF +20%",
+            "shocks": {"crypto": 100, "stock": 25, "etf": 20, "real_estate": 10, "crowdfunding": 5},
+            "duration_days": 365,
+            "historical_recovery_months": 0,
+        },
+        {
+            "id": "rate_hike",
+            "name": "Hausse des taux (+300bp)",
+            "description": "Resserrement monétaire brutal — impact sur les valorisations",
+            "shocks": {"crypto": -25, "stock": -18, "etf": -15, "real_estate": -10, "crowdfunding": -5},
+            "duration_days": 90,
+            "historical_recovery_months": 12,
+        },
+        {
+            "id": "flash_crash",
+            "name": "Flash Crash",
+            "description": "Chute éclair intra-journalière sur tous les marchés",
+            "shocks": {"crypto": -15, "stock": -10, "etf": -8, "real_estate": -3, "crowdfunding": -1},
+            "duration_days": 1,
+            "historical_recovery_months": 1,
+        },
+    ]
+
     async def stress_test(
         self,
         db: AsyncSession,
         user_id: str,
         portfolio_id: Optional[str] = None,
+        currency: str = "EUR",
+        scenario_ids: Optional[List[str]] = None,
     ) -> dict:
         """Run stress tests simulating historical crash scenarios on the portfolio.
 
-        Scenarios:
-        - COVID-19 crash (Mar 2020): ~-35% stocks, ~-50% crypto
-        - 2022 Crypto Winter: ~-65% crypto, ~-20% stocks
-        - 2008 Financial Crisis: ~-50% stocks, ~-10% crypto (not existed)
-        - Rising rates shock: ~-15% stocks/ETF, ~-20% crypto
-        - Flash crash: ~-10% all assets in 1 day
+        Uses metrics_service for live prices and risk_weight per asset.
+        Shocks are modulated by each asset's volatility-based risk_weight:
+        high-risk assets receive proportionally larger shocks.
+
+        Returns MaxDD (worst-case drawdown) and estimated recovery time.
         """
-        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
+        from app.services.metrics_service import metrics_service
 
-        if not assets:
-            return {"scenarios": [], "total_value": 0}
+        # Fetch live portfolio data from metrics_service (single source of truth)
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = result.scalars().all()
 
-        # Current values
-        asset_values: Dict[str, Tuple[str, float]] = {}  # symbol -> (asset_type, value)
-        total_value = 0.0
-        for asset in assets:
-            _, hist = await self._fetch_history(asset.symbol, asset.asset_type, days=60)
-            price = hist[-1] if hist and hist[-1] > 0 else float(asset.avg_buy_price)
-            val = float(asset.quantity) * price
-            at = asset.asset_type.value if isinstance(asset.asset_type, AssetType) else asset.asset_type
-            if asset.symbol in asset_values:
-                old_at, old_val = asset_values[asset.symbol]
-                asset_values[asset.symbol] = (old_at, old_val + val)
-            else:
-                asset_values[asset.symbol] = (at, val)
-            total_value += val
+        if not portfolios:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
-        if total_value == 0:
-            return {"scenarios": [], "total_value": 0}
+        # Collect per-asset live data with risk_weight
+        all_assets = []
+        for portfolio in portfolios:
+            if portfolio_id and str(portfolio.id) != portfolio_id:
+                continue
+            pm = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), currency=currency)
+            all_assets.extend(pm.get("assets", []))
 
-        # Scenario definitions: {name, description, shocks: {asset_type: pct_change}}
-        scenarios_def = [
-            {
-                "name": "COVID-19 (Mars 2020)",
-                "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs",
-                "shocks": {"crypto": -50, "stock": -35, "etf": -30, "real_estate": -10},
-            },
-            {
-                "name": "Crypto Winter 2022",
-                "description": "Effondrement du marché crypto (Luna/FTX) — actions modérément affectées",
-                "shocks": {"crypto": -65, "stock": -20, "etf": -15, "real_estate": -5},
-            },
-            {
-                "name": "Crise financière 2008",
-                "description": "Crise systémique bancaire — chute massive des actions",
-                "shocks": {"crypto": -30, "stock": -50, "etf": -45, "real_estate": -25},
-            },
-            {
-                "name": "Hausse des taux (+300bp)",
-                "description": "Resserrement monétaire brutal — impact sur les valorisations",
-                "shocks": {"crypto": -25, "stock": -18, "etf": -15, "real_estate": -10},
-            },
-            {
-                "name": "Flash Crash",
-                "description": "Chute éclair intra-journalière sur tous les marchés",
-                "shocks": {"crypto": -15, "stock": -10, "etf": -8, "real_estate": -3},
-            },
-        ]
+        if not all_assets:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
+
+        total_value = sum(a.get("current_value", 0) for a in all_assets)
+        if total_value <= 0:
+            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
+
+        # Compute risk-weight statistics for modulation
+        n_assets = len(all_assets)
+        total_risk_weight = sum(a.get("risk_weight", 0) for a in all_assets) or 1.0
+        avg_risk_weight = total_risk_weight / n_assets if n_assets > 0 else 1.0
+
+        # Filter scenarios if specific IDs requested
+        scenarios_to_run = self.HISTORICAL_SCENARIOS
+        if scenario_ids:
+            scenarios_to_run = [s for s in self.HISTORICAL_SCENARIOS if s["id"] in scenario_ids]
 
         scenarios = []
-        for scenario in scenarios_def:
+        worst_loss_pct = 0.0
+        worst_scenario_name = ""
+        worst_recovery_months = 0
+
+        for scenario_def in scenarios_to_run:
             stressed_value = 0.0
             per_asset = []
-            for sym, (at, val) in asset_values.items():
-                shock_pct = scenario["shocks"].get(at, -10)
+            is_bullish = any(v > 0 for v in scenario_def["shocks"].values())
+
+            for asset in all_assets:
+                val = asset.get("current_value", 0)
+                symbol = asset.get("symbol", "")
+                asset_type = asset.get("asset_type", "crypto")
+                risk_weight = asset.get("risk_weight", 0)
+
+                # Base shock from asset class
+                base_shock = scenario_def["shocks"].get(asset_type, -10)
+
+                # Apply risk-weight modulation (only for negative shocks)
+                if not is_bullish and avg_risk_weight > 0 and risk_weight > 0:
+                    multiplier = risk_weight / avg_risk_weight
+                    multiplier = min(max(multiplier, 0.3), 2.5)
+                    shock_pct = base_shock * multiplier
+                else:
+                    shock_pct = base_shock
+                # Cap to prevent negative asset values or absurd gains
+                shock_pct = max(min(shock_pct, 300.0), -95.0)
+
                 stressed = val * (1 + shock_pct / 100)
                 loss = stressed - val
                 stressed_value += stressed
                 per_asset.append(
                     {
-                        "symbol": sym,
+                        "symbol": symbol,
+                        "name": asset.get("name", ""),
                         "current_value": round(val, 2),
                         "stressed_value": round(stressed, 2),
                         "loss": round(loss, 2),
-                        "shock_pct": shock_pct,
+                        "shock_pct": round(shock_pct, 1),
+                        "risk_weight": risk_weight,
                     }
                 )
 
             total_loss = stressed_value - total_value
             total_loss_pct = (total_loss / total_value * 100) if total_value > 0 else 0
 
+            # Track worst drawdown for MaxDD calculation
+            if total_loss_pct < worst_loss_pct:
+                worst_loss_pct = total_loss_pct
+                worst_scenario_name = scenario_def["name"]
+                worst_recovery_months = scenario_def["historical_recovery_months"]
+
+            # Estimated recovery time: scale historical recovery by avg risk weight
+            # Higher average risk = longer recovery
+            base_recovery = scenario_def["historical_recovery_months"]
+            if base_recovery > 0 and avg_risk_weight > 0:
+                # Normalize: risk_weight is a percentage (sum=100), avg across N assets
+                # Scale: if avg risk is 2x the baseline, recovery takes ~1.5x longer
+                risk_factor = 1.0 + (avg_risk_weight - (100 / max(n_assets, 1))) / 100
+                risk_factor = min(max(risk_factor, 0.5), 3.0)
+                estimated_recovery = round(base_recovery * risk_factor)
+            else:
+                estimated_recovery = base_recovery
+
             scenarios.append(
                 {
-                    "name": scenario["name"],
-                    "description": scenario["description"],
+                    "id": scenario_def["id"],
+                    "name": scenario_def["name"],
+                    "description": scenario_def["description"],
+                    "duration_days": scenario_def["duration_days"],
                     "stressed_value": round(stressed_value, 2),
                     "total_loss": round(total_loss, 2),
                     "total_loss_pct": round(total_loss_pct, 2),
+                    "estimated_recovery_months": estimated_recovery,
                     "per_asset": sorted(per_asset, key=lambda x: x["loss"]),
                 }
             )
 
-        # Sort by worst-case first
+        # Sort by worst-case first (negative values first)
         scenarios.sort(key=lambda s: s["total_loss"])
+
+        # MaxDD: worst theoretical drawdown across all scenarios
+        max_drawdown = (
+            {
+                "value": round(abs(worst_loss_pct), 2),
+                "scenario": worst_scenario_name,
+                "estimated_recovery_months": worst_recovery_months,
+            }
+            if worst_loss_pct < 0
+            else None
+        )
 
         return {
             "total_value": round(total_value, 2),
+            "currency": currency,
             "scenarios": scenarios,
+            "max_drawdown": max_drawdown,
         }
 
     # ------------------------------------------------------------------

@@ -15,10 +15,42 @@ from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.exchanges import get_exchange_service
+from app.services.metrics_service import invalidate_dashboard_cache
 from app.services.price_service import PriceService
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _classify_and_mark_error(api_key: APIKey, exc: Exception) -> None:
+    """Classify an exchange error and update api_key status accordingly."""
+    import httpx
+
+    error_msg = str(exc)
+
+    # httpx HTTP errors (raise_for_status)
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        if code in (401, 403):
+            api_key.mark_auth_failure(error_msg)
+            logger.warning("API key %s: auth failure (%d), disabling", api_key.id, code)
+            return
+        if code == 429:
+            api_key.mark_rate_limited(error_msg)
+            logger.warning("API key %s: rate limited (429)", api_key.id)
+            return
+
+    # Kraken returns auth errors in JSON (not HTTP status)
+    lower_msg = error_msg.lower()
+    if "invalid key" in lower_msg or "invalid signature" in lower_msg or "permission denied" in lower_msg:
+        api_key.mark_auth_failure(error_msg)
+        logger.warning("API key %s: auth failure (json), disabling", api_key.id)
+        return
+
+    # Generic error
+    api_key.mark_error(error_msg)
+    logger.error("API key %s: sync error: %s", api_key.id, error_msg[:200])
+
 
 # Global price service instance (reused across sync operations)
 _price_service: Optional[PriceService] = None
@@ -612,7 +644,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
             if not balances:
                 api_key.last_sync_at = datetime.utcnow().isoformat()
-                api_key.last_error = None
+                api_key.mark_success()
                 await db.commit()
                 return {"success": True, "synced": 0}
 
@@ -716,6 +748,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         if trans_type == TransactionType.TRANSFER_IN:
                             current_price = await _get_current_price(balance.symbol)
 
+                        sync_ts = int(datetime.utcnow().timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=trans_type,
@@ -723,6 +756,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
+                            external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
                         db.add(transaction)
@@ -765,6 +799,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
                     # Create initial transfer transaction with market price
                     if float(balance.total) > 0:
+                        init_ts = int(datetime.utcnow().timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=TransactionType.TRANSFER_IN,
@@ -772,6 +807,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
+                            external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
                         db.add(transaction)
@@ -780,14 +816,16 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
             # Update last sync time
             api_key.last_sync_at = datetime.utcnow().isoformat()
-            api_key.last_error = None
+            api_key.mark_success()
 
             await db.commit()
+
+            invalidate_dashboard_cache(str(api_key.user_id))
 
             return {"success": True, "synced": synced_count}
 
         except Exception as e:
-            api_key.last_error = str(e)[:500]
+            _classify_and_mark_error(api_key, e)
             await db.commit()
             return {"success": False, "error": str(e)}
 

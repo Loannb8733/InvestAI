@@ -16,6 +16,7 @@ import {
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import { dashboardApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
+import { useAuthStore } from '@/stores/authStore'
 import AllocationChart from '@/components/charts/AllocationChart'
 import PerformanceChart from '@/components/charts/PerformanceChart'
 import {
@@ -333,6 +334,7 @@ export default function DashboardPage() {
   const [showCustomize, setShowCustomize] = useState(false)
   const [showBenchmarks, setShowBenchmarks] = useState(false)
   const dragIndexRef = useRef<number | null>(null)
+  const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
 
   const handleDragStart = (index: number) => { dragIndexRef.current = index }
   const handleDragOver = (e: React.DragEvent, _index: number) => { e.preventDefault() }
@@ -349,7 +351,7 @@ export default function DashboardPage() {
     error,
     refetch,
   } = useQuery<DashboardMetrics>({
-    queryKey: queryKeys.dashboard.metrics(selectedPeriod),
+    queryKey: [...queryKeys.dashboard.metrics(selectedPeriod), currency],
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
     refetchInterval: 60000,
     staleTime: 30_000,
@@ -357,7 +359,7 @@ export default function DashboardPage() {
   })
 
   const { data: benchmarks } = useQuery<Array<{ name: string; symbol: string; data: Array<{ date: string; value: number }> }>>({
-    queryKey: queryKeys.dashboard.benchmarks(selectedPeriod),
+    queryKey: [...queryKeys.dashboard.benchmarks(selectedPeriod), currency],
     queryFn: () => dashboardApi.getBenchmarks(selectedPeriod),
     enabled: showBenchmarks,
     staleTime: 30_000,

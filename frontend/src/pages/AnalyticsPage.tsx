@@ -104,6 +104,7 @@ interface Analytics {
   }>
   best_performer: string | null
   worst_performer: string | null
+  interpretations?: Record<string, string>
 }
 
 interface Diversification {
@@ -158,28 +159,40 @@ interface MonteCarloData {
   expected_return: number
   prob_positive: number
   prob_loss_10: number
+  prob_ruin: number
   simulations: number
   horizon_days: number
 }
 
 interface StressScenario {
+  id: string
   name: string
   description: string
+  duration_days: number
   stressed_value: number
   total_loss: number
   total_loss_pct: number
+  estimated_recovery_months: number
   per_asset: Array<{
     symbol: string
+    name: string
     current_value: number
     stressed_value: number
     loss: number
     shock_pct: number
+    risk_weight: number
   }>
 }
 
 interface StressTestData {
   total_value: number
+  currency: string
   scenarios: StressScenario[]
+  max_drawdown: {
+    value: number
+    scenario: string
+    estimated_recovery_months: number
+  } | null
 }
 
 interface BetaAsset {
@@ -560,6 +573,14 @@ export default function AnalyticsPage() {
       {/* Portfolio Evolution Chart */}
       <PortfolioEvolutionChart chartHistoricalData={chartHistoricalData} />
 
+      {/* Short history warning */}
+      {analytics.interpretations?.global && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
+          <Info className="h-4 w-4 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-400">{analytics.interpretations.global}</p>
+        </div>
+      )}
+
       {/* Key Metrics — Row 1: Core risk */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -591,23 +612,38 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground">
               {analytics.sharpe_ratio >= 2 ? 'Excellent' : analytics.sharpe_ratio >= 1 ? 'Bon' : analytics.sharpe_ratio >= 0 ? 'Moyen' : 'Faible'}
             </p>
+            {analytics.interpretations?.sharpe && (
+              <p className="text-xs text-muted-foreground/80 mt-1.5 italic leading-snug">
+                {analytics.interpretations.sharpe}
+              </p>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="relative ring-1 ring-blue-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <MetricWithTooltip metricKey="sortino">
-              <CardTitle className="text-sm font-medium">Sortino</CardTitle>
-            </MetricWithTooltip>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <MetricWithTooltip metricKey="sortino">
+                <CardTitle className="text-sm font-medium">Sortino</CardTitle>
+              </MetricWithTooltip>
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                <Zap className="h-2.5 w-2.5" /> Crypto
+              </span>
+            </div>
+            <Shield className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${(analytics.sortino_ratio ?? 0) >= 1 ? 'text-green-500' : (analytics.sortino_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
               {safeFixed(analytics.sortino_ratio, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Risque baissier uniquement
+              Ne punit pas les hausses explosives
             </p>
+            {analytics.interpretations?.sortino && (
+              <p className="text-xs text-muted-foreground/80 mt-1.5 italic leading-snug">
+                {analytics.interpretations.sortino}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -675,6 +711,11 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground">
               Calmar: {safeFixed(analytics.calmar_ratio, 2)}
             </p>
+            {analytics.interpretations?.calmar && (
+              <p className="text-xs text-muted-foreground/80 mt-1 italic leading-snug">
+                {analytics.interpretations.calmar}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -864,7 +905,12 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Stress Test */}
         {stressTest && stressTest.scenarios.length > 0 && (
-          <StressTestCard scenarios={stressTest.scenarios} />
+          <StressTestCard
+            scenarios={stressTest.scenarios}
+            totalValue={stressTest.total_value}
+            currency={stressTest.currency}
+            maxDrawdown={stressTest.max_drawdown}
+          />
         )}
 
         {/* Beta vs Benchmark */}

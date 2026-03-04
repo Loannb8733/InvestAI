@@ -598,6 +598,11 @@ export const predictionsApi = {
     })
     return response.data
   },
+
+  getBacktest: async (days: number = 7) => {
+    const response = await api.get('/predictions/backtest', { params: { days } })
+    return response.data
+  },
 }
 
 // Alerts API
@@ -957,11 +962,16 @@ export const notificationsApi = {
     const response = await api.post('/notifications/read-all')
     return response.data
   },
+
+  sendTelegramTest: async () => {
+    const response = await api.post('/notifications/telegram/test')
+    return response.data
+  },
 }
 
 // Profile API (user self-service)
 export const profileApi = {
-  updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string }) => {
+  updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string; telegram_chat_id?: string; telegram_enabled?: boolean }) => {
     const response = await api.patch('/auth/me', data)
     return response.data
   },

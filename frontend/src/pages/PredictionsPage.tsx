@@ -41,10 +41,15 @@ import {
   Droplets,
   Layers,
   Repeat,
+  Eye,
+  EyeOff,
+  History,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react'
 import { type DisplayThresholds, DEFAULT_DISPLAY_THRESHOLDS } from '@/types'
+import { Button } from '@/components/ui/button'
 import {
-  AreaChart,
   Area,
   BarChart,
   Bar,
@@ -55,6 +60,8 @@ import {
   ResponsiveContainer,
   Cell,
   ReferenceLine,
+  Line,
+  ComposedChart,
 } from 'recharts'
 
 interface PredictionPoint {
@@ -581,6 +588,135 @@ const TopBottomCard = ({ estimates }: { estimates: MarketCycleData['top_bottom_e
   )
 }
 
+// ── Track Record Panel (lazy-loaded per asset) ──────────────────────
+const TrackRecordPanel = ({ symbol }: { symbol: string }) => {
+  const { data, isLoading } = useQuery<{
+    symbol: string
+    records: Array<{
+      date: string | null
+      target_date: string | null
+      predicted_price: number | null
+      actual_price: number | null
+      mape: number | null
+      direction_correct: boolean | null
+      ci_covered: boolean | null
+    }>
+    summary: {
+      total_checked: number
+      avg_mape: number | null
+      direction_accuracy: number | null
+      ci_coverage: number | null
+    }
+  }>({
+    queryKey: queryKeys.predictions.trackRecord(symbol),
+    queryFn: () => predictionsApi.getTrackRecord(symbol),
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-3">
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        <span className="text-xs text-muted-foreground">Chargement du track record...</span>
+      </div>
+    )
+  }
+
+  if (!data || data.summary.total_checked === 0) {
+    return (
+      <div className="py-3">
+        <p className="text-xs text-muted-foreground">Aucun historique de prédiction vérifié pour {symbol}</p>
+      </div>
+    )
+  }
+
+  const s = data.summary
+  const mapeColor = s.avg_mape != null ? (s.avg_mape <= 5 ? 'text-green-500' : s.avg_mape <= 10 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
+  const dirColor = s.direction_accuracy != null ? (s.direction_accuracy >= 60 ? 'text-green-500' : s.direction_accuracy >= 50 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
+  const ciColor = s.ci_coverage != null ? (s.ci_coverage >= 90 ? 'text-green-500' : s.ci_coverage >= 70 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
+
+  return (
+    <div className="mt-4 p-4 rounded-lg bg-muted/30 border">
+      <div className="flex items-center gap-2 mb-3">
+        <History className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Track Record</span>
+        <Badge variant="outline" className="text-[10px] ml-auto">{s.total_checked} prédictions vérifiées</Badge>
+      </div>
+
+      {/* Summary metrics */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="text-center p-2 rounded bg-background">
+          <p className="text-[10px] text-muted-foreground">Erreur moy.</p>
+          <p className={`text-sm font-bold ${mapeColor}`}>
+            {s.avg_mape != null ? `${s.avg_mape.toFixed(1)}%` : 'N/A'}
+          </p>
+          <p className="text-[10px] text-muted-foreground">MAPE</p>
+        </div>
+        <div className="text-center p-2 rounded bg-background">
+          <p className="text-[10px] text-muted-foreground">Direction</p>
+          <p className={`text-sm font-bold ${dirColor}`}>
+            {s.direction_accuracy != null ? `${s.direction_accuracy.toFixed(0)}%` : 'N/A'}
+          </p>
+          <p className="text-[10px] text-muted-foreground">précision</p>
+        </div>
+        <div className="text-center p-2 rounded bg-background">
+          <p className="text-[10px] text-muted-foreground">Couverture IC</p>
+          <p className={`text-sm font-bold ${ciColor}`}>
+            {s.ci_coverage != null ? `${s.ci_coverage.toFixed(0)}%` : 'N/A'}
+          </p>
+          <p className="text-[10px] text-muted-foreground">dans les bandes</p>
+        </div>
+      </div>
+
+      {/* Recent records mini-table */}
+      {data.records.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Date</th>
+                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Prédit</th>
+                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Réel</th>
+                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Erreur</th>
+                <th className="text-center py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Dir.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.records.slice(0, 8).map((r, i) => (
+                <tr key={i} className="border-b last:border-0">
+                  <td className="py-1.5 px-2 text-[10px] text-muted-foreground">
+                    {r.target_date ? new Date(r.target_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—'}
+                  </td>
+                  <td className="py-1.5 px-2 text-[10px] text-right tabular-nums">
+                    {r.predicted_price != null ? formatCurrency(r.predicted_price) : '—'}
+                  </td>
+                  <td className="py-1.5 px-2 text-[10px] text-right tabular-nums">
+                    {r.actual_price != null ? formatCurrency(r.actual_price) : '—'}
+                  </td>
+                  <td className={`py-1.5 px-2 text-[10px] text-right tabular-nums ${
+                    r.mape != null ? (r.mape <= 5 ? 'text-green-500' : r.mape <= 10 ? 'text-yellow-500' : 'text-red-500') : ''
+                  }`}>
+                    {r.mape != null ? `${r.mape.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="py-1.5 px-2 text-center">
+                    {r.direction_correct != null ? (
+                      r.direction_correct ? (
+                        <CheckCircle className="h-3 w-3 text-green-500 mx-auto" />
+                      ) : (
+                        <XCircle className="h-3 w-3 text-red-500 mx-auto" />
+                      )
+                    ) : <span className="text-[10px] text-muted-foreground">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export default function PredictionsPage() {
   const [daysAhead, setDaysAhead] = useState(7)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
@@ -588,6 +724,7 @@ export default function PredictionsPage() {
   const [whatIfChange, setWhatIfChange] = useState<number>(0)
   const [whatIfResult, setWhatIfResult] = useState<WhatIfResult | null>(null)
   const [whatIfLoading, setWhatIfLoading] = useState(false)
+  const [showReality, setShowReality] = useState(false)
   const { toast } = useToast()
 
   const { data: portfolioPredictions, isLoading: loadingPredictions } = useQuery({
@@ -609,6 +746,22 @@ export default function PredictionsPage() {
   const { data: marketCycle, isLoading: loadingCycle } = useQuery<MarketCycleData>({
     queryKey: queryKeys.predictions.marketCycle,
     queryFn: predictionsApi.getMarketCycle,
+  })
+
+  const { data: backtestData, isLoading: loadingBacktest } = useQuery<{
+    per_asset: Array<{
+      symbol: string
+      mape: number | null
+      direction_accuracy: number | null
+      points: Array<{ date: string; predicted: number; actual: number }>
+    }>
+    overall_mape: number | null
+    overall_direction_accuracy: number | null
+    needs_retraining: boolean
+  }>({
+    queryKey: queryKeys.predictions.backtest(daysAhead),
+    queryFn: () => predictionsApi.getBacktest(daysAhead),
+    enabled: showReality,
   })
 
   const summary = portfolioPredictions?.summary as PortfolioPredictionSummary | undefined
@@ -659,7 +812,7 @@ export default function PredictionsPage() {
             source: 'prediction',
           })
         }
-        if (pred.trend_strength > 70) {
+        if (pred.trend_strength > dt.trend_strength.strong) {
           items.push({
             symbol: pred.symbol,
             type: 'strong_trend',
@@ -687,30 +840,72 @@ export default function PredictionsPage() {
 
     const sevOrder = { high: 0, medium: 1, low: 2 }
     return items.sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity])
-  }, [predictions, sentiment])
+  }, [predictions, sentiment, dt])
 
   // Chart data for selected asset
   const selectedPrediction = predictions?.find(p => p.symbol === selectedAsset)
-  const chartData = useMemo(() => {
+
+  // Format date to match Dashboard (fr-FR short)
+  const formatDateLabel = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr)
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    } catch {
+      return dateStr.slice(5)
+    }
+  }
+
+  interface ChartPoint {
+    date: string
+    price?: number
+    confidence_low?: number
+    confidence_high?: number
+    actual?: number
+    predicted_past?: number
+    isToday: boolean
+  }
+
+  const chartData = useMemo((): ChartPoint[] => {
     if (!selectedPrediction?.predictions) return []
+
+    // Backtest actual data for this asset
+    const assetBacktest = showReality && backtestData
+      ? backtestData.per_asset?.find(a => a.symbol === selectedPrediction.symbol)
+      : null
+
+    // Build historical "reality" points (before today)
+    const realityPoints: ChartPoint[] = assetBacktest?.points?.map(p => ({
+      date: formatDateLabel(p.date),
+      actual: p.actual,
+      predicted_past: p.predicted,
+      isToday: false,
+    })) ?? []
+
     // Add current price as day 0 anchor point
-    const today: typeof selectedPrediction.predictions[0] & { isToday?: boolean } = {
+    const currentPoint: ChartPoint = {
       date: "Auj.",
       price: selectedPrediction.current_price,
       confidence_low: selectedPrediction.current_price,
       confidence_high: selectedPrediction.current_price,
+      actual: showReality ? selectedPrediction.current_price : undefined,
+      isToday: true,
     }
-    return [
-      { date: today.date, price: today.price, confidence_low: today.confidence_low, confidence_high: today.confidence_high, isToday: true },
-      ...selectedPrediction.predictions.map(p => ({
-        date: p.date.slice(5),
-        price: p.price,
-        confidence_low: p.confidence_low,
-        confidence_high: p.confidence_high,
-        isToday: false,
-      })),
-    ]
-  }, [selectedPrediction])
+
+    // Future prediction points
+    const futurePoints: ChartPoint[] = selectedPrediction.predictions.map(p => ({
+      date: formatDateLabel(p.date),
+      price: p.price,
+      confidence_low: p.confidence_low,
+      confidence_high: p.confidence_high,
+      isToday: false,
+    }))
+
+    if (showReality && realityPoints.length > 0) {
+      return [...realityPoints, currentPoint, ...futurePoints]
+    }
+
+    return [currentPoint, ...futurePoints]
+  }, [selectedPrediction, showReality, backtestData])
 
   // Smart price formatter for Y axis (handles tiny prices like PEPE)
   const formatPrice = (value: number) => {
@@ -732,9 +927,10 @@ export default function PredictionsPage() {
   // Determine if support/resistance are within chart range (don't crush the scale)
   const showSupportResistance = useMemo(() => {
     if (!selectedPrediction || !chartData.length) return false
-    const prices = chartData.map(d => d.price)
-    const minP = Math.min(...prices, ...chartData.map(d => d.confidence_low))
-    const maxP = Math.max(...prices, ...chartData.map(d => d.confidence_high))
+    const allPrices = chartData.flatMap(d => [d.price, d.confidence_low, d.confidence_high, d.actual].filter((v): v is number => v != null))
+    if (allPrices.length === 0) return false
+    const minP = Math.min(...allPrices)
+    const maxP = Math.max(...allPrices)
     const range = maxP - minP || maxP * 0.1
     const s = selectedPrediction.support_level
     const r = selectedPrediction.resistance_level
@@ -837,16 +1033,21 @@ export default function PredictionsPage() {
           <h1 className="text-3xl font-bold">Analyse & Projections</h1>
           <p className="text-muted-foreground">Projections statistiques et sentiment de marché</p>
         </div>
-        <Select value={daysAhead.toString()} onValueChange={(v) => setDaysAhead(parseInt(v))}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">7 jours</SelectItem>
-            <SelectItem value="14">14 jours</SelectItem>
-            <SelectItem value="30">30 jours</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Badge variant={daysAhead <= 7 ? 'default' : daysAhead <= 14 ? 'secondary' : 'outline'} className="text-xs">
+            Confiance : {daysAhead <= 7 ? 'Haute' : daysAhead <= 14 ? 'Modérée' : 'Indicative'}
+          </Badge>
+          <Select value={daysAhead.toString()} onValueChange={(v) => setDaysAhead(parseInt(v))}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7j — Court terme</SelectItem>
+              <SelectItem value="14">14j — Moyen terme</SelectItem>
+              <SelectItem value="30">30j — Tendance</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* ── Zone haute : Sentiment + Résumé Portfolio (1 rangée) ── */}
@@ -1144,6 +1345,44 @@ export default function PredictionsPage() {
                       <p className="text-sm text-muted-foreground mb-2">
                         Support: {formatCurrency(selectedPrediction.support_level)} · Résistance: {formatCurrency(selectedPrediction.resistance_level)}
                       </p>
+                      {/* Show Reality toggle + Backtest MAPE */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <Button
+                          variant={showReality ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setShowReality(!showReality)}
+                          className="gap-2"
+                        >
+                          {loadingBacktest ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : showReality ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                          {showReality ? 'Masquer la réalité' : 'Afficher la réalité'}
+                        </Button>
+                        {showReality && backtestData && (
+                          <div className="flex items-center gap-2">
+                            {backtestData.overall_mape != null && (
+                              <Badge variant={backtestData.needs_retraining ? 'destructive' : 'secondary'} className="text-xs">
+                                MAPE : {backtestData.overall_mape.toFixed(1)}%
+                              </Badge>
+                            )}
+                            {backtestData.overall_direction_accuracy != null && (
+                              <Badge variant="outline" className="text-xs">
+                                Direction : {backtestData.overall_direction_accuracy.toFixed(0)}%
+                              </Badge>
+                            )}
+                            {backtestData.needs_retraining && (
+                              <span className="text-xs text-red-500 font-medium">
+                                Modèle en cours de réentraînement
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
                       {selectedPrediction.models_detail && selectedPrediction.models_detail.length > 0 ? (
                         <div className="flex flex-wrap gap-2 mb-4">
                           {selectedPrediction.models_detail
@@ -1177,7 +1416,7 @@ export default function PredictionsPage() {
                       )}
                       <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartData}>
+                          <ComposedChart data={chartData}>
                             <defs>
                               <linearGradient id="confGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
@@ -1189,16 +1428,22 @@ export default function PredictionsPage() {
                             <YAxis
                               domain={[
                                 (dataMin: number) => {
-                                  const range = chartData.length > 0
-                                    ? Math.max(...chartData.map(d => d.confidence_high)) - Math.min(...chartData.map(d => d.confidence_low))
-                                    : dataMin * 0.1
-                                  return Math.max(0, dataMin - range * 0.1)
+                                  const prices = chartData.flatMap(d => [
+                                    d.confidence_high, d.confidence_low, d.actual,
+                                  ].filter((v): v is number => v != null))
+                                  const min = prices.length > 0 ? Math.min(...prices) : dataMin
+                                  const max = prices.length > 0 ? Math.max(...prices) : dataMin
+                                  const range = max - min || min * 0.1
+                                  return Math.max(0, min - range * 0.1)
                                 },
                                 (dataMax: number) => {
-                                  const range = chartData.length > 0
-                                    ? Math.max(...chartData.map(d => d.confidence_high)) - Math.min(...chartData.map(d => d.confidence_low))
-                                    : dataMax * 0.1
-                                  return dataMax + range * 0.1
+                                  const prices = chartData.flatMap(d => [
+                                    d.confidence_high, d.confidence_low, d.actual,
+                                  ].filter((v): v is number => v != null))
+                                  const max = prices.length > 0 ? Math.max(...prices) : dataMax
+                                  const min = prices.length > 0 ? Math.min(...prices) : dataMax
+                                  const range = max - min || max * 0.1
+                                  return max + range * 0.1
                                 },
                               ]}
                               tickFormatter={formatPrice}
@@ -1212,22 +1457,49 @@ export default function PredictionsPage() {
                                   confidence_high: 'Borne haute',
                                   confidence_low: 'Borne basse',
                                   price: 'Prix prédit',
+                                  actual: 'Prix réel',
+                                  predicted_past: 'Prédiction passée',
                                 }
                                 return [formatCurrency(value), labels[name] || name]
                               }}
                             />
                             <Area type="monotone" dataKey="confidence_high" stroke="none" fill="url(#confGradient)" fillOpacity={1} />
                             <Area type="monotone" dataKey="confidence_low" stroke="none" fill="hsl(var(--background))" fillOpacity={1} />
-                            <Area type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 3" fill="none" />
+                            <Line type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls />
+                            {/* Reality overlay: actual prices (solid green, matching Dashboard) */}
+                            {showReality && (
+                              <>
+                                <Line type="monotone" dataKey="actual" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3, fill: '#22c55e' }} connectNulls />
+                                <Line type="monotone" dataKey="predicted_past" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls />
+                              </>
+                            )}
                             {showSupportResistance && (
                               <>
                                 <ReferenceLine y={selectedPrediction.support_level} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Support', position: 'left', fontSize: 10, fill: '#ef4444' }} />
                                 <ReferenceLine y={selectedPrediction.resistance_level} stroke="#10b981" strokeDasharray="4 4" label={{ value: 'Résistance', position: 'left', fontSize: 10, fill: '#10b981' }} />
                               </>
                             )}
-                          </AreaChart>
+                          </ComposedChart>
                         </ResponsiveContainer>
                       </div>
+
+                      {/* Chart legend when reality is shown */}
+                      {showReality && (
+                        <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 h-0.5 bg-[#22c55e] inline-block rounded" />
+                            Prix réel
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 h-0.5 bg-[#3b82f6] inline-block rounded" style={{ borderTop: '2px dashed #3b82f6', height: 0 }} />
+                            Prix prédit
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 h-0.5 bg-[#94a3b8] inline-block rounded" />
+                            Prédiction passée
+                          </span>
+                        </div>
+                      )}
 
                       {/* Recommendation */}
                       {selectedPrediction.recommendation && (
@@ -1372,6 +1644,9 @@ export default function PredictionsPage() {
                           </div>
                         )
                       })()}
+
+                      {/* Track Record */}
+                      <TrackRecordPanel symbol={selectedPrediction.symbol} />
                     </div>
                   )}
                 </>
@@ -1484,6 +1759,7 @@ export default function PredictionsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {marketCycle.portfolio_regime ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Badge className={
@@ -1523,6 +1799,9 @@ export default function PredictionsPage() {
                           ))}
                       </div>
                     </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">Données indisponibles</p>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1701,6 +1980,8 @@ export default function PredictionsPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Market events → see CalendarPage */}
             </>
           ) : (
             <Card>

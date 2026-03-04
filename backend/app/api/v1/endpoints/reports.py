@@ -25,7 +25,8 @@ async def get_performance_report_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download a PDF performance report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id))
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), currency=currency)
     pdf_content = report_service.generate_performance_pdf(data)
 
     filename = f"rapport_performance_{datetime.now().strftime('%Y%m%d')}.pdf"
@@ -45,7 +46,8 @@ async def get_performance_report_excel(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download an Excel performance report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id))
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), currency=currency)
     excel_content = report_service.generate_performance_excel(data)
 
     filename = f"rapport_performance_{datetime.now().strftime('%Y%m%d')}.xlsx"
@@ -112,7 +114,8 @@ async def get_transactions_report_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and download a PDF transactions report."""
-    data = await report_service.get_portfolio_data(db, str(current_user.id), year)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), year, currency=currency)
     pdf_content = report_service.generate_performance_pdf(data)
 
     year_str = str(year) if year else "all"

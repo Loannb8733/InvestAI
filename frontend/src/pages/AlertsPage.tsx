@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,7 +42,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { queryKeys } from '@/lib/queryKeys'
-import { alertsApi, assetsApi } from '@/services/api'
+import { alertsApi, assetsApi, profileApi, notificationsApi } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 import {
   Bell,
   BellOff,
@@ -55,6 +56,7 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
+  Send,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
@@ -99,7 +101,19 @@ interface Asset {
 export default function AlertsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { user, fetchCurrentUser } = useAuthStore()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [telegramChatId, setTelegramChatId] = useState(user?.telegramChatId || '')
+  const [telegramEnabled, setTelegramEnabled] = useState(user?.telegramEnabled || false)
+
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [])
+
+  useEffect(() => {
+    setTelegramChatId(user?.telegramChatId || '')
+    setTelegramEnabled(user?.telegramEnabled || false)
+  }, [user?.telegramChatId, user?.telegramEnabled])
   const [, setSelectedAlert] = useState<Alert | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Alert | null>(null)
   const [formData, setFormData] = useState({
@@ -188,6 +202,31 @@ export default function AlertsPage() {
       toast({ title: 'Erreur lors de la vérification', variant: 'destructive' })
     },
   })
+
+  const telegramMutation = useMutation({
+    mutationFn: () => profileApi.updateProfile({ telegram_chat_id: telegramChatId, telegram_enabled: telegramEnabled }),
+    onSuccess: () => {
+      fetchCurrentUser()
+      toast({ title: 'Configuration Telegram enregistr\u00e9e' })
+    },
+    onError: () => {
+      toast({ title: 'Erreur lors de la sauvegarde', variant: 'destructive' })
+    },
+  })
+
+  const telegramTestMutation = useMutation({
+    mutationFn: notificationsApi.sendTelegramTest,
+    onSuccess: () => {
+      toast({ title: 'Message de test envoy\u00e9 sur Telegram' })
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : '\u00c9chec de l\'envoi'
+      toast({ title: msg, variant: 'destructive' })
+    },
+  })
+
+  const isTelegramConnected = user?.telegramEnabled && user?.telegramChatId
+  const isChatIdValid = /^-?\d+$/.test(telegramChatId)
 
   const resetForm = () => {
     setFormData({
@@ -569,6 +608,73 @@ export default function AlertsPage() {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Telegram Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              <div>
+                <CardTitle>Notifications Telegram</CardTitle>
+                <CardDescription>
+                  Recevez vos alertes directement sur Telegram
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant={isTelegramConnected ? 'default' : 'secondary'}>
+              {isTelegramConnected ? 'Connect\u00e9' : 'Non configur\u00e9'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">
+              1. Envoyez un message \u00e0 <strong>@investai_alerts_bot</strong> sur Telegram<br />
+              2. Entrez votre Chat ID ci-dessous et activez les notifications
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="telegram_chat_id">Chat ID Telegram</Label>
+            <Input
+              id="telegram_chat_id"
+              placeholder="Ex: 6504620108"
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.target.value)}
+            />
+            {telegramChatId && !isChatIdValid && (
+              <p className="text-xs text-destructive">Le Chat ID doit \u00eatre un nombre</p>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="telegram_enabled">Activer les notifications Telegram</Label>
+            <Switch
+              id="telegram_enabled"
+              checked={telegramEnabled}
+              onCheckedChange={setTelegramEnabled}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => telegramMutation.mutate()}
+              disabled={telegramMutation.isPending || (telegramChatId !== '' && !isChatIdValid)}
+            >
+              {telegramMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Enregistrer
+            </Button>
+            {isTelegramConnected && (
+              <Button
+                variant="outline"
+                onClick={() => telegramTestMutation.mutate()}
+                disabled={telegramTestMutation.isPending}
+              >
+                {telegramTestMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Envoyer un test
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

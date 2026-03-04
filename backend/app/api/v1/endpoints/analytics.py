@@ -57,6 +57,7 @@ class PortfolioAnalyticsResponse(BaseModel):
     assets: List[AssetPerformanceResponse]
     best_performer: Optional[str]
     worst_performer: Optional[str]
+    interpretations: Dict[str, str] = {}
 
 
 class CorrelationResponse(BaseModel):
@@ -88,6 +89,7 @@ class MonteCarloResponse(BaseModel):
     expected_return: float
     prob_positive: float
     prob_loss_10: float
+    prob_ruin: float
     simulations: int
     horizon_days: int
 
@@ -149,6 +151,7 @@ class RebalanceResponse(BaseModel):
 
 class XIRRResponse(BaseModel):
     xirr: Optional[float]
+    currency: str = "EUR"
     description: str
 
 
@@ -194,6 +197,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
         ],
         best_performer=a.best_performer,
         worst_performer=a.worst_performer,
+        interpretations=getattr(a, "interpretations", {}),
     )
 
 
@@ -415,11 +419,16 @@ async def get_risk_metrics(
 @router.get("/stress-test", response_model=dict)
 async def get_stress_test(
     portfolio_id: Optional[str] = Query(None),
+    scenario_ids: Optional[str] = Query(None, description="Comma-separated scenario IDs to filter"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Run stress tests simulating historical crash scenarios."""
-    return await analytics_service.stress_test(db, str(current_user.id), portfolio_id=portfolio_id)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    ids = [s.strip() for s in scenario_ids.split(",") if s.strip()] if scenario_ids else None
+    return await analytics_service.stress_test(
+        db, str(current_user.id), portfolio_id=portfolio_id, currency=currency, scenario_ids=ids
+    )
 
 
 @router.get("/beta", response_model=dict)
@@ -454,6 +463,7 @@ async def get_monte_carlo(
         expected_return=result.expected_return,
         prob_positive=result.prob_positive,
         prob_loss_10=result.prob_loss_10,
+        prob_ruin=result.prob_ruin,
         simulations=result.simulations,
         horizon_days=result.horizon_days,
     )
@@ -465,8 +475,13 @@ async def get_xirr(
     db: AsyncSession = Depends(get_db),
 ):
     """Compute XIRR (time-weighted internal rate of return)."""
-    rate = await analytics_service.compute_xirr(db, str(current_user.id))
-    return {"xirr": rate, "description": "Taux de rendement interne annualisé (XIRR) en %"}
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    rate = await analytics_service.compute_xirr(db, str(current_user.id), currency=currency)
+    return {
+        "xirr": rate,
+        "currency": currency,
+        "description": "Taux de rendement interne annualisé (XIRR) en %",
+    }
 
 
 @router.post("/rebalance", response_model=RebalanceResponse)

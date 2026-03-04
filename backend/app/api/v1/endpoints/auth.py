@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 import pyotp
 import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,6 +56,8 @@ class UserProfileResponse(BaseModel):
     last_name: Optional[str]
     preferred_currency: str
     mfa_enabled: bool
+    telegram_chat_id: Optional[str] = None
+    telegram_enabled: bool = False
     created_at: str
 
 
@@ -65,7 +67,18 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=10)
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        import re
+
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+        if not re.search(r"\d", v):
+            raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+        return v
 
 
 router = APIRouter()
@@ -154,6 +167,8 @@ class UserProfileUpdate(BaseModel):
     first_name: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
     preferred_currency: Optional[str] = Field(None, pattern=r"^(EUR|USD|CHF|GBP)$")
+    telegram_chat_id: Optional[str] = Field(None, max_length=100, pattern=r"^-?\d+$")
+    telegram_enabled: Optional[bool] = None
 
 
 @router.post("/verify-email", response_model=Token)
@@ -642,6 +657,8 @@ async def get_current_user_info(
         "last_name": current_user.last_name,
         "preferred_currency": getattr(current_user, "preferred_currency", "EUR"),
         "mfa_enabled": current_user.mfa_enabled,
+        "telegram_chat_id": current_user.telegram_chat_id,
+        "telegram_enabled": getattr(current_user, "telegram_enabled", False),
         "created_at": current_user.created_at.isoformat(),
     }
 
@@ -668,6 +685,8 @@ async def update_profile(
         "last_name": current_user.last_name,
         "preferred_currency": getattr(current_user, "preferred_currency", "EUR"),
         "mfa_enabled": current_user.mfa_enabled,
+        "telegram_chat_id": current_user.telegram_chat_id,
+        "telegram_enabled": getattr(current_user, "telegram_enabled", False),
         "created_at": current_user.created_at.isoformat(),
     }
 

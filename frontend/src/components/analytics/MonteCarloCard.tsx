@@ -6,6 +6,7 @@ interface MonteCarloData {
   expected_return: number
   prob_positive: number
   prob_loss_10: number
+  prob_ruin: number
   simulations: number
   horizon_days: number
 }
@@ -56,7 +57,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
             ))}
           </div>
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 pt-2 border-t">
+          <div className="grid grid-cols-4 gap-3 pt-2 border-t">
             <div className="text-center">
               <div className="text-lg font-bold">{monteCarlo.expected_return > 0 ? '+' : ''}{monteCarlo.expected_return.toFixed(1)}%</div>
               <div className="text-xs text-muted-foreground">Rendement moyen</div>
@@ -68,6 +69,10 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
             <div className="text-center">
               <div className="text-lg font-bold text-red-500">{monteCarlo.prob_loss_10.toFixed(0)}%</div>
               <div className="text-xs text-muted-foreground">Prob. perte &gt;10%</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-red-700">{(monteCarlo.prob_ruin ?? 0).toFixed(1)}%</div>
+              <div className="text-xs text-muted-foreground">Prob. ruine</div>
             </div>
           </div>
         </div>
