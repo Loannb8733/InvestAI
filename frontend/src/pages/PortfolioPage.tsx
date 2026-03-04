@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,9 @@ interface AssetMetrics {
   total_invested: number
   gain_loss: number
   gain_loss_percent: number
+  total_fees?: number
+  breakeven_price?: number | null
+  risk_weight?: number
 }
 
 interface StablecoinEntry {
@@ -158,6 +161,23 @@ export default function PortfolioPage() {
     enabled: !!selectedPortfolio && activeTab === 'history',
     placeholderData: keepPreviousData,
   })
+
+  // Fetch sparkline data (lazy: after metrics loaded)
+  const { data: sparklineData } = useQuery({
+    queryKey: queryKeys.portfolios.sparklines(selectedPortfolio),
+    queryFn: () => dashboardApi.getPortfolioSparklines(selectedPortfolio!),
+    enabled: !!selectedPortfolio && !!portfolioMetrics,
+    staleTime: 5 * 60_000,
+  })
+
+  const sparklines = useMemo(() => {
+    if (!sparklineData) return undefined
+    const map: Record<string, { prices: number[]; change_pct: number }> = {}
+    for (const s of sparklineData) {
+      map[s.symbol] = { prices: s.prices, change_pct: s.change_pct }
+    }
+    return map
+  }, [sparklineData])
 
   // Delete asset mutation
   const deleteAssetMutation = useMutation({
@@ -344,6 +364,7 @@ export default function PortfolioPage() {
                   cashBalances={currentPortfolio.cash_balances || {}}
                   portfolioId={currentPortfolio.id}
                   portfolioName={currentPortfolio.name}
+                  sparklines={sparklines}
                   onAddAsset={(pId, pName) => setShowAddAsset({ portfolioId: pId, portfolioName: pName })}
                   onAddTransaction={(aId, aSym) => setShowAddTransaction({ assetId: aId, assetSymbol: aSym })}
                   onDeleteAsset={(asset) => setDeleteAsset(asset)}

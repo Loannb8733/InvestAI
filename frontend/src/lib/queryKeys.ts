@@ -5,6 +5,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.portfolios.all, 'detail', id] as const,
     metrics: (id: string | null) => [...queryKeys.portfolios.all, 'metrics', id] as const,
     history: (id: string | null) => [...queryKeys.portfolios.all, 'history', id] as const,
+    sparklines: (id: string | null) => [...queryKeys.portfolios.all, 'sparklines', id] as const,
   },
 
   assets: {

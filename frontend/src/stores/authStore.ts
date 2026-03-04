@@ -117,11 +117,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Do NOT persist tokens to localStorage — they are already in httpOnly cookies.
+      // Storing JWTs in JS-accessible storage exposes them to XSS attacks.
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
       }),
     }
   )

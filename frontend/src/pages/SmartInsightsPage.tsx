@@ -301,7 +301,7 @@ export default function SmartInsightsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Concentration (HHI)</p>
                     <div className={`text-3xl font-bold ${(data.metrics_summary.hhi ?? 0) < 0.15 ? 'text-green-500' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'text-yellow-500' : 'text-red-500'}`}>
-                      {((data.metrics_summary.hhi ?? 0) * 100).toFixed(0)}%
+                      {((data.metrics_summary.hhi ?? 0) * 10000).toFixed(0)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {(data.metrics_summary.hhi ?? 0) < 0.15 ? 'Bien diversifié' : (data.metrics_summary.hhi ?? 0) < 0.25 ? 'Modérément concentré' : 'Très concentré'}

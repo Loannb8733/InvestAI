@@ -172,6 +172,11 @@ export const dashboardApi = {
     return response.data
   },
 
+  getPortfolioSparklines: async (portfolioId: string, days: number = 30) => {
+    const response = await api.get(`/dashboard/portfolio/${portfolioId}/sparklines`, { params: { days } })
+    return response.data as { symbol: string; prices: number[]; change_pct: number }[]
+  },
+
   getHistoricalData: async (days: number = 30) => {
     const response = await api.get('/dashboard/historical-data', { params: { days } })
     return response.data
@@ -195,6 +200,16 @@ export const dashboardApi = {
   getBenchmarks: async (days: number = 90) => {
     const response = await api.get('/dashboard/benchmarks', { params: { days } })
     return response.data
+  },
+
+  triggerBackfill: async () => {
+    const response = await api.post('/dashboard/backfill-prices')
+    return response.data
+  },
+
+  getBackfillStatus: async () => {
+    const response = await api.get('/dashboard/backfill-status')
+    return response.data as { total_price_points: number; symbols_covered: number; total_active_symbols: number; is_complete: boolean }
   },
 }
 

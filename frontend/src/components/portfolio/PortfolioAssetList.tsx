@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { ALL_PLATFORMS, isColdWallet } from '@/lib/platforms'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sparkline } from '@/components/ui/sparkline'
 
 interface AssetMetrics {
   id: string
@@ -30,6 +31,9 @@ interface AssetMetrics {
   total_invested: number
   gain_loss: number
   gain_loss_percent: number
+  total_fees?: number
+  breakeven_price?: number | null
+  risk_weight?: number
   // Crowdfunding fields
   interest_rate?: number
   maturity_date?: string
@@ -77,6 +81,7 @@ interface PortfolioAssetListProps {
   cashBalances: Record<string, number>
   portfolioId: string
   portfolioName: string
+  sparklines?: Record<string, { prices: number[]; change_pct: number }>
   onAddAsset: (portfolioId: string, portfolioName: string) => void
   onAddTransaction: (assetId: string, assetSymbol: string) => void
   onDeleteAsset: (asset: AssetMetrics) => void
@@ -90,6 +95,7 @@ export default function PortfolioAssetList({
   cashBalances,
   portfolioId,
   portfolioName,
+  sparklines,
   onAddAsset,
   onAddTransaction,
   onDeleteAsset,
@@ -118,16 +124,32 @@ export default function PortfolioAssetList({
   // Group assets by platform for distribution view
   const platformDistribution = useMemo(() => {
     if (!portfolioMetrics?.assets?.length) return []
-    const map = new Map<string, { value: number; assets: { symbol: string; value: number }[] }>()
+    const map = new Map<string, {
+      value: number
+      totalInvested: number
+      gainLoss: number
+      totalFees: number
+      assets: { symbol: string; value: number }[]
+    }>()
     for (const asset of portfolioMetrics.assets) {
       const platform = asset.exchange || 'Non assigné'
-      const entry = map.get(platform) || { value: 0, assets: [] }
+      const entry = map.get(platform) || { value: 0, totalInvested: 0, gainLoss: 0, totalFees: 0, assets: [] }
       entry.value += asset.current_value
+      entry.totalInvested += asset.total_invested
+      entry.gainLoss += asset.gain_loss
+      entry.totalFees += asset.total_fees || 0
       entry.assets.push({ symbol: asset.symbol, value: asset.current_value })
       map.set(platform, entry)
     }
     return Array.from(map.entries())
-      .map(([platform, data]) => ({ platform, ...data }))
+      .map(([platform, data]) => ({
+        platform,
+        ...data,
+        roi: data.totalInvested > 0
+          ? ((data.value - data.totalInvested) / data.totalInvested) * 100
+          : 0,
+        netPnl: data.gainLoss - data.totalFees,
+      }))
       .sort((a, b) => b.value - a.value)
   }, [portfolioMetrics?.assets])
 
@@ -347,7 +369,7 @@ export default function PortfolioAssetList({
       {/* Platform distribution */}
       {hasPlatformData && platformDistribution.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-          {platformDistribution.map(({ platform, value, assets }) => {
+          {platformDistribution.map(({ platform, value, assets, netPnl, roi }) => {
             const isWallet = isColdWallet(platform)
             const isUnassigned = platform === 'Non assigné'
             const isActive = platformFilter === platform
@@ -377,7 +399,13 @@ export default function PortfolioAssetList({
                     </span>
                   </div>
                   <p className="text-lg font-bold">{formatCurrency(value)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className={`text-sm font-medium ${netPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {netPnl >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(Math.abs(netPnl))}
+                  </p>
+                  <p className={`text-xs ${roi >= 0 ? 'text-green-500/80' : 'text-red-500/80'}`}>
+                    ROI: {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {assets.length} actif{assets.length > 1 ? 's' : ''}
                   </p>
                 </CardContent>
@@ -445,8 +473,11 @@ export default function PortfolioAssetList({
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Quantité</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">PRA</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Prix actuel</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Breakeven</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Valeur</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Value</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Risque</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell w-[100px]">30j</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
@@ -476,6 +507,9 @@ export default function PortfolioAssetList({
                     <td className="text-center py-3">
                       {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
                     </td>
+                    <td className="text-center py-3 text-muted-foreground hidden lg:table-cell">
+                      {group.assets[0].breakeven_price != null ? formatCurrency(group.assets[0].breakeven_price) : '-'}
+                    </td>
                     <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
                     <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       <div>
@@ -487,6 +521,27 @@ export default function PortfolioAssetList({
                             : formatPercent(group.totalGainLossPercent)}
                         </p>
                       </div>
+                    </td>
+                    <td className="text-center py-3 hidden lg:table-cell">
+                      {group.assets[0].risk_weight != null && group.assets[0].risk_weight > 0 ? (
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          group.assets[0].risk_weight > 30 ? 'bg-red-500/10 text-red-500' :
+                          group.assets[0].risk_weight > 15 ? 'bg-orange-500/10 text-orange-500' :
+                          'bg-green-500/10 text-green-500'
+                        }`}>
+                          {group.assets[0].risk_weight.toFixed(1)}%
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td className="text-center py-3 hidden lg:table-cell">
+                      {sparklines?.[group.symbol] ? (
+                        <div className="flex justify-center">
+                          <Sparkline
+                            data={sparklines[group.symbol].prices}
+                            positive={sparklines[group.symbol].change_pct >= 0}
+                          />
+                        </div>
+                      ) : <span className="text-xs text-muted-foreground">-</span>}
                     </td>
                     <td className="text-center py-3">
                       <div className="flex justify-center gap-1">
@@ -532,6 +587,13 @@ export default function PortfolioAssetList({
                       <td className="text-center py-3">
                         {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
                       </td>
+                      <td className="text-center py-3 text-muted-foreground hidden lg:table-cell">
+                        {(() => {
+                          const totalQty = group.assets.reduce((s, a) => s + a.quantity, 0)
+                          const totalCost = group.assets.reduce((s, a) => s + a.total_invested + (a.total_fees || 0), 0)
+                          return totalQty > 0 ? formatCurrency(totalCost / totalQty) : '-'
+                        })()}
+                      </td>
                       <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
                       <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                         <div>
@@ -541,6 +603,31 @@ export default function PortfolioAssetList({
                             {formatPercent(group.totalGainLossPercent)}
                           </p>
                         </div>
+                      </td>
+                      <td className="text-center py-3 hidden lg:table-cell">
+                        {(() => {
+                          const riskWt = group.assets[0]?.risk_weight || 0
+                          if (riskWt <= 0) return '-'
+                          return (
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              riskWt > 30 ? 'bg-red-500/10 text-red-500' :
+                              riskWt > 15 ? 'bg-orange-500/10 text-orange-500' :
+                              'bg-green-500/10 text-green-500'
+                            }`}>
+                              {riskWt.toFixed(1)}%
+                            </span>
+                          )
+                        })()}
+                      </td>
+                      <td className="text-center py-3 hidden lg:table-cell">
+                        {sparklines?.[group.symbol] ? (
+                          <div className="flex justify-center">
+                            <Sparkline
+                              data={sparklines[group.symbol].prices}
+                              positive={sparklines[group.symbol].change_pct >= 0}
+                            />
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">-</span>}
                       </td>
                       <td className="text-center py-3" />
                     </tr>
@@ -555,10 +642,15 @@ export default function PortfolioAssetList({
                         <td className="text-center py-2 text-sm">
                           {asset.current_price ? formatCurrency(asset.current_price) : '-'}
                         </td>
+                        <td className="text-center py-2 text-sm text-muted-foreground hidden lg:table-cell">
+                          {asset.breakeven_price != null ? formatCurrency(asset.breakeven_price) : '-'}
+                        </td>
                         <td className="text-center py-2 text-sm">{formatCurrency(asset.current_value)}</td>
                         <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.gain_loss)}
                         </td>
+                        <td className="text-center py-2 hidden lg:table-cell" />
+                        <td className="text-center py-2 hidden lg:table-cell" />
                         <td className="text-center py-2">
                           <div className="flex justify-center gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddTransaction(asset.id, asset.symbol)} title="Ajouter une transaction">

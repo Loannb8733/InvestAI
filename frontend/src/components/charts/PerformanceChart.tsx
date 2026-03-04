@@ -18,7 +18,6 @@ interface DataPoint {
   invested?: number
   net_capital?: number
   gain_loss?: number
-  is_estimated?: boolean
 }
 
 interface PerformanceChartProps {
@@ -102,9 +101,6 @@ export default function PerformanceChart({
             <div className={`text-xs mt-1 pt-1 border-t ${point.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               P/L: {formatCurrency(point.gain_loss)}
             </div>
-          )}
-          {point.is_estimated && (
-            <p className="text-xs text-yellow-600 mt-1">* Valeur estimée</p>
           )}
         </div>
       )
