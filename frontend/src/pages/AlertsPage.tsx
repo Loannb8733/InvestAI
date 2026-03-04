@@ -202,8 +202,13 @@ export default function AlertsPage() {
   }
 
   const handleCreate = () => {
-    if (!formData.asset_id || !formData.name || !formData.condition || !formData.threshold) {
+    const auto = isAutoCondition(formData.condition)
+    if (!formData.asset_id || !formData.name || !formData.condition) {
       toast({ title: 'Veuillez remplir tous les champs obligatoires', variant: 'destructive' })
+      return
+    }
+    if (!auto && !formData.threshold) {
+      toast({ title: 'Veuillez remplir le seuil', variant: 'destructive' })
       return
     }
 
@@ -211,7 +216,7 @@ export default function AlertsPage() {
       asset_id: formData.asset_id,
       name: formData.name,
       condition: formData.condition,
-      threshold: parseFloat(formData.threshold),
+      threshold: auto ? 0 : parseFloat(formData.threshold),
       currency: formData.currency,
       notify_email: formData.notify_email,
       notify_in_app: formData.notify_in_app,
@@ -231,11 +236,20 @@ export default function AlertsPage() {
   }
 
   const getConditionIcon = (conditionValue: string) => {
+    if (conditionValue === 'target_break_even') {
+      return <CheckCircle className="h-4 w-4 text-green-500" />
+    }
+    if (conditionValue === 'volatility_spike') {
+      return <AlertTriangle className="h-4 w-4 text-orange-500" />
+    }
     if (conditionValue.includes('up') || conditionValue.includes('above')) {
       return <TrendingUp className="h-4 w-4 text-green-500" />
     }
     return <TrendingDown className="h-4 w-4 text-red-500" />
   }
+
+  const isAutoCondition = (condition: string) =>
+    condition === 'target_break_even' || condition === 'volatility_spike'
 
   if (loadingAlerts) {
     return (
@@ -327,6 +341,7 @@ export default function AlertsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {!isAutoCondition(formData.condition) && (
                 <div className="grid gap-2">
                   <Label htmlFor="threshold">Seuil</Label>
                   <div className="flex gap-2">
@@ -354,6 +369,16 @@ export default function AlertsPage() {
                     </Select>
                   </div>
                 </div>
+                )}
+                {isAutoCondition(formData.condition) && formData.condition && (
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    {formData.condition === 'target_break_even'
+                      ? 'Le seuil est calculé automatiquement à partir du prix de revient (frais inclus).'
+                      : 'Alerte déclenchée si la contribution au risque augmente de plus de 20% en 24h.'}
+                  </p>
+                </div>
+                )}
                 <div className="flex items-center justify-between">
                   <Label htmlFor="notify_email">Notification email</Label>
                   <Switch
@@ -485,9 +510,13 @@ export default function AlertsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {alert.condition.includes('percent') || alert.condition.includes('change')
-                        ? `${alert.threshold}%`
-                        : formatCurrency(alert.threshold, alert.currency)}
+                      {alert.condition === 'target_break_even'
+                        ? <span className="text-xs text-muted-foreground">Auto (BE)</span>
+                        : alert.condition === 'volatility_spike'
+                          ? <span className="text-xs text-muted-foreground">Auto (&gt;20%)</span>
+                          : alert.condition.includes('percent') || alert.condition.includes('change')
+                            ? `${alert.threshold}%`
+                            : formatCurrency(alert.threshold, alert.currency)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">

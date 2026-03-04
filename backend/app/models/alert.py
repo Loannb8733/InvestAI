@@ -17,6 +17,8 @@ class AlertCondition(str, enum.Enum):
     CHANGE_PERCENT_DOWN = "change_percent_down"
     DAILY_CHANGE_UP = "daily_change_up"
     DAILY_CHANGE_DOWN = "daily_change_down"
+    TARGET_BREAK_EVEN = "target_break_even"
+    VOLATILITY_SPIKE = "volatility_spike"
 
 
 class Alert(Base):
