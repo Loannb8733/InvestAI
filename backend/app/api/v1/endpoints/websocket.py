@@ -51,9 +51,16 @@ async def get_pubsub_redis() -> aioredis.Redis:
 
 
 async def verify_ws_token(token: str) -> bool:
-    """Verify JWT token for WebSocket auth."""
+    """Verify JWT token for WebSocket auth.
+
+    Only accepts access tokens (type="access"). Refresh tokens are
+    long-lived (7 days) and must not grant WebSocket access.
+    """
     try:
-        jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        # Reject refresh tokens — only access tokens should grant WS access
+        if payload.get("type") != "access":
+            return False
         return True
     except JWTError:
         return False

@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 import numpy as np
 
+from app.core.symbol_map import COINGECKO_SYMBOL_MAP
+
 logger = logging.getLogger(__name__)
 
 # Global semaphore: max 5 concurrent CoinGecko requests (~50 req/min free tier)
@@ -46,37 +48,8 @@ class HistoricalDataFetcher:
     COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
     YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
-    # Common symbol -> CoinGecko ID mapping (subset, full map in PriceService)
-    SYMBOL_MAP: Dict[str, str] = {
-        "BTC": "bitcoin",
-        "ETH": "ethereum",
-        "SOL": "solana",
-        "BNB": "binancecoin",
-        "XRP": "ripple",
-        "ADA": "cardano",
-        "DOGE": "dogecoin",
-        "DOT": "polkadot",
-        "LINK": "chainlink",
-        "AVAX": "avalanche-2",
-        "MATIC": "matic-network",
-        "UNI": "uniswap",
-        "ATOM": "cosmos",
-        "LTC": "litecoin",
-        "SHIB": "shiba-inu",
-        "NEAR": "near",
-        "SUI": "sui",
-        "PEPE": "pepe",
-        "PAXG": "pax-gold",
-        "USDG": "first-digital-usd",
-        "USDC": "usd-coin",
-        "TAO": "bittensor",
-        "USDT": "tether",
-        "TON": "the-open-network",
-        "FET": "fetch-ai",
-        "ONDO": "ondo-finance",
-        "PENDLE": "pendle",
-        "INJ": "injective-protocol",
-    }
+    # Unified symbol map (single source of truth in app.core.symbol_map)
+    SYMBOL_MAP: Dict[str, str] = COINGECKO_SYMBOL_MAP
 
     def __init__(self, coingecko_api_key: Optional[str] = None):
         headers = {
@@ -92,7 +65,7 @@ class HistoricalDataFetcher:
         """Close HTTP client."""
         await self.http_client.aclose()
 
-    async def _coingecko_get(self, url: str, params: dict, symbol: str, max_retries: int = 2) -> Optional[dict]:
+    async def _coingecko_get(self, url: str, params: dict, symbol: str, max_retries: int = 3) -> Optional[dict]:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
         for attempt in range(max_retries):
             await _coingecko_throttle()
@@ -101,7 +74,7 @@ class HistoricalDataFetcher:
                 if response.status_code == 200:
                     return response.json()
                 if response.status_code == 429:
-                    wait = (attempt + 1) * 3  # 3s, 6s
+                    wait = (attempt + 1) * 10  # 10s, 20s, 30s
                     logger.warning("CoinGecko 429 for %s — retry %d/%d in %ds", symbol, attempt + 1, max_retries, wait)
                     await asyncio.sleep(wait)
                     continue
@@ -374,6 +347,78 @@ class HistoricalDataFetcher:
             dates, prices = await self.get_real_estate_history(symbol, days)
             return HistoricalDataResult(dates, prices, None)
         return HistoricalDataResult([], [], None)
+
+    async def get_crypto_history_range(
+        self,
+        symbol: str,
+        from_date: datetime,
+        to_date: datetime,
+        currency: str = "eur",
+    ) -> Tuple[List[datetime], List[float]]:
+        """Fetch historical crypto prices for a specific date range via CoinGecko /market_chart/range.
+
+        This endpoint returns daily data for ranges > 90 days, which makes it
+        ideal for deep backfill beyond the 365-day limit of /market_chart.
+        """
+        coin_id = self.SYMBOL_MAP.get(symbol.upper(), symbol.lower())
+
+        from_ts = int(from_date.timestamp())
+        to_ts = int(to_date.timestamp())
+
+        data = await self._coingecko_get(
+            f"{self.COINGECKO_BASE_URL}/coins/{coin_id}/market_chart/range",
+            {"vs_currency": currency, "from": str(from_ts), "to": str(to_ts)},
+            symbol,
+        )
+        if not data:
+            return [], []
+
+        prices_data = data.get("prices", [])
+        if not prices_data:
+            return [], []
+
+        dates = [datetime.fromtimestamp(p[0] / 1000, tz=timezone.utc).replace(tzinfo=None) for p in prices_data]
+        prices = [p[1] for p in prices_data]
+
+        logger.info(
+            "Fetched %d data points for %s from CoinGecko /range (%s → %s)",
+            len(prices),
+            symbol,
+            from_date.date(),
+            to_date.date(),
+        )
+        return dates, prices
+
+    async def get_coin_price_by_date(
+        self,
+        symbol: str,
+        date: datetime,
+        currency: str = "eur",
+    ) -> Optional[float]:
+        """Fetch the price of a coin on a specific historical date.
+
+        Uses CoinGecko /coins/{id}/history?date={dd-mm-yyyy} endpoint.
+        Available on free tier with NO date limit — works for any past date.
+        Returns the price in the specified currency, or None on failure.
+        """
+        coin_id = self.SYMBOL_MAP.get(symbol.upper(), symbol.lower())
+        date_str = date.strftime("%d-%m-%Y")
+
+        data = await self._coingecko_get(
+            f"{self.COINGECKO_BASE_URL}/coins/{coin_id}/history",
+            {"date": date_str, "localization": "false"},
+            symbol,
+        )
+        if not data:
+            return None
+
+        try:
+            price = data.get("market_data", {}).get("current_price", {}).get(currency)
+            if price is not None:
+                return float(price)
+        except (KeyError, TypeError, ValueError):
+            pass
+        return None
 
     async def get_btc_dominance(self) -> Optional[float]:
         """Fetch BTC dominance percentage from CoinGecko /global."""

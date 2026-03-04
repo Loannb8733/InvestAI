@@ -60,6 +60,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.alerts.check_all_alerts",
         "schedule": 300.0,  # Every 5 minutes
     },
+    "seed-risk-weight-snapshots": {
+        "task": "app.tasks.alerts.seed_risk_weight_snapshots",
+        "schedule": crontab(hour=0, minute=5),  # Daily at 00:05 UTC
+    },
     "check-prediction-accuracy": {
         "task": "app.tasks.predictions.check_prediction_accuracy",
         "schedule": 86400.0,  # Every 24 hours
@@ -67,6 +71,10 @@ celery_app.conf.beat_schedule = {
     "cache-historical-data": {
         "task": "app.tasks.history_cache.cache_historical_data",
         "schedule": 1800.0,  # Every 30 minutes
+    },
+    "deep-backfill-prices": {
+        "task": "app.tasks.history_cache.deep_backfill_prices",
+        "schedule": 86400.0,  # Every 24 hours — fills gaps + refreshes recent data
     },
     "tune-hyperparameters": {
         "task": "app.tasks.predictions.tune_hyperparameters",
