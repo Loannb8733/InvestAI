@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
@@ -22,6 +23,7 @@ const loginSchema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(1, 'Mot de passe requis'),
   mfaCode: z.string().optional(),
+  rememberMe: z.boolean().optional(),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
@@ -35,15 +37,20 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { rememberMe: false },
   })
+
+  const rememberMe = watch('rememberMe')
 
   const onSubmit = async (data: LoginFormData) => {
     clearError()
     try {
-      await login(data.email, data.password, data.mfaCode)
+      await login(data.email, data.password, data.mfaCode, data.rememberMe)
       toast({
         title: 'Connexion réussie',
         description: 'Bienvenue sur InvestAI',
@@ -203,6 +210,17 @@ export default function LoginPage() {
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setValue('rememberMe', checked === true)}
+              />
+              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+                Rester connecté
+              </Label>
             </div>
 
             {requiresMFA && (

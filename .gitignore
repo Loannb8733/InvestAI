@@ -107,3 +107,4 @@ temp/
 /*.png
 /*.txt
 !README.txt
+.vercel

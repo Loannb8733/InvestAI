@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -256,25 +257,28 @@ async def calculate_fire(
     is_fire_achieved = portfolio_value >= fire_number
     current_progress = (portfolio_value / fire_number) * 100
 
-    # Project portfolio growth (net of expense ratio / TER)
+    # Project portfolio growth (net of expense ratio / TER) — Decimal precision
     projections = []
-    value = portfolio_value
-    net_annual_return = params.expected_annual_return - params.expense_ratio
+    value = Decimal(str(portfolio_value))
+    net_annual_return = Decimal(str(params.expected_annual_return)) - Decimal(str(params.expense_ratio))
     monthly_return = net_annual_return / 100 / 12
+    monthly_contribution = Decimal(str(params.monthly_contribution))
+    inflation = Decimal(str(params.inflation_rate)) / 100
+    withdrawal = Decimal(str(params.withdrawal_rate)) / 100
     years_to_fire = None
 
     for year in range(params.target_years + 1):
         # Adjust expenses for inflation
-        adjusted_expenses = annual_expenses * ((1 + params.inflation_rate / 100) ** year)
-        adjusted_fire_number = adjusted_expenses / (params.withdrawal_rate / 100)
+        adjusted_expenses = Decimal(str(annual_expenses)) * ((1 + inflation) ** year)
+        adjusted_fire_number = adjusted_expenses / withdrawal
 
         projections.append(
             {
                 "year": year,
-                "portfolio_value": round(value, 2),
-                "fire_number": round(adjusted_fire_number, 2),
+                "portfolio_value": float(round(value, 2)),
+                "fire_number": float(round(adjusted_fire_number, 2)),
                 "is_fire": value >= adjusted_fire_number,
-                "progress_percent": round((value / adjusted_fire_number) * 100, 1),
+                "progress_percent": float(round(value / adjusted_fire_number * 100, 1)),
             }
         )
 
@@ -284,7 +288,7 @@ async def calculate_fire(
 
         # Grow portfolio for next year (monthly compounding + contributions)
         for _ in range(12):
-            value = value * (1 + monthly_return) + params.monthly_contribution
+            value = value * (1 + monthly_return) + monthly_contribution
 
     return FIREResult(
         fire_number=round(fire_number, 2),
@@ -314,42 +318,45 @@ async def project_portfolio(
             detail="La valeur du portefeuille est nulle. Ajoutez des actifs d'abord.",
         )
 
-    # Project growth (net of expense ratio / TER)
+    # Project growth (net of expense ratio / TER) — Decimal precision
     projections = []
-    value = current_value
-    net_annual_return = params.expected_return - params.expense_ratio
+    value = Decimal(str(current_value))
+    initial_value = value
+    net_annual_return = Decimal(str(params.expected_return)) - Decimal(str(params.expense_ratio))
     monthly_return = net_annual_return / 100 / 12
-    total_contributions = 0.0
+    monthly_contribution = Decimal(str(params.monthly_contribution))
+    inflation = Decimal(str(params.inflation_rate)) / 100
+    total_contributions = Decimal("0")
 
     for year in range(params.years + 1):
         real_value = value
         if params.inflation_adjustment:
-            real_value = value / ((1 + params.inflation_rate / 100) ** year)
+            real_value = value / ((1 + inflation) ** year)
 
         projections.append(
             {
                 "year": year,
-                "nominal_value": round(value, 2),
-                "real_value": round(real_value, 2),
-                "contributions": round(total_contributions, 2),
-                "returns": round(value - current_value - total_contributions, 2),
+                "nominal_value": float(round(value, 2)),
+                "real_value": float(round(real_value, 2)),
+                "contributions": float(round(total_contributions, 2)),
+                "returns": float(round(value - initial_value - total_contributions, 2)),
             }
         )
 
         # Grow for next year
         for _ in range(12):
-            value = value * (1 + monthly_return) + params.monthly_contribution
-            total_contributions += params.monthly_contribution
+            value = value * (1 + monthly_return) + monthly_contribution
+            total_contributions += monthly_contribution
 
     final_value = projections[-1]["nominal_value"]
     real_final_value = projections[-1]["real_value"]
-    total_returns = final_value - current_value - total_contributions
+    total_returns = final_value - current_value - float(total_contributions)
 
     return ProjectionResult(
         current_value=round(current_value, 2),
         projections=projections,
         final_value=round(final_value, 2),
-        total_contributions=round(total_contributions, 2),
+        total_contributions=float(round(total_contributions, 2)),
         total_returns=round(total_returns, 2),
         real_final_value=round(real_final_value, 2),
         currency=currency,
@@ -377,49 +384,50 @@ async def simulate_dca(
         num_investments = params.duration_months
         amount_per_investment = params.total_amount / num_investments
 
-    # Simulate price movements
+    # Simulate price movements — Decimal precision for financial sums
     projections = []
-    total_units = 0.0
-    total_invested = 0.0
-    price = 100.0  # Starting price
+    total_units = Decimal("0")
+    total_invested = Decimal("0")
+    price = Decimal("100")  # Starting price
     monthly_return = params.expected_return / 100 / 12
     monthly_volatility = params.expected_volatility / 100 / (12**0.5)
+    amt_per = Decimal(str(amount_per_investment))
 
     random.seed(42)  # For reproducibility
 
     for i in range(num_investments):
-        # Simulate price change
+        # Simulate price change (float OK for stochastic sampling)
         price_change = random.gauss(monthly_return, monthly_volatility)
-        price = price * (1 + price_change)
-        price = max(price, 1)  # Prevent negative prices
+        price = price * Decimal(str(1 + price_change))
+        price = max(price, Decimal("1"))  # Prevent negative prices
 
         # Make investment
-        units_bought = amount_per_investment / price
+        units_bought = amt_per / price
         total_units += units_bought
-        total_invested += amount_per_investment
+        total_invested += amt_per
 
         projections.append(
             {
                 "period": i + 1,
-                "price": round(price, 2),
-                "amount_invested": round(amount_per_investment, 2),
-                "units_bought": round(units_bought, 4),
-                "total_units": round(total_units, 4),
-                "total_invested": round(total_invested, 2),
-                "current_value": round(total_units * price, 2),
+                "price": float(round(price, 2)),
+                "amount_invested": float(round(amt_per, 2)),
+                "units_bought": float(round(units_bought, 4)),
+                "total_units": float(round(total_units, 4)),
+                "total_invested": float(round(total_invested, 2)),
+                "current_value": float(round(total_units * price, 2)),
             }
         )
 
     final_value = total_units * price
-    average_cost = total_invested / total_units if total_units > 0 else 0
-    return_percent = ((final_value - total_invested) / total_invested * 100) if total_invested > 0 else 0
+    average_cost = total_invested / total_units if total_units > 0 else Decimal("0")
+    return_percent = ((final_value - total_invested) / total_invested * 100) if total_invested > 0 else Decimal("0")
 
     return DCAResult(
-        total_invested=round(total_invested, 2),
-        final_value=round(final_value, 2),
-        average_cost=round(average_cost, 2),
-        total_units=round(total_units, 4),
-        return_percent=round(return_percent, 2),
+        total_invested=float(round(total_invested, 2)),
+        final_value=float(round(final_value, 2)),
+        average_cost=float(round(average_cost, 2)),
+        total_units=float(round(total_units, 4)),
+        return_percent=float(round(return_percent, 2)),
         projections=projections,
         currency=currency,
     )
@@ -443,8 +451,8 @@ async def simulate_what_if(
     live = await _get_portfolio_live_data(db, str(current_user.id), currency)
     all_assets = live["assets"]
 
-    current_value = 0.0
-    projected_value = 0.0
+    current_value = Decimal("0")
+    projected_value = Decimal("0")
     asset_breakdown = []
 
     # Compute total risk weight for normalization
@@ -452,7 +460,8 @@ async def simulate_what_if(
     n_assets = len(all_assets) or 1
 
     for asset in all_assets:
-        asset_value = asset.get("current_value", 0.0)
+        asset_val_f = asset.get("current_value", 0.0)
+        asset_value = Decimal(str(asset_val_f))
         symbol = asset.get("symbol", "")
         risk_weight = asset.get("risk_weight", 0.0)
         current_value += asset_value
@@ -464,14 +473,8 @@ async def simulate_what_if(
         elif params.market_change is not None:
             # Uniform market shock, optionally weighted by risk
             if params.use_risk_weighting and total_risk_weight > 0 and risk_weight > 0:
-                # Scale factor: assets with higher risk_weight get proportionally more shock.
-                # Normalized so that the value-weighted average shock = market_change.
-                # risk_weight is a percentage contribution to total portfolio risk.
-                # Multiplier = risk_weight / (value_weight * total_risk_weight / 100)
-                # Simplified: we scale by (risk_weight / average_risk_weight)
                 avg_risk_weight = total_risk_weight / n_assets
                 multiplier = risk_weight / avg_risk_weight if avg_risk_weight > 0 else 1.0
-                # Cap multiplier to avoid extreme swings
                 multiplier = min(max(multiplier, 0.2), 3.0)
                 change_percent = params.market_change * multiplier
             else:
@@ -479,31 +482,34 @@ async def simulate_what_if(
         else:
             change_percent = 0.0
 
-        new_value = asset_value * (1 + change_percent / 100)
+        change_dec = Decimal(str(change_percent))
+        new_value = asset_value * (1 + change_dec / 100)
         projected_value += new_value
 
         asset_breakdown.append(
             {
                 "symbol": symbol,
                 "name": asset.get("name", ""),
-                "current_value": round(asset_value, 2),
+                "current_value": float(round(asset_value, 2)),
                 "change_percent": round(change_percent, 2),
-                "projected_value": round(new_value, 2),
-                "difference": round(new_value - asset_value, 2),
+                "projected_value": float(round(new_value, 2)),
+                "difference": float(round(new_value - asset_value, 2)),
                 "risk_weight": risk_weight,
             }
         )
 
     # Apply withdrawal/contribution
-    projected_value = projected_value - params.withdrawal_amount + params.contribution_amount
+    projected_value = (
+        projected_value - Decimal(str(params.withdrawal_amount)) + Decimal(str(params.contribution_amount))
+    )
 
     difference = projected_value - current_value
-    difference_percent = (difference / current_value * 100) if current_value > 0 else 0
+    difference_percent = float(difference / current_value * 100) if current_value > 0 else 0.0
 
     return WhatIfResult(
-        current_value=round(current_value, 2),
-        projected_value=round(projected_value, 2),
-        difference=round(difference, 2),
+        current_value=float(round(current_value, 2)),
+        projected_value=float(round(projected_value, 2)),
+        difference=float(round(difference, 2)),
         difference_percent=round(difference_percent, 2),
         asset_breakdown=asset_breakdown,
         currency=currency,

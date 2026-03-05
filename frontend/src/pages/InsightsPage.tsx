@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
-import { insightsApi } from '@/services/api'
+import { insightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import {
   BarChart,
@@ -37,6 +37,12 @@ import {
   Calendar,
   Lightbulb,
   Play,
+  Zap,
+  ShieldAlert,
+  Target,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from 'lucide-react'
 
 interface TaxLossOpportunity {
@@ -50,12 +56,13 @@ interface TaxLossOpportunity {
   potential_tax_saving: number
 }
 
-type Tab = 'fees' | 'harvest' | 'income' | 'dca'
+type Tab = 'alpha' | 'fees' | 'harvest' | 'income' | 'dca'
 
 export default function InsightsPage() {
-  const [tab, setTab] = useState<Tab>('fees')
+  const [tab, setTab] = useState<Tab>('alpha')
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'alpha', label: 'Top Alpha', icon: <Zap className="h-4 w-4" /> },
     { id: 'fees', label: 'Frais', icon: <Receipt className="h-4 w-4" /> },
     { id: 'harvest', label: 'Tax-Loss', icon: <Scissors className="h-4 w-4" /> },
     { id: 'income', label: 'Revenus passifs', icon: <Coins className="h-4 w-4" /> },
@@ -84,11 +91,393 @@ export default function InsightsPage() {
         ))}
       </div>
 
+      {tab === 'alpha' && (
+        <>
+          <TopAlpha />
+          <StrategyTable />
+        </>
+      )}
       {tab === 'fees' && <FeeAnalysis />}
       {tab === 'harvest' && <TaxLossHarvesting />}
       {tab === 'income' && <PassiveIncome />}
       {tab === 'dca' && <DcaBacktest />}
     </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────
+// Top Alpha Tab
+// ──────────────────────────────────────────────────────
+
+interface AlphaReason {
+  label: string
+  detail: string
+  score: number
+}
+
+interface AlphaAsset {
+  symbol: string
+  name: string
+  asset_type: string
+  current_price: number
+  score: number
+  predicted_7d_pct: number
+  prediction_source?: string
+  reasons: AlphaReason[]
+  regime: string
+  regime_confidence: number
+  value: number
+  weight_pct: number
+}
+
+function TopAlpha() {
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.predictions.topAlpha,
+    queryFn: predictionsApi.getTopAlpha,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (isLoading) return <Loader />
+  if (!data || !data.found) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold">Aucun signal Alpha détecté</h3>
+          <p className="text-muted-foreground mt-1">
+            Les conditions de marché ne présentent pas de configuration de surperformance pour vos actifs.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const top: AlphaAsset = data.top_alpha
+  const allScores: AlphaAsset[] = data.all_scores || []
+  const concentrationRisk: boolean = data.concentration_risk
+
+  const scoreColor = top.score >= 80 ? 'text-green-600' : top.score >= 50 ? 'text-yellow-600' : 'text-muted-foreground'
+  const predColor = top.predicted_7d_pct >= 0 ? 'text-green-600' : 'text-red-600'
+
+  return (
+    <div className="space-y-4">
+      {/* Main Alpha Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-yellow-500" />
+                Potentiel de Sursaut
+              </CardTitle>
+              <CardDescription>
+                Actif avec la meilleure configuration technique à court terme
+              </CardDescription>
+            </div>
+            <div className="text-right">
+              <div className={`text-3xl font-bold ${scoreColor}`}>{top.score.toFixed(0)}</div>
+              <div className="text-xs text-muted-foreground">/100</div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Concentration Risk Warning */}
+          {concentrationRisk && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+              <ShieldAlert className="h-4 w-4 text-orange-600 shrink-0" />
+              <p className="text-sm text-orange-700 dark:text-orange-400">
+                Cet actif représente déjà {top.weight_pct.toFixed(0)}% de votre portefeuille.
+                Prudence avant de renforcer.
+              </p>
+            </div>
+          )}
+
+          {/* Asset Header */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+            <div>
+              <div className="text-lg font-bold">{top.symbol}</div>
+              <div className="text-sm text-muted-foreground">{top.name}</div>
+              <Badge variant="outline" className="mt-1">{top.asset_type}</Badge>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Prix actuel</div>
+              <div className="text-lg font-semibold">{formatCurrency(top.current_price)}</div>
+              <div className={`text-sm font-medium ${predColor}`}>
+                {top.predicted_7d_pct >= 0 ? '+' : ''}{top.predicted_7d_pct.toFixed(2)}% prédit à 7j
+                {top.prediction_source === 'ema20_slope' && (
+                  <span className="text-[10px] text-muted-foreground ml-1">(EMA)</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Reasons */}
+          <div>
+            <h4 className="text-sm font-semibold mb-2">Raisons techniques</h4>
+            <div className="space-y-2">
+              {top.reasons.map((reason, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <div className="text-sm font-medium">{reason.label}</div>
+                    <div className="text-xs text-muted-foreground">{reason.detail}</div>
+                  </div>
+                  <Badge variant={reason.score >= 20 ? 'default' : 'secondary'}>
+                    +{reason.score}
+                  </Badge>
+                </div>
+              ))}
+              {top.reasons.length === 0 && (
+                <p className="text-sm text-muted-foreground">Aucun signal technique fort détecté.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Regime Info */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Lightbulb className="h-4 w-4" />
+            Régime: <Badge variant="outline">{top.regime}</Badge>
+            (confiance {(top.regime_confidence * 100).toFixed(0)}%)
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Scoreboard — other assets */}
+      {allScores.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Classement Alpha</CardTitle>
+            <CardDescription>Tous vos actifs classés par score de surperformance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {allScores.map((asset, i) => (
+                <div key={asset.symbol} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-muted-foreground w-5">{i + 1}</span>
+                    <div>
+                      <span className="font-medium">{asset.symbol}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{asset.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`text-sm ${asset.predicted_7d_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {asset.predicted_7d_pct >= 0 ? '+' : ''}{asset.predicted_7d_pct.toFixed(2)}%
+                    </span>
+                    <Badge variant={asset.score >= 60 ? 'default' : 'secondary'}>
+                      {asset.score.toFixed(0)}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────
+// Strategy Table — Decision Matrix Alpha × Cycle
+// ──────────────────────────────────────────────────────
+
+interface StrategyRow {
+  symbol: string
+  name: string
+  alpha_score: number
+  alpha_level: string
+  regime: string
+  regime_confidence: number
+  action: string
+  description: string
+  value: number
+  weight_pct: number
+  impact_pct: number
+  impact_eur: number
+  predicted_7d_pct: number
+}
+
+interface StrategyMapData {
+  rows: StrategyRow[]
+  total_portfolio_value: number
+  market_regime: string
+  fear_greed: number | null
+  summary: { buys: number; sells: number; holds: number }
+}
+
+const regimeLabels: Record<string, string> = {
+  bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux',
+}
+const regimeColors: Record<string, string> = {
+  bullish: 'bg-green-500/10 text-green-600 border-green-500/30',
+  bearish: 'bg-red-500/10 text-red-600 border-red-500/30',
+  top: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+  bottom: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+}
+
+const actionStyles: Record<string, string> = {
+  'ACHAT FORT': 'bg-green-600 text-white',
+  'DCA': 'bg-green-500/10 text-green-700 border border-green-500/30',
+  'MAINTENIR': 'bg-gray-500/10 text-gray-700 border border-gray-500/30',
+  'CONSERVER': 'bg-gray-500/10 text-gray-700 border border-gray-500/30',
+  'OBSERVER': 'bg-blue-500/10 text-blue-700 border border-blue-500/30',
+  'ATTENDRE': 'bg-yellow-500/10 text-yellow-700 border border-yellow-500/30',
+  'ÉVITER': 'bg-orange-500/10 text-orange-700 border border-orange-500/30',
+  'PRENDRE PROFITS': 'bg-amber-500/10 text-amber-700 border border-amber-500/30',
+  'ALLÉGER': 'bg-orange-500/10 text-orange-700 border border-orange-500/30',
+  'VENDRE': 'bg-red-600 text-white',
+  'PLANIFIER': 'bg-purple-500/10 text-purple-700 border border-purple-500/30',
+}
+
+function StrategyTable() {
+  const { data, isLoading } = useQuery<StrategyMapData>({
+    queryKey: queryKeys.predictions.strategyMap,
+    queryFn: predictionsApi.getStrategyMap,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (isLoading) return <Loader />
+  if (!data || data.rows.length === 0) return null
+
+  const totalImpact = data.rows.reduce((sum, r) => sum + r.impact_eur, 0)
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Matrice de Stratégie
+            </CardTitle>
+            <CardDescription>
+              Croisement Alpha × Cycle pour chaque actif — actions recommandées
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            {data.summary.buys > 0 && (
+              <Badge className="bg-green-500/10 text-green-700 border border-green-500/30">
+                {data.summary.buys} Achat{data.summary.buys > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {data.summary.sells > 0 && (
+              <Badge className="bg-red-500/10 text-red-700 border border-red-500/30">
+                {data.summary.sells} Vente{data.summary.sells > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {data.summary.holds > 0 && (
+              <Badge variant="secondary">
+                {data.summary.holds} Maintien{data.summary.holds > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                <th className="text-center py-2 px-3 text-xs font-medium">Alpha</th>
+                <th className="text-center py-2 px-3 text-xs font-medium">Phase</th>
+                <th className="text-center py-2 px-3 text-xs font-medium">Action</th>
+                <th className="text-right py-2 px-3 text-xs font-medium">Impact Portefeuille</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row) => {
+                const impactSign = row.impact_eur > 0 ? '+' : row.impact_eur < 0 ? '' : ''
+
+                return (
+                  <tr key={row.symbol} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="py-3 px-3">
+                      <div>
+                        <span className="font-medium">{row.symbol}</span>
+                        {row.name !== row.symbol && (
+                          <span className="text-xs text-muted-foreground ml-2">{row.name}</span>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          {formatCurrency(row.value)} · {row.weight_pct}%
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className={`text-sm font-bold ${
+                          row.alpha_score >= 60 ? 'text-green-600' :
+                          row.alpha_score >= 30 ? 'text-yellow-600' : 'text-muted-foreground'
+                        }`}>
+                          {row.alpha_score.toFixed(0)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground capitalize">{row.alpha_level}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <Badge variant="outline" className={regimeColors[row.regime] || 'text-gray-500'}>
+                        {regimeLabels[row.regime] || row.regime}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <Badge className={`text-xs ${actionStyles[row.action] || 'bg-gray-100 text-gray-700'}`}>
+                        {row.action}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {row.impact_eur > 0 ? (
+                          <ArrowUpRight className="h-3 w-3 text-green-500" />
+                        ) : row.impact_eur < 0 ? (
+                          <ArrowDownRight className="h-3 w-3 text-red-500" />
+                        ) : (
+                          <Minus className="h-3 w-3 text-muted-foreground" />
+                        )}
+                        <span className={`text-sm font-medium tabular-nums ${
+                          row.impact_eur > 0 ? 'text-green-600' :
+                          row.impact_eur < 0 ? 'text-red-600' : 'text-muted-foreground'
+                        }`}>
+                          {impactSign}{formatCurrency(Math.abs(row.impact_eur))}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          ({row.impact_pct > 0 ? '+' : ''}{row.impact_pct}%)
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t">
+                <td colSpan={4} className="py-3 px-3 text-sm font-medium text-right">
+                  Impact total estimé
+                </td>
+                <td className="py-3 px-3 text-right">
+                  <span className={`text-sm font-bold tabular-nums ${
+                    totalImpact > 0 ? 'text-green-600' :
+                    totalImpact < 0 ? 'text-red-600' : 'text-muted-foreground'
+                  }`}>
+                    {totalImpact > 0 ? '+' : ''}{formatCurrency(totalImpact)}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    sur {formatCurrency(data.total_portfolio_value)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 flex items-start gap-2 p-2 rounded bg-muted/30">
+          <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            L'action est déterminée par le croisement du score Alpha (potentiel technique) et de la phase du cycle de marché.
+            L'impact est une estimation basée sur les mouvements suggérés (±2-5% selon l'action).
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

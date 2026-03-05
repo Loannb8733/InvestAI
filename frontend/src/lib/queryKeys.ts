@@ -73,6 +73,8 @@ export const queryKeys = {
       ['predictions', 'backtest', ...(days !== undefined ? [days] : [])] as const,
     trackRecord: (symbol: string) =>
       ['predictions', 'trackRecord', symbol] as const,
+    topAlpha: ['predictions', 'topAlpha'] as const,
+    strategyMap: ['predictions', 'strategyMap'] as const,
   },
 
   alerts: {

@@ -4,6 +4,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -25,7 +26,7 @@ from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
 from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.market_context import MarketContext, compute_market_context
-from app.ml.regime_detector import MarketRegimeDetector
+from app.ml.regime_detector import MarketRegimeDetector, _rsi
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services.price_service import PriceService
@@ -1004,7 +1005,7 @@ class PredictionService:
         portfolio_ids = [p.id for p in portfolios]
 
         per_asset = []
-        total_value = 0.0
+        total_value = Decimal("0")
         regime_weighted = {"bearish": 0.0, "bottom": 0.0, "bullish": 0.0, "top": 0.0}
 
         if portfolio_ids:
@@ -1033,8 +1034,11 @@ class PredictionService:
                     price = await self._get_current_price(asset.symbol, asset.asset_type)
                     if price == 0:
                         continue
-                    value = price * qty_map[asset.symbol]
-                    total_value += value
+                    price_dec = Decimal(str(price))
+                    qty_dec = Decimal(str(qty_map[asset.symbol]))
+                    value_dec = price_dec * qty_dec
+                    total_value += value_dec
+                    value = float(value_dec)
 
                     # Reuse btc_prices if this asset is BTC (already fetched above)
                     a_prices = None
@@ -1105,8 +1109,9 @@ class PredictionService:
                     logger.warning("Market cycle error for %s: %s", asset.symbol, e)
 
         # ── 3. Weighted portfolio regime ──────────────────────────────
-        if total_value > 0:
-            portfolio_probs = {p: round(v / total_value, 4) for p, v in regime_weighted.items()}
+        total_value_f = float(total_value)
+        if total_value_f > 0:
+            portfolio_probs = {p: round(v / total_value_f, 4) for p, v in regime_weighted.items()}
         else:
             portfolio_probs = {p: 0.25 for p in regime_weighted}
         portfolio_dominant = max(portfolio_probs, key=portfolio_probs.get)
@@ -1123,11 +1128,22 @@ class PredictionService:
             cycle_map = {"bottom": 10, "bullish": 40, "top": 75, "bearish": 85}
             cycle_position = cycle_map.get(btc_regime["dominant_regime"] if btc_regime else "bearish", 50)
 
-        # ── 5. Cycle-specific advice ─────────────────────────────────
+        # ── 5. Cycle-specific advice (with live portfolio context) ──
+        max_rw = 0.0
+        if per_asset:
+            # Approximate risk_weight from value concentration (actual
+            # risk_weight requires metrics_service, but value weight is a
+            # fast proxy available here).
+            values = [a["value"] for a in per_asset if a.get("value", 0) > 0]
+            if values and total_value_f > 0:
+                max_rw = max(v / total_value_f * 100 for v in values)
+
         cycle_advice = self._get_cycle_advice(
             btc_regime["dominant_regime"] if btc_regime else "unknown",
             cycle_position,
             fear_greed,
+            portfolio_value=total_value_f,
+            max_risk_weight=max_rw,
         )
 
         # ── 6. Top/Bottom estimates (price + date) ─────────────────
@@ -1188,6 +1204,75 @@ class PredictionService:
             except Exception as e:
                 logger.debug("Top/bottom estimate failed for %s: %s", sym, e)
 
+        # ── 7. Distribution diagnostic ────────────────────────────────
+        # Flag assets in distribution phase (top/bearish regime + high cycle
+        # position) and cross-reference with RSI / momentum weakness.
+        distribution_diagnostic: List[Dict] = []
+        for asset_data in per_asset:
+            dom = asset_data.get("dominant_regime", "")
+            probs = asset_data.get("probabilities", {})
+            top_prob = probs.get("top", 0) + probs.get("bearish", 0)
+            if top_prob < 0.40:
+                continue  # not in distribution zone
+
+            sym = asset_data["symbol"]
+            # Try to compute RSI for this asset
+            rsi_val = None
+            a_prices_diag = None
+            for try_d in [_HISTORY_DAYS, 90]:
+                cached_h = await get_cached_history(sym, asset_data.get("asset_type", "crypto"), try_d)
+                if cached_h and cached_h.get("prices"):
+                    a_prices_diag = cached_h["prices"]
+                    break
+            if sym == "BTC" and btc_prices:
+                a_prices_diag = btc_prices
+
+            if a_prices_diag and len(a_prices_diag) >= 15:
+                rsi_val = _rsi(a_prices_diag, period=14)
+
+            # Build diagnostic entry
+            signals = []
+            sell_priority = "low"
+            if rsi_val is not None and rsi_val > 70:
+                signals.append(f"RSI suracheté ({rsi_val:.0f})")
+                sell_priority = "high"
+            if dom == "top":
+                signals.append("Régime Sommet détecté")
+                sell_priority = "high" if sell_priority != "high" else sell_priority
+            if probs.get("bearish", 0) > 0.25:
+                signals.append(f"Probabilité baissière {probs['bearish']*100:.0f}%")
+                sell_priority = "medium" if sell_priority == "low" else sell_priority
+
+            weight_pct = 0.0
+            if total_value_f > 0 and asset_data.get("value", 0) > 0:
+                weight_pct = asset_data["value"] / total_value_f * 100
+
+            distribution_diagnostic.append(
+                {
+                    "symbol": sym,
+                    "name": asset_data.get("name", sym),
+                    "dominant_regime": dom,
+                    "top_bearish_prob": round(top_prob * 100, 1),
+                    "rsi": round(rsi_val, 1) if rsi_val is not None else None,
+                    "weight_pct": round(weight_pct, 1),
+                    "signals": signals,
+                    "sell_priority": sell_priority,
+                }
+            )
+
+        # Sort by sell priority (high first)
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        distribution_diagnostic.sort(key=lambda d: priority_order.get(d["sell_priority"], 3))
+
+        # ── 8. Time-to-Pivot estimation ──────────────────────────────
+        # Estimate days until the next phase change based on OU theta
+        # and current cycle position relative to phase boundaries.
+        time_to_pivot = self._estimate_time_to_pivot(
+            cycle_position,
+            btc_regime,
+            top_bottom_estimates.get("btc"),
+        )
+
         return {
             "market_regime": btc_regime,
             "market_signals": btc_signals,
@@ -1202,6 +1287,71 @@ class PredictionService:
             "btc_dominance": round(btc_dominance, 1) if btc_dominance else None,
             "display_thresholds": at.build_display_thresholds(btc_ctx),
             "top_bottom_estimates": top_bottom_estimates,
+            "distribution_diagnostic": distribution_diagnostic,
+            "time_to_pivot": time_to_pivot,
+        }
+
+    @staticmethod
+    def _estimate_time_to_pivot(
+        cycle_position: int,
+        btc_regime: Optional[Dict],
+        btc_estimate: Optional[Dict],
+    ) -> Dict:
+        """Estimate days until the next cycle phase transition.
+
+        Uses cycle_position distance to the nearest phase boundary and
+        OU theta from btc_estimate to gauge mean-reversion speed.
+
+        Phase boundaries: 0-15 (Creux), 15-40 (Accumulation),
+        40-65 (Expansion), 65-85 (Distribution), 85-100 (Euphorie).
+        """
+        phases = [
+            (0, 15, "Creux", "Accumulation"),
+            (15, 40, "Accumulation", "Expansion"),
+            (40, 65, "Expansion", "Distribution"),
+            (65, 85, "Distribution", "Euphorie"),
+            (85, 100, "Euphorie", "Creux"),
+        ]
+
+        current_phase = "Inconnu"
+        next_phase = "Inconnu"
+        distance_to_boundary = 50  # default
+
+        for lo, hi, name, nxt in phases:
+            if lo <= cycle_position < hi:
+                current_phase = name
+                next_phase = nxt
+                distance_to_boundary = hi - cycle_position
+                break
+        # Edge case: exactly 100
+        if cycle_position >= 100:
+            current_phase = "Euphorie"
+            next_phase = "Creux"
+            distance_to_boundary = 5
+
+        # Base estimate: 1 cycle position unit ≈ 1-3 days
+        # Use OU theta to modulate: higher theta = faster transitions
+        theta = 0.02  # default
+        if btc_estimate and btc_estimate.get("ou_parameters"):
+            theta = btc_estimate["ou_parameters"].get("theta", 0.02)
+
+        # Faster mean-reversion → quicker phase transitions
+        # theta 0.01 → ~2.5 days/unit, theta 0.05 → ~1.0 day/unit
+        days_per_unit = max(0.8, 2.5 - (theta - 0.01) * 37.5)
+        estimated_days = max(3, round(distance_to_boundary * days_per_unit))
+        estimated_days = min(estimated_days, 90)  # cap at 90 days
+
+        # Confidence based on regime clarity
+        confidence = 0.5
+        if btc_regime:
+            confidence = min(0.85, max(0.2, btc_regime.get("confidence", 0.5)))
+
+        return {
+            "current_phase": current_phase,
+            "next_phase": next_phase,
+            "estimated_days": estimated_days,
+            "confidence": round(confidence, 2),
+            "cycle_position": cycle_position,
         }
 
     def estimate_top_bottom(
@@ -1402,9 +1552,49 @@ class PredictionService:
         }
 
     @staticmethod
-    def _get_cycle_advice(regime: str, cycle_pos: int, fear_greed: Optional[int]) -> List[Dict]:
-        """Generate actionable advice based on market cycle position."""
+    def _get_cycle_advice(
+        regime: str,
+        cycle_pos: int,
+        fear_greed: Optional[int],
+        portfolio_value: float = 0.0,
+        max_risk_weight: float = 0.0,
+    ) -> List[Dict]:
+        """Generate actionable advice based on market cycle position.
+
+        Args:
+            regime: Market regime (bottom/bearish/bullish/top).
+            cycle_pos: 0-100 cycle position.
+            fear_greed: Fear & Greed index (0-100).
+            portfolio_value: User's live portfolio value in €.
+            max_risk_weight: Highest risk_weight (%) among held assets.
+        """
         advice = []
+
+        # ── Risk guard: warn if portfolio is already highly concentrated ──
+        RISK_WEIGHT_CAP = 60.0  # % — single asset > 60% of total risk = danger
+        if max_risk_weight > RISK_WEIGHT_CAP:
+            advice.append(
+                {
+                    "title": "Concentration de risque élevée",
+                    "description": (
+                        f"Un actif représente {max_risk_weight:.0f}% de votre risque total. "
+                        "Tout achat supplémentaire sur cet actif augmenterait dangereusement "
+                        "votre exposition. Privilégiez la diversification."
+                    ),
+                    "action": "DIVERSIFIER",
+                    "priority": "critical",
+                }
+            )
+
+        # ── DCA amount suggestion based on real portfolio value ──
+        def _dca_hint() -> str:
+            if portfolio_value <= 0:
+                return ""
+            # Suggest 2-5% of portfolio per DCA tranche
+            low = round(portfolio_value * 0.02, 2)
+            high = round(portfolio_value * 0.05, 2)
+            return f" Montant suggéré par tranche : {low:.0f}–{high:.0f} € (2-5% de votre portefeuille)."
+
         if regime == "bottom" or (fear_greed and fear_greed < 20):
             advice.append(
                 {
@@ -1412,7 +1602,7 @@ class PredictionService:
                     "description": (
                         "Les indicateurs suggèrent un creux potentiel. C'est historiquement "
                         "le meilleur moment pour accumuler via DCA (achat périodique). "
-                        "Ne tentez pas de timer le bottom exact — étalez vos achats."
+                        "Ne tentez pas de timer le bottom exact — étalez vos achats." + _dca_hint()
                     ),
                     "action": "DCA",
                     "priority": "high",
@@ -1458,7 +1648,7 @@ class PredictionService:
                     "title": "DCA progressif",
                     "description": (
                         "Si vous souhaitez accumuler, faites-le par petites tranches régulières "
-                        "(DCA hebdomadaire) plutôt qu'en une seule fois."
+                        "(DCA hebdomadaire) plutôt qu'en une seule fois." + _dca_hint()
                     ),
                     "action": "DCA",
                     "priority": "medium",
@@ -1530,6 +1720,474 @@ class PredictionService:
                 }
             )
         return advice
+
+    # ------------------------------------------------------------------
+    # Top Alpha detection
+    # ------------------------------------------------------------------
+
+    async def get_top_alpha_asset(
+        self,
+        db: AsyncSession,
+        user_id: str,
+    ) -> Dict:
+        """Detect the asset with the highest short-term alpha potential.
+
+        Scores each held asset (quantity > 0) on 3 axes:
+        1. RSI/Price divergence (bullish divergence = price down + RSI up).
+        2. BTC de-correlation (lower Spearman correlation = more alpha).
+        3. Regime momentum (bottom→bullish transition).
+
+        Returns the top-scoring asset with reasons and 7d price prediction.
+        """
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = result.scalars().all()
+        portfolio_ids = [p.id for p in portfolios]
+
+        if not portfolio_ids:
+            return {"found": False}
+
+        result = await db.execute(
+            select(Asset).where(
+                Asset.portfolio_id.in_(portfolio_ids),
+                Asset.quantity > 0,
+            )
+        )
+        raw_assets = result.scalars().all()
+
+        # Deduplicate by symbol
+        asset_map: Dict[str, object] = {}
+        qty_map: Dict[str, float] = {}
+        for a in raw_assets:
+            if PriceService.is_stablecoin(a.symbol):
+                continue
+            if a.symbol not in asset_map:
+                asset_map[a.symbol] = a
+                qty_map[a.symbol] = float(a.quantity)
+            else:
+                qty_map[a.symbol] += float(a.quantity)
+
+        if not asset_map:
+            return {"found": False}
+
+        # ── Fetch BTC prices for correlation baseline ──
+        btc_prices: List[float] = []
+        try:
+            cached = await get_cached_history("BTC", "crypto", 90)
+            if cached and cached.get("prices"):
+                btc_prices = cached["prices"]
+            else:
+                dates, prices = await self.data_fetcher.get_history("BTC", "crypto", days=90)
+                if dates and prices:
+                    btc_prices = prices
+                    await cache_history(
+                        "BTC", "crypto", 90, {"dates": [d.isoformat() for d in dates], "prices": prices}
+                    )
+        except Exception:
+            logger.warning("Failed to fetch BTC history for alpha scoring")
+
+        btc_returns = np.diff(np.log(np.array(btc_prices, dtype=float))) if len(btc_prices) > 10 else np.array([])
+
+        # ── Fetch Fear & Greed for regime detection ──
+        fear_greed: Optional[int] = None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get("https://api.alternative.me/fng/?limit=1")
+                if resp.status_code == 200:
+                    fng_data = resp.json()
+                    if fng_data.get("data"):
+                        fear_greed = int(fng_data["data"][0].get("value", 50))
+        except Exception:
+            pass
+
+        # ── Batch-fetch prices (same source as Dashboard for parity) ──
+        crypto_symbols = [s for s, a in asset_map.items() if a.asset_type == AssetType.CRYPTO]
+        stock_symbols = [s for s, a in asset_map.items() if a.asset_type in (AssetType.STOCK, AssetType.ETF)]
+        price_map: Dict[str, float] = {}
+
+        if crypto_symbols:
+            try:
+                batch = await self.price_service.get_multiple_crypto_prices(crypto_symbols, "eur")
+                for sym, data in batch.items():
+                    p = data.get("price", 0)
+                    price_map[sym.upper()] = float(p) if p else 0.0
+            except Exception as e:
+                logger.warning("Batch crypto price fetch failed: %s", e)
+
+        for sym in stock_symbols:
+            try:
+                data = await self.price_service.get_stock_price(sym)
+                if data and data.get("price"):
+                    price_map[sym.upper()] = float(data["price"])
+            except Exception:
+                pass
+
+        # ── Score each asset ──
+        scored_assets = []
+        total_value = Decimal("0")
+        value_map: Dict[str, float] = {}
+
+        for symbol, asset in list(asset_map.items())[:10]:
+            try:
+                price = price_map.get(symbol.upper(), 0.0)
+                if price <= 0:
+                    # Fallback to individual fetch
+                    price = await self._get_current_price(symbol, asset.asset_type)
+                if price <= 0:
+                    logger.warning("Price fetch failed for %s (batch + fallback), skipping", symbol)
+                    continue
+                qty_dec = Decimal(str(qty_map[symbol]))
+                price_dec = Decimal(str(price))
+                value_dec = qty_dec * price_dec
+                total_value += value_dec
+                value = float(value_dec)
+                value_map[symbol] = value
+
+                # Fetch 90d history
+                a_prices: List[float] = []
+                cached_hist = await get_cached_history(symbol, asset.asset_type.value, 90)
+                if cached_hist and cached_hist.get("prices"):
+                    a_prices = cached_hist["prices"]
+                else:
+                    try:
+                        a_dates, a_prices_raw = await self.data_fetcher.get_history(
+                            symbol, asset.asset_type.value, days=90
+                        )
+                        if a_dates and a_prices_raw:
+                            a_prices = a_prices_raw
+                            await cache_history(
+                                symbol,
+                                asset.asset_type.value,
+                                90,
+                                {"dates": [d.isoformat() for d in a_dates], "prices": a_prices},
+                            )
+                    except Exception:
+                        pass
+
+                if len(a_prices) < 20:
+                    continue
+
+                reasons = []
+                score = 0.0
+
+                # ── 1. RSI/Price divergence (0-35 points) ──
+                rsi_now = _rsi(a_prices, period=14)
+                rsi_prev = _rsi(a_prices[:-7], period=14) if len(a_prices) > 21 else None
+                price_t = a_prices[-1]
+                price_t7 = a_prices[-8] if len(a_prices) > 8 else price_t
+                price_change_7d = (price_t / price_t7 - 1) * 100 if price_t7 > 0 else 0
+
+                # Divergence log for audit / Telegram recap
+                divergence_log = {
+                    "price_t7": round(price_t7, 4),
+                    "price_t": round(price_t, 4),
+                    "rsi_t7": round(rsi_prev, 2) if rsi_prev is not None else None,
+                    "rsi_t": round(rsi_now, 2) if rsi_now is not None else None,
+                    "price_change_7d_pct": round(price_change_7d, 2),
+                    "is_bullish_divergence": False,
+                }
+
+                if rsi_now is not None and rsi_prev is not None:
+                    # Bullish divergence: price goes down but RSI goes up
+                    rsi_delta = rsi_now - rsi_prev
+                    if price_change_7d < -2 and rsi_delta > 3:
+                        divergence_log["is_bullish_divergence"] = True
+                        div_score = min(35, 15 + rsi_delta * 2)
+                        score += div_score
+                        reasons.append(
+                            {
+                                "label": "Divergence Haussière",
+                                "detail": f"Prix {price_change_7d:+.1f}% mais RSI {rsi_delta:+.1f} pts",
+                                "score": round(div_score),
+                            }
+                        )
+                        logger.info(
+                            "Divergence %s CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f " "ET RSI(T-7)=%.2f < RSI(T)=%.2f",
+                            symbol,
+                            price_t7,
+                            price_t,
+                            rsi_prev,
+                            rsi_now,
+                        )
+                    elif price_change_7d < -2 and rsi_delta <= 3:
+                        # Price dropped but RSI did NOT diverge — degrade score
+                        penalty = min(10, abs(rsi_delta) * 1.5)
+                        score -= penalty
+                        divergence_log["degraded"] = True
+                        divergence_log["penalty"] = round(penalty, 1)
+                        reasons.append(
+                            {
+                                "label": "Divergence Non Confirmée",
+                                "detail": f"Prix {price_change_7d:+.1f}% et RSI {rsi_delta:+.1f} pts (pas de divergence)",
+                                "score": round(-penalty),
+                            }
+                        )
+                        logger.info(
+                            "Divergence %s NON CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f "
+                            "mais RSI(T-7)=%.2f → RSI(T)=%.2f (delta %.1f ≤ 3)",
+                            symbol,
+                            price_t7,
+                            price_t,
+                            rsi_prev,
+                            rsi_now,
+                            rsi_delta,
+                        )
+                    elif rsi_now < 35:
+                        # Oversold but no divergence yet — mild signal
+                        ov_score = min(20, (35 - rsi_now) * 1.2)
+                        score += ov_score
+                        reasons.append(
+                            {
+                                "label": "Survente RSI",
+                                "detail": f"RSI à {rsi_now:.0f} (seuil 35)",
+                                "score": round(ov_score),
+                            }
+                        )
+
+                # ── 2. BTC de-correlation (0-30 points) ──
+                if len(btc_returns) > 10 and len(a_prices) > 10:
+                    a_returns = np.diff(np.log(np.array(a_prices[-len(btc_returns) - 1 :], dtype=float)))
+                    min_len = min(len(btc_returns), len(a_returns))
+                    if min_len >= 10:
+                        from scipy.stats import spearmanr
+
+                        corr, _ = spearmanr(btc_returns[-min_len:], a_returns[-min_len:])
+                        if not np.isnan(corr):
+                            # Lower correlation = more alpha potential
+                            # corr < 0.3 is considered "decoupled"
+                            decorr_score = max(0, (0.6 - corr) / 0.6 * 30)
+                            score += decorr_score
+                            if decorr_score > 10:
+                                reasons.append(
+                                    {
+                                        "label": "Décorrélé du BTC",
+                                        "detail": f"Corrélation {corr:.2f} (faible = indépendant)",
+                                        "score": round(decorr_score),
+                                    }
+                                )
+
+                # ── 3. Regime momentum (0-35 points) ──
+                regime_result = self.regime_detector.detect(
+                    a_prices,
+                    symbol,
+                    fear_greed,
+                    asset_type=asset.asset_type.value,
+                )
+                probs = regime_result.probabilities
+                # Transition from bottom/bearish → bullish = strong alpha signal
+                bottom_prob = probs.get("bottom", 0)
+                bullish_prob = probs.get("bullish", 0)
+                transition_signal = bottom_prob * 0.6 + bullish_prob * 0.4
+
+                if transition_signal > 0.3:
+                    reg_score = min(35, transition_signal * 70)
+                    score += reg_score
+                    dominant = regime_result.dominant_regime
+                    reasons.append(
+                        {
+                            "label": "Momentum de Régime",
+                            "detail": f"Régime: {dominant} (bottom {bottom_prob:.0%}, bull {bullish_prob:.0%})",
+                            "score": round(reg_score),
+                        }
+                    )
+
+                # ── 7d price prediction (Decimal precision) ──
+                predicted_7d_pct = Decimal("0")
+                prediction_source = "none"
+                try:
+                    prediction = await self.get_price_prediction(
+                        symbol,
+                        asset.asset_type,
+                        days_ahead=7,
+                    )
+                    if prediction and prediction.predictions:
+                        last_pred = prediction.predictions[-1]
+                        pred_price = last_pred.get("price", 0)
+                        if pred_price > 0 and price > 0:
+                            predicted_7d_pct = (Decimal(str(pred_price)) / price_dec - 1) * 100
+                            prediction_source = "ensemble"
+                except Exception as e:
+                    logger.debug("7d prediction failed for %s: %s", symbol, e)
+
+                # EMA-20 slope fallback: extrapolate 7 days if model unavailable
+                if predicted_7d_pct == 0 and len(a_prices) >= 20:
+                    try:
+                        arr = np.array(a_prices[-20:], dtype=float)
+                        ema = arr.copy()
+                        k = 2 / 21  # EMA-20 smoothing factor
+                        for idx in range(1, len(ema)):
+                            ema[idx] = arr[idx] * k + ema[idx - 1] * (1 - k)
+                        # Daily slope from last 5 EMA values
+                        daily_slope = (ema[-1] - ema[-5]) / max(ema[-5], 1e-10) / 5
+                        ema_7d_pct = daily_slope * 7 * 100
+                        if abs(ema_7d_pct) > 0.01:  # only if meaningful
+                            predicted_7d_pct = Decimal(str(round(ema_7d_pct, 4)))
+                            prediction_source = "ema20_slope"
+                    except Exception:
+                        pass
+
+                scored_assets.append(
+                    {
+                        "symbol": symbol,
+                        "name": asset.name,
+                        "asset_type": asset.asset_type.value,
+                        "current_price": float(round(price_dec, 2)),
+                        "score": round(score, 1),
+                        "predicted_7d_pct": float(round(predicted_7d_pct, 2)),
+                        "prediction_source": prediction_source,
+                        "reasons": sorted(reasons, key=lambda r: -r["score"]),
+                        "regime": regime_result.dominant_regime,
+                        "regime_confidence": round(regime_result.confidence, 2),
+                        "value": float(round(value_dec, 2)),
+                        "divergence_log": divergence_log,
+                    }
+                )
+            except Exception as e:
+                logger.warning("Alpha scoring failed for %s: %s", symbol, e)
+
+        if not scored_assets:
+            return {"found": False}
+
+        total_value_f = float(total_value)
+
+        # ── Concentration risk guard ──
+        for sa in scored_assets:
+            if total_value_f > 0:
+                sa["weight_pct"] = round(sa["value"] / total_value_f * 100, 1)
+            else:
+                sa["weight_pct"] = 0.0
+
+        # Sort by score desc
+        scored_assets.sort(key=lambda x: -x["score"])
+        top = scored_assets[0]
+
+        # Flag if top alpha asset is already over-concentrated (> 50% weight)
+        concentration_risk = top["weight_pct"] > 50
+
+        return {
+            "found": True,
+            "top_alpha": top,
+            "concentration_risk": concentration_risk,
+            "all_scores": scored_assets[:5],  # Top 5 for frontend display
+            "total_portfolio_value": float(round(total_value, 2)),
+        }
+
+    # ------------------------------------------------------------------
+    # Strategy Map — decision matrix Alpha × Cycle
+    # ------------------------------------------------------------------
+
+    STRATEGY_MATRIX = {
+        # (alpha_level, cycle_phase) → (action, description, impact_pct)
+        # alpha_level: high (>= 60), medium (30-59), low (< 30)
+        # cycle_phase: bottom/bearish/bullish/top
+        ("high", "bottom"): ("ACHAT FORT", "Alpha élevé + creux de marché : signal d'achat optimal", 5.0),
+        ("high", "bearish"): ("DCA", "Alpha élevé en bear market : accumuler progressivement", 3.0),
+        ("high", "bullish"): ("MAINTENIR", "Alpha élevé en bull : laisser courir", 0.0),
+        ("high", "top"): ("PRENDRE PROFITS", "Alpha élevé mais sommet : sécuriser 20-30%", -2.0),
+        ("medium", "bottom"): ("DCA", "Signal moyen + creux : DCA conservateur", 3.0),
+        ("medium", "bearish"): ("ATTENDRE", "Signal moyen en bear : patience", 0.0),
+        ("medium", "bullish"): ("MAINTENIR", "Signal moyen en bull : conserver les positions", 0.0),
+        ("medium", "top"): ("ALLÉGER", "Signal moyen au sommet : réduire l'exposition", -3.0),
+        ("low", "bottom"): ("OBSERVER", "Faible alpha + creux : surveiller les signaux", 0.0),
+        ("low", "bearish"): ("ÉVITER", "Faible alpha en bear : ne pas renforcer", 0.0),
+        ("low", "bullish"): ("CONSERVER", "Faible alpha en bull : ne pas vendre non plus", 0.0),
+        ("low", "top"): ("VENDRE", "Faible alpha + sommet : signal de vente prioritaire", -5.0),
+    }
+
+    async def get_strategy_map(
+        self,
+        db: AsyncSession,
+        user_id: str,
+    ) -> Dict:
+        """Build a strategy decision table crossing Alpha scores with Cycle phase.
+
+        Calls get_top_alpha_asset() and get_market_cycle() then merges
+        per-asset data using a decision matrix.
+        """
+        # Fetch both datasets concurrently-ish (they share DB session)
+        alpha_data = await self.get_top_alpha_asset(db, user_id)
+        cycle_data = await self.get_market_cycle(db, user_id)
+
+        total_value = alpha_data.get("total_portfolio_value", 0.0)
+        alpha_scores = alpha_data.get("all_scores", [])
+        per_asset_cycle = cycle_data.get("per_asset", [])
+        market_regime = cycle_data.get("market_regime", {})
+        fear_greed = cycle_data.get("fear_greed")
+
+        # Build regime lookup by symbol
+        regime_map: Dict[str, Dict] = {}
+        for a in per_asset_cycle:
+            regime_map[a["symbol"]] = a
+
+        # Merge: for each scored asset, cross with its cycle regime
+        strategy_rows: List[Dict] = []
+        summary_buys = 0
+        summary_sells = 0
+        summary_holds = 0
+
+        for scored in alpha_scores:
+            sym = scored["symbol"]
+            score = scored["score"]
+            value = scored.get("value", 0)
+            weight_pct = scored.get("weight_pct", 0)
+
+            # Alpha level
+            if score >= 60:
+                alpha_level = "high"
+            elif score >= 30:
+                alpha_level = "medium"
+            else:
+                alpha_level = "low"
+
+            # Cycle phase — from per-asset regime or fallback to market
+            cycle_info = regime_map.get(sym, {})
+            regime = cycle_info.get(
+                "dominant_regime", market_regime.get("dominant_regime", "bullish") if market_regime else "bullish"
+            )
+
+            # Decision matrix lookup
+            key = (alpha_level, regime)
+            action, description, impact_pct = self.STRATEGY_MATRIX.get(key, ("OBSERVER", "Données insuffisantes", 0.0))
+
+            # Compute portfolio impact
+            impact_eur = round(value * impact_pct / 100, 2) if value > 0 else 0.0
+
+            # Count summary
+            if "ACHAT" in action or action == "DCA":
+                summary_buys += 1
+            elif "VENDRE" in action or "PROFITS" in action or "ALLÉGER" in action:
+                summary_sells += 1
+            else:
+                summary_holds += 1
+
+            strategy_rows.append(
+                {
+                    "symbol": sym,
+                    "name": scored.get("name", sym),
+                    "alpha_score": round(score, 1),
+                    "alpha_level": alpha_level,
+                    "regime": regime,
+                    "regime_confidence": round(cycle_info.get("confidence", 0.5), 2),
+                    "action": action,
+                    "description": description,
+                    "value": round(value, 2),
+                    "weight_pct": round(weight_pct, 1),
+                    "impact_pct": impact_pct,
+                    "impact_eur": impact_eur,
+                    "predicted_7d_pct": scored.get("predicted_7d_pct", 0),
+                }
+            )
+
+        return {
+            "rows": strategy_rows,
+            "total_portfolio_value": round(total_value, 2),
+            "market_regime": market_regime.get("dominant_regime", "unknown") if market_regime else "unknown",
+            "fear_greed": fear_greed,
+            "summary": {
+                "buys": summary_buys,
+                "sells": summary_sells,
+                "holds": summary_holds,
+            },
+        }
 
     async def get_what_if(
         self,

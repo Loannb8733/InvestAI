@@ -1067,6 +1067,10 @@ class AnalyticsService:
         horizon_days: int = 90,
         num_simulations: int = 5000,
         portfolio_id: Optional[str] = None,
+        annual_withdrawal_rate: float = 0.0,
+        ter_percentage: float = 0.0,
+        monthly_withdrawal: float = 0.0,
+        contribution: Optional[Dict[str, float]] = None,
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
@@ -1114,6 +1118,15 @@ class AnalyticsService:
                 horizon_days=horizon_days,
             )
 
+        # Apply contribution: add capital to a specific asset before normalizing
+        if contribution:
+            sym_list = list(seen.keys())
+            for sym_c, amount_eur in contribution.items():
+                if sym_c in sym_list:
+                    idx = sym_list.index(sym_c)
+                    all_weights[idx] += amount_eur
+                    total_value += amount_eur
+
         # Build weight vector and aligned return matrix
         w = np.array(all_weights)
         w = w / w.sum()
@@ -1152,6 +1165,10 @@ class AnalyticsService:
             horizon_days,
             n_assets,
             user_id,
+            annual_withdrawal_rate,
+            ter_percentage,
+            monthly_withdrawal,
+            total_value,
         )
 
     @staticmethod
@@ -1163,8 +1180,12 @@ class AnalyticsService:
         horizon_days: int,
         n_assets: int,
         user_id: str,
+        annual_withdrawal_rate: float = 0.0,
+        ter_percentage: float = 0.0,
+        monthly_withdrawal: float = 0.0,
+        initial_portfolio_value: float = 0.0,
     ) -> "MonteCarloResult":
-        """CPU-bound Monte Carlo with volatility shrinkage and ruin probability.
+        """CPU-bound Monte Carlo with volatility shrinkage, withdrawals and fees.
 
         Volatility shrinkage: for horizons > 90 days, the Cholesky factor (L)
         is blended towards a long-term average volatility (~20% annualized)
@@ -1172,8 +1193,12 @@ class AnalyticsService:
         extreme outcomes when short-term crypto vol (80%+) is extrapolated
         over multi-year horizons.
 
-        Ruin probability: tracks the fraction of simulated paths where the
-        cumulative portfolio value drops to zero (total return <= -100%).
+        Withdrawal modes (mutually exclusive, ``monthly_withdrawal`` takes priority):
+        - ``monthly_withdrawal`` (€): absolute daily deduction = amount / 30.
+          Formula: V(t) = V(t-1) * exp(r_t) * (1 - ter/365) - monthly_withdrawal/30
+        - ``annual_withdrawal_rate`` (%): proportional daily deduction.
+
+        A path is marked as "ruined" when portfolio value drops to ≤ 0.
         """
         # Cap allocation: 200 MB / 8 bytes per float64
         max_elements = 200_000_000 // 8
@@ -1199,17 +1224,59 @@ class AnalyticsService:
         correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)
         port_daily_returns = correlated_returns @ w  # (capped_sims, horizon_days)
 
-        # --- Ruin probability: track cumulative path ---
-        cumulative_path = np.cumsum(port_daily_returns, axis=1)  # (sims, days)
-        # Portfolio value at each step = exp(cum_log_return)
-        # Ruin = value drops to 0, i.e. cum_log_return → -inf, practically <= -100%
-        portfolio_values = np.exp(cumulative_path)  # relative to initial (1.0)
-        ruin_mask = np.any(portfolio_values <= 0.01, axis=1)  # touched <= 1% of initial
-        prob_ruin = float(np.mean(ruin_mask) * 100)
+        # --- Daily deductions from withdrawals + TER ---
+        # TER: multiplicative daily factor  (1 - ter/365) applied each day.
+        daily_ter_factor = 1.0
+        if ter_percentage > 0:
+            daily_ter_factor = 1.0 - ter_percentage / 100.0 / 365.0
 
-        # Total returns from final cumulative value
-        cumulative = cumulative_path[:, -1]
-        total_returns_pct = (np.exp(cumulative) - 1) * 100
+        # Withdrawal: absolute daily amount (monthly_withdrawal / 30) normalised
+        # to portfolio-relative units (we simulate starting at V=1.0).
+        # Fallback: proportional annual_withdrawal_rate for backward compat.
+        daily_abs_withdrawal = 0.0  # in normalised units (fraction of initial)
+        daily_prop_withdrawal = 1.0  # multiplicative factor
+        use_absolute = monthly_withdrawal > 0 and initial_portfolio_value > 0
+
+        if use_absolute:
+            daily_abs_withdrawal = (monthly_withdrawal / 30.0) / initial_portfolio_value
+        elif annual_withdrawal_rate > 0:
+            daily_prop_withdrawal = (1 - annual_withdrawal_rate / 100) ** (1 / 252)
+
+        has_deductions = daily_ter_factor < 1.0 or daily_abs_withdrawal > 0 or daily_prop_withdrawal < 1.0
+
+        if has_deductions:
+            # Step-by-step simulation: V(t) starts at 1.0 (normalised)
+            portfolio_values = np.ones((capped_sims, horizon_days + 1))
+            for day in range(horizon_days):
+                # V(t) = V(t-1) * exp(r_t) * ter_factor - abs_withdrawal
+                # (or  * prop_factor  when using proportional mode)
+                v_next = (
+                    portfolio_values[:, day]
+                    * np.exp(port_daily_returns[:, day])
+                    * daily_ter_factor
+                    * daily_prop_withdrawal
+                )
+                if daily_abs_withdrawal > 0:
+                    v_next -= daily_abs_withdrawal
+                # Floor at zero: once ruined, stay ruined
+                portfolio_values[:, day + 1] = np.maximum(v_next, 0.0)
+
+            # Ruin = portfolio touched 0 (or near-zero)
+            ruin_mask = np.any(portfolio_values[:, 1:] <= 0.001, axis=1)
+            prob_ruin = float(np.mean(ruin_mask) * 100)
+
+            # Total returns from final portfolio value
+            final_values = portfolio_values[:, -1]
+            total_returns_pct = (final_values - 1.0) * 100
+        else:
+            # Original path without deductions (faster vectorized)
+            cumulative_path = np.cumsum(port_daily_returns, axis=1)
+            portfolio_values = np.exp(cumulative_path)  # relative to initial (1.0)
+            ruin_mask = np.any(portfolio_values <= 0.01, axis=1)
+            prob_ruin = float(np.mean(ruin_mask) * 100)
+
+            cumulative = cumulative_path[:, -1]
+            total_returns_pct = (np.exp(cumulative) - 1) * 100
 
         return MonteCarloResult(
             percentiles={
