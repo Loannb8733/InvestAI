@@ -28,6 +28,7 @@ import {
   Loader2,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
   Minus,
   Zap,
   ShieldAlert,
@@ -46,6 +47,8 @@ import {
   History,
   CheckCircle,
   XCircle,
+  Clock,
+  Flame,
 } from 'lucide-react'
 import { type DisplayThresholds, DEFAULT_DISPLAY_THRESHOLDS } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -196,6 +199,23 @@ interface MarketCycleData {
   top_bottom_estimates?: {
     btc: TopBottomEstimate | null
     per_asset: TopBottomEstimate[]
+  }
+  distribution_diagnostic?: Array<{
+    symbol: string
+    name: string
+    dominant_regime: string
+    top_bearish_prob: number
+    rsi: number | null
+    weight_pct: number
+    signals: string[]
+    sell_priority: string
+  }>
+  time_to_pivot?: {
+    current_phase: string
+    next_phase: string
+    estimated_days: number
+    confidence: number
+    cycle_position: number
   }
 }
 
@@ -1806,7 +1826,123 @@ export default function PredictionsPage() {
                 </Card>
               </div>
 
-              {/* Row 2: Top / Bottom Estimates */}
+              {/* Row 2: Time-to-Pivot + Distribution Diagnostic */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Time-to-Pivot */}
+                {marketCycle.time_to_pivot && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Time-to-Pivot
+                      </CardTitle>
+                      <CardDescription>Estimation du prochain changement de phase</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className={
+                              marketCycle.time_to_pivot.current_phase === 'Euphorie' ? 'text-red-500 border-red-500/30' :
+                              marketCycle.time_to_pivot.current_phase === 'Distribution' ? 'text-amber-500 border-amber-500/30' :
+                              marketCycle.time_to_pivot.current_phase === 'Expansion' ? 'text-green-500 border-green-500/30' :
+                              marketCycle.time_to_pivot.current_phase === 'Accumulation' ? 'text-cyan-500 border-cyan-500/30' :
+                              'text-blue-500 border-blue-500/30'
+                            }>
+                              {marketCycle.time_to_pivot.current_phase}
+                            </Badge>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                            <Badge variant="outline" className={
+                              marketCycle.time_to_pivot.next_phase === 'Euphorie' ? 'text-red-500 border-red-500/30' :
+                              marketCycle.time_to_pivot.next_phase === 'Distribution' ? 'text-amber-500 border-amber-500/30' :
+                              marketCycle.time_to_pivot.next_phase === 'Expansion' ? 'text-green-500 border-green-500/30' :
+                              marketCycle.time_to_pivot.next_phase === 'Accumulation' ? 'text-cyan-500 border-cyan-500/30' :
+                              'text-blue-500 border-blue-500/30'
+                            }>
+                              {marketCycle.time_to_pivot.next_phase}
+                            </Badge>
+                          </div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-bold tabular-nums">~{marketCycle.time_to_pivot.estimated_days}</span>
+                            <span className="text-sm text-muted-foreground">jours</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Phase {marketCycle.time_to_pivot.next_phase} prévue dans ~{marketCycle.time_to_pivot.estimated_days} jours
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center" style={{
+                            borderColor: marketCycle.time_to_pivot.confidence >= 0.6 ? '#22c55e' :
+                              marketCycle.time_to_pivot.confidence >= 0.35 ? '#eab308' : '#ef4444',
+                          }}>
+                            <span className="text-xs font-bold" style={{
+                              color: marketCycle.time_to_pivot.confidence >= 0.6 ? '#22c55e' :
+                                marketCycle.time_to_pivot.confidence >= 0.35 ? '#eab308' : '#ef4444',
+                            }}>
+                              {(marketCycle.time_to_pivot.confidence * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">Confiance</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Distribution Diagnostic */}
+                {marketCycle.distribution_diagnostic && marketCycle.distribution_diagnostic.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Flame className="h-4 w-4 text-amber-500" />
+                        Diagnostic Distribution
+                      </CardTitle>
+                      <CardDescription>Actifs en zone de distribution — signaux de vente potentiels</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {marketCycle.distribution_diagnostic.map((diag) => (
+                          <div
+                            key={diag.symbol}
+                            className={`p-3 rounded-lg border ${
+                              diag.sell_priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                              diag.sell_priority === 'medium' ? 'border-amber-500/30 bg-amber-500/5' :
+                              'border-muted bg-muted/20'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{diag.symbol}</span>
+                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                                  diag.sell_priority === 'high' ? 'text-red-500 border-red-500/30' :
+                                  diag.sell_priority === 'medium' ? 'text-amber-500 border-amber-500/30' :
+                                  'text-gray-500'
+                                }`}>
+                                  {diag.sell_priority === 'high' ? 'Vente prioritaire' :
+                                   diag.sell_priority === 'medium' ? 'Surveillance' : 'Faible'}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {diag.rsi !== null && (
+                                  <span>RSI: <span className={diag.rsi > 70 ? 'text-red-500 font-medium' : ''}>{diag.rsi}</span></span>
+                                )}
+                                <span>Poids: {diag.weight_pct}%</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {diag.signals.map((sig, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px]">{sig}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Row 3: Top / Bottom Estimates */}
               {marketCycle.top_bottom_estimates && (
                 <TopBottomCard estimates={marketCycle.top_bottom_estimates} />
               )}

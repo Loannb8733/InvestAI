@@ -352,6 +352,7 @@ class PriceService:
 
             current_price = meta.get("regularMarketPrice", 0)
             previous_close = meta.get("previousClose", current_price)
+            quote_currency = meta.get("currency", "USD").upper()
 
             change = current_price - previous_close
             change_percent = (change / previous_close * 100) if previous_close else 0
@@ -362,6 +363,7 @@ class PriceService:
                 "change_percent_24h": change_percent,
                 "volume_24h": meta.get("regularMarketVolume", 0),
                 "market_cap": 0,
+                "quote_currency": quote_currency,
             }
             self._cache_price("stock", symbol, result, self.CACHE_TTL_STOCK)
             return result

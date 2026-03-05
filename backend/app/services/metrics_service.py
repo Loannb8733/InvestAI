@@ -283,7 +283,18 @@ class MetricsService:
                     continue
                 symbol, stock_data = res
                 if stock_data:
-                    prices[symbol.upper()] = stock_data["price"]
+                    stock_price = stock_data["price"]
+                    quote_ccy = stock_data.get("quote_currency", "USD")
+                    target = currency.upper()
+                    # Convert stock price from quote currency to user's target currency
+                    if quote_ccy != target:
+                        try:
+                            rate = await price_service.get_forex_rate(quote_ccy, target)
+                            if rate:
+                                stock_price = stock_price * rate
+                        except Exception:
+                            logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
+                    prices[symbol.upper()] = stock_price
                     price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
 
         # Calculate metrics for each investment asset

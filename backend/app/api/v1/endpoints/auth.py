@@ -84,7 +84,12 @@ class ResetPasswordRequest(BaseModel):
 router = APIRouter()
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+def _set_auth_cookies(
+    response: Response,
+    access_token: str,
+    refresh_token: str,
+    refresh_max_age_days: int | None = None,
+) -> None:
     """Set httpOnly auth cookies on the response."""
     from app.core.config import settings
 
@@ -101,10 +106,11 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         path="/api",
         **common,
     )
+    refresh_days = refresh_max_age_days or settings.REFRESH_TOKEN_EXPIRE_DAYS
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        max_age=refresh_days * 86400,
         path="/api/v1/auth",
         **common,
     )
@@ -381,10 +387,14 @@ async def login(
     # Generate tokens with fingerprint binding
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
     access_token = create_access_token(subject=str(user.id), fingerprint=fp)
-    refresh_tok = create_refresh_token(subject=str(user.id), fingerprint=fp)
+
+    # "Remember me" → 30-day refresh token, otherwise default (7 days)
+    remember_days = 30 if login_data.remember_me else None
+    refresh_delta = timedelta(days=remember_days) if remember_days else None
+    refresh_tok = create_refresh_token(subject=str(user.id), fingerprint=fp, expires_delta=refresh_delta)
 
     # Set httpOnly cookies
-    _set_auth_cookies(response, access_token, refresh_tok)
+    _set_auth_cookies(response, access_token, refresh_tok, refresh_max_age_days=remember_days)
 
     return Token(
         access_token=access_token,

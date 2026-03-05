@@ -1,9 +1,10 @@
 """Analytics endpoints for portfolio analysis."""
 
+import logging
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,8 @@ from app.core.database import get_db
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.services.analytics_service import analytics_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -447,17 +450,42 @@ async def get_monte_carlo(
     horizon: int = Query(90, ge=7, le=365),
     simulations: int = Query(5000, ge=1000, le=20000),
     portfolio_id: Optional[str] = Query(None),
+    annual_withdrawal_rate: float = Query(
+        0.0, ge=0, le=100, description="Annual withdrawal rate (%) — proportional mode"
+    ),
+    ter_percentage: float = Query(0.0, ge=0, le=5, description="Annual TER/expense ratio (%)"),
+    monthly_withdrawal: float = Query(
+        0.0, ge=0, le=1_000_000, description="Fixed monthly withdrawal (€) — absolute mode, overrides rate"
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    """Monte Carlo simulation of future portfolio returns."""
+    """Monte Carlo simulation of future portfolio returns with optional withdrawals and fees."""
     result = await analytics_service.monte_carlo(
         db,
         str(current_user.id),
         horizon_days=horizon,
         num_simulations=simulations,
         portfolio_id=portfolio_id,
+        annual_withdrawal_rate=annual_withdrawal_rate,
+        ter_percentage=ter_percentage,
+        monthly_withdrawal=monthly_withdrawal,
     )
+
+    # Alert user via Telegram if ruin probability exceeds 20%
+    if result.prob_ruin > 20.0 and current_user.telegram_enabled and current_user.telegram_chat_id:
+        background_tasks.add_task(
+            _send_ruin_alert,
+            chat_id=current_user.telegram_chat_id,
+            user_id=str(current_user.id),
+            prob_ruin=result.prob_ruin,
+            horizon_days=horizon,
+            withdrawal_rate=annual_withdrawal_rate,
+            ter=ter_percentage,
+            monthly_wd=monthly_withdrawal,
+        )
+
     return MonteCarloResponse(
         percentiles=result.percentiles,
         expected_return=result.expected_return,
@@ -467,6 +495,47 @@ async def get_monte_carlo(
         simulations=result.simulations,
         horizon_days=result.horizon_days,
     )
+
+
+async def _send_ruin_alert(
+    chat_id: str,
+    user_id: str,
+    prob_ruin: float,
+    horizon_days: int,
+    withdrawal_rate: float,
+    ter: float,
+    monthly_wd: float = 0.0,
+) -> None:
+    """Send Telegram alert when ruin probability is dangerously high."""
+    try:
+        from app.services.telegram_service import telegram_service
+
+        params_parts = []
+        if monthly_wd > 0:
+            params_parts.append(f"retrait {monthly_wd:.0f}€/mois")
+        elif withdrawal_rate > 0:
+            params_parts.append(f"retrait {withdrawal_rate:.1f}%/an")
+        if ter > 0:
+            params_parts.append(f"TER {ter:.2f}%")
+        params_str = " + ".join(params_parts) if params_parts else "sans retraits"
+
+        message = (
+            f"📉 <b>Alerte Probabilité de Ruine</b>\n\n"
+            f"Votre simulation Monte Carlo ({horizon_days}j, {params_str}) "
+            f"indique une probabilité de ruine de <b>{prob_ruin:.1f}%</b>.\n\n"
+            f"💡 Envisagez de réduire votre taux de retrait ou de diversifier votre portefeuille."
+        )
+
+        await telegram_service.send_smart_alert(
+            message=message,
+            chat_id=chat_id,
+            user_id=user_id,
+            priority="critical",
+            symbol="PORTFOLIO",
+            alert_type="RUIN_PROBABILITY",
+        )
+    except Exception as exc:
+        logger.debug("Ruin alert Telegram failed: %s", exc)
 
 
 @router.get("/xirr", response_model=XIRRResponse)

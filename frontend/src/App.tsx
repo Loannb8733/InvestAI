@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -43,6 +43,16 @@ function PageLoader() {
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isHydrating = useAuthStore((state) => state.isHydrating)
+
+  if (isHydrating) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />
 }
 
@@ -54,6 +64,12 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const hydrateSession = useAuthStore((state) => state.hydrateSession)
+
+  useEffect(() => {
+    hydrateSession()
+  }, [hydrateSession])
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="investai-theme">
       <ErrorBoundary>

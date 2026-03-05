@@ -106,8 +106,8 @@ export const authApi = {
     return response.data
   },
 
-  login: async (email: string, password: string, mfaCode?: string) => {
-    const response = await api.post('/auth/login', { email, password, mfa_code: mfaCode })
+  login: async (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => {
+    const response = await api.post('/auth/login', { email, password, mfa_code: mfaCode, remember_me: rememberMe ?? false })
     return response.data
   },
 
@@ -428,9 +428,21 @@ export const analyticsApi = {
     return response.data
   },
 
-  getMonteCarlo: async (horizon: number = 90, portfolioId?: string) => {
+  getMonteCarlo: async (
+    horizon: number = 90,
+    portfolioId?: string,
+    annualWithdrawalRate?: number,
+    terPercentage?: number,
+    monthlyWithdrawal?: number,
+  ) => {
     const response = await api.get('/analytics/monte-carlo', {
-      params: { horizon, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
+      params: {
+        horizon,
+        ...(portfolioId ? { portfolio_id: portfolioId } : {}),
+        ...(annualWithdrawalRate ? { annual_withdrawal_rate: annualWithdrawalRate } : {}),
+        ...(terPercentage ? { ter_percentage: terPercentage } : {}),
+        ...(monthlyWithdrawal ? { monthly_withdrawal: monthlyWithdrawal } : {}),
+      },
       timeout: ANALYTICS_TIMEOUT,
     })
     return response.data
@@ -582,6 +594,11 @@ export const predictionsApi = {
     return response.data
   },
 
+  getTopAlpha: async () => {
+    const response = await api.get('/predictions/top-alpha', { timeout: ANALYTICS_TIMEOUT })
+    return response.data
+  },
+
   getMarketEvents: async () => {
     const response = await api.get('/predictions/events')
     return response.data
@@ -589,6 +606,11 @@ export const predictionsApi = {
 
   getMarketCycle: async () => {
     const response = await api.get('/predictions/market-cycle')
+    return response.data
+  },
+
+  getStrategyMap: async () => {
+    const response = await api.get('/predictions/strategy-map', { timeout: ANALYTICS_TIMEOUT })
     return response.data
   },
 
@@ -875,6 +897,7 @@ export const simulationsApi = {
     monthly_contribution: number
     monthly_expenses: number
     expected_annual_return?: number
+    expense_ratio?: number
     inflation_rate?: number
     withdrawal_rate?: number
     target_years?: number
@@ -886,6 +909,7 @@ export const simulationsApi = {
   projectPortfolio: async (data: {
     years?: number
     expected_return?: number
+    expense_ratio?: number
     monthly_contribution?: number
     inflation_adjustment?: boolean
     inflation_rate?: number

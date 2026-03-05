@@ -37,6 +37,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     mfa_code: Optional[str] = Field(None, min_length=6, max_length=8)
+    remember_me: bool = False
 
 
 class Token(BaseModel):

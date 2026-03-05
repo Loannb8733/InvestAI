@@ -20,11 +20,13 @@ interface AuthState {
   refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  isHydrating: boolean
   error: string | null
-  login: (email: string, password: string, mfaCode?: string) => Promise<void>
+  login: (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => Promise<void>
   logout: () => void
   refreshAccessToken: () => Promise<void>
   fetchCurrentUser: () => Promise<void>
+  hydrateSession: () => Promise<void>
   setTokens: (accessToken: string, refreshToken: string) => void
   fetchUser: () => Promise<void>
   clearError: () => void
@@ -38,12 +40,13 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
+      isHydrating: false,
       error: null,
 
-      login: async (email: string, password: string, mfaCode?: string) => {
+      login: async (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => {
         set({ isLoading: true, error: null })
         try {
-          const response = await authApi.login(email, password, mfaCode)
+          const response = await authApi.login(email, password, mfaCode, rememberMe)
           set({
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
@@ -102,6 +105,27 @@ export const useAuthStore = create<AuthState>()(
           })
         } catch {
           get().logout()
+        }
+      },
+
+      hydrateSession: async () => {
+        const { isAuthenticated, accessToken } = get()
+        // Only hydrate if store says authenticated but token is missing (page refresh)
+        if (!isAuthenticated) return
+        if (accessToken) return // Already have a token, no need to hydrate
+
+        set({ isHydrating: true })
+        try {
+          // Try to refresh using the httpOnly cookie.
+          // refreshAccessToken() calls logout() internally on failure,
+          // so we just check the result.
+          await get().refreshAccessToken()
+          // If refresh succeeded (still authenticated), fetch fresh user data
+          if (get().isAuthenticated && get().accessToken) {
+            await get().fetchCurrentUser()
+          }
+        } finally {
+          set({ isHydrating: false })
         }
       },
 

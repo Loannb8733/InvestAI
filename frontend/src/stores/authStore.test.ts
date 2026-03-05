@@ -7,6 +7,7 @@ vi.mock('@/services/api', () => ({
     login: vi.fn(),
     refresh: vi.fn(),
     getCurrentUser: vi.fn(),
+    logout: vi.fn(),
   },
 }))
 
@@ -145,12 +146,13 @@ describe('authStore', () => {
       expect(state.refreshToken).toBe('new-refresh')
     })
 
-    it('logs out when no refresh token', async () => {
+    it('logs out when no refresh token and refresh fails', async () => {
       useAuthStore.setState({
         refreshToken: null,
         isAuthenticated: true,
         accessToken: 'some-token',
       })
+      mockedAuthApi.refresh.mockRejectedValue(new Error('no token'))
 
       await useAuthStore.getState().refreshAccessToken()
 
