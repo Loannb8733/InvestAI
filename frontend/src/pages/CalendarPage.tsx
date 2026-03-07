@@ -40,6 +40,7 @@ import {
   AlertCircle,
   Bell,
   Globe,
+  Landmark,
 } from 'lucide-react'
 
 interface CalendarEvent {
@@ -55,6 +56,7 @@ interface CalendarEvent {
   is_completed: boolean
   completed_at: string | null
   created_at: string
+  source_project_id: string | null
 }
 
 interface EventType {
@@ -78,6 +80,7 @@ interface CalendarSummary {
   completed_events: number
   total_expected_income: number
   events_this_month: number
+  projected_income_this_month: number
 }
 
 const eventTypeIcons: Record<string, React.ReactNode> = {
@@ -98,6 +101,7 @@ export default function CalendarPage() {
   const [showAddEvent, setShowAddEvent] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showIncomeOnly, setShowIncomeOnly] = useState(false)
 
   // Fetch event types
   const { data: eventTypes } = useQuery<EventType[]>({
@@ -108,8 +112,8 @@ export default function CalendarPage() {
 
   // Fetch events
   const { data: events, isLoading } = useQuery<CalendarEvent[]>({
-    queryKey: queryKeys.calendar.events(showCompleted),
-    queryFn: () => calendarApi.list({ show_completed: showCompleted }),
+    queryKey: queryKeys.calendar.events(showCompleted, showIncomeOnly),
+    queryFn: () => calendarApi.list({ show_completed: showCompleted, income_only: showIncomeOnly || undefined }),
   })
 
   // Fetch upcoming events
@@ -217,6 +221,11 @@ export default function CalendarPage() {
     return eventTypes?.find(t => t.value === type)
   }
 
+  const getEventColor = (event: CalendarEvent) => {
+    if (event.source_project_id) return '#10b981' // emerald for crowdfunding
+    return getEventTypeInfo(event.event_type)?.color || '#71717a'
+  }
+
   const isOverdue = (event: CalendarEvent) => {
     return !event.is_completed && new Date(event.event_date) < new Date()
   }
@@ -290,6 +299,21 @@ export default function CalendarPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Revenue Banner */}
+      {summary && summary.projected_income_this_month > 0 && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+              <Landmark className="h-4 w-4" />
+              Total revenus projetés ce mois
+            </span>
+            <span className="text-lg font-bold text-emerald-400">
+              +{summary.projected_income_this_month.toLocaleString('fr-FR')} EUR
+            </span>
+          </CardContent>
+        </Card>
       )}
 
       {/* Market Events Timeline */}
@@ -407,14 +431,23 @@ export default function CalendarPage() {
           />
           <Label htmlFor="show-completed">Afficher les complétés</Label>
         </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="income-only"
+            checked={showIncomeOnly}
+            onCheckedChange={(checked) => setShowIncomeOnly(checked === true)}
+          />
+          <Label htmlFor="income-only">Revenus uniquement</Label>
+        </div>
       </div>
 
       {/* All Events */}
       {events && events.length > 0 ? (
         <div className="space-y-3">
           {events.map((event) => {
-            const typeInfo = getEventTypeInfo(event.event_type)
+            const color = getEventColor(event)
             const overdue = isOverdue(event)
+            const typeInfo = getEventTypeInfo(event.event_type)
 
             return (
               <Card
@@ -426,10 +459,12 @@ export default function CalendarPage() {
                     <div className="flex items-center gap-4">
                       <div
                         className="h-12 w-12 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${typeInfo?.color}20` }}
+                        style={{ backgroundColor: `${color}20` }}
                       >
-                        <span style={{ color: typeInfo?.color }}>
-                          {eventTypeIcons[event.event_type]}
+                        <span style={{ color }}>
+                          {event.source_project_id
+                            ? <Landmark className="h-4 w-4" />
+                            : eventTypeIcons[event.event_type]}
                         </span>
                       </div>
                       <div>
@@ -437,6 +472,11 @@ export default function CalendarPage() {
                           <h3 className={`font-medium ${event.is_completed ? 'line-through' : ''}`}>
                             {event.title}
                           </h3>
+                          {event.source_project_id && (
+                            <Badge variant="outline" className="text-xs text-emerald-500 border-emerald-500/30">
+                              Crowdfunding
+                            </Badge>
+                          )}
                           {event.is_recurring && (
                             <Badge variant="outline" className="text-xs">
                               <RefreshCw className="h-3 w-3 mr-1" />

@@ -110,6 +110,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.emails.send_daily_digest",
         "schedule": crontab(hour=7, minute=0),  # Every day at 07:00 UTC (08:00 Paris)
     },
+    # === Regime Mutation Detection ===
+    "check-regime-mutation": {
+        "task": "app.tasks.regime_alerts.check_regime_mutation",
+        "schedule": 43200.0,  # Every 12 hours
+    },
     # === Data Cleanup ===
     "run-weekly-cleanup": {
         "task": "app.tasks.cleanup.run_weekly_cleanup",

@@ -16,22 +16,18 @@ import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
 // Lazy loaded (behind auth, loaded on demand)
+const MasterDashboardPage = lazy(() => import('@/pages/MasterDashboardPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
-const PortfolioPage = lazy(() => import('@/pages/PortfolioPage'))
-const TransactionsPage = lazy(() => import('@/pages/TransactionsPage'))
-const ExchangesPage = lazy(() => import('@/pages/ExchangesPage'))
-const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
-const AlertsPage = lazy(() => import('@/pages/AlertsPage'))
-const PredictionsPage = lazy(() => import('@/pages/PredictionsPage'))
+const PortfolioUnifiedPage = lazy(() => import('@/pages/PortfolioUnifiedPage'))
+const IntelligencePage = lazy(() => import('@/pages/IntelligencePage'))
+const StrategyPage = lazy(() => import('@/pages/StrategyPage'))
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const AdminPage = lazy(() => import('@/pages/AdminPage'))
 const NotesPage = lazy(() => import('@/pages/NotesPage'))
 const CalendarPage = lazy(() => import('@/pages/CalendarPage'))
-const SimulationsPage = lazy(() => import('@/pages/SimulationsPage'))
-const InsightsPage = lazy(() => import('@/pages/InsightsPage'))
-const GoalsPage = lazy(() => import('@/pages/GoalsPage'))
-const SmartInsightsPage = lazy(() => import('@/pages/SmartInsightsPage'))
+const CrowdfundingMesProjectsPage = lazy(() => import('@/pages/CrowdfundingMesProjectsPage'))
+const CrowdfundingAuditLabPage = lazy(() => import('@/pages/CrowdfundingAuditLabPage'))
 
 function PageLoader() {
   return (
@@ -87,20 +83,30 @@ function App() {
               </PrivateRoute>
             }
           >
-            <Route index element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
-            <Route path="portfolio" element={<Suspense fallback={<PageLoader />}><PortfolioPage /></Suspense>} />
-            <Route path="transactions" element={<Suspense fallback={<PageLoader />}><TransactionsPage /></Suspense>} />
-            <Route path="exchanges" element={<Suspense fallback={<PageLoader />}><ExchangesPage /></Suspense>} />
-            <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
-            <Route path="alerts" element={<Suspense fallback={<PageLoader />}><AlertsPage /></Suspense>} />
-            <Route path="predictions" element={<Suspense fallback={<PageLoader />}><PredictionsPage /></Suspense>} />
+            {/* Main routes */}
+            <Route index element={<Suspense fallback={<PageLoader />}><MasterDashboardPage /></Suspense>} />
+            <Route path="portfolio" element={<Suspense fallback={<PageLoader />}><PortfolioUnifiedPage /></Suspense>} />
+            <Route path="intelligence" element={<Suspense fallback={<PageLoader />}><IntelligencePage /></Suspense>} />
+            <Route path="strategy" element={<Suspense fallback={<PageLoader />}><StrategyPage /></Suspense>} />
             <Route path="reports" element={<Suspense fallback={<PageLoader />}><ReportsPage /></Suspense>} />
             <Route path="notes" element={<Suspense fallback={<PageLoader />}><NotesPage /></Suspense>} />
             <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
-            <Route path="simulations" element={<Suspense fallback={<PageLoader />}><SimulationsPage /></Suspense>} />
-            <Route path="insights" element={<Suspense fallback={<PageLoader />}><InsightsPage /></Suspense>} />
-            <Route path="smart-insights" element={<Suspense fallback={<PageLoader />}><SmartInsightsPage /></Suspense>} />
-            <Route path="goals" element={<Suspense fallback={<PageLoader />}><GoalsPage /></Suspense>} />
+            <Route path="crowdfunding" element={<Suspense fallback={<PageLoader />}><CrowdfundingMesProjectsPage /></Suspense>} />
+            <Route path="crowdfunding/audit-lab" element={<Suspense fallback={<PageLoader />}><CrowdfundingAuditLabPage /></Suspense>} />
+
+            {/* Redirects from old URLs */}
+            <Route path="crypto" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
+            <Route path="transactions" element={<Navigate to="/portfolio?tab=transactions" replace />} />
+            <Route path="exchanges" element={<Navigate to="/portfolio?tab=exchanges" replace />} />
+            <Route path="analytics" element={<Navigate to="/intelligence?tab=analytics" replace />} />
+            <Route path="alerts" element={<Navigate to="/intelligence?tab=alerts" replace />} />
+            <Route path="predictions" element={<Navigate to="/intelligence?tab=predictions" replace />} />
+            <Route path="insights" element={<Navigate to="/intelligence" replace />} />
+            <Route path="smart-insights" element={<Navigate to="/intelligence?tab=smart" replace />} />
+            <Route path="simulations" element={<Navigate to="/strategy?tab=simulations" replace />} />
+            <Route path="goals" element={<Navigate to="/strategy" replace />} />
+            <Route path="crowdfunding/projects" element={<Navigate to="/crowdfunding?tab=projects" replace />} />
+            <Route path="crowdfunding/performance" element={<Navigate to="/crowdfunding?tab=performance" replace />} />
             <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
             <Route
               path="admin"

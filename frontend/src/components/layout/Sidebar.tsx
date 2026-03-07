@@ -5,43 +5,68 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard,
   Wallet,
-  ArrowRightLeft,
-  Link2,
-  BarChart3,
-  Bell,
   FileText,
   Settings,
   Users,
   TrendingUp,
-  BookOpen,
   Calendar,
-  Calculator,
-  Lightbulb,
   Target,
   Brain,
+  FolderOpen,
+  ShieldCheck,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: Wallet, label: 'Portefeuille', path: '/portfolio' },
-  { icon: ArrowRightLeft, label: 'Transactions', path: '/transactions' },
-  { icon: Link2, label: 'Exchanges', path: '/exchanges' },
-  { icon: BarChart3, label: 'Analyses', path: '/analytics' },
-  { icon: TrendingUp, label: 'Projections', path: '/predictions' },
-  { icon: Calculator, label: 'Simulations', path: '/simulations' },
-  { icon: Lightbulb, label: 'Insights', path: '/insights' },
-  { icon: Brain, label: 'Smart Insights', path: '/smart-insights' },
-  { icon: Target, label: 'Objectifs', path: '/goals' },
-  { icon: Bell, label: 'Alertes', path: '/alerts' },
-  { icon: BookOpen, label: 'Journal', path: '/notes' },
-  { icon: Calendar, label: 'Calendrier', path: '/calendar' },
-  { icon: FileText, label: 'Rapports', path: '/reports' },
+interface NavItem {
+  icon: LucideIcon
+  label: string
+  path: string
+}
+
+interface NavSection {
+  label: string
+  items: NavItem[]
+}
+
+const navSections: NavSection[] = [
+  {
+    label: 'VUE GLOBALE',
+    items: [
+      { icon: LayoutDashboard, label: 'Tableau de bord', path: '/' },
+      { icon: Calendar, label: 'Calendrier', path: '/calendar' },
+    ],
+  },
+  {
+    label: 'UNIVERS CRYPTO',
+    items: [
+      { icon: LayoutDashboard, label: 'Vue d\'ensemble', path: '/crypto' },
+      { icon: Wallet, label: 'Portefeuille', path: '/portfolio' },
+      { icon: Brain, label: 'Analyses IA', path: '/intelligence' },
+    ],
+  },
+  {
+    label: 'CROWDFUNDING',
+    items: [
+      { icon: FolderOpen, label: 'Mes Projets', path: '/crowdfunding' },
+      { icon: ShieldCheck, label: 'Audit Lab', path: '/crowdfunding/audit-lab' },
+    ],
+  },
+  {
+    label: 'STRATÉGIE',
+    items: [
+      { icon: Target, label: 'Objectifs', path: '/strategy' },
+      { icon: FileText, label: 'Rapports', path: '/reports' },
+    ],
+  },
+]
+
+const bottomItems: NavItem[] = [
   { icon: Settings, label: 'Parametres', path: '/settings' },
 ]
 
-const adminItems = [
+const adminItems: NavItem[] = [
   { icon: Users, label: 'Utilisateurs', path: '/admin' },
 ]
 
@@ -55,9 +80,28 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const isAdmin = user?.role === 'admin'
 
   const handleNavClick = useCallback(() => {
-    // Close sidebar on mobile when a nav link is clicked
     onClose?.()
   }, [onClose])
+
+  const renderNavLink = (item: NavItem) => (
+    <NavLink
+      key={item.path}
+      to={item.path}
+      end={item.path === '/'}
+      onClick={handleNavClick}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        )
+      }
+    >
+      <item.icon className="h-5 w-5" />
+      {item.label}
+    </NavLink>
+  )
 
   const sidebarContent = (
     <aside className="w-64 bg-card border-r border-border flex flex-col h-full">
@@ -67,7 +111,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <TrendingUp className="h-8 w-8 text-primary mr-2" />
           <span className="text-xl font-bold">InvestAI</span>
         </div>
-        {/* Close button visible only on mobile */}
         <Button
           variant="ghost"
           size="icon"
@@ -79,56 +122,36 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </Button>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — sectioned */}
       <nav className="flex-1 overflow-y-auto p-4 space-y-1" role="navigation" aria-label="Menu principal">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={handleNavClick}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )
-            }
-          >
-            <item.icon className="h-5 w-5" />
-            {item.label}
-          </NavLink>
+        {navSections.map((section, idx) => (
+          <div key={section.label}>
+            <div className={cn('pb-2', idx === 0 ? 'pt-0' : 'pt-4')}>
+              <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {section.label}
+              </span>
+            </div>
+            {section.items.map(renderNavLink)}
+          </div>
         ))}
 
         {/* Admin section */}
         {isAdmin && (
-          <>
+          <div>
             <div className="pt-4 pb-2">
               <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Administration
               </span>
             </div>
-            {adminItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={handleNavClick}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  )
-                }
-              >
-                <item.icon className="h-5 w-5" />
-                {item.label}
-              </NavLink>
-            ))}
-          </>
+            {adminItems.map(renderNavLink)}
+          </div>
         )}
       </nav>
+
+      {/* Bottom items (Settings) */}
+      <div className="px-4 pb-2 space-y-1">
+        {bottomItems.map(renderNavLink)}
+      </div>
 
       {/* User info */}
       <div className="p-4 border-t border-border">
@@ -155,7 +178,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </div>
 
       {/* Mobile sidebar: overlay with backdrop */}
-      {/* Backdrop */}
       <div
         className={cn(
           'fixed inset-0 z-40 bg-black/50 transition-opacity lg:hidden',
@@ -165,7 +187,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         aria-hidden="true"
       />
 
-      {/* Sliding panel */}
       <div
         className={cn(
           'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out lg:hidden',

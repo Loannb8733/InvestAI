@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     assets,
     auth,
     calendar,
+    crowdfunding,
     dashboard,
     goals,
     insights,
@@ -20,6 +21,7 @@ from app.api.v1.endpoints import (
     simulations,
     smart_insights,
     system,
+    telegram_webhook,
     transactions,
     users,
     websocket,
@@ -27,6 +29,7 @@ from app.api.v1.endpoints import (
 
 api_router = APIRouter()
 
+api_router.include_router(telegram_webhook.router, prefix="/bot", tags=["Telegram Bot"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
@@ -46,4 +49,5 @@ api_router.include_router(insights.router, prefix="/insights", tags=["Insights"]
 api_router.include_router(websocket.router, tags=["WebSocket"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals"])
 api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
+api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
 api_router.include_router(system.router, prefix="/system", tags=["System"])

@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.services.analytics_service import analytics_service
+from app.services.smart_insights_service import smart_insights_service
 
 logger = logging.getLogger(__name__)
 
@@ -462,6 +463,9 @@ async def get_monte_carlo(
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Monte Carlo simulation of future portfolio returns with optional withdrawals and fees."""
+    # Derive vol_regime from current market regime for regime-aware volatility
+    vol_regime = await smart_insights_service.get_current_vol_regime(db, str(current_user.id))
+
     result = await analytics_service.monte_carlo(
         db,
         str(current_user.id),
@@ -471,6 +475,7 @@ async def get_monte_carlo(
         annual_withdrawal_rate=annual_withdrawal_rate,
         ter_percentage=ter_percentage,
         monthly_withdrawal=monthly_withdrawal,
+        vol_regime=vol_regime,
     )
 
     # Alert user via Telegram if ruin probability exceeds 20%

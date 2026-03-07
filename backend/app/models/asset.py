@@ -17,6 +17,7 @@ class AssetType(str, enum.Enum):
     ETF = "etf"
     REAL_ESTATE = "real_estate"
     BOND = "bond"
+    CROWDFUNDING = "crowdfunding"
     OTHER = "other"
 
 

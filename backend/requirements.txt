@@ -75,3 +75,9 @@ weasyprint==60.2
 # Excel
 openpyxl==3.1.2
 xlsxwriter==3.1.9
+
+# AI / LLM
+anthropic>=0.40.0
+
+# PDF Parsing
+PyMuPDF>=1.24.0

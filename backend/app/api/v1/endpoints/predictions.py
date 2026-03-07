@@ -396,6 +396,7 @@ async def get_top_alpha(
 
     # Telegram alert if score > 85 and not over-concentrated
     top = result.get("top_alpha")
+    total_value = result.get("total_portfolio_value", 0)
     if (
         top
         and top.get("score", 0) > 85
@@ -403,6 +404,14 @@ async def get_top_alpha(
         and current_user.telegram_enabled
         and current_user.telegram_chat_id
     ):
+        # Compute suggested order for keyboard callback
+        strategy_data = await prediction_service.get_strategy_map(db, str(current_user.id))
+        order_eur = 0.0
+        for row in strategy_data.get("rows", []):
+            if row["symbol"] == top["symbol"]:
+                order_eur = round(total_value * abs(row.get("impact_pct", 0)) / 100, 2)
+                break
+
         background_tasks.add_task(
             _send_alpha_alert,
             chat_id=current_user.telegram_chat_id,
@@ -411,6 +420,7 @@ async def get_top_alpha(
             score=top["score"],
             predicted_pct=top.get("predicted_7d_pct", 0),
             reasons=top.get("reasons", []),
+            order_eur=order_eur,
         )
 
     # Telegram alert if any asset exceeds 60% concentration
@@ -435,8 +445,9 @@ async def _send_alpha_alert(
     score: float,
     predicted_pct: float,
     reasons: list,
+    order_eur: float = 0.0,
 ) -> None:
-    """Send Telegram alert for high-alpha signal."""
+    """Send Telegram alert for high-alpha signal with interactive buttons."""
     try:
         from app.services.telegram_service import telegram_service
 
@@ -445,9 +456,13 @@ async def _send_alpha_alert(
         message = (
             f"🚀 <b>Signal Alpha : {symbol}</b>\n\n"
             f"Score: <b>{score:.0f}/100</b> — configuration de surperformance.\n"
-            f"Potentiel 7j: <b>{sign}{predicted_pct:.1f}%</b>\n\n"
+            f"Potentiel 7j: <b>{sign}{predicted_pct:.1f}%</b>\n"
+            f"Ordre suggéré: <b>{order_eur:,.2f} €</b>\n\n"
             f"📊 Raisons:\n{reason_lines}"
         )
+
+        # Build InlineKeyboard with action buttons
+        keyboard = telegram_service.build_alpha_keyboard(user_id, symbol, order_eur)
 
         await telegram_service.send_smart_alert(
             message=message,
@@ -456,6 +471,7 @@ async def _send_alpha_alert(
             priority="high",
             symbol=symbol,
             alert_type="TOP_ALPHA",
+            reply_markup=keyboard,
         )
     except Exception as exc:
         logger.warning("Telegram alpha alert failed for %s: %s", symbol, exc)
@@ -623,6 +639,7 @@ async def validate_signal(
     4. Sends a detailed Telegram report.
     """
     from app.services.analytics_service import analytics_service
+    from app.services.smart_insights_service import smart_insights_service
 
     # ── 1. Top Alpha ──
     alpha_data = await prediction_service.get_top_alpha_asset(db, str(current_user.id))
@@ -656,11 +673,15 @@ async def validate_signal(
 
     # ── 3. Monte Carlo before/after ──
     uid = str(current_user.id)
+    # Derive vol_regime from market regime for regime-aware Monte Carlo
+    _vol_regime = await smart_insights_service.get_current_vol_regime(db, uid)
+
     mc_before = await analytics_service.monte_carlo(
         db,
         uid,
         horizon_days=90,
         num_simulations=2000,
+        vol_regime=_vol_regime,
     )
     prob_ruin_before = mc_before.prob_ruin
 
@@ -671,6 +692,7 @@ async def validate_signal(
         horizon_days=90,
         num_simulations=2000,
         contribution={symbol: order_eur} if order_eur > 0 else None,
+        vol_regime=_vol_regime,
     )
     prob_ruin_after = mc_after.prob_ruin
 
@@ -937,3 +959,77 @@ async def get_track_record(
     Returns past predictions with actual outcomes for transparency.
     """
     return await prediction_service.get_track_record(symbol.upper(), limit)
+
+
+# ── Planned Orders ──────────────────────────────────────────────
+
+
+@router.get("/planned-orders", response_model=list)
+async def list_planned_orders(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List pending planned orders for the current user."""
+    from sqlalchemy import select
+
+    from app.models.planned_order import PlannedOrder, PlannedOrderStatus
+
+    result = await db.execute(
+        select(PlannedOrder)
+        .where(
+            PlannedOrder.user_id == current_user.id,
+            PlannedOrder.status == PlannedOrderStatus.PENDING,
+        )
+        .order_by(PlannedOrder.created_at.desc())
+    )
+    orders = result.scalars().all()
+
+    return [
+        {
+            "id": str(o.id),
+            "symbol": o.symbol,
+            "action": o.action,
+            "order_eur": o.order_eur,
+            "alpha_score": o.alpha_score,
+            "regime": o.regime,
+            "prob_ruin_before": o.prob_ruin_before,
+            "prob_ruin_after": o.prob_ruin_after,
+            "source": o.source,
+            "status": o.status.value if o.status else "pending",
+            "notes": o.notes,
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+        }
+        for o in orders
+    ]
+
+
+@router.patch("/planned-orders/{order_id}", response_model=dict)
+async def update_planned_order(
+    order_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a planned order status (executed/cancelled)."""
+    from sqlalchemy import select
+
+    from app.models.planned_order import PlannedOrder, PlannedOrderStatus
+
+    result = await db.execute(
+        select(PlannedOrder).where(
+            PlannedOrder.id == order_id,
+            PlannedOrder.user_id == current_user.id,
+        )
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Ordre non trouvé")
+
+    new_status = body.get("status")
+    if new_status in ("executed", "cancelled"):
+        order.status = PlannedOrderStatus(new_status)
+        await db.commit()
+
+    return {"id": str(order.id), "status": order.status.value}

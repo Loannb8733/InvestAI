@@ -207,6 +207,9 @@ class EnhancedDashboardResponse(BaseModel):
     # Advanced metrics (includes risk, concentration, stress tests, P&L breakdown)
     advanced_metrics: AdvancedMetrics
 
+    # Liquidity
+    available_liquidity: float = 0.0
+
     # Period context
     period_days: int = 30
     period_label: str = "30j"
@@ -436,9 +439,64 @@ async def get_dashboard(
         upcoming_events=upcoming_events,
         index_comparison=index_comparison,
         advanced_metrics=advanced_metrics,
+        available_liquidity=metrics.get("available_liquidity", 0.0),
         period_days=days,
         period_label=get_period_label_fr(original_days),
         last_updated=datetime.utcnow().isoformat(),
+    )
+
+
+# ============== Munitions (Deployment Capacity) ==============
+
+
+class MunitionsResponse(BaseModel):
+    """Munitions / deployment capacity response."""
+
+    available_liquidity: float
+    total_value: float
+    liquidity_pct: float
+    invested_pct: float
+    next_signal_symbol: Optional[str] = None
+    next_signal_action: Optional[str] = None
+    next_signal_amount: float = 0.0
+    can_execute: bool = True
+    shortfall: float = 0.0
+    message: Optional[str] = None
+    profile: str = "moderate"
+    deploy_to_risk: float = 0.0
+    keep_in_reserve: float = 0.0
+
+
+@router.get("/munitions", response_model=MunitionsResponse)
+async def get_munitions(
+    monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
+    profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get deployment capacity (munitions) for the current user."""
+    from app.services.strategy_service import strategy_service
+
+    capacity = await strategy_service.get_deployment_capacity(
+        db=db,
+        user_id=str(current_user.id),
+        monthly_dca=monthly_dca,
+        profile=profile,
+    )
+    return MunitionsResponse(
+        available_liquidity=capacity.available_liquidity,
+        total_value=capacity.total_value,
+        liquidity_pct=capacity.liquidity_pct,
+        invested_pct=capacity.invested_pct,
+        next_signal_symbol=capacity.next_signal_symbol,
+        next_signal_action=capacity.next_signal_action,
+        next_signal_amount=capacity.next_signal_amount,
+        can_execute=capacity.can_execute,
+        shortfall=capacity.shortfall,
+        message=capacity.message,
+        profile=capacity.profile,
+        deploy_to_risk=capacity.deploy_to_risk,
+        keep_in_reserve=capacity.keep_in_reserve,
     )
 
 

@@ -36,4 +36,10 @@ class CalendarEvent(Base):
     currency = Column(String(10), default="EUR", nullable=False)
     is_completed = Column(Boolean, default=False, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    source_project_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("crowdfunding_projects.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

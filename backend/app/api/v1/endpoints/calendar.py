@@ -59,6 +59,7 @@ class EventResponse(BaseModel):
     is_completed: bool
     completed_at: Optional[datetime]
     created_at: datetime
+    source_project_id: Optional[UUID] = None
 
 
 class EventTypeInfo(BaseModel):
@@ -77,6 +78,26 @@ class CalendarSummaryResponse(BaseModel):
     completed_events: int
     total_expected_income: float
     events_this_month: int
+    projected_income_this_month: float = 0.0
+
+
+def _event_response(e: CalendarEvent) -> EventResponse:
+    """Build an EventResponse from a CalendarEvent model."""
+    return EventResponse(
+        id=e.id,
+        title=e.title,
+        description=e.description,
+        event_type=e.event_type.value,
+        event_date=e.event_date,
+        is_recurring=e.is_recurring,
+        recurrence_rule=e.recurrence_rule,
+        amount=float(e.amount) if e.amount else None,
+        currency=e.currency,
+        is_completed=e.is_completed,
+        completed_at=e.completed_at,
+        created_at=e.created_at,
+        source_project_id=e.source_project_id,
+    )
 
 
 @router.get("/event-types", response_model=List[EventTypeInfo])
@@ -123,12 +144,23 @@ async def get_calendar_summary(
         if e.event_type in income_types and not e.is_completed and e.event_date >= now
     )
 
+    # Projected income this month (income-type events this month, not completed)
+    income_this_month = sum(
+        float(e.amount or 0)
+        for e in events
+        if e.event_type in income_types
+        and not e.is_completed
+        and e.event_date.year == now.year
+        and e.event_date.month == now.month
+    )
+
     return CalendarSummaryResponse(
         total_events=len(events),
         upcoming_events=upcoming,
         completed_events=completed,
         total_expected_income=total_income,
         events_this_month=events_this_month,
+        projected_income_this_month=round(income_this_month, 2),
     )
 
 
@@ -158,23 +190,7 @@ async def list_upcoming_events(
     )
     events = result.scalars().all()
 
-    return [
-        EventResponse(
-            id=e.id,
-            title=e.title,
-            description=e.description,
-            event_type=e.event_type.value,
-            event_date=e.event_date,
-            is_recurring=e.is_recurring,
-            recurrence_rule=e.recurrence_rule,
-            amount=float(e.amount) if e.amount else None,
-            currency=e.currency,
-            is_completed=e.is_completed,
-            completed_at=e.completed_at,
-            created_at=e.created_at,
-        )
-        for e in events
-    ]
+    return [_event_response(e) for e in events]
 
 
 @router.get("", response_model=List[EventResponse])
@@ -183,6 +199,7 @@ async def list_events(
     end_date: Optional[datetime] = None,
     event_type: Optional[EventType] = None,
     show_completed: bool = True,
+    income_only: bool = False,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
@@ -197,29 +214,15 @@ async def list_events(
         query = query.where(CalendarEvent.event_date <= end_date)
     if event_type:
         query = query.where(CalendarEvent.event_type == event_type)
+    if income_only:
+        query = query.where(CalendarEvent.event_type.in_([EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]))
     if not show_completed:
         query = query.where(CalendarEvent.is_completed == False)
 
     result = await db.execute(query.order_by(CalendarEvent.event_date.asc()).offset(skip).limit(limit))
     events = result.scalars().all()
 
-    return [
-        EventResponse(
-            id=e.id,
-            title=e.title,
-            description=e.description,
-            event_type=e.event_type.value,
-            event_date=e.event_date,
-            is_recurring=e.is_recurring,
-            recurrence_rule=e.recurrence_rule,
-            amount=float(e.amount) if e.amount else None,
-            currency=e.currency,
-            is_completed=e.is_completed,
-            completed_at=e.completed_at,
-            created_at=e.created_at,
-        )
-        for e in events
-    ]
+    return [_event_response(e) for e in events]
 
 
 @router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -246,20 +249,7 @@ async def create_event(
     await db.commit()
     await db.refresh(event)
 
-    return EventResponse(
-        id=event.id,
-        title=event.title,
-        description=event.description,
-        event_type=event.event_type.value,
-        event_date=event.event_date,
-        is_recurring=event.is_recurring,
-        recurrence_rule=event.recurrence_rule,
-        amount=float(event.amount) if event.amount else None,
-        currency=event.currency,
-        is_completed=event.is_completed,
-        completed_at=event.completed_at,
-        created_at=event.created_at,
-    )
+    return _event_response(event)
 
 
 @router.get("/{event_id}", response_model=EventResponse)
@@ -283,20 +273,7 @@ async def get_event(
             detail="Evenement non trouve",
         )
 
-    return EventResponse(
-        id=event.id,
-        title=event.title,
-        description=event.description,
-        event_type=event.event_type.value,
-        event_date=event.event_date,
-        is_recurring=event.is_recurring,
-        recurrence_rule=event.recurrence_rule,
-        amount=float(event.amount) if event.amount else None,
-        currency=event.currency,
-        is_completed=event.is_completed,
-        completed_at=event.completed_at,
-        created_at=event.created_at,
-    )
+    return _event_response(event)
 
 
 @router.patch("/{event_id}", response_model=EventResponse)
@@ -347,20 +324,7 @@ async def update_event(
     await db.commit()
     await db.refresh(event)
 
-    return EventResponse(
-        id=event.id,
-        title=event.title,
-        description=event.description,
-        event_type=event.event_type.value,
-        event_date=event.event_date,
-        is_recurring=event.is_recurring,
-        recurrence_rule=event.recurrence_rule,
-        amount=float(event.amount) if event.amount else None,
-        currency=event.currency,
-        is_completed=event.is_completed,
-        completed_at=event.completed_at,
-        created_at=event.created_at,
-    )
+    return _event_response(event)
 
 
 @router.post("/{event_id}/complete", response_model=EventResponse)
@@ -408,20 +372,7 @@ async def complete_event(
     await db.commit()
     await db.refresh(event)
 
-    return EventResponse(
-        id=event.id,
-        title=event.title,
-        description=event.description,
-        event_type=event.event_type.value,
-        event_date=event.event_date,
-        is_recurring=event.is_recurring,
-        recurrence_rule=event.recurrence_rule,
-        amount=float(event.amount) if event.amount else None,
-        currency=event.currency,
-        is_completed=event.is_completed,
-        completed_at=event.completed_at,
-        created_at=event.created_at,
-    )
+    return _event_response(event)
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)

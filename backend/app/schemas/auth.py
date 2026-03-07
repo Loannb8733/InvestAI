@@ -59,7 +59,7 @@ class TokenPayload(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Schema for refresh token request."""
 
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 
 class MFASetupResponse(BaseModel):

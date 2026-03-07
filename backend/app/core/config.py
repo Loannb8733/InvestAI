@@ -129,6 +129,9 @@ class Settings(BaseSettings):
         "X-Requested-With",
     ]
 
+    # AI / LLM (optional — Audit Lab disabled if empty)
+    ANTHROPIC_API_KEY: str = ""
+
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
 

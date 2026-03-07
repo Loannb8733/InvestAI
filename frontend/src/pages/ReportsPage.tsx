@@ -20,6 +20,7 @@ import {
   Calendar,
   Loader2,
   FileDown,
+  Download,
 } from 'lucide-react'
 
 export default function ReportsPage() {
@@ -146,6 +147,26 @@ export default function ReportsPage() {
               'transactions-pdf',
               () => reportsApi.downloadTransactionsPDF(),
               `rapport_transactions_${new Date().toISOString().split('T')[0]}.pdf`
+            ),
+        },
+        {
+          label: 'Excel',
+          icon: FileSpreadsheet,
+          onClick: () =>
+            handleDownload(
+              'transactions-excel',
+              () => reportsApi.downloadTransactionsExcel(),
+              `transactions_${new Date().toISOString().split('T')[0]}.xlsx`
+            ),
+        },
+        {
+          label: 'CSV',
+          icon: Download,
+          onClick: () =>
+            handleDownload(
+              'transactions-csv',
+              () => reportsApi.downloadTransactionsCSV(),
+              `transactions_${new Date().toISOString().split('T')[0]}.csv`
             ),
         },
       ],

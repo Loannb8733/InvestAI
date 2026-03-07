@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
-from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeResult
-from app.models.asset import Asset
+from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
+from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services.analytics_service import AnalyticsService
+from app.services.metrics_service import is_safe_haven
 from app.services.prediction_service import PredictionService
 from app.services.price_service import price_service
 from app.tasks.history_cache import get_cached_history
@@ -206,14 +207,22 @@ class SmartInsightsService:
             hhi = 0.0
             top_holdings = []
 
+        # Scale VaR to the chosen timeframe window (sqrt-T scaling from daily)
+        # Daily VaR → N-day VaR = daily_VaR * sqrt(N)
+        import numpy as np
+
+        var_95_window_eur = round(var_95_eur * np.sqrt(days), 2) if var_95_eur > 0 else 0.0
+
         metrics_summary = {
             "sharpe_ratio": sharpe,
             "sortino_ratio": sortino,
             "volatility": volatility,  # fraction (0-1)
-            "var_95": var_95_eur,  # EUR (for formatCurrency display)
+            "var_95": var_95_eur,  # EUR daily (for formatCurrency display)
+            "var_95_window": var_95_window_eur,  # EUR over full window
             "max_drawdown": max_drawdown,  # fraction (0-1), positive
             "hhi": hhi,
             "total_value": total_value,
+            "days": days,
         }
 
         # === PERFORMANCE INSIGHTS ===
@@ -238,6 +247,7 @@ class SmartInsightsService:
             user_id,
             total_value,
             market_regime=market_regime,
+            days=days,
         )
         if rebalancing_orders:
             insights.append(
@@ -275,6 +285,26 @@ class SmartInsightsService:
                 )
             )
 
+        # === REGIME CONFIG (universal cycle parameters) ===
+        if market_regime:
+            rcfg = market_regime.config
+            metrics_summary["regime_config"] = {
+                "risk_multiplier": rcfg.risk_multiplier,
+                "alpha_threshold": rcfg.alpha_threshold,
+                "gold_relevance": rcfg.gold_relevance,
+                "mode_label": rcfg.mode_label,
+                "vol_regime": rcfg.vol_regime,
+            }
+
+        # === SAFE-HAVEN / GOLD ANALYSIS ===
+        gold_exposure, gold_beta, gold_badge = await self._analyze_safe_haven(
+            db,
+            user_id,
+            total_value,
+            market_regime,
+            metrics_summary,
+        )
+
         # Calculate overall score
         overall_score, overall_status = self._calculate_overall_score(
             sharpe,
@@ -283,6 +313,8 @@ class SmartInsightsService:
             hhi,
             len(anomaly_impacts),
             max_drawdown=max_drawdown,
+            gold_exposure=gold_exposure,
+            market_regime=market_regime,
         )
 
         # Sort insights by severity
@@ -526,6 +558,7 @@ class SmartInsightsService:
         user_id: str,
         total_value: float,
         market_regime: Optional[MarketRegime] = None,
+        days: int = 30,
     ) -> List[RebalancingOrder]:
         """Get concrete rebalancing orders based on MPT optimization.
 
@@ -553,7 +586,7 @@ class SmartInsightsService:
             optimal_weights = {sym: w / 100 for sym, w in optimization.weights.items()}
 
             # Get current allocation from analytics
-            analytics = await self.analytics_service.get_user_analytics(db, user_id)
+            analytics = await self.analytics_service.get_user_analytics(db, user_id, days=days)
             allocation_by_asset = analytics.allocation_by_asset or {}
             # allocation_by_asset values are in percentage (0-100)
             current_holdings = {
@@ -681,6 +714,9 @@ class SmartInsightsService:
         for portfolio in portfolios:
             assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
             for asset in assets_result.scalars().all():
+                # Skip non-tradeable assets (crowdfunding has no market price)
+                if asset.asset_type == AssetType.CROWDFUNDING:
+                    continue
                 if asset.symbol not in asset_map:
                     asset_map[asset.symbol] = {
                         "quantity": float(asset.quantity),
@@ -886,6 +922,73 @@ class SmartInsightsService:
 
         return None
 
+    async def _analyze_safe_haven(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        total_value: float,
+        market_regime: Optional[MarketRegime],
+        metrics_summary: Dict,
+    ) -> Tuple[float, Optional[float], Optional[str]]:
+        """Analyze gold/safe-haven exposure and compute Beta vs BTC.
+
+        Returns (gold_exposure_fraction, gold_beta, badge_or_none).
+        """
+        import numpy as np
+
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = result.scalars().all()
+        if not portfolios:
+            return 0.0, None, None
+
+        portfolio_ids = [p.id for p in portfolios]
+        result = await db.execute(
+            select(Asset).where(
+                Asset.portfolio_id.in_(portfolio_ids),
+                Asset.quantity > 0,
+            )
+        )
+        assets = result.scalars().all()
+
+        gold_value = 0.0
+        gold_symbol = None
+        for a in assets:
+            if is_safe_haven(a.symbol):
+                try:
+                    p = await price_service.get_current_price(a.symbol, a.asset_type.value)
+                    gold_value += float(a.quantity) * float(p)
+                    gold_symbol = a.symbol
+                except Exception:
+                    pass
+
+        gold_exposure = gold_value / total_value if total_value > 0 else 0.0
+        metrics_summary["gold_exposure"] = round(gold_exposure, 4)
+
+        # Compute Beta vs BTC if gold found
+        gold_beta: Optional[float] = None
+        badge: Optional[str] = None
+        if gold_symbol:
+            try:
+                _, btc_prices = get_cached_history("BTC", days=90)
+                _, gold_prices = get_cached_history(gold_symbol, days=90)
+                if btc_prices and gold_prices and len(btc_prices) >= 20 and len(gold_prices) >= 20:
+                    _min = min(len(btc_prices), len(gold_prices))
+                    btc_r = np.diff(np.log(np.array(btc_prices[-_min:], dtype=float)))
+                    gold_r = np.diff(np.log(np.array(gold_prices[-_min:], dtype=float)))
+                    cov = np.cov(gold_r, btc_r)
+                    btc_var = cov[1, 1]
+                    if btc_var > 0:
+                        gold_beta = round(float(cov[0, 1] / btc_var), 3)
+                        if gold_beta < 0.1:
+                            badge = "bouclier_anti_crise"
+            except Exception as e:
+                logger.debug("Gold beta computation failed: %s", e)
+
+        metrics_summary["gold_beta"] = gold_beta
+        metrics_summary["gold_badge"] = badge
+
+        return gold_exposure, gold_beta, badge
+
     def _calculate_overall_score(
         self,
         sharpe: float,
@@ -894,6 +997,8 @@ class SmartInsightsService:
         hhi: float,
         anomaly_count: int,
         max_drawdown: float = 0.0,
+        gold_exposure: float = 0.0,
+        market_regime: Optional[MarketRegime] = None,
     ) -> Tuple[int, str]:
         """Calculate overall portfolio health score (0-100)."""
         score = 100
@@ -946,6 +1051,16 @@ class SmartInsightsService:
         elif abs_dd > 0.10:
             score -= 10
 
+        # Safe-haven bonus: gold_relevance from RegimeConfig scales the bonus
+        # high = 1.5×, medium = 1.0×, low = 0.5× (suppressed in bull)
+        if gold_exposure > 0.05 and market_regime:
+            rcfg = market_regime.config
+            _gold_mult = {"high": 1.5, "medium": 1.0, "low": 0.5}.get(rcfg.gold_relevance, 1.0)
+            dom = market_regime.market.dominant_regime if market_regime.market else ""
+            if dom in ("bearish", "markdown", "distribution", "bottom", "bottoming"):
+                bonus = min(10, int(gold_exposure * 100 * _gold_mult))  # up to +15 capped at 10
+                score += bonus
+
         # Clamp score
         score = max(0, min(100, score))
 
@@ -962,6 +1077,25 @@ class SmartInsightsService:
             status = "critical"
 
         return score, status
+
+    async def get_current_vol_regime(self, db: AsyncSession, user_id: str) -> str:
+        """Lightweight BTC-only regime detection for Monte Carlo vol_regime.
+
+        Returns 'stress', 'normal', or 'low'.
+        """
+        try:
+            from app.services.data_fetcher import get_cached_history
+
+            _, btc_prices = get_cached_history("BTC", days=90)
+            if not btc_prices:
+                _, btc_prices = await self.data_fetcher.get_crypto_history("BTC", days=90)
+            if len(btc_prices) < 7:
+                return "normal"
+            result = self.regime_detector.detect(btc_prices, "BTC")
+            cfg = RegimeConfig.from_regime(result.dominant_regime, result.confidence)
+            return cfg.vol_regime
+        except Exception:
+            return "normal"
 
 
 # Singleton instance

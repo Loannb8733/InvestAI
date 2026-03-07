@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.services.metrics_service import metrics_service
+from app.services.metrics_service import is_liquidity, is_safe_haven, metrics_service
 from app.services.snapshot_service import snapshot_service
 
 logger = logging.getLogger(__name__)
@@ -317,7 +317,32 @@ class ReportService:
             platform_analysis.append(p)
         platform_analysis.sort(key=lambda x: x["total_value"], reverse=True)
 
-        # 6. Build result
+        # 6. Attribution: Alpha / Beta (BTC) / Protection (Or) / Fixed Income / Munitions
+        attribution = {"alpha": 0.0, "beta": 0.0, "protection": 0.0, "fixed_income": 0.0, "munitions": 0.0}
+        for ar in all_asset_reports:
+            sym = ar.symbol.upper()
+            if is_liquidity(sym):
+                attribution["munitions"] += ar.current_value
+            elif getattr(ar, "asset_type", "") == "crowdfunding":
+                attribution["fixed_income"] += ar.current_value
+            elif sym == "BTC":
+                attribution["beta"] += ar.current_value
+            elif is_safe_haven(sym):
+                attribution["protection"] += ar.current_value
+            else:
+                attribution["alpha"] += ar.current_value
+
+        # 7. Cash flows (deposits are NOT gains)
+        cash_flows = {"total_deposits": 0.0, "total_withdrawals": 0.0}
+        for tx in tax_transactions:
+            tt = tx.transaction_type
+            if tt in {"buy", "transfer_in"}:
+                cash_flows["total_deposits"] += tx.total
+            elif tt == "sell":
+                cash_flows["total_withdrawals"] += tx.total
+        cash_flows["net_flows"] = cash_flows["total_deposits"] - cash_flows["total_withdrawals"]
+
+        # 8. Build result
         pnl_data = dashboard.get("pnl_data", {})
 
         return {
@@ -333,6 +358,8 @@ class ReportService:
             "pnl_data": pnl_data,
             "risk_metrics": risk_metrics,
             "platform_analysis": platform_analysis,
+            "attribution": attribution,
+            "cash_flows": cash_flows,
             "generated_at": datetime.utcnow(),
             "year": year,
         }
@@ -439,14 +466,16 @@ class ReportService:
             TransactionType.TRANSFER_OUT,
         }
 
-        year_start = datetime(year, 1, 1)
-        year_end = datetime(year, 12, 31, 23, 59, 59)
+        from datetime import timezone
+
+        year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
+        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
 
         events: List[TaxEvent2086] = []
 
         for tx in all_transactions:
             asset = asset_map.get(tx.asset_id)
-            if not asset:
+            if not asset or not tx.executed_at:
                 continue
 
             symbol = asset.symbol
@@ -472,7 +501,10 @@ class ReportService:
 
                 cession_price = qty * price - fee
 
-                if is_taxable and year_start <= tx.executed_at <= year_end:
+                tx_dt = tx.executed_at
+                if tx_dt.tzinfo is None:
+                    tx_dt = tx_dt.replace(tzinfo=timezone.utc)
+                if is_taxable and year_start <= tx_dt <= year_end:
                     # Compute portfolio value at this moment
                     # We use the current holdings × the price at which this cession occurs
                     # as a proxy. In reality, you'd need all prices at this exact moment.
@@ -511,7 +543,7 @@ class ReportService:
 
                     # Holding period
                     fb = first_buy.get(symbol)
-                    if fb and (tx.executed_at - fb).days >= 730:  # >= 2 years
+                    if fb and (tx_dt - (fb.replace(tzinfo=timezone.utc) if fb.tzinfo is None else fb)).days >= 730:
                         holding = "long_terme"
                     else:
                         holding = "court_terme"
@@ -640,6 +672,78 @@ class ReportService:
         t.setStyle(TableStyle(summary_style_cmds))
         elements.append(t)
         elements.append(Spacer(1, 20))
+
+        # Attribution de performance
+        attr = data.get("attribution", {})
+        if any(v > 0 for v in attr.values()):
+            elements.append(Paragraph("Attribution de Performance", heading_style))
+            total_attr = sum(attr.values()) or 1
+            attr_data = [
+                ["Catégorie", "Valeur", "Poids"],
+                ["Alpha (Altcoins)", _money(attr.get("alpha", 0)), _pct(attr.get("alpha", 0) / total_attr * 100)],
+                ["Beta (BTC)", _money(attr.get("beta", 0)), _pct(attr.get("beta", 0) / total_attr * 100)],
+                [
+                    "Protection (Or)",
+                    _money(attr.get("protection", 0)),
+                    _pct(attr.get("protection", 0) / total_attr * 100),
+                ],
+                [
+                    "Munitions (Cash/Stables)",
+                    _money(attr.get("munitions", 0)),
+                    _pct(attr.get("munitions", 0) / total_attr * 100),
+                ],
+            ]
+            t = Table(attr_data, colWidths=[6 * cm, 4 * cm, 4 * cm])
+            t.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                        ("TOPPADDING", (0, 0), (-1, -1), 8),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                        ("BACKGROUND", (0, 1), (-1, -1), _LIGHT_BG),
+                    ]
+                )
+            )
+            elements.append(t)
+            elements.append(Spacer(1, 20))
+
+        # Flux de trésorerie (Cash Flows)
+        cf = data.get("cash_flows", {})
+        if cf.get("total_deposits", 0) > 0 or cf.get("total_withdrawals", 0) > 0:
+            elements.append(Paragraph("Flux de Trésorerie", heading_style))
+            gain = summary.get("gain_loss", 0)
+            cf_data = [
+                ["Flux", "Montant"],
+                ["Total déposé", _money(cf.get("total_deposits", 0))],
+                ["Total retiré", _money(cf.get("total_withdrawals", 0))],
+                ["Flux nets (dépôts − retraits)", _money(cf.get("net_flows", 0))],
+                ["Plus/Moins-value réelle", _money(gain)],
+            ]
+            t = Table(cf_data, colWidths=[8 * cm, 6 * cm])
+            t.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                        ("TOPPADDING", (0, 0), (-1, -1), 8),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                        ("BACKGROUND", (0, 1), (-1, -1), _LIGHT_BG),
+                        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                        ("TEXTCOLOR", (1, -1), (1, -1), _gain_color(gain)),
+                    ]
+                )
+            )
+            elements.append(t)
+            elements.append(Spacer(1, 20))
 
         # Portfolios
         portfolios = data.get("portfolios", [])
@@ -928,6 +1032,69 @@ class ReportService:
 
             ws_risk.column_dimensions["A"].width = 28
             ws_risk.column_dimensions["B"].width = 18
+
+        # ── Attribution sheet ──────────────────────────────────────────
+        attr = data.get("attribution", {})
+        if any(v > 0 for v in attr.values()):
+            ws_attr = wb.create_sheet("Attribution")
+            ws_attr["A1"] = "Attribution de Performance"
+            ws_attr["A1"].font = Font(bold=True, size=14)
+
+            attr_headers = ["Catégorie", "Valeur", "Poids"]
+            for col, h in enumerate(attr_headers, 1):
+                c = ws_attr.cell(row=3, column=col, value=h)
+                c.font = _XL_HEADER_FONT
+                c.fill = _XL_HEADER_FILL
+                c.border = _XL_BORDER
+
+            total_attr = sum(attr.values()) or 1
+            attr_rows = [
+                ("Alpha (Altcoins)", attr.get("alpha", 0)),
+                ("Beta (BTC)", attr.get("beta", 0)),
+                ("Protection (Or)", attr.get("protection", 0)),
+                ("Munitions (Cash/Stables)", attr.get("munitions", 0)),
+            ]
+            for i, (label, value) in enumerate(attr_rows, 4):
+                ws_attr.cell(row=i, column=1, value=label).border = _XL_BORDER
+                c_val = ws_attr.cell(row=i, column=2, value=value)
+                c_val.number_format = _XL_MONEY
+                c_val.border = _XL_BORDER
+                c_pct = ws_attr.cell(row=i, column=3, value=value / total_attr)
+                c_pct.number_format = _XL_PERCENT
+                c_pct.border = _XL_BORDER
+
+            ws_attr.column_dimensions["A"].width = 28
+            ws_attr.column_dimensions["B"].width = 16
+            ws_attr.column_dimensions["C"].width = 12
+
+        # ── Flux de Trésorerie sheet ──────────────────────────────────
+        cf = data.get("cash_flows", {})
+        if cf.get("total_deposits", 0) > 0 or cf.get("total_withdrawals", 0) > 0:
+            ws_cf = wb.create_sheet("Flux de Trésorerie")
+            ws_cf["A1"] = "Flux de Trésorerie (Cash Flows)"
+            ws_cf["A1"].font = Font(bold=True, size=14)
+
+            for cell_ref in ["A3", "B3"]:
+                ws_cf[cell_ref].font = _XL_HEADER_FONT
+                ws_cf[cell_ref].fill = _XL_HEADER_FILL
+                ws_cf[cell_ref].border = _XL_BORDER
+            ws_cf["A3"] = "Flux"
+            ws_cf["B3"] = "Montant"
+
+            cf_rows = [
+                ("Total déposé", cf.get("total_deposits", 0)),
+                ("Total retiré", cf.get("total_withdrawals", 0)),
+                ("Flux nets (dépôts − retraits)", cf.get("net_flows", 0)),
+                ("Plus/Moins-value réelle", summary.get("gain_loss", 0)),
+            ]
+            for i, (label, value) in enumerate(cf_rows, 4):
+                ws_cf.cell(row=i, column=1, value=label).border = _XL_BORDER
+                c = ws_cf.cell(row=i, column=2, value=value)
+                c.number_format = _XL_MONEY
+                c.border = _XL_BORDER
+
+            ws_cf.column_dimensions["A"].width = 30
+            ws_cf.column_dimensions["B"].width = 18
 
         # ── Performance par Plateforme sheet ─────────────────────────
         platforms = data.get("platform_analysis", [])
@@ -1261,6 +1428,195 @@ class ReportService:
         wb.save(buffer)
         buffer.seek(0)
         return buffer.getvalue()
+
+    # ── Transactions PDF (dedicated) ────────────────────────────────
+
+    def generate_transactions_pdf(self, data: Dict[str, Any]) -> bytes:
+        """Generate a dedicated PDF with all transactions."""
+        transactions = data.get("transactions", [])
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=1.5 * cm,
+            leftMargin=1.5 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=20, spaceAfter=20, textColor=_BLUE)
+        heading_style = ParagraphStyle(
+            "H", parent=styles["Heading2"], fontSize=12, spaceBefore=15, spaceAfter=8, textColor=_DARK_BLUE
+        )
+        normal_style = styles["Normal"]
+        elements = []
+
+        elements.append(Paragraph("Historique des Transactions", title_style))
+        year = data.get("year")
+        period = f"Année {year}" if year else "Toutes les années"
+        elements.append(Paragraph(f"{period} — Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
+        elements.append(Spacer(1, 15))
+
+        # Summary
+        elements.append(Paragraph("Résumé", heading_style))
+        nb = len(transactions)
+        total_volume = sum(t.total for t in transactions)
+        total_fees = sum(t.fee for t in transactions)
+        summary_rows = [
+            ["Nombre de transactions", str(nb)],
+            ["Volume total", _money(total_volume)],
+            ["Total frais", _money(total_fees)],
+        ]
+        t = Table(summary_rows, colWidths=[8 * cm, 5 * cm])
+        t.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("BACKGROUND", (0, 0), (-1, -1), _LIGHT_BG),
+                ]
+            )
+        )
+        elements.append(t)
+        elements.append(Spacer(1, 15))
+
+        # Transaction table
+        if transactions:
+            elements.append(Paragraph("Détail", heading_style))
+            _TYPE_MAP = {
+                "buy": "Achat",
+                "sell": "Vente",
+                "transfer_in": "Transfert ↓",
+                "transfer_out": "Transfert ↑",
+                "conversion_in": "Conv. ↓",
+                "conversion_out": "Conv. ↑",
+                "airdrop": "Airdrop",
+                "staking_reward": "Staking",
+                "fee": "Frais",
+                "dividend": "Dividende",
+                "interest": "Intérêt",
+            }
+            rows = [["Date", "Type", "Actif", "Quantité", "Prix Unitaire", "Valeur Totale", "Frais"]]
+            for tx in transactions:
+                rows.append(
+                    [
+                        tx.date.strftime("%d/%m/%Y") if tx.date else "",
+                        _TYPE_MAP.get(tx.transaction_type, tx.transaction_type),
+                        tx.symbol,
+                        f"{tx.quantity:,.6f}",
+                        _money(tx.price),
+                        _money(tx.total),
+                        _money(tx.fee),
+                    ]
+                )
+            t = Table(rows, colWidths=[2.2 * cm, 2.2 * cm, 2 * cm, 2.4 * cm, 2.8 * cm, 2.8 * cm, 2 * cm])
+            t.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8),
+                        ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                        ("TOPPADDING", (0, 0), (-1, -1), 4),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _LIGHT_BG]),
+                    ]
+                )
+            )
+            elements.append(t)
+
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    # ── Transactions Excel ───────────────────────────────────────────
+
+    def generate_transactions_excel(self, data: Dict[str, Any]) -> bytes:
+        """Generate an Excel file with full transaction history."""
+        transactions = data.get("transactions", [])
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Transactions"
+
+        _TYPE_MAP = {
+            "buy": "Achat",
+            "sell": "Vente",
+            "transfer_in": "Transfert entrant",
+            "transfer_out": "Transfert sortant",
+            "conversion_in": "Conversion entrante",
+            "conversion_out": "Conversion sortante",
+            "airdrop": "Airdrop",
+            "staking_reward": "Staking Reward",
+            "fee": "Frais",
+            "dividend": "Dividende",
+            "interest": "Intérêt",
+        }
+
+        headers = ["Date", "Type", "Actif", "Quantité", "Prix Unitaire (EUR)", "Valeur Totale (EUR)", "Frais (EUR)"]
+        for col, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=col, value=h)
+            c.font = _XL_HEADER_FONT
+            c.fill = _XL_HEADER_FILL
+            c.border = _XL_BORDER
+
+        for row, tx in enumerate(transactions, 2):
+            ws.cell(row=row, column=1, value=tx.date.strftime("%d/%m/%Y") if tx.date else "").border = _XL_BORDER
+            ws.cell(
+                row=row, column=2, value=_TYPE_MAP.get(tx.transaction_type, tx.transaction_type)
+            ).border = _XL_BORDER
+            ws.cell(row=row, column=3, value=tx.symbol).border = _XL_BORDER
+            c = ws.cell(row=row, column=4, value=tx.quantity)
+            c.number_format = "0.000000"
+            c.border = _XL_BORDER
+            ws.cell(row=row, column=5, value=tx.price).number_format = _XL_MONEY
+            ws.cell(row=row, column=5).border = _XL_BORDER
+            ws.cell(row=row, column=6, value=tx.total).number_format = _XL_MONEY
+            ws.cell(row=row, column=6).border = _XL_BORDER
+            ws.cell(row=row, column=7, value=tx.fee).number_format = _XL_MONEY
+            ws.cell(row=row, column=7).border = _XL_BORDER
+
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 18
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    # ── Transactions CSV ─────────────────────────────────────────────
+
+    def generate_transactions_csv(self, data: Dict[str, Any]) -> bytes:
+        """Generate a CSV file with full transaction history."""
+        import csv
+
+        transactions = data.get("transactions", [])
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";")
+        writer.writerow(
+            ["Date", "Type", "Actif", "Quantité", "Prix Unitaire (EUR)", "Valeur Totale (EUR)", "Frais (EUR)"]
+        )
+
+        for tx in transactions:
+            writer.writerow(
+                [
+                    tx.date.strftime("%d/%m/%Y") if tx.date else "",
+                    tx.transaction_type,
+                    tx.symbol,
+                    f"{tx.quantity:.6f}",
+                    f"{tx.price:.2f}",
+                    f"{tx.total:.2f}",
+                    f"{tx.fee:.2f}",
+                ]
+            )
+
+        return buffer.getvalue().encode("utf-8-sig")  # BOM for Excel compatibility
 
 
 # Singleton

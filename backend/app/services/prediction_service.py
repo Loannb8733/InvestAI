@@ -26,9 +26,10 @@ from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
 from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.market_context import MarketContext, compute_market_context
-from app.ml.regime_detector import MarketRegimeDetector, _rsi
+from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeResult, _rsi
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
+from app.services.metrics_service import is_cash_like, is_safe_haven
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
@@ -227,11 +228,57 @@ class PredictionService:
                 for i in range(len(result.dates))
             ]
 
-            trend = result.trend
-            trend_strength = result.trend_strength
-            model_used = result.model_used
-            models_detail = result.models_detail
-            explanations = getattr(result, "explanations", [])
+            # ── Sanity check: reject unrealistic ensemble predictions ─────
+            # If 7d predicted move > ±50%, fallback to EMA-20 extrapolation.
+            if predictions and current_price > 0:
+                final_price = predictions[-1]["price"]
+                ensemble_change_pct = (final_price - current_price) / current_price * 100
+                if abs(ensemble_change_pct) > 50:
+                    logger.warning(
+                        "SANITY CHECK: %s ensemble prediction unrealistic " "(%.1f%% in %dd). Falling back to EMA-20.",
+                        symbol,
+                        ensemble_change_pct,
+                        days_ahead,
+                    )
+                    predictions, ema_trend, ema_strength = self._ema20_fallback(
+                        prices,
+                        current_price,
+                        days_ahead,
+                        smart_round,
+                    )
+                    if predictions:
+                        result_trend = ema_trend
+                        result_strength = ema_strength
+                        result_model = "ema20_sanity_fallback"
+                        result_detail = [
+                            {"name": "EMA-20 (sanity fallback)", "weight_pct": 100, "mape": None, "trend": ema_trend}
+                        ]
+                        result_explanations = []
+                    else:
+                        # EMA fallback also failed — keep original but clamp
+                        result_trend = result.trend
+                        result_strength = result.trend_strength
+                        result_model = result.model_used
+                        result_detail = result.models_detail
+                        result_explanations = getattr(result, "explanations", [])
+                else:
+                    result_trend = result.trend
+                    result_strength = result.trend_strength
+                    result_model = result.model_used
+                    result_detail = result.models_detail
+                    result_explanations = getattr(result, "explanations", [])
+            else:
+                result_trend = result.trend
+                result_strength = result.trend_strength
+                result_model = result.model_used
+                result_detail = result.models_detail
+                result_explanations = getattr(result, "explanations", [])
+
+            trend = result_trend
+            trend_strength = result_strength
+            model_used = result_model
+            models_detail = result_detail
+            explanations = result_explanations
         else:
             # Fallback: simple random walk when no historical data
             logger.warning("No historical data for %s, using random walk", symbol)
@@ -800,23 +847,23 @@ class PredictionService:
                 "display_thresholds": at.build_display_thresholds(None),
             }
 
-        # Deduplicate by symbol: aggregate quantities
+        # Deduplicate by symbol: aggregate quantities (Decimal precision)
         asset_map: Dict[str, object] = {}
-        quantity_map: Dict[str, float] = {}
+        quantity_map: Dict[str, Decimal] = {}
         for a in raw_assets:
             key = a.symbol
             if key not in asset_map:
                 asset_map[key] = a
-                quantity_map[key] = float(a.quantity)
+                quantity_map[key] = Decimal(str(a.quantity))
             else:
-                quantity_map[key] += float(a.quantity)
+                quantity_map[key] += Decimal(str(a.quantity))
         assets = list(asset_map.values())
 
         predictions = []
         bullish_count = 0
         bearish_count = 0
-        total_current = 0.0
-        total_predicted = 0.0
+        total_current = Decimal("0")
+        total_predicted = Decimal("0")
 
         for asset in assets[:10]:
             # Skip stablecoins — their price is pegged, prediction is meaningless
@@ -826,11 +873,13 @@ class PredictionService:
             prediction = await self.get_price_prediction(asset.symbol, asset.asset_type, days_ahead)
 
             qty = quantity_map[asset.symbol]
-            current_value = prediction.current_price * qty
-            predicted_value = prediction.predictions[-1]["price"] * qty if prediction.predictions else current_value
+            price_dec = Decimal(str(prediction.current_price))
+            current_value_dec = price_dec * qty
+            pred_price = prediction.predictions[-1]["price"] if prediction.predictions else prediction.current_price
+            predicted_value_dec = Decimal(str(pred_price)) * qty
 
-            total_current += current_value
-            total_predicted += predicted_value
+            total_current += current_value_dec
+            total_predicted += predicted_value_dec
 
             if prediction.trend == "bullish":
                 bullish_count += 1
@@ -899,7 +948,9 @@ class PredictionService:
                 }
             )
 
-        portfolio_change = ((total_predicted - total_current) / total_current * 100) if total_current > 0 else 0
+        total_current_f = float(total_current)
+        total_predicted_f = float(total_predicted)
+        portfolio_change = ((total_predicted_f - total_current_f) / total_current_f * 100) if total_current_f > 0 else 0
 
         overall_sentiment = (
             "bullish" if bullish_count > bearish_count else "bearish" if bearish_count > bullish_count else "neutral"
@@ -913,8 +964,8 @@ class PredictionService:
         return {
             "predictions": predictions,
             "summary": {
-                "total_current_value": round(total_current, 2),
-                "total_predicted_value": round(total_predicted, 2),
+                "total_current_value": round(total_current_f, 2),
+                "total_predicted_value": round(total_predicted_f, 2),
                 "expected_change_percent": round(portfolio_change, 2),
                 "overall_sentiment": overall_sentiment,
                 "bullish_assets": bullish_count,
@@ -1017,25 +1068,40 @@ class PredictionService:
             )
             assets = result.scalars().all()
 
-            # Deduplicate
+            # Deduplicate (Decimal precision)
             asset_map: Dict[str, object] = {}
-            qty_map: Dict[str, float] = {}
+            qty_map: Dict[str, Decimal] = {}
+            cash_like_qty: Dict[str, Decimal] = {}
             for a in assets:
-                if a.symbol not in asset_map:
-                    asset_map[a.symbol] = a
-                    qty_map[a.symbol] = float(a.quantity)
+                sym = a.symbol
+                qty = Decimal(str(a.quantity))
+                if is_cash_like(sym):
+                    cash_like_qty[sym] = cash_like_qty.get(sym, Decimal("0")) + qty
+                    continue
+                if sym not in asset_map:
+                    asset_map[sym] = a
+                    qty_map[sym] = qty
                 else:
-                    qty_map[a.symbol] += float(a.quantity)
+                    qty_map[sym] += qty
+
+            # Include cash-like value in total for accurate weight calculation
+            for sym, qty in cash_like_qty.items():
+                try:
+                    if PriceService.is_stablecoin(sym):
+                        p = await self.price_service._stablecoin_price_eur(sym)
+                    else:
+                        p = Decimal("1")
+                    total_value += qty * p
+                except Exception:
+                    total_value += qty
 
             for asset in list(asset_map.values())[:10]:
-                if PriceService.is_stablecoin(asset.symbol):
-                    continue
                 try:
                     price = await self._get_current_price(asset.symbol, asset.asset_type)
                     if price == 0:
                         continue
                     price_dec = Decimal(str(price))
-                    qty_dec = Decimal(str(qty_map[asset.symbol]))
+                    qty_dec = qty_map[asset.symbol]
                     value_dec = price_dec * qty_dec
                     total_value += value_dec
                     value = float(value_dec)
@@ -1068,9 +1134,32 @@ class PredictionService:
                                 logger.warning("Failed to fetch history for %s, skipping", asset.symbol)
 
                     if a_prices and len(a_prices) >= 7:
+                        # Bear market indicators
+                        ath = max(a_prices)
+                        drawdown_from_ath = round((a_prices[-1] / ath - 1) * 100, 1) if ath > 0 else 0.0
+                        btc_corr = None
+                        if btc_prices and asset.symbol != "BTC" and len(a_prices) >= 20:
+                            try:
+                                _bp = btc_prices[-len(a_prices) :] if len(btc_prices) >= len(a_prices) else btc_prices
+                                _min = min(len(_bp), len(a_prices))
+                                if _min >= 20:
+                                    _br = np.diff(np.log(np.array(_bp[-_min:], dtype=float)))
+                                    _ar = np.diff(np.log(np.array(a_prices[-_min:], dtype=float)))
+                                    btc_corr = round(float(np.corrcoef(_br, _ar)[0, 1]), 2)
+                            except Exception:
+                                pass
+
                         # For BTC, reuse the market-reference regime to avoid
                         # inconsistency between "Régime BTC" card and per-asset table
                         if asset.symbol == "BTC" and btc_regime:
+                            _btc_rr = RegimeResult(
+                                symbol=asset.symbol,
+                                probabilities=btc_regime["probabilities"],
+                                dominant_regime=btc_regime["dominant_regime"],
+                                confidence=btc_regime["confidence"],
+                                signals=[],
+                                description="",
+                            )
                             per_asset.append(
                                 {
                                     "symbol": asset.symbol,
@@ -1078,8 +1167,12 @@ class PredictionService:
                                     "asset_type": asset.asset_type.value,
                                     "value": round(value, 2),
                                     "dominant_regime": btc_regime["dominant_regime"],
+                                    "regime_6phase": MarketRegimeDetector.refine_to_6phase(_btc_rr, a_prices),
                                     "confidence": btc_regime["confidence"],
                                     "probabilities": btc_regime["probabilities"],
+                                    "drawdown_from_ath": drawdown_from_ath,
+                                    "btc_correlation": None,  # BTC correlation with itself is 1.0
+                                    "is_resilient": is_safe_haven(asset.symbol),
                                 }
                             )
                         else:
@@ -1097,8 +1190,12 @@ class PredictionService:
                                     "asset_type": asset.asset_type.value,
                                     "value": round(value, 2),
                                     "dominant_regime": a_regime.dominant_regime,
+                                    "regime_6phase": MarketRegimeDetector.refine_to_6phase(a_regime, a_prices),
                                     "confidence": a_regime.confidence,
                                     "probabilities": a_regime.probabilities,
+                                    "drawdown_from_ath": drawdown_from_ath,
+                                    "btc_correlation": btc_corr,
+                                    "is_resilient": is_safe_haven(asset.symbol),
                                 }
                             )
                         # Accumulate regime weights from whichever branch was used
@@ -1587,13 +1684,19 @@ class PredictionService:
             )
 
         # ── DCA amount suggestion based on real portfolio value ──
+        # risk_multiplier adjusts DCA sizing: 0.5× in bear → 1.5× in bull
+        from app.ml.regime_detector import RegimeConfig
+
+        _rcfg = RegimeConfig.from_regime(regime)
+        _risk_mult = _rcfg.risk_multiplier
+
         def _dca_hint() -> str:
             if portfolio_value <= 0:
                 return ""
-            # Suggest 2-5% of portfolio per DCA tranche
-            low = round(portfolio_value * 0.02, 2)
-            high = round(portfolio_value * 0.05, 2)
-            return f" Montant suggéré par tranche : {low:.0f}–{high:.0f} € (2-5% de votre portefeuille)."
+            # Base: 2-5% of portfolio, scaled by regime risk_multiplier
+            low = round(portfolio_value * 0.02 * _risk_mult, 2)
+            high = round(portfolio_value * 0.05 * _risk_mult, 2)
+            return f" Montant suggéré par tranche : {low:.0f}–{high:.0f} € ({_risk_mult:.1f}× régime)."
 
         if regime == "bottom" or (fear_greed and fear_greed < 20):
             advice.append(
@@ -1754,20 +1857,24 @@ class PredictionService:
         )
         raw_assets = result.scalars().all()
 
-        # Deduplicate by symbol
+        # Deduplicate by symbol (Decimal precision)
         asset_map: Dict[str, object] = {}
-        qty_map: Dict[str, float] = {}
+        qty_map: Dict[str, Decimal] = {}
+        cash_like_qty: Dict[str, Decimal] = {}
         for a in raw_assets:
-            if PriceService.is_stablecoin(a.symbol):
+            sym = a.symbol
+            qty = Decimal(str(a.quantity))
+            if is_cash_like(sym):
+                cash_like_qty[sym] = cash_like_qty.get(sym, Decimal("0")) + qty
                 continue
-            if a.symbol not in asset_map:
-                asset_map[a.symbol] = a
-                qty_map[a.symbol] = float(a.quantity)
+            if sym not in asset_map:
+                asset_map[sym] = a
+                qty_map[sym] = qty
             else:
-                qty_map[a.symbol] += float(a.quantity)
+                qty_map[sym] += qty
 
         if not asset_map:
-            return {"found": False}
+            return {"found": False, "total_portfolio_value": 0.0}
 
         # ── Fetch BTC prices for correlation baseline ──
         btc_prices: List[float] = []
@@ -1835,7 +1942,7 @@ class PredictionService:
                 if price <= 0:
                     logger.warning("Price fetch failed for %s (batch + fallback), skipping", symbol)
                     continue
-                qty_dec = Decimal(str(qty_map[symbol]))
+                qty_dec = qty_map[symbol]
                 price_dec = Decimal(str(price))
                 value_dec = qty_dec * price_dec
                 total_value += value_dec
@@ -2003,8 +2110,21 @@ class PredictionService:
                         last_pred = prediction.predictions[-1]
                         pred_price = last_pred.get("price", 0)
                         if pred_price > 0 and price > 0:
-                            predicted_7d_pct = (Decimal(str(pred_price)) / price_dec - 1) * 100
-                            prediction_source = "ensemble"
+                            raw_pct = (Decimal(str(pred_price)) / price_dec - 1) * 100
+                            # Sanity check: reject > ±50% moves
+                            if abs(raw_pct) > 50:
+                                logger.warning(
+                                    "SANITY CHECK (alpha): %s ensemble 7d prediction "
+                                    "unrealistic (%.1f%%). Falling back to EMA-20.",
+                                    symbol,
+                                    float(raw_pct),
+                                )
+                                # Force EMA-20 fallback below
+                                predicted_7d_pct = Decimal("0")
+                                prediction_source = "none"
+                            else:
+                                predicted_7d_pct = raw_pct
+                                prediction_source = "ensemble"
                 except Exception as e:
                     logger.debug("7d prediction failed for %s: %s", symbol, e)
 
@@ -2045,7 +2165,18 @@ class PredictionService:
                 logger.warning("Alpha scoring failed for %s: %s", symbol, e)
 
         if not scored_assets:
-            return {"found": False}
+            return {"found": False, "total_portfolio_value": 0.0}
+
+        # Include cash-like assets in total for accurate weight calculation
+        for sym, qty in cash_like_qty.items():
+            try:
+                if PriceService.is_stablecoin(sym):
+                    p = await self.price_service._stablecoin_price_eur(sym)
+                else:
+                    p = Decimal("1")  # fiat EUR=1, others approximated
+                total_value += qty * p
+            except Exception:
+                total_value += qty  # fallback: assume 1:1
 
         total_value_f = float(total_value)
 
@@ -2078,7 +2209,36 @@ class PredictionService:
     STRATEGY_MATRIX = {
         # (alpha_level, cycle_phase) → (action, description, impact_pct)
         # alpha_level: high (>= 60), medium (30-59), low (< 30)
-        # cycle_phase: bottom/bearish/bullish/top
+        # cycle_phase: 6 professional phases
+        # --- Bottoming (RSI < 30, divergence haussière, épuisement vendeur) ---
+        ("high", "bottoming"): (
+            "ACHAT FORT",
+            "Alpha élevé + Bottoming : signal d'achat optimal (RSI survente + divergence)",
+            5.0,
+        ),
+        ("medium", "bottoming"): ("DCA", "Signal moyen + Bottoming : DCA conservateur", 3.0),
+        ("low", "bottoming"): ("OBSERVER", "Faible alpha + Bottoming : surveiller les signaux", 0.0),
+        # --- Accumulation (prix stable, Smart Money Flow positif) ---
+        ("high", "accumulation"): ("DCA", "Alpha élevé + Accumulation : accumuler progressivement", 4.0),
+        ("medium", "accumulation"): ("DCA", "Signal moyen + Accumulation : fenêtre d'entrée progressive", 2.0),
+        ("low", "accumulation"): ("OBSERVER", "Faible alpha + Accumulation : pas encore de signal clair", 0.0),
+        # --- Mark-up (cassure de résistance, volume croissant) ---
+        ("high", "markup"): ("MAINTENIR", "Alpha élevé + Mark-up : laisser courir les gains", 0.0),
+        ("medium", "markup"): ("MAINTENIR", "Signal moyen + Mark-up : conserver les positions", 0.0),
+        ("low", "markup"): ("CONSERVER", "Faible alpha en Mark-up : ne pas vendre", 0.0),
+        # --- Topping (RSI > 70, divergence baissière, risque de retournement) ---
+        ("high", "topping"): ("PRENDRE PROFITS", "Alpha élevé mais Topping : sécuriser 20-30%", -2.0),
+        ("medium", "topping"): ("ALLÉGER", "Signal moyen + Topping : réduire l'exposition", -3.0),
+        ("low", "topping"): ("VENDRE", "Faible alpha + Topping : signal de vente prioritaire", -5.0),
+        # --- Distribution (prix stagne sur sommets, gros volumes sortants) ---
+        ("high", "distribution"): ("ALLÉGER", "Alpha élevé + Distribution : sécuriser une partie", -2.0),
+        ("medium", "distribution"): ("VENDRE", "Signal moyen + Distribution : réduire avant le markdown", -4.0),
+        ("low", "distribution"): ("VENDRE", "Faible alpha + Distribution : sortir avant la chute", -5.0),
+        # --- Markdown (structure descendante, Lower Highs) ---
+        ("high", "markdown"): ("DCA", "Alpha élevé en Markdown : accumuler progressivement (contrarian)", 3.0),
+        ("medium", "markdown"): ("ATTENDRE", "Signal moyen en Markdown : patience, pas de renforcement", 0.0),
+        ("low", "markdown"): ("ÉVITER", "Faible alpha en Markdown : ne pas renforcer", 0.0),
+        # --- Backward-compat: old 4-phase names still work ---
         ("high", "bottom"): ("ACHAT FORT", "Alpha élevé + creux de marché : signal d'achat optimal", 5.0),
         ("high", "bearish"): ("DCA", "Alpha élevé en bear market : accumuler progressivement", 3.0),
         ("high", "bullish"): ("MAINTENIR", "Alpha élevé en bull : laisser courir", 0.0),
@@ -2130,23 +2290,42 @@ class PredictionService:
             value = scored.get("value", 0)
             weight_pct = scored.get("weight_pct", 0)
 
-            # Alpha level
-            if score >= 60:
+            # Alpha level — regime-aware thresholds via RegimeConfig.alpha_threshold
+            _global_regime = market_regime.get("dominant_regime", "") if market_regime else ""
+            _alpha_cfg = RegimeConfig.from_regime(_global_regime)
+            _high_thresh = _alpha_cfg.alpha_threshold  # 85 in bear, 60 in bull
+            _mid_thresh = max(30, _high_thresh - 30)  # 55 in bear, 30 in bull
+            if score >= _high_thresh:
                 alpha_level = "high"
-            elif score >= 30:
+            elif score >= _mid_thresh:
                 alpha_level = "medium"
             else:
                 alpha_level = "low"
 
-            # Cycle phase — from per-asset regime or fallback to market
+            # Cycle phase — prefer 6-phase, fallback to 4-phase dominant_regime
             cycle_info = regime_map.get(sym, {})
             regime = cycle_info.get(
-                "dominant_regime", market_regime.get("dominant_regime", "bullish") if market_regime else "bullish"
+                "regime_6phase",
+                cycle_info.get(
+                    "dominant_regime",
+                    market_regime.get("dominant_regime", "bullish") if market_regime else "bullish",
+                ),
             )
 
             # Decision matrix lookup
             key = (alpha_level, regime)
             action, description, impact_pct = self.STRATEGY_MATRIX.get(key, ("OBSERVER", "Données insuffisantes", 0.0))
+
+            # Bear market validation: ACHAT FORT requires RSI < 35 confirmation
+            # when the global market is in markdown/bearish/distribution
+            global_regime = market_regime.get("dominant_regime", "") if market_regime else ""
+            if action == "ACHAT FORT" and global_regime in ("bearish", "top", "markdown", "distribution"):
+                # Check if scored asset has RSI divergence confirmation
+                has_divergence = any(r.get("label", "") == "Divergence Haussière" for r in scored.get("reasons", []))
+                if not has_divergence:
+                    action = "DCA"
+                    description = "Bear market : ACHAT FORT dégradé en DCA (divergence RSI non confirmée)"
+                    impact_pct = 2.0
 
             # Compute portfolio impact
             impact_eur = round(value * impact_pct / 100, 2) if value > 0 else 0.0
@@ -2158,6 +2337,11 @@ class PredictionService:
                 summary_sells += 1
             else:
                 summary_holds += 1
+
+            # Bull market: virtual trailing stop hint based on EMA-20
+            trailing_stop = None
+            if regime in ("markup", "bullish") and action in ("MAINTENIR", "CONSERVER"):
+                trailing_stop = "EMA-20 trailing stop recommandé — remonter le stop-loss sous l'EMA-20"
 
             strategy_rows.append(
                 {
@@ -2174,6 +2358,8 @@ class PredictionService:
                     "impact_pct": impact_pct,
                     "impact_eur": impact_eur,
                     "predicted_7d_pct": scored.get("predicted_7d_pct", 0),
+                    "is_resilient": is_safe_haven(sym),
+                    "trailing_stop": trailing_stop,
                 }
             )
 
@@ -2215,29 +2401,31 @@ class PredictionService:
         )
         raw_assets = result.scalars().all()
 
-        # Deduplicate by symbol
+        # Deduplicate by symbol (Decimal precision)
         wi_asset_map: Dict[str, object] = {}
-        wi_qty_map: Dict[str, float] = {}
+        wi_qty_map: Dict[str, Decimal] = {}
         for a in raw_assets:
             if a.symbol not in wi_asset_map:
                 wi_asset_map[a.symbol] = a
-                wi_qty_map[a.symbol] = float(a.quantity)
+                wi_qty_map[a.symbol] = Decimal(str(a.quantity))
             else:
-                wi_qty_map[a.symbol] += float(a.quantity)
+                wi_qty_map[a.symbol] += Decimal(str(a.quantity))
         assets = list(wi_asset_map.values())
 
         # Build scenario map
         scenario_map = {s["symbol"].upper(): s["change_percent"] for s in scenarios}
 
         per_asset = []
-        total_current = 0.0
-        total_simulated = 0.0
+        total_current = Decimal("0")
+        total_simulated = Decimal("0")
 
         for asset in assets[:15]:
             price = await self._get_current_price(asset.symbol, asset.asset_type)
-            current_val = price * wi_qty_map[asset.symbol]
+            price_dec = Decimal(str(price))
+            qty_dec = wi_qty_map[asset.symbol]
+            current_val = price_dec * qty_dec
             change = scenario_map.get(asset.symbol.upper(), 0.0)
-            simulated_val = current_val * (1 + change / 100)
+            simulated_val = current_val * Decimal(str(1 + change / 100))
 
             total_current += current_val
             total_simulated += simulated_val
@@ -2246,18 +2434,20 @@ class PredictionService:
                 {
                     "symbol": asset.symbol,
                     "name": asset.name,
-                    "current_value": round(current_val, 2),
-                    "simulated_value": round(simulated_val, 2),
+                    "current_value": round(float(current_val), 2),
+                    "simulated_value": round(float(simulated_val), 2),
                     "change_percent": change,
-                    "impact": round(simulated_val - current_val, 2),
+                    "impact": round(float(simulated_val - current_val), 2),
                 }
             )
 
-        impact_pct = ((total_simulated - total_current) / total_current * 100) if total_current > 0 else 0
+        total_current_f = float(total_current)
+        total_simulated_f = float(total_simulated)
+        impact_pct = ((total_simulated_f - total_current_f) / total_current_f * 100) if total_current_f > 0 else 0
 
         return {
-            "current_value": round(total_current, 2),
-            "simulated_value": round(total_simulated, 2),
+            "current_value": round(total_current_f, 2),
+            "simulated_value": round(total_simulated_f, 2),
             "impact_percent": round(impact_pct, 2),
             "per_asset": per_asset,
         }
@@ -3189,6 +3379,53 @@ class PredictionService:
         elif trend == "bearish":
             return "Tendance légèrement baissière — Surveiller les supports"
         return "Tendance neutre — Attendre un signal plus clair avant de prendre position"
+
+    @staticmethod
+    def _ema20_fallback(
+        prices: List[float],
+        current_price: float,
+        days_ahead: int,
+        smart_round,
+    ) -> Tuple[List[Dict], str, float]:
+        """EMA-20 slope extrapolation — used as sanity fallback when ensemble is unrealistic.
+
+        Returns (predictions_list, trend, trend_strength).
+        Returns empty list if insufficient data.
+        """
+        if not prices or len(prices) < 20 or current_price <= 0:
+            return [], "neutral", 0.0
+
+        arr = np.array(prices[-20:], dtype=float)
+        ema = arr.copy()
+        k = 2 / 21  # EMA-20 smoothing factor
+        for idx in range(1, len(ema)):
+            ema[idx] = arr[idx] * k + ema[idx - 1] * (1 - k)
+
+        # Daily slope from last 5 EMA values
+        daily_slope = (ema[-1] - ema[-5]) / max(ema[-5], 1e-10) / 5
+        # Clamp daily slope to ±2% per day (prevents extreme extrapolation)
+        daily_slope = max(-0.02, min(0.02, daily_slope))
+
+        trend = "bullish" if daily_slope > 0.001 else "bearish" if daily_slope < -0.001 else "neutral"
+        trend_strength = min(80.0, abs(daily_slope) * 5000)
+
+        predictions = []
+        for day in range(1, days_ahead + 1):
+            date = (datetime.utcnow() + timedelta(days=day)).strftime("%Y-%m-%d")
+            predicted = current_price * (1 + daily_slope * day)
+            predicted = max(0.0, predicted)
+            # Conservative CI: ±3% * sqrt(day)
+            ci_margin = 0.03 * math.sqrt(day)
+            predictions.append(
+                {
+                    "date": date,
+                    "price": smart_round(predicted),
+                    "confidence_low": smart_round(predicted * (1 - ci_margin)),
+                    "confidence_high": smart_round(predicted * (1 + ci_margin)),
+                }
+            )
+
+        return predictions, trend, trend_strength
 
     async def _random_walk_fallback(
         self,

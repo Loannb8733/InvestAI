@@ -3,6 +3,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -21,10 +22,11 @@ import {
   BarChart3,
   Brain,
   CheckCircle2,
+  Flame,
   Gauge,
-  Loader2,
   RefreshCw,
   Shield,
+  Snowflake,
   Target,
   TrendingDown,
   TrendingUp,
@@ -77,14 +79,28 @@ interface AnomalyImpact {
   detected_at: string
 }
 
+interface RegimeConfig {
+  risk_multiplier: number
+  alpha_threshold: number
+  gold_relevance: string
+  mode_label: string
+  vol_regime: string
+}
+
 interface MetricsSummary {
   sharpe_ratio: number
   sortino_ratio: number
   volatility: number
   var_95: number
+  var_95_window?: number
   max_drawdown: number
   hhi: number
   total_value: number
+  days?: number
+  gold_exposure?: number
+  gold_beta?: number | null
+  gold_badge?: string | null
+  regime_config?: RegimeConfig | null
 }
 
 interface IndicatorSignal {
@@ -174,18 +190,56 @@ export default function SmartInsightsPage() {
     }
   }
 
+  // Regime-aware styling
+  const regimeConfig = data?.metrics_summary?.regime_config
+  const dominantRegime = data?.market_regime?.market?.dominant_regime ?? ''
+  const isBearMode = ['bearish', 'markdown', 'distribution', 'bottom', 'bottoming'].includes(dominantRegime)
+  const isBullMode = ['bullish', 'markup'].includes(dominantRegime)
+
+  const getRegimeBadge = () => {
+    if (!regimeConfig) return null
+    if (isBearMode) return (
+      <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/30 gap-1 px-3 py-1">
+        <Snowflake className="h-3.5 w-3.5" />
+        {regimeConfig.mode_label}
+      </Badge>
+    )
+    if (isBullMode) return (
+      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 gap-1 px-3 py-1">
+        <Flame className="h-3.5 w-3.5" />
+        {regimeConfig.mode_label}
+      </Badge>
+    )
+    return (
+      <Badge variant="outline" className="gap-1 px-3 py-1">
+        <Activity className="h-3.5 w-3.5" />
+        {regimeConfig.mode_label}
+      </Badge>
+    )
+  }
+
+  // Adaptive accent: bear → blue/gray, bull → amber/green
+  const pageAccent = isBearMode
+    ? 'border-blue-500/20'
+    : isBullMode
+      ? 'border-amber-500/20'
+      : ''
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Brain className="h-8 w-8 text-primary" />
-            Smart Insights
-          </h1>
-          <p className="text-muted-foreground">
-            Analyse IA de votre portefeuille avec recommandations personnalisées
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Brain className="h-8 w-8 text-primary" />
+              Smart Insights
+            </h1>
+            <p className="text-muted-foreground">
+              Analyse IA de votre portefeuille avec recommandations personnalisées
+            </p>
+          </div>
+          {getRegimeBadge()}
         </div>
         <div className="flex items-center gap-3">
           <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
@@ -206,8 +260,46 @@ export default function SmartInsightsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="space-y-4">
+          {/* Score + metrics skeleton */}
+          <div className="grid gap-4 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="pt-6 space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-20" />
+                  <Skeleton className="h-3 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Regime card skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-72 mt-1" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-full rounded-lg" />
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          {/* Insights skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-5 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </CardContent>
+          </Card>
         </div>
       ) : isError ? (
         <Card>
@@ -225,11 +317,11 @@ export default function SmartInsightsPage() {
           {/* Score global + Metriques */}
           <div className="grid gap-4 lg:grid-cols-4">
             {/* Score */}
-            <Card className={`border-2 ${getScoreBg(data.overall_score)}`}>
+            <Card className={`border-2 ${getScoreBg(data.overall_score)} ${pageAccent}`}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Score global</p>
+                    <p className="text-sm text-muted-foreground">Score global ({days}j)</p>
                     <div className={`text-5xl font-bold ${getScoreColor(data.overall_score)}`}>
                       {data.overall_score}
                     </div>
@@ -245,7 +337,7 @@ export default function SmartInsightsPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Ratio de Sharpe</p>
+                    <p className="text-sm text-muted-foreground">Ratio de Sharpe ({days}j)</p>
                     <div className={`text-3xl font-bold ${(data.metrics_summary.sharpe_ratio ?? 0) >= 1 ? 'text-green-500' : (data.metrics_summary.sharpe_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
                       {(data.metrics_summary.sharpe_ratio ?? 0).toFixed(2)}
                     </div>
@@ -272,12 +364,15 @@ export default function SmartInsightsPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">VaR 95%</p>
+                    <p className="text-sm text-muted-foreground">VaR 95% ({days}j)</p>
                     <div className="text-3xl font-bold text-red-500">
                       {formatCurrency(data.metrics_summary.var_95 ?? 0)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Perte max/jour (5% prob.)
+                      {data.metrics_summary.var_95_window != null && data.metrics_summary.var_95_window > 0 && (
+                        <> | {formatCurrency(data.metrics_summary.var_95_window)} sur {days}j</>
+                      )}
                     </p>
                   </div>
                   <TooltipProvider>
@@ -286,7 +381,7 @@ export default function SmartInsightsPage() {
                         <Shield className="h-8 w-8 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Perte maximale attendue sur 1 jour avec 95% de confiance</p>
+                        <p>VaR journaliere: {formatCurrency(data.metrics_summary.var_95 ?? 0)} sur {formatCurrency(data.metrics_summary.total_value ?? 0)}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -326,7 +421,7 @@ export default function SmartInsightsPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Max Drawdown</p>
+                    <p className="text-sm text-muted-foreground">Max Drawdown ({days}j)</p>
                     <div className={`text-3xl font-bold ${Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.25 ? 'text-red-500' : Math.abs(data.metrics_summary.max_drawdown ?? 0) > 0.15 ? 'text-yellow-500' : 'text-green-500'}`}>
                       {(Math.abs(data.metrics_summary.max_drawdown ?? 0) * 100).toFixed(0)}%
                     </div>
@@ -347,7 +442,92 @@ export default function SmartInsightsPage() {
                 </div>
               </CardContent>
             </Card>
+            {/* Gold / Safe Haven */}
+            {(data.metrics_summary.gold_exposure ?? 0) > 0 && (
+              <Card className="border-yellow-500/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Exposition Or</p>
+                      <div className="text-3xl font-bold text-yellow-500">
+                        {((data.metrics_summary.gold_exposure ?? 0) * 100).toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {data.metrics_summary.gold_badge === 'bouclier_anti_crise'
+                          ? 'Bouclier Anti-Crise (Beta < 0.1)'
+                          : data.metrics_summary.gold_beta != null
+                            ? `Beta vs BTC: ${data.metrics_summary.gold_beta.toFixed(2)}`
+                            : 'Valeur refuge'}
+                      </p>
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Shield className={`h-8 w-8 ${data.metrics_summary.gold_badge === 'bouclier_anti_crise' ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Or: actif decorrelé du BTC. Amortit les crashs crypto.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
+
+          {/* Flash Crash Impact */}
+          {data.anomaly_impacts.length > 0 && (() => {
+            const totalFlashImpact = data.anomaly_impacts.reduce(
+              (sum: number, a: AnomalyImpact) => sum + (a.impact_eur < 0 ? a.impact_eur : 0), 0
+            )
+            const totalValue = data.metrics_summary.total_value || 1
+            const flashPct = (totalFlashImpact / totalValue) * 100
+            return (
+              <Card className="border-orange-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Flame className="h-5 w-5 text-orange-500" />
+                    Impact Flash Crash
+                  </CardTitle>
+                  <CardDescription>
+                    Simulation de perte immédiate basée sur les anomalies détectées
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Perte simulée</p>
+                      <p className="text-3xl font-bold text-red-500">
+                        {formatCurrency(Math.abs(totalFlashImpact))}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        soit {Math.abs(flashPct).toFixed(1)}% de {formatCurrency(totalValue)}
+                      </p>
+                    </div>
+                    <div className={`h-16 w-16 rounded-full flex items-center justify-center ${
+                      Math.abs(flashPct) > 10 ? 'bg-red-500/10' : Math.abs(flashPct) > 5 ? 'bg-orange-500/10' : 'bg-yellow-500/10'
+                    }`}>
+                      <Flame className={`h-8 w-8 ${
+                        Math.abs(flashPct) > 10 ? 'text-red-500' : Math.abs(flashPct) > 5 ? 'text-orange-500' : 'text-yellow-500'
+                      }`} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {data.anomaly_impacts.filter((a: AnomalyImpact) => a.impact_eur < 0).map((anomaly: AnomalyImpact, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{anomaly.symbol}</span>
+                          <Badge variant="outline" className="text-xs">{anomaly.anomaly_type}</Badge>
+                        </div>
+                        <span className="font-mono text-red-500">{formatCurrency(anomaly.impact_eur)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
 
           {/* Market Regime */}
           {data.market_regime && (
@@ -569,10 +749,17 @@ export default function SmartInsightsPage() {
 // ──────────────────────────────────────────────────────
 
 const REGIME_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  bearish: { label: 'Baissier', color: '#ef4444', bg: 'bg-red-500/10', icon: <TrendingDown className="h-5 w-5 text-red-500" /> },
-  bottom: { label: 'Creux', color: '#f97316', bg: 'bg-orange-500/10', icon: <ArrowUpRight className="h-5 w-5 text-orange-500" /> },
-  bullish: { label: 'Haussier', color: '#22c55e', bg: 'bg-green-500/10', icon: <TrendingUp className="h-5 w-5 text-green-500" /> },
-  top: { label: 'Sommet', color: '#a855f7', bg: 'bg-purple-500/10', icon: <ArrowDownRight className="h-5 w-5 text-purple-500" /> },
+  bearish: { label: 'Markdown', color: '#ef4444', bg: 'bg-red-500/10', icon: <TrendingDown className="h-5 w-5 text-red-500" /> },
+  bottom: { label: 'Bottoming', color: '#f97316', bg: 'bg-orange-500/10', icon: <ArrowUpRight className="h-5 w-5 text-orange-500" /> },
+  bullish: { label: 'Mark-up', color: '#22c55e', bg: 'bg-green-500/10', icon: <TrendingUp className="h-5 w-5 text-green-500" /> },
+  top: { label: 'Topping', color: '#a855f7', bg: 'bg-purple-500/10', icon: <ArrowDownRight className="h-5 w-5 text-purple-500" /> },
+  // Extended 6-phase labels
+  markdown: { label: 'Markdown', color: '#ef4444', bg: 'bg-red-500/10', icon: <TrendingDown className="h-5 w-5 text-red-500" /> },
+  bottoming: { label: 'Bottoming', color: '#f97316', bg: 'bg-orange-500/10', icon: <ArrowUpRight className="h-5 w-5 text-orange-500" /> },
+  accumulation: { label: 'Accumulation', color: '#eab308', bg: 'bg-yellow-500/10', icon: <Target className="h-5 w-5 text-yellow-500" /> },
+  markup: { label: 'Mark-up', color: '#22c55e', bg: 'bg-green-500/10', icon: <TrendingUp className="h-5 w-5 text-green-500" /> },
+  topping: { label: 'Topping', color: '#a855f7', bg: 'bg-purple-500/10', icon: <ArrowDownRight className="h-5 w-5 text-purple-500" /> },
+  distribution: { label: 'Distribution', color: '#ec4899', bg: 'bg-pink-500/10', icon: <AlertTriangle className="h-5 w-5 text-pink-500" /> },
 }
 
 const SIGNAL_COLORS: Record<string, string> = {
@@ -580,6 +767,12 @@ const SIGNAL_COLORS: Record<string, string> = {
   bottom: 'border-orange-500/40 text-orange-500',
   bullish: 'border-green-500/40 text-green-500',
   top: 'border-purple-500/40 text-purple-500',
+  markdown: 'border-red-500/40 text-red-500',
+  bottoming: 'border-orange-500/40 text-orange-500',
+  accumulation: 'border-yellow-500/40 text-yellow-500',
+  markup: 'border-green-500/40 text-green-500',
+  topping: 'border-purple-500/40 text-purple-500',
+  distribution: 'border-pink-500/40 text-pink-500',
 }
 
 function RegimeBar({ probabilities }: { probabilities: Record<string, number> }) {
@@ -675,6 +868,11 @@ function MarketRegimeCard({ regime }: { regime: MarketRegime }) {
         )}
 
         {/* Per-asset regimes */}
+        {regime.per_asset.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Aucun actif risqué détecté — l'analyse nécessite des positions en cryptomonnaies, actions ou ETF.
+          </p>
+        )}
         {regime.per_asset.length > 0 && (
           <div>
             <p className="text-sm font-medium mb-2">Par actif</p>

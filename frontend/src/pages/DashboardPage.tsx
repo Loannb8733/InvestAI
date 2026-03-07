@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-import { dashboardApi } from '@/services/api'
+import { dashboardApi, crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/stores/authStore'
 import AllocationChart from '@/components/charts/AllocationChart'
@@ -45,6 +45,7 @@ import {
   RotateCcw,
   X,
   Radio,
+  Landmark,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { useExportPdf } from '@/hooks/useExportPdf'
@@ -53,6 +54,7 @@ import DashboardMetricsRow from '@/components/dashboard/DashboardMetricsRow'
 import DashboardPnlCard from '@/components/dashboard/DashboardPnlCard'
 import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
+import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
 
 // ============== Interfaces ==============
 
@@ -181,6 +183,7 @@ interface DashboardMetrics {
   upcoming_events: UpcomingEvent[]
   index_comparison: IndexComparison[]
   advanced_metrics: AdvancedMetrics
+  available_liquidity?: number
   period_days?: number
   period_label?: string
   last_updated: string
@@ -356,6 +359,12 @@ export default function DashboardPage() {
     refetchInterval: 60000,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  })
+
+  const { data: cfDashboard } = useQuery<import('@/types/crowdfunding').CrowdfundingDashboard>({
+    queryKey: ['crowdfunding', 'dashboard'],
+    queryFn: () => crowdfundingApi.getDashboard(),
+    staleTime: 60_000,
   })
 
   const { data: benchmarks } = useQuery<Array<{ name: string; symbol: string; data: Array<{ date: string; value: number }> }>>({
@@ -559,7 +568,46 @@ export default function DashboardPage() {
                     isDailyPositive={isDailyPositive}
                     portfoliosCount={metrics.portfolios_count}
                     selectedPeriod={selectedPeriod}
+                    availableLiquidity={metrics.available_liquidity}
                   />
+                )
+              case 'munitions':
+                return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} />
+              case 'crowdfunding':
+                if (!cfDashboard || cfDashboard.active_count === 0 && cfDashboard.completed_count === 0) return null
+                return (
+                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/crowdfunding')}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-blue-400" />
+                        Crowdfunding
+                        <Badge variant="outline" className="ml-auto text-[10px]">
+                          {cfDashboard.active_count} actif{cfDashboard.active_count > 1 ? 's' : ''}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total investi</p>
+                          <p className="text-lg font-bold">{formatCurrency(cfDashboard.total_invested)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Rendement projeté/an</p>
+                          <p className="text-lg font-bold text-green-500">+{formatCurrency(cfDashboard.projected_annual_interest)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Taux moyen</p>
+                          <p className="text-lg font-bold">{cfDashboard.weighted_average_rate.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                      {cfDashboard.next_maturity && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Prochaine échéance : {new Date(cfDashboard.next_maturity).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
                 )
               case 'pnl':
                 return (
