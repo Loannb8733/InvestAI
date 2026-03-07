@@ -84,17 +84,36 @@ def _find_number_near(text: str, keywords: list[str], is_percent: bool = False, 
     return None
 
 
+def _clean_text(text: str) -> str:
+    """Normalize extracted PDF text for better parsing."""
+    # Normalize euro symbols
+    text = re.sub(r"\bEUR\b|euros?", "€", text, flags=re.IGNORECASE)
+    # Normalize dashes
+    text = text.replace("\u2013", "-").replace("\u2014", "-")
+    # Remove control characters (keep newlines and tabs)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    # Normalize non-breaking spaces
+    text = text.replace("\xa0", " ")
+    # Collapse multiple spaces into one (preserve newlines)
+    text = re.sub(r"[^\S\n]+", " ", text)
+    # Collapse 3+ consecutive blank lines into 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    # Strip trailing whitespace per line
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    return text.strip()
+
+
 class PDFParser:
     """Extracts structured financial data from crowdfunding PDFs."""
 
     def extract_text(self, file_bytes: bytes) -> str:
-        """Extract full text from PDF."""
+        """Extract full text from PDF with cleanup."""
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         pages = []
         for page in doc:
             text = page.get_text()
             if text.strip():
-                pages.append(text.strip())
+                pages.append(_clean_text(text))
         doc.close()
         return "\n\n---PAGE---\n\n".join(pages)
 

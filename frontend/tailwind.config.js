@@ -14,6 +14,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -55,6 +58,15 @@ export default {
         warning: {
           DEFAULT: "hsl(47.9 95.8% 53.1%)",
           foreground: "hsl(26 83.3% 14.1%)",
+        },
+        emerald: {
+          DEFAULT: "hsl(var(--emerald, 160 84% 39%))",
+        },
+        indigo: {
+          DEFAULT: "hsl(var(--indigo, 234 89% 63%))",
+        },
+        gold: {
+          DEFAULT: "hsl(var(--gold, 38 92% 50%))",
         },
       },
       borderRadius: {

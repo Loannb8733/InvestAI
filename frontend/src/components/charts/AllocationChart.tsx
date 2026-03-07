@@ -12,13 +12,13 @@ interface AllocationChartProps {
 }
 
 const COLORS = {
-  crypto: '#F7931A',
-  stock: '#2563EB',
-  etf: '#7C3AED',
-  real_estate: '#059669',
-  bond: '#DC2626',
-  crowdfunding: '#0EA5E9',
-  other: '#6B7280',
+  crypto: '#6366F1',
+  stock: '#818CF8',
+  etf: '#A78BFA',
+  real_estate: '#F59E0B',
+  bond: '#FBBF24',
+  crowdfunding: '#10B981',
+  other: '#64748B',
 }
 
 const LABELS = {
@@ -68,6 +68,15 @@ export default function AllocationChart({ data }: AllocationChartProps) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <PieChart>
+        <defs>
+          <filter id="pieGlow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <Pie
           data={chartData}
           cx="50%"
@@ -76,6 +85,8 @@ export default function AllocationChart({ data }: AllocationChartProps) {
           outerRadius={100}
           paddingAngle={2}
           dataKey="value"
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth={1}
         >
           {chartData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={entry.color} />

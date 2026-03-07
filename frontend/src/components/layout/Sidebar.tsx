@@ -93,8 +93,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         cn(
           'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
           isActive
-            ? 'bg-primary/10 text-primary'
-            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            ? 'bg-indigo-500/10 text-indigo-400'
+            : 'text-muted-foreground hover:bg-white/[0.05] hover:text-foreground'
         )
       }
     >
@@ -104,11 +104,11 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   )
 
   const sidebarContent = (
-    <aside className="w-64 bg-card border-r border-border flex flex-col h-full">
+    <aside className="w-64 bg-white/[0.02] border-r border-white/[0.06] backdrop-blur-xl flex flex-col h-full">
       {/* Logo */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-border">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-white/[0.06]">
         <div className="flex items-center">
-          <TrendingUp className="h-8 w-8 text-primary mr-2" />
+          <TrendingUp className="h-8 w-8 text-indigo-400 mr-2 drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
           <span className="text-xl font-bold">InvestAI</span>
         </div>
         <Button
@@ -154,7 +154,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </div>
 
       {/* User info */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-white/[0.06]">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
             <span className="text-sm font-medium text-primary">

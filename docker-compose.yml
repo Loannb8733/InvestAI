@@ -70,6 +70,11 @@ services:
       - FERNET_KEY=${FERNET_KEY}
       # External APIs (optional)
       - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # Ollama (local LLM — free)
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mistral}
       # Email (SMTP)
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -147,6 +152,36 @@ services:
       - celery
     command: celery -A app.tasks.celery_app beat --loglevel=info
 
+  # Ollama (local LLM — free, no API key needed)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: investai-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auto-pull Ollama model on startup (runs once then exits)
+  ollama-pull:
+    image: curlimages/curl:latest
+    container_name: investai-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c 'echo "Pulling model ${OLLAMA_MODEL:-mistral}..." &&
+             curl -sf -X POST http://ollama:11434/api/pull
+             -H "Content-Type: application/json"
+             -d "{\"name\":\"${OLLAMA_MODEL:-mistral}\"}" &&
+             echo "Model ready."'
+    restart: "no"
+
   # Frontend React
   frontend:
     build:
@@ -202,3 +237,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:

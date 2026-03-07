@@ -129,8 +129,8 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
                 <Radar
                   name="Score"
                   dataKey="score"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
+                  stroke="#6366F1"
+                  fill="#6366F1"
                   fillOpacity={0.3}
                   strokeWidth={2}
                 />
@@ -190,12 +190,17 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
 
             {/* Red Flags */}
             {audit.red_flags.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-red-600 mb-2">Red Flags</h4>
+              <div className="rounded-lg ring-2 ring-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)] p-3">
+                <h4 className="text-sm font-medium text-red-600 mb-2 flex items-center gap-2">
+                  Red Flags
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold animate-pulse">
+                    {audit.red_flags.length}
+                  </span>
+                </h4>
                 <ul className="space-y-1">
                   {audit.red_flags.map((p, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-red-600">
-                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                    <li key={i} className="flex items-start gap-2 text-sm text-red-400">
+                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]" />
                       {p}
                     </li>
                   ))}

@@ -28,7 +28,7 @@ interface PerformanceChartProps {
 
 export default function PerformanceChart({
   data,
-  color = '#2563EB',
+  color = '#6366F1',
   period = 30,
 }: PerformanceChartProps) {
   const hasInvested = data?.some(d => d.invested != null && d.invested > 0) ?? false
@@ -122,9 +122,16 @@ export default function PerformanceChart({
       >
         <defs>
           <linearGradient id={`colorValue-${period}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.2} />
+            <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
         <XAxis
@@ -169,7 +176,8 @@ export default function PerformanceChart({
           fillOpacity={1}
           fill={`url(#colorValue-${period})`}
           dot={data.length <= 14}
-          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
+          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', filter: 'url(#glow)' }}
+          filter="url(#glow)"
         />
         {hasInvested && (
           <Area

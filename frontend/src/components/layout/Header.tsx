@@ -24,7 +24,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="h-16 border-b border-border flex items-center justify-between px-6">
+    <header className="h-16 border-b border-white/[0.06] bg-background/80 backdrop-blur-md flex items-center justify-between px-6">
       <div className="flex items-center gap-2">
         {/* Mobile hamburger menu */}
         <Button
