@@ -1,0 +1,477 @@
+"""Crowdfunding project endpoints — CRUD + dashboard + performance."""
+
+import uuid
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
+from app.core.database import get_db
+from app.core.rate_limit import limiter
+from app.models.asset import Asset, AssetType
+from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
+from app.models.portfolio import Portfolio
+from app.models.project_audit import ProjectAudit
+from app.models.user import User
+from app.schemas.crowdfunding import (
+    CrowdfundingDashboardResponse,
+    CrowdfundingProjectCreate,
+    CrowdfundingProjectResponse,
+    CrowdfundingProjectUpdate,
+    ProjectAuditResponse,
+)
+from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
+
+router = APIRouter()
+
+
+# ──────────────────────── helpers ────────────────────────
+
+
+def _enrich(project: CrowdfundingProject) -> CrowdfundingProjectResponse:
+    """Add computed fields to a project response."""
+    invested = float(project.invested_amount)
+    rate = float(project.annual_rate) / 100
+    months = int(project.duration_months)
+    received = float(project.total_received)
+
+    projected_total = invested * rate * months / 12
+    interest_earned = max(0.0, received - invested) if project.status == ProjectStatus.COMPLETED else received
+
+    progress = 0.0
+    if project.start_date and months > 0:
+        elapsed = (date.today() - project.start_date).days / 30.44
+        progress = min(100.0, elapsed / months * 100)
+
+    return CrowdfundingProjectResponse(
+        id=project.id,
+        asset_id=project.asset_id,
+        platform=project.platform,
+        project_name=project.project_name,
+        description=project.description,
+        project_url=project.project_url,
+        invested_amount=project.invested_amount,
+        annual_rate=project.annual_rate,
+        duration_months=int(project.duration_months),
+        repayment_type=project.repayment_type,
+        start_date=project.start_date,
+        estimated_end_date=project.estimated_end_date,
+        actual_end_date=project.actual_end_date,
+        status=project.status,
+        total_received=project.total_received,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        projected_total_interest=round(projected_total, 2),
+        interest_earned=round(interest_earned, 2),
+        progress_percent=round(progress, 1),
+    )
+
+
+async def _get_user_projects(db: AsyncSession, user_id: uuid.UUID) -> list[CrowdfundingProject]:
+    result = await db.execute(
+        select(CrowdfundingProject)
+        .join(Asset, CrowdfundingProject.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(Portfolio.user_id == user_id)
+        .order_by(CrowdfundingProject.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def _get_project_for_user(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> CrowdfundingProject:
+    result = await db.execute(
+        select(CrowdfundingProject)
+        .join(Asset, CrowdfundingProject.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(CrowdfundingProject.id == project_id, Portfolio.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(404, "Projet non trouvé")
+    return project
+
+
+# ──────────────────────── CRUD ────────────────────────
+
+
+@router.get("", response_model=list[CrowdfundingProjectResponse])
+@limiter.limit("30/minute")
+async def list_projects(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    projects = await _get_user_projects(db, current_user.id)
+    return [_enrich(p) for p in projects]
+
+
+@router.post("", response_model=CrowdfundingProjectResponse, status_code=201)
+@limiter.limit("20/minute")
+async def create_project(
+    request: Request,
+    data: CrowdfundingProjectCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Verify portfolio belongs to user
+    portfolio = await db.get(Portfolio, data.portfolio_id)
+    if not portfolio or portfolio.user_id != current_user.id:
+        raise HTTPException(403, "Portefeuille non trouvé")
+
+    # Create the Asset row
+    asset = Asset(
+        id=uuid.uuid4(),
+        portfolio_id=data.portfolio_id,
+        symbol=data.platform.upper()[:20],
+        name=data.project_name,
+        asset_type=AssetType.CROWDFUNDING,
+        quantity=Decimal("1"),
+        avg_buy_price=data.invested_amount,
+        current_price=data.invested_amount,
+        exchange=data.platform,
+        currency="EUR",
+        interest_rate=data.annual_rate,
+        maturity_date=data.estimated_end_date,
+        project_status=data.status.value,
+        invested_amount=data.invested_amount,
+    )
+    db.add(asset)
+    await db.flush()
+
+    # Create the CrowdfundingProject row
+    project = CrowdfundingProject(
+        id=uuid.uuid4(),
+        asset_id=asset.id,
+        platform=data.platform,
+        project_name=data.project_name,
+        description=data.description,
+        project_url=data.project_url,
+        invested_amount=data.invested_amount,
+        annual_rate=data.annual_rate,
+        duration_months=data.duration_months,
+        repayment_type=data.repayment_type,
+        start_date=data.start_date,
+        estimated_end_date=data.estimated_end_date,
+        status=data.status,
+    )
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+
+    # Auto-generate calendar events for coupons
+    await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+    await db.commit()
+
+    return _enrich(project)
+
+
+@router.get("/dashboard", response_model=CrowdfundingDashboardResponse)
+@limiter.limit("30/minute")
+async def get_dashboard(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    projects = await _get_user_projects(db, current_user.id)
+    enriched = [_enrich(p) for p in projects]
+
+    total_invested = sum(float(p.invested_amount) for p in projects)
+    total_received = sum(float(p.total_received) for p in projects)
+
+    active = [p for p in projects if p.status == ProjectStatus.ACTIVE]
+    projected_annual = sum(float(p.invested_amount) * float(p.annual_rate) / 100 for p in active)
+
+    weighted_rate = 0.0
+    if total_invested > 0:
+        weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in active) / max(
+            1, sum(float(p.invested_amount) for p in active)
+        )
+
+    # Platform breakdown
+    platform_map: dict[str, float] = {}
+    for p in projects:
+        platform_map[p.platform] = platform_map.get(p.platform, 0) + float(p.invested_amount)
+
+    # Next maturity
+    maturities = [p.estimated_end_date for p in active if p.estimated_end_date and p.estimated_end_date >= date.today()]
+    next_mat = min(maturities) if maturities else None
+
+    status_counts = {s: 0 for s in ProjectStatus}
+    for p in projects:
+        status_counts[p.status] += 1
+
+    return CrowdfundingDashboardResponse(
+        total_invested=round(total_invested, 2),
+        total_received=round(total_received, 2),
+        projected_annual_interest=round(projected_annual, 2),
+        weighted_average_rate=round(weighted_rate, 3),
+        active_count=status_counts[ProjectStatus.ACTIVE],
+        completed_count=status_counts[ProjectStatus.COMPLETED],
+        delayed_count=status_counts[ProjectStatus.DELAYED],
+        defaulted_count=status_counts[ProjectStatus.DEFAULTED],
+        funding_count=status_counts[ProjectStatus.FUNDING],
+        next_maturity=next_mat,
+        platform_breakdown=platform_map,
+        projects=enriched,
+    )
+
+
+@router.get("/performance")
+@limiter.limit("30/minute")
+async def get_performance(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    projects = await _get_user_projects(db, current_user.id)
+
+    performance = []
+    for p in projects:
+        invested = float(p.invested_amount)
+        rate = float(p.annual_rate) / 100
+        months = int(p.duration_months)
+        received = float(p.total_received)
+        projected_total = invested * rate * months / 12
+
+        elapsed_months = 0.0
+        on_track = True
+        if p.start_date:
+            elapsed_months = (date.today() - p.start_date).days / 30.44
+            if p.repayment_type.value == "amortizable" and elapsed_months > 0:
+                expected = invested * rate * min(elapsed_months, months) / 12
+                on_track = received >= expected * 0.9
+
+        performance.append(
+            {
+                "id": str(p.id),
+                "project_name": p.project_name,
+                "platform": p.platform,
+                "status": p.status.value,
+                "invested_amount": invested,
+                "annual_rate": float(p.annual_rate),
+                "duration_months": months,
+                "repayment_type": p.repayment_type.value,
+                "projected_total_interest": round(projected_total, 2),
+                "total_received": received,
+                "interest_earned": round(
+                    max(0, received - (invested if p.status == ProjectStatus.COMPLETED else 0)), 2
+                ),
+                "elapsed_months": round(elapsed_months, 1),
+                "progress_percent": round(min(100, elapsed_months / max(1, months) * 100), 1),
+                "on_track": on_track,
+                "start_date": p.start_date.isoformat() if p.start_date else None,
+                "estimated_end_date": p.estimated_end_date.isoformat() if p.estimated_end_date else None,
+            }
+        )
+
+    return {"projects": performance}
+
+
+@router.post("/sync-calendar")
+@limiter.limit("5/minute")
+async def sync_calendar_events(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Regenerate calendar events for all active crowdfunding projects."""
+    projects = await _get_user_projects(db, current_user.id)
+    total = 0
+    for p in projects:
+        if p.status in (ProjectStatus.ACTIVE, ProjectStatus.DELAYED):
+            count = await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, p)
+            total += count
+    await db.commit()
+    return {"synced_events": total}
+
+
+@router.get("/{project_id}", response_model=CrowdfundingProjectResponse)
+@limiter.limit("30/minute")
+async def get_project(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+    return _enrich(project)
+
+
+@router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)
+@limiter.limit("20/minute")
+async def update_project(
+    request: Request,
+    project_id: uuid.UUID,
+    data: CrowdfundingProjectUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(project, field, value)
+
+    # Sync key fields back to the Asset row
+    asset = await db.get(Asset, project.asset_id)
+    if asset:
+        if "annual_rate" in updates:
+            asset.interest_rate = project.annual_rate
+        if "estimated_end_date" in updates:
+            asset.maturity_date = project.estimated_end_date
+        if "status" in updates:
+            asset.project_status = project.status.value
+        if "platform" in updates:
+            asset.exchange = project.platform
+            asset.symbol = project.platform.upper()[:20]
+
+    await db.commit()
+    await db.refresh(project)
+
+    # Sync calendar events if financial terms or status changed
+    financial_fields = {
+        "annual_rate",
+        "duration_months",
+        "repayment_type",
+        "start_date",
+        "estimated_end_date",
+        "invested_amount",
+    }
+    if updates.keys() & financial_fields:
+        await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+        await db.commit()
+    elif "status" in updates:
+        if project.status in (ProjectStatus.COMPLETED, ProjectStatus.DEFAULTED):
+            await crowdfunding_calendar_service.cleanup_completed_project(db, project.id)
+            await db.commit()
+        elif project.status == ProjectStatus.ACTIVE:
+            await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+            await db.commit()
+
+    return _enrich(project)
+
+
+@router.delete("/{project_id}", status_code=204)
+@limiter.limit("10/minute")
+async def delete_project(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    # Delete asset (cascades to project via FK)
+    asset = await db.get(Asset, project.asset_id)
+    if asset:
+        await db.delete(asset)
+    await db.commit()
+
+
+# ──────────────────────── Audit Lab ────────────────────────
+
+
+_MAX_FILES = 5
+_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/analyze", response_model=ProjectAuditResponse, status_code=201)
+@limiter.limit("3/minute")
+async def analyze_documents(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    project_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload PDFs and get an AI-powered risk analysis."""
+    from app.core.config import settings
+    from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
+
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(503, "Audit Lab non disponible — clé API non configurée")
+
+    if len(files) > _MAX_FILES:
+        raise HTTPException(400, f"Maximum {_MAX_FILES} fichiers autorisés")
+
+    # Validate and read files
+    file_contents: list[tuple[str, bytes]] = []
+    for f in files:
+        if not f.filename or not f.filename.lower().endswith(".pdf"):
+            raise HTTPException(400, f"Fichier '{f.filename}' n'est pas un PDF")
+        content = await f.read()
+        if len(content) > _MAX_FILE_SIZE:
+            raise HTTPException(400, f"Fichier '{f.filename}' dépasse 10 MB")
+        file_contents.append((f.filename, content))
+
+    # Compute munitions and total capital from user's portfolios
+    result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
+    portfolios = list(result.scalars().all())
+    total_capital = 0.0
+    munitions = 0.0
+    for p in portfolios:
+        assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == p.id))
+        for a in assets_result.scalars().all():
+            val = float(a.current_price or 0) * float(a.quantity or 0)
+            total_capital += val
+            if a.asset_type in (AssetType.STABLECOIN,):
+                munitions += val
+
+    try:
+        audit = await crowdfunding_analyzer.analyze_documents(
+            db=db,
+            file_contents=file_contents,
+            user_id=current_user.id,
+            project_id=project_id,
+            munitions=munitions,
+            total_capital=total_capital,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).error("Analyze error: %s", exc, exc_info=True)
+        raise HTTPException(500, f"Erreur interne lors de l'analyse : {exc}") from exc
+    await db.commit()
+    await db.refresh(audit)
+    return audit
+
+
+@router.get("/audits", response_model=list[ProjectAuditResponse])
+@limiter.limit("30/minute")
+async def list_audits(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all audits for the current user."""
+    result = await db.execute(
+        select(ProjectAudit).where(ProjectAudit.user_id == current_user.id).order_by(ProjectAudit.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/audits/{audit_id}", response_model=ProjectAuditResponse)
+@limiter.limit("30/minute")
+async def get_audit(
+    request: Request,
+    audit_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a specific audit by ID."""
+    result = await db.execute(
+        select(ProjectAudit).where(
+            ProjectAudit.id == audit_id,
+            ProjectAudit.user_id == current_user.id,
+        )
+    )
+    audit = result.scalar_one_or_none()
+    if not audit:
+        raise HTTPException(404, "Audit non trouvé")
+    return audit

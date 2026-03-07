@@ -116,7 +116,7 @@ async def get_transactions_report_pdf(
     """Generate and download a PDF transactions report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     data = await report_service.get_report_data(db, str(current_user.id), year, currency=currency)
-    pdf_content = report_service.generate_performance_pdf(data)
+    pdf_content = report_service.generate_transactions_pdf(data)
 
     year_str = str(year) if year else "all"
     filename = f"rapport_transactions_{year_str}_{datetime.now().strftime('%Y%m%d')}.pdf"
@@ -124,6 +124,52 @@ async def get_transactions_report_pdf(
     return StreamingResponse(
         io.BytesIO(pdf_content),
         media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/transactions/excel")
+@limiter.limit("10/minute")
+async def get_transactions_report_excel(
+    request: Request,
+    year: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate and download an Excel transactions report."""
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), year, currency=currency)
+    excel_content = report_service.generate_transactions_excel(data)
+
+    year_str = str(year) if year else "all"
+    filename = f"transactions_{year_str}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
+    return StreamingResponse(
+        io.BytesIO(excel_content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/transactions/csv")
+@limiter.limit("10/minute")
+async def get_transactions_report_csv(
+    request: Request,
+    year: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate and download a CSV transactions export."""
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    data = await report_service.get_report_data(db, str(current_user.id), year, currency=currency)
+    csv_content = report_service.generate_transactions_csv(data)
+
+    year_str = str(year) if year else "all"
+    filename = f"transactions_{year_str}_{datetime.now().strftime('%Y%m%d')}.csv"
+
+    return StreamingResponse(
+        io.BytesIO(csv_content),
+        media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 

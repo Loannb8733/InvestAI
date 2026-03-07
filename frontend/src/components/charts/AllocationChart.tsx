@@ -17,6 +17,7 @@ const COLORS = {
   etf: '#7C3AED',
   real_estate: '#059669',
   bond: '#DC2626',
+  crowdfunding: '#0EA5E9',
   other: '#6B7280',
 }
 
@@ -26,6 +27,7 @@ const LABELS = {
   etf: 'ETF',
   real_estate: 'Immobilier',
   bond: 'Obligations',
+  crowdfunding: 'Crowdfunding',
   other: 'Autres',
 }
 

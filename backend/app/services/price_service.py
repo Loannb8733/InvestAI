@@ -131,19 +131,40 @@ class PriceService:
         """Generate cache key for price."""
         return f"price:{asset_type}:{symbol.upper()}"
 
+    # Maximum acceptable cache age before forcing a refresh (seconds)
+    MAX_CACHE_AGE = 300  # 5 minutes
+
     def _get_cached_price(self, asset_type: str, symbol: str) -> Optional[Dict]:
-        """Get price from Redis cache."""
+        """Get price from Redis cache. Returns None if stale (> MAX_CACHE_AGE)."""
         try:
             key = self._get_cache_key(asset_type, symbol)
             data = self.redis.hgetall(key)
             if data:
+                # Freshness guard: reject entries older than MAX_CACHE_AGE
+                last_updated_str = data.get("last_updated")
+                if last_updated_str:
+                    try:
+                        last_updated = datetime.fromisoformat(last_updated_str)
+                        age = (datetime.utcnow() - last_updated).total_seconds()
+                        if age > self.MAX_CACHE_AGE:
+                            logger.info(
+                                "Price cache stale for %s (%s): age=%.0fs > %ds, forcing refresh",
+                                symbol,
+                                asset_type,
+                                age,
+                                self.MAX_CACHE_AGE,
+                            )
+                            return None
+                    except (ValueError, TypeError):
+                        pass  # If timestamp is invalid, use the data anyway
+
                 return {
                     "price": Decimal(data["price"]),
                     "change_24h": float(data.get("change_24h", 0)),
                     "change_percent_24h": float(data.get("change_percent_24h", 0)),
                     "volume_24h": float(data.get("volume_24h", 0)),
                     "market_cap": float(data.get("market_cap", 0)),
-                    "last_updated": data.get("last_updated"),
+                    "last_updated": last_updated_str,
                 }
         except Exception as e:
             logger.warning(f"Redis cache read error for {symbol}: {e}")

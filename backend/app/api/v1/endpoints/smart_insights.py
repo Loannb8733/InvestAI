@@ -67,6 +67,16 @@ class AnomalyImpactResponse(BaseModel):
     detected_at: str
 
 
+class RegimeConfigResponse(BaseModel):
+    """Universal cycle configuration."""
+
+    risk_multiplier: float
+    alpha_threshold: int
+    gold_relevance: str
+    mode_label: str
+    vol_regime: str
+
+
 class MetricsSummaryResponse(BaseModel):
     """Summary of key metrics."""
 
@@ -77,6 +87,7 @@ class MetricsSummaryResponse(BaseModel):
     max_drawdown: float
     hhi: float
     total_value: float
+    regime_config: Optional[RegimeConfigResponse] = None
 
 
 class IndicatorSignalResponse(BaseModel):
@@ -236,6 +247,9 @@ async def get_portfolio_health(
             max_drawdown=report.metrics_summary.get("max_drawdown", 0),
             hhi=report.metrics_summary.get("hhi", 0),
             total_value=report.metrics_summary.get("total_value", 0),
+            regime_config=RegimeConfigResponse(**report.metrics_summary["regime_config"])
+            if report.metrics_summary.get("regime_config")
+            else None,
         ),
         market_regime=_build_regime_response(report.market_regime),
         generated_at=report.generated_at.isoformat(),

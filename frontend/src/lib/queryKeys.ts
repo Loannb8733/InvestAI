@@ -75,6 +75,7 @@ export const queryKeys = {
       ['predictions', 'trackRecord', symbol] as const,
     topAlpha: ['predictions', 'topAlpha'] as const,
     strategyMap: ['predictions', 'strategyMap'] as const,
+    plannedOrders: ['predictions', 'plannedOrders'] as const,
   },
 
   alerts: {
@@ -100,8 +101,8 @@ export const queryKeys = {
 
   calendar: {
     all: ['calendar'] as const,
-    events: (showCompleted?: boolean) =>
-      [...queryKeys.calendar.all, 'events', ...(showCompleted !== undefined ? [showCompleted] : [])] as const,
+    events: (showCompleted?: boolean, incomeOnly?: boolean) =>
+      [...queryKeys.calendar.all, 'events', ...(showCompleted !== undefined ? [showCompleted] : []), ...(incomeOnly !== undefined ? [incomeOnly] : [])] as const,
     upcoming: (days?: number) =>
       [...queryKeys.calendar.all, 'upcoming', ...(days !== undefined ? [days] : [])] as const,
     summary: ['calendar', 'summary'] as const,
@@ -148,5 +149,15 @@ export const queryKeys = {
   reports: {
     all: ['reports'] as const,
     availableYears: ['reports', 'availableYears'] as const,
+  },
+
+  crowdfunding: {
+    all: ['crowdfunding'] as const,
+    list: ['crowdfunding', 'list'] as const,
+    detail: (id: string) => ['crowdfunding', 'detail', id] as const,
+    dashboard: ['crowdfunding', 'dashboard'] as const,
+    performance: ['crowdfunding', 'performance'] as const,
+    audits: ['crowdfunding', 'audits'] as const,
+    audit: (id: string) => ['crowdfunding', 'audit', id] as const,
   },
 } as const

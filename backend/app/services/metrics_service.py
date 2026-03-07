@@ -81,6 +81,19 @@ def is_cash_like(symbol: str) -> bool:
     return is_fiat(symbol) or is_stablecoin(symbol)
 
 
+# Canonical alias — use this across the codebase
+is_liquidity = is_cash_like
+
+
+# Gold / safe-haven asset detection
+_GOLD_SYMBOLS = {"PAXG", "XAUT", "GLD", "IAU", "SGOL", "GOLD"}
+
+
+def is_safe_haven(symbol: str) -> bool:
+    """Return True for gold-backed tokens and ETFs."""
+    return symbol.upper() in _GOLD_SYMBOLS
+
+
 class MetricsService:
     """Service for calculating portfolio metrics."""
 
@@ -309,7 +322,9 @@ class MetricsService:
 
         for asset in investment_assets:
             # Crowdfunding / real estate with invested_amount: no live price
-            is_crowdfunding = asset.asset_type == AssetType.REAL_ESTATE and asset.invested_amount is not None
+            is_crowdfunding = asset.asset_type == AssetType.CROWDFUNDING or (
+                asset.asset_type == AssetType.REAL_ESTATE and asset.invested_amount is not None
+            )
 
             if is_crowdfunding:
                 inv_amount = Decimal(str(asset.invested_amount))
@@ -469,6 +484,9 @@ class MetricsService:
         total_gain_loss = total_value - total_invested
         total_gain_loss_percent = float(total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
 
+        # Available liquidity = stablecoins + fiat assets + portfolio cash_balances
+        available_liquidity = float(cash_from_stablecoins + cash_from_fiat)
+
         result = {
             "total_value": float(total_value),
             "total_invested": float(total_invested),
@@ -480,6 +498,7 @@ class MetricsService:
             "stablecoins": stablecoin_list,
             "cash_from_fiat": float(cash_from_fiat),
             "fiat_assets": fiat_list,
+            "available_liquidity": available_liquidity,
         }
 
         # Include crowdfunding summary if relevant
@@ -649,6 +668,7 @@ class MetricsService:
         total_realized = Decimal("0")
         total_unrealized = Decimal("0")
         total_pnl_fees = Decimal("0")
+        total_liquidity = Decimal("0")
         all_assets = []
 
         for portfolio in portfolios:
@@ -663,6 +683,10 @@ class MetricsService:
             # of CURRENT holdings only (qty * avg_buy_price), not all-time invested
             total_unrealized += Decimal(str(portfolio_metrics["total_gain_loss"]))
             total_pnl_fees += Decimal(str(portfolio_history.get("total_fees", 0)))
+            total_liquidity += Decimal(str(portfolio_metrics.get("available_liquidity", 0)))
+            # Add portfolio cash_balances (fiat held on exchanges)
+            for _ccy, amount in (portfolio.cash_balances or {}).items():
+                total_liquidity += Decimal(str(amount))
             all_assets.extend(portfolio_metrics["assets"])
 
         # total_gain_loss: gain/loss relative to total ever invested (includes sold positions)
@@ -797,6 +821,7 @@ class MetricsService:
                 }
                 for a in worst_performers
             ],
+            "available_liquidity": float(total_liquidity),
             "period_changes": period_changes,
             # Pre-built asset allocation (avoids N+1 re-fetch in dashboard endpoint)
             "aggregated_assets": [

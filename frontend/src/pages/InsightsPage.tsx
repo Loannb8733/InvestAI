@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
 import { insightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
@@ -43,6 +51,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Shield,
 } from 'lucide-react'
 
 interface TaxLossOpportunity {
@@ -143,9 +152,9 @@ function TopAlpha() {
       <Card>
         <CardContent className="py-12 text-center">
           <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold">Aucun signal Alpha détecté</h3>
+          <h3 className="text-lg font-semibold">Aucun actif risqué détecté</h3>
           <p className="text-muted-foreground mt-1">
-            Les conditions de marché ne présentent pas de configuration de surperformance pour vos actifs.
+            L'analyse Alpha nécessite des positions en cryptomonnaies, actions ou ETF. Les stablecoins et le cash sont exclus.
           </p>
         </CardContent>
       </Card>
@@ -295,6 +304,7 @@ interface StrategyRow {
   impact_pct: number
   impact_eur: number
   predicted_7d_pct: number
+  is_resilient?: boolean
 }
 
 interface StrategyMapData {
@@ -306,13 +316,21 @@ interface StrategyMapData {
 }
 
 const regimeLabels: Record<string, string> = {
-  bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux',
+  bullish: 'Mark-up', bearish: 'Markdown', top: 'Topping', bottom: 'Bottoming',
+  markup: 'Mark-up', markdown: 'Markdown', topping: 'Topping', bottoming: 'Bottoming',
+  accumulation: 'Accumulation', distribution: 'Distribution',
 }
 const regimeColors: Record<string, string> = {
   bullish: 'bg-green-500/10 text-green-600 border-green-500/30',
   bearish: 'bg-red-500/10 text-red-600 border-red-500/30',
   top: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
   bottom: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  markup: 'bg-green-500/10 text-green-600 border-green-500/30',
+  markdown: 'bg-red-500/10 text-red-600 border-red-500/30',
+  topping: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+  bottoming: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  accumulation: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
+  distribution: 'bg-pink-500/10 text-pink-600 border-pink-500/30',
 }
 
 const actionStyles: Record<string, string> = {
@@ -329,6 +347,16 @@ const actionStyles: Record<string, string> = {
   'PLANIFIER': 'bg-purple-500/10 text-purple-700 border border-purple-500/30',
 }
 
+interface PlannedOrder {
+  id: string
+  symbol: string
+  action: string
+  order_eur: number
+  source: string
+  status: string
+  created_at: string | null
+}
+
 function StrategyTable() {
   const { data, isLoading } = useQuery<StrategyMapData>({
     queryKey: queryKeys.predictions.strategyMap,
@@ -336,148 +364,310 @@ function StrategyTable() {
     staleTime: 5 * 60 * 1000,
   })
 
-  if (isLoading) return <Loader />
+  const { data: plannedOrders } = useQuery<PlannedOrder[]>({
+    queryKey: queryKeys.predictions.plannedOrders,
+    queryFn: predictionsApi.getPlannedOrders,
+    staleTime: 30 * 1000,
+  })
+
+  const [signalModalOpen, setSignalModalOpen] = useState(false)
+  const validateSignalMutation = useMutation({
+    mutationFn: predictionsApi.validateSignal,
+  })
+
+  const handleActionClick = () => {
+    setSignalModalOpen(true)
+    validateSignalMutation.mutate()
+  }
+
+  if (isLoading) return <StrategyTableSkeleton />
   if (!data || data.rows.length === 0) return null
 
+  // Set of symbols with pending planned orders
+  const plannedSymbols = new Set(
+    (plannedOrders || []).filter(o => o.status === 'pending').map(o => o.symbol)
+  )
+
   const totalImpact = data.rows.reduce((sum, r) => sum + r.impact_eur, 0)
+  const signal = validateSignalMutation.data
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Matrice de Stratégie
-            </CardTitle>
-            <CardDescription>
-              Croisement Alpha × Cycle pour chaque actif — actions recommandées
-            </CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Matrice de Stratégie
+              </CardTitle>
+              <CardDescription>
+                Croisement Alpha × Cycle pour chaque actif — actions recommandées
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              {data.summary.buys > 0 && (
+                <Badge className="bg-green-500/10 text-green-700 border border-green-500/30">
+                  {data.summary.buys} Achat{data.summary.buys > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {data.summary.sells > 0 && (
+                <Badge className="bg-red-500/10 text-red-700 border border-red-500/30">
+                  {data.summary.sells} Vente{data.summary.sells > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {data.summary.holds > 0 && (
+                <Badge variant="secondary">
+                  {data.summary.holds} Maintien{data.summary.holds > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            {data.summary.buys > 0 && (
-              <Badge className="bg-green-500/10 text-green-700 border border-green-500/30">
-                {data.summary.buys} Achat{data.summary.buys > 1 ? 's' : ''}
-              </Badge>
-            )}
-            {data.summary.sells > 0 && (
-              <Badge className="bg-red-500/10 text-red-700 border border-red-500/30">
-                {data.summary.sells} Vente{data.summary.sells > 1 ? 's' : ''}
-              </Badge>
-            )}
-            {data.summary.holds > 0 && (
-              <Badge variant="secondary">
-                {data.summary.holds} Maintien{data.summary.holds > 1 ? 's' : ''}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
-                <th className="text-center py-2 px-3 text-xs font-medium">Alpha</th>
-                <th className="text-center py-2 px-3 text-xs font-medium">Phase</th>
-                <th className="text-center py-2 px-3 text-xs font-medium">Action</th>
-                <th className="text-right py-2 px-3 text-xs font-medium">Impact Portefeuille</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row) => {
-                const impactSign = row.impact_eur > 0 ? '+' : row.impact_eur < 0 ? '' : ''
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium">Alpha</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium">Phase</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium">Action</th>
+                  <th className="text-right py-2 px-3 text-xs font-medium">Impact Portefeuille</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row) => {
+                  const impactSign = row.impact_eur > 0 ? '+' : row.impact_eur < 0 ? '' : ''
+                  const isActionable = ['ACHAT FORT', 'DCA', 'VENDRE', 'ALLÉGER', 'PRENDRE PROFITS'].includes(row.action)
 
-                return (
-                  <tr key={row.symbol} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-3">
-                      <div>
-                        <span className="font-medium">{row.symbol}</span>
-                        {row.name !== row.symbol && (
-                          <span className="text-xs text-muted-foreground ml-2">{row.name}</span>
-                        )}
-                        <div className="text-xs text-muted-foreground">
-                          {formatCurrency(row.value)} · {row.weight_pct}%
+                  return (
+                    <tr key={row.symbol} className={`border-b last:border-0 hover:bg-muted/50 ${plannedSymbols.has(row.symbol) ? 'bg-primary/5' : ''}`}>
+                      <td className="py-3 px-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{row.symbol}</span>
+                            {row.name !== row.symbol && (
+                              <span className="text-xs text-muted-foreground">{row.name}</span>
+                            )}
+                            {row.is_resilient && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600 gap-0.5">
+                                <Shield className="h-3 w-3" />
+                                Bouclier
+                              </Badge>
+                            )}
+                            {plannedSymbols.has(row.symbol) && (
+                              <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0">
+                                À EXÉCUTER
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCurrency(row.value)} · {row.weight_pct}%
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className={`text-sm font-bold ${
-                          row.alpha_score >= 60 ? 'text-green-600' :
-                          row.alpha_score >= 30 ? 'text-yellow-600' : 'text-muted-foreground'
-                        }`}>
-                          {row.alpha_score.toFixed(0)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground capitalize">{row.alpha_level}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <Badge variant="outline" className={regimeColors[row.regime] || 'text-gray-500'}>
-                        {regimeLabels[row.regime] || row.regime}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <Badge className={`text-xs ${actionStyles[row.action] || 'bg-gray-100 text-gray-700'}`}>
-                        {row.action}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {row.impact_eur > 0 ? (
-                          <ArrowUpRight className="h-3 w-3 text-green-500" />
-                        ) : row.impact_eur < 0 ? (
-                          <ArrowDownRight className="h-3 w-3 text-red-500" />
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className={`text-sm font-bold ${
+                            row.alpha_score >= 60 ? 'text-green-600' :
+                            row.alpha_score >= 30 ? 'text-yellow-600' : 'text-muted-foreground'
+                          }`}>
+                            {row.alpha_score.toFixed(0)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground capitalize">{row.alpha_level}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <Badge variant="outline" className={regimeColors[row.regime] || 'text-gray-500'}>
+                          {regimeLabels[row.regime] || row.regime}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {isActionable ? (
+                          <Badge
+                            className={`text-xs cursor-pointer hover:opacity-80 transition-opacity ${actionStyles[row.action] || 'bg-gray-100 text-gray-700'}`}
+                            onClick={handleActionClick}
+                          >
+                            {row.action}
+                          </Badge>
                         ) : (
-                          <Minus className="h-3 w-3 text-muted-foreground" />
+                          <Badge className={`text-xs ${actionStyles[row.action] || 'bg-gray-100 text-gray-700'}`}>
+                            {row.action}
+                          </Badge>
                         )}
-                        <span className={`text-sm font-medium tabular-nums ${
-                          row.impact_eur > 0 ? 'text-green-600' :
-                          row.impact_eur < 0 ? 'text-red-600' : 'text-muted-foreground'
-                        }`}>
-                          {impactSign}{formatCurrency(Math.abs(row.impact_eur))}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          ({row.impact_pct > 0 ? '+' : ''}{row.impact_pct}%)
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t">
-                <td colSpan={4} className="py-3 px-3 text-sm font-medium text-right">
-                  Impact total estimé
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <span className={`text-sm font-bold tabular-nums ${
-                    totalImpact > 0 ? 'text-green-600' :
-                    totalImpact < 0 ? 'text-red-600' : 'text-muted-foreground'
-                  }`}>
-                    {totalImpact > 0 ? '+' : ''}{formatCurrency(totalImpact)}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-1">
-                    sur {formatCurrency(data.total_portfolio_value)}
-                  </span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {row.impact_eur > 0 ? (
+                            <ArrowUpRight className="h-3 w-3 text-green-500" />
+                          ) : row.impact_eur < 0 ? (
+                            <ArrowDownRight className="h-3 w-3 text-red-500" />
+                          ) : (
+                            <Minus className="h-3 w-3 text-muted-foreground" />
+                          )}
+                          <span className={`text-sm font-medium tabular-nums ${
+                            row.impact_eur > 0 ? 'text-green-600' :
+                            row.impact_eur < 0 ? 'text-red-600' : 'text-muted-foreground'
+                          }`}>
+                            {impactSign}{formatCurrency(Math.abs(row.impact_eur))}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            ({row.impact_pct > 0 ? '+' : ''}{row.impact_pct}%)
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t">
+                  <td colSpan={4} className="py-3 px-3 text-sm font-medium text-right">
+                    Impact total estimé
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <span className={`text-sm font-bold tabular-nums ${
+                      totalImpact > 0 ? 'text-green-600' :
+                      totalImpact < 0 ? 'text-red-600' : 'text-muted-foreground'
+                    }`}>
+                      {totalImpact > 0 ? '+' : ''}{formatCurrency(totalImpact)}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      sur {formatCurrency(data.total_portfolio_value)}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
-        {/* Legend */}
-        <div className="mt-4 flex items-start gap-2 p-2 rounded bg-muted/30">
-          <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-          <p className="text-[10px] text-muted-foreground leading-relaxed">
-            L'action est déterminée par le croisement du score Alpha (potentiel technique) et de la phase du cycle de marché.
-            L'impact est une estimation basée sur les mouvements suggérés (±2-5% selon l'action).
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+          {/* Legend */}
+          <div className="mt-4 flex items-start gap-2 p-2 rounded bg-muted/30">
+            <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              L'action est déterminée par le croisement du score Alpha (potentiel technique) et de la phase du cycle de marché.
+              Cliquez sur un badge actionnable pour valider le signal avec Monte Carlo.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Signal Validation Modal */}
+      <Dialog open={signalModalOpen} onOpenChange={setSignalModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Validation du Signal
+            </DialogTitle>
+            <DialogDescription>
+              Simulation Monte Carlo de l'impact sur la probabilité de ruine
+            </DialogDescription>
+          </DialogHeader>
+
+          {validateSignalMutation.isPending ? (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+              <Skeleton className="h-24 w-full" />
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+              </div>
+            </div>
+          ) : validateSignalMutation.isError ? (
+            <div className="py-6 text-center">
+              <AlertTriangle className="h-8 w-8 mx-auto text-red-500 mb-2" />
+              <p className="text-sm text-muted-foreground">Erreur lors de la validation du signal</p>
+            </div>
+          ) : signal ? (
+            <div className="space-y-4 py-2">
+              {/* Asset & Action */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div>
+                  <div className="font-bold text-lg">{signal.symbol}</div>
+                  <div className="text-sm text-muted-foreground">
+                    Score: {signal.score}/100 · {signal.regime}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge className={actionStyles[signal.action] || 'bg-gray-100 text-gray-700'}>
+                    {signal.action}
+                  </Badge>
+                  <div className="text-sm font-mono mt-1">{formatCurrency(signal.order_eur)}</div>
+                </div>
+              </div>
+
+              {/* Monte Carlo comparison */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Prob. de ruine AVANT</p>
+                  <p className="text-2xl font-bold tabular-nums">{signal.prob_ruin_before}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    P(+): {signal.mc_before?.prob_positive?.toFixed(1)}%
+                  </p>
+                </div>
+                <div className={`p-3 rounded-lg border text-center ${
+                  signal.prob_ruin_after <= signal.prob_ruin_before
+                    ? 'border-green-500/30 bg-green-500/5'
+                    : 'border-red-500/30 bg-red-500/5'
+                }`}>
+                  <p className="text-xs text-muted-foreground mb-1">Prob. de ruine APRÈS</p>
+                  <p className="text-2xl font-bold tabular-nums">{signal.prob_ruin_after}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    P(+): {signal.mc_after?.prob_positive?.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Risk impact */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <span className="text-sm font-medium">Impact risque</span>
+                <Badge variant="outline" className={
+                  signal.risk_impact === 'Diminuée' ? 'border-green-500 text-green-600' :
+                  signal.risk_impact === 'Augmentée' ? 'border-red-500 text-red-600' :
+                  'border-gray-500 text-gray-600'
+                }>
+                  {signal.risk_impact}
+                </Badge>
+              </div>
+
+              {/* Concentration */}
+              <div className="flex items-center justify-between text-sm">
+                <span>Concentration post-achat</span>
+                <span className={`font-mono font-medium ${
+                  signal.concentration_status === 'ALERTE' ? 'text-red-500' :
+                  signal.concentration_status === 'VIGILANCE' ? 'text-yellow-500' :
+                  'text-green-500'
+                }`}>
+                  {signal.post_purchase_weight_pct}% ({signal.concentration_status})
+                </span>
+              </div>
+
+              {/* Verdict */}
+              <div className={`p-3 rounded-lg text-center ${
+                signal.validated
+                  ? 'bg-green-500/10 border border-green-500/30'
+                  : 'bg-red-500/10 border border-red-500/30'
+              }`}>
+                <p className={`font-bold ${signal.validated ? 'text-green-600' : 'text-red-600'}`}>
+                  {signal.validated ? 'Signal validé' : 'Signal rejeté'}
+                </p>
+                {!signal.validated && signal.reason && (
+                  <p className="text-xs text-muted-foreground mt-1">{signal.reason}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -982,9 +1172,46 @@ function DcaBacktest() {
 // ──────────────────────────────────────────────────────
 function Loader() {
   return (
-    <div className="flex items-center justify-center h-48">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-72 mt-1" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-4/6" />
+        <div className="flex gap-3 mt-4">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function StrategyTableSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-44" />
+        <Skeleton className="h-4 w-80 mt-1" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-6 w-12" />
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-4 w-24 ml-auto" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

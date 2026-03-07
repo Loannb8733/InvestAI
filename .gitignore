@@ -108,3 +108,4 @@ temp/
 /*.txt
 !README.txt
 .vercel
+backend/tests/fixtures/*.pdf

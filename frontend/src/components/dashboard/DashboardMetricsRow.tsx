@@ -30,6 +30,7 @@ interface DashboardMetricsRowProps {
   isDailyPositive: boolean
   portfoliosCount: number
   selectedPeriod: number
+  availableLiquidity?: number
 }
 
 export default function DashboardMetricsRow({
@@ -45,6 +46,7 @@ export default function DashboardMetricsRow({
   isDailyPositive,
   portfoliosCount,
   selectedPeriod,
+  availableLiquidity,
 }: DashboardMetricsRowProps) {
   const periodLabel = selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`
   return (
@@ -56,7 +58,9 @@ export default function DashboardMetricsRow({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
-          <p className="text-xs text-muted-foreground">{assetsCount} actifs</p>
+          <p className="text-xs text-muted-foreground">
+            {assetsCount} actifs{availableLiquidity != null && availableLiquidity > 0 && ` · dont ${formatCurrency(availableLiquidity)} de liquidité`}
+          </p>
         </CardContent>
       </Card>
       <Card>

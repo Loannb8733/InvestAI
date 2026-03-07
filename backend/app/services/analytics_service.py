@@ -5,6 +5,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -801,10 +802,13 @@ class AnalyticsService:
         # Separate stablecoins from real assets
         real_assets = [d for d in asset_data if not d.get("is_stablecoin", False)]
 
-        total_value = sum(d["current_value"] for d in real_assets)
-        total_invested = sum(d["total_invested"] for d in real_assets)
-        total_gl = total_value - total_invested
-        total_gl_pct = (total_gl / total_invested * 100) if total_invested > 0 else 0
+        total_value_dec = sum((Decimal(str(d["current_value"])) for d in real_assets), Decimal("0"))
+        total_invested_dec = sum((Decimal(str(d["total_invested"])) for d in real_assets), Decimal("0"))
+        total_gl_dec = total_value_dec - total_invested_dec
+        total_value = float(total_value_dec)
+        total_invested = float(total_invested_dec)
+        total_gl = float(total_gl_dec)
+        total_gl_pct = float(total_gl_dec / total_invested_dec * 100) if total_invested_dec > 0 else 0
 
         # Weights & allocation
         allocation_by_type: Dict[str, float] = {}
@@ -1071,11 +1075,19 @@ class AnalyticsService:
         ter_percentage: float = 0.0,
         monthly_withdrawal: float = 0.0,
         contribution: Optional[Dict[str, float]] = None,
+        vol_regime: str = "normal",
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
-        # Get user assets
-        assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
+        from app.services.metrics_service import is_cash_like
+
+        # Get ALL user assets (including stablecoins/fiat for liquidity cushion)
+        assets = await self._get_user_assets(
+            db,
+            user_id,
+            portfolio_id=portfolio_id,
+            exclude_stablecoins=False,
+        )
 
         if not assets:
             return MonteCarloResult(
@@ -1088,25 +1100,39 @@ class AnalyticsService:
                 horizon_days=horizon_days,
             )
 
-        # Collect returns per asset
+        # Separate risky assets from liquidity (vol=0, corr=0 cushion)
         seen = {}
+        liquidity_value = Decimal("0")
         for a in assets:
+            if is_cash_like(a.symbol):
+                price = float(a.avg_buy_price) if a.avg_buy_price and float(a.avg_buy_price) > 0 else 1.0
+                liquidity_value += Decimal(str(a.quantity)) * Decimal(str(price))
+                continue
             if a.symbol not in seen:
                 seen[a.symbol] = a
+
+        # Collect returns per risky asset
         all_returns = []
         all_weights = []
-        total_value = 0.0
+        total_value_dec = liquidity_value  # include liquidity in total
 
         for sym, asset in seen.items():
             _, prices = await self._fetch_history(sym, asset.asset_type, days=90)
             price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price)
-            val = float(asset.quantity) * price
-            total_value += val
+            val_dec = Decimal(str(asset.quantity)) * Decimal(str(price))
+            total_value_dec += val_dec
             rets = _compute_returns(prices)
             if len(rets) >= 10:
                 all_returns.append(rets)
-                all_weights.append(val)
+                all_weights.append(float(val_dec))
 
+        # Add liquidity as a zero-volatility pseudo-asset (dampens overall risk)
+        if float(liquidity_value) > 0 and all_returns:
+            min_len = min(len(r) for r in all_returns)
+            all_returns.append(np.zeros(min_len))  # vol=0, corr=0
+            all_weights.append(float(liquidity_value))
+
+        total_value = float(total_value_dec)
         if not all_returns or total_value == 0:
             return MonteCarloResult(
                 percentiles={"p5": 0, "p25": 0, "p50": 0, "p75": 0, "p95": 0},
@@ -1169,6 +1195,7 @@ class AnalyticsService:
             ter_percentage,
             monthly_withdrawal,
             total_value,
+            vol_regime,
         )
 
     @staticmethod
@@ -1184,6 +1211,7 @@ class AnalyticsService:
         ter_percentage: float = 0.0,
         monthly_withdrawal: float = 0.0,
         initial_portfolio_value: float = 0.0,
+        vol_regime: str = "normal",
     ) -> "MonteCarloResult":
         """CPU-bound Monte Carlo with volatility shrinkage, withdrawals and fees.
 
@@ -1192,6 +1220,11 @@ class AnalyticsService:
         using a linear shrinkage schedule.  This prevents unrealistic
         extreme outcomes when short-term crypto vol (80%+) is extrapolated
         over multi-year horizons.
+
+        vol_regime controls the long-term vol assumption:
+        - "stress" (bear): 30% annualized — heavier tails, more pessimistic
+        - "normal": 20% annualized — baseline
+        - "low" (bull): 15% annualized — compressed vol, more optimistic
 
         Withdrawal modes (mutually exclusive, ``monthly_withdrawal`` takes priority):
         - ``monthly_withdrawal`` (€): absolute daily deduction = amount / 30.
@@ -1206,8 +1239,9 @@ class AnalyticsService:
         capped_sims = max(capped_sims, 100)  # At least 100 simulations
 
         # --- Volatility shrinkage (mean reversion) ---
-        # Long-term daily vol target: ~20% annualized = 0.20 / sqrt(252) ≈ 0.0126
-        LONG_TERM_DAILY_VOL = 0.20 / np.sqrt(252)
+        # Regime-aware long-term vol target
+        _VOL_BY_REGIME = {"stress": 0.30, "normal": 0.20, "low": 0.15}
+        LONG_TERM_DAILY_VOL = _VOL_BY_REGIME.get(vol_regime, 0.20) / np.sqrt(252)
         # Shrinkage ramps from 0 at 90 days to 1 at 1825 days (5 years)
         shrinkage = np.clip((horizon_days - 90) / (1825 - 90), 0.0, 1.0)
 
@@ -1632,7 +1666,7 @@ class AnalyticsService:
         if not all_assets:
             return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
-        total_value = sum(a.get("current_value", 0) for a in all_assets)
+        total_value = float(sum(Decimal(str(a.get("current_value", 0))) for a in all_assets))
         if total_value <= 0:
             return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
 
@@ -1786,7 +1820,7 @@ class AnalyticsService:
         spy_returns = _compute_returns(spy_prices)
 
         asset_betas = []
-        total_value = 0.0
+        total_value_dec = Decimal("0")
         crypto_weighted_beta = 0.0
         crypto_total_val = 0.0
         stock_weighted_beta = 0.0
@@ -1795,8 +1829,9 @@ class AnalyticsService:
         for sym, asset in seen.items():
             _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
             price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price)
-            val = qty_map[sym] * price
-            total_value += val
+            val_dec = Decimal(str(qty_map[sym])) * Decimal(str(price))
+            total_value_dec += val_dec
+            val = float(val_dec)
             rets = _compute_returns(prices)
 
             at = asset.asset_type.value if isinstance(asset.asset_type, AssetType) else asset.asset_type

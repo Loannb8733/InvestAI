@@ -18,6 +18,7 @@ from app.ml.market_context import MarketContext, compute_market_context
 logger = logging.getLogger(__name__)
 
 PHASES = ("bearish", "bottom", "bullish", "top")
+PHASES_6 = ("markdown", "bottoming", "accumulation", "markup", "topping", "distribution")
 
 
 # ---------------------------------------------------------------------------
@@ -49,12 +50,65 @@ class RegimeResult:
 
 
 @dataclass
+class RegimeConfig:
+    """Universal cycle configuration derived from the detected regime.
+
+    Centralizes all regime-dependent parameters so that every service
+    (DCA sizing, alpha filtering, health scoring, Monte Carlo) reads
+    from a single source of truth.
+    """
+
+    risk_multiplier: float  # DCA position sizing: 0.5 (bear) → 1.5 (bull)
+    alpha_threshold: int  # Min alpha to act: 85 (bear, stricter) → 60 (bull)
+    gold_relevance: str  # "high" (bear) / "medium" (neutral) / "low" (bull)
+    mode_label: str  # UI badge: "Mode Survie" / "Mode Expansion" / etc.
+    vol_regime: str  # "stress" / "normal" / "low" — drives Monte Carlo vol
+
+    @staticmethod
+    def from_regime(dominant_regime: str, confidence: float = 0.5) -> "RegimeConfig":
+        """Build config from the dominant regime name."""
+        _MAP = {
+            # Bear-family
+            "bearish": RegimeConfig(0.5, 85, "high", "Mode Survie Actif", "stress"),
+            "markdown": RegimeConfig(0.5, 85, "high", "Mode Survie Actif", "stress"),
+            "distribution": RegimeConfig(0.6, 80, "high", "Mode Prudence", "stress"),
+            "bottom": RegimeConfig(0.7, 75, "medium", "Mode Accumulation", "normal"),
+            "bottoming": RegimeConfig(0.7, 75, "medium", "Mode Accumulation", "normal"),
+            "accumulation": RegimeConfig(0.8, 70, "medium", "Mode Accumulation", "normal"),
+            # Bull-family
+            "bullish": RegimeConfig(1.5, 60, "low", "Mode Expansion Actif", "low"),
+            "markup": RegimeConfig(1.5, 60, "low", "Mode Expansion Actif", "low"),
+            "topping": RegimeConfig(0.8, 75, "medium", "Mode Prudence", "normal"),
+            "top": RegimeConfig(0.8, 75, "medium", "Mode Prudence", "normal"),
+        }
+        cfg = _MAP.get(dominant_regime, RegimeConfig(1.0, 70, "medium", "Mode Normal", "normal"))
+        # If confidence is low, pull towards neutral
+        if confidence < 0.4:
+            cfg = RegimeConfig(
+                risk_multiplier=round(0.6 * cfg.risk_multiplier + 0.4 * 1.0, 2),
+                alpha_threshold=int(0.6 * cfg.alpha_threshold + 0.4 * 70),
+                gold_relevance=cfg.gold_relevance,
+                mode_label=cfg.mode_label,
+                vol_regime="normal",
+            )
+        return cfg
+
+
+@dataclass
 class MarketRegime:
     """Aggregate regime for market + per-asset."""
 
     market: RegimeResult
     per_asset: List[RegimeResult] = field(default_factory=list)
     generated_at: datetime = field(default_factory=datetime.utcnow)
+
+    @property
+    def config(self) -> RegimeConfig:
+        """Derived universal config from the market regime."""
+        return RegimeConfig.from_regime(
+            self.market.dominant_regime,
+            self.market.confidence,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +320,50 @@ class MarketRegimeDetector:
             signals=signals,
             description=description,
         )
+
+    @staticmethod
+    def refine_to_6phase(result: "RegimeResult", prices: List[float]) -> str:
+        """Map 4-phase regime to 6-phase professional nomenclature.
+
+        Uses RSI, EMA-20 slope, and regime probabilities:
+          bottom  → bottoming  (RSI survendu + prix stable)
+                  → accumulation (RSI improving + EMA-20 flat/rising)
+          bullish → markup (EMA-20 slope positive)
+          top     → topping (RSI suracheté + momentum saturé)
+                  → distribution (EMA-20 slope flattening + bearish prob rising)
+          bearish → markdown (EMA-20 slope negative = lower highs)
+        """
+        dom = result.dominant_regime
+        probs = result.probabilities
+        rsi = _rsi(prices) if len(prices) >= 15 else None
+
+        # Compute EMA-20 slope (pct change over last 5 EMA values)
+        ema20_slope = None
+        if len(prices) >= 25:
+            ema_series = _ema(prices, 20)
+            if ema_series and len(ema_series) >= 5:
+                ema20_slope = (ema_series[-1] - ema_series[-5]) / max(abs(ema_series[-5]), 1e-10)
+
+        if dom == "bottom":
+            # Bottom with improving RSI + EMA turning up → accumulation
+            if rsi is not None and rsi > 35:
+                return "accumulation"
+            if ema20_slope is not None and ema20_slope > -0.005:
+                # Price stabilizing (EMA not falling much) → accumulation
+                return "accumulation"
+            return "bottoming"
+        elif dom == "bullish":
+            return "markup"
+        elif dom == "top":
+            # Top with bearish probability rising or EMA flattening → distribution
+            if probs.get("bearish", 0) > 0.20:
+                return "distribution"
+            if ema20_slope is not None and ema20_slope < 0.005:
+                return "distribution"
+            return "topping"
+        elif dom == "bearish":
+            return "markdown"
+        return dom
 
     # -----------------------------------------------------------------------
     # Individual indicator analyzers
@@ -654,10 +752,10 @@ class MarketRegimeDetector:
     def _make_description(self, dominant: str, probs: Dict[str, float], confidence: float) -> str:
         pct = probs[dominant] * 100
         labels = {
-            "bearish": "Marche baissier",
-            "bottom": "Creux potentiel — zone d'accumulation",
-            "bullish": "Marche haussier",
-            "top": "Sommet potentiel — zone de distribution",
+            "bearish": "Markdown — structure de prix descendante (Lower Highs)",
+            "bottom": "Bottoming — RSI en survente, epuisement vendeur",
+            "bullish": "Mark-up — cassure de resistance, volume croissant",
+            "top": "Topping — RSI surchauffe, risque de retournement",
         }
         label = labels.get(dominant, dominant)
 
@@ -666,9 +764,9 @@ class MarketRegimeDetector:
         second = sorted_phases[1]
         second_labels = {
             "bearish": "avec pression baissiere",
-            "bottom": "avec signes de creux",
+            "bottom": "avec signes d'accumulation",
             "bullish": "avec tendance haussiere",
-            "top": "avec signes de surchauffe",
+            "top": "avec signes de distribution",
         }
 
         if second[1] > 0.25:

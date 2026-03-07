@@ -112,7 +112,7 @@ export const authApi = {
   },
 
   refresh: async (refreshToken?: string) => {
-    const response = await api.post('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : {})
+    const response = await api.post('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : undefined)
     return response.data
   },
 
@@ -210,6 +210,27 @@ export const dashboardApi = {
   getBackfillStatus: async () => {
     const response = await api.get('/dashboard/backfill-status')
     return response.data as { total_price_points: number; symbols_covered: number; total_active_symbols: number; is_complete: boolean }
+  },
+
+  getMunitions: async (monthlyDca: number = 300, profile: string = 'moderate') => {
+    const response = await api.get('/dashboard/munitions', {
+      params: { monthly_dca: monthlyDca, profile },
+    })
+    return response.data as {
+      available_liquidity: number
+      total_value: number
+      liquidity_pct: number
+      invested_pct: number
+      next_signal_symbol: string | null
+      next_signal_action: string | null
+      next_signal_amount: number
+      can_execute: boolean
+      shortfall: number
+      message: string | null
+      profile: string
+      deploy_to_risk: number
+      keep_in_reserve: number
+    }
   },
 }
 
@@ -625,6 +646,21 @@ export const predictionsApi = {
     const response = await api.get('/predictions/backtest', { params: { days } })
     return response.data
   },
+
+  validateSignal: async () => {
+    const response = await api.get('/predictions/validate-signal', { timeout: ANALYTICS_TIMEOUT })
+    return response.data
+  },
+
+  getPlannedOrders: async () => {
+    const response = await api.get('/predictions/planned-orders')
+    return response.data
+  },
+
+  updatePlannedOrder: async (id: string, status: string) => {
+    const response = await api.patch(`/predictions/planned-orders/${id}`, { status })
+    return response.data
+  },
 }
 
 // Alerts API
@@ -721,6 +757,24 @@ export const reportsApi = {
   downloadTransactionsPDF: async (year?: number) => {
     const params = year ? { year } : {}
     const response = await api.get('/reports/transactions/pdf', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  downloadTransactionsExcel: async (year?: number) => {
+    const params = year ? { year } : {}
+    const response = await api.get('/reports/transactions/excel', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  downloadTransactionsCSV: async (year?: number) => {
+    const params = year ? { year } : {}
+    const response = await api.get('/reports/transactions/csv', {
       params,
       responseType: 'blob',
     })
@@ -836,6 +890,7 @@ export const calendarApi = {
     end_date?: string
     event_type?: string
     show_completed?: boolean
+    income_only?: boolean
   }) => {
     const response = await api.get('/calendar', { params })
     return response.data
@@ -1034,7 +1089,19 @@ export const goalsApi = {
     return response.data
   },
 
-  create: async (data: { name: string; target_amount: number; currency?: string; target_date?: string; icon?: string; color?: string; notes?: string }) => {
+  create: async (data: {
+    name: string
+    goal_type?: string
+    target_amount: number
+    currency?: string
+    target_date?: string
+    deadline_date?: string
+    priority?: string
+    strategy_type?: string
+    icon?: string
+    color?: string
+    notes?: string
+  }) => {
     const response = await api.post('/goals', data)
     return response.data
   },
@@ -1049,8 +1116,77 @@ export const goalsApi = {
     return response.data
   },
 
+  projection: async (id: string, monthlyContribution: number = 0) => {
+    const response = await api.get(`/goals/${id}/projection`, {
+      params: { monthly_contribution: monthlyContribution },
+    })
+    return response.data
+  },
+
   delete: async (id: string) => {
     await api.delete(`/goals/${id}`)
+  },
+}
+
+export const crowdfundingApi = {
+  list: async () => {
+    const response = await api.get('/crowdfunding')
+    return response.data
+  },
+
+  create: async (data: Record<string, unknown>) => {
+    const response = await api.post('/crowdfunding', data)
+    return response.data
+  },
+
+  get: async (id: string) => {
+    const response = await api.get(`/crowdfunding/${id}`)
+    return response.data
+  },
+
+  update: async (id: string, data: Record<string, unknown>) => {
+    const response = await api.patch(`/crowdfunding/${id}`, data)
+    return response.data
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/crowdfunding/${id}`)
+  },
+
+  getDashboard: async () => {
+    const response = await api.get('/crowdfunding/dashboard')
+    return response.data
+  },
+
+  getPerformance: async () => {
+    const response = await api.get('/crowdfunding/performance')
+    return response.data
+  },
+
+  syncCalendar: async () => {
+    const response = await api.post('/crowdfunding/sync-calendar')
+    return response.data
+  },
+
+  analyzeDocuments: async (files: File[], projectId?: string) => {
+    const formData = new FormData()
+    files.forEach((f) => formData.append('files', f))
+    if (projectId) formData.append('project_id', projectId)
+    const response = await api.post('/crowdfunding/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    })
+    return response.data
+  },
+
+  listAudits: async () => {
+    const response = await api.get('/crowdfunding/audits')
+    return response.data
+  },
+
+  getAudit: async (id: string) => {
+    const response = await api.get(`/crowdfunding/audits/${id}`)
+    return response.data
   },
 }
 

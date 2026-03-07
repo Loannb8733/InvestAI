@@ -92,12 +92,16 @@ class TestCycleAdviceCoherence:
             fear_greed=15,
             portfolio_value=100000.0,
         )
-        # Small portfolio: 2-5% of 1000 = 20-50€
+        # Small portfolio: 2-5% of 1000 × risk_multiplier (0.7 for bottom) = 14-35€
         dca_small = [a for a in advice_small if a["action"] == "DCA"][0]
-        assert "20" in dca_small["description"] or "50" in dca_small["description"]
-        # Large portfolio: 2-5% of 100000 = 2000-5000€
+        assert (
+            "14" in dca_small["description"] or "35" in dca_small["description"]
+        ), f"DCA amounts should reflect regime multiplier: {dca_small['description']}"
+        # Large portfolio: 2-5% of 100000 × 0.7 = 1400-3500€
         dca_large = [a for a in advice_large if a["action"] == "DCA"][0]
-        assert "2000" in dca_large["description"] or "5000" in dca_large["description"]
+        assert (
+            "1400" in dca_large["description"] or "3500" in dca_large["description"]
+        ), f"DCA amounts should scale with portfolio: {dca_large['description']}"
 
     def test_bearish_regime_no_panic_sell(self):
         """Bearish regime advises patience/conservation, not panic selling."""

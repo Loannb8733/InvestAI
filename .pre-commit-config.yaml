@@ -55,14 +55,14 @@ repos:
     hooks:
       - id: frontend-eslint
         name: Frontend ESLint
-        entry: bash -c 'cd frontend && npx eslint --ext ts,tsx src/'
+        entry: bash -c 'cd frontend && ./node_modules/.bin/eslint --ext ts,tsx src/'
         language: system
         files: ^frontend/src/.*\.(ts|tsx)$
         pass_filenames: false
 
       - id: frontend-typecheck
         name: Frontend TypeScript
-        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        entry: bash -c 'cd frontend && ./node_modules/.bin/tsc --noEmit'
         language: system
         files: ^frontend/src/.*\.(ts|tsx)$
         pass_filenames: false
