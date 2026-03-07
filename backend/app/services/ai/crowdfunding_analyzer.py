@@ -1,4 +1,4 @@
-"""AI-powered crowdfunding project analysis using Claude API."""
+"""AI-powered crowdfunding project analysis with multi-provider fallback."""
 
 import json
 import logging
@@ -6,7 +6,6 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
-import fitz  # PyMuPDF
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +14,7 @@ from app.models.asset import Asset
 from app.models.crowdfunding_project import CrowdfundingProject
 from app.models.portfolio import Portfolio
 from app.models.project_audit import ProjectAudit
+from app.services.ai.pdf_parser import PDFParser
 
 logger = logging.getLogger(__name__)
 
@@ -84,18 +84,17 @@ Tu dois TOUJOURS répondre en JSON valide, sans markdown ni commentaires."""
 
 
 class CrowdfundingAnalyzerService:
-    """Analyzes crowdfunding project PDFs using Claude API."""
+    """Analyzes crowdfunding project PDFs with multi-provider fallback.
+
+    Provider priority: Ollama (local/free) → Gemini (cloud/free) → Anthropic (cloud/paid) → Static regex.
+    """
+
+    def __init__(self) -> None:
+        self._pdf_parser = PDFParser()
 
     def _extract_pdf_text(self, file_bytes: bytes) -> str:
-        """Extract text from a PDF file using PyMuPDF."""
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        pages = []
-        for page in doc:
-            text = page.get_text()
-            if text.strip():
-                pages.append(text.strip())
-        doc.close()
-        return "\n\n---PAGE---\n\n".join(pages)
+        """Extract text from a PDF file using PDFParser."""
+        return self._pdf_parser.extract_text(file_bytes)
 
     def _build_messages(
         self,
@@ -267,6 +266,215 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
             "portfolio_concentration": concentration,
         }
 
+    async def _call_anthropic(self, messages: list[dict]) -> str:
+        """Call Anthropic Claude API and return raw text response."""
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        logger.info("Calling Claude API for crowdfunding analysis")
+        try:
+            response = await client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=_SYSTEM_PROMPT,
+                messages=messages,
+                timeout=90.0,
+            )
+        except anthropic.AuthenticationError as exc:
+            raise ValueError("Clé API Anthropic invalide — vérifiez ANTHROPIC_API_KEY") from exc
+        except anthropic.RateLimitError as exc:
+            raise ValueError("Limite de requêtes Anthropic atteinte — réessayez dans quelques minutes") from exc
+        except (anthropic.APITimeoutError, anthropic.APIConnectionError) as exc:
+            logger.error("Anthropic API connectivity error: %s", exc)
+            raise ValueError("Timeout ou erreur de connexion à l'API Anthropic") from exc
+        except anthropic.APIError as exc:
+            logger.error("Anthropic API error: %s", exc)
+            raise ValueError(f"Erreur API Anthropic : {exc}") from exc
+
+        raw_text = response.content[0].text
+        logger.info("Claude response received (%d chars)", len(raw_text))
+        return raw_text
+
+    async def _call_gemini(self, messages: list[dict]) -> str:
+        """Call Google Gemini API (free tier) and return raw text response."""
+        import httpx
+
+        # Build the prompt from system + user messages
+        parts = [{"text": _SYSTEM_PROMPT}]
+        for msg in messages:
+            parts.append({"text": msg["content"]})
+
+        payload = {
+            "contents": [{"parts": parts}],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 4096,
+                "responseMimeType": "application/json",
+            },
+        }
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash"
+            f":generateContent?key={settings.GEMINI_API_KEY}"
+        )
+
+        logger.info("Calling Gemini API for crowdfunding analysis")
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            try:
+                resp = await client.post(url, json=payload)
+            except httpx.TimeoutException as exc:
+                raise ValueError("Timeout de connexion à l'API Gemini") from exc
+            except httpx.ConnectError as exc:
+                raise ValueError("Erreur de connexion à l'API Gemini") from exc
+
+        if resp.status_code == 400:
+            detail = resp.json().get("error", {}).get("message", resp.text[:200])
+            raise ValueError(f"Erreur Gemini : {detail}")
+        if resp.status_code == 429:
+            raise ValueError("Limite de requêtes Gemini atteinte — réessayez dans quelques minutes")
+        if resp.status_code != 200:
+            raise ValueError(f"Erreur Gemini (HTTP {resp.status_code}) : {resp.text[:200]}")
+
+        data = resp.json()
+        try:
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Réponse Gemini inattendue : {str(data)[:200]}") from exc
+
+        logger.info("Gemini response received (%d chars)", len(raw_text))
+        return raw_text
+
+    async def _call_ollama(self, messages: list[dict]) -> str:
+        """Call local Ollama API and return raw text response."""
+        import httpx
+
+        url = f"{settings.OLLAMA_URL}/api/chat"
+        payload = {
+            "model": settings.OLLAMA_MODEL,
+            "messages": [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": messages[0]["content"]},
+            ],
+            "stream": False,
+            "format": "json",
+            "options": {"temperature": 0.2, "num_predict": 4096},
+        }
+
+        logger.info("Calling Ollama (%s) for crowdfunding analysis", settings.OLLAMA_MODEL)
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            try:
+                resp = await client.post(url, json=payload)
+            except (httpx.ConnectError, httpx.TimeoutException) as exc:
+                raise ValueError(f"Ollama non disponible ({settings.OLLAMA_URL})") from exc
+
+        if resp.status_code != 200:
+            raise ValueError(f"Erreur Ollama (HTTP {resp.status_code}) : {resp.text[:200]}")
+
+        data = resp.json()
+        raw_text = data.get("message", {}).get("content", "")
+        if not raw_text:
+            raise ValueError("Réponse Ollama vide")
+
+        logger.info("Ollama response received (%d chars)", len(raw_text))
+        return raw_text
+
+    def _analyze_statically(self, file_contents: list[tuple[str, bytes]]) -> dict:
+        """Fallback: extract KPIs using regex when no LLM is available."""
+        from app.services.ai.pdf_parser import ExtractedFinancials
+
+        all_financials: list[ExtractedFinancials] = []
+        for filename, content in file_contents:
+            try:
+                fin = self._pdf_parser.extract_financials(content)
+                all_financials.append(fin)
+            except Exception as exc:
+                logger.warning("Static extraction failed for %s: %s", filename, exc)
+
+        # Merge: take first non-None value from each document
+        merged = ExtractedFinancials()
+        for fin in all_financials:
+            for fld in [
+                "chiffre_affaires",
+                "prix_revient",
+                "marge_brute",
+                "marge_brute_percent",
+                "tri",
+                "duration_min",
+                "duration_max",
+                "collecte",
+                "ltv",
+                "ltc",
+                "pre_commercialisation",
+                "fonds_propres",
+            ]:
+                if getattr(merged, fld) is None and getattr(fin, fld) is not None:
+                    setattr(merged, fld, getattr(fin, fld))
+
+        # Build output matching _ANALYSIS_SCHEMA
+        data: dict = {
+            "project_name": "Analyse statique (sans IA)",
+            "operator": None,
+            "location": None,
+            "document_type": "mixed",
+            "tri": merged.tri,
+            "duration_min": merged.duration_min,
+            "duration_max": merged.duration_max,
+            "collection_amount": merged.collecte,
+            "margin_percent": merged.marge_brute_percent,
+            "ltv": merged.ltv,
+            "ltc": merged.ltc,
+            "pre_sales_percent": merged.pre_commercialisation or 0,
+            "equity_contribution": merged.fonds_propres,
+            "guarantees": [],
+            "admin_status": None,
+            "points_forts": [],
+            "points_vigilance": ["Analyse statique (regex) — résultats partiels, relecture recommandée"],
+            "red_flags": [],
+            "verdict": "VIGILANCE",
+        }
+
+        # Auto-score based on extracted values
+        scores = {}
+        scores["score_operator"] = 5  # Unknown
+        scores["score_location"] = 5  # Unknown
+        scores["score_admin"] = 5  # Unknown
+
+        # Score guarantees
+        scores["score_guarantees"] = 3  # No guarantee info from regex
+
+        # Score risk/return
+        margin = merged.marge_brute_percent
+        if margin is not None and margin >= 20:
+            scores["score_risk_return"] = 7
+        elif margin is not None and margin >= 10:
+            scores["score_risk_return"] = 5
+        else:
+            scores["score_risk_return"] = 3
+
+        # Risk score = average
+        avg = sum(scores.values()) / len(scores)
+        scores["risk_score"] = round(avg)
+        data.update(scores)
+
+        # Auto-generate points forts
+        if merged.tri and merged.tri >= 8:
+            data["points_forts"].append(f"TRI attractif de {merged.tri}%")
+        if margin and margin >= 20:
+            data["points_forts"].append(f"Marge promoteur confortable ({margin:.1f}%)")
+        if merged.ltv and merged.ltv < 60:
+            data["points_forts"].append(f"LTV conservateur ({merged.ltv:.1f}%)")
+        if merged.fonds_propres and merged.fonds_propres > 100000:
+            data["points_forts"].append("Fonds propres significatifs de l'opérateur")
+
+        logger.info(
+            "Static analysis: TRI=%s, margin=%s, LTV=%s, collecte=%s",
+            merged.tri,
+            merged.marge_brute_percent,
+            merged.ltv,
+            merged.collecte,
+        )
+        return data
+
     async def analyze_documents(
         self,
         db: AsyncSession,
@@ -289,11 +497,6 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         Returns:
             Persisted ProjectAudit instance.
         """
-        import anthropic
-
-        if not settings.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY non configurée — Audit Lab désactivé")
-
         # Extract text from PDFs
         texts = []
         file_names = []
@@ -310,47 +513,46 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         if not texts:
             raise ValueError("Aucun texte extractible des PDFs fournis")
 
-        # Call Claude API (async client to avoid blocking the event loop)
-        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
         messages = self._build_messages(texts, munitions, total_capital)
 
-        logger.info("Calling Claude API for crowdfunding analysis (%d documents)", len(texts))
-        try:
-            response = await client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system=_SYSTEM_PROMPT,
-                messages=messages,
-                timeout=90.0,
-            )
-        except anthropic.AuthenticationError as exc:
-            raise ValueError("Clé API Anthropic invalide — vérifiez ANTHROPIC_API_KEY") from exc
-        except anthropic.RateLimitError as exc:
-            raise ValueError("Limite de requêtes Anthropic atteinte — réessayez dans quelques minutes") from exc
-        except (anthropic.APITimeoutError, anthropic.APIConnectionError) as exc:
-            logger.error("Anthropic API connectivity error: %s", exc)
-            raise ValueError("Timeout ou erreur de connexion à l'API Anthropic") from exc
-        except anthropic.APIError as exc:
-            logger.error("Anthropic API error: %s", exc)
-            raise ValueError(f"Erreur API Anthropic : {exc}") from exc
+        # Provider cascade: Ollama → Gemini → Anthropic → Static
+        providers: list[tuple[str, object]] = []
+        if settings.OLLAMA_URL:
+            providers.append(("Ollama", self._call_ollama))
+        if settings.GEMINI_API_KEY:
+            providers.append(("Gemini", self._call_gemini))
+        if settings.ANTHROPIC_API_KEY:
+            providers.append(("Anthropic", self._call_anthropic))
 
-        raw_text = response.content[0].text
-        logger.info("Claude API response received (%d chars)", len(raw_text))
+        raw_text = None
+        data = None
+        for provider_name, provider_fn in providers:
+            try:
+                raw_text = await provider_fn(messages)
+                break
+            except Exception as exc:
+                logger.warning("Provider %s failed: %s", provider_name, exc)
+                continue
 
-        # Parse JSON response
-        try:
-            data = json.loads(raw_text)
-        except json.JSONDecodeError:
-            # Try to extract JSON from the response
-            start = raw_text.find("{")
-            end = raw_text.rfind("}") + 1
-            if start >= 0 and end > start:
-                try:
-                    data = json.loads(raw_text[start:end])
-                except json.JSONDecodeError:
-                    raise ValueError(f"Réponse Claude non-JSON : {raw_text[:200]}")
-            else:
-                raise ValueError(f"Réponse Claude non-JSON : {raw_text[:200]}")
+        if raw_text is not None:
+            # Parse JSON response from LLM
+            try:
+                data = json.loads(raw_text)
+            except json.JSONDecodeError:
+                start = raw_text.find("{")
+                end = raw_text.rfind("}") + 1
+                if start >= 0 and end > start:
+                    try:
+                        data = json.loads(raw_text[start:end])
+                    except json.JSONDecodeError:
+                        logger.warning("LLM returned non-JSON, falling back to static: %s", raw_text[:100])
+                        data = None
+
+        # Ultimate fallback: static regex analysis
+        if data is None:
+            logger.info("All LLM providers failed or unavailable — using static analysis")
+            data = self._analyze_statically(file_contents)
+            raw_text = json.dumps(data, ensure_ascii=False)
 
         # Validate and enrich
         data = self._validate_and_enrich(data)

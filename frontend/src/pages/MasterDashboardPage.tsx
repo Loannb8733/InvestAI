@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -269,7 +270,7 @@ export default function MasterDashboardPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Valeur nette totale</p>
-              <p className="text-4xl font-bold tracking-tight">{formatCurrency(netWorth)}</p>
+              <p className="text-4xl font-bold tracking-tight tabular-nums">{formatCurrency(netWorth)}</p>
               <div className="flex items-center gap-2 mt-2">
                 {isPositive ? (
                   <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-950/20">
@@ -298,55 +299,63 @@ export default function MasterDashboardPage() {
 
       {/* KPI Row */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Wallet className="h-3.5 w-3.5" />
-              Total Investi
-            </div>
-            <p className="text-xl font-bold">{formatCurrency(totalInvested)}</p>
-          </CardContent>
-        </Card>
+        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Wallet className="h-3.5 w-3.5" />
+                Total Investi
+              </div>
+              <p className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(totalInvested)}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              {pnl >= 0 ? (
-                <TrendingUp className="h-3.5 w-3.5 text-green-500" />
-              ) : (
-                <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-              )}
-              P&L Net
-            </div>
-            <p className={`text-xl font-bold ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(pnl)}
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                {pnl >= 0 ? (
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                )}
+                P&L Net
+              </div>
+              <p className={`text-xl font-bold tracking-tight tabular-nums ${pnl >= 0 ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]' : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'}`}>
+                {formatCurrency(pnl)}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Rendement annualisé
-            </div>
-            <p className={`text-xl font-bold ${blendedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatPercent(blendedReturn)}
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Rendement annualisé
+              </div>
+              <p className={`text-xl font-bold tracking-tight tabular-nums ${blendedReturn >= 0 ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]' : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'}`}>
+                {formatPercent(blendedReturn)}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Banknote className="h-3.5 w-3.5" />
-              Liquidités
-            </div>
-            <p className="text-xl font-bold">
-              {formatCurrency(metrics?.available_liquidity ?? 0)}
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Banknote className="h-3.5 w-3.5" />
+                Liquidités
+              </div>
+              <p className="text-xl font-bold tracking-tight tabular-nums">
+                {formatCurrency(metrics?.available_liquidity ?? 0)}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Charts Row */}

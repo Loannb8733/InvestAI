@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { Button } from '@/components/ui/button'
@@ -69,7 +70,17 @@ export default function Layout() {
         <Header onMenuClick={handleToggleSidebar} />
         <main className="flex-1 overflow-y-auto p-6">
           <RouteErrorBoundary resetKey={location.pathname}>
-            <Outlet />
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </RouteErrorBoundary>
         </main>
       </div>
