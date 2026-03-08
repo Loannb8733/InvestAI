@@ -289,89 +289,6 @@ async def sync_calendar_events(
     return {"synced_events": total}
 
 
-@router.get("/{project_id}", response_model=CrowdfundingProjectResponse)
-@limiter.limit("30/minute")
-async def get_project(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    project = await _get_project_for_user(db, project_id, current_user.id)
-    return _enrich(project)
-
-
-@router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)
-@limiter.limit("20/minute")
-async def update_project(
-    request: Request,
-    project_id: uuid.UUID,
-    data: CrowdfundingProjectUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    project = await _get_project_for_user(db, project_id, current_user.id)
-
-    updates = data.model_dump(exclude_unset=True)
-    for field, value in updates.items():
-        setattr(project, field, value)
-
-    # Sync key fields back to the Asset row
-    asset = await db.get(Asset, project.asset_id)
-    if asset:
-        if "annual_rate" in updates:
-            asset.interest_rate = project.annual_rate
-        if "estimated_end_date" in updates:
-            asset.maturity_date = project.estimated_end_date
-        if "status" in updates:
-            asset.project_status = project.status.value
-        if "platform" in updates:
-            asset.exchange = project.platform
-            asset.symbol = project.platform.upper()[:20]
-
-    await db.commit()
-    await db.refresh(project)
-
-    # Sync calendar events if financial terms or status changed
-    financial_fields = {
-        "annual_rate",
-        "duration_months",
-        "repayment_type",
-        "start_date",
-        "estimated_end_date",
-        "invested_amount",
-    }
-    if updates.keys() & financial_fields:
-        await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
-        await db.commit()
-    elif "status" in updates:
-        if project.status in (ProjectStatus.COMPLETED, ProjectStatus.DEFAULTED):
-            await crowdfunding_calendar_service.cleanup_completed_project(db, project.id)
-            await db.commit()
-        elif project.status == ProjectStatus.ACTIVE:
-            await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
-            await db.commit()
-
-    return _enrich(project)
-
-
-@router.delete("/{project_id}", status_code=204)
-@limiter.limit("10/minute")
-async def delete_project(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    project = await _get_project_for_user(db, project_id, current_user.id)
-
-    # Delete asset (cascades to project via FK)
-    asset = await db.get(Asset, project.asset_id)
-    if asset:
-        await db.delete(asset)
-    await db.commit()
-
-
 # ──────────────────────── Audit Lab ────────────────────────
 
 
@@ -389,11 +306,7 @@ async def analyze_documents(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload PDFs and get an AI-powered risk analysis."""
-    from app.core.config import settings
     from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
-
-    if not settings.ANTHROPIC_API_KEY:
-        raise HTTPException(503, "Audit Lab non disponible — clé API non configurée")
 
     if len(files) > _MAX_FILES:
         raise HTTPException(400, f"Maximum {_MAX_FILES} fichiers autorisés")
@@ -475,3 +388,89 @@ async def get_audit(
     if not audit:
         raise HTTPException(404, "Audit non trouvé")
     return audit
+
+
+# ──────────────────── Single Project CRUD ────────────────────
+
+
+@router.get("/{project_id}", response_model=CrowdfundingProjectResponse)
+@limiter.limit("30/minute")
+async def get_project(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+    return _enrich(project)
+
+
+@router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)
+@limiter.limit("20/minute")
+async def update_project(
+    request: Request,
+    project_id: uuid.UUID,
+    data: CrowdfundingProjectUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(project, field, value)
+
+    # Sync key fields back to the Asset row
+    asset = await db.get(Asset, project.asset_id)
+    if asset:
+        if "annual_rate" in updates:
+            asset.interest_rate = project.annual_rate
+        if "estimated_end_date" in updates:
+            asset.maturity_date = project.estimated_end_date
+        if "status" in updates:
+            asset.project_status = project.status.value
+        if "platform" in updates:
+            asset.exchange = project.platform
+            asset.symbol = project.platform.upper()[:20]
+
+    await db.commit()
+    await db.refresh(project)
+
+    # Sync calendar events if financial terms or status changed
+    financial_fields = {
+        "annual_rate",
+        "duration_months",
+        "repayment_type",
+        "start_date",
+        "estimated_end_date",
+        "invested_amount",
+    }
+    if updates.keys() & financial_fields:
+        await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+        await db.commit()
+    elif "status" in updates:
+        if project.status in (ProjectStatus.COMPLETED, ProjectStatus.DEFAULTED):
+            await crowdfunding_calendar_service.cleanup_completed_project(db, project.id)
+            await db.commit()
+        elif project.status == ProjectStatus.ACTIVE:
+            await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+            await db.commit()
+
+    return _enrich(project)
+
+
+@router.delete("/{project_id}", status_code=204)
+@limiter.limit("10/minute")
+async def delete_project(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    # Delete asset (cascades to project via FK)
+    asset = await db.get(Asset, project.asset_id)
+    if asset:
+        await db.delete(asset)
+    await db.commit()
