@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -26,7 +26,7 @@ interface PerformanceChartProps {
   period?: number
 }
 
-export default function PerformanceChart({
+export default memo(function PerformanceChart({
   data,
   color = '#6366F1',
   period = 30,
@@ -206,4 +206,4 @@ export default function PerformanceChart({
       </AreaChart>
     </ResponsiveContainer>
   )
-}
+})

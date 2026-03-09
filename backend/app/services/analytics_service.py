@@ -873,7 +873,7 @@ class AnalyticsService:
 
         sorted_p = sorted(perfs, key=lambda x: x.gain_loss_percent, reverse=True)
         best = sorted_p[0].symbol if sorted_p else None
-        worst = sorted_p[-1].symbol if len(sorted_p) > 1 else None
+        worst = sorted_p[-1].symbol if len(sorted_p) > 1 else (None if len(sorted_p) <= 1 else sorted_p[0].symbol)
 
         # ── Contextual interpretations ──
         interpretations = self._build_interpretations(
@@ -1118,7 +1118,9 @@ class AnalyticsService:
 
         for sym, asset in seen.items():
             _, prices = await self._fetch_history(sym, asset.asset_type, days=90)
-            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price)
+            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
+            if price <= 0:
+                continue
             val_dec = Decimal(str(asset.quantity)) * Decimal(str(price))
             total_value_dec += val_dec
             rets = _compute_returns(prices)
@@ -1828,7 +1830,9 @@ class AnalyticsService:
 
         for sym, asset in seen.items():
             _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
-            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price)
+            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
+            if price <= 0:
+                continue
             val_dec = Decimal(str(qty_map[sym])) * Decimal(str(price))
             total_value_dec += val_dec
             val = float(val_dec)

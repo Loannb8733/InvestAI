@@ -425,6 +425,8 @@ class SnapshotService:
         if not portfolio_ids:
             return []
 
+        from app.models.asset import AssetType
+
         query = (
             select(
                 Transaction.executed_at,
@@ -438,7 +440,11 @@ class SnapshotService:
                 Transaction.created_at,
             )
             .join(Asset, Transaction.asset_id == Asset.id)
-            .where(Asset.portfolio_id.in_(portfolio_ids))
+            .where(
+                Asset.portfolio_id.in_(portfolio_ids),
+                # Exclude CROWDFUNDING — managed via dedicated endpoints
+                Asset.asset_type != AssetType.CROWDFUNDING,
+            )
             .order_by(Transaction.executed_at.asc())
         )
 
@@ -600,7 +606,7 @@ class SnapshotService:
                         .order_by(AssetPriceHistory.price_date)
                     )
                     rows = result.all()
-                    if rows and len(rows) >= max(days * 0.5, 5):
+                    if rows and len(rows) >= 1:
                         series: Dict[str, float] = {}
                         for row in rows:
                             series[row[0].strftime("%Y-%m-%d")] = float(row[1])
@@ -650,7 +656,7 @@ class SnapshotService:
         async def _fetch_one(sym: str, at: str) -> Tuple[str, Optional[Tuple]]:
             async with _api_semaphore:
                 try:
-                    result = await fetcher.get_history(sym, at, days)
+                    result = await fetcher.get_history(sym, at, days, fast=True)
                     return (sym, result)
                 except Exception as e:
                     logger.warning("Failed to fetch prices for %s: %s", sym, e)

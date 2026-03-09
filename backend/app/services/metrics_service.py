@@ -243,7 +243,8 @@ class MetricsService:
             }
 
         # Separate into: investments, stablecoins, fiat cash
-        investment_assets = [a for a in assets if not is_cash_like(a.symbol)]
+        # Exclude CROWDFUNDING — managed via dedicated /crowdfunding endpoints
+        investment_assets = [a for a in assets if not is_cash_like(a.symbol) and a.asset_type != AssetType.CROWDFUNDING]
         stablecoin_assets = [a for a in assets if is_stablecoin(a.symbol)]
         fiat_assets = [a for a in assets if is_fiat(a.symbol)]
 
@@ -597,8 +598,34 @@ class MetricsService:
                 except Exception as e:
                     logger.warning("Failed to fetch crypto period changes (batch): %s", e)
 
-        # ── Step 3: Live historical fetch for remaining uncached symbols ──
+        # ── Step 2b: Try PostgreSQL asset_price_history for remaining ──
         remaining = uncached_crypto + uncached_stocks
+        if remaining:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from app.models.asset_price_history import AssetPriceHistory
+
+                cutoff = (datetime.utcnow() - timedelta(days=days + 5)).date()
+                async with AsyncSessionLocal() as _db:
+                    for symbol in list(remaining):
+                        sym_upper = symbol.upper()
+                        result = await _db.execute(
+                            select(AssetPriceHistory.price_eur)
+                            .where(
+                                AssetPriceHistory.symbol == sym_upper,
+                                AssetPriceHistory.price_date >= cutoff,
+                            )
+                            .order_by(AssetPriceHistory.price_date)
+                        )
+                        prices = [float(r[0]) for r in result.all()]
+                        if prices and len(prices) >= 2 and prices[0] != 0:
+                            change = (prices[-1] - prices[0]) / prices[0] * 100
+                            changes[sym_upper] = change
+                            remaining = [s for s in remaining if s.upper() != sym_upper]
+            except Exception as e:
+                logger.warning("DB period change lookup failed: %s", e)
+
+        # ── Step 3: Live historical fetch for remaining uncached symbols (fast mode) ──
         if remaining:
             fetcher = HistoricalDataFetcher()
             try:
@@ -606,7 +633,7 @@ class MetricsService:
                     try:
                         sym_upper = symbol.upper()
                         if sym_upper in [s.upper() for s in symbols_by_type.get("crypto", [])]:
-                            _, prices = await fetcher.get_crypto_history(symbol, days=days)
+                            _, prices = await fetcher.get_crypto_history(symbol, days=days, fast=True)
                         else:
                             _, prices = await fetcher.get_stock_history(symbol, days=days)
                         if prices and len(prices) >= 2 and prices[0] != 0:
@@ -865,10 +892,11 @@ class MetricsService:
         Includes all assets (even those with 0 quantity) and calculates
         total invested from all buy transactions.
         """
-        # Get ALL assets in portfolio (including zero quantity)
+        # Get ALL assets in portfolio (including zero quantity), excluding CROWDFUNDING
         result = await db.execute(
             select(Asset).where(
                 Asset.portfolio_id == portfolio_id,
+                Asset.asset_type != AssetType.CROWDFUNDING,
             )
         )
         all_assets = result.scalars().all()

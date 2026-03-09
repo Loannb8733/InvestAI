@@ -1,5 +1,6 @@
 """Dashboard endpoints."""
 
+import asyncio
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -14,6 +15,7 @@ from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
 from app.models.portfolio import Portfolio
+from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.metrics_service import metrics_service
@@ -256,12 +258,18 @@ async def get_dashboard(
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=days)
 
-    # Get historical data — always use real price-based series
-    historical_data = await snapshot_service.build_portfolio_value_series(db, user_id, days)
+    # Run historical data (heaviest call) in parallel with index comparison (HTTP only)
+    historical_task = snapshot_service.build_portfolio_value_series(db, user_id, days)
+    index_task = get_index_comparison(days)
+    historical_data, index_comparison = await asyncio.gather(historical_task, index_task)
+
+    # Light DB queries (fast, sequential to avoid session conflicts)
+    events_window = min(days, 90) if days > 0 else 90
+    recent_transactions = await get_recent_transactions_internal(db, current_user, 5, days=days)
+    active_alerts = await get_active_alerts_internal(db, current_user)
+    upcoming_events = await get_upcoming_events_internal(db, current_user, events_window)
 
     # Data quality: check actual coverage vs expected data points.
-    # With deep backfill, PostgreSQL should have full coverage.
-    # Only flag as estimated if coverage is truly poor (< 30% of expected).
     data_interval = snapshot_service._get_data_point_interval(days)
     expected_points = max(days // data_interval, 5)
     coverage_ratio = len(historical_data) / expected_points if expected_points > 0 else 1.0
@@ -295,19 +303,6 @@ async def get_dashboard(
         for a in metrics.get("aggregated_assets", [])
     ]
     asset_allocation.sort(key=lambda x: x.value, reverse=True)
-
-    # Get recent transactions (filtered by period)
-    recent_transactions = await get_recent_transactions_internal(db, current_user, 5, days=days)
-
-    # Get active alerts
-    active_alerts = await get_active_alerts_internal(db, current_user)
-
-    # Get upcoming events (adapted to selected period window)
-    events_window = min(days, 90) if days > 0 else 90
-    upcoming_events = await get_upcoming_events_internal(db, current_user, events_window)
-
-    # Get index comparison (BTC, ETH, SOL)
-    index_comparison = await get_index_comparison(days)
 
     # ============== Calculate Advanced Metrics ==============
 
@@ -405,10 +400,33 @@ async def get_dashboard(
     )
 
     # Create snapshot for today if we have assets (max 1 per day)
-    # Fire-and-forget: don't block the response on snapshot creation
+    # Use already-computed metrics to avoid re-fetching prices
     if metrics["assets_count"] > 0:
         try:
-            await snapshot_service.create_user_snapshot_if_missing(db, user_id)
+            from decimal import Decimal as _Dec
+
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            existing = await db.execute(
+                select(func.count())
+                .select_from(PortfolioSnapshot)
+                .where(
+                    PortfolioSnapshot.user_id == user_id,
+                    PortfolioSnapshot.snapshot_date >= today_start,
+                    PortfolioSnapshot.portfolio_id.is_(None),
+                )
+            )
+            if existing.scalar() == 0:
+                snap = PortfolioSnapshot(
+                    user_id=user_id,
+                    portfolio_id=None,
+                    snapshot_date=datetime.utcnow(),
+                    total_value=_Dec(str(metrics["total_value"])),
+                    total_invested=_Dec(str(metrics["total_invested"])),
+                    total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
+                    currency=currency,
+                )
+                db.add(snap)
+                await db.commit()
         except Exception:
             pass
 

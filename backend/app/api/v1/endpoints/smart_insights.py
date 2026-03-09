@@ -135,6 +135,16 @@ class PortfolioHealthResponse(BaseModel):
 # === Helpers ===
 
 
+def _safe_regime_config(raw: Optional[dict]) -> Optional[RegimeConfigResponse]:
+    """Safely build RegimeConfigResponse, returning None on bad data."""
+    if not raw or not isinstance(raw, dict):
+        return None
+    try:
+        return RegimeConfigResponse(**raw)
+    except Exception:
+        return None
+
+
 def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
     """Convert MarketRegime dataclass to response model."""
     if regime is None:
@@ -235,7 +245,9 @@ async def get_portfolio_health(
                 price_change_percent=a.price_change_percent,
                 position_value_eur=a.position_value_eur,
                 impact_eur=a.impact_eur,
-                detected_at=a.detected_at.isoformat() if a.detected_at else "",
+                detected_at=a.detected_at.isoformat()
+                if a.detected_at and hasattr(a.detected_at, "isoformat")
+                else str(a.detected_at or ""),
             )
             for a in report.anomaly_impacts
         ],
@@ -247,9 +259,7 @@ async def get_portfolio_health(
             max_drawdown=report.metrics_summary.get("max_drawdown", 0),
             hhi=report.metrics_summary.get("hhi", 0),
             total_value=report.metrics_summary.get("total_value", 0),
-            regime_config=RegimeConfigResponse(**report.metrics_summary["regime_config"])
-            if report.metrics_summary.get("regime_config")
-            else None,
+            regime_config=_safe_regime_config(report.metrics_summary.get("regime_config")),
         ),
         market_regime=_build_regime_response(report.market_regime),
         generated_at=report.generated_at.isoformat(),

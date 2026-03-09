@@ -60,9 +60,10 @@ interface DashboardRiskCardsProps {
   riskMetrics: RiskMetrics
   thresholds?: DisplayThresholds
   periodLabel?: string
+  privacyMode?: boolean
 }
 
-export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabel }: DashboardRiskCardsProps) {
+export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabel, privacyMode }: DashboardRiskCardsProps) {
   const st = thresholds?.sharpe ?? DEFAULT_DISPLAY_THRESHOLDS.sharpe
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -107,7 +108,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           <div className="flex items-center justify-between">
             <div>
               <MetricTooltip content={`Perte potentielle maximale avec ${(riskMetrics.var_95.confidence_level * 100).toFixed(0)}% de confiance sur 1 jour.`}><p className="text-sm text-muted-foreground">VaR 95%</p></MetricTooltip>
-              <p className="text-xl font-bold text-orange-500">{formatCurrency(riskMetrics.var_95.var_amount)}</p>
+              <p className="text-xl font-bold text-orange-500">{privacyMode ? '••••••' : formatCurrency(riskMetrics.var_95.var_amount)}</p>
               <p className="text-xs text-muted-foreground">soit {riskMetrics.var_95.var_percent.toFixed(1)}%</p>
             </div>
             <ShieldAlert className="h-8 w-8 text-orange-500" />

@@ -121,9 +121,18 @@ export default function PortfolioAssetList({
     })
   }
 
+  // Filter out crowdfunding assets (managed via dedicated page)
+  const filteredMetrics = useMemo(() => {
+    if (!portfolioMetrics) return portfolioMetrics
+    return {
+      ...portfolioMetrics,
+      assets: portfolioMetrics.assets.filter((a) => a.asset_type !== 'crowdfunding'),
+    }
+  }, [portfolioMetrics])
+
   // Group assets by platform for distribution view
   const platformDistribution = useMemo(() => {
-    if (!portfolioMetrics?.assets?.length) return []
+    if (!filteredMetrics?.assets?.length) return []
     const map = new Map<string, {
       value: number
       totalInvested: number
@@ -131,7 +140,7 @@ export default function PortfolioAssetList({
       totalFees: number
       assets: { symbol: string; value: number }[]
     }>()
-    for (const asset of portfolioMetrics.assets) {
+    for (const asset of filteredMetrics.assets) {
       const platform = asset.exchange || 'Non assigné'
       const entry = map.get(platform) || { value: 0, totalInvested: 0, gainLoss: 0, totalFees: 0, assets: [] }
       entry.value += asset.current_value
@@ -151,12 +160,12 @@ export default function PortfolioAssetList({
         netPnl: data.gainLoss - data.totalFees,
       }))
       .sort((a, b) => b.value - a.value)
-  }, [portfolioMetrics?.assets])
+  }, [filteredMetrics?.assets])
 
   // Group assets by symbol for aggregated view
   const groupedAssets = useMemo(() => {
-    if (!portfolioMetrics?.assets?.length) return []
-    const filtered = portfolioMetrics.assets.filter((asset) =>
+    if (!filteredMetrics?.assets?.length) return []
+    const filtered = filteredMetrics.assets.filter((asset) =>
       !platformFilter || (asset.exchange || 'Non assigné') === platformFilter
     )
     const map = new Map<string, GroupedAsset>()
@@ -202,15 +211,15 @@ export default function PortfolioAssetList({
       if (priced) group.currentPrice = priced.current_price
     }
     return Array.from(map.values()).sort((a, b) => b.totalValue - a.totalValue)
-  }, [portfolioMetrics?.assets, platformFilter])
+  }, [filteredMetrics?.assets, platformFilter])
 
   const hasPlatformData = platformDistribution.some((p) => p.platform !== 'Non assigné')
 
   // Detect if this is a crowdfunding portfolio (all assets are real_estate with invested_amount)
   const isCrowdfundingPortfolio = useMemo(() => {
-    if (!portfolioMetrics?.assets?.length) return false
-    return portfolioMetrics.assets.every((a) => a.asset_type === 'real_estate' && a.invested_amount != null)
-  }, [portfolioMetrics?.assets])
+    if (!filteredMetrics?.assets?.length) return false
+    return filteredMetrics.assets.every((a) => a.asset_type === 'real_estate' && a.invested_amount != null)
+  }, [filteredMetrics?.assets])
 
   const statusBadge = (status?: string) => {
     switch (status) {
@@ -419,7 +428,7 @@ export default function PortfolioAssetList({
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      ) : portfolioMetrics && isCrowdfundingPortfolio && portfolioMetrics.assets.length > 0 ? (
+      ) : filteredMetrics && isCrowdfundingPortfolio && filteredMetrics.assets.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -434,7 +443,7 @@ export default function PortfolioAssetList({
               </tr>
             </thead>
             <tbody>
-              {portfolioMetrics.assets
+              {filteredMetrics.assets
                 .filter((a) => !platformFilter || (a.exchange || 'Non assigné') === platformFilter)
                 .map((asset) => (
                 <tr key={asset.id} className="border-b last:border-0">

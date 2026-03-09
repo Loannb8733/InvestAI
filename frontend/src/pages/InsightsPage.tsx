@@ -770,7 +770,7 @@ function FeeAnalysis() {
                     <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-red-500 rounded-full"
-                        style={{ width: `${Math.min(100, (item.fees / data.total_fees) * 100)}%` }}
+                        style={{ width: `${data.total_fees > 0 ? Math.min(100, (item.fees / data.total_fees) * 100) : 0}%` }}
                       />
                     </div>
                     <span className="text-sm font-mono w-20 text-right">{formatCurrency(item.fees)}</span>

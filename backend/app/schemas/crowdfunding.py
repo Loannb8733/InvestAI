@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.crowdfunding_project import ProjectStatus, RepaymentType
+from app.models.crowdfunding_repayment import PaymentType
 
 # ---------- Request schemas ----------
 
@@ -42,7 +43,42 @@ class CrowdfundingProjectUpdate(BaseModel):
     total_received: Optional[Decimal] = Field(None, ge=0)
 
 
+# ---------- Repayment schemas ----------
+
+
+class RepaymentCreate(BaseModel):
+    payment_date: date
+    amount: Decimal = Field(..., gt=0)
+    payment_type: PaymentType
+    notes: Optional[str] = None
+
+
+class RepaymentResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    payment_date: date
+    amount: Decimal
+    payment_type: PaymentType
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ---------- Response schemas ----------
+
+
+class ProjectDocumentResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    file_name: str
+    file_size: int
+    audit_id: Optional[UUID] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class CrowdfundingProjectResponse(BaseModel):
@@ -68,6 +104,8 @@ class CrowdfundingProjectResponse(BaseModel):
     projected_total_interest: Optional[float] = None
     interest_earned: Optional[float] = None
     progress_percent: Optional[float] = None
+    documents: list[ProjectDocumentResponse] = []
+    repayments: list[RepaymentResponse] = []
 
     class Config:
         from_attributes = True

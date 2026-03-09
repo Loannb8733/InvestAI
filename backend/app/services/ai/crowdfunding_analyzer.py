@@ -268,7 +268,10 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
 
     async def _call_anthropic(self, messages: list[dict]) -> str:
         """Call Anthropic Claude API and return raw text response."""
-        import anthropic
+        try:
+            import anthropic
+        except ImportError:
+            raise ValueError("Le package 'anthropic' n'est pas installé. Utilisez Ollama ou installez anthropic.")
 
         client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
         logger.info("Calling Claude API for crowdfunding analysis")

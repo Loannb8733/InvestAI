@@ -14,8 +14,10 @@ from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.models.asset import Asset, AssetType
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
+from app.models.crowdfunding_repayment import CrowdfundingRepayment
 from app.models.portfolio import Portfolio
 from app.models.project_audit import ProjectAudit
+from app.models.project_document import ProjectDocument
 from app.models.user import User
 from app.schemas.crowdfunding import (
     CrowdfundingDashboardResponse,
@@ -23,6 +25,9 @@ from app.schemas.crowdfunding import (
     CrowdfundingProjectResponse,
     CrowdfundingProjectUpdate,
     ProjectAuditResponse,
+    ProjectDocumentResponse,
+    RepaymentCreate,
+    RepaymentResponse,
 )
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 
@@ -32,7 +37,11 @@ router = APIRouter()
 # ──────────────────────── helpers ────────────────────────
 
 
-def _enrich(project: CrowdfundingProject) -> CrowdfundingProjectResponse:
+def _enrich(
+    project: CrowdfundingProject,
+    documents: Optional[list[ProjectDocument]] = None,
+    repayments: Optional[list[CrowdfundingRepayment]] = None,
+) -> CrowdfundingProjectResponse:
     """Add computed fields to a project response."""
     invested = float(project.invested_amount)
     rate = float(project.annual_rate) / 100
@@ -46,6 +55,9 @@ def _enrich(project: CrowdfundingProject) -> CrowdfundingProjectResponse:
     if project.start_date and months > 0:
         elapsed = (date.today() - project.start_date).days / 30.44
         progress = min(100.0, elapsed / months * 100)
+
+    docs = [ProjectDocumentResponse.model_validate(d) for d in (documents or [])]
+    reps = [RepaymentResponse.model_validate(r) for r in (repayments or [])]
 
     return CrowdfundingProjectResponse(
         id=project.id,
@@ -68,6 +80,8 @@ def _enrich(project: CrowdfundingProject) -> CrowdfundingProjectResponse:
         projected_total_interest=round(projected_total, 2),
         interest_earned=round(interest_earned, 2),
         progress_percent=round(progress, 1),
+        documents=docs,
+        repayments=reps,
     )
 
 
@@ -80,6 +94,42 @@ async def _get_user_projects(db: AsyncSession, user_id: uuid.UUID) -> list[Crowd
         .order_by(CrowdfundingProject.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def _get_docs_for_projects(
+    db: AsyncSession,
+    project_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[ProjectDocument]]:
+    """Load documents for a batch of projects (without file_data)."""
+    if not project_ids:
+        return {}
+    result = await db.execute(
+        select(ProjectDocument)
+        .where(ProjectDocument.project_id.in_(project_ids))
+        .order_by(ProjectDocument.created_at.desc())
+    )
+    docs: dict[uuid.UUID, list[ProjectDocument]] = {}
+    for d in result.scalars().all():
+        docs.setdefault(d.project_id, []).append(d)
+    return docs
+
+
+async def _get_repayments_for_projects(
+    db: AsyncSession,
+    project_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[CrowdfundingRepayment]]:
+    """Load repayments for a batch of projects."""
+    if not project_ids:
+        return {}
+    result = await db.execute(
+        select(CrowdfundingRepayment)
+        .where(CrowdfundingRepayment.project_id.in_(project_ids))
+        .order_by(CrowdfundingRepayment.payment_date.desc())
+    )
+    repayments: dict[uuid.UUID, list[CrowdfundingRepayment]] = {}
+    for r in result.scalars().all():
+        repayments.setdefault(r.project_id, []).append(r)
+    return repayments
 
 
 async def _get_project_for_user(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> CrowdfundingProject:
@@ -106,7 +156,10 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
 ):
     projects = await _get_user_projects(db, current_user.id)
-    return [_enrich(p) for p in projects]
+    pids = [p.id for p in projects]
+    docs_map = await _get_docs_for_projects(db, pids)
+    reps_map = await _get_repayments_for_projects(db, pids)
+    return [_enrich(p, docs_map.get(p.id, []), reps_map.get(p.id, [])) for p in projects]
 
 
 @router.post("", response_model=CrowdfundingProjectResponse, status_code=201)
@@ -390,6 +443,218 @@ async def get_audit(
     return audit
 
 
+# ──────────────────── Repayments ────────────────────
+
+
+@router.post("/{project_id}/repayments", response_model=RepaymentResponse, status_code=201)
+@limiter.limit("20/minute")
+async def create_repayment(
+    request: Request,
+    project_id: uuid.UUID,
+    data: RepaymentCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Log a payment received from a crowdfunding project."""
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    repayment = CrowdfundingRepayment(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        user_id=current_user.id,
+        payment_date=data.payment_date,
+        amount=data.amount,
+        payment_type=data.payment_type,
+        notes=data.notes,
+    )
+    db.add(repayment)
+
+    # Update cumulative total
+    project.total_received = (project.total_received or Decimal("0")) + data.amount
+
+    # Mark closest calendar event as completed
+    await crowdfunding_calendar_service.mark_closest_event_completed(db, project.id, data.payment_date)
+
+    await db.commit()
+    await db.refresh(repayment)
+    return repayment
+
+
+@router.get("/{project_id}/repayments", response_model=list[RepaymentResponse])
+@limiter.limit("30/minute")
+async def list_repayments(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all repayments for a project."""
+    await _get_project_for_user(db, project_id, current_user.id)
+    result = await db.execute(
+        select(CrowdfundingRepayment)
+        .where(CrowdfundingRepayment.project_id == project_id)
+        .order_by(CrowdfundingRepayment.payment_date.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.delete("/{project_id}/repayments/{repayment_id}", status_code=204)
+@limiter.limit("10/minute")
+async def delete_repayment(
+    request: Request,
+    project_id: uuid.UUID,
+    repayment_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a repayment and decrement the project total."""
+    project = await _get_project_for_user(db, project_id, current_user.id)
+    result = await db.execute(
+        select(CrowdfundingRepayment).where(
+            CrowdfundingRepayment.id == repayment_id,
+            CrowdfundingRepayment.project_id == project_id,
+        )
+    )
+    repayment = result.scalar_one_or_none()
+    if not repayment:
+        raise HTTPException(404, "Remboursement non trouvé")
+
+    project.total_received = max(
+        Decimal("0"),
+        (project.total_received or Decimal("0")) - repayment.amount,
+    )
+    await db.delete(repayment)
+    await db.commit()
+
+
+# ──────────────────── Project Documents ────────────────────
+
+
+@router.get("/documents/{doc_id}/download")
+@limiter.limit("30/minute")
+async def download_document(
+    request: Request,
+    doc_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download a project document PDF."""
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    result = await db.execute(
+        select(ProjectDocument).where(
+            ProjectDocument.id == doc_id,
+            ProjectDocument.user_id == current_user.id,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(404, "Document non trouvé")
+
+    return StreamingResponse(
+        io.BytesIO(doc.file_data),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{doc.file_name}"'},
+    )
+
+
+@router.post("/{project_id}/documents", response_model=list[ProjectDocumentResponse], status_code=201)
+@limiter.limit("10/minute")
+async def upload_documents(
+    request: Request,
+    project_id: uuid.UUID,
+    files: list[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload PDFs to a project and auto-trigger audit analysis."""
+    from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
+
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    if len(files) > _MAX_FILES:
+        raise HTTPException(400, f"Maximum {_MAX_FILES} fichiers autorisés")
+
+    file_contents: list[tuple[str, bytes]] = []
+    for f in files:
+        if not f.filename or not f.filename.lower().endswith(".pdf"):
+            raise HTTPException(400, f"Fichier '{f.filename}' n'est pas un PDF")
+        content = await f.read()
+        if len(content) > _MAX_FILE_SIZE:
+            raise HTTPException(400, f"Fichier '{f.filename}' dépasse 10 MB")
+        file_contents.append((f.filename, content))
+
+    # Run audit analysis
+    audit = None
+    try:
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
+        portfolios = list(result.scalars().all())
+        total_capital = 0.0
+        munitions = 0.0
+        for p in portfolios:
+            assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == p.id))
+            for a in assets_result.scalars().all():
+                val = float(a.current_price or 0) * float(a.quantity or 0)
+                total_capital += val
+                if a.asset_type in (AssetType.STABLECOIN,):
+                    munitions += val
+
+        audit = await crowdfunding_analyzer.analyze_documents(
+            db=db,
+            file_contents=file_contents,
+            user_id=current_user.id,
+            project_id=project.id,
+            munitions=munitions,
+            total_capital=total_capital,
+        )
+        await db.flush()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning("Auto-audit failed for project %s", project_id, exc_info=True)
+
+    # Store documents
+    docs = []
+    for fname, fdata in file_contents:
+        doc = ProjectDocument(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            user_id=current_user.id,
+            file_name=fname,
+            file_data=fdata,
+            file_size=len(fdata),
+            audit_id=audit.id if audit else None,
+        )
+        db.add(doc)
+        docs.append(doc)
+
+    await db.commit()
+    for doc in docs:
+        await db.refresh(doc)
+
+    return docs
+
+
+@router.get("/{project_id}/documents", response_model=list[ProjectDocumentResponse])
+@limiter.limit("30/minute")
+async def list_project_documents(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all documents for a project."""
+    await _get_project_for_user(db, project_id, current_user.id)
+    result = await db.execute(
+        select(ProjectDocument)
+        .where(ProjectDocument.project_id == project_id)
+        .order_by(ProjectDocument.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 # ──────────────────── Single Project CRUD ────────────────────
 
 
@@ -402,7 +667,9 @@ async def get_project(
     db: AsyncSession = Depends(get_db),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
-    return _enrich(project)
+    docs_map = await _get_docs_for_projects(db, [project.id])
+    reps_map = await _get_repayments_for_projects(db, [project.id])
+    return _enrich(project, docs_map.get(project.id, []), reps_map.get(project.id, []))
 
 
 @router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)

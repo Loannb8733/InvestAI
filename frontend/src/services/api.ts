@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import { useAuthStore } from '@/stores/authStore'
+import { toast } from '@/hooks/use-toast'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -9,6 +10,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  timeout: 30000,
 })
 
 // Request interceptor to add auth token
@@ -88,6 +90,27 @@ api.interceptors.response.use(
       } finally {
         isRefreshing = false
       }
+    }
+
+    // Global error notifications for non-401 errors
+    if (error.response) {
+      const status = error.response.status
+      const detail = (error.response.data as { detail?: string })?.detail
+      if (status === 422) {
+        toast({ title: 'Erreur de validation', description: detail || 'Données invalides. Vérifiez les champs.', variant: 'destructive' })
+      } else if (status >= 500) {
+        toast({ title: 'Erreur serveur', description: detail || 'Une erreur interne est survenue. Réessayez.', variant: 'destructive' })
+      } else if (status === 403) {
+        toast({ title: 'Accès refusé', description: detail || 'Vous n\'avez pas les permissions nécessaires.', variant: 'destructive' })
+      } else if (status === 404) {
+        // 404 silenced — handled by individual callers
+      } else if (status >= 400 && status !== 401) {
+        toast({ title: `Erreur ${status}`, description: detail || 'Une erreur est survenue.', variant: 'destructive' })
+      }
+    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      toast({ title: 'Timeout', description: 'Le serveur met trop de temps à répondre.', variant: 'destructive' })
+    } else if (!error.response) {
+      toast({ title: 'Erreur réseau', description: 'Impossible de contacter le serveur. Vérifiez votre connexion.', variant: 'destructive' })
     }
 
     return Promise.reject(error)
@@ -1187,6 +1210,47 @@ export const crowdfundingApi = {
   getAudit: async (id: string) => {
     const response = await api.get(`/crowdfunding/audits/${id}`)
     return response.data
+  },
+
+  uploadDocuments: async (projectId: string, files: File[]) => {
+    const formData = new FormData()
+    files.forEach((f) => formData.append('files', f))
+    const response = await api.post(`/crowdfunding/${projectId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    })
+    return response.data
+  },
+
+  listDocuments: async (projectId: string) => {
+    const response = await api.get(`/crowdfunding/${projectId}/documents`)
+    return response.data
+  },
+
+  downloadDocument: async (docId: string) => {
+    const response = await api.get(`/crowdfunding/documents/${docId}/download`, {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  createRepayment: async (projectId: string, data: {
+    payment_date: string
+    amount: number
+    payment_type: 'interest' | 'capital' | 'both'
+    notes?: string
+  }) => {
+    const response = await api.post(`/crowdfunding/${projectId}/repayments`, data)
+    return response.data
+  },
+
+  listRepayments: async (projectId: string) => {
+    const response = await api.get(`/crowdfunding/${projectId}/repayments`)
+    return response.data
+  },
+
+  deleteRepayment: async (projectId: string, repaymentId: string) => {
+    await api.delete(`/crowdfunding/${projectId}/repayments/${repaymentId}`)
   },
 }
 
