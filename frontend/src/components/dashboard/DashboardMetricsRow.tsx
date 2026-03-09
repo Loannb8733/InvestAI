@@ -31,6 +31,7 @@ interface DashboardMetricsRowProps {
   portfoliosCount: number
   selectedPeriod: number
   availableLiquidity?: number
+  privacyMode?: boolean
 }
 
 export default function DashboardMetricsRow({
@@ -47,8 +48,11 @@ export default function DashboardMetricsRow({
   portfoliosCount,
   selectedPeriod,
   availableLiquidity,
+  privacyMode,
 }: DashboardMetricsRowProps) {
   const periodLabel = selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`
+  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
+  const pp = (val: number) => privacyMode ? '••••' : formatPercent(val)
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <Card>
@@ -57,9 +61,9 @@ export default function DashboardMetricsRow({
           <Wallet className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+          <div className="text-2xl font-bold">{pc(totalValue)}</div>
           <p className="text-xs text-muted-foreground">
-            {assetsCount} actifs{availableLiquidity != null && availableLiquidity > 0 && ` · dont ${formatCurrency(availableLiquidity)} de liquidité`}
+            {assetsCount} actifs{availableLiquidity != null && availableLiquidity > 0 && ` · dont ${pc(availableLiquidity)} de liquidité`}
           </p>
         </CardContent>
       </Card>
@@ -83,8 +87,8 @@ export default function DashboardMetricsRow({
           <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(netCapital)}</div>
-          <p className="text-xs text-muted-foreground">{formatCurrency(totalInvested)} investi au total</p>
+          <div className="text-2xl font-bold">{pc(netCapital)}</div>
+          <p className="text-xs text-muted-foreground">{pc(totalInvested)} investi au total</p>
         </CardContent>
       </Card>
       <Card>
@@ -100,8 +104,8 @@ export default function DashboardMetricsRow({
           {isPositive ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {formatCurrency(netGainLoss)}</div>
-          <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {formatPercent(netGainLossPercent)}</p>
+          <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pc(netGainLoss)}</div>
+          <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pp(netGainLossPercent)}</p>
         </CardContent>
       </Card>
       <Card>
@@ -110,8 +114,8 @@ export default function DashboardMetricsRow({
           {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {formatCurrency(dailyChange)}</div>
-          <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {formatPercent(dailyChangePercent)}</p>
+          <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pc(dailyChange)}</div>
+          <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pp(dailyChangePercent)}</p>
         </CardContent>
       </Card>
       <Card>

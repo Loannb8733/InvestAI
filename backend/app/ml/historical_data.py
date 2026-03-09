@@ -65,7 +65,9 @@ class HistoricalDataFetcher:
         """Close HTTP client."""
         await self.http_client.aclose()
 
-    async def _coingecko_get(self, url: str, params: dict, symbol: str, max_retries: int = 3) -> Optional[dict]:
+    async def _coingecko_get(
+        self, url: str, params: dict, symbol: str, max_retries: int = 3, fast: bool = False
+    ) -> Optional[dict]:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
         for attempt in range(max_retries):
             await _coingecko_throttle()
@@ -74,7 +76,7 @@ class HistoricalDataFetcher:
                 if response.status_code == 200:
                     return response.json()
                 if response.status_code == 429:
-                    wait = (attempt + 1) * 10  # 10s, 20s, 30s
+                    wait = 2 if fast else (attempt + 1) * 10  # fast: 2s, normal: 10s, 20s, 30s
                     logger.warning("CoinGecko 429 for %s — retry %d/%d in %ds", symbol, attempt + 1, max_retries, wait)
                     await asyncio.sleep(wait)
                     continue
@@ -102,6 +104,7 @@ class HistoricalDataFetcher:
         symbol: str,
         days: int = 90,
         currency: str = "eur",
+        fast: bool = False,
     ) -> Tuple[List[datetime], List[float]]:
         """Fetch historical crypto prices from CoinGecko.
 
@@ -114,6 +117,8 @@ class HistoricalDataFetcher:
             f"{self.COINGECKO_BASE_URL}/coins/{coin_id}/market_chart",
             {"vs_currency": currency, "days": str(days), "interval": "daily"},
             symbol,
+            max_retries=1 if fast else 3,
+            fast=fast,
         )
         if not data:
             return [], []
@@ -321,10 +326,11 @@ class HistoricalDataFetcher:
         symbol: str,
         asset_type: str,
         days: int = 90,
+        fast: bool = False,
     ) -> Tuple[List[datetime], List[float]]:
         """Fetch historical data for any asset type."""
         if asset_type == "crypto":
-            return await self.get_crypto_history(symbol, days)
+            return await self.get_crypto_history(symbol, days, fast=fast)
         elif asset_type in ("stock", "etf"):
             return await self.get_stock_history(symbol, days)
         elif asset_type == "real_estate":

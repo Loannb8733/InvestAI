@@ -33,7 +33,7 @@ const profileLabel: Record<string, string> = {
   conservative: 'Conservateur',
 }
 
-export default function DashboardMunitionsCard({ availableLiquidity, totalValue }: { availableLiquidity?: number; totalValue?: number }) {
+export default function DashboardMunitionsCard({ availableLiquidity, totalValue, privacyMode }: { availableLiquidity?: number; totalValue?: number; privacyMode?: boolean }) {
   const { data, isLoading } = useQuery<MunitionsData>({
     queryKey: ['dashboard', 'munitions'],
     queryFn: () => dashboardApi.getMunitions(),
@@ -61,6 +61,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue 
     )
   }
 
+  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
   const available_liquidity = liquidity
   const total_value = total
   const liquidity_pct = data?.liquidity_pct ?? (total > 0 ? Math.round(liquidity / total * 1000) / 10 : 0)
@@ -94,7 +95,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue 
       <CardContent className="space-y-3">
         {/* Big amount */}
         <div className="text-2xl font-bold text-amber-400">
-          {formatCurrency(available_liquidity)}
+          {pc(available_liquidity)}
         </div>
 
         {/* Progress bar: Invested vs Munitions */}
@@ -114,8 +115,8 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue 
             />
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>{formatCurrency(total_value - available_liquidity)}</span>
-            <span>{formatCurrency(available_liquidity)}</span>
+            <span>{pc(total_value - available_liquidity)}</span>
+            <span>{pc(available_liquidity)}</span>
           </div>
         </div>
 
@@ -140,8 +141,8 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue 
               </div>
               {data.next_signal_amount > 0 && (
                 <div className="text-muted-foreground">
-                  Montant : {formatCurrency(data.next_signal_amount)}
-                  {!data.can_execute && ` · Manque ${formatCurrency(data.shortfall)}`}
+                  Montant : {pc(data.next_signal_amount)}
+                  {!data.can_execute && ` · Manque ${pc(data.shortfall)}`}
                 </div>
               )}
             </div>
@@ -153,8 +154,8 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue 
           <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
             <ArrowRight className="h-3 w-3" />
             <span>
-              DCA 300€/mois : {formatCurrency(data.deploy_to_risk)} vers actifs risqués,{' '}
-              {formatCurrency(data.keep_in_reserve)} en réserve
+              DCA 300€/mois : {pc(data.deploy_to_risk)} vers actifs risqués,{' '}
+              {pc(data.keep_in_reserve)} en réserve
             </span>
           </div>
         )}

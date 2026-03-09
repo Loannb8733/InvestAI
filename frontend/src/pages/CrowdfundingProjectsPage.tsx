@@ -33,8 +33,9 @@ import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi, portfoliosApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Trash2, Edit, Loader2, FolderOpen } from 'lucide-react'
-import type { CrowdfundingProject, ProjectStatus, RepaymentType } from '@/types/crowdfunding'
+import { Textarea } from '@/components/ui/textarea'
+import { Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText, Download, X, Banknote } from 'lucide-react'
+import type { CrowdfundingProject, ProjectStatus, RepaymentType, PaymentType } from '@/types/crowdfunding'
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   funding: 'bg-yellow-500/10 text-yellow-500',
@@ -52,7 +53,27 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
   defaulted: 'Défaut',
 }
 
-const PLATFORMS = ['Anaxago', 'Wiseed', 'Raizers', 'Homunity', 'ClubFunding', 'Fundimmo', 'October', 'Enerfip', 'Lendopolis', 'Autre']
+const PLATFORMS = ['Anaxago', 'Wiseed', 'Raizers', 'Homunity', 'ClubFunding', 'Fundimmo', 'October', 'Enerfip', 'Lendopolis', 'Tokimo', 'Autre']
+
+const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  interest: 'Intérêts',
+  capital: 'Capital',
+  both: 'Intérêts + Capital',
+}
+
+interface RepaymentForm {
+  payment_date: string
+  amount: string
+  payment_type: PaymentType
+  notes: string
+}
+
+const emptyRepaymentForm: RepaymentForm = {
+  payment_date: new Date().toISOString().split('T')[0],
+  amount: '',
+  payment_type: 'interest',
+  notes: '',
+}
 
 interface ProjectForm {
   platform: string
@@ -89,7 +110,12 @@ export default function CrowdfundingProjectsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [files, setFiles] = useState<File[]>([])
+  const [uploadingDocs, setUploadingDocs] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [repaymentDialogOpen, setRepaymentDialogOpen] = useState(false)
+  const [repaymentProjectId, setRepaymentProjectId] = useState<string | null>(null)
+  const [repaymentForm, setRepaymentForm] = useState(emptyRepaymentForm)
 
   const { data: projects = [], isLoading } = useQuery<CrowdfundingProject[]>({
     queryKey: queryKeys.crowdfunding.list,
@@ -107,9 +133,24 @@ export default function CrowdfundingProjectsPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.crowdfunding.all })
   }
 
+  const uploadFiles = async (projectId: string) => {
+    if (files.length === 0) return
+    setUploadingDocs(true)
+    try {
+      await crowdfundingApi.uploadDocuments(projectId, files)
+      toast({ title: `${files.length} document(s) uploadé(s) — audit lancé` })
+    } catch {
+      toast({ title: 'Erreur lors de l\'upload des documents', variant: 'destructive' })
+    } finally {
+      setUploadingDocs(false)
+      setFiles([])
+    }
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => crowdfundingApi.create(data),
-    onSuccess: () => {
+    onSuccess: async (project: CrowdfundingProject) => {
+      await uploadFiles(project.id)
       invalidate()
       setDialogOpen(false)
       setForm(emptyForm)
@@ -121,7 +162,8 @@ export default function CrowdfundingProjectsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       crowdfundingApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: async (_: unknown, variables: { id: string; data: Record<string, unknown> }) => {
+      await uploadFiles(variables.id)
       invalidate()
       setDialogOpen(false)
       setEditingId(null)
@@ -140,6 +182,42 @@ export default function CrowdfundingProjectsPage() {
     },
     onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
   })
+
+  const createRepaymentMutation = useMutation({
+    mutationFn: ({ projectId, data }: { projectId: string; data: { payment_date: string; amount: number; payment_type: PaymentType; notes?: string } }) =>
+      crowdfundingApi.createRepayment(projectId, data),
+    onSuccess: () => {
+      invalidate()
+      setRepaymentDialogOpen(false)
+      setRepaymentProjectId(null)
+      setRepaymentForm(emptyRepaymentForm)
+      toast({ title: 'Versement enregistré' })
+    },
+    onError: () => toast({ title: 'Erreur lors de l\'enregistrement', variant: 'destructive' }),
+  })
+
+  const deleteRepaymentMutation = useMutation({
+    mutationFn: ({ projectId, repaymentId }: { projectId: string; repaymentId: string }) =>
+      crowdfundingApi.deleteRepayment(projectId, repaymentId),
+    onSuccess: () => {
+      invalidate()
+      toast({ title: 'Versement supprimé' })
+    },
+    onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
+  })
+
+  const handleRepaymentSubmit = () => {
+    if (!repaymentProjectId || !repaymentForm.amount) return
+    createRepaymentMutation.mutate({
+      projectId: repaymentProjectId,
+      data: {
+        payment_date: repaymentForm.payment_date,
+        amount: parseFloat(repaymentForm.amount),
+        payment_type: repaymentForm.payment_type,
+        notes: repaymentForm.notes || undefined,
+      },
+    })
+  }
 
   const handleSubmit = () => {
     const payload: Record<string, unknown> = {
@@ -204,6 +282,7 @@ export default function CrowdfundingProjectsPage() {
             if (!open) {
               setEditingId(null)
               setForm(emptyForm)
+              setFiles([])
             }
           }}
         >
@@ -328,11 +407,56 @@ export default function CrowdfundingProjectsPage() {
                   placeholder="https://..."
                 />
               </div>
+              {/* Documents upload */}
+              <div className="grid gap-2">
+                <Label>Documents PDF (optionnel)</Label>
+                <div
+                  className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => document.getElementById('pdf-upload')?.click()}
+                >
+                  <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Cliquez pour ajouter des PDFs (max 5, 10 MB chacun)
+                  </p>
+                  <input
+                    id="pdf-upload"
+                    type="file"
+                    accept=".pdf"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const newFiles = Array.from(e.target.files || [])
+                      setFiles((prev) => [...prev, ...newFiles].slice(0, 5))
+                      e.target.value = ''
+                    }}
+                  />
+                </div>
+                {files.length > 0 && (
+                  <div className="space-y-1">
+                    {files.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm bg-muted rounded px-2 py-1">
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate flex-1">{f.name}</span>
+                        <span className="text-muted-foreground shrink-0">
+                          {(f.size / 1024).toFixed(0)} KB
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Button
                 onClick={handleSubmit}
-                disabled={!form.platform || !form.project_name || !form.invested_amount || !form.annual_rate || !form.duration_months || isSubmitting}
+                disabled={!form.platform || !form.project_name || !form.invested_amount || !form.annual_rate || !form.duration_months || isSubmitting || uploadingDocs}
               >
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {(isSubmitting || uploadingDocs) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {editingId ? 'Modifier' : 'Créer'}
               </Button>
             </div>
@@ -429,7 +553,86 @@ export default function CrowdfundingProjectsPage() {
                   </div>
                 )}
 
+                {/* Documents */}
+                {p.documents && p.documents.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {p.documents.length} document(s)
+                    </p>
+                    {p.documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-1.5 text-xs">
+                        <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate flex-1">{doc.file_name}</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const blob = await crowdfundingApi.downloadDocument(doc.id)
+                              const url = URL.createObjectURL(blob)
+                              const a = document.createElement('a')
+                              a.href = url
+                              a.download = doc.file_name
+                              a.click()
+                              URL.revokeObjectURL(url)
+                            } catch {
+                              toast({ title: 'Erreur de téléchargement', variant: 'destructive' })
+                            }
+                          }}
+                          className="text-muted-foreground hover:text-primary shrink-0"
+                        >
+                          <Download className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Repayments summary */}
+                <div className="border-t pt-3 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Reçu</span>
+                    <span>
+                      <span className="font-medium text-green-500">{formatCurrency(p.total_received)}</span>
+                      <span className="text-muted-foreground"> / {formatCurrency(p.projected_total_interest ?? 0)}</span>
+                    </span>
+                  </div>
+                  {p.repayments && p.repayments.length > 0 && (
+                    <div className="space-y-1">
+                      {p.repayments.slice(0, 3).map((r) => (
+                        <div key={r.id} className="flex items-center justify-between text-xs group">
+                          <span className="text-muted-foreground">
+                            {new Date(r.payment_date).toLocaleDateString('fr-FR')} — {PAYMENT_TYPE_LABELS[r.payment_type]}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium text-green-500">+{formatCurrency(r.amount)}</span>
+                            <button
+                              onClick={() => deleteRepaymentMutation.mutate({ projectId: p.id, repaymentId: r.id })}
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                      {p.repayments.length > 3 && (
+                        <p className="text-xs text-muted-foreground">+ {p.repayments.length - 3} autre(s)</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRepaymentProjectId(p.id)
+                      setRepaymentForm(emptyRepaymentForm)
+                      setRepaymentDialogOpen(true)
+                    }}
+                  >
+                    <Banknote className="h-3.5 w-3.5 mr-1" />
+                    + Versement
+                  </Button>
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(p)}>
                     <Edit className="h-3.5 w-3.5 mr-1" />
                     Modifier
@@ -470,6 +673,76 @@ export default function CrowdfundingProjectsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Repayment dialog */}
+      <Dialog
+        open={repaymentDialogOpen}
+        onOpenChange={(open) => {
+          setRepaymentDialogOpen(open)
+          if (!open) {
+            setRepaymentProjectId(null)
+            setRepaymentForm(emptyRepaymentForm)
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enregistrer un versement</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={repaymentForm.payment_date}
+                onChange={(e) => setRepaymentForm({ ...repaymentForm, payment_date: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Montant (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={repaymentForm.amount}
+                onChange={(e) => setRepaymentForm({ ...repaymentForm, amount: e.target.value })}
+                placeholder="6.72"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Type</Label>
+              <Select
+                value={repaymentForm.payment_type}
+                onValueChange={(v) => setRepaymentForm({ ...repaymentForm, payment_type: v as PaymentType })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PAYMENT_TYPE_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Notes (optionnel)</Label>
+              <Textarea
+                value={repaymentForm.notes}
+                onChange={(e) => setRepaymentForm({ ...repaymentForm, notes: e.target.value })}
+                placeholder="Coupon mensuel mars 2026..."
+                rows={2}
+              />
+            </div>
+            <Button
+              onClick={handleRepaymentSubmit}
+              disabled={!repaymentForm.payment_date || !repaymentForm.amount || createRepaymentMutation.isPending}
+            >
+              {createRepaymentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Enregistrer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

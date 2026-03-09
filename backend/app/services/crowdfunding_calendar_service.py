@@ -126,6 +126,32 @@ class CrowdfundingCalendarService:
 
         return income
 
+    async def mark_closest_event_completed(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        payment_date: date,
+    ) -> None:
+        """Find the closest uncompleted calendar event for this project and mark it completed."""
+        from sqlalchemy import func as sqlfunc
+
+        payment_dt = _date_to_utc(payment_date)
+
+        result = await db.execute(
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.source_project_id == project_id,
+                CalendarEvent.is_completed == False,  # noqa: E712
+            )
+            .order_by(sqlfunc.abs(sqlfunc.extract("epoch", CalendarEvent.event_date - payment_dt)))
+            .limit(1)
+        )
+        event = result.scalar_one_or_none()
+        if event:
+            event.is_completed = True
+            event.completed_at = datetime.now(timezone.utc)
+            logger.info("Marked calendar event %s as completed for project %s", event.id, project_id)
+
     # ──────────────────── Private generators ────────────────────
 
     def _generate_events_in_fine(

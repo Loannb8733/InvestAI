@@ -336,6 +336,7 @@ export default function DashboardPage() {
   const { visibleWidgets, hiddenWidgets, toggleWidget, moveWidget, resetLayout } = useDashboardLayout()
   const [showCustomize, setShowCustomize] = useState(false)
   const [showBenchmarks, setShowBenchmarks] = useState(false)
+  const [privacyMode, setPrivacyMode] = useState(() => localStorage.getItem('investai-privacy') === 'true')
   const dragIndexRef = useRef<number | null>(null)
   const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
 
@@ -388,6 +389,8 @@ export default function DashboardPage() {
     const live = livePrices[symbol.toUpperCase()]
     return live ? live.price : fallbackValue
   }
+
+  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
 
   if (isLoading) {
     return (
@@ -507,6 +510,10 @@ export default function DashboardPage() {
                 onClose={() => setShowCustomize(false)}
               />
             )}
+            <Button variant="outline" size="sm" onClick={() => setPrivacyMode((v) => { const next = !v; localStorage.setItem('investai-privacy', String(next)); return next })} title={privacyMode ? 'Afficher les montants' : 'Masquer les montants'}>
+              {privacyMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {privacyMode ? 'Afficher' : 'Masquer'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => exportToPdf('Dashboard InvestAI')} data-no-print>
               <Printer className="h-4 w-4 mr-2" />
               PDF
@@ -569,10 +576,11 @@ export default function DashboardPage() {
                     portfoliosCount={metrics.portfolios_count}
                     selectedPeriod={selectedPeriod}
                     availableLiquidity={metrics.available_liquidity}
+                    privacyMode={privacyMode}
                   />
                 )
               case 'munitions':
-                return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} />
+                return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} privacyMode={privacyMode} />
               case 'crowdfunding':
                 if (!cfDashboard || cfDashboard.active_count === 0 && cfDashboard.completed_count === 0) return null
                 return (
@@ -590,11 +598,11 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Total investi</p>
-                          <p className="text-lg font-bold">{formatCurrency(cfDashboard.total_invested)}</p>
+                          <p className="text-lg font-bold">{pc(cfDashboard.total_invested)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Rendement projeté/an</p>
-                          <p className="text-lg font-bold text-green-500">+{formatCurrency(cfDashboard.projected_annual_interest)}</p>
+                          <p className="text-lg font-bold text-green-500">+{pc(cfDashboard.projected_annual_interest)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Taux moyen</p>
@@ -613,11 +621,11 @@ export default function DashboardPage() {
                 return (
                   // P&L breakdown is always all-time (realized gains are cumulative)
                   // Show "Depuis le début" regardless of selected period to avoid misleading labels
-                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel="Depuis le début" />
+                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel="Depuis le début" privacyMode={privacyMode} />
                 )
               case 'risk':
                 return (
-                  <DashboardRiskCards riskMetrics={risk_metrics} periodLabel={periodLabel} />
+                  <DashboardRiskCards riskMetrics={risk_metrics} periodLabel={periodLabel} privacyMode={privacyMode} />
                 )
               case 'roi-concentration':
                 return (
@@ -653,7 +661,7 @@ export default function DashboardPage() {
                             {stress_tests.map((test) => (
                               <div key={test.scenario_name} className="flex justify-between items-center">
                                 <span className="text-sm">{test.scenario_name}</span>
-                                <span className="text-sm font-medium text-red-500">{formatCurrency(test.potential_loss)}</span>
+                                <span className="text-sm font-medium text-red-500">{pc(test.potential_loss)}</span>
                               </div>
                             ))}
                           </div>
@@ -682,7 +690,7 @@ export default function DashboardPage() {
                               </div>
                               <p className={`text-sm ${idx.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{idx.change_percent >= 0 ? '▲ +' : '▼ '}{idx.change_percent.toFixed(2)}%</p>
                             </div>
-                            <p className="text-sm text-muted-foreground ml-2">{formatCurrency(liveIndexPrice)}</p>
+                            <p className="text-sm text-muted-foreground ml-2">{pc(liveIndexPrice)}</p>
                           </div>)
                         })}
                         <div className="flex items-center gap-3 border-l pl-6 ml-2">
@@ -730,7 +738,7 @@ export default function DashboardPage() {
                                       <p className="font-medium text-sm">{asset.symbol}</p>
                                       {/* Live indicator removed: asset.value is server-computed, not updated with WS prices */}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(asset.value)}</p>
+                                    <p className="text-xs text-muted-foreground">{pc(asset.value)}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -776,7 +784,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="text-right">
                                   <p className={`text-sm font-medium ${tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? 'text-red-500' : 'text-green-500'}`}>
-                                    {tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? '-' : '+'}{formatCurrency(tx.total)}
+                                    {tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? '-' : '+'}{pc(tx.total)}
                                   </p>
                                   <p className="text-xs text-muted-foreground">{new Date(tx.executed_at).toLocaleDateString('fr-FR')}</p>
                                 </div>
@@ -816,7 +824,7 @@ export default function DashboardPage() {
                                       <div><span className="text-sm">{event.title}</span><p className="text-xs text-muted-foreground">{eventTypeLabels[event.event_type] || event.event_type}</p></div>
                                     </div>
                                     <div className="text-right">
-                                      {event.amount && (<p className="text-sm font-medium text-green-500">+{formatCurrency(event.amount)}</p>)}
+                                      {event.amount && (<p className="text-sm font-medium text-green-500">+{pc(event.amount)}</p>)}
                                       <p className="text-xs text-muted-foreground">{new Date(event.event_date).toLocaleDateString('fr-FR')}</p>
                                     </div>
                                   </div>
@@ -854,10 +862,10 @@ export default function DashboardPage() {
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
                                   <div>
                                     <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
+                                    <p className="text-xs text-muted-foreground">{pc(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">+{formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
+                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">+{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>
@@ -877,10 +885,10 @@ export default function DashboardPage() {
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
                                   <div>
                                     <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.current_value)}</p>
+                                    <p className="text-xs text-muted-foreground">{pc(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">-{formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
+                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">-{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>

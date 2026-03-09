@@ -247,6 +247,26 @@ class PDFParser:
             ["fonds propres", "apport promoteur", "equity", "skin in the game"],
         )
 
+        # Bounds validation — reject implausible extracted values
+        if result.ltv is not None and not (0 < result.ltv <= 100):
+            logger.warning("PDF extraction: LTV=%.1f%% out of bounds, discarding", result.ltv)
+            result.ltv = None
+        if result.ltc is not None and not (0 < result.ltc <= 150):
+            logger.warning("PDF extraction: LTC=%.1f%% out of bounds, discarding", result.ltc)
+            result.ltc = None
+        if result.tri is not None and not (0 < result.tri <= 50):
+            logger.warning("PDF extraction: TRI=%.1f%% out of bounds, discarding", result.tri)
+            result.tri = None
+        if result.marge_brute_percent is not None and not (-50 < result.marge_brute_percent <= 80):
+            logger.warning("PDF extraction: margin=%.1f%% out of bounds, discarding", result.marge_brute_percent)
+            result.marge_brute_percent = None
+        if result.pre_commercialisation is not None and not (0 <= result.pre_commercialisation <= 100):
+            logger.warning("PDF extraction: pre-comm=%.1f%% out of bounds, discarding", result.pre_commercialisation)
+            result.pre_commercialisation = None
+        # Cross-field: LTC should generally be >= LTV
+        if result.ltv is not None and result.ltc is not None and result.ltc < result.ltv * 0.5:
+            logger.warning("PDF extraction: LTC (%.1f%%) << LTV (%.1f%%), possible swap", result.ltc, result.ltv)
+
         logger.info(
             "PDF extraction: CA=%s, PR=%s, margin=%.2f%%, TRI=%s%%",
             result.chiffre_affaires,

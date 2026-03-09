@@ -138,13 +138,14 @@ interface PortfolioHealth {
 }
 
 function formatMetric(name: string | undefined, value: number): string {
-  if (!name) return value.toFixed(2)
+  const v = Number.isFinite(value) ? value : 0
+  if (!name) return v.toFixed(2)
   const n = name.toLowerCase()
   if (n.includes('volatil') || n.includes('drawdown') || n.includes('hhi'))
-    return `${(value * 100).toFixed(1)}%`
+    return `${(v * 100).toFixed(1)}%`
   if (n.includes('var'))
-    return formatCurrency(value)
-  return value.toFixed(2)
+    return formatCurrency(v)
+  return v.toFixed(2)
 }
 
 export default function SmartInsightsPage() {

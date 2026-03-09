@@ -22,6 +22,20 @@ from app.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
+async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) -> bool:
+    """Add transaction only if its internal_hash doesn't already exist.
+
+    Returns True if added, False if duplicate.
+    """
+    transaction.compute_hash()
+    existing = await db.execute(select(Transaction.id).where(Transaction.internal_hash == transaction.internal_hash))
+    if existing.scalar_one_or_none() is not None:
+        logger.debug("Skipping duplicate transaction hash=%s", transaction.internal_hash)
+        return False
+    db.add(transaction)
+    return True
+
+
 def _classify_and_mark_error(api_key: APIKey, exc: Exception) -> None:
     """Classify an exchange error and update api_key status accordingly."""
     import httpx
@@ -80,6 +94,10 @@ async def _get_or_create_asset(
     exchange: str = "",
 ) -> Asset:
     """Get or create an asset in the portfolio."""
+    # Normalize Earn variants (ADAU → ADA, SUIU → SUI, etc.)
+    normalized = _normalize_earn_variant(symbol)
+    if normalized and normalized != symbol:
+        symbol = normalized
     if symbol in existing_assets:
         return existing_assets[symbol]
 
@@ -241,7 +259,7 @@ async def _sync_detailed_transactions(
                         exchange=service.exchange_name,
                         notes=f"Conversion {base_asset} -> autre crypto",
                     )
-                    db.add(transaction)
+                    await _add_transaction_if_new(db, transaction)
                     existing_external_ids.add(trade.trade_id)
                     asset.quantity = max(0, float(asset.quantity) - qty)
                     logger.info(f"Created CONVERSION_OUT: {base_asset} qty={qty}")
@@ -264,7 +282,7 @@ async def _sync_detailed_transactions(
                         exchange=service.exchange_name,
                         notes=f"Conversion autre crypto -> {base_asset}",
                     )
-                    db.add(transaction)
+                    await _add_transaction_if_new(db, transaction)
                     existing_external_ids.add(trade.trade_id)
                     asset.quantity = float(asset.quantity) + qty
                     logger.info(f"Created CONVERSION_IN: {base_asset} qty={qty}")
@@ -277,7 +295,9 @@ async def _sync_detailed_transactions(
     # === 2. Sync Instant Buys (Kraken specific) ===
     try:
         if hasattr(service, "get_instant_buys"):
-            instant_buys = await service.get_instant_buys(limit=500)
+            result = await service.get_instant_buys(limit=500)
+            # get_instant_buys returns (trades, processed_refids) tuple
+            instant_buys = result[0] if isinstance(result, tuple) else result
             logger.info(f"Found {len(instant_buys)} instant buys from {service.exchange_name}")
 
             for trade in instant_buys:
@@ -314,7 +334,7 @@ async def _sync_detailed_transactions(
                     exchange=service.exchange_name,
                     notes="Instant Buy",
                 )
-                db.add(transaction)
+                await _add_transaction_if_new(db, transaction)
 
                 # Update asset quantity and avg price
                 old_qty = float(asset.quantity)
@@ -366,7 +386,7 @@ async def _sync_detailed_transactions(
                     exchange=service.exchange_name,
                     notes="Fiat Order",
                 )
-                db.add(transaction)
+                await _add_transaction_if_new(db, transaction)
                 existing_external_ids.add(ext_id)
 
                 if trans_type == TransactionType.BUY:
@@ -420,7 +440,7 @@ async def _sync_detailed_transactions(
                     exchange=service.exchange_name,
                     notes="Auto-Invest DCA",
                 )
-                db.add(transaction)
+                await _add_transaction_if_new(db, transaction)
                 existing_external_ids.add(ext_id)
 
                 old_qty = float(asset.quantity)
@@ -484,7 +504,7 @@ async def _sync_detailed_transactions(
                 external_id=trade.trade_id,
                 exchange=service.exchange_name,
             )
-            db.add(transaction)
+            await _add_transaction_if_new(db, transaction)
             existing_external_ids.add(trade.trade_id)
 
             # Update asset quantity and avg price
@@ -545,7 +565,7 @@ async def _sync_detailed_transactions(
                     exchange=service.exchange_name,
                     notes=f"Reward from {service.exchange_name}",
                 )
-                db.add(transaction)
+                await _add_transaction_if_new(db, transaction)
                 existing_external_ids.add(reward.trade_id)
 
                 # Add to quantity
@@ -595,7 +615,7 @@ async def _sync_detailed_transactions(
                     exchange=service.exchange_name,
                     notes=f"Dépôt depuis externe ({deposit.tx_id[:16]}...)" if deposit.tx_id else "Dépôt externe",
                 )
-                db.add(transaction)
+                await _add_transaction_if_new(db, transaction)
                 existing_external_ids.add(ext_id)
 
                 # Update quantity and avg_buy_price
@@ -643,7 +663,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
             balances = await service.get_balances()
 
             if not balances:
-                api_key.last_sync_at = datetime.utcnow().isoformat()
+                api_key.last_sync_at = datetime.utcnow()
                 api_key.mark_success()
                 await db.commit()
                 return {"success": True, "synced": 0}
@@ -759,7 +779,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
-                        db.add(transaction)
+                        await _add_transaction_if_new(db, transaction)
 
                         # Update avg_buy_price if it's 0 and we have a price
                         if (
@@ -810,12 +830,12 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
-                        db.add(transaction)
+                        await _add_transaction_if_new(db, transaction)
 
                     synced_count += 1
 
             # Update last sync time
-            api_key.last_sync_at = datetime.utcnow().isoformat()
+            api_key.last_sync_at = datetime.utcnow()
             api_key.mark_success()
 
             await db.commit()

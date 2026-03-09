@@ -76,8 +76,8 @@ weasyprint==60.2
 openpyxl==3.1.2
 xlsxwriter==3.1.9
 
-# AI / LLM
-anthropic>=0.40.0,<0.50.0
+# AI / LLM (optional — Ollama is the default free engine)
+# anthropic>=0.40.0,<0.50.0  # Uncomment if you want Claude API as fallback
 
 # PDF Parsing
 PyMuPDF>=1.24.0

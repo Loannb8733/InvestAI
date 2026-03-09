@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.asset import Asset
+from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
@@ -39,6 +39,8 @@ async def list_assets(
 
     query = select(Asset).where(
         Asset.portfolio_id.in_(portfolio_ids),
+        # Exclude CROWDFUNDING — managed via dedicated /crowdfunding endpoints
+        Asset.asset_type != AssetType.CROWDFUNDING,
     )
 
     if portfolio_id:

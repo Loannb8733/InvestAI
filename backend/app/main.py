@@ -14,6 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -243,6 +244,9 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-Request-ID"],  # Pagination + tracing
     max_age=600,  # Cache preflight for 10 minutes
 )
+
+# GZip compression (min 500 bytes to avoid overhead on small responses)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Request logging middleware
 app.add_middleware(RequestLoggingMiddleware)

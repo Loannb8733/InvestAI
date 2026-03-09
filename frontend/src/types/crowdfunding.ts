@@ -1,6 +1,27 @@
 export type RepaymentType = 'in_fine' | 'amortizable'
 export type ProjectStatus = 'funding' | 'active' | 'completed' | 'delayed' | 'defaulted'
 
+export interface ProjectDocument {
+  id: string
+  project_id: string
+  file_name: string
+  file_size: number
+  audit_id: string | null
+  created_at: string
+}
+
+export type PaymentType = 'interest' | 'capital' | 'both'
+
+export interface CrowdfundingRepayment {
+  id: string
+  project_id: string
+  payment_date: string
+  amount: number
+  payment_type: PaymentType
+  notes: string | null
+  created_at: string
+}
+
 export interface CrowdfundingProject {
   id: string
   asset_id: string
@@ -22,6 +43,8 @@ export interface CrowdfundingProject {
   projected_total_interest: number | null
   interest_earned: number | null
   progress_percent: number | null
+  documents: ProjectDocument[]
+  repayments: CrowdfundingRepayment[]
 }
 
 export interface CrowdfundingCreateData {

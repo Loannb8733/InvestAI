@@ -192,6 +192,7 @@ async def create_transaction(
         external_id=transaction_in.external_id,
         notes=transaction_in.notes,
     )
+    transaction.compute_hash()
 
     db.add(transaction)
 
@@ -635,6 +636,7 @@ async def import_transactions_csv(
         )
 
     success_count = 0
+    skipped = 0
     error_count = len(parse_errors)
     errors = parse_errors.copy()
     created_transactions = []
@@ -777,6 +779,14 @@ async def import_transactions_csv(
                 notes=parsed.notes,
                 exchange=parser.name,
             )
+            transaction.compute_hash()
+            # Skip if duplicate hash already exists
+            from sqlalchemy import select as _sel
+
+            _dup = await db.execute(_sel(Transaction.id).where(Transaction.internal_hash == transaction.internal_hash))
+            if _dup.scalar_one_or_none() is not None:
+                skipped += 1
+                continue
             db.add(transaction)
 
             # Update asset quantity (avg_buy_price recalculated in batch after commit)

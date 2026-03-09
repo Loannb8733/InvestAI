@@ -37,6 +37,14 @@ function PageLoader() {
   )
 }
 
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
+    </ErrorBoundary>
+  )
+}
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isHydrating = useAuthStore((state) => state.isHydrating)
@@ -84,18 +92,18 @@ function App() {
             }
           >
             {/* Main routes */}
-            <Route index element={<Suspense fallback={<PageLoader />}><MasterDashboardPage /></Suspense>} />
-            <Route path="portfolio" element={<Suspense fallback={<PageLoader />}><PortfolioUnifiedPage /></Suspense>} />
-            <Route path="intelligence" element={<Suspense fallback={<PageLoader />}><IntelligencePage /></Suspense>} />
-            <Route path="strategy" element={<Suspense fallback={<PageLoader />}><StrategyPage /></Suspense>} />
-            <Route path="reports" element={<Suspense fallback={<PageLoader />}><ReportsPage /></Suspense>} />
-            <Route path="notes" element={<Suspense fallback={<PageLoader />}><NotesPage /></Suspense>} />
-            <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
-            <Route path="crowdfunding" element={<Suspense fallback={<PageLoader />}><CrowdfundingMesProjectsPage /></Suspense>} />
-            <Route path="crowdfunding/audit-lab" element={<Suspense fallback={<PageLoader />}><CrowdfundingAuditLabPage /></Suspense>} />
+            <Route index element={<LazyPage><MasterDashboardPage /></LazyPage>} />
+            <Route path="portfolio" element={<LazyPage><PortfolioUnifiedPage /></LazyPage>} />
+            <Route path="intelligence" element={<LazyPage><IntelligencePage /></LazyPage>} />
+            <Route path="strategy" element={<LazyPage><StrategyPage /></LazyPage>} />
+            <Route path="reports" element={<LazyPage><ReportsPage /></LazyPage>} />
+            <Route path="notes" element={<LazyPage><NotesPage /></LazyPage>} />
+            <Route path="calendar" element={<LazyPage><CalendarPage /></LazyPage>} />
+            <Route path="crowdfunding" element={<LazyPage><CrowdfundingMesProjectsPage /></LazyPage>} />
+            <Route path="crowdfunding/audit-lab" element={<LazyPage><CrowdfundingAuditLabPage /></LazyPage>} />
 
             {/* Redirects from old URLs */}
-            <Route path="crypto" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
+            <Route path="crypto" element={<LazyPage><DashboardPage /></LazyPage>} />
             <Route path="transactions" element={<Navigate to="/portfolio?tab=transactions" replace />} />
             <Route path="exchanges" element={<Navigate to="/portfolio?tab=exchanges" replace />} />
             <Route path="analytics" element={<Navigate to="/intelligence?tab=analytics" replace />} />
@@ -107,12 +115,12 @@ function App() {
             <Route path="goals" element={<Navigate to="/strategy" replace />} />
             <Route path="crowdfunding/projects" element={<Navigate to="/crowdfunding?tab=projects" replace />} />
             <Route path="crowdfunding/performance" element={<Navigate to="/crowdfunding?tab=performance" replace />} />
-            <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+            <Route path="settings" element={<LazyPage><SettingsPage /></LazyPage>} />
             <Route
               path="admin"
               element={
                 <AdminRoute>
-                  <Suspense fallback={<PageLoader />}><AdminPage /></Suspense>
+                  <LazyPage><AdminPage /></LazyPage>
                 </AdminRoute>
               }
             />

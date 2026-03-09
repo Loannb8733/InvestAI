@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 
@@ -31,7 +32,14 @@ const LABELS = {
   other: 'Autres',
 }
 
-export default function AllocationChart({ data }: AllocationChartProps) {
+export default memo(function AllocationChart({ data }: AllocationChartProps) {
+  const chartData = useMemo(() => (data || []).map((item) => ({
+    name: LABELS[item.type as keyof typeof LABELS] || item.type,
+    value: item.value,
+    percentage: item.percentage,
+    color: COLORS[item.type as keyof typeof COLORS] || COLORS.other,
+  })), [data])
+
   if (!data || data.length === 0) {
     return (
       <div className="h-[300px] flex items-center justify-center text-muted-foreground">
@@ -39,13 +47,6 @@ export default function AllocationChart({ data }: AllocationChartProps) {
       </div>
     )
   }
-
-  const chartData = data.map((item) => ({
-    name: LABELS[item.type as keyof typeof LABELS] || item.type,
-    value: item.value,
-    percentage: item.percentage,
-    color: COLORS[item.type as keyof typeof COLORS] || COLORS.other,
-  }))
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; percentage: number } }> }) => {
     if (active && payload && payload.length) {
@@ -106,4 +107,4 @@ export default function AllocationChart({ data }: AllocationChartProps) {
       </PieChart>
     </ResponsiveContainer>
   )
-}
+})
