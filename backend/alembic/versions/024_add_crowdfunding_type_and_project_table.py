@@ -36,68 +36,29 @@ def upgrade() -> None:
         END $$;
     """)
 
-    op.create_table(
-        "crowdfunding_projects",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "asset_id",
-            UUID(as_uuid=True),
-            sa.ForeignKey("assets.id", ondelete="CASCADE"),
-            nullable=False,
-            unique=True,
-            index=True,
-        ),
-        # Platform info
-        sa.Column("platform", sa.String(100), nullable=False),
-        sa.Column("project_name", sa.String(300), nullable=True),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("project_url", sa.String(500), nullable=True),
-        # Financial terms
-        sa.Column("invested_amount", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("annual_rate", sa.Numeric(precision=6, scale=3), nullable=False),
-        sa.Column("duration_months", sa.Numeric(precision=4, scale=0), nullable=False),
-        sa.Column(
-            "repayment_type",
-            sa.Enum("in_fine", "amortizable", name="repaymenttype", create_type=False),
-            nullable=False,
-            server_default="in_fine",
-        ),
-        # Timeline
-        sa.Column("start_date", sa.Date(), nullable=True),
-        sa.Column("estimated_end_date", sa.Date(), nullable=True),
-        sa.Column("actual_end_date", sa.Date(), nullable=True),
-        # Status
-        sa.Column(
-            "status",
-            sa.Enum(
-                "funding", "active", "completed", "delayed", "defaulted",
-                name="projectstatus",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="active",
-        ),
-        # Tracking
-        sa.Column(
-            "total_received",
-            sa.Numeric(precision=12, scale=2),
-            nullable=False,
-            server_default="0",
-        ),
-        # Timestamps
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-    )
+    # Use raw SQL to create the table to avoid SQLAlchemy enum before_create events
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS crowdfunding_projects (
+            id UUID PRIMARY KEY,
+            asset_id UUID NOT NULL UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+            platform VARCHAR(100) NOT NULL,
+            project_name VARCHAR(300),
+            description TEXT,
+            project_url VARCHAR(500),
+            invested_amount NUMERIC(12, 2) NOT NULL,
+            annual_rate NUMERIC(6, 3) NOT NULL,
+            duration_months NUMERIC(4, 0) NOT NULL,
+            repayment_type repaymenttype NOT NULL DEFAULT 'in_fine',
+            start_date DATE,
+            estimated_end_date DATE,
+            actual_end_date DATE,
+            status projectstatus NOT NULL DEFAULT 'active',
+            total_received NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_crowdfunding_projects_asset_id ON crowdfunding_projects(asset_id)")
 
 
 def downgrade() -> None:
