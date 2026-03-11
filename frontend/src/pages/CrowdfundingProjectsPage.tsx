@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,8 +34,14 @@ import { crowdfundingApi, portfoliosApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText, Download, X, Banknote } from 'lucide-react'
-import type { CrowdfundingProject, ProjectStatus, RepaymentType, PaymentType } from '@/types/crowdfunding'
+import {
+  Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText,
+  Download, X, Banknote, ShieldCheck, ChevronRight,
+  AlertTriangle, CheckCircle2, Clock,
+} from 'lucide-react'
+import type { CrowdfundingProject, ProjectStatus, RepaymentType, PaymentType, InterestFrequency } from '@/types/crowdfunding'
+import StressTestSlider from '@/components/crowdfunding/StressTestSlider'
+import PaymentTimeline from '@/components/crowdfunding/PaymentTimeline'
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   funding: 'bg-yellow-500/10 text-yellow-500',
@@ -53,6 +59,14 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
   defaulted: 'Défaut',
 }
 
+const INTEREST_FREQUENCY_LABELS: Record<InterestFrequency, string> = {
+  at_maturity: 'À maturité',
+  monthly: 'Mensuel',
+  quarterly: 'Trimestriel',
+  semi_annual: 'Semestriel',
+  annual: 'Annuel',
+}
+
 const PLATFORMS = ['Anaxago', 'Wiseed', 'Raizers', 'Homunity', 'ClubFunding', 'Fundimmo', 'October', 'Enerfip', 'Lendopolis', 'Tokimo', 'Autre']
 
 const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
@@ -61,17 +75,42 @@ const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
   both: 'Intérêts + Capital',
 }
 
+// ─── Schedule health helpers ───
+
+type ScheduleHealth = 'none' | 'healthy' | 'warning' | 'danger'
+
+function getScheduleHealth(project: CrowdfundingProject): ScheduleHealth {
+  const schedule = project.schedule ?? []
+  if (schedule.length === 0) return 'none'
+  const overdueCount = schedule.filter((s) => s.status === 'overdue').length
+  const paidCount = schedule.filter((s) => s.status === 'paid').length
+  if (overdueCount > 0) return 'danger'
+  if (paidCount > 0) return 'healthy'
+  return 'warning'
+}
+
+const HEALTH_CONFIG: Record<ScheduleHealth, { dot: string; label: string; icon: typeof CheckCircle2 }> = {
+  none: { dot: 'bg-muted-foreground', label: 'Pas d\'échéancier', icon: Clock },
+  healthy: { dot: 'bg-emerald-500', label: 'À jour', icon: CheckCircle2 },
+  warning: { dot: 'bg-amber-500', label: 'En attente', icon: Clock },
+  danger: { dot: 'bg-red-500', label: 'Retard détecté', icon: AlertTriangle },
+}
+
+// ─── Form types ───
+
 interface RepaymentForm {
   payment_date: string
-  amount: string
-  payment_type: PaymentType
+  interest_amount: string
+  capital_amount: string
+  tax_amount: string
   notes: string
 }
 
 const emptyRepaymentForm: RepaymentForm = {
   payment_date: new Date().toISOString().split('T')[0],
-  amount: '',
-  payment_type: 'interest',
+  interest_amount: '',
+  capital_amount: '',
+  tax_amount: '',
   notes: '',
 }
 
@@ -82,6 +121,9 @@ interface ProjectForm {
   annual_rate: string
   duration_months: string
   repayment_type: RepaymentType
+  interest_frequency: InterestFrequency
+  tax_rate: string
+  delay_months: string
   start_date: string
   estimated_end_date: string
   status: ProjectStatus
@@ -96,12 +138,17 @@ const emptyForm: ProjectForm = {
   annual_rate: '',
   duration_months: '',
   repayment_type: 'in_fine',
+  interest_frequency: 'at_maturity',
+  tax_rate: '30',
+  delay_months: '0',
   start_date: '',
   estimated_end_date: '',
   status: 'active',
   description: '',
   project_url: '',
 }
+
+// ─── Main component ───
 
 export default function CrowdfundingProjectsPage() {
   const { toast } = useToast()
@@ -116,6 +163,7 @@ export default function CrowdfundingProjectsPage() {
   const [repaymentDialogOpen, setRepaymentDialogOpen] = useState(false)
   const [repaymentProjectId, setRepaymentProjectId] = useState<string | null>(null)
   const [repaymentForm, setRepaymentForm] = useState(emptyRepaymentForm)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
   const { data: projects = [], isLoading } = useQuery<CrowdfundingProject[]>({
     queryKey: queryKeys.crowdfunding.list,
@@ -132,6 +180,11 @@ export default function CrowdfundingProjectsPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.crowdfunding.all })
   }
+
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  )
 
   const uploadFiles = async (projectId: string) => {
     if (files.length === 0) return
@@ -178,13 +231,14 @@ export default function CrowdfundingProjectsPage() {
     onSuccess: () => {
       invalidate()
       setDeletingId(null)
+      if (selectedProjectId === deletingId) setSelectedProjectId(null)
       toast({ title: 'Projet supprimé' })
     },
     onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
   })
 
   const createRepaymentMutation = useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: { payment_date: string; amount: number; payment_type: PaymentType; notes?: string } }) =>
+    mutationFn: ({ projectId, data }: { projectId: string; data: Parameters<typeof crowdfundingApi.createRepayment>[1] }) =>
       crowdfundingApi.createRepayment(projectId, data),
     onSuccess: () => {
       invalidate()
@@ -207,13 +261,25 @@ export default function CrowdfundingProjectsPage() {
   })
 
   const handleRepaymentSubmit = () => {
-    if (!repaymentProjectId || !repaymentForm.amount) return
+    if (!repaymentProjectId) return
+    const interest = parseFloat(repaymentForm.interest_amount) || 0
+    const capital = parseFloat(repaymentForm.capital_amount) || 0
+    const tax = parseFloat(repaymentForm.tax_amount) || 0
+    const amount = interest + capital - tax
+    if (amount <= 0) return
+
+    const paymentType: PaymentType =
+      interest > 0 && capital > 0 ? 'both' : capital > 0 ? 'capital' : 'interest'
+
     createRepaymentMutation.mutate({
       projectId: repaymentProjectId,
       data: {
         payment_date: repaymentForm.payment_date,
-        amount: parseFloat(repaymentForm.amount),
-        payment_type: repaymentForm.payment_type,
+        amount,
+        payment_type: paymentType,
+        interest_amount: interest || undefined,
+        capital_amount: capital || undefined,
+        tax_amount: tax || undefined,
         notes: repaymentForm.notes || undefined,
       },
     })
@@ -227,6 +293,9 @@ export default function CrowdfundingProjectsPage() {
       annual_rate: parseFloat(form.annual_rate),
       duration_months: parseInt(form.duration_months),
       repayment_type: form.repayment_type,
+      interest_frequency: form.repayment_type === 'in_fine' ? form.interest_frequency : 'monthly',
+      tax_rate: parseFloat(form.tax_rate) || 30,
+      delay_months: parseInt(form.delay_months) || 0,
       status: form.status,
     }
     if (form.start_date) payload.start_date = form.start_date
@@ -251,6 +320,9 @@ export default function CrowdfundingProjectsPage() {
       annual_rate: String(p.annual_rate),
       duration_months: String(p.duration_months),
       repayment_type: p.repayment_type,
+      interest_frequency: p.interest_frequency || 'at_maturity',
+      tax_rate: String(p.tax_rate ?? 30),
+      delay_months: String(p.delay_months ?? 0),
       start_date: p.start_date || '',
       estimated_end_date: p.estimated_end_date || '',
       status: p.status,
@@ -364,6 +436,50 @@ export default function CrowdfundingProjectsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              {form.repayment_type === 'in_fine' && (
+                <div className="grid gap-2">
+                  <Label>Fréquence des intérêts</Label>
+                  <Select
+                    value={form.interest_frequency}
+                    onValueChange={(v) => setForm({ ...form, interest_frequency: v as InterestFrequency })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(INTEREST_FREQUENCY_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className={`grid ${form.status === 'delayed' ? 'grid-cols-2' : ''} gap-4`}>
+                <div className="grid gap-2">
+                  <Label>Flat tax (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={form.tax_rate}
+                    onChange={(e) => setForm({ ...form, tax_rate: e.target.value })}
+                    placeholder="30"
+                  />
+                </div>
+                {form.status === 'delayed' && (
+                  <div className="grid gap-2">
+                    <Label>Retard constaté (mois)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={form.delay_months}
+                      onChange={(e) => setForm({ ...form, delay_months: e.target.value })}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -492,164 +608,255 @@ export default function CrowdfundingProjectsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => (
-            <Card key={p.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">
-                      {p.project_name || p.platform}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">{p.platform}</p>
-                  </div>
-                  <Badge className={STATUS_COLORS[p.status]}>{STATUS_LABELS[p.status]}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Montant</p>
-                    <p className="font-medium">{formatCurrency(p.invested_amount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Taux</p>
-                    <p className="font-medium">{p.annual_rate}% / an</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Durée</p>
-                    <p className="font-medium">{p.duration_months} mois</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Type</p>
-                    <p className="font-medium">
-                      {p.repayment_type === 'in_fine' ? 'In Fine' : 'Amortissable'}
-                    </p>
-                  </div>
-                </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((p) => {
+              const health = getScheduleHealth(p)
+              const healthCfg = HEALTH_CONFIG[health]
+              const isSelected = selectedProjectId === p.id
+              const scheduleLen = p.schedule?.length ?? 0
+              const paidCount = p.schedule?.filter((s) => s.status === 'paid').length ?? 0
+              const overdueCount = p.schedule?.filter((s) => s.status === 'overdue').length ?? 0
 
-                {/* Progress bar */}
-                {p.progress_percent !== null && p.status === 'active' && (
-                  <div>
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>Progression</span>
-                      <span>{p.progress_percent}%</span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${Math.min(100, p.progress_percent)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {p.projected_total_interest !== null && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Intérêts projetés : </span>
-                    <span className="font-medium text-green-500">
-                      {formatCurrency(p.projected_total_interest)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Documents */}
-                {p.documents && p.documents.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">
-                      {p.documents.length} document(s)
-                    </p>
-                    {p.documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center gap-1.5 text-xs">
-                        <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="truncate flex-1">{doc.file_name}</span>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const blob = await crowdfundingApi.downloadDocument(doc.id)
-                              const url = URL.createObjectURL(blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              a.download = doc.file_name
-                              a.click()
-                              URL.revokeObjectURL(url)
-                            } catch {
-                              toast({ title: 'Erreur de téléchargement', variant: 'destructive' })
-                            }
-                          }}
-                          className="text-muted-foreground hover:text-primary shrink-0"
-                        >
-                          <Download className="h-3 w-3" />
-                        </button>
+              return (
+                <Card
+                  key={p.id}
+                  className={`transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'ring-2 ring-primary/50 bg-primary/[0.02]'
+                      : 'hover:bg-muted/30'
+                  }`}
+                  onClick={() => setSelectedProjectId(isSelected ? null : p.id)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base truncate">
+                          {p.project_name || p.platform}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">{p.platform}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="flex items-center gap-2">
+                        <Badge className={STATUS_COLORS[p.status]}>{STATUS_LABELS[p.status]}</Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Montant</p>
+                        <p className="font-medium">{formatCurrency(p.invested_amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Taux</p>
+                        <p className="font-medium">{p.annual_rate}% / an</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Durée</p>
+                        <p className="font-medium">{p.duration_months} mois</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Type</p>
+                        <p className="font-medium">
+                          {p.repayment_type === 'in_fine' ? 'In Fine' : 'Amortissable'}
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Repayments summary */}
-                <div className="border-t pt-3 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Reçu</span>
-                    <span>
-                      <span className="font-medium text-green-500">{formatCurrency(p.total_received)}</span>
-                      <span className="text-muted-foreground"> / {formatCurrency(p.projected_total_interest ?? 0)}</span>
-                    </span>
-                  </div>
-                  {p.repayments && p.repayments.length > 0 && (
-                    <div className="space-y-1">
-                      {p.repayments.slice(0, 3).map((r) => (
-                        <div key={r.id} className="flex items-center justify-between text-xs group">
-                          <span className="text-muted-foreground">
-                            {new Date(r.payment_date).toLocaleDateString('fr-FR')} — {PAYMENT_TYPE_LABELS[r.payment_type]}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="font-medium text-green-500">+{formatCurrency(r.amount)}</span>
-                            <button
-                              onClick={() => deleteRepaymentMutation.mutate({ projectId: p.id, repaymentId: r.id })}
-                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
+                    {/* Progress bar */}
+                    {p.progress_percent !== null && (p.status === 'active' || p.status === 'delayed') && (
+                      <div>
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>Progression</span>
+                          <span>{p.progress_percent}%</span>
                         </div>
-                      ))}
-                      {p.repayments.length > 3 && (
-                        <p className="text-xs text-muted-foreground">+ {p.repayments.length - 3} autre(s)</p>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${Math.min(100, p.progress_percent)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {p.projected_total_interest !== null && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Intérêts projetés : </span>
+                        <span className="font-medium text-green-500">
+                          {formatCurrency(p.projected_total_interest)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Documents */}
+                    {p.documents && p.documents.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground font-medium">
+                          {p.documents.length} document(s)
+                        </p>
+                        {p.documents.map((doc) => (
+                          <div key={doc.id} className="flex items-center gap-1.5 text-xs">
+                            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="truncate flex-1">{doc.file_name}</span>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const blob = await crowdfundingApi.downloadDocument(doc.id)
+                                  const url = URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = doc.file_name
+                                  a.click()
+                                  URL.revokeObjectURL(url)
+                                } catch {
+                                  toast({ title: 'Erreur de téléchargement', variant: 'destructive' })
+                                }
+                              }}
+                              className="text-muted-foreground hover:text-primary shrink-0"
+                            >
+                              <Download className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Repayments summary */}
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Reçu</span>
+                        <span>
+                          <span className="font-medium text-green-500">{formatCurrency(p.total_received)}</span>
+                          <span className="text-muted-foreground"> / {formatCurrency(p.projected_total_interest ?? 0)}</span>
+                        </span>
+                      </div>
+                      {p.repayments && p.repayments.length > 0 && (
+                        <div className="space-y-1">
+                          {p.repayments.slice(0, 3).map((r) => (
+                            <div key={r.id} className="flex items-center justify-between text-xs group">
+                              <span className="text-muted-foreground">
+                                {new Date(r.payment_date).toLocaleDateString('fr-FR')} — {PAYMENT_TYPE_LABELS[r.payment_type]}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium text-green-500">+{formatCurrency(r.amount)}</span>
+                                <button
+                                  onClick={() => deleteRepaymentMutation.mutate({ projectId: p.id, repaymentId: r.id })}
+                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            </div>
+                          ))}
+                          {p.repayments.length > 3 && (
+                            <p className="text-xs text-muted-foreground">+ {p.repayments.length - 3} autre(s)</p>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+
+                    {/* Sentinel mini indicator + expand hint */}
+                    {scheduleLen > 0 && (
+                      <button
+                        className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-all ${
+                          isSelected
+                            ? 'border-primary/30 bg-primary/5'
+                            : 'border-border/50 bg-muted/20 hover:bg-muted/40'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedProjectId(isSelected ? null : p.id)
+                        }}
+                      >
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${healthCfg.dot} ${health === 'danger' ? 'animate-pulse' : ''}`} />
+                        <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="flex-1 text-left text-muted-foreground">
+                          Sentinel — {paidCount}/{scheduleLen}
+                          {overdueCount > 0 && (
+                            <span className="text-red-400 ml-1.5">({overdueCount} retard{overdueCount > 1 ? 's' : ''})</span>
+                          )}
+                        </span>
+                        <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isSelected ? 'rotate-90' : ''}`} />
+                      </button>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setRepaymentProjectId(p.id)
+                          setRepaymentForm(emptyRepaymentForm)
+                          setRepaymentDialogOpen(true)
+                        }}
+                      >
+                        <Banknote className="h-3.5 w-3.5 mr-1" />
+                        + Versement
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(p)}>
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeletingId(p.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* ═══ Full-width Sentinel Panel ═══ */}
+          {selectedProject && (selectedProject.schedule?.length ?? 0) > 0 && (
+            <div className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+              {/* Glassmorphism overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+              {/* Header */}
+              <div className="relative flex items-center justify-between border-b border-border/50 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${HEALTH_CONFIG[getScheduleHealth(selectedProject)].dot} ${getScheduleHealth(selectedProject) === 'danger' ? 'animate-pulse' : ''}`} />
+                  <div>
+                    <h2 className="text-sm font-semibold flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" />
+                      Sentinel — {selectedProject.project_name || selectedProject.platform}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Échéancier contractuel et simulation de stress
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => setSelectedProjectId(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Content: 2 columns */}
+              <div className="relative grid lg:grid-cols-5 gap-0 divide-x divide-border/50">
+                {/* Timeline — 3/5 width */}
+                <div className="lg:col-span-3 p-6">
+                  <PaymentTimeline project={selectedProject} />
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setRepaymentProjectId(p.id)
-                      setRepaymentForm(emptyRepaymentForm)
-                      setRepaymentDialogOpen(true)
-                    }}
-                  >
-                    <Banknote className="h-3.5 w-3.5 mr-1" />
-                    + Versement
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(p)}>
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Modifier
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setDeletingId(p.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {/* Stress Test — 2/5 width */}
+                <div className="lg:col-span-2 p-6">
+                  <StressTestSlider projectId={selectedProject.id} />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete confirmation */}
@@ -674,7 +881,7 @@ export default function CrowdfundingProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Repayment dialog */}
+      {/* Repayment dialog — Tokimo-style breakdown */}
       <Dialog
         open={repaymentDialogOpen}
         onOpenChange={(open) => {
@@ -685,62 +892,107 @@ export default function CrowdfundingProjectsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Enregistrer un versement</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={repaymentForm.payment_date}
-                onChange={(e) => setRepaymentForm({ ...repaymentForm, payment_date: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Montant (€)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={repaymentForm.amount}
-                onChange={(e) => setRepaymentForm({ ...repaymentForm, amount: e.target.value })}
-                placeholder="6.72"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Type</Label>
-              <Select
-                value={repaymentForm.payment_type}
-                onValueChange={(v) => setRepaymentForm({ ...repaymentForm, payment_type: v as PaymentType })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PAYMENT_TYPE_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Notes (optionnel)</Label>
-              <Textarea
-                value={repaymentForm.notes}
-                onChange={(e) => setRepaymentForm({ ...repaymentForm, notes: e.target.value })}
-                placeholder="Coupon mensuel mars 2026..."
-                rows={2}
-              />
-            </div>
-            <Button
-              onClick={handleRepaymentSubmit}
-              disabled={!repaymentForm.payment_date || !repaymentForm.amount || createRepaymentMutation.isPending}
-            >
-              {createRepaymentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Enregistrer
-            </Button>
-          </div>
+          {(() => {
+            const interest = parseFloat(repaymentForm.interest_amount) || 0
+            const capital = parseFloat(repaymentForm.capital_amount) || 0
+            const tax = parseFloat(repaymentForm.tax_amount) || 0
+            const netAmount = interest + capital - tax
+            const project = projects?.find((p) => p.id === repaymentProjectId)
+            const totalCapitalPaid = (project?.repayments ?? [])
+              .reduce((s, r) => s + (r.capital_amount ?? 0), 0)
+            const invested = project?.invested_amount ?? 0
+            const remainingCapital = Math.max(0, invested - totalCapitalPaid - capital)
+
+            return (
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label>Date de paiement</Label>
+                  <Input
+                    type="date"
+                    value={repaymentForm.payment_date}
+                    onChange={(e) => setRepaymentForm({ ...repaymentForm, payment_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label>Parts des intérêts (€)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={repaymentForm.interest_amount}
+                      onChange={(e) => setRepaymentForm({ ...repaymentForm, interest_amount: e.target.value })}
+                      placeholder="6.72"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Parts de capital (€)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={repaymentForm.capital_amount}
+                      onChange={(e) => setRepaymentForm({ ...repaymentForm, capital_amount: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Taxes IR + CSG (€)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={repaymentForm.tax_amount}
+                    onChange={(e) => setRepaymentForm({ ...repaymentForm, tax_amount: e.target.value })}
+                    placeholder="2.03"
+                  />
+                </div>
+
+                {/* Computed summary */}
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Montant versé</span>
+                    <span className={`font-semibold tabular-nums ${netAmount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                      {formatCurrency(netAmount > 0 ? netAmount : 0)}
+                    </span>
+                  </div>
+                  {capital > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Capital restant dû</span>
+                      <span className="font-semibold tabular-nums">
+                        {formatCurrency(remainingCapital)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Notes (optionnel)</Label>
+                  <Textarea
+                    value={repaymentForm.notes}
+                    onChange={(e) => setRepaymentForm({ ...repaymentForm, notes: e.target.value })}
+                    placeholder="Coupon mensuel mars 2026..."
+                    rows={2}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleRepaymentSubmit}
+                  disabled={!repaymentForm.payment_date || netAmount <= 0 || createRepaymentMutation.isPending}
+                >
+                  {createRepaymentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Enregistrer
+                </Button>
+              </div>
+            )
+          })()}
         </DialogContent>
       </Dialog>
     </div>

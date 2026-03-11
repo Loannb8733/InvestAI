@@ -1238,6 +1238,9 @@ export const crowdfundingApi = {
     payment_date: string
     amount: number
     payment_type: 'interest' | 'capital' | 'both'
+    interest_amount?: number
+    capital_amount?: number
+    tax_amount?: number
     notes?: string
   }) => {
     const response = await api.post(`/crowdfunding/${projectId}/repayments`, data)
@@ -1251,6 +1254,18 @@ export const crowdfundingApi = {
 
   deleteRepayment: async (projectId: string, repaymentId: string) => {
     await api.delete(`/crowdfunding/${projectId}/repayments/${repaymentId}`)
+  },
+
+  getSchedule: async (projectId: string) => {
+    const response = await api.get(`/crowdfunding/${projectId}/schedule`)
+    return response.data
+  },
+
+  getStressTest: async (projectId: string, delayMonths: number) => {
+    const response = await api.get(`/crowdfunding/${projectId}/stress-test`, {
+      params: { delay_months: delayMonths },
+    })
+    return response.data
   },
 }
 

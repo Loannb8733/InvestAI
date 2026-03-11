@@ -18,6 +18,7 @@ celery_app = Celery(
         "app.tasks.snapshots",
         "app.tasks.emails",
         "app.tasks.cleanup",
+        "app.tasks.monitor_delays",
     ],
 )
 
@@ -123,5 +124,10 @@ celery_app.conf.beat_schedule = {
     "validate-portfolio-consistency": {
         "task": "app.tasks.cleanup.validate_portfolio_consistency",
         "schedule": crontab(hour=4, minute=0),  # Every day at 04:00 UTC
+    },
+    # === Crowdfunding Delay Monitoring ===
+    "check-crowdfunding-delays": {
+        "task": "app.tasks.monitor_delays.check_crowdfunding_delays",
+        "schedule": crontab(hour=8, minute=30),  # Daily at 08:30 UTC (09:30 Paris)
     },
 }

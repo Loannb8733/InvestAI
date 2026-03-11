@@ -18,8 +18,26 @@ export interface CrowdfundingRepayment {
   payment_date: string
   amount: number
   payment_type: PaymentType
+  interest_amount: number | null
+  capital_amount: number | null
+  tax_amount: number | null
   notes: string | null
   created_at: string
+}
+
+export type ScheduleStatus = 'paid' | 'pending' | 'overdue'
+export type InterestFrequency = 'at_maturity' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+
+export interface PaymentScheduleEntry {
+  id: string
+  project_id: string
+  due_date: string
+  expected_capital: number
+  expected_interest: number
+  is_completed: boolean
+  completed_at: string | null
+  repayment_id: string | null
+  status: ScheduleStatus
 }
 
 export interface CrowdfundingProject {
@@ -33,6 +51,9 @@ export interface CrowdfundingProject {
   annual_rate: number
   duration_months: number
   repayment_type: RepaymentType
+  interest_frequency: InterestFrequency | null
+  tax_rate: number
+  delay_months: number
   start_date: string | null
   estimated_end_date: string | null
   actual_end_date: string | null
@@ -45,6 +66,7 @@ export interface CrowdfundingProject {
   progress_percent: number | null
   documents: ProjectDocument[]
   repayments: CrowdfundingRepayment[]
+  schedule: PaymentScheduleEntry[]
 }
 
 export interface CrowdfundingCreateData {
@@ -57,6 +79,9 @@ export interface CrowdfundingCreateData {
   annual_rate: number
   duration_months: number
   repayment_type: RepaymentType
+  interest_frequency?: InterestFrequency
+  tax_rate?: number
+  delay_months?: number
   start_date?: string
   estimated_end_date?: string
   status?: ProjectStatus
@@ -70,6 +95,9 @@ export interface CrowdfundingUpdateData {
   annual_rate?: number
   duration_months?: number
   repayment_type?: RepaymentType
+  interest_frequency?: InterestFrequency
+  tax_rate?: number
+  delay_months?: number
   start_date?: string
   estimated_end_date?: string
   actual_end_date?: string
@@ -133,6 +161,23 @@ export interface ProjectAudit {
   correlation_score: number | null
   portfolio_concentration: Record<string, number> | null
   created_at: string
+}
+
+export interface StressTestCashflow {
+  date: string
+  capital: number
+  interest: number
+  total: number
+  is_delayed: boolean
+}
+
+export interface StressTestResult {
+  project_id: string
+  delay_months: number
+  base_irr: number | null
+  stressed_irr: number | null
+  irr_delta: number | null
+  cashflows: StressTestCashflow[]
 }
 
 export interface CrowdfundingPerformanceItem {

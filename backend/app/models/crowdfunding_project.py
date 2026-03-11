@@ -59,6 +59,15 @@ class CrowdfundingProject(Base):
     # Tracking
     total_received = Column(Numeric(precision=12, scale=2), default=Decimal("0"), nullable=False)
 
+    # Interest payment frequency (for IN_FINE: at_maturity, monthly, quarterly, semi_annual, annual)
+    interest_frequency = Column(String(20), default="at_maturity", nullable=True)
+
+    # Flat tax rate applied to interest (PFU default 30%)
+    tax_rate = Column(Numeric(precision=5, scale=2), default=Decimal("30.00"), nullable=False)
+
+    # Observed delay in months (extends schedule beyond contractual duration)
+    delay_months = Column(Numeric(precision=4, scale=0), default=Decimal("0"), nullable=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

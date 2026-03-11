@@ -604,7 +604,10 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
     price_map = {}
     if all_symbols:
         try:
-            price_data = await price_service.get_multiple_crypto_prices(all_symbols)
+            price_data = await asyncio.wait_for(
+                price_service.get_multiple_crypto_prices(all_symbols),
+                timeout=5.0,
+            )
             price_map = {sym.upper(): d["price"] for sym, d in price_data.items()}
         except Exception:
             pass
@@ -673,11 +676,17 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
     indices = []
 
     try:
-        # Fetch current prices
-        all_data = await price_service.get_multiple_crypto_prices([s for s, _ in index_symbols])
+        # Fetch current prices with a tight timeout to avoid blocking dashboard
+        all_data = await asyncio.wait_for(
+            price_service.get_multiple_crypto_prices([s for s, _ in index_symbols]),
+            timeout=5.0,
+        )
 
         # Fetch period-specific changes
-        period_changes = await metrics_service._fetch_period_changes({"crypto": [s for s, _ in index_symbols]}, days)
+        period_changes = await asyncio.wait_for(
+            metrics_service._fetch_period_changes({"crypto": [s for s, _ in index_symbols]}, days),
+            timeout=5.0,
+        )
 
         for symbol, name in index_symbols:
             if symbol in all_data:
