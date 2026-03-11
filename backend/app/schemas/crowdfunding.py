@@ -25,6 +25,9 @@ class CrowdfundingProjectCreate(BaseModel):
     repayment_type: RepaymentType = RepaymentType.IN_FINE
     start_date: Optional[date] = None
     estimated_end_date: Optional[date] = None
+    interest_frequency: Optional[str] = Field("at_maturity", max_length=20)
+    tax_rate: Decimal = Field(Decimal("30.00"), ge=0, le=100)
+    delay_months: int = Field(0, ge=0, le=120)
     status: ProjectStatus = ProjectStatus.ACTIVE
 
 
@@ -40,6 +43,9 @@ class CrowdfundingProjectUpdate(BaseModel):
     estimated_end_date: Optional[date] = None
     actual_end_date: Optional[date] = None
     status: Optional[ProjectStatus] = None
+    interest_frequency: Optional[str] = Field(None, max_length=20)
+    tax_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    delay_months: Optional[int] = Field(None, ge=0, le=120)
     total_received: Optional[Decimal] = Field(None, ge=0)
 
 
@@ -50,6 +56,9 @@ class RepaymentCreate(BaseModel):
     payment_date: date
     amount: Decimal = Field(..., gt=0)
     payment_type: PaymentType
+    interest_amount: Optional[Decimal] = Field(None, ge=0)
+    capital_amount: Optional[Decimal] = Field(None, ge=0)
+    tax_amount: Optional[Decimal] = Field(None, ge=0)
     notes: Optional[str] = None
 
 
@@ -59,6 +68,9 @@ class RepaymentResponse(BaseModel):
     payment_date: date
     amount: Decimal
     payment_type: PaymentType
+    interest_amount: Optional[Decimal] = None
+    capital_amount: Optional[Decimal] = None
+    tax_amount: Optional[Decimal] = None
     notes: Optional[str] = None
     created_at: datetime
 
@@ -81,6 +93,21 @@ class ProjectDocumentResponse(BaseModel):
         from_attributes = True
 
 
+class PaymentScheduleEntryResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    due_date: date
+    expected_capital: Decimal
+    expected_interest: Decimal
+    is_completed: bool
+    completed_at: Optional[datetime] = None
+    repayment_id: Optional[UUID] = None
+    status: str = "pending"  # "paid" | "pending" | "overdue"
+
+    class Config:
+        from_attributes = True
+
+
 class CrowdfundingProjectResponse(BaseModel):
     id: UUID
     asset_id: UUID
@@ -92,6 +119,9 @@ class CrowdfundingProjectResponse(BaseModel):
     annual_rate: Decimal
     duration_months: int
     repayment_type: RepaymentType
+    interest_frequency: Optional[str] = "at_maturity"
+    tax_rate: Decimal = Decimal("30.00")
+    delay_months: int = 0
     start_date: Optional[date] = None
     estimated_end_date: Optional[date] = None
     actual_end_date: Optional[date] = None
@@ -106,6 +136,7 @@ class CrowdfundingProjectResponse(BaseModel):
     progress_percent: Optional[float] = None
     documents: list[ProjectDocumentResponse] = []
     repayments: list[RepaymentResponse] = []
+    schedule: list[PaymentScheduleEntryResponse] = []
 
     class Config:
         from_attributes = True
@@ -183,3 +214,23 @@ class ProjectAuditResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Stress Test schemas ----------
+
+
+class StressTestCashflowSchema(BaseModel):
+    date: date
+    capital: float
+    interest: float
+    total: float
+    is_delayed: bool
+
+
+class StressTestResponse(BaseModel):
+    project_id: UUID
+    delay_months: int
+    base_irr: Optional[float] = None
+    stressed_irr: Optional[float] = None
+    irr_delta: Optional[float] = None
+    cashflows: list[StressTestCashflowSchema]

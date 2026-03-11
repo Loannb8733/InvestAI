@@ -5,23 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(value: number | null | undefined, currency = "EUR"): string {
-  if (value == null || !Number.isFinite(value)) return "—"
+export function formatCurrency(value: number | string | null | undefined, currency = "EUR"): string {
+  if (value == null) return "—"
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (!Number.isFinite(num)) return "—"
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value)
+  }).format(num)
 }
 
-export function formatPercent(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—"
+export function formatPercent(value: number | string | null | undefined): string {
+  if (value == null) return "—"
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (!Number.isFinite(num)) return "—"
   return new Intl.NumberFormat("fr-FR", {
     style: "percent",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value / 100)
+  }).format(num / 100)
 }
 
 export function formatDate(dateString: string | null | undefined): string {

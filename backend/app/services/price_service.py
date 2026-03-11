@@ -50,7 +50,7 @@ class PriceService:
         if self.coingecko_api_key:
             headers["x-cg-demo-api-key"] = self.coingecko_api_key
 
-        self.http_client = httpx.AsyncClient(timeout=30.0, headers=headers)
+        self.http_client = httpx.AsyncClient(timeout=3.0, headers=headers)
 
         # Dynamic symbol cache (discovered from API)
         self._dynamic_symbol_cache: Dict[str, str] = {}

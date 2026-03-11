@@ -35,5 +35,8 @@ class CrowdfundingRepayment(Base):
     payment_date = Column(Date, nullable=False)
     amount = Column(Numeric(precision=12, scale=2), nullable=False)
     payment_type = Column(Enum(PaymentType), nullable=False)
+    interest_amount = Column(Numeric(precision=12, scale=2), nullable=True)
+    capital_amount = Column(Numeric(precision=12, scale=2), nullable=True)
+    tax_amount = Column(Numeric(precision=12, scale=2), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -15,6 +15,7 @@ from app.models.asset import Asset  # noqa: E402, F401
 from app.models.asset_price_history import AssetPriceHistory  # noqa: E402, F401
 from app.models.audit_log import AuditLog  # noqa: E402, F401
 from app.models.calendar_event import CalendarEvent  # noqa: E402, F401
+from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule  # noqa: E402, F401
 from app.models.crowdfunding_project import CrowdfundingProject  # noqa: E402, F401
 from app.models.crowdfunding_repayment import CrowdfundingRepayment  # noqa: E402, F401
 from app.models.goal import Goal  # noqa: E402, F401

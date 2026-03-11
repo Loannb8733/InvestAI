@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -299,7 +298,7 @@ export default function MasterDashboardPage() {
 
       {/* KPI Row */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+        <div className="transition-transform hover:scale-[1.02]">
           <Card>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -309,9 +308,9 @@ export default function MasterDashboardPage() {
               <p className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(totalInvested)}</p>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+        <div className="transition-transform hover:scale-[1.02]">
           <Card>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -327,9 +326,9 @@ export default function MasterDashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+        <div className="transition-transform hover:scale-[1.02]">
           <Card>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -341,9 +340,9 @@ export default function MasterDashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}>
+        <div className="transition-transform hover:scale-[1.02]">
           <Card>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -355,7 +354,7 @@ export default function MasterDashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
       </div>
 
       {/* Charts Row */}

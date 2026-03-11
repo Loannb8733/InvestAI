@@ -276,14 +276,28 @@ class MetricsService:
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
         stock_symbols = [a.symbol for a in investment_assets if a.asset_type in [AssetType.STOCK, AssetType.ETF]]
 
-        # Fetch prices (with 24h change data)
+        # Fetch prices (with 24h change data) — fallback to DB current_price on timeout
         prices = {}
         price_changes = {}
+
+        # Pre-populate fallback prices from DB (current_price stored on asset)
+        db_fallback_prices = {
+            a.symbol.upper(): float(a.current_price)
+            for a in investment_assets
+            if a.current_price and float(a.current_price) > 0
+        }
+
         if crypto_symbols:
-            crypto_prices = await price_service.get_multiple_crypto_prices(crypto_symbols, currency.lower())
-            for symbol, data in crypto_prices.items():
-                prices[symbol.upper()] = data["price"]
-                price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
+            try:
+                crypto_prices = await asyncio.wait_for(
+                    price_service.get_multiple_crypto_prices(crypto_symbols, currency.lower()),
+                    timeout=5.0,
+                )
+                for symbol, data in crypto_prices.items():
+                    prices[symbol.upper()] = data["price"]
+                    price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
+            except (asyncio.TimeoutError, Exception) as e:
+                logger.warning("Crypto price fetch failed (%s), using DB fallback", type(e).__name__)
 
         if stock_symbols:
 
@@ -291,25 +305,36 @@ class MetricsService:
                 data = await price_service.get_stock_price(sym)
                 return sym, data
 
-            results = await asyncio.gather(*[_fetch_stock(s) for s in stock_symbols], return_exceptions=True)
-            for res in results:
-                if isinstance(res, Exception):
-                    continue
-                symbol, stock_data = res
-                if stock_data:
-                    stock_price = stock_data["price"]
-                    quote_ccy = stock_data.get("quote_currency", "USD")
-                    target = currency.upper()
-                    # Convert stock price from quote currency to user's target currency
-                    if quote_ccy != target:
-                        try:
-                            rate = await price_service.get_forex_rate(quote_ccy, target)
-                            if rate:
-                                stock_price = stock_price * rate
-                        except Exception:
-                            logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
-                    prices[symbol.upper()] = stock_price
-                    price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*[_fetch_stock(s) for s in stock_symbols], return_exceptions=True),
+                    timeout=5.0,
+                )
+                for res in results:
+                    if isinstance(res, Exception):
+                        continue
+                    symbol, stock_data = res
+                    if stock_data:
+                        stock_price = stock_data["price"]
+                        quote_ccy = stock_data.get("quote_currency", "USD")
+                        target = currency.upper()
+                        if quote_ccy != target:
+                            try:
+                                rate = await price_service.get_forex_rate(quote_ccy, target)
+                                if rate:
+                                    stock_price = stock_price * rate
+                            except Exception:
+                                logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
+                        prices[symbol.upper()] = stock_price
+                        price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
+            except (asyncio.TimeoutError, Exception) as e:
+                logger.warning("Stock price fetch failed (%s), using DB fallback", type(e).__name__)
+
+        # Fill missing prices from DB fallback
+        for sym, fallback_price in db_fallback_prices.items():
+            if sym not in prices:
+                prices[sym] = fallback_price
+                price_changes.setdefault(sym, 0.0)
 
         # Calculate metrics for each investment asset
         total_value = Decimal("0")

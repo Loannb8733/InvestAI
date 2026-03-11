@@ -1,7 +1,7 @@
 """Crowdfunding project endpoints — CRUD + dashboard + performance."""
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -13,6 +13,7 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.models.asset import Asset, AssetType
+from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
 from app.models.crowdfunding_repayment import CrowdfundingRepayment
 from app.models.portfolio import Portfolio
@@ -24,12 +25,16 @@ from app.schemas.crowdfunding import (
     CrowdfundingProjectCreate,
     CrowdfundingProjectResponse,
     CrowdfundingProjectUpdate,
+    PaymentScheduleEntryResponse,
     ProjectAuditResponse,
     ProjectDocumentResponse,
     RepaymentCreate,
     RepaymentResponse,
+    StressTestResponse,
 )
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
+from app.services.reconciliation_service import reconciliation_service
+from app.services.stress_test_service import ALLOWED_DELAY_MONTHS, stress_test_service
 
 router = APIRouter()
 
@@ -37,10 +42,20 @@ router = APIRouter()
 # ──────────────────────── helpers ────────────────────────
 
 
+def _compute_schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
+    """Compute display status for a schedule entry."""
+    if entry.is_completed:
+        return "paid"
+    if entry.due_date < date.today() - timedelta(days=5):
+        return "overdue"
+    return "pending"
+
+
 def _enrich(
     project: CrowdfundingProject,
     documents: Optional[list[ProjectDocument]] = None,
     repayments: Optional[list[CrowdfundingRepayment]] = None,
+    schedule: Optional[list[CrowdfundingPaymentSchedule]] = None,
 ) -> CrowdfundingProjectResponse:
     """Add computed fields to a project response."""
     invested = float(project.invested_amount)
@@ -59,6 +74,12 @@ def _enrich(
     docs = [ProjectDocumentResponse.model_validate(d) for d in (documents or [])]
     reps = [RepaymentResponse.model_validate(r) for r in (repayments or [])]
 
+    schedule_entries = []
+    for s in schedule or []:
+        entry_resp = PaymentScheduleEntryResponse.model_validate(s)
+        entry_resp.status = _compute_schedule_status(s)
+        schedule_entries.append(entry_resp)
+
     return CrowdfundingProjectResponse(
         id=project.id,
         asset_id=project.asset_id,
@@ -70,6 +91,9 @@ def _enrich(
         annual_rate=project.annual_rate,
         duration_months=int(project.duration_months),
         repayment_type=project.repayment_type,
+        interest_frequency=project.interest_frequency or "at_maturity",
+        tax_rate=project.tax_rate,
+        delay_months=int(project.delay_months or 0),
         start_date=project.start_date,
         estimated_end_date=project.estimated_end_date,
         actual_end_date=project.actual_end_date,
@@ -82,6 +106,7 @@ def _enrich(
         progress_percent=round(progress, 1),
         documents=docs,
         repayments=reps,
+        schedule=schedule_entries,
     )
 
 
@@ -132,6 +157,24 @@ async def _get_repayments_for_projects(
     return repayments
 
 
+async def _get_schedules_for_projects(
+    db: AsyncSession,
+    project_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[CrowdfundingPaymentSchedule]]:
+    """Load payment schedule entries for a batch of projects."""
+    if not project_ids:
+        return {}
+    result = await db.execute(
+        select(CrowdfundingPaymentSchedule)
+        .where(CrowdfundingPaymentSchedule.project_id.in_(project_ids))
+        .order_by(CrowdfundingPaymentSchedule.due_date)
+    )
+    schedules: dict[uuid.UUID, list[CrowdfundingPaymentSchedule]] = {}
+    for s in result.scalars().all():
+        schedules.setdefault(s.project_id, []).append(s)
+    return schedules
+
+
 async def _get_project_for_user(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> CrowdfundingProject:
     result = await db.execute(
         select(CrowdfundingProject)
@@ -159,7 +202,8 @@ async def list_projects(
     pids = [p.id for p in projects]
     docs_map = await _get_docs_for_projects(db, pids)
     reps_map = await _get_repayments_for_projects(db, pids)
-    return [_enrich(p, docs_map.get(p.id, []), reps_map.get(p.id, [])) for p in projects]
+    sched_map = await _get_schedules_for_projects(db, pids)
+    return [_enrich(p, docs_map.get(p.id, []), reps_map.get(p.id, []), sched_map.get(p.id, [])) for p in projects]
 
 
 @router.post("", response_model=CrowdfundingProjectResponse, status_code=201)
@@ -179,7 +223,7 @@ async def create_project(
     asset = Asset(
         id=uuid.uuid4(),
         portfolio_id=data.portfolio_id,
-        symbol=data.platform.upper()[:20],
+        symbol=f"{data.platform}-{data.project_name}".upper()[:20],
         name=data.project_name,
         asset_type=AssetType.CROWDFUNDING,
         quantity=Decimal("1"),
@@ -207,6 +251,7 @@ async def create_project(
         annual_rate=data.annual_rate,
         duration_months=data.duration_months,
         repayment_type=data.repayment_type,
+        interest_frequency=data.interest_frequency or "at_maturity",
         start_date=data.start_date,
         estimated_end_date=data.estimated_end_date,
         status=data.status,
@@ -217,9 +262,12 @@ async def create_project(
 
     # Auto-generate calendar events for coupons
     await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+    # Auto-generate contractual payment schedule
+    await reconciliation_service.populate_initial_schedule(db, project)
     await db.commit()
 
-    return _enrich(project)
+    schedule = await reconciliation_service.get_schedule_for_project(db, project.id)
+    return _enrich(project, schedule=schedule)
 
 
 @router.get("/dashboard", response_model=CrowdfundingDashboardResponse)
@@ -230,7 +278,11 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     projects = await _get_user_projects(db, current_user.id)
-    enriched = [_enrich(p) for p in projects]
+    pids = [p.id for p in projects]
+    docs_map = await _get_docs_for_projects(db, pids)
+    reps_map = await _get_repayments_for_projects(db, pids)
+    sched_map = await _get_schedules_for_projects(db, pids)
+    enriched = [_enrich(p, docs_map.get(p.id, []), reps_map.get(p.id, []), sched_map.get(p.id, [])) for p in projects]
 
     total_invested = sum(float(p.invested_amount) for p in projects)
     total_received = sum(float(p.total_received) for p in projects)
@@ -443,6 +495,29 @@ async def get_audit(
     return audit
 
 
+# ──────────────────── Payment Schedule ────────────────────
+
+
+@router.get("/{project_id}/schedule", response_model=list[PaymentScheduleEntryResponse])
+@limiter.limit("30/minute")
+async def get_schedule(
+    request: Request,
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the contractual payment schedule for a project."""
+    await _get_project_for_user(db, project_id, current_user.id)
+    entries = await reconciliation_service.get_schedule_for_project(db, project_id)
+
+    result = []
+    for e in entries:
+        resp = PaymentScheduleEntryResponse.model_validate(e)
+        resp.status = _compute_schedule_status(e)
+        result.append(resp)
+    return result
+
+
 # ──────────────────── Repayments ────────────────────
 
 
@@ -465,15 +540,27 @@ async def create_repayment(
         payment_date=data.payment_date,
         amount=data.amount,
         payment_type=data.payment_type,
+        interest_amount=data.interest_amount,
+        capital_amount=data.capital_amount,
+        tax_amount=data.tax_amount,
         notes=data.notes,
     )
     db.add(repayment)
+    await db.flush()  # Ensure repayment row exists before FK reference
 
     # Update cumulative total
     project.total_received = (project.total_received or Decimal("0")) + data.amount
 
     # Mark closest calendar event as completed
     await crowdfunding_calendar_service.mark_closest_event_completed(db, project.id, data.payment_date)
+
+    # Reconcile with payment schedule
+    await reconciliation_service.reconcile_repayment(
+        db,
+        project.id,
+        repayment.id,
+        data.payment_date,
+    )
 
     await db.commit()
     await db.refresh(repayment)
@@ -523,6 +610,10 @@ async def delete_repayment(
         Decimal("0"),
         (project.total_received or Decimal("0")) - repayment.amount,
     )
+
+    # Unreconcile from payment schedule before deleting
+    await reconciliation_service.unreconcile_repayment(db, repayment.id)
+
     await db.delete(repayment)
     await db.commit()
 
@@ -655,6 +746,52 @@ async def list_project_documents(
     return list(result.scalars().all())
 
 
+# ──────────────────── Stress Test ────────────────────
+
+
+@router.get("/{project_id}/stress-test", response_model=StressTestResponse)
+@limiter.limit("20/minute")
+async def get_stress_test(
+    request: Request,
+    project_id: uuid.UUID,
+    delay_months: int = Query(0, ge=0, le=24),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compute degraded IRR for a project with simulated payment delays."""
+    if delay_months not in ALLOWED_DELAY_MONTHS:
+        raise HTTPException(400, "delay_months doit être 0, 6, 12 ou 24")
+
+    project = await _get_project_for_user(db, project_id, current_user.id)
+
+    try:
+        result = stress_test_service.compute_stress_test(project, delay_months)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    irr_delta = None
+    if result.base_irr is not None and result.stressed_irr is not None:
+        irr_delta = round(result.stressed_irr - result.base_irr, 2)
+
+    return StressTestResponse(
+        project_id=project.id,
+        delay_months=result.delay_months,
+        base_irr=result.base_irr,
+        stressed_irr=result.stressed_irr,
+        irr_delta=irr_delta,
+        cashflows=[
+            {
+                "date": cf.date,
+                "capital": cf.capital,
+                "interest": cf.interest,
+                "total": cf.total,
+                "is_delayed": cf.is_delayed,
+            }
+            for cf in result.cashflows
+        ],
+    )
+
+
 # ──────────────────── Single Project CRUD ────────────────────
 
 
@@ -669,7 +806,8 @@ async def get_project(
     project = await _get_project_for_user(db, project_id, current_user.id)
     docs_map = await _get_docs_for_projects(db, [project.id])
     reps_map = await _get_repayments_for_projects(db, [project.id])
-    return _enrich(project, docs_map.get(project.id, []), reps_map.get(project.id, []))
+    sched_map = await _get_schedules_for_projects(db, [project.id])
+    return _enrich(project, docs_map.get(project.id, []), reps_map.get(project.id, []), sched_map.get(project.id, []))
 
 
 @router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)
@@ -698,22 +836,26 @@ async def update_project(
             asset.project_status = project.status.value
         if "platform" in updates:
             asset.exchange = project.platform
-            asset.symbol = project.platform.upper()[:20]
+            asset.symbol = f"{project.platform}-{project.project_name}".upper()[:20]
 
     await db.commit()
     await db.refresh(project)
 
-    # Sync calendar events if financial terms or status changed
+    # Sync calendar events and schedule if financial terms or status changed
     financial_fields = {
         "annual_rate",
         "duration_months",
         "repayment_type",
+        "interest_frequency",
         "start_date",
         "estimated_end_date",
         "invested_amount",
+        "tax_rate",
+        "delay_months",
     }
     if updates.keys() & financial_fields:
         await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+        await reconciliation_service.populate_initial_schedule(db, project)
         await db.commit()
     elif "status" in updates:
         if project.status in (ProjectStatus.COMPLETED, ProjectStatus.DEFAULTED):
@@ -721,9 +863,11 @@ async def update_project(
             await db.commit()
         elif project.status == ProjectStatus.ACTIVE:
             await crowdfunding_calendar_service.sync_events_for_project(db, current_user.id, project)
+            await reconciliation_service.populate_initial_schedule(db, project)
             await db.commit()
 
-    return _enrich(project)
+    schedule = await reconciliation_service.get_schedule_for_project(db, project.id)
+    return _enrich(project, schedule=schedule)
 
 
 @router.delete("/{project_id}", status_code=204)

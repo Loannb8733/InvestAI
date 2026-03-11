@@ -159,5 +159,6 @@ export const queryKeys = {
     performance: ['crowdfunding', 'performance'] as const,
     audits: ['crowdfunding', 'audits'] as const,
     audit: (id: string) => ['crowdfunding', 'audit', id] as const,
+    stressTest: (id: string, delay: number) => ['crowdfunding', 'stress-test', id, delay] as const,
   },
 } as const
