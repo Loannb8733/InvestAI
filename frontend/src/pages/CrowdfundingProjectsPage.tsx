@@ -516,6 +516,15 @@ export default function CrowdfundingProjectsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
+                <Label>Description (optionnel)</Label>
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Division d'un ensemble immobilier en 5 lots..."
+                  rows={3}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label>URL du projet (optionnel)</Label>
                 <Input
                   value={form.project_url}
@@ -635,6 +644,9 @@ export default function CrowdfundingProjectsPage() {
                           {p.project_name || p.platform}
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">{p.platform}</p>
+                        {p.description && (
+                          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">{p.description}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge className={STATUS_COLORS[p.status]}>{STATUS_LABELS[p.status]}</Badge>
