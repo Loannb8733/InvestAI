@@ -1,0 +1,43 @@
+# Dockerfile optimisé pour Render Free Tier (512MB RAM)
+# - Pas de CmdStan/Prophet (trop lourd)
+# - Multi-stage build pour réduire la taille de l'image
+# - Dépendances système minimales
+
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-render.txt requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# --- Runtime stage ---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    libglib2.0-0 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /install /usr/local
+
+COPY . .
+
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE 8000
+
+# Render injects $PORT at runtime
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

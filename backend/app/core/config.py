@@ -47,9 +47,9 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "investai"
 
-    # Database pool configuration
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 10
+    # Database pool configuration (conservative defaults for free tiers)
+    DB_POOL_SIZE: int = 3
+    DB_MAX_OVERFLOW: int = 5
     DB_POOL_RECYCLE: int = 300
 
     @field_validator("SECRET_KEY")
@@ -72,10 +72,19 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        """Build async database URL. Uses DATABASE_URL env var (Railway) if set."""
+        """Build async database URL.
+
+        Uses DATABASE_URL env var if set (Railway, Render, Supabase…).
+        For Supabase, use the **direct** connection (port 5432) with sslmode=require:
+          postgresql://postgres.[ref]:[pwd]@host:5432/postgres?sslmode=require
+        Do NOT use the pooler (port 6543) — it breaks asyncpg prepared statements.
+        """
         external = os.environ.get("DATABASE_URL", "")
         if external:
-            return external.replace("postgresql://", "postgresql+asyncpg://")
+            url = external.replace("postgresql://", "postgresql+asyncpg://")
+            # Ensure asyncpg variant isn't doubled
+            url = url.replace("postgresql+asyncpg+asyncpg://", "postgresql+asyncpg://")
+            return url
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -86,7 +95,11 @@ class Settings(BaseSettings):
         """Build sync database URL for Alembic."""
         external = os.environ.get("DATABASE_URL", "")
         if external:
-            return external.replace("postgresql+asyncpg://", "postgresql://")
+            url = external.replace("postgresql+asyncpg://", "postgresql://")
+            # Ensure we have plain postgresql:// for psycopg2
+            if not url.startswith("postgresql://"):
+                url = url.replace("postgres://", "postgresql://")
+            return url
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

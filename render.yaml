@@ -1,16 +1,20 @@
 # Render Blueprint - InvestAI
 # Deploy: https://render.com/deploy
+#
+# Stack gratuite :
+#   - Backend API : Render Free Tier (web service)
+#   - Base de données : Supabase PostgreSQL (externe, free tier)
+#   - Redis : Upstash Redis (externe, free tier)
+#   - Frontend : Vercel (free tier)
 
 services:
   # Backend API
   - type: web
     name: investai-api
-    runtime: python
+    runtime: docker
     region: frankfurt
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./backend/Dockerfile.render
     healthCheckPath: /health
     envVars:
       - key: APP_ENV
@@ -25,15 +29,14 @@ services:
         value: "15"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
+      # Supabase PostgreSQL — use direct connection (port 5432), NOT pooler (6543)
+      # Format: postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: investai-db
-          property: connectionString
+        sync: false
+      # Upstash Redis (free tier)
+      # Format: rediss://default:[password]@[endpoint].upstash.io:6379
       - key: REDIS_URL
-        fromService:
-          name: investai-redis
-          type: redis
-          property: connectionString
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -49,39 +52,31 @@ services:
       - key: SMTP_FROM_NAME
         value: InvestAI
       - key: FERNET_KEY
-        generateValue: true
+        sync: false
       - key: CORS_ORIGINS
         sync: false
 
-  # Celery Worker
+  # Celery Worker (requires Upstash Redis)
   - type: worker
     name: investai-worker
-    runtime: python
+    runtime: docker
     region: frankfurt
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    dockerfilePath: ./backend/Dockerfile.render
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
     envVars:
       - fromGroup: investai-shared
 
   # Celery Beat (Scheduler)
   - type: worker
     name: investai-beat
-    runtime: python
+    runtime: docker
     region: frankfurt
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    dockerfilePath: ./backend/Dockerfile.render
     startCommand: celery -A app.tasks.celery_app beat --loglevel=info
     envVars:
       - fromGroup: investai-shared
 
-databases:
-  - name: investai-db
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: "15"
-
-# Note: Redis requires paid plan on Render
-# Alternative: Use Upstash Redis (free tier)
+# No Render database — using Supabase PostgreSQL (external, free tier)
+# No Render Redis — using Upstash Redis (external, free tier)

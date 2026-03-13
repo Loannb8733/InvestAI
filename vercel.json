@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://investai-production.up.railway.app/api/:path*"
+      "destination": "https://investai-api.onrender.com/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
