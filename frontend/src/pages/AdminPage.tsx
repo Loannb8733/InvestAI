@@ -194,7 +194,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                           <span className="text-sm font-medium text-primary">
-                            {user.email.charAt(0).toUpperCase()}
+                            {user.email?.charAt(0).toUpperCase() ?? 'U'}
                           </span>
                         </div>
                         <div>
