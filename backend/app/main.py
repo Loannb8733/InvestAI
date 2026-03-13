@@ -281,9 +281,9 @@ async def readiness_check():
     try:
         import redis.asyncio as aioredis
 
-        from app.core.redis_client import redis_ssl_kwargs
+        from app.core.redis_client import redis_async_url, redis_ssl_kwargs
 
-        r = aioredis.from_url(settings.REDIS_URL, socket_timeout=2, **redis_ssl_kwargs())
+        r = aioredis.from_url(redis_async_url(), socket_timeout=2, **redis_ssl_kwargs())
         await r.ping()
         await r.aclose()
         checks["redis"] = "ok"

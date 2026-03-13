@@ -13,6 +13,23 @@ import redis.asyncio as aioredis
 from app.core.config import settings
 
 
+def redis_async_url() -> str:
+    """Return REDIS_URL stripped of ssl_cert_reqs query param.
+
+    redis.asyncio.from_url() cannot parse the string 'CERT_NONE' from
+    the URL — it must be passed as a Python ssl.CERT_NONE kwarg instead.
+    The query param is kept in settings.REDIS_URL for Celery/kombu compat.
+    """
+    url = settings.REDIS_URL
+    # Remove ssl_cert_reqs=... from query string
+    for sep in ("?ssl_cert_reqs=CERT_NONE", "&ssl_cert_reqs=CERT_NONE"):
+        url = url.replace(sep, "")
+    # Clean trailing ? if nothing left
+    if url.endswith("?"):
+        url = url[:-1]
+    return url
+
+
 def redis_ssl_kwargs() -> Dict[str, Any]:
     """Return extra kwargs needed for rediss:// (TLS) connections."""
     if settings.REDIS_URL.startswith("rediss://"):
@@ -35,7 +52,7 @@ async def _get_redis_bin() -> aioredis.Redis:
     global _redis_bin
     if _redis_bin is None:
         _redis_bin = aioredis.from_url(
-            settings.REDIS_URL,
+            redis_async_url(),
             encoding=None,
             decode_responses=False,
             **redis_ssl_kwargs(),
@@ -48,7 +65,7 @@ async def _get_redis_txt() -> aioredis.Redis:
     global _redis_txt
     if _redis_txt is None:
         _redis_txt = aioredis.from_url(
-            settings.REDIS_URL,
+            redis_async_url(),
             encoding="utf-8",
             decode_responses=True,
             **redis_ssl_kwargs(),
