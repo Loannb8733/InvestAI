@@ -50,7 +50,9 @@ class AlertService:
     async def _get_redis(self) -> aioredis.Redis:
         """Lazy init Redis connection."""
         if self._redis is None:
-            self._redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            from app.core.redis_client import redis_ssl_kwargs
+
+            self._redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True, **redis_ssl_kwargs())
         return self._redis
 
     # ------------------------------------------------------------------

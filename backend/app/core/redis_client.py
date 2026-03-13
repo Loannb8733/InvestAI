@@ -4,12 +4,21 @@ import hashlib
 import hmac
 import json
 import logging
-import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization
-from typing import Optional
+import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization  # noqa: S403
+import ssl as _ssl
+from typing import Any, Dict, Optional
 
 import redis.asyncio as aioredis
 
 from app.core.config import settings
+
+
+def redis_ssl_kwargs() -> Dict[str, Any]:
+    """Return extra kwargs needed for rediss:// (TLS) connections."""
+    if settings.REDIS_URL.startswith("rediss://"):
+        return {"ssl_cert_reqs": _ssl.CERT_NONE}
+    return {}
+
 
 # HMAC key derived from SECRET_KEY for pickle integrity verification
 _HMAC_KEY: bytes = settings.SECRET_KEY.encode() if isinstance(settings.SECRET_KEY, str) else settings.SECRET_KEY
@@ -29,6 +38,7 @@ async def _get_redis_bin() -> aioredis.Redis:
             settings.REDIS_URL,
             encoding=None,
             decode_responses=False,
+            **redis_ssl_kwargs(),
         )
     return _redis_bin
 
@@ -41,6 +51,7 @@ async def _get_redis_txt() -> aioredis.Redis:
             settings.REDIS_URL,
             encoding="utf-8",
             decode_responses=True,
+            **redis_ssl_kwargs(),
         )
     return _redis_txt
 
