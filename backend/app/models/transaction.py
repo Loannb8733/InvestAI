@@ -5,7 +5,7 @@ import hashlib
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -87,7 +87,7 @@ class Transaction(Base):
             "uq_transactions_internal_hash",
             "internal_hash",
             unique=True,
-            postgresql_where=Text("internal_hash IS NOT NULL"),
+            postgresql_where=text("internal_hash IS NOT NULL"),
         ),
     )
 
