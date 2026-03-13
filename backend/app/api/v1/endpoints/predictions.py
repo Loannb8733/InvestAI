@@ -45,6 +45,8 @@ class RegimeInfo(BaseModel):
 class AssetPredictionResponse(BaseModel):
     """Asset prediction response."""
 
+    model_config = {"protected_namespaces": ()}
+
     symbol: str
     current_price: float
     predictions: List[PredictionPoint]
@@ -108,6 +110,8 @@ class FeatureExplanation(BaseModel):
 
 class PortfolioAssetPrediction(BaseModel):
     """Prediction for a single asset in the portfolio."""
+
+    model_config = {"protected_namespaces": ()}
 
     symbol: str
     name: str

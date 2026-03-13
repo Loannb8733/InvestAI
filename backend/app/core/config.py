@@ -115,9 +115,16 @@ class Settings(BaseSettings):
 
     @property
     def REDIS_URL(self) -> str:
-        """Build Redis URL. Uses REDIS_URL env var (Railway) if set."""
+        """Build Redis URL. Uses REDIS_URL env var if set.
+
+        For Upstash (rediss://), appends ssl_cert_reqs=CERT_NONE when missing
+        to avoid Celery/kombu SSL warnings.
+        """
         external = os.environ.get("REDIS_URL", "")
         if external:
+            if external.startswith("rediss://") and "ssl_cert_reqs" not in external:
+                sep = "&" if "?" in external else "?"
+                external = f"{external}{sep}ssl_cert_reqs=CERT_NONE"
             return external
         if self.REDIS_PASSWORD:
             return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
