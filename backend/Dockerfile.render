@@ -24,10 +24,9 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    libglib2.0-0 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
+    gir1.2-gdkpixbuf-2.0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
