@@ -5,7 +5,6 @@ import hmac
 import json
 import logging
 import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization  # noqa: S403
-import ssl as _ssl
 from typing import Any, Dict, Optional
 
 import redis.asyncio as aioredis
@@ -16,32 +15,26 @@ from app.core.config import settings
 def redis_async_url() -> str:
     """Return REDIS_URL cleaned for redis.asyncio.from_url().
 
-    - Strips ssl_cert_reqs query param (causes parse errors in redis-py 5)
-    - Converts rediss:// → redis:// (we handle TLS via ssl kwarg instead)
+    Strips the ssl_cert_reqs query param (string 'CERT_NONE' causes parse
+    errors in redis-py 5). We pass ssl_cert_reqs as a kwarg instead.
     The raw settings.REDIS_URL is kept for Celery/kombu compatibility.
     """
     url = settings.REDIS_URL
-    # Remove ssl_cert_reqs=... from query string
     for sep in ("?ssl_cert_reqs=CERT_NONE", "&ssl_cert_reqs=CERT_NONE"):
         url = url.replace(sep, "")
     if url.endswith("?"):
         url = url[:-1]
-    # Downgrade scheme — SSL is handled via the ssl kwarg
-    url = url.replace("rediss://", "redis://")
     return url
 
 
 def redis_ssl_kwargs() -> Dict[str, Any]:
     """Return extra kwargs needed for TLS connections (Upstash).
 
-    When the original URL uses rediss://, we pass a permissive SSLContext
-    since redis_async_url() downgrades the scheme to redis://.
+    Uses ssl_cert_reqs="none" (lowercase string) which redis-py 5.x
+    accepts alongside the rediss:// URL scheme.
     """
     if settings.REDIS_URL.startswith("rediss://"):
-        ctx = _ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_NONE
-        return {"ssl": ctx}
+        return {"ssl_cert_reqs": "none"}
     return {}
 
 
