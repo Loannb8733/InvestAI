@@ -2,6 +2,6 @@
 dockerfilePath = "Dockerfile.railway"
 
 [deploy]
-startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 restartPolicyType = "ON_FAILURE"
