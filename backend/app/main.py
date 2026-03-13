@@ -287,8 +287,9 @@ async def readiness_check():
         await r.ping()
         await r.aclose()
         checks["redis"] = "ok"
-    except Exception:
+    except Exception as exc:
         checks["redis"] = "error"
+        checks["redis_detail"] = str(exc)
         checks["status"] = "degraded"
         http_status = 503
 
