@@ -42,10 +42,10 @@ async def get_pubsub_redis() -> aioredis.Redis:
     """Get or create the async Redis client for pub/sub."""
     global _pubsub_redis
     if _pubsub_redis is None:
-        from app.core.redis_client import redis_ssl_kwargs
+        from app.core.redis_client import redis_async_url, redis_ssl_kwargs
 
         _pubsub_redis = aioredis.from_url(
-            settings.REDIS_URL,
+            redis_async_url(),
             encoding="utf-8",
             decode_responses=True,
             **redis_ssl_kwargs(),
