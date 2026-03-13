@@ -16,25 +16,26 @@ from app.core.config import settings
 def redis_async_url() -> str:
     """Return REDIS_URL cleaned for redis.asyncio.from_url().
 
-    - Strips ssl_cert_reqs query param (redis.asyncio can't parse it)
-    - Keeps rediss:// scheme so redis-py enables TLS automatically
-    The raw settings.REDIS_URL is kept for Celery/kombu compat.
+    - Strips ssl_cert_reqs query param (causes parse errors in redis-py 5)
+    - Converts rediss:// → redis:// (we handle TLS via ssl kwarg instead)
+    The raw settings.REDIS_URL is kept for Celery/kombu compatibility.
     """
     url = settings.REDIS_URL
     # Remove ssl_cert_reqs=... from query string
     for sep in ("?ssl_cert_reqs=CERT_NONE", "&ssl_cert_reqs=CERT_NONE"):
         url = url.replace(sep, "")
-    # Clean trailing ? if nothing left
     if url.endswith("?"):
         url = url[:-1]
+    # Downgrade scheme — SSL is handled via the ssl kwarg
+    url = url.replace("rediss://", "redis://")
     return url
 
 
 def redis_ssl_kwargs() -> Dict[str, Any]:
-    """Return extra kwargs needed for rediss:// (TLS) connections.
+    """Return extra kwargs needed for TLS connections (Upstash).
 
-    Builds a real ssl.SSLContext because redis-py >= 5 wraps it in
-    RedisSSLContext which does not support the ssl_cert_reqs shortcut.
+    When the original URL uses rediss://, we pass a permissive SSLContext
+    since redis_async_url() downgrades the scheme to redis://.
     """
     if settings.REDIS_URL.startswith("rediss://"):
         ctx = _ssl.create_default_context()
