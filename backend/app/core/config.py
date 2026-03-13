@@ -84,6 +84,9 @@ class Settings(BaseSettings):
             url = external.replace("postgresql://", "postgresql+asyncpg://")
             # Ensure asyncpg variant isn't doubled
             url = url.replace("postgresql+asyncpg+asyncpg://", "postgresql+asyncpg://")
+            # asyncpg doesn't understand sslmode — replace with ssl=require
+            url = url.replace("sslmode=require", "ssl=require")
+            url = url.replace("sslmode=verify-full", "ssl=verify-full")
             return url
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
