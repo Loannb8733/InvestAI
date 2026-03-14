@@ -1,0 +1,17 @@
+name: Keep Render Warm
+
+on:
+  schedule:
+    # Every 14 minutes — prevents Render Free Tier from sleeping
+    - cron: "*/14 * * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    name: Ping Health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ping Render backend
+        run: python scripts/keep_warm.py
