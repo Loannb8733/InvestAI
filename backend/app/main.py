@@ -256,12 +256,14 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health_check():
     """Liveness probe — returns 200 if the process is running."""
     return {"app": settings.APP_NAME, "status": "alive"}
 
 
 @app.get("/health/ready")
+@app.get("/api/v1/health/ready")
 async def readiness_check():
     """Readiness probe — checks DB and Redis connectivity."""
     checks = {"app": settings.APP_NAME, "status": "ready"}
