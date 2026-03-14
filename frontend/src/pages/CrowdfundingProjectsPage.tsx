@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { formatCurrency } from '@/lib/utils'
-import { crowdfundingApi, portfoliosApi } from '@/services/api'
+import { crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import { Textarea } from '@/components/ui/textarea'
@@ -170,12 +170,7 @@ export default function CrowdfundingProjectsPage() {
     queryFn: crowdfundingApi.list,
   })
 
-  const { data: portfolios } = useQuery({
-    queryKey: queryKeys.portfolios.list(),
-    queryFn: portfoliosApi.list,
-  })
-
-  const portfolioId = portfolios?.[0]?.id
+  // Portfolio is auto-created by the backend — no need to fetch or require one
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.crowdfunding.all })
@@ -306,7 +301,6 @@ export default function CrowdfundingProjectsPage() {
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: payload })
     } else {
-      payload.portfolio_id = portfolioId
       createMutation.mutate(payload)
     }
   }
@@ -359,7 +353,7 @@ export default function CrowdfundingProjectsPage() {
           }}
         >
           <DialogTrigger asChild>
-            <Button disabled={!portfolioId}>
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Ajouter un projet
             </Button>
