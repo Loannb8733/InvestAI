@@ -14,7 +14,7 @@ from app.models.crowdfunding_repayment import PaymentType
 
 
 class CrowdfundingProjectCreate(BaseModel):
-    portfolio_id: UUID
+    portfolio_id: Optional[UUID] = None
     platform: str = Field(..., max_length=100)
     project_name: str = Field(..., max_length=300)
     description: Optional[str] = None

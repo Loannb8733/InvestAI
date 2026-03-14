@@ -214,15 +214,34 @@ async def create_project(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Verify portfolio belongs to user
-    portfolio = await db.get(Portfolio, data.portfolio_id)
-    if not portfolio or portfolio.user_id != current_user.id:
-        raise HTTPException(403, "Portefeuille non trouvé")
+    # Resolve or auto-create a dedicated crowdfunding portfolio
+    if data.portfolio_id:
+        portfolio = await db.get(Portfolio, data.portfolio_id)
+        if not portfolio or portfolio.user_id != current_user.id:
+            raise HTTPException(403, "Portefeuille non trouvé")
+    else:
+        # Find or create a dedicated "Crowdfunding" portfolio for this user
+        result = await db.execute(
+            select(Portfolio).where(
+                Portfolio.user_id == current_user.id,
+                Portfolio.name == "Crowdfunding",
+            )
+        )
+        portfolio = result.scalar_one_or_none()
+        if not portfolio:
+            portfolio = Portfolio(
+                id=uuid.uuid4(),
+                user_id=current_user.id,
+                name="Crowdfunding",
+                description="Portefeuille dédié aux investissements crowdfunding",
+            )
+            db.add(portfolio)
+            await db.flush()
 
     # Create the Asset row
     asset = Asset(
         id=uuid.uuid4(),
-        portfolio_id=data.portfolio_id,
+        portfolio_id=portfolio.id,
         symbol=f"{data.platform}-{data.project_name}".upper()[:20],
         name=data.project_name,
         asset_type=AssetType.CROWDFUNDING,
