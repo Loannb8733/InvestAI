@@ -804,30 +804,3 @@ async def reset_password(
     await db.commit()
 
     return {"message": "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter."}
-
-
-# --- Temporary admin password reset (remove after use) ---
-class _AdminResetRequest(BaseModel):
-    email: EmailStr
-    new_password: str
-    admin_secret: str
-
-
-@router.post("/admin-force-reset", include_in_schema=False)
-async def admin_force_reset(
-    data: _AdminResetRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Temporary endpoint to force-reset a user password. Remove after use."""
-    expected = "G2E2KuNZGOBISwjOYjZSNXE0hrp74eac67rZ-7VP9ZY"
-    if data.admin_secret != expected:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user.password_hash = hash_password(data.new_password)
-    await db.commit()
-    return {"message": "Password reset successfully"}
