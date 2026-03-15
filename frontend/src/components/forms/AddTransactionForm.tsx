@@ -326,7 +326,11 @@ export default function AddTransactionForm({
             </div>
             <Select
               value={selectedAssetId}
-              onValueChange={(value) => setValue('asset_id', value)}
+              onValueChange={(value) => {
+                setValue('asset_id', value)
+                const selected = assets?.find((a) => a.id === value)
+                if (selected?.exchange) setValue('exchange', selected.exchange)
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder={exchangeFilteredAssets.length ? "Sélectionner un actif" : "Aucun actif — créez-en un"} />
@@ -379,10 +383,10 @@ export default function AddTransactionForm({
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Plateforme *</Label>
-                <Input
-                  placeholder={newAssetType === 'real_estate' ? 'Tokimo...' : 'Bitstamp, Binance...'}
+                <PlatformSelect
                   value={newAssetExchange}
-                  onChange={(e) => setNewAssetExchange(e.target.value)}
+                  onChange={setNewAssetExchange}
+                  placeholder="Plateforme..."
                 />
               </div>
             </div>
@@ -535,17 +539,19 @@ export default function AddTransactionForm({
           </div>
         </div>
 
-        {(transactionType === 'transfer_in' || transactionType === 'transfer_out') && (
-          <div className="space-y-2">
-            <Label htmlFor="exchange">
-              {transactionType === 'transfer_in' ? 'Depuis (plateforme source)' : 'Vers (plateforme destination)'}
-            </Label>
-            <PlatformSelect
-              value={watch('exchange') || ''}
-              onChange={(value) => setValue('exchange', value)}
-            />
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="exchange">
+            {transactionType === 'transfer_in'
+              ? 'Depuis (plateforme source)'
+              : transactionType === 'transfer_out'
+                ? 'Vers (plateforme destination)'
+                : 'Plateforme (optionnel)'}
+          </Label>
+          <PlatformSelect
+            value={watch('exchange') || ''}
+            onChange={(value) => setValue('exchange', value)}
+          />
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="notes">Notes (optionnel)</Label>

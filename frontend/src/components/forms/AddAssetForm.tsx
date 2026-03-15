@@ -6,9 +6,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -24,7 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { assetsApi } from '@/services/api'
 import { Loader2 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
-import { EXCHANGES, COLD_WALLETS, CROWDFUNDING_PLATFORMS } from '@/lib/platforms'
+import { PlatformSelect } from '@/components/forms/PlatformSelect'
 
 interface AddAssetFormProps {
   open: boolean
@@ -222,22 +220,11 @@ export default function AddAssetForm({
 
                 <div className="space-y-2">
                   <Label>Plateforme</Label>
-                  <Select
+                  <PlatformSelect
                     value={(watch('exchange') as string) || ''}
-                    onValueChange={(value) => setValue('exchange', value || undefined)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une plateforme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Crowdfunding</SelectLabel>
-                        {CROWDFUNDING_PLATFORMS.map((p) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setValue('exchange', value || undefined)}
+                    placeholder="Sélectionner une plateforme"
+                  />
                 </div>
               </>
             ) : (
@@ -295,28 +282,11 @@ export default function AddAssetForm({
 
                 <div className="space-y-2">
                   <Label>Plateforme (optionnel)</Label>
-                  <Select
+                  <PlatformSelect
                     value={(watch('exchange') as string) || ''}
-                    onValueChange={(value) => setValue('exchange', value || undefined)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Où est stocké cet actif ?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Exchanges</SelectLabel>
-                        {EXCHANGES.map((ex) => (
-                          <SelectItem key={ex} value={ex}>{ex}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Cold Wallets</SelectLabel>
-                        {COLD_WALLETS.map((w) => (
-                          <SelectItem key={w} value={w}>{w}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setValue('exchange', value || undefined)}
+                    placeholder="Où est stocké cet actif ?"
+                  />
                 </div>
               </>
             )}
