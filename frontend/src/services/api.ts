@@ -419,6 +419,11 @@ export const transactionsApi = {
     return response.data
   },
 
+  getPlatforms: async (): Promise<{ platforms: string[] }> => {
+    const response = await api.get('/transactions/platforms')
+    return response.data
+  },
+
   exportCSV: async (portfolioId?: string) => {
     const params = portfolioId ? { portfolio_id: portfolioId } : {}
     const response = await api.get('/transactions/export-csv', {
@@ -432,7 +437,19 @@ export const transactionsApi = {
 // Analytics API
 const ANALYTICS_TIMEOUT = 120000 // 2 minutes — historical data fetches are slow
 
+export interface PlatformDistributionItem {
+  name: string
+  value: number
+  percentage: number
+  trust_score: number
+}
+
 export const analyticsApi = {
+  getPlatformDistribution: async (): Promise<PlatformDistributionItem[]> => {
+    const response = await api.get('/analytics/distribution/platforms')
+    return response.data
+  },
+
   getGlobal: async (days?: number) => {
     const response = await api.get('/analytics', { params: days ? { days } : {}, timeout: ANALYTICS_TIMEOUT })
     return response.data

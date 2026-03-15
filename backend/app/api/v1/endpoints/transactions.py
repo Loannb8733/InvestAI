@@ -231,6 +231,36 @@ async def get_csv_platforms():
     return {"platforms": get_available_platforms()}
 
 
+@router.get("/platforms")
+@limiter.limit("30/minute")
+async def get_user_platforms(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return distinct exchange/platform names used by the current user."""
+    from sqlalchemy import func as sqlfunc
+
+    result = await db.execute(
+        select(sqlfunc.distinct(sqlfunc.trim(Transaction.exchange)))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(
+            Portfolio.user_id == current_user.id,
+            Transaction.exchange.isnot(None),
+            sqlfunc.trim(Transaction.exchange) != "",
+        )
+    )
+    raw = [row[0] for row in result.all()]
+    # Deduplicate case-insensitively, keeping the first-seen casing
+    seen: dict[str, str] = {}
+    for name in raw:
+        key = name.strip().lower()
+        if key not in seen:
+            seen[key] = name.strip()
+    return {"platforms": sorted(seen.values())}
+
+
 @router.get("/export-csv")
 async def export_transactions_csv(
     portfolio_id: Optional[UUID] = None,
