@@ -1,24 +1,41 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, ChevronsUpDown, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, Shield, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { EXCHANGES, COLD_WALLETS } from '@/lib/platforms'
+import { EXCHANGES, COLD_WALLETS, getTrustScore, getTrustColor, getTrustLabel } from '@/lib/platforms'
 import { transactionsApi } from '@/services/api'
 
 interface PlatformSelectProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  showTrustBadge?: boolean
 }
 
 const MAX_LENGTH = 50
 
-export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner une plateforme' }: PlatformSelectProps) {
+function TrustBadge({ platform }: { platform: string }) {
+  const score = getTrustScore(platform)
+  const color = getTrustColor(score)
+  const label = getTrustLabel(score)
+
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 text-[10px] font-medium"
+      title={`${label} (${score}/10)`}
+    >
+      <Shield className="h-3 w-3" style={{ color }} fill={color} fillOpacity={0.2} />
+      <span style={{ color }}>{score}</span>
+    </span>
+  )
+}
+
+export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner une plateforme', showTrustBadge = true }: PlatformSelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -73,6 +90,14 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
     setNewPlatformName('')
     setShowCreate(false)
   }
+
+  const renderPlatformItem = (p: { name: string }) => (
+    <CommandItem key={p.name} value={p.name} onSelect={() => handleSelect(p.name)}>
+      <Check className={cn('mr-2 h-4 w-4', value === p.name ? 'opacity-100' : 'opacity-0')} />
+      <span className="flex-1">{p.name}</span>
+      {showTrustBadge && <TrustBadge platform={p.name} />}
+    </CommandItem>
+  )
 
   if (showCreate) {
     return (
@@ -129,8 +154,13 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
               aria-expanded={open}
               className="w-full justify-between font-normal"
             >
-              <span className={cn(!value && 'text-muted-foreground')}>
-                {value || placeholder}
+              <span className={cn('flex items-center gap-1.5', !value && 'text-muted-foreground')}>
+                {value ? (
+                  <>
+                    {value}
+                    {showTrustBadge && <TrustBadge platform={value} />}
+                  </>
+                ) : placeholder}
               </span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
@@ -146,31 +176,16 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
                 <CommandEmpty>Aucune plateforme trouvée</CommandEmpty>
 
                 <CommandGroup heading="Exchanges">
-                  {exchanges.map((p) => (
-                    <CommandItem key={p.name} value={p.name} onSelect={() => handleSelect(p.name)}>
-                      <Check className={cn('mr-2 h-4 w-4', value === p.name ? 'opacity-100' : 'opacity-0')} />
-                      {p.name}
-                    </CommandItem>
-                  ))}
+                  {exchanges.map(renderPlatformItem)}
                 </CommandGroup>
 
                 <CommandGroup heading="Cold Wallets">
-                  {wallets.map((p) => (
-                    <CommandItem key={p.name} value={p.name} onSelect={() => handleSelect(p.name)}>
-                      <Check className={cn('mr-2 h-4 w-4', value === p.name ? 'opacity-100' : 'opacity-0')} />
-                      {p.name}
-                    </CommandItem>
-                  ))}
+                  {wallets.map(renderPlatformItem)}
                 </CommandGroup>
 
                 {custom.length > 0 && (
                   <CommandGroup heading="Mes plateformes">
-                    {custom.map((p) => (
-                      <CommandItem key={p.name} value={p.name} onSelect={() => handleSelect(p.name)}>
-                        <Check className={cn('mr-2 h-4 w-4', value === p.name ? 'opacity-100' : 'opacity-0')} />
-                        {p.name}
-                      </CommandItem>
-                    ))}
+                    {custom.map(renderPlatformItem)}
                   </CommandGroup>
                 )}
               </CommandList>
