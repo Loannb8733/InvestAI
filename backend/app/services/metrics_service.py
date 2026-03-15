@@ -561,7 +561,10 @@ class MetricsService:
             all_symbols.extend(syms)
 
         for symbol in all_symbols:
-            dates, prices = get_cached_history(symbol.upper(), days=max(days, 2))
+            try:
+                _dates, prices = get_cached_history(symbol.upper(), days=max(days, 2))
+            except Exception:
+                prices = []
             if prices and len(prices) >= 2 and prices[0] != 0:
                 change = (prices[-1] - prices[0]) / prices[0] * 100
                 changes[symbol.upper()] = change
