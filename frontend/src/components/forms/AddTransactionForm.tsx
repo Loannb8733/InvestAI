@@ -489,6 +489,20 @@ export default function AddTransactionForm({
           </Select>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="exchange">
+            {transactionType === 'transfer_in'
+              ? 'Depuis (plateforme source)'
+              : transactionType === 'transfer_out'
+                ? 'Vers (plateforme destination)'
+                : 'Plateforme (optionnel)'}
+          </Label>
+          <PlatformSelect
+            value={watch('exchange') || ''}
+            onChange={(value) => setValue('exchange', value)}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="quantity">Quantité</Label>
@@ -537,20 +551,6 @@ export default function AddTransactionForm({
               {...register('executed_at')}
             />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="exchange">
-            {transactionType === 'transfer_in'
-              ? 'Depuis (plateforme source)'
-              : transactionType === 'transfer_out'
-                ? 'Vers (plateforme destination)'
-                : 'Plateforme (optionnel)'}
-          </Label>
-          <PlatformSelect
-            value={watch('exchange') || ''}
-            onChange={(value) => setValue('exchange', value)}
-          />
         </div>
 
         <div className="space-y-2">
