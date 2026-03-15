@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from app.core.redis_client import redis_async_url, redis_ssl_kwargs
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset
 from app.models.asset_price_history import AssetPriceHistory
@@ -32,7 +33,8 @@ DEFAULT_CACHE_DAYS = 365
 
 
 def _get_redis() -> Redis:
-    return Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True)
+    url = redis_async_url()  # same cleaned URL used by async clients
+    return Redis.from_url(url, decode_responses=True, **redis_ssl_kwargs())
 
 
 def _run_async(coro):

@@ -225,8 +225,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {type(exc).__name__}: {exc}")
     logger.error(f"Traceback:\n{traceback.format_exc()}")
     tb = traceback.format_exc()
-    # TODO: revert after debugging dashboard 500
-    detail = f"{type(exc).__name__}: {exc}\n{tb}"
+    detail = "An internal error occurred. Please try again later."
+    if settings.APP_ENV != "production":
+        detail = f"{type(exc).__name__}: {exc}\n{tb}"
     return JSONResponse(
         status_code=500,
         content={"detail": detail},
