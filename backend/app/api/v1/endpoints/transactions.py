@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
@@ -167,6 +168,34 @@ async def create_transaction(
             detail="Asset not found",
         )
 
+    # If the transaction specifies a different exchange than the asset,
+    # find or create a separate asset for this (symbol, exchange) pair.
+    tx_exchange = (transaction_in.exchange or "").strip()
+    asset_exchange = (asset.exchange or "").strip()
+    if tx_exchange and tx_exchange.lower() != asset_exchange.lower():
+        existing_result = await db.execute(
+            select(Asset).where(
+                Asset.portfolio_id == asset.portfolio_id,
+                Asset.symbol == asset.symbol,
+                Asset.exchange == tx_exchange,
+            )
+        )
+        target_asset = existing_result.scalar_one_or_none()
+        if not target_asset:
+            target_asset = Asset(
+                portfolio_id=asset.portfolio_id,
+                symbol=asset.symbol,
+                name=asset.name,
+                asset_type=asset.asset_type,
+                quantity=Decimal("0"),
+                avg_buy_price=Decimal("0"),
+                exchange=tx_exchange,
+                currency=asset.currency,
+            )
+            db.add(target_asset)
+            await db.flush()
+        asset = target_asset
+
     # Sanitize values to prevent numeric overflow
     # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
     MAX_NUMERIC_VALUE = 9_999_999_999.0
@@ -181,7 +210,7 @@ async def create_transaction(
     fee = max(0, min(fee, MAX_NUMERIC_VALUE))
 
     transaction = Transaction(
-        asset_id=transaction_in.asset_id,
+        asset_id=asset.id,
         transaction_type=transaction_in.transaction_type,
         quantity=quantity,
         price=price,
