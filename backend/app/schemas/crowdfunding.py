@@ -36,6 +36,7 @@ class CrowdfundingProjectUpdate(BaseModel):
     description: Optional[str] = None
     project_url: Optional[str] = Field(None, max_length=500)
     platform: Optional[str] = Field(None, max_length=100)
+    invested_amount: Optional[Decimal] = Field(None, gt=0)
     annual_rate: Optional[Decimal] = Field(None, ge=0, le=100)
     duration_months: Optional[int] = Field(None, ge=1, le=360)
     repayment_type: Optional[RepaymentType] = None

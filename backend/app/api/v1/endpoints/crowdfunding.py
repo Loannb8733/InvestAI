@@ -847,6 +847,8 @@ async def update_project(
     # Sync key fields back to the Asset row
     asset = await db.get(Asset, project.asset_id)
     if asset:
+        if "invested_amount" in updates:
+            asset.purchase_price = project.invested_amount
         if "annual_rate" in updates:
             asset.interest_rate = project.annual_rate
         if "estimated_end_date" in updates:
