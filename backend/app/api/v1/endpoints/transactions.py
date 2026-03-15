@@ -205,12 +205,10 @@ async def create_transaction(
         asset.quantity = min(new_total, MAX_NUMERIC_VALUE)
     elif transaction_in.transaction_type.value in subtract_types:
         new_total = float(asset.quantity) - quantity
-        if new_total < 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Insufficient quantity",
-            )
-        asset.quantity = new_total
+        # Allow historical sells even when quantity was already synced to 0
+        # (e.g. exchange sync updated balance before the transaction was recorded).
+        # Clamp to 0 to avoid negative quantities.
+        asset.quantity = max(0, new_total)
 
     # Recalculate avg_buy_price from all BUY + CONVERSION_IN transactions
     # (avoids the incremental formula bug that dilutes PRU with airdrop quantities)
