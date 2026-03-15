@@ -9,9 +9,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -27,7 +25,7 @@ import {
 import { Loader2, Plus } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
-import { EXCHANGES, COLD_WALLETS } from '@/lib/platforms'
+import { PlatformSelect } from '@/components/forms/PlatformSelect'
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Sélectionnez un actif'),
@@ -542,28 +540,10 @@ export default function AddTransactionForm({
             <Label htmlFor="exchange">
               {transactionType === 'transfer_in' ? 'Depuis (plateforme source)' : 'Vers (plateforme destination)'}
             </Label>
-            <Select
+            <PlatformSelect
               value={watch('exchange') || ''}
-              onValueChange={(value) => setValue('exchange', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une plateforme" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Exchanges</SelectLabel>
-                  {EXCHANGES.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel>Cold Wallets</SelectLabel>
-                  {COLD_WALLETS.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              onChange={(value) => setValue('exchange', value)}
+            />
           </div>
         )}
 

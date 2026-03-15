@@ -21,7 +21,7 @@ export interface Portfolio {
 }
 
 // Asset types
-export type AssetType = 'crypto' | 'stock' | 'etf' | 'real_estate' | 'bond' | 'other'
+export type AssetType = 'crypto' | 'stock' | 'etf' | 'real_estate' | 'bond' | 'crowdfunding' | 'other'
 
 export interface Asset {
   id: string

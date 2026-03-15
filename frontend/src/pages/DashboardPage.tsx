@@ -18,6 +18,8 @@ import { dashboardApi, crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/stores/authStore'
 import AllocationChart from '@/components/charts/AllocationChart'
+import PlatformPieChart from '@/components/charts/PlatformPieChart'
+import SecurityBadge from '@/components/charts/SecurityBadge'
 import PerformanceChart from '@/components/charts/PerformanceChart'
 import {
   TrendingUp,
@@ -760,12 +762,19 @@ export default function DashboardPage() {
                 )
               case 'allocation-transactions-alerts':
                 return (
-                  <div className="grid gap-4 lg:grid-cols-3">
-                    <Card className="lg:col-span-1">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Card>
                       <CardHeader><CardTitle>Répartition par classe</CardTitle></CardHeader>
                       <CardContent><AllocationChart data={metrics.allocation} /></CardContent>
                     </Card>
-                    <Card className="lg:col-span-1">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Répartition par plateforme</CardTitle>
+                        <SecurityBadge />
+                      </CardHeader>
+                      <CardContent><PlatformPieChart onPlatformClick={(p) => { if (p) navigate(`/transactions?platform=${encodeURIComponent(p)}`) }} /></CardContent>
+                    </Card>
+                    <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Transactions récentes <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/transactions')}>Voir tout<ChevronRight className="h-4 w-4 ml-1" /></Button>

@@ -215,11 +215,11 @@ export default function PortfolioAssetList({
 
   const hasPlatformData = platformDistribution.some((p) => p.platform !== 'Non assigné')
 
-  // Detect if this is a crowdfunding portfolio (all assets are real_estate with invested_amount)
+  // Detect if this is a crowdfunding portfolio (all assets are crowdfunding type)
   const isCrowdfundingPortfolio = useMemo(() => {
-    if (!filteredMetrics?.assets?.length) return false
-    return filteredMetrics.assets.every((a) => a.asset_type === 'real_estate' && a.invested_amount != null)
-  }, [filteredMetrics?.assets])
+    if (!portfolioMetrics?.assets?.length) return false
+    return portfolioMetrics.assets.every((a) => a.asset_type === 'crowdfunding')
+  }, [portfolioMetrics?.assets])
 
   const statusBadge = (status?: string) => {
     switch (status) {
@@ -428,7 +428,7 @@ export default function PortfolioAssetList({
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      ) : filteredMetrics && isCrowdfundingPortfolio && filteredMetrics.assets.length > 0 ? (
+      ) : portfolioMetrics && isCrowdfundingPortfolio && portfolioMetrics.assets.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -443,7 +443,7 @@ export default function PortfolioAssetList({
               </tr>
             </thead>
             <tbody>
-              {filteredMetrics.assets
+              {portfolioMetrics.assets
                 .filter((a) => !platformFilter || (a.exchange || 'Non assigné') === platformFilter)
                 .map((asset) => (
                 <tr key={asset.id} className="border-b last:border-0">
