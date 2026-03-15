@@ -214,7 +214,7 @@ export default function AddTransactionForm({
   }
 
   // Post-transaction preview
-  const currentQuantity = selectedAsset?.quantity ?? 0
+  const currentQuantity = toNum(selectedAsset?.quantity)
   const isInbound = ['buy', 'transfer_in', 'staking_reward', 'airdrop', 'conversion_in'].includes(transactionType)
   const newQuantity = isInbound
     ? currentQuantity + quantity
@@ -266,17 +266,29 @@ export default function AddTransactionForm({
       onSuccess?.()
     },
     onError: (error: unknown) => {
-      const axiosError = error as import('axios').AxiosError<{ detail?: string }>
+      const axiosError = error as import('axios').AxiosError<{ detail?: string | Array<{ msg: string }> }>
+      const detail = axiosError.response?.data?.detail
+      const message = typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((e) => e.msg).join(', ')
+          : 'Impossible d\'ajouter la transaction.'
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: axiosError.response?.data?.detail || 'Impossible d\'ajouter la transaction.',
+        description: message,
       })
     },
   })
 
   const onSubmit = (data: FormData) => {
-    mutation.mutate(data)
+    const payload = {
+      ...data,
+      executed_at: data.executed_at || undefined,
+      notes: data.notes || undefined,
+      exchange: data.exchange || undefined,
+    }
+    mutation.mutate(payload)
   }
 
   const handleCreateAsset = () => {
@@ -666,7 +678,7 @@ export default function AddTransactionForm({
                 Solde {selectedAsset.symbol} après transaction
               </span>
               <span className="font-medium">
-                {newQuantity.toFixed(8).replace(/\.?0+$/, '')} {selectedAsset.symbol}
+                {toNum(newQuantity).toFixed(8).replace(/\.?0+$/, '')} {selectedAsset.symbol}
               </span>
             </div>
             {total > 0 && (
