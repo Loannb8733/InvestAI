@@ -395,7 +395,7 @@ export const transactionsApi = {
     return response.data
   },
 
-  importCSV: async (file: File, portfolioId?: string, platform?: string) => {
+  importCSV: async (file: File, portfolioId?: string, platform?: string, destinationExchange?: string) => {
     const formData = new FormData()
     formData.append('file', file)
     const params: Record<string, string> = {}
@@ -404,6 +404,9 @@ export const transactionsApi = {
     }
     if (platform) {
       params.platform = platform
+    }
+    if (destinationExchange) {
+      params.destination_exchange = destinationExchange
     }
     const response = await api.post('/transactions/import-csv', formData, {
       headers: {

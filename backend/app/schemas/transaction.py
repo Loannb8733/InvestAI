@@ -29,6 +29,11 @@ class TransactionCreate(TransactionBase):
     asset_id: UUID
     exchange: Optional[str] = Field(None, max_length=50)
     external_id: Optional[str] = Field(None, max_length=100)
+    destination_exchange: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="For transfer_out: destination platform (creates mirror transfer_in)",
+    )
 
 
 class TransactionUpdate(BaseModel):

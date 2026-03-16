@@ -136,6 +136,7 @@ export default function AddTransactionForm({
   const [newMaturityDate, setNewMaturityDate] = useState('')
   const [totalInput, setTotalInput] = useState('')
   const [editingTotal, setEditingTotal] = useState(false)
+  const [destinationExchange, setDestinationExchange] = useState('')
 
   const filteredAssets = useMemo(() => {
     if (!assets || !selectedPortfolioId) return []
@@ -263,6 +264,7 @@ export default function AddTransactionForm({
       setSelectedPortfolioId('')
       setTotalInput('')
       setEditingTotal(false)
+      setDestinationExchange('')
       onSuccess?.()
     },
     onError: (error: unknown) => {
@@ -287,6 +289,9 @@ export default function AddTransactionForm({
       executed_at: data.executed_at || undefined,
       notes: data.notes || undefined,
       exchange: data.exchange || undefined,
+      destination_exchange: data.transaction_type === 'transfer_out' && destinationExchange
+        ? destinationExchange
+        : undefined,
     }
     mutation.mutate(payload)
   }
@@ -525,15 +530,28 @@ export default function AddTransactionForm({
           <Label>
             {transactionType === 'transfer_in'
               ? 'Depuis (plateforme source)'
-              : transactionType === 'transfer_out'
-                ? 'Vers (plateforme destination)'
-                : 'Plateforme'}
+              : 'Plateforme'}
           </Label>
           <PlatformSelect
             value={watch('exchange') || ''}
             onChange={(value) => setValue('exchange', value)}
           />
         </div>
+
+        {/* 3b. Destination platform for transfer_out */}
+        {transactionType === 'transfer_out' && (
+          <div className="space-y-2">
+            <Label>Vers (plateforme destination)</Label>
+            <PlatformSelect
+              value={destinationExchange}
+              onChange={setDestinationExchange}
+              placeholder="Cold wallet, autre exchange..."
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Un transfert entrant sera créé automatiquement sur la destination
+            </p>
+          </div>
+        )}
 
         {/* 4. Transaction type with icons */}
         <div className="space-y-2">
