@@ -253,6 +253,29 @@ def _create_missing_transfer_mirrors():
         DEFAULT_DESTINATION = "Tangem"
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)
         with sync_engine.begin() as conn:
+            # Ensure related_transaction_id column exists (may be missing if
+            # the DB was created by create_all before the column was added)
+            col_check = conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_name = 'transactions'"
+                    " AND column_name = 'related_transaction_id'"
+                )
+            ).fetchone()
+            if not col_check:
+                logger.info("Adding missing related_transaction_id column to transactions")
+                conn.execute(
+                    text(
+                        "ALTER TABLE transactions ADD COLUMN related_transaction_id UUID"
+                        " REFERENCES transactions(id) ON DELETE SET NULL"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_transactions_related_tx_id ON transactions(related_transaction_id)"
+                    )
+                )
+
             # Find transfer_out without mirrors
             rows = conn.execute(
                 text(
@@ -383,7 +406,9 @@ def _create_missing_transfer_mirrors():
             logger.info("Transfer mirror fix complete")
         sync_engine.dispose()
     except Exception as e:
-        logger.warning("Transfer mirror fix failed: %s", e)
+        import traceback
+
+        logger.error("Transfer mirror fix failed: %s\n%s", e, traceback.format_exc())
 
 
 def _run_alembic_upgrade():
