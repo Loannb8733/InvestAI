@@ -202,10 +202,10 @@ def _fix_multiplatform_assets():
                 net = conn.execute(
                     text(
                         "SELECT COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
+                        " WHEN transaction_type::text IN ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
                         " THEN quantity ELSE 0 END), 0)"
                         " - COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN ('sell','transfer_out','conversion_out','fee')"
+                        " WHEN transaction_type::text IN ('sell','transfer_out','conversion_out','fee')"
                         " THEN quantity ELSE 0 END), 0) AS net_qty"
                         " FROM transactions WHERE asset_id = :aid"
                     ),
@@ -218,7 +218,7 @@ def _fix_multiplatform_assets():
                     text(
                         "SELECT COALESCE(SUM(quantity), 0) AS tq, COALESCE(SUM(quantity * price), 0) AS tc"
                         " FROM transactions WHERE asset_id = :aid"
-                        " AND LOWER(transaction_type) IN ('buy','conversion_in')"
+                        " AND transaction_type::text IN ('buy','conversion_in')"
                     ),
                     {"aid": aid},
                 ).fetchone()
@@ -284,7 +284,7 @@ def _create_missing_transfer_mirrors():
                     " a.portfolio_id, a.symbol, a.name, a.asset_type, a.exchange AS asset_exchange,"
                     " a.currency AS asset_currency"
                     " FROM transactions t JOIN assets a ON t.asset_id = a.id"
-                    " WHERE LOWER(t.transaction_type) = 'transfer_out'"
+                    " WHERE t.transaction_type::text = 'transfer_out'"
                     " AND t.related_transaction_id IS NULL"
                 )
             ).fetchall()
@@ -375,11 +375,11 @@ def _create_missing_transfer_mirrors():
                 net = conn.execute(
                     text(
                         "SELECT COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN"
+                        " WHEN transaction_type::text IN"
                         " ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
                         " THEN quantity ELSE 0 END), 0)"
                         " - COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN ('sell','transfer_out','conversion_out','fee')"
+                        " WHEN transaction_type::text IN ('sell','transfer_out','conversion_out','fee')"
                         " THEN quantity ELSE 0 END), 0) AS net_qty"
                         " FROM transactions WHERE asset_id = :aid"
                     ),
@@ -391,7 +391,7 @@ def _create_missing_transfer_mirrors():
                     text(
                         "SELECT COALESCE(SUM(quantity), 0) AS tq, COALESCE(SUM(quantity * price), 0) AS tc"
                         " FROM transactions WHERE asset_id = :aid"
-                        " AND LOWER(transaction_type) IN ('buy','conversion_in')"
+                        " AND transaction_type::text IN ('buy','conversion_in')"
                     ),
                     {"aid": aid},
                 ).fetchone()
@@ -645,7 +645,7 @@ async def admin_fix_mirrors(request: Request):
                     " a.portfolio_id, a.symbol, a.name, a.asset_type,"
                     " a.exchange AS asset_exchange, a.currency AS asset_currency"
                     " FROM transactions t JOIN assets a ON t.asset_id = a.id"
-                    " WHERE LOWER(t.transaction_type) = 'transfer_out'"
+                    " WHERE t.transaction_type::text = 'transfer_out'"
                     " AND t.related_transaction_id IS NULL"
                 )
             ).fetchall()
@@ -734,11 +734,11 @@ async def admin_fix_mirrors(request: Request):
                 net = conn.execute(
                     text(
                         "SELECT COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN"
+                        " WHEN transaction_type::text IN"
                         " ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
                         " THEN quantity ELSE 0 END), 0)"
                         " - COALESCE(SUM(CASE"
-                        " WHEN LOWER(transaction_type) IN ('sell','transfer_out','conversion_out','fee')"
+                        " WHEN transaction_type::text IN ('sell','transfer_out','conversion_out','fee')"
                         " THEN quantity ELSE 0 END), 0) AS net_qty"
                         " FROM transactions WHERE asset_id = :aid"
                     ),
