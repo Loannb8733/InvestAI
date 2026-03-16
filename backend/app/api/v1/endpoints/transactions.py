@@ -269,9 +269,11 @@ async def get_user_platforms(
 ):
     """Return distinct exchange/platform names used by the current user."""
     from sqlalchemy import func as sqlfunc
+    from sqlalchemy import union
 
-    result = await db.execute(
-        select(sqlfunc.distinct(sqlfunc.trim(Transaction.exchange)))
+    # Platforms from transactions
+    tx_q = (
+        select(sqlfunc.trim(Transaction.exchange).label("name"))
         .join(Asset, Transaction.asset_id == Asset.id)
         .join(Portfolio, Asset.portfolio_id == Portfolio.id)
         .where(
@@ -280,6 +282,18 @@ async def get_user_platforms(
             sqlfunc.trim(Transaction.exchange) != "",
         )
     )
+    # Platforms from assets (covers assets created without transactions yet)
+    asset_q = (
+        select(sqlfunc.trim(Asset.exchange).label("name"))
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(
+            Portfolio.user_id == current_user.id,
+            Asset.exchange.isnot(None),
+            sqlfunc.trim(Asset.exchange) != "",
+        )
+    )
+    combined = union(tx_q, asset_q).subquery()
+    result = await db.execute(select(combined.c.name).distinct())
     raw = [row[0] for row in result.all()]
     # Deduplicate case-insensitively, keeping the first-seen casing
     seen: dict[str, str] = {}
