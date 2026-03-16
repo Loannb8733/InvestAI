@@ -601,6 +601,23 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
+@app.post("/api/v1/admin/fix-mirrors")
+async def admin_fix_mirrors(request: Request):
+    """Manually trigger the transfer mirror fix. Requires admin auth."""
+    import traceback
+
+    # Quick auth check
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    try:
+        _create_missing_transfer_mirrors()
+        return {"status": "ok", "message": "Mirror fix executed — check assets for Tangem"}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+
 @app.get("/health")
 @app.get("/api/v1/health")
 async def health_check():
