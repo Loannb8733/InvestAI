@@ -119,12 +119,38 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 def _run_alembic_upgrade():
-    """Run pending Alembic migrations (sync, called once at startup)."""
+    """Run pending Alembic migrations (sync, called once at startup).
+
+    If the database was created via create_all (no alembic_version row),
+    stamp it at the last schema migration so only data-fix migrations run.
+    """
     try:
         from alembic import command
         from alembic.config import Config
+        from sqlalchemy import create_engine, inspect, text
+
+        from app.core.config import settings
 
         alembic_cfg = Config("alembic.ini")
+
+        # Check if alembic_version table exists and has a current revision
+        sync_engine = create_engine(settings.DATABASE_URL_SYNC)
+        with sync_engine.connect() as conn:
+            inspector = inspect(conn)
+            if inspector.has_table("alembic_version"):
+                row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+                if row:
+                    logger.info("Alembic current revision: %s", row[0])
+                else:
+                    # Table exists but empty — stamp to last schema migration
+                    logger.info("alembic_version empty, stamping to 035_delay_months")
+                    command.stamp(alembic_cfg, "035_delay_months")
+            else:
+                # Table doesn't exist — DB was created by create_all, stamp it
+                logger.info("No alembic_version table, stamping to 035_delay_months")
+                command.stamp(alembic_cfg, "035_delay_months")
+        sync_engine.dispose()
+
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic migrations applied successfully")
     except Exception as e:
