@@ -118,11 +118,28 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise
 
 
+def _run_alembic_upgrade():
+    """Run pending Alembic migrations (sync, called once at startup)."""
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations applied successfully")
+    except Exception as e:
+        logger.warning("Alembic migration skipped or failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     logger.info(f"Starting {settings.APP_NAME} (env={settings.APP_ENV}, debug={settings.DEBUG})")
+
+    # Run Alembic migrations before creating tables
+    _run_alembic_upgrade()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     # Trigger historical data cache on startup (via Celery)
