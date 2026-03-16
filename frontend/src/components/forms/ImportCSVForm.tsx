@@ -20,6 +20,7 @@ import { transactionsApi, portfoliosApi } from '@/services/api'
 import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, HelpCircle } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
+import { PlatformSelect } from '@/components/forms/PlatformSelect'
 
 interface Portfolio {
   id: string
@@ -53,6 +54,7 @@ export default function ImportCSVForm({
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>(initialPortfolioId || '')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('auto')
+  const [destinationExchange, setDestinationExchange] = useState<string>('')
 
   // Fetch portfolios for selection
   const { data: portfolios } = useQuery<Portfolio[]>({
@@ -72,7 +74,8 @@ export default function ImportCSVForm({
     mutationFn: (file: File) => transactionsApi.importCSV(
       file,
       selectedPortfolioId || undefined,
-      selectedPlatform !== 'auto' ? selectedPlatform : undefined
+      selectedPlatform !== 'auto' ? selectedPlatform : undefined,
+      destinationExchange || undefined
     ),
     onSuccess: (result: ImportResult) => {
       setImportResult(result)
@@ -150,6 +153,7 @@ export default function ImportCSVForm({
       setSelectedFile(null)
       setImportResult(null)
       setSelectedPlatform('auto')
+      setDestinationExchange('')
     }
     onOpenChange?.(newOpen)
   }
@@ -206,6 +210,21 @@ export default function ImportCSVForm({
         </Select>
         <p className="text-xs text-muted-foreground">
           Le format sera détecté automatiquement, ou sélectionnez manuellement.
+        </p>
+      </div>
+
+      {/* Destination platform for transfer_out */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Destination des transferts sortants</label>
+        <PlatformSelect
+          value={destinationExchange}
+          onChange={setDestinationExchange}
+          placeholder="Aucune (optionnel)"
+          showTrustBadge={false}
+        />
+        <p className="text-xs text-muted-foreground">
+          Si vos transferts sortants vont vers un cold wallet, sélectionnez-le ici
+          pour créer automatiquement les transferts entrants correspondants.
         </p>
       </div>
 

@@ -244,6 +244,12 @@ async def create_transaction(
     await db.flush()
     await _recalculate_avg_buy_price(db, asset)
 
+    # Mirror transfer_out → transfer_in on destination platform
+    if transaction_in.transaction_type == TransactionType.TRANSFER_OUT and transaction_in.destination_exchange:
+        from app.services.transfer_service import create_mirror_transfer_in
+
+        await create_mirror_transfer_in(db, transaction, asset, transaction_in.destination_exchange.strip())
+
     await db.commit()
     await db.refresh(transaction)
 
@@ -583,6 +589,23 @@ async def delete_transaction(
     elif transaction.transaction_type.value in subtract_types:
         asset.quantity = float(asset.quantity) + float(transaction.quantity)
 
+    # If this is a transfer with a mirror, delete the mirror too
+    if transaction.related_transaction_id:
+        mirror_result = await db.execute(
+            select(Transaction).where(Transaction.id == transaction.related_transaction_id)
+        )
+        mirror = mirror_result.scalar_one_or_none()
+        if mirror:
+            # Revert mirror's effect on its asset
+            mirror_asset_result = await db.execute(select(Asset).where(Asset.id == mirror.asset_id))
+            mirror_asset = mirror_asset_result.scalar_one_or_none()
+            if mirror_asset:
+                if mirror.transaction_type.value in add_types:
+                    mirror_asset.quantity = max(0, float(mirror_asset.quantity) - float(mirror.quantity))
+                elif mirror.transaction_type.value in subtract_types:
+                    mirror_asset.quantity = float(mirror_asset.quantity) + float(mirror.quantity)
+            await db.delete(mirror)
+
     await db.delete(transaction)
     await db.flush()
 
@@ -601,6 +624,9 @@ async def import_transactions_csv(
     file: UploadFile = File(...),
     portfolio_id: Optional[UUID] = Query(None),
     platform: Optional[str] = Query(None),
+    destination_exchange: Optional[str] = Query(
+        None, description="Destination platform for transfer_out (e.g. cold wallet name)"
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResult:
@@ -869,6 +895,12 @@ async def import_transactions_csv(
             elif trans_type.value in csv_subtract_types:
                 new_quantity = float(asset.quantity) - quantity
                 asset.quantity = max(0, new_quantity)  # Prevent negative quantities
+
+            # Mirror transfer_out → transfer_in on destination platform
+            if trans_type == TransactionType.TRANSFER_OUT and destination_exchange:
+                from app.services.transfer_service import create_mirror_transfer_in
+
+                await create_mirror_transfer_in(db, transaction, asset, destination_exchange.strip())
 
             await db.flush()
             created_transactions.append(transaction.id)
