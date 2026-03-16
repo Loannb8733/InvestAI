@@ -603,19 +603,158 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 @app.post("/api/v1/admin/fix-mirrors")
 async def admin_fix_mirrors(request: Request):
-    """Manually trigger the transfer mirror fix. Requires admin auth."""
-    import traceback
+    """Manually trigger the transfer mirror fix. Returns detailed results."""
+    import traceback as tb_mod
+    import uuid as uuid_mod
 
-    # Quick auth check
+    from sqlalchemy import create_engine
+
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
+    DEFAULT_DESTINATION = "Tangem"
+    log = []
     try:
-        _create_missing_transfer_mirrors()
-        return {"status": "ok", "message": "Mirror fix executed — check assets for Tangem"}
+        sync_engine = create_engine(settings.DATABASE_URL_SYNC)
+        with sync_engine.begin() as conn:
+            # Check related_transaction_id column
+            col_check = conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_name = 'transactions'"
+                    " AND column_name = 'related_transaction_id'"
+                )
+            ).fetchone()
+            if not col_check:
+                conn.execute(
+                    text(
+                        "ALTER TABLE transactions ADD COLUMN related_transaction_id UUID"
+                        " REFERENCES transactions(id) ON DELETE SET NULL"
+                    )
+                )
+                log.append("Added related_transaction_id column")
+            else:
+                log.append("related_transaction_id column exists")
+
+            # Find transfer_out without mirrors
+            rows = conn.execute(
+                text(
+                    "SELECT t.id, t.asset_id, t.quantity, t.price, t.fee, t.fee_currency,"
+                    " t.currency, t.executed_at, t.exchange AS tx_exchange,"
+                    " a.portfolio_id, a.symbol, a.name, a.asset_type,"
+                    " a.exchange AS asset_exchange, a.currency AS asset_currency"
+                    " FROM transactions t JOIN assets a ON t.asset_id = a.id"
+                    " WHERE LOWER(t.transaction_type) = 'transfer_out'"
+                    " AND t.related_transaction_id IS NULL"
+                )
+            ).fetchall()
+
+            log.append(f"Found {len(rows)} unmirrored transfer_out")
+
+            if not rows:
+                sync_engine.dispose()
+                return {"status": "ok", "log": log}
+
+            asset_cache = {}
+            mirrors_created = 0
+            for r in rows:
+                key = (str(r.portfolio_id), r.symbol, DEFAULT_DESTINATION)
+                if key not in asset_cache:
+                    existing = conn.execute(
+                        text(
+                            "SELECT id FROM assets WHERE portfolio_id = :pid" " AND symbol = :sym AND exchange = :exc"
+                        ),
+                        {"pid": r.portfolio_id, "sym": r.symbol, "exc": DEFAULT_DESTINATION},
+                    ).fetchone()
+                    if existing:
+                        asset_cache[key] = str(existing.id)
+                    else:
+                        new_id = str(uuid_mod.uuid4())
+                        conn.execute(
+                            text(
+                                "INSERT INTO assets (id, portfolio_id, symbol, name, asset_type,"
+                                " quantity, avg_buy_price, exchange, currency)"
+                                " VALUES (:id, :pid, :sym, :name, :atype, 0, 0, :exc, :cur)"
+                            ),
+                            {
+                                "id": new_id,
+                                "pid": r.portfolio_id,
+                                "sym": r.symbol,
+                                "name": r.name,
+                                "atype": r.asset_type,
+                                "exc": DEFAULT_DESTINATION,
+                                "cur": r.asset_currency,
+                            },
+                        )
+                        asset_cache[key] = new_id
+                        log.append(f"Created asset {r.symbol}/{DEFAULT_DESTINATION}")
+
+                qty = float(r.quantity)
+                fee = float(r.fee) if r.fee else 0
+                fee_currency = (r.fee_currency or "").upper()
+                if fee > 0 and (not fee_currency or fee_currency == r.symbol.upper()):
+                    mirror_qty = qty - fee
+                else:
+                    mirror_qty = qty
+                if mirror_qty <= 0:
+                    log.append(f"Skip {r.symbol}: mirror_qty={mirror_qty}")
+                    continue
+
+                dest_asset_id = asset_cache[key]
+                mirror_id = str(uuid_mod.uuid4())
+                conn.execute(
+                    text(
+                        "INSERT INTO transactions (id, asset_id, transaction_type, quantity, price,"
+                        " fee, currency, executed_at, exchange, notes, related_transaction_id)"
+                        " VALUES (:id, :aid, 'transfer_in', :qty, :price, 0, :cur,"
+                        " :exec_at, :exc, :notes, :related_id)"
+                    ),
+                    {
+                        "id": mirror_id,
+                        "aid": dest_asset_id,
+                        "qty": mirror_qty,
+                        "price": float(r.price),
+                        "cur": r.currency,
+                        "exec_at": r.executed_at,
+                        "exc": DEFAULT_DESTINATION,
+                        "notes": f"Auto-mirror from {r.tx_exchange or r.asset_exchange or 'unknown'}",
+                        "related_id": r.id,
+                    },
+                )
+                conn.execute(
+                    text("UPDATE transactions SET related_transaction_id = :mid WHERE id = :tid"),
+                    {"mid": mirror_id, "tid": r.id},
+                )
+                mirrors_created += 1
+                log.append(f"Mirror {r.symbol} {mirror_qty} -> {DEFAULT_DESTINATION}")
+
+            # Recalculate destination asset quantities
+            for key, aid in asset_cache.items():
+                net = conn.execute(
+                    text(
+                        "SELECT COALESCE(SUM(CASE"
+                        " WHEN LOWER(transaction_type) IN"
+                        " ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
+                        " THEN quantity ELSE 0 END), 0)"
+                        " - COALESCE(SUM(CASE"
+                        " WHEN LOWER(transaction_type) IN ('sell','transfer_out','conversion_out','fee')"
+                        " THEN quantity ELSE 0 END), 0) AS net_qty"
+                        " FROM transactions WHERE asset_id = :aid"
+                    ),
+                    {"aid": aid},
+                ).fetchone()
+                final_qty = max(0, float(net.net_qty)) if net else 0
+                conn.execute(
+                    text("UPDATE assets SET quantity = :qty WHERE id = :aid"),
+                    {"qty": final_qty, "aid": aid},
+                )
+                log.append(f"Asset {key[1]}/{key[2]} qty={final_qty}")
+
+        sync_engine.dispose()
+        return {"status": "ok", "mirrors_created": mirrors_created, "log": log}
     except Exception as e:
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+        return {"status": "error", "message": str(e), "traceback": tb_mod.format_exc()}
 
 
 @app.get("/health")
