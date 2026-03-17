@@ -276,7 +276,7 @@ def _create_missing_transfer_mirrors():
                     )
                 )
 
-            # Find transfer_out without mirrors
+            # Find transfer_out without VALID mirrors (broken refs or NULL)
             rows = conn.execute(
                 text(
                     "SELECT t.id, t.asset_id, t.quantity, t.price, t.fee, t.fee_currency,"
@@ -284,8 +284,9 @@ def _create_missing_transfer_mirrors():
                     " a.portfolio_id, a.symbol, a.name, a.asset_type, a.exchange AS asset_exchange,"
                     " a.currency AS asset_currency"
                     " FROM transactions t JOIN assets a ON t.asset_id = a.id"
+                    " LEFT JOIN transactions m ON t.related_transaction_id = m.id"
                     " WHERE t.transaction_type::text = 'transfer_out'"
-                    " AND t.related_transaction_id IS NULL"
+                    " AND (t.related_transaction_id IS NULL OR m.id IS NULL)"
                 )
             ).fetchall()
 
@@ -293,6 +294,13 @@ def _create_missing_transfer_mirrors():
                 logger.info("No unmirrored transfer_out transactions found")
                 sync_engine.dispose()
                 return
+
+            # Clear broken references
+            for r in rows:
+                conn.execute(
+                    text("UPDATE transactions SET related_transaction_id = NULL WHERE id = :tid"),
+                    {"tid": r.id},
+                )
 
             logger.info("Found %d transfer_out without mirrors", len(rows))
 
@@ -637,7 +645,23 @@ async def admin_fix_mirrors(request: Request):
             else:
                 log.append("related_transaction_id column exists")
 
-            # Find transfer_out without mirrors
+            # Debug: show all transfer_out and their related_transaction_id state
+            debug_rows = conn.execute(
+                text(
+                    "SELECT t.id, t.related_transaction_id, a.symbol, t.exchange"
+                    " FROM transactions t JOIN assets a ON t.asset_id = a.id"
+                    " WHERE t.transaction_type::text = 'transfer_out'"
+                )
+            ).fetchall()
+            for dr in debug_rows:
+                log.append(
+                    f"DEBUG transfer_out {dr.symbol} ({str(dr.id)[:8]})"
+                    f" related={str(dr.related_transaction_id)[:8] if dr.related_transaction_id else 'NULL'}"
+                )
+
+            # Find transfer_out without VALID mirrors:
+            # - related_transaction_id IS NULL, OR
+            # - related_transaction_id points to a non-existent transaction
             rows = conn.execute(
                 text(
                     "SELECT t.id, t.asset_id, t.quantity, t.price, t.fee, t.fee_currency,"
@@ -645,8 +669,9 @@ async def admin_fix_mirrors(request: Request):
                     " a.portfolio_id, a.symbol, a.name, a.asset_type,"
                     " a.exchange AS asset_exchange, a.currency AS asset_currency"
                     " FROM transactions t JOIN assets a ON t.asset_id = a.id"
+                    " LEFT JOIN transactions m ON t.related_transaction_id = m.id"
                     " WHERE t.transaction_type::text = 'transfer_out'"
-                    " AND t.related_transaction_id IS NULL"
+                    " AND (t.related_transaction_id IS NULL OR m.id IS NULL)"
                 )
             ).fetchall()
 
@@ -655,6 +680,13 @@ async def admin_fix_mirrors(request: Request):
             if not rows:
                 sync_engine.dispose()
                 return {"status": "ok", "log": log}
+
+            # Clear broken related_transaction_id references before creating mirrors
+            for r in rows:
+                conn.execute(
+                    text("UPDATE transactions SET related_transaction_id = NULL WHERE id = :tid"),
+                    {"tid": r.id},
+                )
 
             asset_cache = {}
             mirrors_created = 0
