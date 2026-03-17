@@ -102,8 +102,17 @@ async def create_mirror_transfer_in(
     # Link source → mirror
     source_transaction.related_transaction_id = mirror.id
 
-    # Update destination asset quantity
-    dest_asset.quantity = Decimal(str(dest_asset.quantity)) + mirror_qty
+    # Update destination asset quantity and propagate avg_buy_price
+    old_qty = Decimal(str(dest_asset.quantity))
+    old_avg = Decimal(str(dest_asset.avg_buy_price or 0))
+    source_avg = Decimal(str(source_asset.avg_buy_price or 0))
+
+    new_qty = old_qty + mirror_qty
+    dest_asset.quantity = new_qty
+
+    # Weighted-average the buy price from source into destination
+    if source_avg > 0 and new_qty > 0:
+        dest_asset.avg_buy_price = (old_qty * old_avg + mirror_qty * source_avg) / new_qty
 
     logger.info(
         "Created mirror transfer_in %s %s on %s (id=%s)",
