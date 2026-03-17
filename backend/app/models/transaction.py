@@ -77,7 +77,9 @@ class Transaction(Base):
     external_id = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
     conversion_rate = Column(Numeric(precision=30, scale=12), nullable=True)
-    related_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=True, index=True)
+    related_transaction_id = Column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     internal_hash = Column(String(40), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
