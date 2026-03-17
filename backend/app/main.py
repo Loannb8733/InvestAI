@@ -645,17 +645,24 @@ async def admin_fix_mirrors(request: Request):
             else:
                 log.append("related_transaction_id column exists")
 
+            # Debug: show all distinct transaction_type values
+            type_rows = conn.execute(
+                text("SELECT DISTINCT transaction_type::text AS tt FROM transactions ORDER BY tt")
+            ).fetchall()
+            log.append(f"DEBUG all types: {[r.tt for r in type_rows]}")
+
             # Debug: show all transfer_out and their related_transaction_id state
             debug_rows = conn.execute(
                 text(
-                    "SELECT t.id, t.related_transaction_id, a.symbol, t.exchange"
+                    "SELECT t.id, t.related_transaction_id, a.symbol, t.exchange,"
+                    " t.transaction_type::text AS tt"
                     " FROM transactions t JOIN assets a ON t.asset_id = a.id"
-                    " WHERE t.transaction_type::text = 'transfer_out'"
+                    " WHERE t.transaction_type::text ILIKE '%transfer%'"
                 )
             ).fetchall()
             for dr in debug_rows:
                 log.append(
-                    f"DEBUG transfer_out {dr.symbol} ({str(dr.id)[:8]})"
+                    f"DEBUG {dr.tt} {dr.symbol} ({str(dr.id)[:8]})"
                     f" related={str(dr.related_transaction_id)[:8] if dr.related_transaction_id else 'NULL'}"
                 )
 
