@@ -871,6 +871,7 @@ async def import_transactions_csv(
                 quantity=quantity,
                 price=price,
                 fee=fee,
+                fee_currency=symbol if fee > 0 else None,
                 currency=parsed.currency or "EUR",
                 executed_at=parsed.timestamp,
                 notes=parsed.notes,
@@ -936,9 +937,9 @@ async def import_transactions_csv(
                 TransactionType.DIVIDEND,
                 TransactionType.INTEREST,
             ]
-            # TRANSFER_OUT is NOT subtracted: you still own the asset (it moved to cold wallet)
             sell_types = [
                 TransactionType.SELL,
+                TransactionType.TRANSFER_OUT,
                 TransactionType.CONVERSION_OUT,
             ]
 
@@ -959,29 +960,7 @@ async def import_transactions_csv(
                     ).where(Transaction.asset_id == asset.id)
                 )
                 owned_qty = max(0, float(qty_result.scalar()))
-
-                # Check if asset has been transferred out (to cold wallet)
-                transfer_out_result = await db.execute(
-                    select(func.coalesce(func.sum(Transaction.quantity), 0)).where(
-                        Transaction.asset_id == asset.id,
-                        Transaction.transaction_type == TransactionType.TRANSFER_OUT,
-                    )
-                )
-                transferred_qty = float(transfer_out_result.scalar())
-
-                if transferred_qty > 0.0001:
-                    # Asset was transferred — deduct withdrawal fees in crypto
-                    transfer_fees_result = await db.execute(
-                        select(func.coalesce(func.sum(Transaction.fee), 0)).where(
-                            Transaction.asset_id == asset.id,
-                            Transaction.transaction_type == TransactionType.TRANSFER_OUT,
-                            Transaction.fee_currency == symbol,
-                        )
-                    )
-                    transfer_fees = float(transfer_fees_result.scalar())
-                    asset.quantity = max(0, owned_qty - transfer_fees)
-                else:
-                    asset.quantity = owned_qty
+                asset.quantity = owned_qty
 
                 # Recalculate avg_buy_price from buy transactions
                 avg_result = await db.execute(
