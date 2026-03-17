@@ -215,6 +215,7 @@ async def create_transaction(
         quantity=quantity,
         price=price,
         fee=fee,
+        fee_currency=transaction_in.fee_currency,
         currency=transaction_in.currency,
         executed_at=transaction_in.executed_at,
         exchange=transaction_in.exchange,
