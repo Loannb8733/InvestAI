@@ -18,7 +18,6 @@ import { transactionsApi, assetsApi, portfoliosApi } from '@/services/api'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -29,13 +28,15 @@ import {
   Gift,
   Loader2,
   Plus,
-  RefreshCw,
   Coins,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
+import { cn } from '@/lib/utils'
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Sélectionnez un actif'),
@@ -83,14 +84,14 @@ interface AddTransactionFormProps {
 }
 
 const transactionTypes = [
-  { value: 'buy', label: 'Achat', icon: ArrowDownRight, color: 'text-green-500' },
-  { value: 'sell', label: 'Vente', icon: ArrowUpRight, color: 'text-red-500' },
-  { value: 'transfer_in', label: 'Transfert entrant', icon: ArrowDownRight, color: 'text-blue-500' },
-  { value: 'transfer_out', label: 'Transfert sortant', icon: ArrowUpRight, color: 'text-orange-500' },
-  { value: 'staking_reward', label: 'Récompense staking', icon: Coins, color: 'text-yellow-500' },
-  { value: 'airdrop', label: 'Airdrop', icon: Gift, color: 'text-pink-500' },
-  { value: 'conversion_in', label: 'Conversion entrante', icon: ArrowLeftRight, color: 'text-teal-500' },
-  { value: 'conversion_out', label: 'Conversion sortante', icon: ArrowLeftRight, color: 'text-amber-500' },
+  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-green-500', bg: 'bg-green-500/10 border-green-500/20', activeBg: 'bg-green-500/20 border-green-500/40 ring-1 ring-green-500/30' },
+  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30' },
+  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30' },
+  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30' },
+  { value: 'staking_reward', label: 'Récompense staking', shortLabel: 'Staking', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30' },
+  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30' },
+  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30' },
+  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30' },
 ] as const
 
 const assetTypes = [
@@ -103,6 +104,10 @@ const assetTypes = [
 ]
 
 const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+const fmtQty = (v: number, symbol: string) => {
+  const str = v.toFixed(8).replace(/\.?0+$/, '')
+  return `${str} ${symbol}`
+}
 
 export default function AddTransactionForm({
   onSuccess,
@@ -169,11 +174,17 @@ export default function AddTransactionForm({
   const fee = toNum(watch('fee'))
   const total = quantity * price + fee
 
-  // Get selected asset details
   const selectedAsset = useMemo(
     () => assets?.find((a) => a.id === selectedAssetId),
     [assets, selectedAssetId],
   )
+
+  // Auto-set platform when asset is selected
+  useEffect(() => {
+    if (selectedAsset?.exchange) {
+      setValue('exchange', selectedAsset.exchange)
+    }
+  }, [selectedAsset?.exchange, setValue])
 
   // Real-time price for selected asset
   const symbolsToWatch = useMemo(
@@ -182,7 +193,7 @@ export default function AddTransactionForm({
   )
   const { prices: realtimePrices } = useRealtimePrices(symbolsToWatch)
   const currentMarketPrice = selectedAsset?.symbol
-    ? realtimePrices[selectedAsset.symbol]?.price
+    ? realtimePrices[selectedAsset.symbol]?.price ?? undefined
     : undefined
 
   // Bidirectional total calculation
@@ -203,12 +214,11 @@ export default function AddTransactionForm({
     }
   }, [total, editingTotal])
 
-  // Reset editingTotal when quantity changes from form
   const handleQuantityBlur = () => setEditingTotal(false)
   const handleTotalBlur = () => setEditingTotal(false)
 
   const handleFetchCurrentPrice = () => {
-    if (currentMarketPrice && currentMarketPrice > 0) {
+    if (currentMarketPrice != null && currentMarketPrice > 0) {
       setValue('price', parseFloat(currentMarketPrice.toFixed(8)))
       setEditingTotal(false)
     }
@@ -332,10 +342,37 @@ export default function AddTransactionForm({
 
   const formContent = (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="space-y-4 py-4">
-        {/* 1. Portfolio */}
+      <div className="space-y-4 py-3">
+        {/* 1. Transaction Type — Toggle Group */}
         <div className="space-y-2">
-          <Label>Portefeuille *</Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Type de transaction</Label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {transactionTypes.map((type) => {
+              const Icon = type.icon
+              const isActive = transactionType === type.value
+              return (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setValue('transaction_type', type.value as FormData['transaction_type'])}
+                  className={cn(
+                    'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-[11px] font-medium transition-all duration-150',
+                    isActive ? type.activeBg : `${type.bg} hover:opacity-80 opacity-60`,
+                  )}
+                >
+                  <Icon className={cn('h-4 w-4', type.color)} />
+                  <span className={cn('truncate w-full text-center', isActive ? 'text-foreground' : 'text-muted-foreground')}>
+                    {type.shortLabel}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 2. Portfolio */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Portefeuille</Label>
           <Select
             value={selectedPortfolioId}
             onValueChange={(value) => {
@@ -358,11 +395,11 @@ export default function AddTransactionForm({
           </Select>
         </div>
 
-        {/* 2. Asset — "J'achète [BTC]..." */}
+        {/* 3. Asset */}
         {selectedPortfolioId && !showNewAsset && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="asset_id">Actif *</Label>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Actif</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -381,8 +418,6 @@ export default function AddTransactionForm({
               value={selectedAssetId}
               onValueChange={(value) => {
                 setValue('asset_id', value)
-                const selected = assets?.find((a) => a.id === value)
-                if (selected?.exchange) setValue('exchange', selected.exchange)
               }}
             >
               <SelectTrigger>
@@ -393,7 +428,7 @@ export default function AddTransactionForm({
                   .sort((a, b) => a.symbol.localeCompare(b.symbol))
                   .map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
-                    {asset.symbol} - {asset.name}
+                    {asset.symbol}{asset.exchange ? ` (${asset.exchange})` : ''}{asset.name && asset.name !== asset.symbol ? ` - ${asset.name}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -406,7 +441,7 @@ export default function AddTransactionForm({
 
         {/* Inline new asset creation */}
         {selectedPortfolioId && showNewAsset && (
-          <div className="space-y-3 rounded-lg border p-3">
+          <div className="space-y-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3">
             <div className="flex items-center justify-between">
               <Label className="font-medium">Nouvel actif</Label>
               <Button
@@ -441,7 +476,7 @@ export default function AddTransactionForm({
                   value={newAssetExchange}
                   onChange={setNewAssetExchange}
                   placeholder="Plateforme..."
-                  showTrustBadge={false}
+                  showTrustBadge
                 />
               </div>
             </div>
@@ -525,27 +560,36 @@ export default function AddTransactionForm({
           </div>
         )}
 
-        {/* 3. Platform — "...sur [Binance]" */}
+        {/* 4. Platform */}
         <div className="space-y-2">
-          <Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
             {transactionType === 'transfer_in'
-              ? 'Depuis (plateforme source)'
-              : 'Plateforme'}
+              ? 'Sur (plateforme de réception)'
+              : transactionType === 'transfer_out'
+                ? 'Depuis (plateforme source)'
+                : 'Plateforme'}
           </Label>
           <PlatformSelect
             value={watch('exchange') || ''}
             onChange={(value) => setValue('exchange', value)}
+            showTrustBadge
           />
+          {transactionType === 'transfer_in' && (
+            <p className="text-[10px] text-muted-foreground">
+              Plateforme où l'actif est reçu (ex: Tangem, Ledger...)
+            </p>
+          )}
         </div>
 
-        {/* 3b. Destination platform for transfer_out */}
+        {/* 4b. Destination platform for transfer_out */}
         {transactionType === 'transfer_out' && (
           <div className="space-y-2">
-            <Label>Vers (plateforme destination)</Label>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Vers (plateforme destination)</Label>
             <PlatformSelect
               value={destinationExchange}
               onChange={setDestinationExchange}
               placeholder="Cold wallet, autre exchange..."
+              showTrustBadge
             />
             <p className="text-[10px] text-muted-foreground">
               Un transfert entrant sera créé automatiquement sur la destination
@@ -553,43 +597,10 @@ export default function AddTransactionForm({
           </div>
         )}
 
-        {/* 4. Transaction type with icons */}
-        <div className="space-y-2">
-          <Label htmlFor="transaction_type">Type de transaction</Label>
-          <Select
-            value={transactionType}
-            onValueChange={(value) => setValue('transaction_type', value as FormData['transaction_type'])}
-          >
-            <SelectTrigger>
-              <SelectValue>
-                {typeConfig && (
-                  <span className="flex items-center gap-2">
-                    <typeConfig.icon className={`h-4 w-4 ${typeConfig.color}`} />
-                    {typeConfig.label}
-                  </span>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {transactionTypes.map((type) => {
-                const Icon = type.icon
-                return (
-                  <SelectItem key={type.value} value={type.value}>
-                    <span className="flex items-center gap-2">
-                      <Icon className={`h-4 w-4 ${type.color}`} />
-                      {type.label}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* 5. Quantity + Unit price (with "Current price" button) */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantité</Label>
+        {/* 5. Quantity + Unit price — 2-column grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="quantity" className="text-xs text-muted-foreground uppercase tracking-wider">Quantité</Label>
             <Input
               id="quantity"
               type="text"
@@ -599,23 +610,23 @@ export default function AddTransactionForm({
               onBlur={handleQuantityBlur}
             />
             {errors.quantity && (
-              <p className="text-sm text-destructive">{errors.quantity.message}</p>
+              <p className="text-xs text-destructive">{errors.quantity.message}</p>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="price">Prix unitaire (EUR)</Label>
-              {currentMarketPrice !== undefined && currentMarketPrice > 0 && (
+              <Label htmlFor="price" className="text-xs text-muted-foreground uppercase tracking-wider">Prix unitaire</Label>
+              {currentMarketPrice != null && currentMarketPrice > 0 && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-auto py-0 px-1 text-xs text-primary"
+                  className="h-auto py-0 px-1 text-[10px] text-primary gap-1"
                   onClick={handleFetchCurrentPrice}
                   title={`Prix actuel: ${fmt.format(currentMarketPrice)}`}
                 >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Prix actuel
+                  <TrendingUp className="h-3 w-3" />
+                  {fmt.format(currentMarketPrice)}
                 </Button>
               )}
             </div>
@@ -631,15 +642,15 @@ export default function AddTransactionForm({
               }}
             />
             {errors.price && (
-              <p className="text-sm text-destructive">{errors.price.message}</p>
+              <p className="text-xs text-destructive">{errors.price.message}</p>
             )}
           </div>
         </div>
 
-        {/* 6. Fees + Total (bidirectional) */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="fee">Frais (EUR)</Label>
+        {/* 6. Fees + Total (bidirectional) — 2-column grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="fee" className="text-xs text-muted-foreground uppercase tracking-wider">Frais (EUR)</Label>
             <Input
               id="fee"
               type="text"
@@ -652,8 +663,8 @@ export default function AddTransactionForm({
               }}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="total">Montant total (EUR)</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="total" className="text-xs text-muted-foreground uppercase tracking-wider">Montant total</Label>
             <Input
               id="total"
               type="text"
@@ -667,18 +678,18 @@ export default function AddTransactionForm({
           </div>
         </div>
 
-        {/* 7. Date + Notes */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="executed_at">Date (optionnel)</Label>
+        {/* 7. Date + Notes — 2-column grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="executed_at" className="text-xs text-muted-foreground uppercase tracking-wider">Date</Label>
             <Input
               id="executed_at"
               type="datetime-local"
               {...register('executed_at')}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optionnel)</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="notes" className="text-xs text-muted-foreground uppercase tracking-wider">Notes</Label>
             <Input
               id="notes"
               placeholder="Notes..."
@@ -687,30 +698,36 @@ export default function AddTransactionForm({
           </div>
         </div>
 
-        {/* 8. Preview zone */}
+        {/* 8. Impact Summary */}
         {selectedAsset && quantity > 0 && (
-          <div className="rounded-lg border border-border/50 bg-muted/50 p-3 space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Prévisualisation</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                Solde {selectedAsset.symbol} après transaction
-              </span>
-              <span className="font-medium">
-                {toNum(newQuantity).toFixed(8).replace(/\.?0+$/, '')} {selectedAsset.symbol}
-              </span>
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-xs font-medium text-muted-foreground">Résumé de l'impact</p>
             </div>
-            {total > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {isInbound ? 'Coût total' : 'Montant récupéré'}
-                </span>
-                <span className={isInbound ? 'font-medium text-red-400' : 'font-medium text-green-400'}>
-                  {isInbound ? '-' : '+'}{fmt.format(total)}
-                </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-muted-foreground">Nouveau solde</p>
+                <p className="text-sm font-semibold">
+                  {fmtQty(toNum(newQuantity), selectedAsset.symbol)}
+                </p>
               </div>
-            )}
+              {total > 0 && (
+                <div className="space-y-0.5 text-right">
+                  <p className="text-[10px] text-muted-foreground">
+                    {isInbound ? 'Impact Cash' : 'Montant récupéré'}
+                  </p>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    isInbound ? 'text-red-400' : 'text-green-400',
+                  )}>
+                    {isInbound ? '-' : '+'}{fmt.format(total)}
+                  </p>
+                </div>
+              )}
+            </div>
             {!isInbound && newQuantity < 0 && (
-              <p className="text-xs text-destructive">Attention : solde négatif après transaction</p>
+              <p className="text-xs text-destructive font-medium">Attention : solde négatif après transaction</p>
             )}
           </div>
         )}
@@ -720,7 +737,7 @@ export default function AddTransactionForm({
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" disabled={mutation.isPending || !selectedAssetId} size="lg">
           {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {typeConfig && <typeConfig.icon className={`mr-2 h-4 w-4 ${typeConfig.color}`} />}
+          {typeConfig && <typeConfig.icon className={cn('mr-2 h-4 w-4', typeConfig.color)} />}
           {typeConfig?.label || 'Ajouter'}
         </Button>
       </div>
@@ -730,12 +747,12 @@ export default function AddTransactionForm({
   if (open !== undefined && onOpenChange !== undefined) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="border-white/[0.08] bg-background/80 backdrop-blur-xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Ajouter une transaction</DialogTitle>
-            <DialogDescription>
-              {assetSymbol ? `Transaction pour ${assetSymbol}` : 'Enregistrez une nouvelle transaction'}
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              {typeConfig && <typeConfig.icon className={cn('h-5 w-5', typeConfig.color)} />}
+              {assetSymbol ? `Transaction ${assetSymbol}` : 'Nouvelle transaction'}
+            </DialogTitle>
           </DialogHeader>
           {formContent}
         </DialogContent>
