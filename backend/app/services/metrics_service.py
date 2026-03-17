@@ -213,22 +213,21 @@ class MetricsService:
         result = await db.execute(query)
         all_assets = result.scalars().all()
 
-        # Filter out dust positions (worth less than min_value_eur)
+        # Pre-filter: remove assets with zero quantity (actual dust filtering
+        # happens later after live prices are fetched, so we keep all qty > 0 here)
         assets = []
         for asset in all_assets:
             if not include_zero_quantity:
                 qty = float(asset.quantity)
                 avg_price = float(asset.avg_buy_price) if asset.avg_buy_price else 0.0
                 current_price = float(asset.current_price) if asset.current_price else 0.0
-                # Use the best available price to estimate value
                 best_price = avg_price or current_price
                 if best_price > 0:
                     est_value = qty * best_price
                     if est_value < min_value_eur:
                         continue
-                elif qty < 0.01:
-                    # No price info and tiny quantity — almost certainly dust
-                    continue
+                # No price info yet — keep the asset; real value will be
+                # determined after live prices are fetched below.
             assets.append(asset)
 
         if not assets:
