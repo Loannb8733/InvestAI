@@ -622,7 +622,7 @@ async def admin_fix_mirrors(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     DEFAULT_DESTINATION = "Tangem"
-    log = []
+    log = ["version=pr51-broken-refs"]
     try:
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)
         with sync_engine.begin() as conn:
