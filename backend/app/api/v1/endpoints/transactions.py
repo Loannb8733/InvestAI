@@ -223,6 +223,17 @@ async def create_transaction(
     )
     transaction.compute_hash()
 
+    # Duplicate detection: reject if a transaction with the same hash already exists
+    if transaction.internal_hash:
+        existing = await db.execute(
+            select(Transaction.id).where(Transaction.internal_hash == transaction.internal_hash)
+        )
+        if existing.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Une transaction identique existe déjà (même actif, type, quantité, prix et date).",
+            )
+
     db.add(transaction)
 
     # Update asset quantity for buy/sell
