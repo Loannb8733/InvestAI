@@ -774,7 +774,7 @@ async def admin_fix_mirrors(request: Request):
                     text(
                         "SELECT COALESCE(SUM(CASE"
                         " WHEN transaction_type::text IN"
-                        " ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
+                        " ('BUY','CONVERSION_IN','TRANSFER_IN','AIRDROP','STAKING_REWARD','DIVIDEND','INTEREST')"
                         " THEN quantity ELSE 0 END), 0)"
                         " - COALESCE(SUM(CASE"
                         " WHEN transaction_type::text IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')"
@@ -789,6 +789,32 @@ async def admin_fix_mirrors(request: Request):
                     {"qty": final_qty, "aid": aid},
                 )
                 log.append(f"Asset {key[1]}/{key[2]} qty={final_qty}")
+
+            # Always recalculate ALL Tangem assets (fix for previous runs with wrong case)
+            tangem_assets = conn.execute(
+                text("SELECT id, symbol FROM assets WHERE exchange = :exc"),
+                {"exc": DEFAULT_DESTINATION},
+            ).fetchall()
+            for ta in tangem_assets:
+                net = conn.execute(
+                    text(
+                        "SELECT COALESCE(SUM(CASE"
+                        " WHEN transaction_type::text IN"
+                        " ('BUY','CONVERSION_IN','TRANSFER_IN','AIRDROP','STAKING_REWARD','DIVIDEND','INTEREST')"
+                        " THEN quantity ELSE 0 END), 0)"
+                        " - COALESCE(SUM(CASE"
+                        " WHEN transaction_type::text IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')"
+                        " THEN quantity ELSE 0 END), 0) AS net_qty"
+                        " FROM transactions WHERE asset_id = :aid"
+                    ),
+                    {"aid": ta.id},
+                ).fetchone()
+                final_qty = max(0, float(net.net_qty)) if net else 0
+                conn.execute(
+                    text("UPDATE assets SET quantity = :qty WHERE id = :aid"),
+                    {"qty": final_qty, "aid": ta.id},
+                )
+                log.append(f"Recalc Tangem {ta.symbol} qty={final_qty}")
 
         sync_engine.dispose()
         return {"status": "ok", "mirrors_created": mirrors_created, "log": log}
