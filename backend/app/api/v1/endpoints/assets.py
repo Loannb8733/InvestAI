@@ -224,5 +224,26 @@ async def delete_asset(
             detail="Asset not found",
         )
 
+    # Clear related_transaction_id references that point to this asset's transactions
+    # to avoid FK constraint errors during cascade delete
+    from sqlalchemy import select as sql_select
+    from sqlalchemy import update as sql_update
+
+    from app.models.transaction import Transaction
+
+    asset_tx_ids = sql_select(Transaction.id).where(Transaction.asset_id == asset_id)
+    await db.execute(
+        sql_update(Transaction)
+        .where(Transaction.related_transaction_id.in_(asset_tx_ids))
+        .values(related_transaction_id=None)
+    )
+    # Also clear references within the asset's own transactions
+    await db.execute(
+        sql_update(Transaction)
+        .where(Transaction.asset_id == asset_id, Transaction.related_transaction_id.isnot(None))
+        .values(related_transaction_id=None)
+    )
+    await db.flush()
+
     await db.delete(asset)
     await db.commit()

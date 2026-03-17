@@ -543,6 +543,15 @@ async def delete_all_transactions(
     transactions = count_result.scalars().all()
     deleted_count = len(transactions)
 
+    # Clear related_transaction_id references to avoid FK constraint errors
+    from sqlalchemy import update as sql_update
+
+    await db.execute(
+        sql_update(Transaction)
+        .where(Transaction.asset_id.in_(asset_ids), Transaction.related_transaction_id.isnot(None))
+        .values(related_transaction_id=None)
+    )
+
     # Hard delete all transactions
     for transaction in transactions:
         await db.delete(transaction)
@@ -616,7 +625,22 @@ async def delete_transaction(
                     mirror_asset.quantity = max(0, float(mirror_asset.quantity) - float(mirror.quantity))
                 elif mirror.transaction_type.value in subtract_types:
                     mirror_asset.quantity = float(mirror_asset.quantity) + float(mirror.quantity)
+            # Clear back-reference before deleting to avoid FK constraint
+            mirror.related_transaction_id = None
             await db.delete(mirror)
+
+    # Clear any other transactions that reference this one
+    from sqlalchemy import update as sql_update
+
+    await db.execute(
+        sql_update(Transaction)
+        .where(Transaction.related_transaction_id == transaction.id)
+        .values(related_transaction_id=None)
+    )
+
+    # Clear own reference before deleting
+    transaction.related_transaction_id = None
+    await db.flush()
 
     await db.delete(transaction)
     await db.flush()
