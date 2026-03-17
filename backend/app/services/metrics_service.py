@@ -219,12 +219,15 @@ class MetricsService:
             if not include_zero_quantity:
                 qty = float(asset.quantity)
                 avg_price = float(asset.avg_buy_price) if asset.avg_buy_price else 0.0
-                if avg_price > 0:
-                    est_value = qty * avg_price
+                current_price = float(asset.current_price) if asset.current_price else 0.0
+                # Use the best available price to estimate value
+                best_price = avg_price or current_price
+                if best_price > 0:
+                    est_value = qty * best_price
                     if est_value < min_value_eur:
                         continue
                 elif qty < 0.01:
-                    # No buy price and tiny quantity — almost certainly dust
+                    # No price info and tiny quantity — almost certainly dust
                     continue
             assets.append(asset)
 
