@@ -1017,9 +1017,9 @@ class MetricsService:
 
             # Track sells (real capital out)
             # TRANSFER_OUT excluded: user still owns the asset on cold wallet
-            # CONVERSION_OUT excluded: crypto→crypto swap, not real capital leaving
-            #   (symmetric with CONVERSION_IN being excluded from total_invested)
-            elif tx_type == "SELL":
+            # CONVERSION_OUT included: user disposed of the asset (even if swapped to another crypto),
+            #   so it should appear in history as quantity sold
+            elif tx_type in ["SELL", "CONVERSION_OUT"]:
                 ah["total_sold"] += Decimal(str(tx.quantity))
                 ah["total_sold_value"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
 
