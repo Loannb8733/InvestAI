@@ -84,14 +84,14 @@ interface AddTransactionFormProps {
 }
 
 const transactionTypes = [
-  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-green-500', bg: 'bg-green-500/10 border-green-500/20', activeBg: 'bg-green-500/20 border-green-500/40 ring-1 ring-green-500/30' },
-  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30' },
-  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30' },
-  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30' },
-  { value: 'staking_reward', label: 'Récompense staking', shortLabel: 'Staking', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30' },
-  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30' },
-  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30' },
-  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30' },
+  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-green-500', bg: 'bg-green-500/10 border-green-500/20', activeBg: 'bg-green-500/20 border-green-500/40 ring-1 ring-green-500/30', submitBg: 'bg-green-600 hover:bg-green-700' },
+  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30', submitBg: 'bg-red-600 hover:bg-red-700' },
+  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30', submitBg: 'bg-blue-600 hover:bg-blue-700' },
+  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30', submitBg: 'bg-orange-600 hover:bg-orange-700' },
+  { value: 'staking_reward', label: 'Récompense staking', shortLabel: 'Staking', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30', submitBg: 'bg-yellow-600 hover:bg-yellow-700' },
+  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30', submitBg: 'bg-pink-600 hover:bg-pink-700' },
+  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30', submitBg: 'bg-teal-600 hover:bg-teal-700' },
+  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30', submitBg: 'bg-amber-600 hover:bg-amber-700' },
 ] as const
 
 const assetTypes = [
@@ -370,74 +370,74 @@ export default function AddTransactionForm({
           </div>
         </div>
 
-        {/* 2. Portfolio */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Portefeuille</Label>
-          <Select
-            value={selectedPortfolioId}
-            onValueChange={(value) => {
-              setSelectedPortfolioId(value)
-              setValue('asset_id', '')
-              setValue('exchange', '')
-              setShowNewAsset(false)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionner un portefeuille" />
-            </SelectTrigger>
-            <SelectContent>
-              {portfolios?.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* 3. Asset */}
-        {selectedPortfolioId && !showNewAsset && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Actif</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-auto py-0 px-1 text-xs text-primary"
-                onClick={() => {
-                  setShowNewAsset(true)
-                  setNewAssetExchange(watch('exchange') || '')
-                }}
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Nouvel actif
-              </Button>
-            </div>
+        {/* 2. Portfolio + Asset — single row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Portefeuille</Label>
             <Select
-              value={selectedAssetId}
+              value={selectedPortfolioId}
               onValueChange={(value) => {
-                setValue('asset_id', value)
+                setSelectedPortfolioId(value)
+                setValue('asset_id', '')
+                setValue('exchange', '')
+                setShowNewAsset(false)
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder={filteredAssets.length ? "Sélectionner un actif" : "Aucun actif — créez-en un"} />
+                <SelectValue placeholder="Portefeuille..." />
               </SelectTrigger>
               <SelectContent>
-                {filteredAssets
-                  .sort((a, b) => a.symbol.localeCompare(b.symbol))
-                  .map((asset) => (
-                  <SelectItem key={asset.id} value={asset.id}>
-                    {asset.symbol}{asset.exchange ? ` (${asset.exchange})` : ''}{asset.name && asset.name !== asset.symbol ? ` - ${asset.name}` : ''}
+                {portfolios?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.asset_id && (
-              <p className="text-sm text-destructive">{errors.asset_id.message}</p>
-            )}
           </div>
-        )}
+          {selectedPortfolioId && !showNewAsset && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Actif</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto py-0 px-1 text-[10px] text-primary"
+                  onClick={() => {
+                    setShowNewAsset(true)
+                    setNewAssetExchange(watch('exchange') || '')
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-0.5" />
+                  Nouveau
+                </Button>
+              </div>
+              <Select
+                value={selectedAssetId}
+                onValueChange={(value) => {
+                  setValue('asset_id', value)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={filteredAssets.length ? "Actif..." : "Aucun actif"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredAssets
+                    .sort((a, b) => a.symbol.localeCompare(b.symbol))
+                    .map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.symbol}{asset.exchange ? ` (${asset.exchange})` : ''}{asset.name && asset.name !== asset.symbol ? ` - ${asset.name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.asset_id && (
+                <p className="text-xs text-destructive">{errors.asset_id.message}</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Inline new asset creation */}
         {selectedPortfolioId && showNewAsset && (
@@ -735,9 +735,14 @@ export default function AddTransactionForm({
 
       {/* Submit */}
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="submit" disabled={mutation.isPending || !selectedAssetId} size="lg">
+        <Button
+          type="submit"
+          disabled={mutation.isPending || !selectedAssetId}
+          size="lg"
+          className={cn('text-white transition-colors', typeConfig?.submitBg)}
+        >
           {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {typeConfig && <typeConfig.icon className={cn('mr-2 h-4 w-4', typeConfig.color)} />}
+          {typeConfig && <typeConfig.icon className="mr-2 h-4 w-4" />}
           {typeConfig?.label || 'Ajouter'}
         </Button>
       </div>
