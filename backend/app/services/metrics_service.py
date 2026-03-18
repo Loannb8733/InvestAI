@@ -289,46 +289,140 @@ class MetricsService:
             )
             fees_map = {str(r[0]): float(r[1] or 0) for r in fee_result.all()}
 
-            # Actual invested = inflow cost minus proportional outflow cost
-            # Inflows: BUY/CONVERSION_IN/TRANSFER_IN with price > 0
-            # Outflows: SELL/CONVERSION_OUT/TRANSFER_OUT reduce invested proportionally
-            inflow_result = await db.execute(
-                select(
-                    Transaction.asset_id,
-                    func.sum(Transaction.quantity * Transaction.price).label("inflow_cost"),
-                    func.sum(Transaction.quantity).label("inflow_qty"),
-                )
-                .where(
-                    Transaction.asset_id.in_(inv_asset_ids),
-                    Transaction.transaction_type.in_([TxType.BUY, TxType.CONVERSION_IN, TxType.TRANSFER_IN]),
-                    Transaction.price > 0,
-                )
-                .group_by(Transaction.asset_id)
-            )
-            inflow_map = {str(r[0]): {"cost": float(r[1] or 0), "qty": float(r[2] or 0)} for r in inflow_result.all()}
+            # Actual invested = real money spent (BUY only), propagated through
+            # conversions and transfers so the cost basis follows the asset.
+            #
+            # Algorithm (symbol-level, then split by asset_id):
+            # 1. Compute BUY cost per symbol across all platforms
+            # 2. Trace conversion chains (e.g. INJ→BTC) to propagate BUY cost
+            #    from source symbols to destination symbols
+            # 3. Subtract SELL proceeds (money leaving portfolio)
+            # 4. Split the per-symbol cost across asset_ids (platforms)
+            #    proportionally to each platform's current quantity
 
-            # Total outflow quantity (SELL + CONVERSION_OUT + TRANSFER_OUT)
-            outflow_result = await db.execute(
-                select(
-                    Transaction.asset_id,
-                    func.sum(Transaction.quantity).label("outflow_qty"),
-                )
-                .where(
-                    Transaction.asset_id.in_(inv_asset_ids),
-                    Transaction.transaction_type.in_([TxType.SELL, TxType.CONVERSION_OUT, TxType.TRANSFER_OUT]),
-                )
-                .group_by(Transaction.asset_id)
+            # Fetch ALL transactions for the portfolio (not just inv_asset_ids)
+            # to capture conversion sources that may have qty=0 now
+            portfolio_id_val = investment_assets[0].portfolio_id
+            all_tx_result = await db.execute(
+                select(Transaction)
+                .join(Asset, Transaction.asset_id == Asset.id)
+                .where(Asset.portfolio_id == portfolio_id_val)
+                .order_by(Transaction.executed_at, Transaction.id)
             )
-            outflow_map = {str(r[0]): float(r[1] or 0) for r in outflow_result.all()}
+            all_txs = all_tx_result.scalars().all()
 
-            # Net invested = inflow_cost * remaining_fraction
-            for aid, inflow in inflow_map.items():
-                outflow_qty = outflow_map.get(aid, 0.0)
-                if inflow["qty"] > 0 and outflow_qty > 0:
-                    remaining_frac = max(0.0, 1.0 - outflow_qty / inflow["qty"])
-                    invested_map[aid] = inflow["cost"] * remaining_frac
+            # Build symbol for each asset_id
+            aid_to_symbol: Dict[str, str] = {}
+            for tx in all_txs:
+                aid_to_symbol[str(tx.asset_id)] = ""
+            for a in investment_assets:
+                aid_to_symbol[str(a.id)] = a.symbol.upper()
+            # Fill remaining from transactions (sold-off assets)
+            for a in all_assets:
+                aid_to_symbol[str(a.id)] = a.symbol.upper()
+
+            # Step 1: BUY cost per symbol
+            from collections import defaultdict as _defaultdict
+
+            buy_cost_by_sym: Dict[str, float] = _defaultdict(float)
+            buy_qty_by_sym: Dict[str, float] = _defaultdict(float)
+            for tx in all_txs:
+                if tx.transaction_type == TxType.BUY:
+                    sym = aid_to_symbol.get(str(tx.asset_id), "")
+                    buy_cost_by_sym[sym] += float(tx.quantity) * float(tx.price or 0)
+                    buy_qty_by_sym[sym] += float(tx.quantity)
+
+            # Step 2: Trace conversions — match OUT→IN pairs by notes/trade_id
+            # and propagate BUY cost from source symbol to destination symbol
+            import re as _re
+
+            cost_by_sym: Dict[str, float] = _defaultdict(float)
+            cost_by_sym.update(buy_cost_by_sym)
+            qty_by_sym: Dict[str, float] = _defaultdict(float)
+
+            # Accumulate all quantities per symbol (for proportional removal)
+            for tx in all_txs:
+                sym = aid_to_symbol.get(str(tx.asset_id), "")
+                ttype = tx.transaction_type
+                qty = float(tx.quantity)
+                if ttype in (
+                    TxType.BUY,
+                    TxType.AIRDROP,
+                    TxType.STAKING_REWARD,
+                    TxType.CONVERSION_IN,
+                    TxType.TRANSFER_IN,
+                ):
+                    qty_by_sym[sym] += qty
+
+            # Build conversion/transfer OUT list
+            conv_outs = []
+            for tx in all_txs:
+                if tx.transaction_type == TxType.CONVERSION_OUT:
+                    conv_outs.append(tx)
+
+            # Build conversion IN index for matching
+            conv_ins = [tx for tx in all_txs if tx.transaction_type == TxType.CONVERSION_IN]
+
+            for co in conv_outs:
+                src_sym = aid_to_symbol.get(str(co.asset_id), "")
+                co_qty = float(co.quantity)
+                notes = co.notes or ""
+                exchange = co.exchange or ""
+
+                # Find matching conversion_in
+                dest_sym = None
+                if "Crypto.com" in exchange or "crypto.com" in exchange.lower():
+                    for ci in conv_ins:
+                        if (ci.notes or "") == notes and (ci.exchange or "") == exchange:
+                            dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                            break
                 else:
-                    invested_map[aid] = inflow["cost"]
+                    # Kraken: match trade_id suffix
+                    m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
+                    if m:
+                        suffix = m.group(1)
+                        for ci in conv_ins:
+                            if f"convert_buy_{suffix}" in (ci.notes or ""):
+                                dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                                break
+
+                # Remove proportional cost from source, add to destination
+                pool = qty_by_sym.get(src_sym, 0)
+                if pool > 0 and cost_by_sym.get(src_sym, 0) > 0:
+                    frac = min(co_qty / pool, 1.0)
+                    removed = cost_by_sym[src_sym] * frac
+                    cost_by_sym[src_sym] -= removed
+                    qty_by_sym[src_sym] = max(0, pool - co_qty)
+                    if dest_sym:
+                        cost_by_sym[dest_sym] += removed
+
+            # Process SELL — cost exits portfolio
+            for tx in all_txs:
+                if tx.transaction_type == TxType.SELL:
+                    sym = aid_to_symbol.get(str(tx.asset_id), "")
+                    sell_qty = float(tx.quantity)
+                    pool = qty_by_sym.get(sym, 0)
+                    if pool > 0 and cost_by_sym.get(sym, 0) > 0:
+                        frac = min(sell_qty / pool, 1.0)
+                        removed = cost_by_sym[sym] * frac
+                        cost_by_sym[sym] -= removed
+                        qty_by_sym[sym] = max(0, pool - sell_qty)
+
+            # Transfer OUT/IN: same symbol, different platform — no cost change
+            # at symbol level (cost stays with the symbol)
+
+            # Step 3: Split per-symbol cost across asset_ids by current quantity
+            sym_to_aids: Dict[str, list] = _defaultdict(list)
+            for a in investment_assets:
+                sym_to_aids[a.symbol.upper()].append(a)
+
+            for sym, sym_assets in sym_to_aids.items():
+                total_qty = sum(float(a.quantity) for a in sym_assets)
+                sym_cost = cost_by_sym.get(sym, 0)
+                if total_qty > 0 and sym_cost > 0:
+                    for a in sym_assets:
+                        share = float(a.quantity) / total_qty
+                        invested_map[str(a.id)] = sym_cost * share
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
