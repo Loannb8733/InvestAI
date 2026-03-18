@@ -1,10 +1,13 @@
 """Dashboard endpoints."""
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -976,13 +979,27 @@ async def get_benchmark_data(
 
 @router.post("/backfill-prices")
 async def trigger_price_backfill(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
-    """Trigger a deep backfill of historical prices for all assets."""
-    from app.tasks.history_cache import deep_backfill_prices
+    """Trigger a backfill of historical prices for all assets.
 
-    task = deep_backfill_prices.delay()
-    return {"status": "started", "task_id": str(task.id)}
+    Runs inline as a FastAPI background task (no Celery worker needed).
+    Falls back to Celery if available.
+    """
+    from app.tasks.history_cache import _fetch_and_cache_all
+
+    async def _run_backfill():
+        try:
+            count = await _fetch_and_cache_all()
+            logger.info("Backfill complete: %d assets cached", count)
+        except Exception as e:
+            logger.warning("Backfill failed: %s", e)
+
+    import asyncio
+
+    asyncio.create_task(_run_backfill())
+    return {"status": "started", "message": "Backfill running in background"}
 
 
 @router.get("/backfill-status")

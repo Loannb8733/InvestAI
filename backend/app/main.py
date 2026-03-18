@@ -475,14 +475,21 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Trigger historical data cache on startup (via Celery)
-    try:
-        from app.tasks.history_cache import cache_historical_data
 
-        cache_historical_data.delay()
-        logger.info("Triggered historical data cache task")
-    except Exception as e:
-        logger.warning("Could not trigger history cache task: %s", e)
+    # Trigger historical data cache on startup — run inline (no Celery needed)
+    async def _startup_backfill():
+        try:
+            from app.tasks.history_cache import _fetch_and_cache_all
+
+            count = await _fetch_and_cache_all()
+            logger.info("Startup price backfill complete: %d assets cached", count)
+        except Exception as e:
+            logger.warning("Startup price backfill failed: %s", e)
+
+    import asyncio
+
+    asyncio.create_task(_startup_backfill())
+    logger.info("Triggered startup price backfill (background)")
     yield
     # Shutdown
     logger.info(f"Shutting down {settings.APP_NAME}")
