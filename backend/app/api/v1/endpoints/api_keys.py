@@ -773,6 +773,25 @@ async def import_trade_history(
                     )
                     break
 
+        # Remove sync-created adjustment transactions (init/sync) since
+        # the real transaction history will replace them.
+        exchange_prefix = service.exchange_name
+        sync_asset_ids = [a.id for a in existing_assets.values()]
+        if sync_asset_ids:
+            from sqlalchemy import delete as sql_delete
+
+            sync_del = await db.execute(
+                sql_delete(Transaction).where(
+                    Transaction.asset_id.in_(sync_asset_ids),
+                    Transaction.external_id.ilike(f"{exchange_prefix}_%"),
+                )
+            )
+            removed = sync_del.rowcount
+            if removed:
+                logger.info(f"Removed {removed} sync adjustment transactions before history import")
+                # Also remove them from existing_trade_ids so they don't block reimport
+                existing_trade_ids = {tid for tid in existing_trade_ids if not tid.startswith(f"{exchange_prefix}_")}
+
         imported_count = 0
         fiat_orders_count = 0
         rewards_count = 0
