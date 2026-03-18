@@ -517,8 +517,13 @@ class DeleteAllResult(BaseModel):
 async def delete_all_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    delete_assets: bool = Query(False, description="Also delete all assets"),
 ) -> DeleteAllResult:
     """Delete all transactions for the current user and reset asset quantities."""
+    from sqlalchemy import delete as sql_delete
+    from sqlalchemy import func
+    from sqlalchemy import update as sql_update
+
     # Get user's portfolio IDs
     portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
@@ -526,40 +531,37 @@ async def delete_all_transactions(
     if not portfolio_ids:
         return DeleteAllResult(deleted_count=0)
 
-    # Get user's assets
-    asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
-    assets = asset_result.scalars().all()
-    asset_ids = [a.id for a in assets]
+    # Get user's asset IDs
+    asset_result = await db.execute(select(Asset.id).where(Asset.portfolio_id.in_(portfolio_ids)))
+    asset_ids = [a for a in asset_result.scalars().all()]
 
     if not asset_ids:
         return DeleteAllResult(deleted_count=0)
 
-    # Count and delete all transactions
+    # Count transactions
     count_result = await db.execute(
-        select(Transaction).where(
+        select(func.count())
+        .select_from(Transaction)
+        .where(
             Transaction.asset_id.in_(asset_ids),
         )
     )
-    transactions = count_result.scalars().all()
-    deleted_count = len(transactions)
+    deleted_count = count_result.scalar()
 
-    # Clear related_transaction_id references to avoid FK constraint errors
-    from sqlalchemy import update as sql_update
-
+    # Step 1: Nullify all related_transaction_id references (bulk SQL)
     await db.execute(
-        sql_update(Transaction)
-        .where(Transaction.asset_id.in_(asset_ids), Transaction.related_transaction_id.isnot(None))
-        .values(related_transaction_id=None)
+        sql_update(Transaction).where(Transaction.asset_id.in_(asset_ids)).values(related_transaction_id=None)
     )
 
-    # Hard delete all transactions
-    for transaction in transactions:
-        await db.delete(transaction)
+    # Step 2: Bulk delete all transactions (pure SQL, no ORM objects)
+    await db.execute(sql_delete(Transaction).where(Transaction.asset_id.in_(asset_ids)))
 
-    # Reset all asset quantities and avg prices
-    for asset in assets:
-        asset.quantity = 0
-        asset.avg_buy_price = 0
+    if delete_assets:
+        # Also delete all assets
+        await db.execute(sql_delete(Asset).where(Asset.id.in_(asset_ids)))
+    else:
+        # Reset all asset quantities and avg prices
+        await db.execute(sql_update(Asset).where(Asset.id.in_(asset_ids)).values(quantity=0, avg_buy_price=0))
 
     await db.commit()
 
