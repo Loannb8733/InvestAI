@@ -658,8 +658,27 @@ export default function PortfolioAssetList({
                         <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.gain_loss)}
                         </td>
-                        <td className="text-center py-2 hidden lg:table-cell" />
-                        <td className="text-center py-2 hidden lg:table-cell" />
+                        <td className="text-center py-2 hidden lg:table-cell">
+                          {asset.risk_weight != null && asset.risk_weight > 0 ? (
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              asset.risk_weight > 30 ? 'bg-red-500/10 text-red-500' :
+                              asset.risk_weight > 15 ? 'bg-orange-500/10 text-orange-500' :
+                              'bg-green-500/10 text-green-500'
+                            }`}>
+                              {asset.risk_weight.toFixed(1)}%
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="text-center py-2 hidden lg:table-cell">
+                          {sparklines?.[group.symbol] ? (
+                            <div className="flex justify-center">
+                              <Sparkline
+                                data={sparklines[group.symbol].prices}
+                                positive={sparklines[group.symbol].change_pct >= 0}
+                              />
+                            </div>
+                          ) : <span className="text-xs text-muted-foreground">-</span>}
+                        </td>
                         <td className="text-center py-2">
                           <div className="flex justify-center gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddTransaction(asset.id, asset.symbol)} title="Ajouter une transaction">
