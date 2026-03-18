@@ -115,6 +115,10 @@ class MetricsService:
         else:
             total_invested = quantity * avg_buy_price
 
+        # Recalculate PRA from actual invested when available
+        if actual_invested is not None and quantity > 0:
+            avg_buy_price = total_invested / quantity
+
         # Current value
         if current_price is None:
             current_value = total_invested
@@ -285,12 +289,14 @@ class MetricsService:
             )
             fees_map = {str(r[0]): float(r[1] or 0) for r in fee_result.all()}
 
-            # Actual invested = sum(qty * price) for BUY/CONVERSION_IN/TRANSFER_IN with price > 0
-            # This avoids inflating total_invested when airdrops add to quantity
-            invested_result = await db.execute(
+            # Actual invested = inflow cost minus proportional outflow cost
+            # Inflows: BUY/CONVERSION_IN/TRANSFER_IN with price > 0
+            # Outflows: SELL/CONVERSION_OUT/TRANSFER_OUT reduce invested proportionally
+            inflow_result = await db.execute(
                 select(
                     Transaction.asset_id,
-                    func.sum(Transaction.quantity * Transaction.price),
+                    func.sum(Transaction.quantity * Transaction.price).label("inflow_cost"),
+                    func.sum(Transaction.quantity).label("inflow_qty"),
                 )
                 .where(
                     Transaction.asset_id.in_(inv_asset_ids),
@@ -299,7 +305,30 @@ class MetricsService:
                 )
                 .group_by(Transaction.asset_id)
             )
-            invested_map = {str(r[0]): float(r[1] or 0) for r in invested_result.all()}
+            inflow_map = {str(r[0]): {"cost": float(r[1] or 0), "qty": float(r[2] or 0)} for r in inflow_result.all()}
+
+            # Total outflow quantity (SELL + CONVERSION_OUT + TRANSFER_OUT)
+            outflow_result = await db.execute(
+                select(
+                    Transaction.asset_id,
+                    func.sum(Transaction.quantity).label("outflow_qty"),
+                )
+                .where(
+                    Transaction.asset_id.in_(inv_asset_ids),
+                    Transaction.transaction_type.in_([TxType.SELL, TxType.CONVERSION_OUT, TxType.TRANSFER_OUT]),
+                )
+                .group_by(Transaction.asset_id)
+            )
+            outflow_map = {str(r[0]): float(r[1] or 0) for r in outflow_result.all()}
+
+            # Net invested = inflow_cost * remaining_fraction
+            for aid, inflow in inflow_map.items():
+                outflow_qty = outflow_map.get(aid, 0.0)
+                if inflow["qty"] > 0 and outflow_qty > 0:
+                    remaining_frac = max(0.0, 1.0 - outflow_qty / inflow["qty"])
+                    invested_map[aid] = inflow["cost"] * remaining_frac
+                else:
+                    invested_map[aid] = inflow["cost"]
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -878,11 +907,11 @@ class MetricsService:
             "net_gain_loss": float(net_gain_loss),
             "net_gain_loss_percent": net_gain_loss_percent,
             "daily_change": sum(a["current_value"] * a.get("change_percent_24h", 0) / 100 for a in all_assets),
-            "daily_change_percent": sum(
-                (a["current_value"] / float(total_value)) * a.get("change_percent_24h", 0) for a in all_assets
-            )
-            if float(total_value) > 0
-            else 0.0,
+            "daily_change_percent": (
+                sum((a["current_value"] / float(total_value)) * a.get("change_percent_24h", 0) for a in all_assets)
+                if float(total_value) > 0
+                else 0.0
+            ),
             "period_change": period_change,
             "period_change_percent": period_change_percent,
             "portfolios_count": len(portfolios),
