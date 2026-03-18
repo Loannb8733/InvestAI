@@ -1043,21 +1043,21 @@ class MetricsService:
 
             # Track buys (including dividend/interest which add quantity)
             if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN", "DIVIDEND", "INTEREST"]:
-                # Use original price for buy-side — do NOT resolve historical prices
-                # Airdrops/rewards are free (price=0 is correct, not "invested")
-                tx_price = Decimal(str(tx.price))
+                original_price = Decimal(str(tx.price))
+                resolved_price = _resolve_price(tx, symbol)
                 tx_qty = Decimal(str(tx.quantity))
                 ah["total_bought"] += tx_qty
-                ah["total_bought_value"] += tx_qty * tx_price
-                # Track cost basis separately: only include transactions with a real price
-                # so that free tokens (airdrops, transfers at price=0) don't deflate avg cost
-                if tx_price > 0:
+                ah["total_bought_value"] += tx_qty * resolved_price
+                # Cost basis: use resolved price (includes historical market value
+                # at time of receipt for airdrops/rewards — needed for realized P&L)
+                if resolved_price > 0:
                     ah["total_bought_with_cost"] += tx_qty
-                    ah["total_bought_cost_value"] += tx_qty * tx_price
-                # Track real money in (BUY + TRANSFER_IN with price) for total_invested
-                # CONVERSION_IN is excluded: it's a form change (crypto→crypto), not new capital
-                if tx_type in ["BUY", "TRANSFER_IN"] and tx_price > 0:
-                    ah["total_bought_fiat_value"] += tx_qty * tx_price
+                    ah["total_bought_cost_value"] += tx_qty * resolved_price
+                # Real money in (only BUY with ORIGINAL stored price > 0)
+                # Airdrops/rewards/conversions are NOT capital outflow
+                # TRANSFER_IN excluded: could be from own wallet (not new capital)
+                if tx_type == "BUY" and original_price > 0:
+                    ah["total_bought_fiat_value"] += tx_qty * original_price
 
             # Track sells (real capital out)
             # TRANSFER_OUT excluded: user still owns the asset on cold wallet
@@ -1104,7 +1104,7 @@ class MetricsService:
                 )
                 if ah["total_bought_with_cost"] > 0 and ah["total_sold"] > 0
                 else (
-                    # No cost basis (free tokens: airdrops, rewards) → sold value is pure profit
+                    # No cost basis at all (no historical prices available) → pure profit
                     float(ah["total_sold_value"])
                     if ah["total_sold"] > 0
                     else 0.0
