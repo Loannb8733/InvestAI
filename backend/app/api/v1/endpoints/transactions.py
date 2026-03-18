@@ -28,7 +28,12 @@ router = APIRouter()
 
 
 async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
-    """Recalculate avg_buy_price from BUY and CONVERSION_IN transactions for an asset."""
+    """Recalculate avg_buy_price from BUY, CONVERSION_IN, and TRANSFER_IN transactions.
+
+    TRANSFER_IN is included because transferred assets carry their cost basis
+    from the source exchange (e.g. Kraken → Tangem). Without it, cold wallet
+    assets would lose their PRA after any subsequent transaction.
+    """
     from sqlalchemy import func as sqlfunc
 
     result = await db.execute(
@@ -37,7 +42,9 @@ async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
             sqlfunc.sum(Transaction.quantity),
         ).where(
             Transaction.asset_id == asset.id,
-            Transaction.transaction_type.in_([TransactionType.BUY, TransactionType.CONVERSION_IN]),
+            Transaction.transaction_type.in_(
+                [TransactionType.BUY, TransactionType.CONVERSION_IN, TransactionType.TRANSFER_IN]
+            ),
             Transaction.price > 0,
         )
     )
