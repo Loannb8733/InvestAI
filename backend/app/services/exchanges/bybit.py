@@ -23,10 +23,19 @@ from app.services.exchanges.base import (
 
 
 class BybitService(BaseExchangeService):
-    """Bybit exchange integration (API v5)."""
+    """Bybit exchange integration (API v5).
 
-    BASE_URL = "https://api.bybit.com"
+    Supports both global (api.bybit.com) and EU (api.bybit.nl) endpoints.
+    Tries the global endpoint first; falls back to EU if it fails auth.
+    """
+
+    BASE_URLS = ["https://api.bybit.com", "https://api.bybit.nl"]
     RECV_WINDOW = "5000"
+
+    def __init__(self, api_key: str, secret_key: str, passphrase: str = None):
+        super().__init__(api_key, secret_key, passphrase)
+        # Will be resolved on first successful call
+        self._base_url: Optional[str] = None
 
     @property
     def exchange_name(self) -> str:
@@ -64,20 +73,41 @@ class BybitService(BaseExchangeService):
         """Create HTTP client for Bybit API."""
         return httpx.AsyncClient(timeout=timeout)
 
+    @property
+    def BASE_URL(self) -> str:
+        """Return resolved base URL (default to first)."""
+        return self._base_url or self.BASE_URLS[0]
+
+    async def _resolve_base_url(self) -> str:
+        """Try each base URL and return the first that works."""
+        if self._base_url:
+            return self._base_url
+        for url in self.BASE_URLS:
+            try:
+                async with self._get_http_client(timeout=10.0) as client:
+                    params = {"accountType": "UNIFIED"}
+                    timestamp = self._get_timestamp()
+                    headers = self._get_headers(timestamp, params)
+                    response = await client.get(
+                        f"{url}/v5/account/wallet-balance",
+                        params=params,
+                        headers=headers,
+                    )
+                    data = response.json()
+                    if data.get("retCode") == 0:
+                        self._base_url = url
+                        logger.info(f"Bybit: resolved base URL to {url}")
+                        return url
+                    logger.debug(f"Bybit {url}: retCode={data.get('retCode')}, msg={data.get('retMsg')}")
+            except Exception as e:
+                logger.debug(f"Bybit {url} failed: {e}")
+        return self.BASE_URLS[0]
+
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
         try:
-            async with self._get_http_client(timeout=15.0) as client:
-                params = {"accountType": "UNIFIED"}
-                timestamp = self._get_timestamp()
-                headers = self._get_headers(timestamp, params)
-                response = await client.get(
-                    f"{self.BASE_URL}/v5/account/wallet-balance",
-                    params=params,
-                    headers=headers,
-                )
-                data = response.json()
-                return data.get("retCode") == 0
+            await self._resolve_base_url()
+            return self._base_url is not None
         except Exception as e:
             logger.error(f"Bybit test_connection error: {e}")
             return False
@@ -86,12 +116,13 @@ class BybitService(BaseExchangeService):
         """Get all non-zero balances from Bybit."""
         balances = []
         try:
+            base_url = await self._resolve_base_url()
             async with self._get_http_client() as client:
                 params = {"accountType": "UNIFIED"}
                 timestamp = self._get_timestamp()
                 headers = self._get_headers(timestamp, params)
                 response = await client.get(
-                    f"{self.BASE_URL}/v5/account/wallet-balance",
+                    f"{base_url}/v5/account/wallet-balance",
                     params=params,
                     headers=headers,
                 )
