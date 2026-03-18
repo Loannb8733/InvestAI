@@ -1183,7 +1183,6 @@ async def sync_exchange(
     """Sync balances from an exchange to portfolio assets."""
     from app.models.asset import Asset, AssetType
     from app.models.portfolio import Portfolio
-    from app.models.transaction import Transaction, TransactionType
 
     result = await db.execute(
         select(APIKey).where(
@@ -1287,23 +1286,7 @@ async def sync_exchange(
                 new_quantity = float(balance.total)
 
                 if abs(new_quantity - old_quantity) > 0.00000001:
-                    # Create adjustment transaction
-                    diff = new_quantity - old_quantity
-                    trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
-                    sync_ts = int(datetime.now(timezone.utc).timestamp())
-
-                    transaction = Transaction(
-                        asset_id=asset.id,
-                        transaction_type=trans_type,
-                        quantity=abs(diff),
-                        price=0,
-                        fee=0,
-                        currency="EUR",
-                        external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
-                        notes=f"Sync auto depuis {service.exchange_name}",
-                    )
-                    db.add(transaction)
-
+                    # Just update the quantity — real transactions come from import-history
                     asset.quantity = new_quantity
                     synced_count += 1
             else:
@@ -1321,21 +1304,7 @@ async def sync_exchange(
                 db.add(asset)
                 await db.flush()
 
-                # Create initial transfer transaction
-                if float(balance.total) > 0:
-                    init_ts = int(datetime.now(timezone.utc).timestamp())
-                    transaction = Transaction(
-                        asset_id=asset.id,
-                        transaction_type=TransactionType.TRANSFER_IN,
-                        quantity=float(balance.total),
-                        price=0,
-                        fee=0,
-                        currency="EUR",
-                        external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
-                        notes=f"Import initial depuis {service.exchange_name}",
-                    )
-                    db.add(transaction)
-
+                # No initial transaction — real transactions come from import-history
                 synced_count += 1
 
         # Update last sync time
