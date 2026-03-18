@@ -97,13 +97,23 @@ def is_safe_haven(symbol: str) -> bool:
 class MetricsService:
     """Service for calculating portfolio metrics."""
 
-    async def get_asset_metrics(self, asset: Asset, current_price: Optional[Decimal] = None) -> Dict:
+    async def get_asset_metrics(
+        self,
+        asset: Asset,
+        current_price: Optional[Decimal] = None,
+        actual_invested: Optional[float] = None,
+    ) -> Dict:
         """Calculate metrics for a single asset."""
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
 
-        # Total invested
-        total_invested = quantity * avg_buy_price
+        # Total invested: use actual cost basis from transactions if available,
+        # otherwise fall back to quantity * avg_buy_price (which can be inflated
+        # when airdrops/rewards add to quantity without adding to cost)
+        if actual_invested is not None:
+            total_invested = Decimal(str(actual_invested))
+        else:
+            total_invested = quantity * avg_buy_price
 
         # Current value
         if current_price is None:
@@ -250,9 +260,10 @@ class MetricsService:
         stablecoin_assets = [a for a in assets if is_stablecoin(a.symbol)]
         fiat_assets = [a for a in assets if is_fiat(a.symbol)]
 
-        # Batch-fetch total fees per asset from transactions
+        # Batch-fetch total fees and actual invested per asset from transactions
         inv_asset_ids = [a.id for a in investment_assets]
         fees_map: Dict[str, float] = {}
+        invested_map: Dict[str, float] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
         if inv_asset_ids:
             from app.models.transaction import TransactionType as TxType
 
@@ -273,6 +284,22 @@ class MetricsService:
                 .group_by(Transaction.asset_id)
             )
             fees_map = {str(r[0]): float(r[1] or 0) for r in fee_result.all()}
+
+            # Actual invested = sum(qty * price) for BUY/CONVERSION_IN/TRANSFER_IN with price > 0
+            # This avoids inflating total_invested when airdrops add to quantity
+            invested_result = await db.execute(
+                select(
+                    Transaction.asset_id,
+                    func.sum(Transaction.quantity * Transaction.price),
+                )
+                .where(
+                    Transaction.asset_id.in_(inv_asset_ids),
+                    Transaction.transaction_type.in_([TxType.BUY, TxType.CONVERSION_IN, TxType.TRANSFER_IN]),
+                    Transaction.price > 0,
+                )
+                .group_by(Transaction.asset_id)
+            )
+            invested_map = {str(r[0]): float(r[1] or 0) for r in invested_result.all()}
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -388,7 +415,8 @@ class MetricsService:
                 }
             else:
                 current_price = prices.get(asset.symbol.upper())
-                metrics = await self.get_asset_metrics(asset, current_price)
+                asset_invested = invested_map.get(str(asset.id))
+                metrics = await self.get_asset_metrics(asset, current_price, asset_invested)
 
                 # Post-filter: skip dust positions based on actual current value
                 if (
@@ -734,7 +762,8 @@ class MetricsService:
             portfolio_history = await self.get_portfolio_history(db, str(portfolio.id), currency)
             total_value += Decimal(str(portfolio_metrics["total_value"]))
             total_invested += Decimal(str(portfolio_history["total_invested_all_time"]))
-            total_sold += Decimal(str(portfolio_history.get("total_sold", 0)))
+            # Use total_sold_fiat (only SELL, not conversions) for net_capital
+            total_sold += Decimal(str(portfolio_history.get("total_sold_fiat", 0)))
             total_realized += Decimal(str(portfolio_history.get("realized_gains", 0)))
             # Unrealized P&L from portfolio_metrics: correctly uses cost basis
             # of CURRENT holdings only (qty * avg_buy_price), not all-time invested
@@ -827,7 +856,8 @@ class MetricsService:
                 period_change_percent += a.get("period_change_percent", 0) * weight
         period_change = float(total_value) * period_change_percent / 100 if period_change_percent else 0.0
 
-        # Net capital = money injected - money withdrawn (informational only)
+        # Net capital = money injected (BUY) - money withdrawn (SELL to fiat only)
+        # CONVERSION_OUT excluded: crypto→crypto swaps don't change capital deployed
         net_capital = total_invested - total_sold
 
         # Unified P&L: ALL indicators use the same root formula:
@@ -970,6 +1000,7 @@ class MetricsService:
                 "total_bought_fiat_value": Decimal("0"),  # Only BUY+TRANSFER_IN (real money in, not conversions)
                 "total_sold": Decimal("0"),
                 "total_sold_value": Decimal("0"),
+                "total_sold_fiat_value": Decimal("0"),  # Only SELL (crypto→fiat, real money out)
                 "total_fees": Decimal("0"),
                 "first_transaction": None,
                 "last_transaction": None,
@@ -1065,12 +1096,18 @@ class MetricsService:
             #   so it should appear in history as quantity sold
             elif tx_type in ["SELL", "CONVERSION_OUT"]:
                 tx_price = _resolve_price(tx, symbol)
-                ah["total_sold"] += Decimal(str(tx.quantity))
-                ah["total_sold_value"] += Decimal(str(tx.quantity)) * tx_price
+                tx_qty = Decimal(str(tx.quantity))
+                ah["total_sold"] += tx_qty
+                ah["total_sold_value"] += tx_qty * tx_price
+                # Track real fiat outflow (only SELL = crypto→fiat)
+                # CONVERSION_OUT is crypto→crypto, not actual capital withdrawal
+                if tx_type == "SELL":
+                    ah["total_sold_fiat_value"] += tx_qty * tx_price
 
         # Calculate summary metrics
         total_invested_all_time = Decimal("0")
         total_sold_value = Decimal("0")
+        total_sold_fiat = Decimal("0")  # Only SELL (crypto→fiat)
         total_fees = Decimal("0")
         current_holdings = []
         sold_assets = []
@@ -1083,6 +1120,7 @@ class MetricsService:
             # CONVERSION_IN is a form change (crypto→crypto), not new capital
             total_invested_all_time += ah["total_bought_fiat_value"]
             total_sold_value += ah["total_sold_value"]
+            total_sold_fiat += ah["total_sold_fiat_value"]
             total_fees += ah["total_fees"]
 
             # Format for output
@@ -1138,6 +1176,7 @@ class MetricsService:
         return {
             "total_invested_all_time": float(total_invested_all_time),
             "total_sold": float(total_sold_value),
+            "total_sold_fiat": float(total_sold_fiat),  # Only SELL (not conversions)
             "total_fees": float(total_fees),
             "realized_gains": float(total_realized_gains),
             "current_holdings_count": len(current_holdings),

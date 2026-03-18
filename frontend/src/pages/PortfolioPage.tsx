@@ -323,11 +323,7 @@ export default function PortfolioPage() {
                 {portfolioMetrics && (
                   <div className="text-right">
                     <p className="text-2xl font-bold">
-                      {formatCurrency(
-                        portfolioMetrics.total_value
-                        + (portfolioMetrics.cash_from_stablecoins || 0)
-                        + (portfolioMetrics.cash_from_fiat || 0)
-                      )}
+                      {formatCurrency(portfolioMetrics.total_value)}
                     </p>
                     <p className={`text-sm ${portfolioMetrics.total_gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {portfolioMetrics.total_gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(portfolioMetrics.total_gain_loss)} ({formatPercent(portfolioMetrics.total_gain_loss_percent)})
