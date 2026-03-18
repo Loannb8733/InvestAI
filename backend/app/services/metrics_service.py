@@ -1124,6 +1124,19 @@ class MetricsService:
             total_fees += ah["total_fees"]
 
             # Format for output
+            # Realized gain based on fiat cost basis (money out of pocket)
+            # Consistent with "Total investi" which only shows BUY fiat
+            if ah["total_bought_fiat_value"] > 0 and ah["total_sold"] > 0 and ah["total_bought"] > 0:
+                # Proportional fiat cost: spread BUY cost across total quantity
+                # (includes airdrops/conversions which dilute average cost)
+                proportional_fiat_cost = ah["total_bought_fiat_value"] * ah["total_sold"] / ah["total_bought"]
+                realized_gain_val = float(ah["total_sold_value"] - proportional_fiat_cost)
+            elif ah["total_sold"] > 0:
+                # No fiat invested (all airdrops/conversions) → pure profit
+                realized_gain_val = float(ah["total_sold_value"])
+            else:
+                realized_gain_val = 0.0
+
             asset_data = {
                 "id": ah["id"],
                 "symbol": ah["symbol"],
@@ -1132,16 +1145,11 @@ class MetricsService:
                 "exchange": ah["exchange"],
                 "current_quantity": ah["current_quantity"],
                 "total_bought": float(ah["total_bought"]),
-                "total_bought_value": float(ah["total_bought_value"]),
+                "total_bought_value": float(ah["total_bought_fiat_value"]),
                 "total_sold": float(ah["total_sold"]),
                 "total_sold_value": float(ah["total_sold_value"]),
                 "total_fees": float(ah["total_fees"]),
-                "realized_gain": float(
-                    ah["total_sold_value"]
-                    - (ah["total_bought_cost_value"] * ah["total_sold"] / ah["total_bought_with_cost"])
-                )
-                if ah["total_bought_with_cost"] > 0 and ah["total_sold"] > 0
-                else 0.0,  # No cost basis available → cannot compute realized gain
+                "realized_gain": realized_gain_val,
                 "first_transaction": ah["first_transaction"].isoformat() if ah["first_transaction"] else None,
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
@@ -1167,7 +1175,7 @@ class MetricsService:
             else:
                 current_holdings.append(asset_data)
 
-        # Sort by total invested
+        # Sort by total invested (fiat value)
         sold_assets.sort(key=lambda x: x["total_bought_value"], reverse=True)
 
         # Sum realized gains from individual assets (already computed per-asset)
