@@ -1043,7 +1043,9 @@ class MetricsService:
 
             # Track buys (including dividend/interest which add quantity)
             if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN", "DIVIDEND", "INTEREST"]:
-                tx_price = _resolve_price(tx, symbol)
+                # Use original price for buy-side — do NOT resolve historical prices
+                # Airdrops/rewards are free (price=0 is correct, not "invested")
+                tx_price = Decimal(str(tx.price))
                 tx_qty = Decimal(str(tx.quantity))
                 ah["total_bought"] += tx_qty
                 ah["total_bought_value"] += tx_qty * tx_price
@@ -1101,7 +1103,12 @@ class MetricsService:
                     - (ah["total_bought_cost_value"] * ah["total_sold"] / ah["total_bought_with_cost"])
                 )
                 if ah["total_bought_with_cost"] > 0 and ah["total_sold"] > 0
-                else 0.0,
+                else (
+                    # No cost basis (free tokens: airdrops, rewards) → sold value is pure profit
+                    float(ah["total_sold_value"])
+                    if ah["total_sold"] > 0
+                    else 0.0
+                ),
                 "first_transaction": ah["first_transaction"].isoformat() if ah["first_transaction"] else None,
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
