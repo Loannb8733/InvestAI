@@ -975,6 +975,47 @@ class MetricsService:
                 "last_transaction": None,
             }
 
+        # Build historical price lookup for transactions with price=0
+        # Collect (symbol, date) pairs that need pricing
+        from app.models.asset_price_history import AssetPriceHistory
+
+        asset_id_to_symbol = {str(a.id): a.symbol.upper() for a in all_assets}
+        price_lookup_needed: set = set()
+        for tx in transactions:
+            if Decimal(str(tx.price)) == 0 and tx.executed_at is not None:
+                sym = asset_id_to_symbol.get(str(tx.asset_id))
+                if sym:
+                    price_lookup_needed.add((sym, tx.executed_at.date()))
+
+        # Batch fetch from AssetPriceHistory
+        historical_prices: dict = {}  # (symbol, date) → price_eur
+        if price_lookup_needed:
+            symbols_needed = list({s for s, _ in price_lookup_needed})
+            dates_needed = list({d for _, d in price_lookup_needed})
+            price_result = await db.execute(
+                select(
+                    AssetPriceHistory.symbol,
+                    AssetPriceHistory.price_date,
+                    AssetPriceHistory.price_eur,
+                ).where(
+                    AssetPriceHistory.symbol.in_(symbols_needed),
+                    AssetPriceHistory.price_date.in_(dates_needed),
+                )
+            )
+            for row in price_result.all():
+                historical_prices[(row[0], row[1])] = Decimal(str(row[2]))
+
+        def _resolve_price(tx, symbol: str) -> Decimal:
+            """Get transaction price, falling back to historical price if 0."""
+            p = Decimal(str(tx.price))
+            if p > 0:
+                return p
+            if tx.executed_at is not None:
+                hist_p = historical_prices.get((symbol, tx.executed_at.date()))
+                if hist_p:
+                    return hist_p
+            return Decimal("0")
+
         # Process transactions
         for tx in transactions:
             asset_id = str(tx.asset_id)
@@ -983,6 +1024,7 @@ class MetricsService:
 
             ah = asset_history[asset_id]
             tx_type = tx.transaction_type.value.upper()
+            symbol = asset_id_to_symbol.get(asset_id, "")
 
             # Track dates (skip if executed_at is None)
             tx_date = tx.executed_at
@@ -1001,7 +1043,7 @@ class MetricsService:
 
             # Track buys (including dividend/interest which add quantity)
             if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN", "DIVIDEND", "INTEREST"]:
-                tx_price = Decimal(str(tx.price))
+                tx_price = _resolve_price(tx, symbol)
                 tx_qty = Decimal(str(tx.quantity))
                 ah["total_bought"] += tx_qty
                 ah["total_bought_value"] += tx_qty * tx_price
@@ -1020,8 +1062,9 @@ class MetricsService:
             # CONVERSION_OUT included: user disposed of the asset (even if swapped to another crypto),
             #   so it should appear in history as quantity sold
             elif tx_type in ["SELL", "CONVERSION_OUT"]:
+                tx_price = _resolve_price(tx, symbol)
                 ah["total_sold"] += Decimal(str(tx.quantity))
-                ah["total_sold_value"] += Decimal(str(tx.quantity)) * Decimal(str(tx.price))
+                ah["total_sold_value"] += Decimal(str(tx.quantity)) * tx_price
 
         # Calculate summary metrics
         total_invested_all_time = Decimal("0")
@@ -1063,10 +1106,13 @@ class MetricsService:
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
 
-            # Consider as "sold" only if quantity is 0 AND has actual sells
-            # Dust positions with no sells stay in current_holdings (not shown as "sold")
-            if ah["current_quantity"] <= 0:
+            # Consider as "sold" only if quantity is ~0 AND has actual sells/conversions
+            # Assets only transferred out (no sells) stay in current_holdings
+            if ah["current_quantity"] <= 0 and ah["total_sold"] > 0:
                 sold_assets.append(asset_data)
+            elif ah["current_quantity"] <= 0:
+                # Zero quantity but no sells (transferred out only) — skip from history
+                continue
             elif ah["total_sold"] > 0:
                 # Partially sold: estimate remaining value
                 est_value = (
