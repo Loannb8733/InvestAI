@@ -813,9 +813,11 @@ async def get_portfolio_sparklines(
         symbol_data[row[0]].append(float(row[2]))
 
     sparklines = []
+    missing_symbols = []
     for symbol in symbols:
         prices = symbol_data.get(symbol, [])
         if len(prices) < 2:
+            missing_symbols.append(symbol)
             continue
         # Normalize to [0, 1] for consistent rendering
         min_p, max_p = min(prices), max(prices)
@@ -830,6 +832,22 @@ async def get_portfolio_sparklines(
                 change_pct=round(change, 2),
             )
         )
+
+    # Auto-backfill missing symbols in background (light: 30 days only)
+    if missing_symbols:
+
+        async def _fill_missing():
+            try:
+                from app.tasks.history_cache import _cache_single
+
+                for sym in missing_symbols:
+                    await _cache_single(sym, "crypto", days=30)
+                    await asyncio.sleep(8.0)
+                logger.info("On-demand sparkline backfill done for: %s", missing_symbols)
+            except Exception as e:
+                logger.warning("On-demand sparkline backfill failed: %s", e)
+
+        asyncio.create_task(_fill_missing())
 
     return sparklines
 
