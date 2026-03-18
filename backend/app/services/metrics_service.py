@@ -1103,12 +1103,7 @@ class MetricsService:
                     - (ah["total_bought_cost_value"] * ah["total_sold"] / ah["total_bought_with_cost"])
                 )
                 if ah["total_bought_with_cost"] > 0 and ah["total_sold"] > 0
-                else (
-                    # No cost basis at all (no historical prices available) → pure profit
-                    float(ah["total_sold_value"])
-                    if ah["total_sold"] > 0
-                    else 0.0
-                ),
+                else 0.0,  # No cost basis available → cannot compute realized gain
                 "first_transaction": ah["first_transaction"].isoformat() if ah["first_transaction"] else None,
                 "last_transaction": ah["last_transaction"].isoformat() if ah["last_transaction"] else None,
             }
