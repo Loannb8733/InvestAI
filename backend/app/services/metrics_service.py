@@ -424,9 +424,10 @@ class MetricsService:
                     removed = cost_by_sym[src_sym] * frac
                     cost_by_sym[src_sym] -= removed
                     qty_by_sym[src_sym] = max(0, pool - co_qty)
-                    # Update cost-bearing qty for source
+                    # Update cost-bearing qty for source (proportional, same frac
+                    # as cost, so PRA stays stable with mixed free/paid qty)
                     src_cq = cost_qty_by_sym.get(src_sym, 0)
-                    cost_qty_by_sym[src_sym] = max(0, src_cq - co_qty)
+                    cost_qty_by_sym[src_sym] = max(0, src_cq * (1 - frac))
                     if dest_sym:
                         cost_by_sym[dest_sym] += removed
                         # Only add to cost-bearing qty if real cost was propagated
@@ -444,8 +445,10 @@ class MetricsService:
                         removed = cost_by_sym[sym] * frac
                         cost_by_sym[sym] -= removed
                         qty_by_sym[sym] = max(0, pool - sell_qty)
+                        # Proportional removal (same frac as cost) so PRA
+                        # stays stable with mixed free/paid quantities
                         sell_cq = cost_qty_by_sym.get(sym, 0)
-                        cost_qty_by_sym[sym] = max(0, sell_cq - sell_qty)
+                        cost_qty_by_sym[sym] = max(0, sell_cq * (1 - frac))
 
             # Transfer OUT/IN: same symbol, different platform — no cost change
             # at symbol level (cost stays with the symbol)
