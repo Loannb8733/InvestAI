@@ -1,6 +1,7 @@
 """Service for handling mirror transfer transactions."""
 
 import logging
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -82,6 +83,32 @@ async def create_mirror_transfer_in(
             fee,
         )
         return None
+
+    # Check if a transfer_in already exists on the destination for the same
+    # symbol, similar date (±1 day) and similar quantity (within 1%).
+    # This prevents duplicates when users manually create transfer_in before
+    # the auto-mirror runs.
+    exec_date = source_transaction.executed_at
+    existing_result = await db.execute(
+        select(Transaction).where(
+            Transaction.asset_id == dest_asset.id,
+            Transaction.transaction_type == TransactionType.TRANSFER_IN,
+            Transaction.executed_at >= exec_date - timedelta(days=1),
+            Transaction.executed_at <= exec_date + timedelta(days=1),
+        )
+    )
+    for existing_tx in existing_result.scalars().all():
+        existing_qty = float(existing_tx.quantity)
+        if existing_qty > 0 and abs(existing_qty - float(mirror_qty)) / existing_qty < 0.01:
+            logger.info(
+                "Skip auto-mirror for %s on %s: transfer_in already exists (id=%s)",
+                symbol,
+                destination_exchange,
+                existing_tx.id,
+            )
+            # Link the source to the existing transfer_in
+            source_transaction.related_transaction_id = existing_tx.id
+            return None
 
     mirror = Transaction(
         asset_id=dest_asset.id,

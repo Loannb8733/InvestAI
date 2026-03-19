@@ -350,6 +350,37 @@ def _create_missing_transfer_mirrors():
                     continue
 
                 dest_asset_id = asset_cache[key]
+
+                # Skip if a transfer_in already exists on destination for same
+                # symbol, similar date (±1 day), and similar quantity (within 1%)
+                from datetime import timedelta as _td
+
+                existing_mirror = conn.execute(
+                    text(
+                        "SELECT id, quantity FROM transactions"
+                        " WHERE asset_id = :aid AND transaction_type = 'TRANSFER_IN'"
+                        " AND executed_at >= :d1 AND executed_at <= :d2"
+                    ),
+                    {
+                        "aid": dest_asset_id,
+                        "d1": r.executed_at - _td(days=1),
+                        "d2": r.executed_at + _td(days=1),
+                    },
+                ).fetchall()
+                skip = False
+                for em in existing_mirror:
+                    eq = float(em.quantity)
+                    if eq > 0 and abs(eq - mirror_qty) / eq < 0.01:
+                        logger.info("Skip auto-mirror for %s: transfer_in exists (id=%s)", r.symbol, em.id)
+                        conn.execute(
+                            text("UPDATE transactions SET related_transaction_id = :mid WHERE id = :tid"),
+                            {"mid": str(em.id), "tid": r.id},
+                        )
+                        skip = True
+                        break
+                if skip:
+                    continue
+
                 mirror_id = str(uuid_mod.uuid4())
 
                 # Create mirror transfer_in
@@ -774,6 +805,36 @@ async def admin_fix_mirrors(request: Request):
                     continue
 
                 dest_asset_id = asset_cache[key]
+
+                # Skip if a transfer_in already exists on destination
+                from datetime import timedelta as _td
+
+                existing_mirror = conn.execute(
+                    text(
+                        "SELECT id, quantity FROM transactions"
+                        " WHERE asset_id = :aid AND transaction_type = 'TRANSFER_IN'"
+                        " AND executed_at >= :d1 AND executed_at <= :d2"
+                    ),
+                    {
+                        "aid": dest_asset_id,
+                        "d1": r.executed_at - _td(days=1),
+                        "d2": r.executed_at + _td(days=1),
+                    },
+                ).fetchall()
+                skip = False
+                for em in existing_mirror:
+                    eq = float(em.quantity)
+                    if eq > 0 and abs(eq - mirror_qty) / eq < 0.01:
+                        log.append(f"Skip {r.symbol}: transfer_in exists (id={em.id})")
+                        conn.execute(
+                            text("UPDATE transactions SET related_transaction_id = :mid WHERE id = :tid"),
+                            {"mid": str(em.id), "tid": r.id},
+                        )
+                        skip = True
+                        break
+                if skip:
+                    continue
+
                 mirror_id = str(uuid_mod.uuid4())
                 conn.execute(
                     text(
