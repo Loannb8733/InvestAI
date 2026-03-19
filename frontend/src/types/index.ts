@@ -61,6 +61,8 @@ export type TransactionType =
   | 'airdrop'
   | 'conversion_in'
   | 'conversion_out'
+  | 'staking'
+  | 'unstaking'
 
 export interface Transaction {
   id: string

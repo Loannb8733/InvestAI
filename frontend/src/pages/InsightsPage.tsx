@@ -912,7 +912,7 @@ function PassiveIncome() {
   }))
 
   const typeLabels: Record<string, string> = {
-    staking_reward: 'Staking',
+    staking_reward: 'Reward',
     airdrop: 'Airdrops',
   }
 

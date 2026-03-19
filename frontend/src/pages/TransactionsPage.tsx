@@ -121,13 +121,15 @@ const typeLabels: Record<string, string> = {
   sell: 'Vente',
   transfer_in: 'Transfert entrant',
   transfer_out: 'Transfert sortant',
-  staking_reward: 'Staking',
+  staking_reward: 'Reward',
   airdrop: 'Airdrop',
   conversion_in: 'Conversion entrante',
   conversion_out: 'Conversion sortante',
   dividend: 'Dividende',
   interest: 'Intérêts',
   fee: 'Frais',
+  staking: 'Staking',
+  unstaking: 'Unstaking',
 }
 
 const typeColors: Record<string, string> = {
@@ -142,6 +144,8 @@ const typeColors: Record<string, string> = {
   dividend: 'text-emerald-500',
   interest: 'text-cyan-500',
   fee: 'text-red-400',
+  staking: 'text-purple-500',
+  unstaking: 'text-purple-400',
 }
 
 const typeOptions = [
@@ -150,12 +154,14 @@ const typeOptions = [
   { value: 'sell', label: 'Ventes' },
   { value: 'transfer_in', label: 'Transferts entrants' },
   { value: 'transfer_out', label: 'Transferts sortants' },
-  { value: 'staking_reward', label: 'Staking' },
+  { value: 'staking_reward', label: 'Rewards' },
   { value: 'airdrop', label: 'Airdrops' },
   { value: 'conversions', label: 'Conversions' },
   { value: 'dividend', label: 'Dividendes' },
   { value: 'interest', label: 'Intérêts' },
   { value: 'fee', label: 'Frais' },
+  { value: 'staking', label: 'Staking' },
+  { value: 'unstaking', label: 'Unstaking' },
 ]
 
 const dateOptions = [
@@ -1008,6 +1014,7 @@ export default function TransactionsPage() {
                                 'transfer_in',
                                 'staking_reward',
                                 'airdrop',
+                                'unstaking',
                               ].includes(tx.transaction_type) ? (
                               <ArrowDownRight
                                 className={`h-4 w-4 ${typeColors[tx.transaction_type] || 'text-gray-500'}`}

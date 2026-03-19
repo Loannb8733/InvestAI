@@ -59,6 +59,8 @@ class TransactionType(str, enum.Enum):
     AIRDROP = "airdrop"
     CONVERSION_IN = "conversion_in"
     CONVERSION_OUT = "conversion_out"
+    STAKING = "staking"
+    UNSTAKING = "unstaking"
 
 
 class Transaction(Base):
