@@ -1495,10 +1495,12 @@ class ReportService:
                 "conversion_in": "Conv. ↓",
                 "conversion_out": "Conv. ↑",
                 "airdrop": "Airdrop",
-                "staking_reward": "Staking",
+                "staking_reward": "Reward",
                 "fee": "Frais",
                 "dividend": "Dividende",
                 "interest": "Intérêt",
+                "staking": "Staking",
+                "unstaking": "Unstaking",
             }
             rows = [["Date", "Type", "Actif", "Quantité", "Prix Unitaire", "Valeur Totale", "Frais"]]
             for tx in transactions:
@@ -1552,10 +1554,12 @@ class ReportService:
             "conversion_in": "Conversion entrante",
             "conversion_out": "Conversion sortante",
             "airdrop": "Airdrop",
-            "staking_reward": "Staking Reward",
+            "staking_reward": "Reward",
             "fee": "Frais",
             "dividend": "Dividende",
             "interest": "Intérêt",
+            "staking": "Staking",
+            "unstaking": "Unstaking",
         }
 
         headers = ["Date", "Type", "Actif", "Quantité", "Prix Unitaire (EUR)", "Valeur Totale (EUR)", "Frais (EUR)"]

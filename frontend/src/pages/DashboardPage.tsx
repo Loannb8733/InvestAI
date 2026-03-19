@@ -207,10 +207,12 @@ const transactionTypeLabels: Record<string, string> = {
   sell: 'Vente',
   transfer_in: 'Transfert entrant',
   transfer_out: 'Transfert sortant',
-  staking_reward: 'Staking',
+  staking_reward: 'Reward',
   airdrop: 'Airdrop',
   conversion_in: 'Conversion entrante',
   conversion_out: 'Conversion sortante',
+  staking: 'Staking',
+  unstaking: 'Unstaking',
 }
 
 const eventTypeLabels: Record<string, string> = {

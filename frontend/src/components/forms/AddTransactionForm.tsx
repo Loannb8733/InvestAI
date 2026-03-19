@@ -31,6 +31,8 @@ import {
   Coins,
   TrendingUp,
   Wallet,
+  Lock,
+  Unlock,
 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
@@ -49,6 +51,8 @@ const schema = z.object({
     'airdrop',
     'conversion_in',
     'conversion_out',
+    'staking',
+    'unstaking',
   ]),
   quantity: z.coerce.number().positive('Quantité doit être positive'),
   price: z.coerce.number().min(0, 'Prix invalide'),
@@ -88,10 +92,12 @@ const transactionTypes = [
   { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30', submitBg: 'bg-red-600 hover:bg-red-700' },
   { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30', submitBg: 'bg-blue-600 hover:bg-blue-700' },
   { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30', submitBg: 'bg-orange-600 hover:bg-orange-700' },
-  { value: 'staking_reward', label: 'Récompense staking', shortLabel: 'Staking', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30', submitBg: 'bg-yellow-600 hover:bg-yellow-700' },
+  { value: 'staking_reward', label: 'Reward', shortLabel: 'Reward', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30', submitBg: 'bg-yellow-600 hover:bg-yellow-700' },
   { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30', submitBg: 'bg-pink-600 hover:bg-pink-700' },
   { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30', submitBg: 'bg-teal-600 hover:bg-teal-700' },
   { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30', submitBg: 'bg-amber-600 hover:bg-amber-700' },
+  { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20', activeBg: 'bg-purple-500/20 border-purple-500/40 ring-1 ring-purple-500/30', submitBg: 'bg-purple-600 hover:bg-purple-700' },
+  { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20', activeBg: 'bg-purple-400/20 border-purple-400/40 ring-1 ring-purple-400/30', submitBg: 'bg-purple-500 hover:bg-purple-600' },
 ] as const
 
 const assetTypes = [
@@ -226,10 +232,13 @@ export default function AddTransactionForm({
 
   // Post-transaction preview
   const currentQuantity = toNum(selectedAsset?.quantity)
+  const isNeutral = ['staking', 'unstaking'].includes(transactionType)
   const isInbound = ['buy', 'transfer_in', 'staking_reward', 'airdrop', 'conversion_in'].includes(transactionType)
-  const newQuantity = isInbound
-    ? currentQuantity + quantity
-    : currentQuantity - quantity
+  const newQuantity = isNeutral
+    ? currentQuantity
+    : isInbound
+      ? currentQuantity + quantity
+      : currentQuantity - quantity
 
   const typeConfig = transactionTypes.find((t) => t.value === transactionType)
 
