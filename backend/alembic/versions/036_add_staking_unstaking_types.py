@@ -1,7 +1,7 @@
 """Add staking, unstaking to TransactionType enum.
 
 Revision ID: 036_add_staking_unstaking_types
-Revises: 035_add_delay_months_to_crowdfunding_projects
+Revises: a1b2c3d4e5f6
 Create Date: 2026-03-19
 
 """
