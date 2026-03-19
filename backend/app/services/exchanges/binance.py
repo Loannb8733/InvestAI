@@ -186,7 +186,7 @@ class BinanceService(BaseExchangeService):
             return self._valid_pairs
 
         try:
-            async with self._get_http_client(timeout=30.0) as client:
+            async with self._get_http_client(timeout=60.0) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/api/v3/exchangeInfo",
                 )
@@ -196,8 +196,23 @@ class BinanceService(BaseExchangeService):
                         symbol["symbol"] for symbol in data.get("symbols", []) if symbol.get("status") == "TRADING"
                     }
                     logger.info(f"Binance: {len(self._valid_pairs)} valid trading pairs cached")
+                else:
+                    logger.error(f"Binance exchangeInfo returned status {response.status_code}")
         except Exception as e:
             logger.error(f"Error fetching exchange info: {e}")
+
+        # Fallback: if exchangeInfo failed, build pairs optimistically from
+        # account symbols × quote currencies so we still attempt myTrades calls
+        if not self._valid_pairs:
+            logger.warning("Binance: exchangeInfo unavailable, building pairs from account symbols (fallback)")
+            all_symbols = self._all_account_symbols or set()
+            for asset_symbol in all_symbols:
+                if asset_symbol in self.FIAT_CURRENCIES:
+                    continue
+                for quote in self.QUOTE_CURRENCIES:
+                    if asset_symbol != quote:
+                        self._valid_pairs.add(f"{asset_symbol}{quote}")
+            logger.info(f"Binance: {len(self._valid_pairs)} candidate pairs (fallback, unvalidated)")
 
         return self._valid_pairs
 
@@ -238,6 +253,8 @@ class BinanceService(BaseExchangeService):
                     )
 
                     if response.status_code != 200:
+                        error_body = response.text[:200] if response.text else ""
+                        logger.warning(f"Binance myTrades {trading_symbol}: HTTP {response.status_code} — {error_body}")
                         break
 
                     data = response.json()
@@ -319,7 +336,12 @@ class BinanceService(BaseExchangeService):
                 logger.error(f"Error fetching account symbols for trade pairs: {e}")
 
         symbols_list = list(symbols_to_fetch)
-        logger.info(f"Binance: Fetching trades for {len(symbols_list)} valid trading pairs (parallel)...")
+        logger.info(
+            f"Binance: Fetching trades for {len(symbols_list)} valid trading pairs "
+            f"(from {len(valid_pairs)} exchange pairs, parallel)..."
+        )
+        if symbols_list:
+            logger.info(f"Binance: Sample pairs: {symbols_list[:15]}")
 
         # Use semaphore for rate limiting (10 concurrent requests)
         semaphore = asyncio.Semaphore(10)
@@ -336,11 +358,14 @@ class BinanceService(BaseExchangeService):
 
         # Collect all trades from results
         all_trades = []
+        errors = 0
         for result in results:
             if isinstance(result, list):
                 all_trades.extend(result)
+            elif isinstance(result, Exception):
+                errors += 1
 
-        logger.info(f"Binance: Total trades found: {len(all_trades)}")
+        logger.info(f"Binance: Total spot trades found: {len(all_trades)} (errors: {errors}/{len(symbols_list)})")
         return sorted(all_trades, key=lambda x: x.timestamp, reverse=True)
 
     async def get_deposits(
