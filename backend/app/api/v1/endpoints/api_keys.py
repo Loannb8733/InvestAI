@@ -971,30 +971,6 @@ async def import_trade_history(
         # Flush to get transaction IDs before linking
         await db.flush()
 
-        # Create auto-mirror transfer_in for withdrawals (transfer_out)
-        # so assets moved to cold wallets (e.g. Tangem) appear on destination
-        if withdrawals_imported > 0:
-            from app.services.transfer_service import create_mirror_transfer_in
-
-            # Default destination for crypto withdrawals (cold wallet)
-            cold_wallet_destination = "Tangem"
-
-            withdrawal_asset_ids = [a.id for a in existing_assets.values()]
-            if withdrawal_asset_ids:
-                withdrawal_txs_result = await db.execute(
-                    select(Transaction).where(
-                        Transaction.asset_id.in_(withdrawal_asset_ids),
-                        Transaction.transaction_type == TransactionType.TRANSFER_OUT,
-                        Transaction.related_transaction_id.is_(None),
-                    )
-                )
-                for w_tx in withdrawal_txs_result.scalars().all():
-                    w_asset_result = await db.execute(select(Asset).where(Asset.id == w_tx.asset_id))
-                    w_asset = w_asset_result.scalar_one_or_none()
-                    if w_asset:
-                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination)
-                await db.flush()
-
         # Link conversion pairs together
         # Rebuild all_asset_ids to include newly created assets from the import
         refreshed_assets_result = await db.execute(select(Asset.id).where(Asset.portfolio_id == portfolio.id))
@@ -1115,6 +1091,33 @@ async def import_trade_history(
             row = avg_result.one()
             if row[1] and float(row[1]) > 0:
                 asset.avg_buy_price = float(row[0]) / float(row[1])
+
+        await db.flush()
+
+        # Create auto-mirror transfer_in for withdrawals (transfer_out)
+        # so assets moved to cold wallets (e.g. Tangem) appear on destination.
+        # This runs AFTER avg_buy_price is calculated so the cost basis propagates.
+        if withdrawals_imported > 0:
+            from app.services.transfer_service import create_mirror_transfer_in
+
+            # Default destination for crypto withdrawals (cold wallet)
+            cold_wallet_destination = "Tangem"
+
+            withdrawal_asset_ids = [a.id for a in existing_assets.values()]
+            if withdrawal_asset_ids:
+                withdrawal_txs_result = await db.execute(
+                    select(Transaction).where(
+                        Transaction.asset_id.in_(withdrawal_asset_ids),
+                        Transaction.transaction_type == TransactionType.TRANSFER_OUT,
+                        Transaction.related_transaction_id.is_(None),
+                    )
+                )
+                for w_tx in withdrawal_txs_result.scalars().all():
+                    w_asset_result = await db.execute(select(Asset).where(Asset.id == w_tx.asset_id))
+                    w_asset = w_asset_result.scalar_one_or_none()
+                    if w_asset:
+                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination)
+                await db.flush()
 
         # Create assets for API balances that have no transactions (e.g. airdrops, dust)
         fiat_currencies = {"EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"}

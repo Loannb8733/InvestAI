@@ -110,11 +110,17 @@ async def create_mirror_transfer_in(
             source_transaction.related_transaction_id = existing_tx.id
             return None
 
+    # Use source avg_buy_price as the transfer price so cost basis propagates
+    source_avg_price = Decimal(str(source_asset.avg_buy_price or 0))
+    mirror_price = source_transaction.price
+    if (not mirror_price or Decimal(str(mirror_price)) == 0) and source_avg_price > 0:
+        mirror_price = source_avg_price
+
     mirror = Transaction(
         asset_id=dest_asset.id,
         transaction_type=TransactionType.TRANSFER_IN,
         quantity=mirror_qty,
-        price=source_transaction.price,
+        price=mirror_price,
         fee=Decimal("0"),
         currency=source_transaction.currency,
         executed_at=source_transaction.executed_at,
