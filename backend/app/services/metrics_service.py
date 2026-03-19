@@ -102,22 +102,30 @@ class MetricsService:
         asset: Asset,
         current_price: Optional[Decimal] = None,
         actual_invested: Optional[float] = None,
+        buy_pra: Optional[float] = None,
     ) -> Dict:
-        """Calculate metrics for a single asset."""
+        """Calculate metrics for a single asset.
+
+        Args:
+            buy_pra: Undiluted PRA from BUY transactions only (not diluted by
+                     free rewards/conversions). When provided, G/L is computed
+                     relative to the real purchase price so that free quantity
+                     doesn't mask losses on actual purchases.
+        """
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
 
-        # Total invested: use actual cost basis from transactions if available,
-        # otherwise fall back to quantity * avg_buy_price (which can be inflated
-        # when airdrops/rewards add to quantity without adding to cost)
-        if actual_invested is not None:
+        # Use undiluted buy PRA if available — this is the real avg purchase
+        # price, not diluted by free rewards converted into this asset
+        if buy_pra is not None and buy_pra > 0:
+            avg_buy_price = Decimal(str(buy_pra))
+            total_invested = quantity * avg_buy_price
+        elif actual_invested is not None:
             total_invested = Decimal(str(actual_invested))
+            if quantity > 0:
+                avg_buy_price = total_invested / quantity
         else:
             total_invested = quantity * avg_buy_price
-
-        # Recalculate PRA from actual invested when available
-        if actual_invested is not None and quantity > 0:
-            avg_buy_price = total_invested / quantity
 
         # Current value
         if current_price is None:
@@ -340,6 +348,12 @@ class MetricsService:
             cost_by_sym.update(buy_cost_by_sym)
             qty_by_sym: Dict[str, float] = _defaultdict(float)
 
+            # Track cost-bearing quantity per symbol (BUY qty + conversion_in qty
+            # that received non-zero cost). Used to compute undiluted PRA so that
+            # free rewards converted to another asset don't lower the avg buy price.
+            cost_qty_by_sym: Dict[str, float] = _defaultdict(float)
+            cost_qty_by_sym.update(buy_qty_by_sym)
+
             # Accumulate all quantities per symbol (for proportional removal)
             for tx in all_txs:
                 sym = aid_to_symbol.get(str(tx.asset_id), "")
@@ -386,6 +400,23 @@ class MetricsService:
                                 dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
                                 break
 
+                # Find the matching conversion_in quantity
+                matched_ci_qty = co_qty  # fallback
+                if dest_sym:
+                    for ci in conv_ins:
+                        ci_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                        if ci_sym == dest_sym:
+                            ci_notes = ci.notes or ""
+                            if exchange and ("Crypto.com" in exchange or "crypto.com" in exchange.lower()):
+                                if ci_notes == notes and (ci.exchange or "") == exchange:
+                                    matched_ci_qty = float(ci.quantity)
+                                    break
+                            else:
+                                m2 = _re.search(r"trade_id:convert_sell_(\S+)", notes)
+                                if m2 and f"convert_buy_{m2.group(1)}" in ci_notes:
+                                    matched_ci_qty = float(ci.quantity)
+                                    break
+
                 # Remove proportional cost from source, add to destination
                 pool = qty_by_sym.get(src_sym, 0)
                 if pool > 0 and cost_by_sym.get(src_sym, 0) > 0:
@@ -393,8 +424,14 @@ class MetricsService:
                     removed = cost_by_sym[src_sym] * frac
                     cost_by_sym[src_sym] -= removed
                     qty_by_sym[src_sym] = max(0, pool - co_qty)
+                    # Update cost-bearing qty for source
+                    src_cq = cost_qty_by_sym.get(src_sym, 0)
+                    cost_qty_by_sym[src_sym] = max(0, src_cq - co_qty)
                     if dest_sym:
                         cost_by_sym[dest_sym] += removed
+                        # Only add to cost-bearing qty if real cost was propagated
+                        if removed > 0:
+                            cost_qty_by_sym[dest_sym] += matched_ci_qty
 
             # Process SELL — cost exits portfolio
             for tx in all_txs:
@@ -407,6 +444,8 @@ class MetricsService:
                         removed = cost_by_sym[sym] * frac
                         cost_by_sym[sym] -= removed
                         qty_by_sym[sym] = max(0, pool - sell_qty)
+                        sell_cq = cost_qty_by_sym.get(sym, 0)
+                        cost_qty_by_sym[sym] = max(0, sell_cq - sell_qty)
 
             # Transfer OUT/IN: same symbol, different platform — no cost change
             # at symbol level (cost stays with the symbol)
@@ -415,6 +454,14 @@ class MetricsService:
             sym_to_aids: Dict[str, list] = _defaultdict(list)
             for a in investment_assets:
                 sym_to_aids[a.symbol.upper()].append(a)
+
+            # Compute undiluted PRA per symbol: cost / cost-bearing qty
+            # This is the real avg purchase price, not diluted by free rewards
+            buy_pra_by_sym: Dict[str, float] = {}
+            for sym in cost_by_sym:
+                cq = cost_qty_by_sym.get(sym, 0)
+                if cq > 0 and cost_by_sym[sym] > 0:
+                    buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
 
             for sym, sym_assets in sym_to_aids.items():
                 total_qty = sum(float(a.quantity) for a in sym_assets)
@@ -539,7 +586,8 @@ class MetricsService:
             else:
                 current_price = prices.get(asset.symbol.upper())
                 asset_invested = invested_map.get(str(asset.id))
-                metrics = await self.get_asset_metrics(asset, current_price, asset_invested)
+                asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper())
+                metrics = await self.get_asset_metrics(asset, current_price, asset_invested, asset_buy_pra)
 
                 # Post-filter: skip dust positions based on actual current value
                 if (
@@ -550,7 +598,13 @@ class MetricsService:
                     continue
 
             total_value += Decimal(str(metrics["current_value"]))
-            total_invested += Decimal(str(metrics["total_invested"]))
+            # Use real invested (from invested_map) for portfolio total,
+            # not the PRA-based invested shown per asset
+            real_invested = invested_map.get(str(asset.id))
+            if real_invested is not None:
+                total_invested += Decimal(str(real_invested))
+            else:
+                total_invested += Decimal(str(metrics["total_invested"]))
 
             # Per-asset fees and break-even price
             asset_fees = fees_map.get(str(asset.id), 0.0)
