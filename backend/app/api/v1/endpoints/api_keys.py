@@ -971,6 +971,30 @@ async def import_trade_history(
         # Flush to get transaction IDs before linking
         await db.flush()
 
+        # Create auto-mirror transfer_in for withdrawals (transfer_out)
+        # so assets moved to cold wallets (e.g. Tangem) appear on destination
+        if withdrawals_imported > 0:
+            from app.services.transfer_service import create_mirror_transfer_in
+
+            # Default destination for crypto withdrawals (cold wallet)
+            cold_wallet_destination = "Tangem"
+
+            withdrawal_asset_ids = [a.id for a in existing_assets.values()]
+            if withdrawal_asset_ids:
+                withdrawal_txs_result = await db.execute(
+                    select(Transaction).where(
+                        Transaction.asset_id.in_(withdrawal_asset_ids),
+                        Transaction.transaction_type == TransactionType.TRANSFER_OUT,
+                        Transaction.related_transaction_id.is_(None),
+                    )
+                )
+                for w_tx in withdrawal_txs_result.scalars().all():
+                    w_asset_result = await db.execute(select(Asset).where(Asset.id == w_tx.asset_id))
+                    w_asset = w_asset_result.scalar_one_or_none()
+                    if w_asset:
+                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination)
+                await db.flush()
+
         # Link conversion pairs together
         # Rebuild all_asset_ids to include newly created assets from the import
         refreshed_assets_result = await db.execute(select(Asset.id).where(Asset.portfolio_id == portfolio.id))
