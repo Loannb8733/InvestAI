@@ -257,12 +257,28 @@ async def test_api_key(
                 balance=balance_dict if balance_dict else None,
             )
         else:
-            api_key.last_error = "Échec de la connexion"
+            # Try to get more details about the failure
+            error_detail = "Échec de la connexion"
+            try:
+                async with service._get_http_client(timeout=10.0) as client:
+                    params = service._sign_request({})
+                    resp = await client.get(
+                        f"{service.BASE_URL}/api/v3/account",
+                        params=params,
+                        headers=service._get_headers(),
+                    )
+                    if resp.status_code != 200:
+                        body = resp.json()
+                        error_detail = f"HTTP {resp.status_code}: {body.get('msg', resp.text[:200])}"
+            except Exception:
+                pass
+
+            api_key.last_error = error_detail
             await db.commit()
 
             return APIKeyTestResult(
                 success=False,
-                message="Échec de la connexion. Vérifiez vos identifiants.",
+                message=f"Échec de la connexion: {error_detail}",
             )
 
     except Exception as e:
