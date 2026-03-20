@@ -150,38 +150,34 @@ class BinanceService(BaseExchangeService):
         # Enrich with Simple Earn positions (totalAmount = principal + interest)
         try:
             earn_balances = await self._get_earn_positions()
-        except Exception as e:
-            logger.warning(f"Failed to fetch earn positions, using spot balances only: {e}")
-            earn_balances = {}
-        if earn_balances:
-            balance_map = {b.symbol: b for b in balances}
-            for symbol, total_amount in earn_balances.items():
-                ld_symbol = f"LD{symbol}"
-                if ld_symbol in balance_map:
-                    old_total = balance_map[ld_symbol].total
-                    if total_amount > old_total:
-                        logger.info(
-                            f"Earn position {symbol}: updating {ld_symbol} "
-                            f"{float(old_total):.8f} → {float(total_amount):.8f} (incl. interest)"
-                        )
+            if earn_balances:
+                balance_map = {b.symbol: b for b in balances}
+                for symbol, total_amount in earn_balances.items():
+                    ld_symbol = f"LD{symbol}"
+                    if ld_symbol in balance_map:
+                        old_total = balance_map[ld_symbol].total
+                        if total_amount > old_total:
+                            logger.info(
+                                f"Earn position {symbol}: updating {ld_symbol} "
+                                f"{float(old_total):.8f} → {float(total_amount):.8f} (incl. interest)"
+                            )
+                            balance_map[ld_symbol] = ExchangeBalance(
+                                symbol=ld_symbol,
+                                free=Decimal("0"),
+                                locked=total_amount,
+                                total=total_amount,
+                            )
+                    elif symbol not in balance_map:
+                        # No LD* variant and no spot balance — create an LD* entry
                         balance_map[ld_symbol] = ExchangeBalance(
                             symbol=ld_symbol,
                             free=Decimal("0"),
                             locked=total_amount,
                             total=total_amount,
                         )
-                elif symbol not in balance_map:
-                    # No LD* variant and no spot balance — create an LD* entry
-                    balances.append(
-                        ExchangeBalance(
-                            symbol=ld_symbol,
-                            free=Decimal("0"),
-                            locked=total_amount,
-                            total=total_amount,
-                        )
-                    )
-                    balance_map[ld_symbol] = balances[-1]
-            balances = list(balance_map.values())
+                balances = list(balance_map.values())
+        except Exception as e:
+            logger.warning(f"Failed to fetch/apply earn positions, using spot balances only: {e}")
 
         return balances
 
