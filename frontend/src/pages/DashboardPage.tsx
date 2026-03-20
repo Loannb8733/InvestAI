@@ -123,6 +123,7 @@ interface AssetAllocation {
   percentage: number
   gain_loss_percent: number
   avg_buy_price?: number
+  staked_quantity?: number
 }
 
 interface RecentTransaction {
@@ -742,7 +743,7 @@ export default function DashboardPage() {
                                       <p className="font-medium text-sm">{asset.symbol}</p>
                                       {/* Live indicator removed: asset.value is server-computed, not updated with WS prices */}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{pc(asset.value)}</p>
+                                    <p className="text-xs text-muted-foreground">{pc(asset.value)}{asset.staked_quantity != null && asset.staked_quantity > 0 && <span className="ml-1 text-purple-500">(dont {asset.staked_quantity.toFixed(2)} en Staking)</span>}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">

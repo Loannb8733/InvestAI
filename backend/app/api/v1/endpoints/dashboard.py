@@ -87,6 +87,7 @@ class AssetAllocation(BaseModel):
     percentage: float
     gain_loss_percent: float
     avg_buy_price: Optional[float] = None
+    staked_quantity: Optional[float] = None
 
 
 class IndexComparison(BaseModel):
@@ -292,6 +293,21 @@ async def get_dashboard(
             metrics["period_change"] = 0.0
             metrics["period_change_percent"] = 0.0
 
+    # Query staked quantities per symbol (sum of STAKING tx quantities)
+    from app.models.transaction import TransactionType
+
+    staked_result = await db.execute(
+        select(Asset.symbol, func.sum(Transaction.quantity))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(
+            Portfolio.user_id == current_user.id,
+            Transaction.transaction_type == TransactionType.STAKING,
+        )
+        .group_by(Asset.symbol)
+    )
+    staked_map = {row[0].upper(): float(row[1]) for row in staked_result.fetchall()}
+
     # Build asset-level allocation from pre-aggregated data (no extra DB/API calls)
     asset_allocation = [
         AssetAllocation(
@@ -302,6 +318,7 @@ async def get_dashboard(
             percentage=a["percentage"],
             gain_loss_percent=a["gain_loss_percent"],
             avg_buy_price=a.get("avg_buy_price"),
+            staked_quantity=staked_map.get(a["symbol"].upper()),
         )
         for a in metrics.get("aggregated_assets", [])
     ]
