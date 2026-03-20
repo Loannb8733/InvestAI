@@ -147,7 +147,87 @@ class BinanceService(BaseExchangeService):
                         )
                     )
 
+        # Enrich with Simple Earn positions (totalAmount = principal + interest)
+        earn_balances = await self._get_earn_positions()
+        if earn_balances:
+            balance_map = {b.symbol: b for b in balances}
+            for symbol, total_amount in earn_balances.items():
+                ld_symbol = f"LD{symbol}"
+                if ld_symbol in balance_map:
+                    old_total = balance_map[ld_symbol].total
+                    if total_amount > old_total:
+                        logger.info(
+                            f"Earn position {symbol}: updating {ld_symbol} "
+                            f"{float(old_total):.8f} → {float(total_amount):.8f} (incl. interest)"
+                        )
+                        balance_map[ld_symbol] = ExchangeBalance(
+                            symbol=ld_symbol,
+                            free=Decimal("0"),
+                            locked=total_amount,
+                            total=total_amount,
+                        )
+                elif symbol not in balance_map:
+                    # No LD* variant and no spot balance — create an LD* entry
+                    balances.append(
+                        ExchangeBalance(
+                            symbol=ld_symbol,
+                            free=Decimal("0"),
+                            locked=total_amount,
+                            total=total_amount,
+                        )
+                    )
+                    balance_map[ld_symbol] = balances[-1]
+            balances = list(balance_map.values())
+
         return balances
+
+    async def _get_earn_positions(self) -> dict[str, Decimal]:
+        """Fetch Simple Earn Flexible + Locked positions from Binance.
+
+        Returns dict of {symbol: totalAmount} (principal + accrued interest).
+        """
+        earn_totals: dict[str, Decimal] = {}
+
+        await self._sync_server_time()
+
+        async with self._get_http_client(timeout=30.0) as client:
+            # Simple Earn Flexible positions
+            for endpoint in [
+                "/sapi/v1/simple-earn/flexible/position",
+                "/sapi/v1/simple-earn/locked/position",
+            ]:
+                try:
+                    current = 1
+                    while True:
+                        params = self._sign_request({"current": current, "size": 100})
+                        response = await client.get(
+                            f"{self.BASE_URL}{endpoint}",
+                            params=params,
+                            headers=self._get_headers(),
+                        )
+                        if response.status_code != 200:
+                            logger.warning(f"Earn positions {endpoint}: HTTP {response.status_code}")
+                            break
+                        data = response.json()
+                        rows = data.get("rows", [])
+                        if not rows:
+                            break
+                        for row in rows:
+                            asset = row.get("asset", "")
+                            total_amount = Decimal(str(row.get("totalAmount", "0")))
+                            if total_amount > 0 and asset:
+                                earn_totals[asset] = earn_totals.get(asset, Decimal("0")) + total_amount
+                                logger.debug(f"Earn {endpoint}: {asset} totalAmount={total_amount}")
+                        total_pages = data.get("total", 0)
+                        if current * 100 >= total_pages:
+                            break
+                        current += 1
+                except Exception as e:
+                    logger.warning(f"Failed to fetch {endpoint}: {e}")
+
+        if earn_totals:
+            logger.info(f"Earn positions found: {dict((k, float(v)) for k, v in earn_totals.items())}")
+        return earn_totals
 
     async def _get_all_account_symbols(self) -> set:
         """Get ALL symbols from the account (including 0 balance).
