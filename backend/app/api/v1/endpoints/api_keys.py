@@ -480,10 +480,10 @@ async def import_trade_history(
             # Add instant buys to trades list
             trades.extend(instant_buys)
 
-        # Get staking rewards from Kraken ledgers
+        # Get staking rewards (Kraken ledgers, Binance earn history)
         rewards = []
         if hasattr(service, "get_rewards"):
-            logger.info("Querying Kraken rewards/staking history from ledgers...")
+            logger.info(f"Querying {service.exchange_name} rewards/staking history...")
             rewards = await service.get_rewards(limit=500, ledgers=_cached_ledgers)
             logger.info(f"Rewards found: {len(rewards)}")
 

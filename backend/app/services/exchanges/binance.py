@@ -1097,3 +1097,71 @@ class BinanceService(BaseExchangeService):
                 logger.error(f"Error fetching simple earn history: {e}")
 
         return orders
+
+    async def get_rewards(self, limit: int = 500, **kwargs) -> List[ExchangeTrade]:
+        """Get Simple Earn interest/rewards history from Binance.
+
+        Queries rewardsRecord endpoints for flexible and locked earn products.
+        Returns rewards as ExchangeTrade with trade_id prefix 'reward_staking_'.
+        """
+        trades: list[ExchangeTrade] = []
+
+        await self._sync_server_time()
+
+        async with self._get_http_client(timeout=30.0) as client:
+            # Each endpoint requires a 'type' param:
+            # BONUS = sign-up/promotional, REALTIME = daily interest, REWARDS = locked staking
+            earn_queries = [
+                ("/sapi/v1/simple-earn/flexible/history/rewardsRecord", "BONUS"),
+                ("/sapi/v1/simple-earn/flexible/history/rewardsRecord", "REALTIME"),
+                ("/sapi/v1/simple-earn/locked/history/rewardsRecord", "BONUS"),
+                ("/sapi/v1/simple-earn/locked/history/rewardsRecord", "REALTIME"),
+                ("/sapi/v1/simple-earn/locked/history/rewardsRecord", "REWARDS"),
+            ]
+            for endpoint, reward_type in earn_queries:
+                try:
+                    current = 1
+                    while True:
+                        params = self._sign_request({"type": reward_type, "current": current, "size": 100})
+                        response = await client.get(
+                            f"{self.BASE_URL}{endpoint}",
+                            params=params,
+                            headers=self._get_headers(),
+                        )
+                        if response.status_code != 200:
+                            logger.warning(
+                                f"Earn rewards {endpoint} type={reward_type}: HTTP {response.status_code} — {response.text}"
+                            )
+                            break
+                        data = response.json()
+                        rows = data.get("rows", [])
+                        if not rows:
+                            break
+                        for row in rows:
+                            asset = row.get("asset", "")
+                            rewards_amt = Decimal(str(row.get("rewards", "0")))
+                            if rewards_amt <= 0 or not asset:
+                                continue
+                            raw_time = row.get("time", 0)
+                            ts = datetime.utcfromtimestamp(raw_time / 1000)
+                            trades.append(
+                                ExchangeTrade(
+                                    trade_id=f"reward_staking_{asset}_{reward_type}_{raw_time}",
+                                    symbol=f"{asset}EUR",
+                                    side="buy",
+                                    quantity=rewards_amt,
+                                    price=Decimal("0"),
+                                    fee=Decimal("0"),
+                                    fee_currency="EUR",
+                                    timestamp=ts,
+                                )
+                            )
+                        total_records = data.get("total", 0)
+                        if current * 100 >= total_records:
+                            break
+                        current += 1
+                except Exception as e:
+                    logger.warning(f"Failed to fetch {endpoint} type={reward_type}: {e}")
+
+        logger.info(f"Binance earn rewards found: {len(trades)}")
+        return sorted(trades, key=lambda x: x.timestamp, reverse=True)

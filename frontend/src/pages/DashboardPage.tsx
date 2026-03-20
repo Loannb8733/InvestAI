@@ -136,6 +136,7 @@ interface EarnAsset {
 interface EarnSummary {
   total_staked_value: number
   total_rewards: number
+  apr?: number
   assets: EarnAsset[]
 }
 
