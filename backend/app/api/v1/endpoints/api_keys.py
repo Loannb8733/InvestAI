@@ -417,6 +417,49 @@ async def import_trade_history(
         balances = await service.get_balances()
         balance_map = {b.symbol: b for b in balances}
 
+        # Normalize Binance Earn variants (LDUSDC → USDC, etc.)
+        # Merge earn balances into base symbol and track staked amounts
+        from app.tasks.sync_exchanges import _normalize_earn_variant
+
+        earn_staked: dict = {}  # {base_symbol: staked_qty}
+        normalized_balance_map: dict = {}
+        for b in balances:
+            norm = _normalize_earn_variant(b.symbol)
+            if norm != b.symbol:
+                # This is an earn variant — track staked amount
+                earn_staked[norm] = earn_staked.get(norm, 0) + float(b.total)
+                logger.info(f"Earn variant: {b.symbol} ({float(b.total)}) → staked {norm}")
+                # Merge into base symbol balance for reconciliation
+                if norm in normalized_balance_map:
+                    existing = normalized_balance_map[norm]
+                    from app.services.exchanges.base import ExchangeBalance
+
+                    normalized_balance_map[norm] = ExchangeBalance(
+                        symbol=norm,
+                        free=existing.free + b.free,
+                        locked=existing.locked + b.locked,
+                        total=existing.total + b.total,
+                    )
+                else:
+                    from app.services.exchanges.base import ExchangeBalance
+
+                    base_balance = balance_map.get(norm)
+                    if base_balance:
+                        normalized_balance_map[norm] = ExchangeBalance(
+                            symbol=norm,
+                            free=base_balance.free + b.free,
+                            locked=base_balance.locked + b.locked,
+                            total=base_balance.total + b.total,
+                        )
+                    else:
+                        normalized_balance_map[norm] = ExchangeBalance(
+                            symbol=norm, free=b.free, locked=b.locked, total=b.total
+                        )
+            else:
+                if b.symbol not in normalized_balance_map:
+                    normalized_balance_map[b.symbol] = b
+        balance_map = normalized_balance_map
+
         # Get all trades (no arbitrary cap — paginate fully)
         trades = await service.get_trades(limit=10000)
 
@@ -1094,6 +1137,41 @@ async def import_trade_history(
 
         await db.flush()
 
+        # Create STAKING transactions for Earn variants (LDUSDC → staking USDC, etc.)
+        staking_created = 0
+        for base_sym, staked_qty in earn_staked.items():
+            if staked_qty <= 0 or base_sym not in existing_assets:
+                continue
+            asset = existing_assets[base_sym]
+            # Check if a staking tx already exists for this asset
+            existing_staking = await db.execute(
+                select(Transaction)
+                .where(
+                    Transaction.asset_id == asset.id,
+                    Transaction.transaction_type == TransactionType.STAKING,
+                )
+                .limit(1)
+            )
+            if existing_staking.scalar_one_or_none():
+                continue  # Already has a staking marker
+            staking_tx = Transaction(
+                asset_id=asset.id,
+                transaction_type=TransactionType.STAKING,
+                quantity=staked_qty,
+                price=0,
+                fee=0,
+                currency="EUR",
+                executed_at=datetime.now(timezone.utc),
+                exchange=service.exchange_name,
+                notes=f"Auto: {staked_qty:.8f} {base_sym} in Earn/Staking",
+            )
+            db.add(staking_tx)
+            staking_created += 1
+            logger.info(f"{base_sym}: created STAKING transaction ({staked_qty:.8f} in Earn)")
+
+        if staking_created:
+            await db.flush()
+
         # Create auto-mirror transfer_in for withdrawals (transfer_out)
         # so assets moved to cold wallets (e.g. Tangem) appear on destination.
         # This runs AFTER avg_buy_price is calculated so the cost basis propagates.
@@ -1122,11 +1200,16 @@ async def import_trade_history(
         # Create assets for API balances that have no transactions (e.g. airdrops, dust)
         fiat_currencies = {"EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"}
         for balance in balances:
-            if balance.symbol in fiat_currencies:
+            symbol = balance.symbol
+            # Skip earn variants — they're merged into base asset
+            norm = _normalize_earn_variant(symbol)
+            if norm != symbol:
+                continue
+            if symbol in fiat_currencies:
                 continue
             if float(balance.total) < 0.00000001:
                 continue
-            if balance.symbol in existing_assets:
+            if symbol in existing_assets:
                 continue
             # Check if asset already exists for this exchange
             existing_check = await db.execute(
