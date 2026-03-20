@@ -13,6 +13,7 @@ interface EarnAsset {
 interface EarnSummary {
   total_staked_value: number
   total_rewards: number
+  apr?: number
   assets: EarnAsset[]
 }
 
@@ -25,6 +26,11 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Lock className="h-4 w-4 text-purple-400" />
           Earn / Staking
+          {earnSummary.apr != null && earnSummary.apr > 0 && (
+            <Badge className="bg-green-500/10 text-green-500 border-green-500/30 text-[10px]">
+              Yield {earnSummary.apr.toFixed(1)}%
+            </Badge>
+          )}
           <Badge className="ml-auto bg-purple-500/10 text-purple-400 border-purple-500/30 text-[10px]">
             {earnSummary.assets.length} actif{earnSummary.assets.length > 1 ? 's' : ''}
           </Badge>
@@ -40,7 +46,7 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
           <div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              Rewards cumulés
+              Rewards cumules
             </p>
             <p className={`text-lg font-bold ${earnSummary.total_rewards > 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
               {earnSummary.total_rewards > 0 ? '+' : ''}{pc(earnSummary.total_rewards)}

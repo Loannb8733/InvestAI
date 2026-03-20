@@ -103,6 +103,7 @@ class EarnSummary(BaseModel):
 
     total_staked_value: float
     total_rewards: float
+    apr: Optional[float] = None
     assets: List[EarnAsset]
 
 
@@ -394,8 +395,31 @@ async def get_dashboard(
         # else: unknown price, skip
 
     earn_assets.sort(key=lambda x: x.current_value, reverse=True)
+
+    # Compute APR: annualized yield = (rewards / staked_value) * (365 / days_staking)
+    earn_apr = None
+    if total_staked_value > 0 and total_rewards > 0:
+        first_staking_tx = await db.execute(
+            select(func.min(Transaction.executed_at))
+            .join(Asset, Transaction.asset_id == Asset.id)
+            .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+            .where(
+                Portfolio.user_id == current_user.id,
+                Transaction.transaction_type == TransactionType.STAKING_REWARD,
+            )
+        )
+        first_reward_date = first_staking_tx.scalar()
+        if first_reward_date:
+            days_earning = max((datetime.utcnow() - first_reward_date.replace(tzinfo=None)).days, 1)
+            earn_apr = round((total_rewards / total_staked_value) * (365 / days_earning) * 100, 2)
+
     earn_summary = (
-        EarnSummary(total_staked_value=total_staked_value, total_rewards=total_rewards, assets=earn_assets)
+        EarnSummary(
+            total_staked_value=total_staked_value,
+            total_rewards=total_rewards,
+            apr=earn_apr,
+            assets=earn_assets,
+        )
         if earn_assets
         else None
     )
