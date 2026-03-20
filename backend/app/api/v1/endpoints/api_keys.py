@@ -483,43 +483,47 @@ async def import_trade_history(
         # Get staking rewards (Kraken ledgers, Binance earn history)
         rewards = []
         if hasattr(service, "get_rewards"):
-            logger.info(f"Querying {service.exchange_name} rewards/staking history...")
-            rewards = await service.get_rewards(limit=500, ledgers=_cached_ledgers)
-            logger.info(f"Rewards found: {len(rewards)}")
+            try:
+                logger.info(f"Querying {service.exchange_name} rewards/staking history...")
+                rewards = await service.get_rewards(limit=500, ledgers=_cached_ledgers)
+                logger.info(f"Rewards found: {len(rewards)}")
 
-            # Fetch historical prices for rewards
-            if rewards:
-                import asyncio
+                # Fetch historical prices for rewards
+                if rewards:
+                    import asyncio
 
-                from app.services.price_service import price_service
+                    from app.services.price_service import price_service
 
-                logger.info("Fetching historical prices for rewards (this may take a moment)...")
+                    logger.info("Fetching historical prices for rewards (this may take a moment)...")
 
-                # Group rewards by symbol and date to minimize API calls
-                price_cache = {}
-                for reward in rewards:
-                    # Extract symbol from pair (e.g., BTCEUR -> BTC)
-                    symbol = reward.symbol.replace("EUR", "").replace("USD", "")
-                    date_key = f"{symbol}_{reward.timestamp.strftime('%Y-%m-%d')}"
+                    # Group rewards by symbol and date to minimize API calls
+                    price_cache = {}
+                    for reward in rewards:
+                        # Extract symbol from pair (e.g., BTCEUR -> BTC)
+                        symbol = reward.symbol.replace("EUR", "").replace("USD", "")
+                        date_key = f"{symbol}_{reward.timestamp.strftime('%Y-%m-%d')}"
 
-                    if date_key not in price_cache:
-                        try:
-                            price = await price_service.get_historical_crypto_price(symbol, reward.timestamp, "eur")
-                            price_cache[date_key] = price
-                            if price:
-                                logger.debug(f"{symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
-                            # Delay to avoid CoinGecko rate limiting (50 req/min)
-                            await asyncio.sleep(1.5)
-                        except Exception as e:
-                            logger.error(f"Error getting price for {symbol}: {e}")
-                            price_cache[date_key] = None
+                        if date_key not in price_cache:
+                            try:
+                                price = await price_service.get_historical_crypto_price(symbol, reward.timestamp, "eur")
+                                price_cache[date_key] = price
+                                if price:
+                                    logger.debug(f"{symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
+                                # Delay to avoid CoinGecko rate limiting (50 req/min)
+                                await asyncio.sleep(1.5)
+                            except Exception as e:
+                                logger.error(f"Error getting price for {symbol}: {e}")
+                                price_cache[date_key] = None
 
-                    # Update reward price
-                    if price_cache.get(date_key):
-                        reward.price = price_cache[date_key]
+                        # Update reward price
+                        if price_cache.get(date_key):
+                            reward.price = price_cache[date_key]
 
-            # Add rewards to trades list
-            trades.extend(rewards)
+                # Add rewards to trades list
+                trades.extend(rewards)
+            except Exception as e:
+                logger.error(f"Failed to fetch rewards from {service.exchange_name}: {e}")
+                rewards = []
 
         # Get crypto-to-crypto conversions (Kraken, Crypto.com)
         # Skip for Binance: get_convert_history already covers crypto-to-crypto conversions
