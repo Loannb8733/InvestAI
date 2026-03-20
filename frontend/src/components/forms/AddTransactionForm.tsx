@@ -233,6 +233,7 @@ export default function AddTransactionForm({
   // Post-transaction preview
   const currentQuantity = toNum(selectedAsset?.quantity)
   const isNeutral = ['staking', 'unstaking'].includes(transactionType)
+  const isFreeCrypto = ['staking_reward', 'airdrop'].includes(transactionType)
   const isInbound = ['buy', 'transfer_in', 'staking_reward', 'airdrop', 'conversion_in'].includes(transactionType)
   const newQuantity = isNeutral
     ? currentQuantity
@@ -724,13 +725,13 @@ export default function AddTransactionForm({
               {total > 0 && (
                 <div className="space-y-0.5 text-right">
                   <p className="text-[10px] text-muted-foreground">
-                    {isInbound ? 'Impact Cash' : 'Montant récupéré'}
+                    {isFreeCrypto ? 'Valeur estimée' : isInbound ? 'Impact Cash' : 'Montant récupéré'}
                   </p>
                   <p className={cn(
                     'text-sm font-semibold',
-                    isInbound ? 'text-red-400' : 'text-green-400',
+                    isFreeCrypto ? 'text-muted-foreground' : isInbound ? 'text-red-400' : 'text-green-400',
                   )}>
-                    {isInbound ? '-' : '+'}{fmt.format(total)}
+                    {isFreeCrypto ? '≈ ' : isInbound ? '-' : '+'}{fmt.format(total)}
                   </p>
                 </div>
               )}
