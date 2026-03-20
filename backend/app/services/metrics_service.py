@@ -66,7 +66,6 @@ STABLECOIN_SYMBOLS = {
     "FDUSD",
     "EURC",
     "EURT",
-    "LDUSDC",
 }
 
 
@@ -658,7 +657,7 @@ class MetricsService:
         # Calculate stablecoin cash value (filter out dust)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
-        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD", "LDUSDC"}
+        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD"}
         for asset in stablecoin_assets:
             # Stablecoins are valued at ~1:1 with their denomination
             if asset.symbol.upper() in usd_stablecoins:

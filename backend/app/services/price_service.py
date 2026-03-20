@@ -202,7 +202,6 @@ class PriceService:
         "PYUSD": "USD",  # PayPal USD
         "FDUSD": "USD",  # First Digital USD
         "USDG": "USD",  # Global Dollar (Paxos)
-        "LDUSDC": "USD",  # Binance Lending USDC (Earn)
         "EURT": "EUR",  # Euro Tether
         "EUROC": "EUR",  # Euro Coin
     }
