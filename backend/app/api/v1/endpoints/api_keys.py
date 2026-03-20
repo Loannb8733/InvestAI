@@ -1308,7 +1308,7 @@ async def import_trade_history(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de l'import des transactions. Veuillez réessayer.",
+            detail=f"Import error: {type(e).__name__}: {e}",
         )
 
 
