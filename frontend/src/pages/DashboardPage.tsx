@@ -57,6 +57,7 @@ import DashboardPnlCard from '@/components/dashboard/DashboardPnlCard'
 import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
+import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
 
 // ============== Interfaces ==============
 
@@ -126,6 +127,18 @@ interface AssetAllocation {
   staked_quantity?: number
 }
 
+interface EarnAsset {
+  symbol: string
+  staked_quantity: number
+  current_value: number
+}
+
+interface EarnSummary {
+  total_staked_value: number
+  total_rewards: number
+  assets: EarnAsset[]
+}
+
 interface RecentTransaction {
   id: string
   symbol: string
@@ -187,6 +200,7 @@ interface DashboardMetrics {
   index_comparison: IndexComparison[]
   advanced_metrics: AdvancedMetrics
   available_liquidity?: number
+  earn_summary?: EarnSummary
   period_days?: number
   period_label?: string
   last_updated: string
@@ -586,6 +600,9 @@ export default function DashboardPage() {
                 )
               case 'munitions':
                 return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} privacyMode={privacyMode} />
+              case 'earn':
+                if (!metrics.earn_summary) return null
+                return <DashboardEarnCard earnSummary={metrics.earn_summary} privacyMode={privacyMode} />
               case 'crowdfunding':
                 if (!cfDashboard || cfDashboard.active_count === 0 && cfDashboard.completed_count === 0) return null
                 return (

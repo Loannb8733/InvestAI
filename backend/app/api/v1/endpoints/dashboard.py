@@ -90,6 +90,22 @@ class AssetAllocation(BaseModel):
     staked_quantity: Optional[float] = None
 
 
+class EarnAsset(BaseModel):
+    """A single staked asset in the earn summary."""
+
+    symbol: str
+    staked_quantity: float
+    current_value: float
+
+
+class EarnSummary(BaseModel):
+    """Earn/staking summary for dashboard."""
+
+    total_staked_value: float
+    total_rewards: float
+    assets: List[EarnAsset]
+
+
 class IndexComparison(BaseModel):
     """Index comparison data."""
 
@@ -216,6 +232,9 @@ class EnhancedDashboardResponse(BaseModel):
     # Liquidity
     available_liquidity: float = 0.0
 
+    # Earn / Staking
+    earn_summary: Optional[EarnSummary] = None
+
     # Period context
     period_days: int = 30
     period_label: str = "30j"
@@ -293,20 +312,82 @@ async def get_dashboard(
             metrics["period_change"] = 0.0
             metrics["period_change_percent"] = 0.0
 
-    # Query staked quantities per symbol (sum of STAKING tx quantities)
+    # Query net staked quantities per symbol (STAKING - UNSTAKING)
+    from sqlalchemy import case as sa_case
+
     from app.models.transaction import TransactionType
+    from app.services.metrics_service import is_stablecoin
 
     staked_result = await db.execute(
-        select(Asset.symbol, func.sum(Transaction.quantity))
+        select(
+            Asset.symbol,
+            func.sum(
+                sa_case(
+                    (Transaction.transaction_type == TransactionType.STAKING, Transaction.quantity),
+                    (Transaction.transaction_type == TransactionType.UNSTAKING, -Transaction.quantity),
+                    else_=0,
+                )
+            ),
+        )
         .join(Asset, Transaction.asset_id == Asset.id)
         .join(Portfolio, Asset.portfolio_id == Portfolio.id)
         .where(
             Portfolio.user_id == current_user.id,
-            Transaction.transaction_type == TransactionType.STAKING,
+            Transaction.transaction_type.in_([TransactionType.STAKING, TransactionType.UNSTAKING]),
         )
         .group_by(Asset.symbol)
     )
-    staked_map = {row[0].upper(): float(row[1]) for row in staked_result.fetchall()}
+    staked_map = {row[0].upper(): max(0, float(row[1])) for row in staked_result.fetchall()}
+
+    # Query cumulative staking rewards (quantity * price = value in EUR)
+    rewards_result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.quantity * Transaction.price), 0))
+        .join(Asset, Transaction.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(
+            Portfolio.user_id == current_user.id,
+            Transaction.transaction_type == TransactionType.STAKING_REWARD,
+        )
+    )
+    total_rewards = float(rewards_result.scalar() or 0)
+
+    # Build earn summary — price lookup from aggregated_assets
+    asset_price_map: dict[str, float] = {}
+    for a in metrics.get("aggregated_assets", []):
+        qty = a.get("quantity", 0)
+        if qty and float(qty) > 0:
+            asset_price_map[a["symbol"].upper()] = float(a["current_value"]) / float(qty)
+
+    earn_assets: list[EarnAsset] = []
+    total_staked_value = 0.0
+    for symbol, staked_qty in staked_map.items():
+        if staked_qty <= 0:
+            continue
+        if symbol in asset_price_map:
+            unit_price = asset_price_map[symbol]
+        elif is_stablecoin(symbol):
+            # Approximate: USD stablecoins ≈ EUR rate from metrics
+            unit_price = (
+                metrics.get("available_liquidity", 0)
+                / max(sum(staked_map.get(s, 0) for s in staked_map if is_stablecoin(s)), 1)
+                if is_stablecoin(symbol)
+                else 1.0
+            )
+            # Simpler fallback: ~0.87 EUR/USD
+            if unit_price <= 0:
+                unit_price = 0.87
+        else:
+            unit_price = 0.0
+        current_value = staked_qty * unit_price
+        total_staked_value += current_value
+        earn_assets.append(EarnAsset(symbol=symbol, staked_quantity=staked_qty, current_value=current_value))
+
+    earn_assets.sort(key=lambda x: x.current_value, reverse=True)
+    earn_summary = (
+        EarnSummary(total_staked_value=total_staked_value, total_rewards=total_rewards, assets=earn_assets)
+        if earn_assets
+        else None
+    )
 
     # Build asset-level allocation from pre-aggregated data (no extra DB/API calls)
     asset_allocation = [
@@ -478,6 +559,7 @@ async def get_dashboard(
         index_comparison=index_comparison,
         advanced_metrics=advanced_metrics,
         available_liquidity=metrics.get("available_liquidity", 0.0),
+        earn_summary=earn_summary,
         period_days=days,
         period_label=get_period_label_fr(original_days),
         last_updated=datetime.utcnow().isoformat(),
