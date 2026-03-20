@@ -1150,10 +1150,20 @@ async def import_trade_history(
                     Transaction.asset_id == asset.id,
                     Transaction.transaction_type == TransactionType.STAKING,
                 )
+                .order_by(Transaction.executed_at.desc())
                 .limit(1)
             )
-            if existing_staking.scalar_one_or_none():
-                continue  # Already has a staking marker
+            existing_staking_tx = existing_staking.scalar_one_or_none()
+            if existing_staking_tx:
+                # Update quantity to match current earn balance
+                if abs(float(existing_staking_tx.quantity) - staked_qty) > 0.0001:
+                    old_qty = float(existing_staking_tx.quantity)
+                    existing_staking_tx.quantity = staked_qty
+                    existing_staking_tx.executed_at = datetime.now(timezone.utc)
+                    existing_staking_tx.notes = f"Auto: {staked_qty:.8f} {base_sym} in Earn/Staking"
+                    staking_created += 1
+                    logger.info(f"{base_sym}: updated STAKING tx {old_qty:.8f} → {staked_qty:.8f}")
+                continue
             staking_tx = Transaction(
                 asset_id=asset.id,
                 transaction_type=TransactionType.STAKING,
