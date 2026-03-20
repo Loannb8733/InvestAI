@@ -339,17 +339,18 @@ async def get_dashboard(
     )
     staked_map = {row[0].upper(): max(0, float(row[1])) for row in staked_result.fetchall()}
 
-    # Query cumulative staking rewards (quantity * price = value in EUR)
+    # Query cumulative staking rewards per symbol (quantity only — we price later)
     rewards_result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.quantity * Transaction.price), 0))
+        select(Asset.symbol, func.sum(Transaction.quantity))
         .join(Asset, Transaction.asset_id == Asset.id)
         .join(Portfolio, Asset.portfolio_id == Portfolio.id)
         .where(
             Portfolio.user_id == current_user.id,
             Transaction.transaction_type == TransactionType.STAKING_REWARD,
         )
+        .group_by(Asset.symbol)
     )
-    total_rewards = float(rewards_result.scalar() or 0)
+    rewards_by_symbol = {row[0].upper(): float(row[1]) for row in rewards_result.fetchall()}
 
     # Build earn summary — price lookup from aggregated_assets
     asset_price_map: dict[str, float] = {}
@@ -357,6 +358,15 @@ async def get_dashboard(
         qty = a.get("quantity", 0)
         if qty and float(qty) > 0:
             asset_price_map[a["symbol"].upper()] = float(a["current_value"]) / float(qty)
+
+    # Get real USD→EUR rate for stablecoin pricing
+    from app.services.price_service import PriceService
+
+    _price_svc = PriceService()
+    try:
+        usd_eur_rate = float(await _price_svc._get_eur_usd_rate())
+    except Exception:
+        usd_eur_rate = 0.92  # fallback
 
     earn_assets: list[EarnAsset] = []
     total_staked_value = 0.0
@@ -366,21 +376,22 @@ async def get_dashboard(
         if symbol in asset_price_map:
             unit_price = asset_price_map[symbol]
         elif is_stablecoin(symbol):
-            # Approximate: USD stablecoins ≈ EUR rate from metrics
-            unit_price = (
-                metrics.get("available_liquidity", 0)
-                / max(sum(staked_map.get(s, 0) for s in staked_map if is_stablecoin(s)), 1)
-                if is_stablecoin(symbol)
-                else 1.0
-            )
-            # Simpler fallback: ~0.87 EUR/USD
-            if unit_price <= 0:
-                unit_price = 0.87
+            # USD stablecoins: 1 unit ≈ usd_eur_rate EUR
+            unit_price = usd_eur_rate
         else:
             unit_price = 0.0
         current_value = staked_qty * unit_price
         total_staked_value += current_value
         earn_assets.append(EarnAsset(symbol=symbol, staked_quantity=staked_qty, current_value=current_value))
+
+    # Compute total rewards in EUR using the same price maps
+    total_rewards = 0.0
+    for sym, reward_qty in rewards_by_symbol.items():
+        if sym in asset_price_map:
+            total_rewards += reward_qty * asset_price_map[sym]
+        elif is_stablecoin(sym):
+            total_rewards += reward_qty * usd_eur_rate
+        # else: unknown price, skip
 
     earn_assets.sort(key=lambda x: x.current_value, reverse=True)
     earn_summary = (
