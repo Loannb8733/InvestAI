@@ -148,7 +148,11 @@ class BinanceService(BaseExchangeService):
                     )
 
         # Enrich with Simple Earn positions (totalAmount = principal + interest)
-        earn_balances = await self._get_earn_positions()
+        try:
+            earn_balances = await self._get_earn_positions()
+        except Exception as e:
+            logger.warning(f"Failed to fetch earn positions, using spot balances only: {e}")
+            earn_balances = {}
         if earn_balances:
             balance_map = {b.symbol: b for b in balances}
             for symbol, total_amount in earn_balances.items():
@@ -188,8 +192,7 @@ class BinanceService(BaseExchangeService):
         """
         earn_totals: dict[str, Decimal] = {}
 
-        await self._sync_server_time()
-
+        # Note: server time already synced by get_balances() caller
         async with self._get_http_client(timeout=30.0) as client:
             # Simple Earn Flexible positions
             for endpoint in [
