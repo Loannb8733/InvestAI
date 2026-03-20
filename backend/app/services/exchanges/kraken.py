@@ -674,9 +674,14 @@ class KrakenService(BaseExchangeService):
             # Process rewards and staking (including Spin & Win, promotions, etc.)
             is_reward = entry_type in reward_types or subtype in reward_types
             if is_reward and amount > 0:
-                # Determine if it's staking or promotional reward (airdrop)
-                is_staking = entry_type == "staking" or subtype == "staking"
-                reward_prefix = "reward_staking_" if is_staking else "reward_airdrop_"
+                # Determine if it's a recurring reward (staking/earn) or a one-off airdrop
+                # staking, reward, earn, credit = recurring passive income → staking_reward
+                # airdrop, bonus = one-off promotional gift → airdrop
+                is_airdrop = entry_type in ("airdrop", "bonus") or subtype in (
+                    "airdrop",
+                    "bonus",
+                )
+                reward_prefix = "reward_airdrop_" if is_airdrop else "reward_staking_"
 
                 trades.append(
                     ExchangeTrade(
