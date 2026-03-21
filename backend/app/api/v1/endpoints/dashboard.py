@@ -28,6 +28,24 @@ from app.services.snapshot_service import snapshot_service
 router = APIRouter()
 
 
+def _ensure_json_safe(obj):
+    """Recursively convert Decimal/non-finite floats so the response is JSON-safe."""
+    import math as _math
+    from decimal import Decimal as _Dec
+
+    if isinstance(obj, _Dec):
+        return float(obj)
+    if isinstance(obj, float):
+        if _math.isnan(obj) or _math.isinf(obj):
+            return 0.0
+        return obj
+    if isinstance(obj, dict):
+        return {k: _ensure_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_ensure_json_safe(v) for v in obj]
+    return obj
+
+
 # ============== Pydantic Models ==============
 
 
@@ -862,8 +880,12 @@ async def get_portfolio_dashboard(
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
-    metrics = await metrics_service.get_portfolio_metrics(db, portfolio_id, currency=currency)
-    return metrics
+    try:
+        metrics = await metrics_service.get_portfolio_metrics(db, portfolio_id, currency=currency)
+    except Exception:
+        logger.exception("get_portfolio_metrics failed for portfolio %s", portfolio_id)
+        raise
+    return _ensure_json_safe(metrics)
 
 
 @router.get("/portfolio/{portfolio_id}/history")
