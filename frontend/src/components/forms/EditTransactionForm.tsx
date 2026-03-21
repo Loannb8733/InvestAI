@@ -32,20 +32,7 @@ import {
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
 import { cn } from '@/lib/utils'
-
-interface Transaction {
-  id: string
-  asset_symbol: string
-  transaction_type: string
-  quantity: number
-  price: number
-  fee: number | null
-  fee_currency?: string | null
-  currency: string
-  executed_at: string
-  exchange?: string | null
-  notes: string | null
-}
+import type { TransactionEdit as Transaction } from '@/types'
 
 interface EditTransactionFormProps {
   transaction: Transaction | null

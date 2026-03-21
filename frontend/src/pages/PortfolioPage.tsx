@@ -44,13 +44,9 @@ import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { isColdWallet } from '@/lib/platforms'
 import PortfolioAssetList from '@/components/portfolio/PortfolioAssetList'
 import CreatePortfolioForm from '@/components/portfolio/CreatePortfolioForm'
+import type { PortfolioSummary } from '@/types'
 
-interface Portfolio {
-  id: string
-  name: string
-  description?: string
-  cash_balances?: Record<string, number>
-}
+type Portfolio = PortfolioSummary
 
 interface AssetMetrics {
   id: string

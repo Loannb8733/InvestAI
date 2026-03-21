@@ -34,6 +34,9 @@ interface AssetMetrics {
   total_fees?: number
   breakeven_price?: number | null
   risk_weight?: number
+  first_buy_date?: string | null
+  holding_days?: number | null
+  annualized_return?: number | null
   // Crowdfunding fields
   interest_rate?: number
   maturity_date?: string
@@ -480,9 +483,8 @@ export default function PortfolioAssetList({
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Quantité</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">PRA</th>
+                <th className="text-center py-2 text-sm font-medium text-muted-foreground" title="Prix de revient (frais inclus)">PRU</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Prix actuel</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Breakeven</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">Valeur</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Value</th>
                 <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Risque</th>
@@ -511,13 +513,14 @@ export default function PortfolioAssetList({
                     <td className="text-center py-3">{renderPlatformBadge(group.assets[0])}</td>
                     <td className="text-center py-3">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
                     <td className="text-center py-3 text-muted-foreground">
-                      {group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}
+                      {group.assets[0].breakeven_price != null ? (
+                        <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}`}>
+                          {formatCurrency(group.assets[0].breakeven_price)}
+                        </span>
+                      ) : group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}
                     </td>
                     <td className="text-center py-3">
                       {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
-                    </td>
-                    <td className="text-center py-3 text-muted-foreground hidden lg:table-cell">
-                      {group.assets[0].breakeven_price != null ? formatCurrency(group.assets[0].breakeven_price) : '-'}
                     </td>
                     <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
                     <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -525,10 +528,17 @@ export default function PortfolioAssetList({
                         <p>{group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.totalGainLoss)}</p>
                         <p className="text-xs">
                           {group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'}{' '}
-                          {group.avgBuyPrice > 0 && group.currentPrice
-                            ? `${((group.currentPrice - group.avgBuyPrice) / group.avgBuyPrice * 100).toFixed(2)}%`
-                            : formatPercent(group.totalGainLossPercent)}
+                          {formatPercent(group.totalGainLossPercent)}
                         </p>
+                        {group.assets[0].annualized_return != null && group.assets[0].holding_days != null && group.assets[0].holding_days >= 7 && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5" title={`Détenu depuis ${group.assets[0].holding_days}j`}>
+                            CAGR: {group.assets[0].annualized_return >= 0 ? '+' : ''}{group.assets[0].annualized_return.toFixed(1)}%/an
+                            {' '}({group.assets[0].holding_days < 365
+                              ? `${group.assets[0].holding_days}j`
+                              : `${(group.assets[0].holding_days / 365.25).toFixed(1)}a`
+                            })
+                          </p>
+                        )}
                       </div>
                     </td>
                     <td className="text-center py-3 hidden lg:table-cell">
@@ -591,17 +601,14 @@ export default function PortfolioAssetList({
                       </td>
                       <td className="text-center py-3 font-medium">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
                       <td className="text-center py-3 text-muted-foreground">
-                        {group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}
-                      </td>
-                      <td className="text-center py-3">
-                        {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
-                      </td>
-                      <td className="text-center py-3 text-muted-foreground hidden lg:table-cell">
                         {(() => {
                           const totalQty = group.assets.reduce((s, a) => s + a.quantity, 0)
                           const totalCost = group.assets.reduce((s, a) => s + a.total_invested + (a.total_fees || 0), 0)
                           return totalQty > 0 ? formatCurrency(totalCost / totalQty) : '-'
                         })()}
+                      </td>
+                      <td className="text-center py-3">
+                        {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
                       </td>
                       <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
                       <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -611,6 +618,15 @@ export default function PortfolioAssetList({
                             {group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'}{' '}
                             {formatPercent(group.totalGainLossPercent)}
                           </p>
+                          {(() => {
+                            const first = group.assets.find(a => a.annualized_return != null && a.holding_days != null && a.holding_days >= 7)
+                            if (!first) return null
+                            return (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                CAGR: {first.annualized_return! >= 0 ? '+' : ''}{first.annualized_return!.toFixed(1)}%/an
+                              </p>
+                            )
+                          })()}
                         </div>
                       </td>
                       <td className="text-center py-3 hidden lg:table-cell">
@@ -646,13 +662,14 @@ export default function PortfolioAssetList({
                         <td className="text-center py-2">{renderPlatformBadge(asset)}</td>
                         <td className="text-center py-2 text-sm">{asset.quantity.toFixed(asset.quantity < 1 ? 8 : 2)}</td>
                         <td className="text-center py-2 text-sm text-muted-foreground">
-                          {asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}
+                          {asset.breakeven_price != null ? (
+                            <span title={`PRA hors frais : ${asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}`}>
+                              {formatCurrency(asset.breakeven_price)}
+                            </span>
+                          ) : asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}
                         </td>
                         <td className="text-center py-2 text-sm">
                           {asset.current_price ? formatCurrency(asset.current_price) : '-'}
-                        </td>
-                        <td className="text-center py-2 text-sm text-muted-foreground hidden lg:table-cell">
-                          {asset.breakeven_price != null ? formatCurrency(asset.breakeven_price) : '-'}
                         </td>
                         <td className="text-center py-2 text-sm">{formatCurrency(asset.current_value)}</td>
                         <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>

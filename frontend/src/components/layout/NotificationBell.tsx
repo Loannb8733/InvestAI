@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bell, Check, CheckCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,12 +30,13 @@ interface NotificationCount {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
+  const pageVisible = usePageVisibility()
   const queryClient = useQueryClient()
 
   const { data: countData } = useQuery<NotificationCount>({
     queryKey: queryKeys.notifications.unreadCount,
     queryFn: notificationsApi.getUnreadCount,
-    refetchInterval: 30000, // Poll every 30s
+    refetchInterval: pageVisible ? 30000 : false,
   })
 
   const { data: notifications } = useQuery<Notification[]>({

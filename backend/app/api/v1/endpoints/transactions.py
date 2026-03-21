@@ -22,6 +22,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate, TransactionWithAsset
+from app.services.audit_service import log_audit
 from app.services.metrics_service import invalidate_dashboard_cache
 
 router = APIRouter()
@@ -152,6 +153,7 @@ async def list_transactions(
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
+    request: Request,
     transaction_in: TransactionCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -271,6 +273,26 @@ async def create_transaction(
 
     await db.commit()
     await db.refresh(transaction)
+
+    # Audit trail
+    await log_audit(
+        db,
+        action="transaction.create",
+        user_id=str(current_user.id),
+        resource_type="transaction",
+        resource_id=str(transaction.id),
+        details={
+            "asset_id": str(asset.id),
+            "symbol": asset.symbol,
+            "type": transaction_in.transaction_type.value,
+            "quantity": float(transaction_in.quantity),
+            "price": float(transaction_in.price),
+            "fee": float(transaction_in.fee) if transaction_in.fee else 0,
+        },
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    await db.commit()
 
     invalidate_dashboard_cache(str(current_user.id))
 
@@ -431,6 +453,7 @@ async def get_transaction(
 
 @router.patch("/{transaction_id}", response_model=TransactionResponse)
 async def update_transaction(
+    request: Request,
     transaction_id: UUID,
     transaction_update: TransactionUpdate,
     current_user: User = Depends(get_current_user),
@@ -459,6 +482,19 @@ async def update_transaction(
         )
 
     update_data = transaction_update.model_dump(exclude_unset=True)
+
+    # Capture old values for audit trail (before mutation)
+    old_values = {
+        field: (
+            getattr(transaction, field).value
+            if hasattr(getattr(transaction, field), "value")
+            else float(getattr(transaction, field))
+            if isinstance(getattr(transaction, field), (Decimal, float, int))
+            else str(getattr(transaction, field))
+        )
+        for field in update_data
+        if hasattr(transaction, field)
+    }
 
     # If quantity or transaction_type changed, revert old effect and apply new
     quantity_changed = "quantity" in update_data
@@ -508,6 +544,30 @@ async def update_transaction(
 
     await db.commit()
     await db.refresh(transaction)
+
+    # Audit trail
+    new_values = {
+        field: (
+            getattr(transaction, field).value
+            if hasattr(getattr(transaction, field), "value")
+            else float(getattr(transaction, field))
+            if isinstance(getattr(transaction, field), (Decimal, float, int))
+            else str(getattr(transaction, field))
+        )
+        for field in update_data
+        if hasattr(transaction, field)
+    }
+    await log_audit(
+        db,
+        action="transaction.update",
+        user_id=str(current_user.id),
+        resource_type="transaction",
+        resource_id=str(transaction.id),
+        details={"old": old_values, "new": new_values},
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    await db.commit()
 
     invalidate_dashboard_cache(str(current_user.id))
 
@@ -573,6 +633,7 @@ async def delete_all_transactions(
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_transaction(
+    request: Request,
     transaction_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -598,6 +659,17 @@ async def delete_transaction(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found",
         )
+
+    # Capture transaction data before deletion for audit trail
+    deleted_data = {
+        "asset_id": str(transaction.asset_id),
+        "type": transaction.transaction_type.value,
+        "quantity": float(transaction.quantity),
+        "price": float(transaction.price),
+        "fee": float(transaction.fee) if transaction.fee else 0,
+        "executed_at": str(transaction.executed_at),
+        "exchange": transaction.exchange,
+    }
 
     # Revert asset quantity
     asset_result = await db.execute(select(Asset).where(Asset.id == transaction.asset_id))
@@ -651,6 +723,19 @@ async def delete_transaction(
     # Recalculate avg_buy_price from remaining BUY transactions
     await _recalculate_avg_buy_price(db, asset)
 
+    await db.commit()
+
+    # Audit trail
+    await log_audit(
+        db,
+        action="transaction.delete",
+        user_id=str(current_user.id),
+        resource_type="transaction",
+        resource_id=str(transaction_id),
+        details=deleted_data,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
     await db.commit()
 
     invalidate_dashboard_cache(str(current_user.id))

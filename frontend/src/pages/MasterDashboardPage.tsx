@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react'
+import type { PnLBreakdown } from '@/types'
+import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,14 +46,6 @@ interface UpcomingEvent {
   event_type: string
   event_date: string
   amount?: number
-}
-
-interface PnLBreakdown {
-  realized_pnl: number
-  unrealized_pnl: number
-  total_pnl: number
-  total_fees: number
-  net_pnl: number
 }
 
 interface AdvancedMetrics {
@@ -100,6 +94,7 @@ const PERIOD_OPTIONS = [
 
 export default function MasterDashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30)
+  const pageVisible = usePageVisibility()
   const navigate = useNavigate()
 
   // Fetch crypto dashboard metrics
@@ -108,7 +103,7 @@ export default function MasterDashboardPage() {
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: pageVisible ? 60_000 : false,
   })
 
   // Fetch crowdfunding dashboard

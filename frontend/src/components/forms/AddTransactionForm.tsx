@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { PortfolioSummary as Portfolio } from '@/types'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -72,11 +73,6 @@ interface Asset {
   exchange?: string
   quantity?: number
   asset_type?: string
-}
-
-interface Portfolio {
-  id: string
-  name: string
 }
 
 interface AddTransactionFormProps {

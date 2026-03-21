@@ -5,7 +5,7 @@ import hashlib
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
+from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -93,6 +93,9 @@ class Transaction(Base):
             unique=True,
             postgresql_where=text("internal_hash IS NOT NULL"),
         ),
+        CheckConstraint("quantity >= 0", name="ck_transactions_quantity_positive"),
+        CheckConstraint("price >= 0", name="ck_transactions_price_positive"),
+        CheckConstraint("fee >= 0", name="ck_transactions_fee_positive"),
     )
 
     def compute_hash(self) -> str:

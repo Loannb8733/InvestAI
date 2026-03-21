@@ -3,11 +3,17 @@ InvestAI - Backend API
 Plateforme multi-utilisateurs de gestion et d'analyse d'investissements
 """
 
+from __future__ import annotations
+
 import time
 import uuid
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request
+if TYPE_CHECKING:
+    from app.models.user import User
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -16,6 +22,7 @@ from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from app.api.deps import get_current_admin_user
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
@@ -648,16 +655,20 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.post("/api/v1/admin/fix-mirrors")
-async def admin_fix_mirrors(request: Request):
-    """Manually trigger the transfer mirror fix. Returns detailed results."""
-    import traceback as tb_mod
+@limiter.limit("2/minute")
+async def admin_fix_mirrors(
+    request: Request,
+    current_user: "User" = Depends(get_current_admin_user),
+):
+    """Manually trigger the transfer mirror fix. Requires admin role."""
     import uuid as uuid_mod
 
     from sqlalchemy import create_engine
 
-    auth = request.headers.get("authorization", "")
-    if not auth.startswith("Bearer "):
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    from app.core.logging import get_logger
+
+    admin_logger = get_logger("admin.fix_mirrors")
+    admin_logger.info("fix-mirrors triggered by user_id=%s", current_user.id)
 
     DEFAULT_DESTINATION = "Tangem"
     log = ["version=pr51-broken-refs"]
@@ -887,7 +898,11 @@ async def admin_fix_mirrors(request: Request):
         sync_engine.dispose()
         return {"status": "ok", "mirrors_created": mirrors_created, "log": log}
     except Exception as e:
-        return {"status": "error", "message": str(e), "traceback": tb_mod.format_exc()}
+        admin_logger.exception("fix-mirrors failed for user_id=%s", current_user.id)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)},
+        )
 
 
 @app.get("/health")

@@ -238,15 +238,16 @@ class MetricsService:
         # Pre-filter: remove assets with zero quantity (actual dust filtering
         # happens later after live prices are fetched, so we keep all qty > 0 here)
         assets = []
+        min_value_threshold = Decimal(str(min_value_eur))
         for asset in all_assets:
             if not include_zero_quantity:
-                qty = float(asset.quantity)
-                avg_price = float(asset.avg_buy_price) if asset.avg_buy_price else 0.0
-                current_price = float(asset.current_price) if asset.current_price else 0.0
+                qty = Decimal(str(asset.quantity))
+                avg_price = Decimal(str(asset.avg_buy_price)) if asset.avg_buy_price else Decimal("0")
+                current_price = Decimal(str(asset.current_price)) if asset.current_price else Decimal("0")
                 best_price = avg_price or current_price
                 if best_price > 0:
                     est_value = qty * best_price
-                    if est_value < min_value_eur:
+                    if est_value < min_value_threshold:
                         continue
                 # No price info yet — keep the asset; real value will be
                 # determined after live prices are fetched below.
@@ -272,10 +273,22 @@ class MetricsService:
         stablecoin_assets = [a for a in assets if is_stablecoin(a.symbol)]
         fiat_assets = [a for a in assets if is_fiat(a.symbol)]
 
-        # Batch-fetch total fees and actual invested per asset from transactions
+        # Batch-fetch total fees, actual invested, and first buy date per asset
         inv_asset_ids = [a.id for a in investment_assets]
         fees_map: Dict[str, float] = {}
         invested_map: Dict[str, float] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
+        first_buy_map: Dict[str, datetime] = {}  # first transaction date per asset
+        if inv_asset_ids:
+            # Fetch first transaction date per asset (for holding duration)
+            first_tx_result = await db.execute(
+                select(
+                    Transaction.asset_id,
+                    func.min(Transaction.executed_at).label("first_date"),
+                )
+                .where(Transaction.asset_id.in_(inv_asset_ids))
+                .group_by(Transaction.asset_id)
+            )
+            first_buy_map = {str(r[0]): r[1] for r in first_tx_result.all() if r[1]}
         if inv_asset_ids:
             from app.models.transaction import TransactionType as TxType
 
@@ -332,33 +345,35 @@ class MetricsService:
             # Step 1: BUY cost per symbol
             from collections import defaultdict as _defaultdict
 
-            buy_cost_by_sym: Dict[str, float] = _defaultdict(float)
-            buy_qty_by_sym: Dict[str, float] = _defaultdict(float)
+            _ZERO = Decimal("0")
+
+            buy_cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            buy_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
             for tx in all_txs:
                 if tx.transaction_type == TxType.BUY:
                     sym = aid_to_symbol.get(str(tx.asset_id), "")
-                    buy_cost_by_sym[sym] += float(tx.quantity) * float(tx.price or 0)
-                    buy_qty_by_sym[sym] += float(tx.quantity)
+                    buy_cost_by_sym[sym] += Decimal(str(tx.quantity)) * Decimal(str(tx.price or 0))
+                    buy_qty_by_sym[sym] += Decimal(str(tx.quantity))
 
             # Step 2: Trace conversions — match OUT→IN pairs by notes/trade_id
             # and propagate BUY cost from source symbol to destination symbol
             import re as _re
 
-            cost_by_sym: Dict[str, float] = _defaultdict(float)
+            cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
             cost_by_sym.update(buy_cost_by_sym)
-            qty_by_sym: Dict[str, float] = _defaultdict(float)
+            qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
 
             # Track cost-bearing quantity per symbol (BUY qty + conversion_in qty
             # that received non-zero cost). Used to compute undiluted PRA so that
             # free rewards converted to another asset don't lower the avg buy price.
-            cost_qty_by_sym: Dict[str, float] = _defaultdict(float)
+            cost_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
             cost_qty_by_sym.update(buy_qty_by_sym)
 
             # Accumulate all quantities per symbol (for proportional removal)
             for tx in all_txs:
                 sym = aid_to_symbol.get(str(tx.asset_id), "")
                 ttype = tx.transaction_type
-                qty = float(tx.quantity)
+                qty = Decimal(str(tx.quantity))
                 if ttype in (
                     TxType.BUY,
                     TxType.AIRDROP,
@@ -377,9 +392,11 @@ class MetricsService:
             # Build conversion IN index for matching
             conv_ins = [tx for tx in all_txs if tx.transaction_type == TxType.CONVERSION_IN]
 
+            _ONE = Decimal("1")
+
             for co in conv_outs:
                 src_sym = aid_to_symbol.get(str(co.asset_id), "")
-                co_qty = float(co.quantity)
+                co_qty = Decimal(str(co.quantity))
                 notes = co.notes or ""
                 exchange = co.exchange or ""
 
@@ -409,25 +426,25 @@ class MetricsService:
                             ci_notes = ci.notes or ""
                             if exchange and ("Crypto.com" in exchange or "crypto.com" in exchange.lower()):
                                 if ci_notes == notes and (ci.exchange or "") == exchange:
-                                    matched_ci_qty = float(ci.quantity)
+                                    matched_ci_qty = Decimal(str(ci.quantity))
                                     break
                             else:
                                 m2 = _re.search(r"trade_id:convert_sell_(\S+)", notes)
                                 if m2 and f"convert_buy_{m2.group(1)}" in ci_notes:
-                                    matched_ci_qty = float(ci.quantity)
+                                    matched_ci_qty = Decimal(str(ci.quantity))
                                     break
 
                 # Remove proportional cost from source, add to destination
-                pool = qty_by_sym.get(src_sym, 0)
-                if pool > 0 and cost_by_sym.get(src_sym, 0) > 0:
-                    frac = min(co_qty / pool, 1.0)
+                pool = qty_by_sym.get(src_sym, _ZERO)
+                if pool > 0 and cost_by_sym.get(src_sym, _ZERO) > 0:
+                    frac = min(co_qty / pool, _ONE)
                     removed = cost_by_sym[src_sym] * frac
                     cost_by_sym[src_sym] -= removed
-                    qty_by_sym[src_sym] = max(0, pool - co_qty)
+                    qty_by_sym[src_sym] = max(_ZERO, pool - co_qty)
                     # Update cost-bearing qty for source (proportional, same frac
                     # as cost, so PRA stays stable with mixed free/paid qty)
-                    src_cq = cost_qty_by_sym.get(src_sym, 0)
-                    cost_qty_by_sym[src_sym] = max(0, src_cq * (1 - frac))
+                    src_cq = cost_qty_by_sym.get(src_sym, _ZERO)
+                    cost_qty_by_sym[src_sym] = max(_ZERO, src_cq * (_ONE - frac))
                     if dest_sym:
                         cost_by_sym[dest_sym] += removed
                         # Only add to cost-bearing qty if real cost was propagated
@@ -438,17 +455,17 @@ class MetricsService:
             for tx in all_txs:
                 if tx.transaction_type == TxType.SELL:
                     sym = aid_to_symbol.get(str(tx.asset_id), "")
-                    sell_qty = float(tx.quantity)
-                    pool = qty_by_sym.get(sym, 0)
-                    if pool > 0 and cost_by_sym.get(sym, 0) > 0:
-                        frac = min(sell_qty / pool, 1.0)
+                    sell_qty = Decimal(str(tx.quantity))
+                    pool = qty_by_sym.get(sym, _ZERO)
+                    if pool > 0 and cost_by_sym.get(sym, _ZERO) > 0:
+                        frac = min(sell_qty / pool, _ONE)
                         removed = cost_by_sym[sym] * frac
                         cost_by_sym[sym] -= removed
-                        qty_by_sym[sym] = max(0, pool - sell_qty)
+                        qty_by_sym[sym] = max(_ZERO, pool - sell_qty)
                         # Proportional removal (same frac as cost) so PRA
                         # stays stable with mixed free/paid quantities
-                        sell_cq = cost_qty_by_sym.get(sym, 0)
-                        cost_qty_by_sym[sym] = max(0, sell_cq * (1 - frac))
+                        sell_cq = cost_qty_by_sym.get(sym, _ZERO)
+                        cost_qty_by_sym[sym] = max(_ZERO, sell_cq * (_ONE - frac))
 
             # Transfer OUT/IN: same symbol, different platform — no cost change
             # at symbol level (cost stays with the symbol)
@@ -460,19 +477,19 @@ class MetricsService:
 
             # Compute undiluted PRA per symbol: cost / cost-bearing qty
             # This is the real avg purchase price, not diluted by free rewards
-            buy_pra_by_sym: Dict[str, float] = {}
+            buy_pra_by_sym: Dict[str, Decimal] = {}
             for sym in cost_by_sym:
-                cq = cost_qty_by_sym.get(sym, 0)
+                cq = cost_qty_by_sym.get(sym, _ZERO)
                 if cq > 0 and cost_by_sym[sym] > 0:
                     buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
 
             for sym, sym_assets in sym_to_aids.items():
-                total_qty = sum(float(a.quantity) for a in sym_assets)
-                sym_cost = cost_by_sym.get(sym, 0)
+                total_qty = sum(Decimal(str(a.quantity)) for a in sym_assets)
+                sym_cost = cost_by_sym.get(sym, _ZERO)
                 if total_qty > 0 and sym_cost > 0:
                     for a in sym_assets:
-                        share = float(a.quantity) / total_qty
-                        invested_map[str(a.id)] = sym_cost * share
+                        share = Decimal(str(a.quantity)) / total_qty
+                        invested_map[str(a.id)] = float(sym_cost * share)
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -614,6 +631,16 @@ class MetricsService:
             qty = metrics["quantity"]
             breakeven_price = (metrics["total_invested"] + asset_fees) / qty if qty > 0 else None
 
+            # Holding duration and annualized return
+            first_date = first_buy_map.get(str(asset.id))
+            holding_days = (datetime.utcnow() - first_date).days if first_date else None
+            annualized_return = None
+            if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
+                years = holding_days / 365.25
+                ratio = metrics["current_value"] / metrics["total_invested"]
+                if ratio > 0 and years > 0:
+                    annualized_return = round((pow(ratio, 1 / years) - 1) * 100, 2)
+
             asset_entry = {
                 "id": str(asset.id),
                 "symbol": asset.symbol,
@@ -623,6 +650,9 @@ class MetricsService:
                 "change_percent_24h": price_changes.get(asset.symbol.upper(), 0.0),
                 "total_fees": asset_fees,
                 "breakeven_price": round(breakeven_price, 2) if breakeven_price is not None else None,
+                "first_buy_date": first_date.isoformat() if first_date else None,
+                "holding_days": holding_days,
+                "annualized_return": annualized_return,
                 **metrics,
             }
             # Include crowdfunding fields if present
@@ -635,38 +665,100 @@ class MetricsService:
             asset_metrics.append(asset_entry)
 
         # Fetch forex rates for stablecoin/fiat valuation in target currency
-        # USD stablecoins → target currency, EUR fiat → target currency
+        # Strategy: live API → Redis cache (24h TTL) → hardcoded fallback (last resort)
+        from app.core.redis_client import cache_forex_rate, get_cached_forex_rate
+
         target = currency.upper()
-        usd_to_target = 1.0  # fallback if target is USD
-        eur_to_target = 1.0  # fallback if target is EUR
-        _FALLBACK_RATES = {
+        usd_to_target = 1.0  # identity if target is USD
+        eur_to_target = 1.0  # identity if target is EUR
+        _HARDCODED_FALLBACK_RATES = {
             "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
             "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
         }
-        try:
-            if target != "USD":
-                rate = await price_service.get_forex_rate("USD", target)
-                usd_to_target = float(rate) if rate else _FALLBACK_RATES.get("USD", {}).get(target, 1.0)
-            if target != "EUR":
-                rate = await price_service.get_forex_rate("EUR", target)
-                eur_to_target = float(rate) if rate else _FALLBACK_RATES.get("EUR", {}).get(target, 1.0)
-        except Exception:
-            usd_to_target = _FALLBACK_RATES.get("USD", {}).get(target, 1.0) if target != "USD" else 1.0
-            eur_to_target = _FALLBACK_RATES.get("EUR", {}).get(target, 1.0) if target != "EUR" else 1.0
+        forex_stale = False  # flag for frontend warning
 
-        # Calculate stablecoin cash value (filter out dust)
+        async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
+            """Fetch rate: live API → Redis cache → hardcoded fallback.
+
+            Returns (rate, is_stale) where is_stale=True if using cache >24h
+            or hardcoded fallback.
+            """
+            # 1. Try live API
+            try:
+                rate = await price_service.get_forex_rate(from_ccy, to_ccy)
+                if rate:
+                    rate_f = float(rate)
+                    await cache_forex_rate(from_ccy, to_ccy, rate_f)
+                    return rate_f, False
+            except Exception:
+                pass
+
+            # 2. Try Redis cache
+            cached = await get_cached_forex_rate(from_ccy, to_ccy)
+            if cached and cached.get("rate"):
+                return cached["rate"], False  # within 24h TTL
+
+            # 3. Hardcoded fallback (last resort)
+            fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
+            return fallback, True
+
+        if target != "USD":
+            usd_to_target, stale = await _get_rate_with_cache("USD", target)
+            forex_stale = forex_stale or stale
+        if target != "EUR":
+            eur_to_target, stale = await _get_rate_with_cache("EUR", target)
+            forex_stale = forex_stale or stale
+
+        # Calculate stablecoin cash value using live market prices
+        # This detects depegs (e.g. USDC at $0.87 in March 2023)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
-        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD"}
+        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD", "PYUSD", "FRAX", "LUSD", "USDG"}
+        eur_stablecoins = {"EURC", "EURT"}
+        _DEPEG_THRESHOLD = 0.02  # 2% deviation from peg triggers warning
+
+        # Batch-fetch live stablecoin prices from CoinGecko
+        stablecoin_symbols = [a.symbol for a in stablecoin_assets]
+        stablecoin_live_prices: Dict[str, float] = {}
+        if stablecoin_symbols:
+            try:
+                sc_prices = await asyncio.wait_for(
+                    price_service.get_multiple_crypto_prices(stablecoin_symbols, currency.lower()),
+                    timeout=5.0,
+                )
+                for sym, data in sc_prices.items():
+                    stablecoin_live_prices[sym.upper()] = float(data["price"])
+            except Exception:
+                pass  # fallback to peg below
+
         for asset in stablecoin_assets:
-            # Stablecoins are valued at ~1:1 with their denomination
-            if asset.symbol.upper() in usd_stablecoins:
-                unit_price = usd_to_target
+            sym_upper = asset.symbol.upper()
+            live_price = stablecoin_live_prices.get(sym_upper)
+
+            if live_price and live_price > 0:
+                # Use live market price
+                unit_price = live_price
+            elif sym_upper in usd_stablecoins:
+                unit_price = usd_to_target  # fallback: 1 USD = target rate
+            elif sym_upper in eur_stablecoins:
+                unit_price = eur_to_target  # fallback: 1 EUR = target rate
             else:
-                unit_price = eur_to_target  # EUR-denominated stablecoins
+                unit_price = eur_to_target
+
             value = float(asset.quantity) * unit_price
             if value < min_value_eur:
                 continue
+
+            # Detect depeg: compare live price to expected peg value
+            depeg_percent = 0.0
+            if live_price and live_price > 0:
+                if sym_upper in usd_stablecoins:
+                    expected_price = usd_to_target
+                else:
+                    expected_price = eur_to_target
+                if expected_price > 0:
+                    depeg_percent = abs(live_price - expected_price) / expected_price
+
             cash_from_stablecoins += Decimal(str(value))
             stablecoin_list.append(
                 {
@@ -674,6 +766,9 @@ class MetricsService:
                     "symbol": asset.symbol,
                     "quantity": float(asset.quantity),
                     "value": value,
+                    "unit_price": unit_price,
+                    "depeg_warning": depeg_percent > _DEPEG_THRESHOLD,
+                    "depeg_percent": round(depeg_percent * 100, 2) if depeg_percent > _DEPEG_THRESHOLD else 0,
                 }
             )
 
@@ -735,6 +830,7 @@ class MetricsService:
             "cash_from_fiat": float(cash_from_fiat),
             "fiat_assets": fiat_list,
             "available_liquidity": available_liquidity,
+            "forex_stale": forex_stale,
         }
 
         # Include crowdfunding summary if relevant

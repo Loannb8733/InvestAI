@@ -95,6 +95,41 @@ def _data_hash(prices: list) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+# ── Forex rate cache ─────────────────────────────────────────────────
+
+_FOREX_CACHE_TTL = 86400  # 24 hours
+_FOREX_KEY_PREFIX = "forex:"
+
+
+async def get_cached_forex_rate(from_ccy: str, to_ccy: str) -> Optional[dict]:
+    """Get cached forex rate. Returns {"rate": float, "cached_at": ISO timestamp} or None."""
+    try:
+        r = await _get_redis_txt()
+        data = await r.get(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}")
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.debug("Redis forex cache miss %s→%s: %s", from_ccy, to_ccy, e)
+    return None
+
+
+async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
+    """Cache a forex rate with 24h TTL and timestamp."""
+    try:
+        from datetime import datetime, timezone
+
+        r = await _get_redis_txt()
+        payload = json.dumps(
+            {
+                "rate": rate,
+                "cached_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        await r.setex(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}", _FOREX_CACHE_TTL, payload)
+    except Exception as e:
+        logger.warning("Failed to cache forex rate %s→%s: %s", from_ccy, to_ccy, e)
+
+
 # ── JSON-based caches (use text client) ──────────────────────────────
 
 
