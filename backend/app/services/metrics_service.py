@@ -633,6 +633,8 @@ class MetricsService:
 
             # Holding duration and annualized return
             first_date = first_buy_map.get(str(asset.id))
+            if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
+                first_date = first_date.replace(tzinfo=None)
             holding_days = (datetime.utcnow() - first_date).days if first_date else None
             annualized_return = None
             if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
