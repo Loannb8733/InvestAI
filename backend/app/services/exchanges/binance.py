@@ -30,11 +30,16 @@ class BinanceService(BaseExchangeService):
 
     BASE_URL = "https://api.binance.com"
 
+    # Binance rate limit: 1200 request weight / minute.
+    # Most endpoints cost 10-40 weight. We throttle to ~1 req/s to stay safe.
+    _REQUEST_INTERVAL = 0.3  # seconds between API calls (max ~200 req/min)
+
     def __init__(self, api_key, secret_key, passphrase=None):
         super().__init__(api_key, secret_key, passphrase)
         self._server_time_offset: int = 0
         self._all_account_symbols: set = set()
         self._valid_pairs: set = set()
+        self._last_request_time: float = 0
 
     @property
     def exchange_name(self) -> str:
@@ -57,11 +62,25 @@ class BinanceService(BaseExchangeService):
             timeout=timeout,
         )
 
+    async def _throttle(self) -> None:
+        """Rate-limit requests to avoid Binance IP bans."""
+        now = time.monotonic()
+        elapsed = now - self._last_request_time
+        if elapsed < self._REQUEST_INTERVAL:
+            await asyncio.sleep(self._REQUEST_INTERVAL - elapsed)
+        self._last_request_time = time.monotonic()
+
+    async def _api_get(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+        """Throttled GET request."""
+        await self._throttle()
+        return await client.get(url, **kwargs)
+
     async def _sync_server_time(self) -> None:
         """Synchronize with Binance server time to avoid timestamp errors."""
         try:
             async with self._get_http_client(timeout=10.0) as client:
-                response = await client.get(
+                response = await self._api_get(
+                    client,
                     f"{self.BASE_URL}/api/v3/time",
                 )
                 if response.status_code == 200:
@@ -102,7 +121,8 @@ class BinanceService(BaseExchangeService):
 
             async with self._get_http_client(timeout=15.0) as client:
                 params = self._sign_request({})
-                response = await client.get(
+                response = await self._api_get(
+                    client,
                     f"{self.BASE_URL}/api/v3/account",
                     params=params,
                     headers=self._get_headers(),
@@ -123,7 +143,8 @@ class BinanceService(BaseExchangeService):
 
         async with self._get_http_client(timeout=30.0) as client:
             params = self._sign_request({})
-            response = await client.get(
+            response = await self._api_get(
+                client,
                 f"{self.BASE_URL}/api/v3/account",
                 params=params,
                 headers=self._get_headers(),
@@ -201,7 +222,8 @@ class BinanceService(BaseExchangeService):
                     current = 1
                     while True:
                         params = self._sign_request({"current": current, "size": 100})
-                        response = await client.get(
+                        response = await self._api_get(
+                            client,
                             f"{self.BASE_URL}{endpoint}",
                             params=params,
                             headers=self._get_headers(),
@@ -240,7 +262,8 @@ class BinanceService(BaseExchangeService):
 
         async with self._get_http_client(timeout=30.0) as client:
             params = self._sign_request({})
-            response = await client.get(
+            response = await self._api_get(
+                client,
                 f"{self.BASE_URL}/api/v3/account",
                 params=params,
                 headers=self._get_headers(),
@@ -268,7 +291,8 @@ class BinanceService(BaseExchangeService):
 
         try:
             async with self._get_http_client(timeout=30.0) as client:
-                response = await client.get(
+                response = await self._api_get(
+                    client,
                     f"{self.BASE_URL}/api/v3/exchangeInfo",
                 )
                 if response.status_code == 200:
@@ -311,7 +335,8 @@ class BinanceService(BaseExchangeService):
                         params["endTime"] = int(end_time.timestamp() * 1000)
 
                     params = self._sign_request(params)
-                    response = await client.get(
+                    response = await self._api_get(
+                        client,
                         f"{self.BASE_URL}/api/v3/myTrades",
                         params=params,
                         headers=self._get_headers(),
@@ -444,7 +469,8 @@ class BinanceService(BaseExchangeService):
                 params["startTime"] = int(start_time.timestamp() * 1000)
 
             params = self._sign_request(params)
-            response = await client.get(
+            response = await self._api_get(
+                client,
                 f"{self.BASE_URL}/sapi/v1/capital/deposit/hisrec",
                 params=params,
                 headers=self._get_headers(),
@@ -491,7 +517,8 @@ class BinanceService(BaseExchangeService):
                 params["startTime"] = int(start_time.timestamp() * 1000)
 
             params = self._sign_request(params)
-            response = await client.get(
+            response = await self._api_get(
+                client,
                 f"{self.BASE_URL}/sapi/v1/capital/withdraw/history",
                 params=params,
                 headers=self._get_headers(),
@@ -575,7 +602,8 @@ class BinanceService(BaseExchangeService):
                             )
 
                             params = self._sign_request(params)
-                            response = await client.get(
+                            response = await self._api_get(
+                                client,
                                 f"{self.BASE_URL}/sapi/v1/fiat/payments",
                                 params=params,
                                 headers=self._get_headers(),
@@ -679,7 +707,8 @@ class BinanceService(BaseExchangeService):
                         params["endTime"] = int(end_time.timestamp() * 1000)
 
                     params = self._sign_request(params)
-                    response = await client.get(
+                    response = await self._api_get(
+                        client,
                         f"{self.BASE_URL}/sapi/v1/convert/tradeFlow",
                         params=params,
                         headers=self._get_headers(),
@@ -829,7 +858,8 @@ class BinanceService(BaseExchangeService):
                     }
 
                     params = self._sign_request(params)
-                    response = await client.get(
+                    response = await self._api_get(
+                        client,
                         f"{self.BASE_URL}/sapi/v1/convert/tradeFlow",
                         params=params,
                         headers=self._get_headers(),
@@ -979,7 +1009,8 @@ class BinanceService(BaseExchangeService):
                         params["endTime"] = int(end_time.timestamp() * 1000)
 
                     params = self._sign_request(params)
-                    response = await client.get(
+                    response = await self._api_get(
+                        client,
                         f"{self.BASE_URL}/sapi/v1/lending/auto-invest/history/list",
                         params=params,
                         headers=self._get_headers(),
@@ -1060,7 +1091,8 @@ class BinanceService(BaseExchangeService):
                     params["endTime"] = int(end_time.timestamp() * 1000)
 
                 params = self._sign_request(params)
-                response = await client.get(
+                response = await self._api_get(
+                    client,
                     f"{self.BASE_URL}/sapi/v1/simple-earn/flexible/history/subscriptionRecord",
                     params=params,
                     headers=self._get_headers(),
@@ -1125,7 +1157,8 @@ class BinanceService(BaseExchangeService):
                     current = 1
                     while True:
                         params = self._sign_request({"type": reward_type, "current": current, "size": 100})
-                        response = await client.get(
+                        response = await self._api_get(
+                            client,
                             f"{self.BASE_URL}{endpoint}",
                             params=params,
                             headers=self._get_headers(),
