@@ -79,6 +79,59 @@ export interface Transaction {
   createdAt: string
 }
 
+// Portfolio summary (for selectors/dropdowns — snake_case matches API response)
+export interface PortfolioSummary {
+  id: string
+  name: string
+  description?: string
+  cash_balances?: Record<string, number>
+}
+
+// Transaction with asset info (API response shape — snake_case)
+export interface TransactionWithAssetInfo {
+  id: string
+  asset_id: string
+  transaction_type: string
+  quantity: number
+  price: number
+  fee: number | null
+  currency: string
+  executed_at: string
+  notes: string | null
+  created_at: string
+  exchange: string | null
+  external_id: string | null
+  asset_symbol: string
+  asset_name: string | null
+  asset_type: string
+  related_transaction_id: string | null
+  conversion_rate: number | null
+}
+
+// Transaction for edit forms (subset of fields)
+export interface TransactionEdit {
+  id: string
+  asset_symbol: string
+  transaction_type: string
+  quantity: number
+  price: number
+  fee: number | null
+  fee_currency?: string | null
+  currency: string
+  executed_at: string
+  exchange?: string | null
+  notes: string | null
+}
+
+// P&L breakdown (from backend advanced metrics)
+export interface PnLBreakdown {
+  realized_pnl: number
+  unrealized_pnl: number
+  total_pnl: number
+  total_fees: number
+  net_pnl: number
+}
+
 // Alert types
 export type AlertCondition =
   | 'price_above'

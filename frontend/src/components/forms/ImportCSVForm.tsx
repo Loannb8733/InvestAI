@@ -21,11 +21,7 @@ import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, Help
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
-
-interface Portfolio {
-  id: string
-  name: string
-}
+import type { PortfolioSummary as Portfolio } from '@/types'
 
 interface ImportCSVFormProps {
   onSuccess?: () => void

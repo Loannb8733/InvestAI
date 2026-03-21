@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { PortfolioSummary as Portfolio } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -127,11 +128,6 @@ interface Correlation {
   matrix: number[][]
   strongly_correlated: [string, string, number][]
   negatively_correlated: [string, string, number][]
-}
-
-interface Portfolio {
-  id: string
-  name: string
 }
 
 interface PerformanceItem {

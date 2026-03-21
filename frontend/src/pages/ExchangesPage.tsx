@@ -81,51 +81,51 @@ interface TestResult {
   balance?: Record<string, number>
 }
 
-// Exchange logos component with local SVG logos
+// Exchange logos — static lookups hoisted outside the component to avoid re-creation per render
+const LOGO_URLS: Record<string, string> = {
+  binance: '/logos/binance.png',
+  kraken: '/logos/kraken.png',
+  cryptocom: '/logos/cryptocom.svg',
+  coinbase: '/logos/coinbase.svg',
+  kucoin: '/logos/kucoin.svg',
+  okx: '/logos/okx.svg',
+  bybit: '/logos/bybit.svg',
+  bitpanda: '/logos/bitpanda.svg',
+  bitstamp: '/logos/bitstamp.svg',
+  gateio: '/logos/gateio.svg',
+}
+
+const FALLBACK_COLORS: Record<string, string> = {
+  binance: 'bg-[#F3BA2F]',
+  kraken: 'bg-[#5741D9]',
+  coinbase: 'bg-[#0052FF]',
+  cryptocom: 'bg-[#002D74]',
+  kucoin: 'bg-[#23AF91]',
+  bybit: 'bg-[#F7A600]',
+  okx: 'bg-[#000000]',
+  bitpanda: 'bg-[#5A6773]',
+  bitstamp: 'bg-[#4A9F3F]',
+  gateio: 'bg-[#2354E6]',
+}
+
+const FALLBACK_LABELS: Record<string, string> = {
+  binance: 'BN',
+  kraken: 'KR',
+  coinbase: 'CB',
+  cryptocom: 'CC',
+  kucoin: 'KC',
+  bybit: 'BY',
+  okx: 'OK',
+  bitpanda: 'BP',
+  bitstamp: 'BS',
+  gateio: 'GT',
+}
+
 const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number }) => {
-  const logoUrls: Record<string, string> = {
-    binance: '/logos/binance.png',
-    kraken: '/logos/kraken.png',
-    cryptocom: '/logos/cryptocom.svg',
-    coinbase: '/logos/coinbase.svg',
-    kucoin: '/logos/kucoin.svg',
-    okx: '/logos/okx.svg',
-    bybit: '/logos/bybit.svg',
-    bitpanda: '/logos/bitpanda.svg',
-    bitstamp: '/logos/bitstamp.svg',
-    gateio: '/logos/gateio.svg',
-  }
-
-  const fallbackColors: Record<string, string> = {
-    binance: 'bg-[#F3BA2F]',
-    kraken: 'bg-[#5741D9]',
-    coinbase: 'bg-[#0052FF]',
-    cryptocom: 'bg-[#002D74]',
-    kucoin: 'bg-[#23AF91]',
-    bybit: 'bg-[#F7A600]',
-    okx: 'bg-[#000000]',
-    bitpanda: 'bg-[#5A6773]',
-    bitstamp: 'bg-[#4A9F3F]',
-    gateio: 'bg-[#2354E6]',
-  }
-
-  const fallbackLabels: Record<string, string> = {
-    binance: 'BN',
-    kraken: 'KR',
-    coinbase: 'CB',
-    cryptocom: 'CC',
-    kucoin: 'KC',
-    bybit: 'BY',
-    okx: 'OK',
-    bitpanda: 'BP',
-    bitstamp: 'BS',
-    gateio: 'GT',
-  }
-
-  if (logoUrls[exchange]) {
+  if (LOGO_URLS[exchange]) {
     return (
       <img
-        src={logoUrls[exchange]}
+        src={LOGO_URLS[exchange]}
         alt={exchange}
         width={size}
         height={size}
@@ -136,10 +136,10 @@ const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number
 
   return (
     <div
-      className={`${fallbackColors[exchange] || 'bg-primary/20'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
+      className={`${FALLBACK_COLORS[exchange] || 'bg-primary/20'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
       style={{ width: size, height: size, fontSize: size * 0.35 }}
     >
-      {fallbackLabels[exchange] || <Coins style={{ width: size * 0.5, height: size * 0.5 }} />}
+      {FALLBACK_LABELS[exchange] || <Coins style={{ width: size * 0.5, height: size * 0.5 }} />}
     </div>
   )
 }

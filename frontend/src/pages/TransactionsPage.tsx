@@ -79,32 +79,12 @@ import AddTransactionForm from '@/components/forms/AddTransactionForm'
 import ImportCSVForm from '@/components/forms/ImportCSVForm'
 import EditTransactionForm from '@/components/forms/EditTransactionForm'
 
+import type { TransactionWithAssetInfo, PortfolioSummary } from '@/types'
+
 // ============== Interfaces ==============
 
-interface Transaction {
-  id: string
-  asset_id: string
-  transaction_type: string
-  quantity: number
-  price: number
-  fee: number | null
-  currency: string
-  executed_at: string
-  notes: string | null
-  created_at: string
-  exchange: string | null
-  external_id: string | null
-  asset_symbol: string
-  asset_name: string | null
-  asset_type: string
-  related_transaction_id: string | null
-  conversion_rate: number | null
-}
-
-interface Portfolio {
-  id: string
-  name: string
-}
+type Transaction = TransactionWithAssetInfo
+type Portfolio = PortfolioSummary
 
 interface TransactionStats {
   totalBought: number

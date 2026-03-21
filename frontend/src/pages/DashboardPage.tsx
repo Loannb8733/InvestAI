@@ -1,8 +1,10 @@
 import { useState, useRef, useMemo, lazy, Suspense, type ReactNode } from 'react'
+import type { PnLBreakdown } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding } from '@/components/OnboardingWizard'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
+import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -89,14 +91,6 @@ interface StressTest {
   stressed_value: number
   potential_loss: number
   potential_loss_percent: number
-}
-
-interface PnLBreakdown {
-  realized_pnl: number
-  unrealized_pnl: number
-  total_pnl: number
-  total_fees: number
-  net_pnl: number
 }
 
 interface RiskMetrics {
@@ -353,6 +347,7 @@ export default function DashboardPage() {
   const { showOnboarding, markDone } = useOnboarding()
   const [onboardingVisible, setOnboardingVisible] = useState(showOnboarding)
   const { exportToPdf } = useExportPdf()
+  const pageVisible = usePageVisibility()
   const { visibleWidgets, hiddenWidgets, toggleWidget, moveWidget, resetLayout } = useDashboardLayout()
   const [showCustomize, setShowCustomize] = useState(false)
   const [showBenchmarks, setShowBenchmarks] = useState(false)
@@ -377,7 +372,7 @@ export default function DashboardPage() {
   } = useQuery<DashboardMetrics>({
     queryKey: [...queryKeys.dashboard.metrics(selectedPeriod), currency],
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
-    refetchInterval: 60000,
+    refetchInterval: pageVisible ? 60000 : false,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   })

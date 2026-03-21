@@ -4,7 +4,7 @@ import enum
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, Date, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -25,6 +25,8 @@ class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
         UniqueConstraint("portfolio_id", "symbol", "exchange", name="uq_assets_portfolio_symbol_exchange"),
+        CheckConstraint("quantity >= 0", name="ck_assets_quantity_positive"),
+        CheckConstraint("avg_buy_price >= 0", name="ck_assets_avg_buy_price_positive"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
