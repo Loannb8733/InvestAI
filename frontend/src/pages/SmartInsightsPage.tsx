@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +25,7 @@ import {
   CheckCircle2,
   Flame,
   Gauge,
+  GitBranch,
   RefreshCw,
   Shield,
   Snowflake,
@@ -101,6 +103,8 @@ interface MetricsSummary {
   gold_beta?: number | null
   gold_badge?: string | null
   regime_config?: RegimeConfig | null
+  avg_top5_correlation?: number | null
+  risk_clusters?: Array<{ assets: string[]; avg_corr: number }> | null
 }
 
 interface IndicatorSignal {
@@ -149,6 +153,7 @@ function formatMetric(name: string | undefined, value: number): string {
 }
 
 export default function SmartInsightsPage() {
+  const navigate = useNavigate()
   const [days, setDays] = useState(30)
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<PortfolioHealth>({
@@ -475,7 +480,81 @@ export default function SmartInsightsPage() {
                 </CardContent>
               </Card>
             )}
+            {/* Correlation Analysis */}
+            {data.metrics_summary.avg_top5_correlation != null && (
+              <Card className={`${(data.metrics_summary.avg_top5_correlation ?? 0) > 0.7 ? 'border-red-500/20' : 'border-border'}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Corrélation Top 5</p>
+                      <div className={`text-3xl font-bold ${(data.metrics_summary.avg_top5_correlation ?? 0) > 0.85 ? 'text-red-500' : (data.metrics_summary.avg_top5_correlation ?? 0) > 0.7 ? 'text-yellow-500' : 'text-green-500'}`}>
+                        {((data.metrics_summary.avg_top5_correlation ?? 0) * 100).toFixed(0)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {(data.metrics_summary.avg_top5_correlation ?? 0) > 0.85
+                          ? 'Diversification illusoire'
+                          : (data.metrics_summary.avg_top5_correlation ?? 0) > 0.7
+                            ? 'Corrélation élevée'
+                            : (data.metrics_summary.avg_top5_correlation ?? 0) > 0.4
+                              ? 'Corrélation modérée'
+                              : 'Bien décorrélé'}
+                      </p>
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <GitBranch className="h-8 w-8 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Corrélation moyenne entre vos 5 plus grosses positions. &lt; 50% = bonne diversification.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
+
+          {/* Risk Clusters */}
+          {data.metrics_summary.risk_clusters && data.metrics_summary.risk_clusters.length > 0 && (
+            <Card className="border-red-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GitBranch className="h-5 w-5 text-red-500" />
+                  Clusters de Risque
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {data.metrics_summary.risk_clusters.map((cluster, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {cluster.assets.map((asset) => (
+                          <Badge key={asset} variant="outline" className="border-red-500/30 text-red-600">
+                            {asset}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-red-500">{(cluster.avg_corr * 100).toFixed(0)}%</p>
+                        <p className="text-[10px] text-muted-foreground">corrélation</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Ces actifs bougent ensemble (corrélation &gt; 85%). En cas de chute, ils baisseront simultanément.
+                    </p>
+                    <Button variant="outline" size="sm" className="shrink-0 ml-2" onClick={() => navigate('/analytics?tab=correlation')}>
+                      <GitBranch className="h-3.5 w-3.5 mr-1" />
+                      Matrice
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Flash Crash Impact */}
           {data.anomaly_impacts.length > 0 && (() => {
