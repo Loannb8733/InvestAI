@@ -252,6 +252,18 @@ def _money(v: float) -> str:
     return f"{v:,.2f} €"
 
 
+def _fmt_qty(v: float) -> str:
+    """Format quantity to fit PDF columns: shorten large numbers, trim decimals."""
+    abs_v = abs(v)
+    if abs_v >= 1_000_000:
+        return f"{v / 1_000_000:,.2f}M"
+    if abs_v >= 10_000:
+        return f"{v:,.0f}"
+    if abs_v >= 1:
+        return f"{v:,.4f}"
+    return f"{v:,.6f}"
+
+
 def _pct(v: float) -> str:
     return f"{v:,.2f} %"
 
@@ -1238,7 +1250,7 @@ class ReportService:
                     [
                         a.symbol,
                         a.asset_type.upper()[:6],
-                        f"{a.quantity:,.4f}",
+                        _fmt_qty(a.quantity),
                         _money(a.avg_buy_price),
                         _money(a.current_value),
                         _money(a.gain_loss),
@@ -1955,7 +1967,7 @@ class ReportService:
                         tx.date.strftime("%d/%m/%Y") if tx.date else "",
                         _TYPE_MAP.get(tx.transaction_type, tx.transaction_type),
                         tx.symbol,
-                        f"{tx.quantity:,.6f}",
+                        _fmt_qty(tx.quantity),
                         _money(tx.price),
                         _money(tx.total),
                         _money(tx.fee),
