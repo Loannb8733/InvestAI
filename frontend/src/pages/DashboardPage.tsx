@@ -16,10 +16,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatCurrency, formatPercent } from '@/lib/utils'
+import { MIN_DISPLAY_VALUE } from '@/lib/constants'
 import { dashboardApi, crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/stores/authStore'
 import AllocationChart from '@/components/charts/AllocationChart'
+import CryptoClassChart from '@/components/charts/CryptoClassChart'
 import PlatformPieChart from '@/components/charts/PlatformPieChart'
 import SecurityBadge from '@/components/charts/SecurityBadge'
 import PerformanceChart from '@/components/charts/PerformanceChart'
@@ -60,6 +62,7 @@ import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
 import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
+import StalePriceBadge from '@/components/dashboard/StalePriceBadge'
 
 // ============== Interfaces ==============
 
@@ -198,6 +201,7 @@ interface DashboardMetrics {
   earn_summary?: EarnSummary
   period_days?: number
   period_label?: string
+  forex_stale?: boolean
   last_updated: string
 }
 
@@ -495,6 +499,7 @@ export default function DashboardPage() {
                 Live
               </Badge>
             )}
+            <StalePriceBadge wsConnected={wsConnected} forexStale={metrics.forex_stale} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -747,7 +752,7 @@ export default function DashboardPage() {
                       <CardContent>
                         {metrics.asset_allocation.length > 0 ? (
                           <div className="space-y-3">
-                            {metrics.asset_allocation.slice(0, 6).map((asset, i) => (
+                            {metrics.asset_allocation.filter((a) => a.value >= MIN_DISPLAY_VALUE).slice(0, 6).map((asset, i) => (
                               <div key={`${asset.symbol}-${i}`} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={asset.symbol} name={asset.name} assetType={asset.asset_type} size={32} />
@@ -778,10 +783,14 @@ export default function DashboardPage() {
                 )
               case 'allocation-transactions-alerts':
                 return (
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-4 lg:grid-cols-3">
                     <Card>
                       <CardHeader><CardTitle>Répartition par classe</CardTitle></CardHeader>
                       <CardContent><AllocationChart data={metrics.allocation} /></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader><CardTitle>Crypto par catégorie</CardTitle></CardHeader>
+                      <CardContent><CryptoClassChart assets={metrics.asset_allocation} /></CardContent>
                     </Card>
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">

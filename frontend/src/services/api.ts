@@ -823,6 +823,22 @@ export const reportsApi = {
     })
     return response.data
   },
+
+  getRebalancingReport: async (targetAllocations: Record<string, number>) => {
+    const response = await api.post('/reports/rebalancing', {
+      target_allocations: targetAllocations,
+    })
+    return response.data
+  },
+
+  downloadRebalancingPDF: async (targetAllocations: Record<string, number>) => {
+    const response = await api.post('/reports/rebalancing/pdf', {
+      target_allocations: targetAllocations,
+    }, {
+      responseType: 'blob',
+    })
+    return response.data
+  },
 }
 
 // Users API (admin only)
