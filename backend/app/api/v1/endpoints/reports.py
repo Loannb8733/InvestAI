@@ -2,10 +2,11 @@
 
 import io
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -13,6 +14,32 @@ from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.models.user import User
 from app.services.report_service import report_service
+
+
+class RebalancingRequest(BaseModel):
+    """Request body for rebalancing report."""
+
+    target_allocations: Dict[str, float] = Field(
+        ...,
+        description="Target allocation per crypto class. Keys: L1, L2, DeFi, Stable, Meme, Other. Values: 0.0–1.0.",
+        examples=[{"L1": 0.50, "Stable": 0.20, "DeFi": 0.20, "Meme": 0.10}],
+    )
+
+    @field_validator("target_allocations")
+    @classmethod
+    def validate_allocations(cls, v: Dict[str, float]) -> Dict[str, float]:
+        valid_keys = {"L1", "L2", "DeFi", "Stable", "Meme", "Other"}
+        for key in v:
+            if key not in valid_keys:
+                raise ValueError(f"Invalid category '{key}'. Allowed: {valid_keys}")
+        total = sum(v.values())
+        if not (0.99 <= total <= 1.01):
+            raise ValueError(f"Allocations must sum to 1.0 (got {total:.4f})")
+        for key, val in v.items():
+            if val < 0 or val > 1:
+                raise ValueError(f"Allocation for '{key}' must be between 0 and 1")
+        return v
+
 
 router = APIRouter()
 
@@ -202,3 +229,70 @@ async def get_available_years(
         years = [datetime.now().year]
 
     return {"years": years}
+
+
+@router.post("/rebalancing")
+@limiter.limit("10/minute")
+async def get_rebalancing_report(
+    request: Request,
+    body: RebalancingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compute rebalancing report with tax impact estimation."""
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    report = await report_service.get_rebalancing_report(
+        db,
+        str(current_user.id),
+        body.target_allocations,
+        currency=currency,
+    )
+    return {
+        "total_value": report.total_value,
+        "categories": report.categories,
+        "orders": [
+            {
+                "category": o.category,
+                "action": o.action,
+                "amount_eur": o.amount_eur,
+                "current_pct": o.current_pct,
+                "target_pct": o.target_pct,
+                "drift_pct": o.drift_pct,
+                "estimated_gain": o.estimated_gain,
+                "estimated_tax": o.estimated_tax,
+            }
+            for o in report.orders
+        ],
+        "total_sell_amount": report.total_sell_amount,
+        "total_buy_amount": report.total_buy_amount,
+        "total_estimated_gain": report.total_estimated_gain,
+        "total_estimated_tax": report.total_estimated_tax,
+        "hhi_before": report.hhi_before,
+        "hhi_after": report.hhi_after,
+    }
+
+
+@router.post("/rebalancing/pdf")
+@limiter.limit("10/minute")
+async def get_rebalancing_report_pdf(
+    request: Request,
+    body: RebalancingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate and download a PDF rebalancing report."""
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    report = await report_service.get_rebalancing_report(
+        db,
+        str(current_user.id),
+        body.target_allocations,
+        currency=currency,
+    )
+    pdf_content = report_service.generate_rebalancing_pdf(report)
+
+    filename = f"rapport_reequilibrage_{datetime.now().strftime('%Y%m%d')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_content),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

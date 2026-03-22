@@ -277,7 +277,14 @@ class MetricsService:
         inv_asset_ids = [a.id for a in investment_assets]
         fees_map: Dict[str, float] = {}
         invested_map: Dict[str, float] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
+        buy_pra_by_sym: Dict[str, Decimal] = {}  # undiluted PRA per symbol
+        sym_to_aids: Dict[str, list] = {}  # symbol -> list of Asset objects
+        cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total cost basis
+        cost_qty_by_sym: Dict[str, Decimal] = {}  # symbol -> cost-bearing qty
+        buy_cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total buy cost
         first_buy_map: Dict[str, datetime] = {}  # first transaction date per asset
+        # B1/M2: Fees needing currency conversion (resolved after forex rates available)
+        _pending_fee_conversions: list = []
         if inv_asset_ids:
             # Fetch first transaction date per asset (for holding duration)
             first_tx_result = await db.execute(
@@ -310,16 +317,16 @@ class MetricsService:
             )
             fees_map = {str(r[0]): float(r[1] or 0) for r in fee_result.all()}
 
-            # Actual invested = real money spent (BUY only), propagated through
-            # conversions and transfers so the cost basis follows the asset.
+            # ====== M1: FIFO cost basis per (symbol, exchange) ======
             #
-            # Algorithm (symbol-level, then split by asset_id):
-            # 1. Compute BUY cost per symbol across all platforms
-            # 2. Trace conversion chains (e.g. INJ→BTC) to propagate BUY cost
-            #    from source symbols to destination symbols
-            # 3. Subtract SELL proceeds (money leaving portfolio)
-            # 4. Split the per-symbol cost across asset_ids (platforms)
-            #    proportionally to each platform's current quantity
+            # Each BUY creates a cost "layer" tied to its exchange.
+            # SELLs consume layers FIFO from the SAME exchange.
+            # TRANSFER_OUT/IN moves oldest layers to the destination exchange.
+            # CONVERSION_OUT/IN consumes source layers FIFO, creates a new
+            # layer on the destination (symbol, exchange) with propagated cost.
+            #
+            # Output: invested_map[asset_id] = total cost basis for that
+            #         (symbol, exchange) combination.
 
             # Fetch ALL transactions for the portfolio (not just inv_asset_ids)
             # to capture conversion sources that may have qty=0 now
@@ -332,164 +339,317 @@ class MetricsService:
             )
             all_txs = all_tx_result.scalars().all()
 
-            # Build symbol for each asset_id
+            # Build symbol + exchange lookups for each asset_id
             aid_to_symbol: Dict[str, str] = {}
+            aid_to_exchange: Dict[str, str] = {}
             for tx in all_txs:
                 aid_to_symbol[str(tx.asset_id)] = ""
+                aid_to_exchange[str(tx.asset_id)] = ""
             for a in investment_assets:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
-            # Fill remaining from transactions (sold-off assets)
+                aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
             for a in all_assets:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
+                aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
 
-            # Step 1: BUY cost per symbol
+            import re as _re
             from collections import defaultdict as _defaultdict
 
             _ZERO = Decimal("0")
 
-            buy_cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            buy_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            for tx in all_txs:
-                if tx.transaction_type == TxType.BUY:
-                    sym = aid_to_symbol.get(str(tx.asset_id), "")
-                    buy_cost_by_sym[sym] += Decimal(str(tx.quantity)) * Decimal(str(tx.price or 0))
-                    buy_qty_by_sym[sym] += Decimal(str(tx.quantity))
+            # FIFO layers: keyed by (symbol, exchange)
+            # Each layer: {"qty": Decimal, "unit_cost": Decimal, "is_paid": bool}
+            # is_paid=True for BUY layers, False for free (airdrop/reward)
+            FifoKey = Tuple[str, str]  # (symbol, exchange)
+            fifo: Dict[FifoKey, list] = _defaultdict(list)
 
-            # Step 2: Trace conversions — match OUT→IN pairs by notes/trade_id
-            # and propagate BUY cost from source symbol to destination symbol
-            import re as _re
-
-            cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            cost_by_sym.update(buy_cost_by_sym)
-            qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-
-            # Track cost-bearing quantity per symbol (BUY qty + conversion_in qty
-            # that received non-zero cost). Used to compute undiluted PRA so that
-            # free rewards converted to another asset don't lower the avg buy price.
-            cost_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            cost_qty_by_sym.update(buy_qty_by_sym)
-
-            # Accumulate all quantities per symbol (for proportional removal)
-            for tx in all_txs:
-                sym = aid_to_symbol.get(str(tx.asset_id), "")
-                ttype = tx.transaction_type
-                qty = Decimal(str(tx.quantity))
-                if ttype in (
-                    TxType.BUY,
-                    TxType.AIRDROP,
-                    TxType.STAKING_REWARD,
-                    TxType.CONVERSION_IN,
-                    TxType.TRANSFER_IN,
-                ):
-                    qty_by_sym[sym] += qty
-
-            # Build conversion/transfer OUT list
-            conv_outs = []
-            for tx in all_txs:
-                if tx.transaction_type == TxType.CONVERSION_OUT:
-                    conv_outs.append(tx)
-
-            # Build conversion IN index for matching
+            # Pre-build conversion matching indices
             conv_ins = [tx for tx in all_txs if tx.transaction_type == TxType.CONVERSION_IN]
 
-            _ONE = Decimal("1")
+            def _match_conversion_in(co_tx: Transaction, src_sym: str) -> Tuple[Optional[str], Optional[str], Decimal]:
+                """Find the matching CONVERSION_IN for a CONVERSION_OUT.
 
-            for co in conv_outs:
-                src_sym = aid_to_symbol.get(str(co.asset_id), "")
-                co_qty = Decimal(str(co.quantity))
-                notes = co.notes or ""
-                exchange = co.exchange or ""
+                Returns (dest_symbol, dest_exchange, matched_qty).
+                """
+                notes = co_tx.notes or ""
+                exch = co_tx.exchange or ""
+                co_qty = Decimal(str(co_tx.quantity))
 
-                # Find matching conversion_in
-                dest_sym = None
-                if "Crypto.com" in exchange or "crypto.com" in exchange.lower():
+                dest_sym: Optional[str] = None
+                dest_exch: Optional[str] = None
+                matched_qty = co_qty  # fallback
+
+                if "Crypto.com" in exch or "crypto.com" in exch.lower():
                     for ci in conv_ins:
-                        if (ci.notes or "") == notes and (ci.exchange or "") == exchange:
+                        if (ci.notes or "") == notes and (ci.exchange or "") == exch:
                             dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                            dest_exch = (ci.exchange or "").strip()
+                            matched_qty = Decimal(str(ci.quantity))
                             break
                 else:
-                    # Kraken: match trade_id suffix
+                    # Kraken / generic: match trade_id suffix
                     m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
                     if m:
                         suffix = m.group(1)
                         for ci in conv_ins:
                             if f"convert_buy_{suffix}" in (ci.notes or ""):
-                                dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                                candidate = aid_to_symbol.get(str(ci.asset_id), "")
+                                # M3: Verify dest symbol differs from source
+                                if candidate and candidate != src_sym:
+                                    dest_sym = candidate
+                                    dest_exch = (ci.exchange or "").strip()
+                                    matched_qty = Decimal(str(ci.quantity))
+                                else:
+                                    logger.warning(
+                                        "Kraken conversion match rejected: " "src=%s == dest=%s (suffix=%s, tx_id=%s)",
+                                        src_sym,
+                                        candidate,
+                                        suffix,
+                                        co_tx.id,
+                                    )
                                 break
 
-                # Find the matching conversion_in quantity
-                matched_ci_qty = co_qty  # fallback
-                if dest_sym:
-                    for ci in conv_ins:
-                        ci_sym = aid_to_symbol.get(str(ci.asset_id), "")
-                        if ci_sym == dest_sym:
-                            ci_notes = ci.notes or ""
-                            if exchange and ("Crypto.com" in exchange or "crypto.com" in exchange.lower()):
-                                if ci_notes == notes and (ci.exchange or "") == exchange:
-                                    matched_ci_qty = Decimal(str(ci.quantity))
-                                    break
-                            else:
-                                m2 = _re.search(r"trade_id:convert_sell_(\S+)", notes)
-                                if m2 and f"convert_buy_{m2.group(1)}" in ci_notes:
-                                    matched_ci_qty = Decimal(str(ci.quantity))
-                                    break
+                return dest_sym, dest_exch, matched_qty
 
-                # Remove proportional cost from source, add to destination
-                pool = qty_by_sym.get(src_sym, _ZERO)
-                if pool > 0 and cost_by_sym.get(src_sym, _ZERO) > 0:
-                    frac = min(co_qty / pool, _ONE)
-                    removed = cost_by_sym[src_sym] * frac
-                    cost_by_sym[src_sym] -= removed
-                    qty_by_sym[src_sym] = max(_ZERO, pool - co_qty)
-                    # Update cost-bearing qty for source (proportional, same frac
-                    # as cost, so PRA stays stable with mixed free/paid qty)
-                    src_cq = cost_qty_by_sym.get(src_sym, _ZERO)
-                    cost_qty_by_sym[src_sym] = max(_ZERO, src_cq * (_ONE - frac))
-                    if dest_sym:
-                        cost_by_sym[dest_sym] += removed
-                        # Only add to cost-bearing qty if real cost was propagated
-                        if removed > 0:
-                            cost_qty_by_sym[dest_sym] += matched_ci_qty
+            def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
+                """Remove qty from FIFO layers, return total cost removed."""
+                layers = fifo.get(key, [])
+                remaining = qty_to_remove
+                cost_removed = _ZERO
+                while remaining > 0 and layers:
+                    layer = layers[0]
+                    if layer["qty"] <= remaining:
+                        cost_removed += layer["qty"] * layer["unit_cost"]
+                        remaining -= layer["qty"]
+                        layers.pop(0)
+                    else:
+                        cost_removed += remaining * layer["unit_cost"]
+                        layer["qty"] -= remaining
+                        remaining = _ZERO
+                if remaining > 0:
+                    logger.warning(
+                        "FIFO underflow: wanted to remove %s more from %s " "but no layers left",
+                        remaining,
+                        key,
+                    )
+                return cost_removed
 
-            # Process SELL — cost exits portfolio
+            def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
+                """Remove qty from FIFO layers, return list of extracted layers
+                (preserving original unit costs for transfer/conversion)."""
+                layers = fifo.get(key, [])
+                remaining = qty_to_remove
+                extracted: list = []
+                while remaining > 0 and layers:
+                    layer = layers[0]
+                    if layer["qty"] <= remaining:
+                        extracted.append(layer.copy())
+                        remaining -= layer["qty"]
+                        layers.pop(0)
+                    else:
+                        extracted.append(
+                            {
+                                "qty": remaining,
+                                "unit_cost": layer["unit_cost"],
+                                "is_paid": layer["is_paid"],
+                            }
+                        )
+                        layer["qty"] -= remaining
+                        remaining = _ZERO
+                if remaining > 0:
+                    logger.warning(
+                        "FIFO underflow: wanted to extract %s more from %s " "but no layers left",
+                        remaining,
+                        key,
+                    )
+                return extracted
+
+            # ---- Single-pass chronological processing ----
             for tx in all_txs:
-                if tx.transaction_type == TxType.SELL:
-                    sym = aid_to_symbol.get(str(tx.asset_id), "")
-                    sell_qty = Decimal(str(tx.quantity))
-                    pool = qty_by_sym.get(sym, _ZERO)
-                    if pool > 0 and cost_by_sym.get(sym, _ZERO) > 0:
-                        frac = min(sell_qty / pool, _ONE)
-                        removed = cost_by_sym[sym] * frac
-                        cost_by_sym[sym] -= removed
-                        qty_by_sym[sym] = max(_ZERO, pool - sell_qty)
-                        # Proportional removal (same frac as cost) so PRA
-                        # stays stable with mixed free/paid quantities
-                        sell_cq = cost_qty_by_sym.get(sym, _ZERO)
-                        cost_qty_by_sym[sym] = max(_ZERO, sell_cq * (_ONE - frac))
+                sym = aid_to_symbol.get(str(tx.asset_id), "")
+                exch = (tx.exchange or "").strip()
+                key: FifoKey = (sym, exch)
+                qty = Decimal(str(tx.quantity))
+                ttype = tx.transaction_type
 
-            # Transfer OUT/IN: same symbol, different platform — no cost change
-            # at symbol level (cost stays with the symbol)
+                if ttype == TxType.BUY:
+                    unit_cost = Decimal(str(tx.price or 0))
+                    total_cost = qty * unit_cost
+                    # B1/M2: Include transaction fees in cost basis
+                    fee = Decimal(str(tx.fee or 0))
+                    if fee > 0:
+                        fee_ccy = (tx.fee_currency or tx.currency or "EUR").upper()
+                        portfolio_ccy = currency.upper()
+                        if fee_ccy == portfolio_ccy:
+                            total_cost += fee
+                        else:
+                            _pending_fee_conversions.append((sym, fee, fee_ccy))
+                    layer_unit = total_cost / qty if qty > 0 else _ZERO
+                    fifo[key].append({"qty": qty, "unit_cost": layer_unit, "is_paid": True})
 
-            # Step 3: Split per-symbol cost across asset_ids by current quantity
+                elif ttype == TxType.SELL:
+                    # O5: Warn if sell qty exceeds pool
+                    pool_qty = sum(ly["qty"] for ly in fifo.get(key, []))
+                    if qty > pool_qty:
+                        logger.warning(
+                            "Oversell: SELL qty=%s > pool=%s for %s@%s (tx_id=%s)",
+                            qty,
+                            pool_qty,
+                            sym,
+                            exch,
+                            tx.id,
+                        )
+                    _consume_fifo(key, qty)
+
+                elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
+                    # Free tokens — zero cost layer
+                    fifo[key].append({"qty": qty, "unit_cost": _ZERO, "is_paid": False})
+
+                elif ttype == TxType.TRANSFER_OUT:
+                    # Move oldest layers to a "transit" — the matching TRANSFER_IN
+                    # will pick them up. We use the transaction's exchange as source.
+                    extracted = _consume_fifo_layers(key, qty)
+                    # Store extracted layers temporarily keyed by (sym, "__transit__", tx.id)
+                    transit_key = (sym, f"__transit__{tx.id}")
+                    fifo[transit_key] = extracted
+
+                elif ttype == TxType.TRANSFER_IN:
+                    # Try to find matching TRANSFER_OUT layers in transit
+                    # Match by: same symbol, qty ~= transit qty, closest in time
+                    matched_transit = None
+                    best_match_diff = None
+                    for tkey, tlayers in list(fifo.items()):
+                        if tkey[0] == sym and tkey[1].startswith("__transit__"):
+                            transit_qty = sum(ly["qty"] for ly in tlayers)
+                            diff = abs(transit_qty - qty)
+                            if best_match_diff is None or diff < best_match_diff:
+                                best_match_diff = diff
+                                matched_transit = tkey
+                    if matched_transit and fifo[matched_transit]:
+                        # Move transit layers to destination exchange
+                        for layer in fifo.pop(matched_transit):
+                            fifo[key].append(layer)
+                    else:
+                        # No matching transit — treat as zero-cost (external transfer in)
+                        fifo[key].append({"qty": qty, "unit_cost": _ZERO, "is_paid": False})
+
+                elif ttype == TxType.CONVERSION_OUT:
+                    src_sym = sym
+                    dest_sym, dest_exch, matched_ci_qty = _match_conversion_in(tx, src_sym)
+
+                    if dest_sym is None:
+                        # B2: Unmatched — preserve cost on source
+                        logger.error(
+                            "Unmatched CONVERSION_OUT: tx_id=%s src=%s qty=%s "
+                            "exchange=%s notes='%s' — cost preserved on source",
+                            tx.id,
+                            src_sym,
+                            qty,
+                            exch,
+                            tx.notes or "",
+                        )
+                        # Qty leaves but we DON'T consume cost layers
+                        # Just remove zero-cost equivalent from pool for qty tracking
+                    else:
+                        # O5: Warn if conversion qty exceeds pool
+                        pool_qty = sum(ly["qty"] for ly in fifo.get(key, []))
+                        if qty > pool_qty:
+                            logger.warning(
+                                "Over-conversion: CONVERSION_OUT qty=%s > pool=%s " "for %s@%s (tx_id=%s)",
+                                qty,
+                                pool_qty,
+                                src_sym,
+                                exch,
+                                tx.id,
+                            )
+                        # Consume FIFO layers from source
+                        cost_removed = _consume_fifo(key, qty)
+                        # Create single layer on destination with propagated cost
+                        if matched_ci_qty > 0 and cost_removed > 0:
+                            dest_key: FifoKey = (dest_sym, dest_exch or exch)
+                            dest_unit = cost_removed / matched_ci_qty
+                            fifo[dest_key].append(
+                                {
+                                    "qty": matched_ci_qty,
+                                    "unit_cost": dest_unit,
+                                    "is_paid": True,
+                                }
+                            )
+                        elif matched_ci_qty > 0:
+                            # Zero cost source (e.g. airdrop converted)
+                            dest_key = (dest_sym, dest_exch or exch)
+                            fifo[dest_key].append(
+                                {
+                                    "qty": matched_ci_qty,
+                                    "unit_cost": _ZERO,
+                                    "is_paid": False,
+                                }
+                            )
+
+                elif ttype == TxType.CONVERSION_IN:
+                    # B1/M2: Collect fees from CONVERSION_IN
+                    fee = Decimal(str(tx.fee or 0))
+                    if fee > 0:
+                        fee_ccy = (tx.fee_currency or tx.currency or "EUR").upper()
+                        portfolio_ccy = currency.upper()
+                        if fee_ccy == portfolio_ccy:
+                            # Add fee to the last layer of this key if it exists
+                            layers = fifo.get(key, [])
+                            if layers:
+                                last = layers[-1]
+                                old_total = last["qty"] * last["unit_cost"]
+                                last["unit_cost"] = (old_total + fee) / last["qty"] if last["qty"] > 0 else _ZERO
+                            else:
+                                # No layer yet — CONVERSION_OUT handler will create it
+                                # Store fee for later application
+                                _pending_fee_conversions.append((sym, fee, fee_ccy))
+                        else:
+                            _pending_fee_conversions.append((sym, fee, fee_ccy))
+                    # Qty already handled by CONVERSION_OUT creating the layer
+
+                # STAKING/UNSTAKING: no cost impact (same exchange, same symbol)
+
+            # ---- Derive per-asset invested_map from FIFO layers ----
+            # Each asset_id maps to (symbol, exchange) via aid_to_symbol/aid_to_exchange
             sym_to_aids: Dict[str, list] = _defaultdict(list)
             for a in investment_assets:
                 sym_to_aids[a.symbol.upper()].append(a)
 
+            # Aggregate cost by (symbol, exchange) from remaining FIFO layers
+            cost_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            paid_qty_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            for fkey, layers in fifo.items():
+                if fkey[1].startswith("__transit__"):
+                    continue  # skip unmatched transit layers
+                for layer in layers:
+                    cost_by_key[fkey] += layer["qty"] * layer["unit_cost"]
+                    if layer["is_paid"]:
+                        paid_qty_by_key[fkey] += layer["qty"]
+
+            # Also build symbol-level aggregates for PRA and downstream compatibility
+            cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            cost_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            buy_cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            for fkey, cost in cost_by_key.items():
+                sym = fkey[0]
+                cost_by_sym[sym] += cost
+                buy_cost_by_sym[sym] += cost
+                cost_qty_by_sym[sym] += paid_qty_by_key.get(fkey, _ZERO)
+
             # Compute undiluted PRA per symbol: cost / cost-bearing qty
-            # This is the real avg purchase price, not diluted by free rewards
             buy_pra_by_sym: Dict[str, Decimal] = {}
             for sym in cost_by_sym:
                 cq = cost_qty_by_sym.get(sym, _ZERO)
                 if cq > 0 and cost_by_sym[sym] > 0:
                     buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
 
-            for sym, sym_assets in sym_to_aids.items():
-                total_qty = sum(Decimal(str(a.quantity)) for a in sym_assets)
-                sym_cost = cost_by_sym.get(sym, _ZERO)
-                if total_qty > 0 and sym_cost > 0:
-                    for a in sym_assets:
-                        share = Decimal(str(a.quantity)) / total_qty
-                        invested_map[str(a.id)] = float(sym_cost * share)
+            # Map cost to each asset_id using FIFO layers per (symbol, exchange)
+            for a in investment_assets:
+                aid = str(a.id)
+                fkey = (a.symbol.upper(), (a.exchange or "").strip())
+                cost = cost_by_key.get(fkey, _ZERO)
+                if cost > 0:
+                    invested_map[aid] = float(cost)
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -641,7 +801,9 @@ class MetricsService:
                 years = holding_days / 365.25
                 ratio = metrics["current_value"] / metrics["total_invested"]
                 if ratio > 0 and years > 0:
-                    annualized_return = round((pow(ratio, 1 / years) - 1) * 100, 2)
+                    raw = (pow(ratio, 1 / years) - 1) * 100
+                    # O4: Clamp to avoid aberrations on short holding periods
+                    annualized_return = round(max(-99.0, min(raw, 999.0)), 2)
 
             asset_entry = {
                 "id": str(asset.id),
@@ -710,6 +872,41 @@ class MetricsService:
         if target != "EUR":
             eur_to_target, stale = await _get_rate_with_cache("EUR", target)
             forex_stale = forex_stale or stale
+
+        # B1/M2: Resolve pending fee conversions now that forex rates are available
+        if _pending_fee_conversions:
+            portfolio_ccy = currency.upper()
+            for sym, fee_amount, fee_ccy in _pending_fee_conversions:
+                rate, stale = await _get_rate_with_cache(fee_ccy, portfolio_ccy)
+                forex_stale = forex_stale or stale
+                converted_fee = fee_amount * Decimal(str(rate))
+                cost_by_sym[sym] += converted_fee
+                buy_cost_by_sym[sym] += converted_fee
+                logger.debug(
+                    "Fee conversion: %s %s -> %s %s (rate=%s) for %s",
+                    fee_amount,
+                    fee_ccy,
+                    converted_fee,
+                    portfolio_ccy,
+                    rate,
+                    sym,
+                )
+            # Re-compute PRA with updated cost
+            for sym in cost_by_sym:
+                cq = cost_qty_by_sym.get(sym, _ZERO)
+                if cq > 0 and cost_by_sym[sym] > 0:
+                    buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
+            # Re-distribute converted fees into invested_map per asset
+            for a in investment_assets:
+                aid = str(a.id)
+                fkey = (a.symbol.upper(), (a.exchange or "").strip())
+                # Proportional share of symbol-level fee addition
+                sym = a.symbol.upper()
+                sym_assets = sym_to_aids.get(sym, [])
+                total_qty = sum(Decimal(str(sa.quantity)) for sa in sym_assets)
+                if total_qty > 0:
+                    share = Decimal(str(a.quantity)) / total_qty
+                    invested_map[aid] = float(cost_by_sym.get(sym, _ZERO) * share)
 
         # Calculate stablecoin cash value using live market prices
         # This detects depegs (e.g. USDC at $0.87 in March 2023)
@@ -1033,6 +1230,7 @@ class MetricsService:
         total_pnl_fees = Decimal("0")
         total_liquidity = Decimal("0")
         all_assets = []
+        any_forex_stale = False
 
         for portfolio in portfolios:
             portfolio_metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
@@ -1052,6 +1250,7 @@ class MetricsService:
             for _ccy, amount in (portfolio.cash_balances or {}).items():
                 total_liquidity += Decimal(str(amount))
             all_assets.extend(portfolio_metrics["assets"])
+            any_forex_stale = any_forex_stale or portfolio_metrics.get("forex_stale", False)
 
         # total_gain_loss: gain/loss relative to total ever invested (includes sold positions)
         # This is used for the "brut" view; net_gain_loss below is the primary P&L metric
@@ -1218,6 +1417,7 @@ class MetricsService:
                 "net_pnl": float(total_value - total_invested - total_pnl_fees),
                 "is_all_time": True,  # P&L breakdown is always cumulative
             },
+            "forex_stale": any_forex_stale,
         }
 
         # Cache the result (bounded)
@@ -1482,10 +1682,11 @@ class MetricsService:
         final_value: Decimal,
         years: float,
     ) -> float:
-        """Calculate Compound Annual Growth Rate."""
+        """Calculate Compound Annual Growth Rate (clamped -99% to +999%)."""
         if initial_value <= 0 or years <= 0:
             return 0.0
-        return float((pow(float(final_value / initial_value), 1 / years) - 1) * 100)
+        raw = (pow(float(final_value / initial_value), 1 / years) - 1) * 100
+        return float(max(-99.0, min(raw, 999.0)))
 
     async def calculate_realized_unrealized_pnl(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Dict:
         """

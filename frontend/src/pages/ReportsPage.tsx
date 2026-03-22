@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { reportsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
@@ -21,7 +22,9 @@ import {
   Loader2,
   FileDown,
   Download,
+  ArrowRightLeft,
 } from 'lucide-react'
+import RebalancingTab from '@/components/reports/RebalancingTab'
 
 export default function ReportsPage() {
   const { toast } = useToast()
@@ -182,82 +185,101 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {reportCards.map((report) => (
-          <Card key={report.id} className="flex flex-col">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-lg ${report.bgColor}`}>
-                  <report.icon className={`h-6 w-6 ${report.color}`} />
-                </div>
+      <Tabs defaultValue="exports" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="exports" className="gap-2">
+            <FileDown className="h-4 w-4" />
+            Exports
+          </TabsTrigger>
+          <TabsTrigger value="strategy" className="gap-2">
+            <ArrowRightLeft className="h-4 w-4" />
+            Stratégie
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="exports" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {reportCards.map((report) => (
+              <Card key={report.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-lg ${report.bgColor}`}>
+                      <report.icon className={`h-6 w-6 ${report.color}`} />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{report.title}</CardTitle>
+                    </div>
+                  </div>
+                  <CardDescription className="mt-2">
+                    {report.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col justify-end">
+                  {report.yearSelector && (
+                    <div className="mb-4">
+                      <label className="text-sm font-medium mb-2 block">
+                        Année fiscale
+                      </label>
+                      <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {years.map((year: number) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    {report.actions.map((action) => (
+                      <Button
+                        key={action.label}
+                        variant="outline"
+                        className="flex-1"
+                        onClick={action.onClick}
+                        disabled={loadingReport !== null}
+                      >
+                        {loadingReport === `${report.id}-${action.label.toLowerCase()}` ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <action.icon className="h-4 w-4 mr-2" />
+                        )}
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Info section */}
+          <Card className="bg-muted/50">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <FileDown className="h-8 w-8 text-muted-foreground" />
                 <div>
-                  <CardTitle className="text-lg">{report.title}</CardTitle>
+                  <h3 className="font-semibold mb-2">À propos des rapports</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Les rapports PDF sont optimisés pour l'impression et l'archivage</li>
+                    <li>• Les fichiers Excel permettent une analyse détaillée et personnalisée</li>
+                    <li>• La déclaration fiscale est fournie à titre indicatif - consultez un professionnel</li>
+                    <li>• Les données sont calculées en temps réel à partir de vos transactions</li>
+                  </ul>
                 </div>
-              </div>
-              <CardDescription className="mt-2">
-                {report.description}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-end">
-              {report.yearSelector && (
-                <div className="mb-4">
-                  <label className="text-sm font-medium mb-2 block">
-                    Année fiscale
-                  </label>
-                  <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.map((year: number) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="flex gap-2">
-                {report.actions.map((action) => (
-                  <Button
-                    key={action.label}
-                    variant="outline"
-                    className="flex-1"
-                    onClick={action.onClick}
-                    disabled={loadingReport === `${report.id}-${action.label.toLowerCase()}`}
-                  >
-                    {loadingReport === `${report.id}-${action.label.toLowerCase()}` ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <action.icon className="h-4 w-4 mr-2" />
-                    )}
-                    {action.label}
-                  </Button>
-                ))}
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Info section */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <FileDown className="h-8 w-8 text-muted-foreground" />
-            <div>
-              <h3 className="font-semibold mb-2">À propos des rapports</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Les rapports PDF sont optimisés pour l'impression et l'archivage</li>
-                <li>• Les fichiers Excel permettent une analyse détaillée et personnalisée</li>
-                <li>• La déclaration fiscale est fournie à titre indicatif - consultez un professionnel</li>
-                <li>• Les données sont calculées en temps réel à partir de vos transactions</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="strategy">
+          <RebalancingTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

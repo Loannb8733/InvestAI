@@ -2,10 +2,15 @@
 
 import io
 import logging
+import re as _re
+from collections import defaultdict as _defaultdict
 from dataclasses import dataclass, field
+from datetime import date as _date
 from datetime import datetime
+from datetime import timezone as _tz
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from openpyxl import Workbook
 from openpyxl.styles import Border, Font, PatternFill, Side
@@ -14,11 +19,12 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table, TableStyle
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset, AssetType
+from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.metrics_service import is_liquidity, is_safe_haven, metrics_service
@@ -106,6 +112,121 @@ class TaxSummary2086:
     events: List[TaxEvent2086] = field(default_factory=list)
 
 
+@dataclass
+class RebalanceOrder:
+    """A single suggested buy or sell to reach target allocation."""
+
+    category: str  # L1, L2, DeFi, Stable, Meme, Other
+    action: str  # "buy" / "sell"
+    amount_eur: float  # absolute EUR amount
+    current_pct: float
+    target_pct: float
+    drift_pct: float  # current − target
+    # Tax impact (sell orders only)
+    estimated_gain: float = 0.0
+    estimated_tax: float = 0.0  # PFU 30%
+
+
+@dataclass
+class RebalancingReport:
+    """Full rebalancing report."""
+
+    total_value: float
+    categories: List[Dict[str, Any]]  # current allocation per category
+    orders: List[RebalanceOrder]
+    total_sell_amount: float = 0.0
+    total_buy_amount: float = 0.0
+    total_estimated_gain: float = 0.0
+    total_estimated_tax: float = 0.0
+    hhi_before: float = 0.0
+    hhi_after: float = 0.0
+
+
+# ── Crypto asset class mapping (server-side, mirrors frontend) ─────
+
+CRYPTO_ASSET_CLASSES: Dict[str, str] = {
+    # Layer 1
+    "BTC": "L1",
+    "ETH": "L1",
+    "SOL": "L1",
+    "ADA": "L1",
+    "AVAX": "L1",
+    "DOT": "L1",
+    "ATOM": "L1",
+    "NEAR": "L1",
+    "SUI": "L1",
+    "APT": "L1",
+    "ALGO": "L1",
+    "XTZ": "L1",
+    "EGLD": "L1",
+    "FTM": "L1",
+    "HBAR": "L1",
+    "ICP": "L1",
+    "TON": "L1",
+    "SEI": "L1",
+    "KAS": "L1",
+    "TIA": "L1",
+    "INJ": "L1",
+    # Layer 2
+    "MATIC": "L2",
+    "ARB": "L2",
+    "OP": "L2",
+    "IMX": "L2",
+    "MNT": "L2",
+    "STRK": "L2",
+    "ZK": "L2",
+    "METIS": "L2",
+    "POL": "L2",
+    # DeFi
+    "UNI": "DeFi",
+    "AAVE": "DeFi",
+    "MKR": "DeFi",
+    "LDO": "DeFi",
+    "SNX": "DeFi",
+    "CRV": "DeFi",
+    "COMP": "DeFi",
+    "SUSHI": "DeFi",
+    "CAKE": "DeFi",
+    "PENDLE": "DeFi",
+    "RUNE": "DeFi",
+    "JUP": "DeFi",
+    "RAY": "DeFi",
+    "GMX": "DeFi",
+    # Stablecoins
+    "USDT": "Stable",
+    "USDC": "Stable",
+    "DAI": "Stable",
+    "BUSD": "Stable",
+    "FDUSD": "Stable",
+    "TUSD": "Stable",
+    "PYUSD": "Stable",
+    "FRAX": "Stable",
+    "LUSD": "Stable",
+    "USDG": "Stable",
+    "EURC": "Stable",
+    "EURT": "Stable",
+    # Meme
+    "DOGE": "Meme",
+    "SHIB": "Meme",
+    "PEPE": "Meme",
+    "FLOKI": "Meme",
+    "WIF": "Meme",
+    "BONK": "Meme",
+    "MEME": "Meme",
+    "TURBO": "Meme",
+    "BRETT": "Meme",
+}
+
+CRYPTO_CLASS_LABELS: Dict[str, str] = {
+    "L1": "Layer 1",
+    "L2": "Layer 2",
+    "DeFi": "DeFi",
+    "Stable": "Stablecoins",
+    "Meme": "Meme",
+    "Other": "Autres",
+}
+
+
 # ── Styles helpers ──────────────────────────────────────────────────
 
 _BLUE = colors.HexColor("#1e40af")
@@ -137,6 +258,49 @@ def _pct(v: float) -> str:
 
 def _gain_color(v: float):
     return _GREEN if v >= 0 else _RED
+
+
+_PARIS_TZ = ZoneInfo("Europe/Paris")
+_ZERO = Decimal("0")
+
+# FIFO layer key type
+FifoKey = Tuple[str, str]
+
+
+def _now_paris() -> datetime:
+    """Current datetime in Europe/Paris timezone."""
+    return datetime.now(tz=_PARIS_TZ)
+
+
+def _format_paris_dt() -> str:
+    """Format current Paris datetime for report headers."""
+    now = _now_paris()
+    return now.strftime("%d/%m/%Y à %H:%M") + " (heure de Paris)"
+
+
+def _page_footer(canvas, doc):
+    """Draw 'Page X / Y' footer on every page."""
+    canvas.saveState()
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#94a3b8"))
+    page_text = f"Page {canvas.getPageNumber()}"
+    canvas.drawCentredString(A4[0] / 2, 1.2 * cm, page_text)
+    canvas.restoreState()
+
+
+def _build_doc_with_footer(buffer, **kwargs) -> BaseDocTemplate:
+    """Create a BaseDocTemplate with page numbering footer."""
+    doc = BaseDocTemplate(buffer, pagesize=A4, **kwargs)
+    frame = Frame(
+        doc.leftMargin,
+        doc.bottomMargin,
+        doc.width,
+        doc.height,
+        id="main",
+    )
+    template = PageTemplate(id="with_footer", frames=[frame], onPage=_page_footer)
+    doc.addPageTemplates([template])
+    return doc
 
 
 # ── Report Service ──────────────────────────────────────────────────
@@ -333,10 +497,12 @@ class ReportService:
                 attribution["alpha"] += ar.current_value
 
         # 7. Cash flows (deposits are NOT gains)
+        # M2: TRANSFER_IN/OUT are NOT capital flows — they just move assets
+        # between exchanges. Only BUY = deposit, SELL = withdrawal.
         cash_flows = {"total_deposits": 0.0, "total_withdrawals": 0.0}
         for tx in tax_transactions:
             tt = tx.transaction_type
-            if tt in {"buy", "transfer_in"}:
+            if tt == "buy":
                 cash_flows["total_deposits"] += tx.total
             elif tt == "sell":
                 cash_flows["total_withdrawals"] += tx.total
@@ -364,7 +530,59 @@ class ReportService:
             "year": year,
         }
 
-    # ── Tax 2086 computation ────────────────────────────────────────
+    # ── Tax 2086 computation (FIFO-aligned) ─────────────────────────
+
+    async def _get_historical_prices(
+        self,
+        db: AsyncSession,
+        symbols: List[str],
+        price_date: _date,
+    ) -> Dict[str, Decimal]:
+        """Fetch historical EUR prices from asset_price_history for a set of
+        symbols on a given date. Falls back to the nearest earlier date within
+        7 days if an exact match is missing.
+        """
+        from datetime import timedelta
+
+        if not symbols:
+            return {}
+
+        # Try exact date first
+        result = await db.execute(
+            select(AssetPriceHistory.symbol, AssetPriceHistory.price_eur).where(
+                AssetPriceHistory.symbol.in_(symbols),
+                AssetPriceHistory.price_date == price_date,
+            )
+        )
+        prices: Dict[str, Decimal] = {row[0].upper(): Decimal(str(row[1])) for row in result.all()}
+
+        # For missing symbols, look back up to 7 days
+        missing = [s for s in symbols if s.upper() not in prices]
+        if missing:
+            fallback_start = price_date - timedelta(days=7)
+            fb_result = await db.execute(
+                select(
+                    AssetPriceHistory.symbol,
+                    AssetPriceHistory.price_eur,
+                    AssetPriceHistory.price_date,
+                )
+                .where(
+                    AssetPriceHistory.symbol.in_(missing),
+                    AssetPriceHistory.price_date.between(fallback_start, price_date),
+                )
+                .order_by(
+                    AssetPriceHistory.symbol,
+                    AssetPriceHistory.price_date.desc(),
+                )
+            )
+            seen = set()
+            for row in fb_result.all():
+                sym_upper = row[0].upper()
+                if sym_upper not in seen:
+                    prices[sym_upper] = Decimal(str(row[1]))
+                    seen.add(sym_upper)
+
+        return prices
 
     async def compute_tax_2086(
         self,
@@ -372,220 +590,451 @@ class ReportService:
         user_id: str,
         year: int,
     ) -> TaxSummary2086:
-        """Compute capital gains per French 2086 formula.
+        """Compute capital gains per French 2086 formula (art. 150 VH bis CGI).
+
+        Uses FIFO layers (aligned with metrics_service) with acquisition dates
+        for accurate holding-period determination.
 
         Formula per cession:
           PV = Prix_cession − (Total_acquisition × Prix_cession / Valeur_portefeuille)
 
         Where:
           - Prix_cession = qty × price − fees
-          - Total_acquisition = cumulative cost of all buys up to this point
-          - Valeur_portefeuille = total portfolio value at the moment of cession
+          - Total_acquisition = cumulative PAID cost (BUY + CONVERSION_IN propagated),
+            excluding TRANSFER_IN/OUT (no cost impact)
+          - Valeur_portefeuille = sum(holdings × market_price) from asset_price_history
         """
-        # 1. Get ALL crypto assets for this user
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
+        empty = TaxSummary2086(
+            year=year,
+            total_cessions=0,
+            total_acquisitions_fraction=0,
+            total_plus_values=0,
+            total_moins_values=0,
+            net_plus_value=0,
+            nb_cessions=0,
+            nb_court_terme=0,
+            nb_long_terme=0,
+            flat_tax_30=0,
+            ir_12_8=0,
+            ps_17_2=0,
+            events=[],
         )
+
+        # 1. Get ALL crypto assets for this user
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
         portfolios = result.scalars().all()
         portfolio_ids = [p.id for p in portfolios]
-
         if not portfolio_ids:
-            return TaxSummary2086(
-                year=year,
-                total_cessions=0,
-                total_acquisitions_fraction=0,
-                total_plus_values=0,
-                total_moins_values=0,
-                net_plus_value=0,
-                nb_cessions=0,
-                nb_court_terme=0,
-                nb_long_terme=0,
-                flat_tax_30=0,
-                ir_12_8=0,
-                ps_17_2=0,
-                events=[],
-            )
+            return empty
 
-        asset_result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id.in_(portfolio_ids),
-            )
-        )
+        asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
         assets = asset_result.scalars().all()
         crypto_assets = [a for a in assets if a.asset_type == AssetType.CRYPTO]
         crypto_asset_ids = [a.id for a in crypto_assets]
-
         if not crypto_asset_ids:
-            return TaxSummary2086(
-                year=year,
-                total_cessions=0,
-                total_acquisitions_fraction=0,
-                total_plus_values=0,
-                total_moins_values=0,
-                net_plus_value=0,
-                nb_cessions=0,
-                nb_court_terme=0,
-                nb_long_terme=0,
-                flat_tax_30=0,
-                ir_12_8=0,
-                ps_17_2=0,
-                events=[],
-            )
-
-        # 2. Get ALL transactions (all years) ordered chronologically
-        trans_result = await db.execute(
-            select(Transaction)
-            .where(
-                Transaction.asset_id.in_(crypto_asset_ids),
-            )
-            .order_by(Transaction.executed_at.asc())
-        )
-        all_transactions = trans_result.scalars().all()
+            return empty
 
         asset_map = {a.id: a for a in crypto_assets}
+        aid_to_symbol: Dict[str, str] = {str(a.id): a.symbol.upper() for a in crypto_assets}
 
-        # 3. Reconstruct portfolio history chronologically
-        # Track: holdings (symbol → qty), total_acquisition_cost, first_buy_date per symbol
-        holdings: Dict[str, Decimal] = {}  # symbol → quantity
-        cost_basis: Dict[str, Decimal] = {}  # symbol → total cost for that symbol
-        first_buy: Dict[str, datetime] = {}  # symbol → first acquisition date
-        total_acquisition_cost = Decimal("0")  # global PMP numerator
+        # 2. Get ALL transactions (all years) chronologically
+        trans_result = await db.execute(
+            select(Transaction)
+            .where(Transaction.asset_id.in_(crypto_asset_ids))
+            .order_by(Transaction.executed_at.asc())
+        )
+        all_transactions = list(trans_result.scalars().all())
 
-        buy_types = {
-            TransactionType.BUY,
-            TransactionType.TRANSFER_IN,
-            TransactionType.AIRDROP,
-            TransactionType.STAKING_REWARD,
-            TransactionType.CONVERSION_IN,
-        }
-        sell_types = {
-            TransactionType.SELL,
-            TransactionType.CONVERSION_OUT,
-            TransactionType.TRANSFER_OUT,
-        }
+        # Pre-collect CONVERSION_IN transactions for matching
+        conv_ins = [t for t in all_transactions if t.transaction_type == TransactionType.CONVERSION_IN]
 
-        from datetime import timezone
+        # ── FIFO helpers (mirroring metrics_service) ──────────────────
 
-        year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
-        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        # Layer format: {"qty": Decimal, "unit_cost": Decimal,
+        #                "is_paid": bool, "acquired_at": datetime}
+        fifo: Dict[FifoKey, list] = _defaultdict(list)
 
+        def _match_conversion_in(
+            co_tx: Transaction,
+            src_sym: str,
+        ) -> Tuple[Optional[str], Optional[str], Decimal]:
+            """Find matching CONVERSION_IN for a CONVERSION_OUT."""
+            notes = co_tx.notes or ""
+            exch = co_tx.exchange or ""
+            co_qty = Decimal(str(co_tx.quantity))
+            dest_sym: Optional[str] = None
+            dest_exch: Optional[str] = None
+            matched_qty = co_qty
+
+            if "crypto.com" in exch.lower():
+                for ci in conv_ins:
+                    if (ci.notes or "") == notes and (ci.exchange or "") == exch:
+                        dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
+                        dest_exch = (ci.exchange or "").strip()
+                        matched_qty = Decimal(str(ci.quantity))
+                        break
+            else:
+                m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
+                if m:
+                    suffix = m.group(1)
+                    for ci in conv_ins:
+                        if f"convert_buy_{suffix}" in (ci.notes or ""):
+                            candidate = aid_to_symbol.get(str(ci.asset_id), "")
+                            if candidate and candidate != src_sym:
+                                dest_sym = candidate
+                                dest_exch = (ci.exchange or "").strip()
+                                matched_qty = Decimal(str(ci.quantity))
+                            break
+            return dest_sym, dest_exch, matched_qty
+
+        def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
+            """Remove qty from FIFO layers, return total cost removed."""
+            layers = fifo.get(key, [])
+            remaining = qty_to_remove
+            cost_removed = _ZERO
+            while remaining > 0 and layers:
+                layer = layers[0]
+                if layer["qty"] <= remaining:
+                    cost_removed += layer["qty"] * layer["unit_cost"]
+                    remaining -= layer["qty"]
+                    layers.pop(0)
+                else:
+                    cost_removed += remaining * layer["unit_cost"]
+                    layer["qty"] -= remaining
+                    remaining = _ZERO
+            return cost_removed
+
+        def _consume_fifo_with_dates(
+            key: FifoKey,
+            qty_to_remove: Decimal,
+        ) -> Tuple[Decimal, Optional[datetime]]:
+            """Consume FIFO layers and return (cost_removed, oldest_acquired_at).
+
+            The oldest layer's acquired_at determines the holding period (M1).
+            """
+            layers = fifo.get(key, [])
+            remaining = qty_to_remove
+            cost_removed = _ZERO
+            oldest_date: Optional[datetime] = None
+            while remaining > 0 and layers:
+                layer = layers[0]
+                if oldest_date is None:
+                    oldest_date = layer.get("acquired_at")
+                take = min(layer["qty"], remaining)
+                cost_removed += take * layer["unit_cost"]
+                remaining -= take
+                if take >= layer["qty"]:
+                    layers.pop(0)
+                else:
+                    layer["qty"] -= take
+            return cost_removed, oldest_date
+
+        def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
+            """Extract layers preserving unit costs (for transfers)."""
+            layers = fifo.get(key, [])
+            remaining = qty_to_remove
+            extracted: list = []
+            while remaining > 0 and layers:
+                layer = layers[0]
+                if layer["qty"] <= remaining:
+                    extracted.append(layer.copy())
+                    remaining -= layer["qty"]
+                    layers.pop(0)
+                else:
+                    extracted.append(
+                        {
+                            "qty": remaining,
+                            "unit_cost": layer["unit_cost"],
+                            "is_paid": layer["is_paid"],
+                            "acquired_at": layer.get("acquired_at"),
+                        }
+                    )
+                    layer["qty"] -= remaining
+                    remaining = _ZERO
+            return extracted
+
+        # ── 3. Single-pass chronological processing ───────────────────
+        # holdings tracks total qty per symbol (for portfolio_value calc)
+        holdings: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+        # total_acquisition_cost: global PMP numerator (art. 150 VH bis)
+        # B2: EXCLUDES transfers. B3: CONVERSION_IN inherits from OUT.
+        total_acquisition_cost = _ZERO
+
+        year_start = datetime(year, 1, 1, tzinfo=_tz.utc)
+        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=_tz.utc)
         events: List[TaxEvent2086] = []
+
+        # Collect unique dates where we need portfolio values (B1)
+        cession_dates: set = set()
+
+        TxType = TransactionType
 
         for tx in all_transactions:
             asset = asset_map.get(tx.asset_id)
             if not asset or not tx.executed_at:
                 continue
 
-            symbol = asset.symbol
+            sym = asset.symbol.upper()
+            exch = (tx.exchange or "").strip()
+            key: FifoKey = (sym, exch)
             qty = Decimal(str(tx.quantity))
-            price = Decimal(str(tx.price))
+            price = Decimal(str(tx.price or 0))
             fee = Decimal(str(tx.fee or 0))
-            tx_type = tx.transaction_type
+            ttype = tx.transaction_type
+            tx_dt = tx.executed_at
+            if tx_dt.tzinfo is None:
+                tx_dt = tx_dt.replace(tzinfo=_tz.utc)
 
-            if tx_type in buy_types:
-                # Acquisition
-                tx_cost = qty * price + fee
-                holdings[symbol] = holdings.get(symbol, Decimal("0")) + qty
-                cost_basis[symbol] = cost_basis.get(symbol, Decimal("0")) + tx_cost
-                total_acquisition_cost += tx_cost
+            if ttype == TxType.BUY:
+                total_cost = qty * price + fee
+                layer_unit = total_cost / qty if qty > 0 else _ZERO
+                fifo[key].append(
+                    {
+                        "qty": qty,
+                        "unit_cost": layer_unit,
+                        "is_paid": True,
+                        "acquired_at": tx_dt,
+                    }
+                )
+                holdings[sym] += qty
+                total_acquisition_cost += total_cost
 
-                if symbol not in first_buy:
-                    first_buy[symbol] = tx.executed_at
+            elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
+                fifo[key].append(
+                    {
+                        "qty": qty,
+                        "unit_cost": _ZERO,
+                        "is_paid": False,
+                        "acquired_at": tx_dt,
+                    }
+                )
+                holdings[sym] += qty
 
-            elif tx_type in sell_types:
-                # Cession — only SELL and CONVERSION_OUT are taxable events
-                # TRANSFER_OUT is not a taxable cession (just moving assets)
-                is_taxable = tx_type in {TransactionType.SELL, TransactionType.CONVERSION_OUT}
+            elif ttype == TxType.TRANSFER_OUT:
+                # B2: Transfers do NOT modify total_acquisition_cost
+                extracted = _consume_fifo_layers(key, qty)
+                transit_key = (sym, f"__transit__{tx.id}")
+                fifo[transit_key] = extracted
+                holdings[sym] = max(_ZERO, holdings[sym] - qty)
 
+            elif ttype == TxType.TRANSFER_IN:
+                # B2: Match transit layers — no cost change
+                matched_transit = None
+                best_diff = None
+                for tkey in list(fifo.keys()):
+                    if tkey[0] == sym and tkey[1].startswith("__transit__"):
+                        transit_qty = sum(ly["qty"] for ly in fifo[tkey])
+                        diff = abs(transit_qty - qty)
+                        if best_diff is None or diff < best_diff:
+                            best_diff = diff
+                            matched_transit = tkey
+                if matched_transit and fifo[matched_transit]:
+                    for layer in fifo.pop(matched_transit):
+                        fifo[key].append(layer)
+                else:
+                    fifo[key].append(
+                        {
+                            "qty": qty,
+                            "unit_cost": _ZERO,
+                            "is_paid": False,
+                            "acquired_at": tx_dt,
+                        }
+                    )
+                holdings[sym] += qty
+
+            elif ttype == TxType.CONVERSION_OUT:
+                # B3: Consume FIFO from source, propagate cost to destination
+                src_sym = sym
+                dest_sym, dest_exch, matched_ci_qty = _match_conversion_in(tx, src_sym)
+
+                # This IS a taxable event — compute before modifying state
+                is_in_year = year_start <= tx_dt <= year_end
                 cession_price = qty * price - fee
 
-                tx_dt = tx.executed_at
-                if tx_dt.tzinfo is None:
-                    tx_dt = tx_dt.replace(tzinfo=timezone.utc)
-                if is_taxable and year_start <= tx_dt <= year_end:
-                    # Compute portfolio value at this moment
-                    # We use the current holdings × the price at which this cession occurs
-                    # as a proxy. In reality, you'd need all prices at this exact moment.
-                    # The simplest correct approach: use the cost basis as proxy for
-                    # "valeur globale du portefeuille" when we don't have exact prices.
-                    # Better approach: sum all holdings × their last known prices.
-                    # For now, use the sum of cost_basis as the portfolio value proxy,
-                    # adjusted by the ratio of current cession price to cost basis.
-                    #
-                    # Actually, the correct 2086 approach:
-                    # Valeur_portefeuille = sum of all crypto holdings at market price
-                    # at the time of cession. We approximate using cost_basis for unsold
-                    # assets and market price for the asset being sold.
-                    portfolio_value = Decimal("0")
-                    for sym, qty_held in holdings.items():
-                        if qty_held > 0:
-                            if sym == symbol:
-                                # Use the cession price for this asset
-                                portfolio_value += qty_held * price
-                            else:
-                                # Use cost basis / quantity as proxy
-                                sym_qty = holdings.get(sym, Decimal("0"))
-                                sym_cost = cost_basis.get(sym, Decimal("0"))
-                                if sym_qty > 0:
-                                    portfolio_value += sym_cost  # cost basis as proxy
+                if is_in_year:
+                    cession_dates.add(tx_dt.date())
 
-                    # The 2086 formula
-                    if portfolio_value > 0:
-                        acquisition_fraction = (
-                            float(total_acquisition_cost) * float(cession_price) / float(portfolio_value)
+                cost_removed, oldest_date = _consume_fifo_with_dates(key, qty)
+                holdings[sym] = max(_ZERO, holdings[sym] - qty)
+
+                # Reduce total_acquisition_cost by the cost of consumed layers
+                total_acquisition_cost -= cost_removed
+
+                if dest_sym and matched_ci_qty > 0:
+                    dest_key: FifoKey = (dest_sym, dest_exch or exch)
+                    if cost_removed > 0:
+                        dest_unit = cost_removed / matched_ci_qty
+                        fifo[dest_key].append(
+                            {
+                                "qty": matched_ci_qty,
+                                "unit_cost": dest_unit,
+                                "is_paid": True,
+                                "acquired_at": tx_dt,
+                            }
                         )
+                        # B3: The converted cost re-enters total_acquisition_cost
+                        # as the new asset's cost basis
+                        total_acquisition_cost += cost_removed
                     else:
-                        acquisition_fraction = 0.0
+                        fifo[dest_key].append(
+                            {
+                                "qty": matched_ci_qty,
+                                "unit_cost": _ZERO,
+                                "is_paid": False,
+                                "acquired_at": tx_dt,
+                            }
+                        )
+                    holdings[dest_sym] += matched_ci_qty
 
-                    gain_loss = float(cession_price) - acquisition_fraction
-
-                    # Holding period
-                    fb = first_buy.get(symbol)
-                    if fb and (tx_dt - (fb.replace(tzinfo=timezone.utc) if fb.tzinfo is None else fb)).days >= 730:
-                        holding = "long_terme"
-                    else:
-                        holding = "court_terme"
-
+                # Record event data for year cessions (computed below)
+                if is_in_year:
                     events.append(
                         TaxEvent2086(
                             date=tx.executed_at,
-                            symbol=symbol,
-                            event_type=tx_type.value,
+                            symbol=src_sym,
+                            event_type=ttype.value,
                             quantity=float(qty),
                             unit_price=float(price),
                             cession_price=float(cession_price),
-                            portfolio_value=float(portfolio_value),
+                            portfolio_value=0.0,  # filled in pass 2
                             total_acquisition_cost=float(total_acquisition_cost),
-                            acquisition_fraction=acquisition_fraction,
-                            gain_loss=gain_loss,
-                            holding_period=holding,
+                            acquisition_fraction=0.0,  # filled in pass 2
+                            gain_loss=0.0,  # filled in pass 2
+                            holding_period=(
+                                "long_terme" if oldest_date and (tx_dt - oldest_date).days >= 730 else "court_terme"
+                            ),
                             fees=float(fee),
                         )
                     )
 
-                # Update holdings and reduce acquisition cost proportionally
-                held = holdings.get(symbol, Decimal("0"))
-                if held > 0:
-                    fraction_sold = min(qty / held, Decimal("1"))
-                    cost_reduction = cost_basis.get(symbol, Decimal("0")) * fraction_sold
-                    cost_basis[symbol] = cost_basis.get(symbol, Decimal("0")) - cost_reduction
-                    total_acquisition_cost -= cost_reduction
+            elif ttype == TxType.CONVERSION_IN:
+                # B3: Qty/cost already handled by CONVERSION_OUT.
+                # Only apply fees to last layer if present.
+                fee_ci = Decimal(str(tx.fee or 0))
+                if fee_ci > 0:
+                    layers = fifo.get(key, [])
+                    if layers:
+                        last = layers[-1]
+                        old_total = last["qty"] * last["unit_cost"]
+                        last["unit_cost"] = (old_total + fee_ci) / last["qty"] if last["qty"] > 0 else _ZERO
+                        total_acquisition_cost += fee_ci
 
-                holdings[symbol] = max(Decimal("0"), holdings.get(symbol, Decimal("0")) - qty)
+            elif ttype == TxType.SELL:
+                cession_price = qty * price - fee
 
-        # 4. Build summary
+                is_in_year = year_start <= tx_dt <= year_end
+                if is_in_year:
+                    cession_dates.add(tx_dt.date())
+
+                # M1: Use FIFO layer date for holding period
+                cost_removed, oldest_date = _consume_fifo_with_dates(key, qty)
+                holdings[sym] = max(_ZERO, holdings[sym] - qty)
+
+                # Reduce total_acquisition_cost proportionally
+                total_acquisition_cost -= cost_removed
+
+                if is_in_year:
+                    events.append(
+                        TaxEvent2086(
+                            date=tx.executed_at,
+                            symbol=sym,
+                            event_type=ttype.value,
+                            quantity=float(qty),
+                            unit_price=float(price),
+                            cession_price=float(cession_price),
+                            portfolio_value=0.0,  # filled in pass 2
+                            total_acquisition_cost=float(total_acquisition_cost),
+                            acquisition_fraction=0.0,
+                            gain_loss=0.0,
+                            holding_period=(
+                                "long_terme" if oldest_date and (tx_dt - oldest_date).days >= 730 else "court_terme"
+                            ),
+                            fees=float(fee),
+                        )
+                    )
+
+        # ── 4. Pass 2: Compute portfolio_value from historical prices (B1) ──
+        # Collect ALL symbols that ever had holdings (we need to replay
+        # holdings per cession date, including symbols sold since).
+        all_symbols_ever = set(aid_to_symbol.values())
+
+        # Fetch historical prices for all cession dates in batch
+        price_cache: Dict[_date, Dict[str, Decimal]] = {}
+        for d in cession_dates:
+            price_cache[d] = await self._get_historical_prices(
+                db,
+                list(all_symbols_ever),
+                d,
+            )
+
+        # Replay holdings to get state at each cession date, then fill events.
+        # We need to re-walk transactions to snapshot holdings at each event.
+        holdings_replay: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+        event_idx = 0
+
+        for tx in all_transactions:
+            asset = asset_map.get(tx.asset_id)
+            if not asset or not tx.executed_at:
+                continue
+
+            sym = asset.symbol.upper()
+            qty = Decimal(str(tx.quantity))
+            ttype = tx.transaction_type
+            tx_dt = tx.executed_at
+            if tx_dt.tzinfo is None:
+                tx_dt = tx_dt.replace(tzinfo=_tz.utc)
+
+            # Update replay holdings
+            if ttype in (TxType.BUY, TxType.AIRDROP, TxType.STAKING_REWARD, TxType.TRANSFER_IN, TxType.CONVERSION_IN):
+                holdings_replay[sym] += qty
+            elif ttype in (TxType.SELL, TxType.TRANSFER_OUT, TxType.CONVERSION_OUT):
+                holdings_replay[sym] = max(_ZERO, holdings_replay[sym] - qty)
+
+            # Check if this tx corresponds to the next event
+            is_in_year = year_start <= tx_dt <= year_end
+            is_taxable = ttype in (TxType.SELL, TxType.CONVERSION_OUT)
+            if is_in_year and is_taxable and event_idx < len(events):
+                ev = events[event_idx]
+                # Verify match (same date + symbol)
+                if ev.date == tx.executed_at and ev.symbol == sym:
+                    td = tx_dt.date()
+                    day_prices = price_cache.get(td, {})
+
+                    # B1: Compute real portfolio value from market prices
+                    portfolio_value = _ZERO
+                    for held_sym, held_qty in holdings_replay.items():
+                        if held_qty > _ZERO:
+                            if held_sym == sym:
+                                # Use actual cession price per unit
+                                portfolio_value += held_qty * Decimal(str(tx.price or 0))
+                            else:
+                                hist_price = day_prices.get(held_sym.upper(), _ZERO)
+                                portfolio_value += held_qty * hist_price
+
+                    # Apply 2086 formula
+                    cession_d = Decimal(str(ev.cession_price))
+                    total_acq_d = Decimal(str(ev.total_acquisition_cost))
+                    if portfolio_value > 0:
+                        acq_fraction = float(total_acq_d * cession_d / portfolio_value)
+                    else:
+                        acq_fraction = 0.0
+
+                    ev.portfolio_value = float(portfolio_value)
+                    ev.acquisition_fraction = acq_fraction
+                    ev.gain_loss = ev.cession_price - acq_fraction
+
+                    event_idx += 1
+
+        # ── 5. Build summary ──────────────────────────────────────────
         total_cessions = sum(e.cession_price for e in events)
         total_acq_fraction = sum(e.acquisition_fraction for e in events)
         total_pv = sum(e.gain_loss for e in events if e.gain_loss > 0)
         total_mv = sum(e.gain_loss for e in events if e.gain_loss < 0)
-        net_pv = total_pv + total_mv  # total_mv is negative
+        net_pv = total_pv + total_mv
         nb_ct = sum(1 for e in events if e.holding_period == "court_terme")
         nb_lt = sum(1 for e in events if e.holding_period == "long_terme")
 
-        # Flat tax only applies if net_plus_value > 0
-        taxable = max(0, net_pv)
+        taxable = max(0.0, net_pv)
         ir = taxable * 0.128
         ps = taxable * 0.172
         flat_tax = ir + ps
@@ -610,9 +1059,8 @@ class ReportService:
 
     def generate_performance_pdf(self, data: Dict[str, Any]) -> bytes:
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
+        doc = _build_doc_with_footer(
             buffer,
-            pagesize=A4,
             rightMargin=2 * cm,
             leftMargin=2 * cm,
             topMargin=2 * cm,
@@ -627,7 +1075,7 @@ class ReportService:
         elements = []
 
         elements.append(Paragraph("Rapport de Performance", title_style))
-        elements.append(Paragraph(f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
+        elements.append(Paragraph(f"Généré le {_format_paris_dt()}", normal_style))
         elements.append(Spacer(1, 20))
 
         summary = data.get("summary", {})
@@ -846,7 +1294,7 @@ class ReportService:
         pnl = data.get("pnl_data", {})
         ws["A1"] = "Rapport de Performance InvestAI"
         ws["A1"].font = Font(bold=True, size=16)
-        ws["A2"] = f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+        ws["A2"] = f"Généré le {_format_paris_dt()}"
 
         for cell_ref in ["A4", "B4"]:
             ws[cell_ref].font = _XL_HEADER_FONT
@@ -1143,9 +1591,8 @@ class ReportService:
         tax = await self.compute_tax_2086(db, user_id, year)
 
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
+        doc = _build_doc_with_footer(
             buffer,
-            pagesize=A4,
             rightMargin=2 * cm,
             leftMargin=2 * cm,
             topMargin=2 * cm,
@@ -1166,7 +1613,7 @@ class ReportService:
         elements.append(Paragraph("Formulaire 2086 — Plus-values sur actifs numériques", heading_style))
         elements.append(
             Paragraph(
-                f"Document généré le {datetime.now().strftime('%d/%m/%Y')} — À usage indicatif uniquement", info_style
+                f"Document généré le {_now_paris().strftime('%d/%m/%Y')} — À usage indicatif uniquement", info_style
             )
         )
         elements.append(Spacer(1, 20))
@@ -1332,7 +1779,7 @@ class ReportService:
 
         ws["A1"] = f"Déclaration Fiscale Crypto — Année {year}"
         ws["A1"].font = Font(bold=True, size=14)
-        ws["A2"] = f"Généré le {datetime.now().strftime('%d/%m/%Y')}"
+        ws["A2"] = f"Généré le {_now_paris().strftime('%d/%m/%Y')}"
         ws["A2"].font = Font(italic=True, color="666666")
 
         # Summary data
@@ -1436,9 +1883,8 @@ class ReportService:
         transactions = data.get("transactions", [])
 
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
+        doc = _build_doc_with_footer(
             buffer,
-            pagesize=A4,
             rightMargin=1.5 * cm,
             leftMargin=1.5 * cm,
             topMargin=2 * cm,
@@ -1455,7 +1901,7 @@ class ReportService:
         elements.append(Paragraph("Historique des Transactions", title_style))
         year = data.get("year")
         period = f"Année {year}" if year else "Toutes les années"
-        elements.append(Paragraph(f"{period} — Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
+        elements.append(Paragraph(f"{period} — Généré le {_format_paris_dt()}", normal_style))
         elements.append(Spacer(1, 15))
 
         # Summary
@@ -1621,6 +2067,505 @@ class ReportService:
             )
 
         return buffer.getvalue().encode("utf-8-sig")  # BOM for Excel compatibility
+
+    # ── Rebalancing Report ────────────────────────────────────────────
+
+    async def get_rebalancing_report(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        target_allocations: Dict[str, float],
+        currency: str = "EUR",
+    ) -> RebalancingReport:
+        """Compute rebalancing orders to reach target allocation per crypto class.
+
+        Args:
+            target_allocations: e.g. {"L1": 0.5, "Stable": 0.3, "DeFi": 0.2}
+                Values must sum to 1.0 (100%).
+            currency: Portfolio currency.
+
+        Returns:
+            RebalancingReport with current allocation, drift, suggested orders,
+            and estimated tax impact (PFU 30%) for sell orders via FIFO.
+        """
+        # 1. Fetch portfolio data (single source of truth)
+        dashboard = await metrics_service.get_user_dashboard_metrics(
+            db,
+            user_id,
+            currency=currency,
+        )
+        total_value = dashboard.get("total_value", 0.0)
+
+        if total_value <= 0:
+            return RebalancingReport(
+                total_value=0,
+                categories=[],
+                orders=[],
+            )
+
+        # 2. Group crypto assets by class
+        allocations = dashboard.get("aggregated_assets", [])
+        class_totals: Dict[str, float] = _defaultdict(float)
+        class_assets: Dict[str, List[Dict[str, Any]]] = _defaultdict(list)
+
+        for a in allocations:
+            if a.get("asset_type") != "crypto":
+                continue
+            sym = a.get("symbol", "").upper()
+            val = a.get("value", 0.0)
+            if val < 0.10:  # dust filter
+                continue
+            cls = CRYPTO_ASSET_CLASSES.get(sym, "Other")
+            class_totals[cls] += val
+            class_assets[cls].append(a)
+
+        crypto_total = sum(class_totals.values())
+        if crypto_total <= 0:
+            return RebalancingReport(
+                total_value=total_value,
+                categories=[],
+                orders=[],
+            )
+
+        # 3. Build current allocation breakdown
+        all_classes = set(list(target_allocations.keys()) + list(class_totals.keys()))
+        categories: List[Dict[str, Any]] = []
+        for cls in sorted(all_classes):
+            current_val = class_totals.get(cls, 0.0)
+            current_pct = (current_val / crypto_total * 100) if crypto_total > 0 else 0.0
+            target_pct = target_allocations.get(cls, 0.0) * 100
+            categories.append(
+                {
+                    "category": cls,
+                    "label": CRYPTO_CLASS_LABELS.get(cls, cls),
+                    "current_value": round(current_val, 2),
+                    "current_pct": round(current_pct, 2),
+                    "target_pct": round(target_pct, 2),
+                    "drift_pct": round(current_pct - target_pct, 2),
+                    "drift_eur": round(current_val - crypto_total * target_allocations.get(cls, 0.0), 2),
+                }
+            )
+
+        # 4. Compute rebalancing orders
+        orders: List[RebalanceOrder] = []
+        for cat in categories:
+            drift_eur = cat["drift_eur"]
+            if abs(drift_eur) < 1.0:  # ignore tiny drifts
+                continue
+            action = "sell" if drift_eur > 0 else "buy"
+            orders.append(
+                RebalanceOrder(
+                    category=cat["category"],
+                    action=action,
+                    amount_eur=round(abs(drift_eur), 2),
+                    current_pct=cat["current_pct"],
+                    target_pct=cat["target_pct"],
+                    drift_pct=cat["drift_pct"],
+                )
+            )
+
+        # 5. Estimate tax impact for sell orders via FIFO
+        # We need the FIFO layers to estimate unrealized gains on the assets to sell
+        if any(o.action == "sell" for o in orders):
+            await self._estimate_rebalancing_tax(
+                db,
+                user_id,
+                orders,
+                class_assets,
+                currency,
+            )
+
+        # 6. HHI (concentration index) before/after
+        weights_before = [(v / crypto_total * 100) for v in class_totals.values()]
+        hhi_before = sum(w**2 for w in weights_before)
+
+        weights_after = [target_allocations.get(cls, 0.0) * 100 for cls in all_classes]
+        hhi_after = sum(w**2 for w in weights_after)
+
+        total_sell = sum(o.amount_eur for o in orders if o.action == "sell")
+        total_buy = sum(o.amount_eur for o in orders if o.action == "buy")
+        total_gain = sum(o.estimated_gain for o in orders)
+        total_tax = sum(o.estimated_tax for o in orders)
+
+        return RebalancingReport(
+            total_value=round(total_value, 2),
+            categories=categories,
+            orders=orders,
+            total_sell_amount=round(total_sell, 2),
+            total_buy_amount=round(total_buy, 2),
+            total_estimated_gain=round(total_gain, 2),
+            total_estimated_tax=round(total_tax, 2),
+            hhi_before=round(hhi_before, 1),
+            hhi_after=round(hhi_after, 1),
+        )
+
+    async def _estimate_rebalancing_tax(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        orders: List[RebalanceOrder],
+        class_assets: Dict[str, List[Dict[str, Any]]],
+        currency: str,
+    ) -> None:
+        """Estimate unrealized P&L and PFU tax for sell orders using FIFO layers.
+
+        Mutates orders in-place to fill estimated_gain and estimated_tax.
+        """
+        # Get all portfolios + assets + transactions for FIFO replay
+        result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
+        portfolios = result.scalars().all()
+        portfolio_ids = [p.id for p in portfolios]
+        if not portfolio_ids:
+            return
+
+        asset_result = await db.execute(
+            select(Asset).where(
+                Asset.portfolio_id.in_(portfolio_ids),
+                Asset.asset_type == AssetType.CRYPTO,
+            )
+        )
+        assets = asset_result.scalars().all()
+        aid_to_symbol = {str(a.id): a.symbol.upper() for a in assets}
+        crypto_ids = [a.id for a in assets]
+        if not crypto_ids:
+            return
+
+        trans_result = await db.execute(
+            select(Transaction).where(Transaction.asset_id.in_(crypto_ids)).order_by(Transaction.executed_at.asc())
+        )
+        all_txs = list(trans_result.scalars().all())
+
+        # Build FIFO state (simplified — same logic as compute_tax_2086)
+        fifo: Dict[FifoKey, list] = _defaultdict(list)
+        TxType = TransactionType
+
+        for tx in all_txs:
+            sym = aid_to_symbol.get(str(tx.asset_id), "")
+            if not sym:
+                continue
+            exch = (tx.exchange or "").strip()
+            key: FifoKey = (sym, exch)
+            qty = Decimal(str(tx.quantity))
+            price = Decimal(str(tx.price or 0))
+            fee = Decimal(str(tx.fee or 0))
+
+            if tx.transaction_type == TxType.BUY:
+                total_cost = qty * price + fee
+                unit = total_cost / qty if qty > 0 else _ZERO
+                fifo[key].append({"qty": qty, "unit_cost": unit})
+            elif tx.transaction_type == TxType.SELL:
+                self._consume_fifo_simple(fifo, key, qty)
+            elif tx.transaction_type in (TxType.AIRDROP, TxType.STAKING_REWARD):
+                fifo[key].append({"qty": qty, "unit_cost": _ZERO})
+            elif tx.transaction_type == TxType.TRANSFER_OUT:
+                layers = self._extract_fifo_simple(fifo, key, qty)
+                fifo[(sym, f"__transit__{tx.id}")] = layers
+            elif tx.transaction_type == TxType.TRANSFER_IN:
+                matched = None
+                best = None
+                for tkey in list(fifo.keys()):
+                    if tkey[0] == sym and tkey[1].startswith("__transit__"):
+                        tqty = sum(ly["qty"] for ly in fifo[tkey])
+                        diff = abs(tqty - qty)
+                        if best is None or diff < best:
+                            best = diff
+                            matched = tkey
+                if matched and fifo[matched]:
+                    for layer in fifo.pop(matched):
+                        fifo[key].append(layer)
+                else:
+                    fifo[key].append({"qty": qty, "unit_cost": _ZERO})
+            elif tx.transaction_type == TxType.CONVERSION_OUT:
+                self._consume_fifo_simple(fifo, key, qty)
+            elif tx.transaction_type == TxType.CONVERSION_IN:
+                # Simplified: use price as cost (approximation for tax estimate)
+                total_cost = qty * price
+                unit = total_cost / qty if qty > 0 else _ZERO
+                fifo[key].append({"qty": qty, "unit_cost": unit})
+
+        # Now estimate gains for each sell order
+        for order in orders:
+            if order.action != "sell":
+                continue
+
+            category = order.category
+            sell_remaining = Decimal(str(order.amount_eur))
+            estimated_gain = _ZERO
+
+            # Get assets in this category sorted by value (sell largest first)
+            assets_in_class = class_assets.get(category, [])
+            assets_sorted = sorted(assets_in_class, key=lambda a: a.get("value", 0), reverse=True)
+
+            for asset_info in assets_sorted:
+                if sell_remaining <= 0:
+                    break
+                sym = asset_info.get("symbol", "").upper()
+                current_price = Decimal(str(asset_info.get("current_price", 0)))
+                if current_price <= 0:
+                    continue
+
+                # Find FIFO layers for this symbol (all exchanges)
+                sym_layers: list = []
+                for fkey, layers in fifo.items():
+                    if fkey[0] == sym and not fkey[1].startswith("__transit__"):
+                        sym_layers.extend(layers)
+
+                # Estimate how much qty we'd sell
+                asset_value = Decimal(str(asset_info.get("value", 0)))
+                sell_from_this = min(sell_remaining, asset_value)
+                qty_to_sell = sell_from_this / current_price if current_price > 0 else _ZERO
+
+                # Walk FIFO layers to compute gain
+                remaining = qty_to_sell
+                for layer in sym_layers:
+                    if remaining <= 0:
+                        break
+                    take = min(layer["qty"], remaining)
+                    gain = take * (current_price - layer["unit_cost"])
+                    estimated_gain += gain
+                    remaining -= take
+
+                sell_remaining -= sell_from_this
+
+            order.estimated_gain = round(float(estimated_gain), 2)
+            order.estimated_tax = round(max(0.0, float(estimated_gain)) * 0.30, 2)
+
+    @staticmethod
+    def _consume_fifo_simple(
+        fifo: Dict[FifoKey, list],
+        key: FifoKey,
+        qty: Decimal,
+    ) -> Decimal:
+        """Simple FIFO consume (no dates). Returns cost removed."""
+        layers = fifo.get(key, [])
+        remaining = qty
+        cost = _ZERO
+        while remaining > 0 and layers:
+            layer = layers[0]
+            take = min(layer["qty"], remaining)
+            cost += take * layer["unit_cost"]
+            remaining -= take
+            if take >= layer["qty"]:
+                layers.pop(0)
+            else:
+                layer["qty"] -= take
+        return cost
+
+    @staticmethod
+    def _extract_fifo_simple(
+        fifo: Dict[FifoKey, list],
+        key: FifoKey,
+        qty: Decimal,
+    ) -> list:
+        """Extract FIFO layers preserving unit costs."""
+        layers = fifo.get(key, [])
+        remaining = qty
+        extracted: list = []
+        while remaining > 0 and layers:
+            layer = layers[0]
+            if layer["qty"] <= remaining:
+                extracted.append(layer.copy())
+                remaining -= layer["qty"]
+                layers.pop(0)
+            else:
+                extracted.append({"qty": remaining, "unit_cost": layer["unit_cost"]})
+                layer["qty"] -= remaining
+                remaining = _ZERO
+        return extracted
+
+    # ── Rebalancing PDF ───────────────────────────────────────────────
+
+    def generate_rebalancing_pdf(self, report: RebalancingReport) -> bytes:
+        """Generate a PDF rebalancing report."""
+        buffer = io.BytesIO()
+        doc = _build_doc_with_footer(
+            buffer,
+            rightMargin=2 * cm,
+            leftMargin=2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "T",
+            parent=styles["Heading1"],
+            fontSize=20,
+            spaceAfter=20,
+            textColor=_BLUE,
+        )
+        heading_style = ParagraphStyle(
+            "H",
+            parent=styles["Heading2"],
+            fontSize=13,
+            spaceBefore=15,
+            spaceAfter=8,
+            textColor=_DARK_BLUE,
+        )
+        normal_style = styles["Normal"]
+        info_style = ParagraphStyle(
+            "I",
+            parent=styles["Normal"],
+            fontSize=9,
+            textColor=colors.HexColor("#64748b"),
+        )
+        elements = []
+
+        # Title
+        elements.append(Paragraph("Rapport de Rééquilibrage", title_style))
+        elements.append(
+            Paragraph(
+                f"Généré le {_format_paris_dt()}",
+                normal_style,
+            )
+        )
+        elements.append(Spacer(1, 15))
+
+        # 1. Portfolio summary
+        elements.append(Paragraph("1. Valeur du portefeuille crypto", heading_style))
+        elements.append(
+            Paragraph(
+                f"Valeur totale : <b>{_money(report.total_value)}</b>",
+                normal_style,
+            )
+        )
+        elements.append(Spacer(1, 15))
+
+        # 2. Current vs Target allocation table
+        elements.append(Paragraph("2. Allocation Actuelle vs Cible", heading_style))
+        rows = [["Catégorie", "Valeur", "Actuel %", "Cible %", "Écart %", "Écart EUR"]]
+        for cat in report.categories:
+            rows.append(
+                [
+                    CRYPTO_CLASS_LABELS.get(cat["category"], cat["category"]),
+                    _money(cat["current_value"]),
+                    _pct(cat["current_pct"]),
+                    _pct(cat["target_pct"]),
+                    _pct(cat["drift_pct"]),
+                    _money(cat["drift_eur"]),
+                ]
+            )
+        t = Table(rows, colWidths=[3.5 * cm, 3 * cm, 2 * cm, 2 * cm, 2 * cm, 3 * cm])
+        style_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _LIGHT_BG]),
+        ]
+        # Color drift column
+        for i, cat in enumerate(report.categories, 1):
+            c = _GREEN if abs(cat["drift_pct"]) < 3 else _RED
+            style_cmds.append(("TEXTCOLOR", (4, i), (5, i), c))
+        t.setStyle(TableStyle(style_cmds))
+        elements.append(t)
+        elements.append(Spacer(1, 20))
+
+        # 3. Suggested orders
+        if report.orders:
+            elements.append(Paragraph("3. Ordres de Rééquilibrage Suggérés", heading_style))
+            order_rows = [["Action", "Catégorie", "Montant", "PV Latente", "Impôt (PFU 30%)"]]
+            for o in report.orders:
+                action_label = "VENDRE" if o.action == "sell" else "ACHETER"
+                order_rows.append(
+                    [
+                        action_label,
+                        CRYPTO_CLASS_LABELS.get(o.category, o.category),
+                        _money(o.amount_eur),
+                        _money(o.estimated_gain) if o.action == "sell" else "—",
+                        _money(o.estimated_tax) if o.action == "sell" else "—",
+                    ]
+                )
+            t = Table(order_rows, colWidths=[2.5 * cm, 3.5 * cm, 3 * cm, 3 * cm, 3.5 * cm])
+            order_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _LIGHT_BG]),
+            ]
+            for i, o in enumerate(report.orders, 1):
+                c = _RED if o.action == "sell" else _GREEN
+                order_style.append(("TEXTCOLOR", (0, i), (0, i), c))
+            t.setStyle(TableStyle(order_style))
+            elements.append(t)
+            elements.append(Spacer(1, 15))
+
+            # Tax summary
+            elements.append(Paragraph("4. Impact Fiscal du Rééquilibrage", heading_style))
+            tax_rows = [
+                ["Total ventes", _money(report.total_sell_amount)],
+                ["Total achats", _money(report.total_buy_amount)],
+                ["Plus-value latente estimée", _money(report.total_estimated_gain)],
+                ["Impôt estimé (PFU 30%)", _money(report.total_estimated_tax)],
+            ]
+            t = Table(tax_rows, colWidths=[8 * cm, 5 * cm])
+            t.setStyle(
+                TableStyle(
+                    [
+                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                        ("TOPPADDING", (0, 0), (-1, -1), 6),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                        ("BACKGROUND", (0, 0), (-1, -1), _LIGHT_BG),
+                        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                        ("TEXTCOLOR", (1, -1), (1, -1), _RED),
+                    ]
+                )
+            )
+            elements.append(t)
+            elements.append(Spacer(1, 15))
+
+        # 5. Concentration index
+        elements.append(Paragraph("5. Score de Diversification (HHI)", heading_style))
+        hhi_rows = [
+            ["HHI avant rééquilibrage", f"{report.hhi_before:.0f}"],
+            ["HHI après rééquilibrage", f"{report.hhi_after:.0f}"],
+        ]
+        t = Table(hhi_rows, colWidths=[8 * cm, 5 * cm])
+        t.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 1, _BORDER_COLOR),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("BACKGROUND", (0, 0), (-1, -1), _LIGHT_BG),
+                ]
+            )
+        )
+        elements.append(t)
+        elements.append(Spacer(1, 10))
+        elements.append(
+            Paragraph(
+                "HHI &lt; 1500 = bien diversifié | 1500-2500 = modéré | &gt; 2500 = concentré",
+                info_style,
+            )
+        )
+        elements.append(Spacer(1, 20))
+
+        # Disclaimer
+        elements.append(
+            Paragraph(
+                "Ce rapport est fourni à titre indicatif. L'estimation fiscale utilise "
+                "les couches FIFO actuelles et le PFU à 30%. Consultez un professionnel "
+                "avant d'exécuter les ordres suggérés.",
+                info_style,
+            )
+        )
+
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer.getvalue()
 
 
 # Singleton

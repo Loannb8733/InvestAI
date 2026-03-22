@@ -258,6 +258,9 @@ class EnhancedDashboardResponse(BaseModel):
     period_days: int = 30
     period_label: str = "30j"
 
+    # Data freshness
+    forex_stale: bool = False  # True if forex rates are cached >24h or hardcoded fallback
+
     # Metadata
     last_updated: str
 
@@ -615,6 +618,7 @@ async def get_dashboard(
         earn_summary=earn_summary,
         period_days=days,
         period_label=get_period_label_fr(original_days),
+        forex_stale=metrics.get("forex_stale", False),
         last_updated=datetime.utcnow().isoformat(),
     )
 
