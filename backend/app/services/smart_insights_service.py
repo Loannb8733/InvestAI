@@ -295,6 +295,10 @@ class SmartInsightsService:
                 "mode_label": rcfg.mode_label,
                 "vol_regime": rcfg.vol_regime,
             }
+            # Extract VIX from regime signals for metrics_summary
+            vix_signals = [s for s in market_regime.market.signals if s.name == "VIX (TradFi)"]
+            if vix_signals:
+                metrics_summary["vix"] = vix_signals[0].value
 
         # === SAFE-HAVEN / GOLD ANALYSIS ===
         gold_exposure, gold_beta, gold_badge = await self._analyze_safe_haven(
@@ -304,6 +308,16 @@ class SmartInsightsService:
             market_regime,
             metrics_summary,
         )
+
+        # === CROSS-ASSET CORRELATION (CIO Advisor) ===
+        cross_asset_insights = await self._analyze_cross_asset_correlation(
+            db,
+            user_id,
+            top_holdings,
+            metrics_summary,
+            market_regime,
+        )
+        insights.extend(cross_asset_insights)
 
         # Calculate overall score
         overall_score, overall_status = self._calculate_overall_score(
@@ -784,6 +798,7 @@ class SmartInsightsService:
         try:
             # Fetch Fear & Greed Index
             fear_greed: Optional[int] = None
+            vix_value: Optional[float] = None
             try:
                 import httpx
 
@@ -794,6 +809,16 @@ class SmartInsightsService:
                         fear_greed = int(fng_data["data"][0].get("value", 50))
             except Exception as e:
                 logger.warning("Failed to fetch Fear & Greed: %s", e)
+
+            # Fetch VIX (CBOE Volatility Index) for TradFi sentiment
+            try:
+                from app.services.price_service import price_service
+
+                vix_data = await price_service.get_stock_price("^VIX")
+                if vix_data and vix_data.get("price"):
+                    vix_value = float(vix_data["price"])
+            except Exception as e:
+                logger.debug("Failed to fetch VIX: %s", e)
 
             # Market regime via BTC as proxy (prefer Redis cache)
             _, btc_prices = get_cached_history("BTC", days=regime_days)
@@ -806,7 +831,7 @@ class SmartInsightsService:
             if len(btc_prices) < 7:
                 return None
 
-            market_result = self.regime_detector.detect(btc_prices, "BTC (Marche)", fear_greed)
+            market_result = self.regime_detector.detect(btc_prices, "BTC (Marche)", fear_greed, vix=vix_value)
 
             # Per-asset regime for top 5
             per_asset = []
@@ -821,7 +846,7 @@ class SmartInsightsService:
                     if not prices:
                         _, prices = await self.data_fetcher.get_crypto_history(symbol, days=regime_days)
                     if len(prices) >= 7:
-                        result = self.regime_detector.detect(prices, symbol, fear_greed)
+                        result = self.regime_detector.detect(prices, symbol, fear_greed, vix=vix_value)
                         per_asset.append(result)
                 except Exception as e:
                     logger.debug("Could not fetch history for %s: %s", symbol, e)
@@ -988,6 +1013,153 @@ class SmartInsightsService:
         metrics_summary["gold_badge"] = badge
 
         return gold_exposure, gold_beta, badge
+
+    async def _analyze_cross_asset_correlation(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        top_holdings: List[Dict],
+        metrics_summary: Dict,
+        market_regime: Optional[MarketRegime],
+    ) -> List[SmartInsight]:
+        """CIO Advisor: Analyze cross-asset correlations for strategic insights.
+
+        Produces actionable insights like a Chief Investment Officer would:
+        - Identifies hidden correlation risks between crypto and TradFi
+        - Detects Beta-Heavy portfolios (too exposed to market beta)
+        - Highlights natural hedges (e.g. Gold decorrelation)
+        - Warns about simultaneous exposure to correlated macro factors
+        """
+        insights: List[SmartInsight] = []
+
+        try:
+            corr_data = await self.analytics_service.get_correlation_matrix(db, user_id, days=60)
+        except Exception as e:
+            logger.debug("Cross-asset correlation analysis failed: %s", e)
+            return insights
+
+        bench_corrs = corr_data.benchmark_correlations or {}
+        sp500_corrs = bench_corrs.get("S&P500", {})
+        nasdaq_corrs = bench_corrs.get("Nasdaq", {})
+        gold_corrs = bench_corrs.get("Gold", {})
+
+        # Store in metrics_summary for frontend
+        metrics_summary["benchmark_correlations"] = bench_corrs
+        metrics_summary["portfolio_beta"] = corr_data.portfolio_beta
+        metrics_summary["is_beta_heavy"] = corr_data.is_beta_heavy
+
+        # === CIO INSIGHT 1: Beta-Heavy Detection ===
+        if corr_data.is_beta_heavy and corr_data.portfolio_beta is not None:
+            # Find the most correlated assets with S&P500
+            high_beta_assets = [(sym, c) for sym, c in sp500_corrs.items() if c > 0.60]
+            high_beta_assets.sort(key=lambda x: -x[1])
+            asset_list = ", ".join(f"{s} ({c:.0%})" for s, c in high_beta_assets[:4])
+
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.WARNING,
+                    title="Portefeuille Beta-Heavy",
+                    message=(
+                        f"Votre portefeuille est correle a {corr_data.portfolio_beta:.0%} "
+                        f"avec le S&P 500. Les actifs les plus exposes : {asset_list}. "
+                        "Un choc macroeconomique (hausse des taux, recession) impactera "
+                        "l'ensemble de vos positions simultanement."
+                    ),
+                    metric_name="portfolio_beta",
+                    current_value=corr_data.portfolio_beta,
+                    target_value=0.50,
+                    potential_improvement="Diversifier avec des actifs decorrelés (or, obligations, immobilier)",
+                    actions=[
+                        {
+                            "type": "buy",
+                            "symbol": "PAXG",
+                            "reason": "Or tokenise — decorrelation historique avec les marches actions",
+                        },
+                    ],
+                )
+            )
+
+        # === CIO INSIGHT 2: Hidden Tech/Crypto Correlation ===
+        # Detect if crypto holdings are highly correlated with Nasdaq (tech proxy)
+        crypto_nasdaq_pairs = []
+        for sym, nasdaq_c in nasdaq_corrs.items():
+            if nasdaq_c > 0.70:
+                # Check if this asset also appears in the user's portfolio
+                for h in top_holdings:
+                    if h.get("symbol", "").upper() == sym.upper():
+                        crypto_nasdaq_pairs.append((sym, nasdaq_c))
+                        break
+
+        if crypto_nasdaq_pairs:
+            pairs_str = ", ".join(f"{s} ({c:.0%})" for s, c in crypto_nasdaq_pairs[:3])
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.RISK,
+                    severity=InsightSeverity.WARNING,
+                    title="Correlation cachee Tech/Crypto",
+                    message=(
+                        f"Attention : {pairs_str} sont correles a plus de 70% avec le Nasdaq. "
+                        "Un choc sur les taux d'interet ou une rotation sectorielle "
+                        "impactera ces positions et vos eventuelles expositions tech "
+                        "simultanement."
+                    ),
+                    metric_name="nasdaq_correlation",
+                    current_value=max(c for _, c in crypto_nasdaq_pairs),
+                )
+            )
+
+        # === CIO INSIGHT 3: Gold as Stabilizer ===
+        gold_decorrelated = [(sym, c) for sym, c in gold_corrs.items() if c < 0.20]
+        if gold_decorrelated and len(gold_decorrelated) >= 2:
+            avg_gold_corr = sum(c for _, c in gold_decorrelated) / len(gold_decorrelated)
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.DIVERSIFICATION,
+                    severity=InsightSeverity.INFO,
+                    title="Or : couverture naturelle active",
+                    message=(
+                        f"L'or (PAXG/XAU) affiche une correlation moyenne de "
+                        f"{avg_gold_corr:.0%} avec vos positions, confirmant son role "
+                        "de couverture. En regime baissier, cette decorrelation "
+                        "stabilise la volatilite globale de votre portefeuille."
+                    ),
+                    metric_name="gold_avg_correlation",
+                    current_value=avg_gold_corr,
+                )
+            )
+
+        # === CIO INSIGHT 4: VIX-aware regime warning ===
+        if market_regime and hasattr(market_regime.market, "signals"):
+            vix_signals = [s for s in market_regime.market.signals if s.name == "VIX (TradFi)"]
+            if vix_signals:
+                vix_sig = vix_signals[0]
+                if vix_sig.value > 25 and corr_data.is_beta_heavy:
+                    insights.append(
+                        SmartInsight(
+                            category=InsightCategory.RISK,
+                            severity=InsightSeverity.CRITICAL,
+                            title="Alerte VIX + Beta eleve",
+                            message=(
+                                f"Le VIX est a {vix_sig.value:.0f} (stress eleve) et votre "
+                                f"portefeuille est Beta-Heavy ({corr_data.portfolio_beta:.0%} "
+                                "correle au S&P500). Risque d'impact severe. "
+                                "Envisagez de renforcer vos couvertures ou reduire "
+                                "l'exposition aux actifs les plus correles."
+                            ),
+                            metric_name="vix",
+                            current_value=vix_sig.value,
+                            actions=[
+                                {
+                                    "type": "hold",
+                                    "symbol": "PORTFOLIO",
+                                    "reason": "Reduire l'exposition beta en periode de stress",
+                                },
+                            ],
+                        )
+                    )
+
+        return insights
 
     def _calculate_overall_score(
         self,

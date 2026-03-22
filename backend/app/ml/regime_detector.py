@@ -217,6 +217,7 @@ class MarketRegimeDetector:
         btc_dominance: Optional[float] = None,
         asset_type: Optional[str] = None,
         market_context: Optional[MarketContext] = None,
+        vix: Optional[float] = None,
     ) -> RegimeResult:
         """Analyze prices and return regime probabilities.
 
@@ -239,6 +240,9 @@ class MarketRegimeDetector:
                 signals=[],
                 description="Pas assez de donnees pour analyser le regime de marche.",
             )
+
+        # Store VIX for indicator access
+        self._vix_value = vix
 
         # Compute MarketContext if not provided (needs >= 30 prices)
         ctx = market_context
@@ -287,6 +291,13 @@ class MarketRegimeDetector:
         # 7. Fear & Greed (P19: weighted by BTC dominance)
         if fear_greed is not None:
             sig = self._analyze_fear_greed(fear_greed, btc_dominance=btc_dominance, ctx=ctx)
+            if sig:
+                signals.append(sig)
+                all_votes.append(self._signal_to_votes(sig, ctx=ctx))
+
+        # 8. VIX (CBOE Volatility Index) — TradFi sentiment
+        if hasattr(self, "_vix_value") and self._vix_value is not None:
+            sig = self._analyze_vix(self._vix_value, ctx=ctx)
             if sig:
                 signals.append(sig)
                 all_votes.append(self._signal_to_votes(sig, ctx=ctx))
@@ -686,6 +697,44 @@ class MarketRegimeDetector:
             strength = strength * dominance_factor
 
         return IndicatorSignal("Fear & Greed", float(fg), signal, round(strength, 2), desc)
+
+    def _analyze_vix(self, vix: float, ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+        """Analyze CBOE VIX (Volatility Index) as a TradFi sentiment indicator.
+
+        VIX thresholds (classic interpretation):
+        - < 15: Low volatility / complacency → bullish/top risk
+        - 15-20: Normal → neutral/bullish
+        - 20-30: Elevated fear → bearish
+        - 30-40: High fear → bearish, potential bottom forming
+        - > 40: Extreme fear / panic → bottom signal (capitulation)
+        """
+        if vix <= 0:
+            return None
+
+        if vix > 40:
+            signal, strength = "bottom", min(1.0, (vix - 40) / 30)
+            desc = f"VIX extreme ({vix:.0f}) — panique sur les marches actions, capitulation possible"
+        elif vix > 30:
+            signal, strength = "bearish", 0.5 + 0.3 * (vix - 30) / 10
+            desc = f"VIX tres eleve ({vix:.0f}) — forte crainte sur les marches TradFi"
+        elif vix > 25:
+            signal, strength = "bearish", 0.3 + 0.2 * (vix - 25) / 5
+            desc = f"VIX eleve ({vix:.0f}) — stress accru sur les marches actions"
+        elif vix > 20:
+            signal, strength = "bearish", 0.2
+            desc = f"VIX moderement eleve ({vix:.0f}) — prudence sur les marches"
+        elif vix > 15:
+            signal, strength = "bullish", 0.2
+            desc = f"VIX normal ({vix:.0f}) — conditions de marche stables"
+        elif vix > 12:
+            signal, strength = "bullish", 0.3
+            desc = f"VIX bas ({vix:.0f}) — faible volatilite, marche confiant"
+        else:
+            # Extremely low VIX can signal complacency → potential top
+            signal, strength = "top", 0.3 + 0.2 * max(0, 12 - vix) / 5
+            desc = f"VIX tres bas ({vix:.0f}) — complaisance, risque de retournement"
+
+        return IndicatorSignal("VIX (TradFi)", vix, signal, round(strength, 2), desc)
 
     # -----------------------------------------------------------------------
     # Helpers
