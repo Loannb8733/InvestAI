@@ -241,6 +241,14 @@ async def get_rebalancing_report(
 ):
     """Compute rebalancing report with tax impact estimation."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+
+    # Temporary debug: return raw aggregated_assets to diagnose empty categories
+    from app.services.metrics_service import metrics_service as _ms
+
+    _dash = await _ms.get_user_dashboard_metrics(db, str(current_user.id), currency=currency)
+    _raw = _dash.get("aggregated_assets", [])
+    _debug_assets = [{k: a.get(k) for k in ("symbol", "asset_type", "current_value", "value")} for a in _raw[:10]]
+
     report = await report_service.get_rebalancing_report(
         db,
         str(current_user.id),
@@ -248,6 +256,7 @@ async def get_rebalancing_report(
         currency=currency,
     )
     return {
+        "_debug_assets": _debug_assets,
         "total_value": report.total_value,
         "categories": report.categories,
         "orders": [
