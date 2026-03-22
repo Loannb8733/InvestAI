@@ -2112,7 +2112,7 @@ class ReportService:
             if a.get("asset_type") != "crypto":
                 continue
             sym = a.get("symbol", "").upper()
-            val = a.get("value", 0.0)
+            val = a.get("current_value", 0.0)
             if val < 0.10:  # dust filter
                 continue
             cls = CRYPTO_ASSET_CLASSES.get(sym, "Other")
