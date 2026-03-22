@@ -62,6 +62,7 @@ import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
 import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
+import IASummaryWidget from '@/components/dashboard/IASummaryWidget'
 import StalePriceBadge from '@/components/dashboard/StalePriceBadge'
 
 // ============== Interfaces ==============
@@ -599,6 +600,8 @@ export default function DashboardPage() {
                     privacyMode={privacyMode}
                   />
                 )
+              case 'ia-summary':
+                return <IASummaryWidget />
               case 'munitions':
                 return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} privacyMode={privacyMode} />
               case 'earn':

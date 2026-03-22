@@ -1078,6 +1078,70 @@ class SmartInsightsService:
 
         return score, status
 
+    async def get_dashboard_summary(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+    ) -> Dict:
+        """Lightweight summary for the dashboard IA widget.
+
+        Returns health score, top insight, breakeven distance,
+        top alpha signal, anomaly count, and data freshness.
+        """
+        report = await self.get_portfolio_health(db, user_id, days)
+
+        # Top insight: first critical, then warning, then info
+        top_insight = None
+        if report.insights:
+            best = report.insights[0]  # already sorted by severity
+            top_insight = {
+                "title": best.title,
+                "message": best.message,
+                "severity": best.severity.value,
+                "category": best.category.value,
+            }
+
+        # Breakeven distance: how far from cost basis
+        total_value = report.metrics_summary.get("total_value", 0)
+        breakeven_pct = None
+        try:
+            analytics = await self.analytics_service.get_user_analytics(db, user_id, days)
+            net_capital = getattr(analytics, "net_capital", None) or getattr(analytics, "total_invested", 0)
+            if net_capital and net_capital > 0:
+                breakeven_pct = round(((total_value / net_capital) - 1) * 100, 2)
+        except Exception:
+            pass
+
+        # Top alpha: try prediction service
+        top_alpha = None
+        try:
+            alpha_data = await self.prediction_service.get_top_alpha(db, user_id)
+            if alpha_data and isinstance(alpha_data, list) and len(alpha_data) > 0:
+                best_alpha = alpha_data[0]
+                top_alpha = {
+                    "symbol": best_alpha.get("symbol", "?"),
+                    "alpha_score": best_alpha.get("alpha_score", 0),
+                }
+        except Exception:
+            pass
+
+        # Market regime
+        regime_label = None
+        if report.market_regime and hasattr(report.market_regime, "market"):
+            regime_label = report.market_regime.market.dominant_regime
+
+        return {
+            "health_score": report.overall_score,
+            "health_status": report.overall_status,
+            "top_insight": top_insight,
+            "breakeven_pct": breakeven_pct,
+            "top_alpha": top_alpha,
+            "anomaly_count": len(report.anomaly_impacts),
+            "regime": regime_label,
+            "generated_at": report.generated_at.isoformat(),
+        }
+
     async def get_current_vol_regime(self, db: AsyncSession, user_id: str) -> str:
         """Lightweight BTC-only regime detection for Monte Carlo vol_regime.
 

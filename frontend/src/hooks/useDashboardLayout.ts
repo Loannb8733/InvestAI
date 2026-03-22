@@ -5,6 +5,7 @@ const STORAGE_KEY = 'investai-dashboard-layout'
 // All available widget IDs
 export const ALL_WIDGETS = [
   'metrics',
+  'ia-summary',
   'munitions',
   'earn',
   'crowdfunding',
@@ -21,6 +22,7 @@ export type WidgetId = (typeof ALL_WIDGETS)[number]
 
 export const WIDGET_LABELS: Record<WidgetId, string> = {
   'metrics': 'Patrimoine & KPIs',
+  'ia-summary': 'Résumé IA',
   'munitions': 'Munitions Disponibles',
   'earn': 'Earn / Staking',
   'crowdfunding': 'Crowdfunding',

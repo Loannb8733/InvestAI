@@ -1139,6 +1139,20 @@ export const smartInsightsApi = {
     const response = await api.get('/smart-insights/anomalies-impact', { timeout: ANALYTICS_TIMEOUT })
     return response.data
   },
+
+  getSummary: async (days: number = 30) => {
+    const response = await api.get('/smart-insights/summary', { params: { days }, timeout: ANALYTICS_TIMEOUT })
+    return response.data as {
+      health_score: number
+      health_status: string
+      top_insight: { title: string; message: string; severity: string; category: string } | null
+      breakeven_pct: number | null
+      top_alpha: { symbol: string; alpha_score: number } | null
+      anomaly_count: number
+      regime: string | null
+      generated_at: string
+    }
+  },
 }
 
 // Goals API
