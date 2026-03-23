@@ -13,6 +13,7 @@ export const ALL_WIDGETS = [
   'roi-concentration',
   'indices',
   'charts',
+  'currency-exposure',
   'allocation-transactions-alerts',
   'performers',
 ] as const
@@ -29,6 +30,7 @@ export const WIDGET_LABELS: Record<WidgetId, string> = {
   'roi-concentration': 'ROI & Concentration',
   'indices': 'Comparaison indices',
   'charts': 'Graphiques',
+  'currency-exposure': 'Exposition Devises',
   'allocation-transactions-alerts': 'Allocation & Transactions',
   'performers': 'Top / Worst performers',
 }

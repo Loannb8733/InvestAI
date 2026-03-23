@@ -797,6 +797,22 @@ export const reportsApi = {
     return response.data
   },
 
+  downloadStockTaxPDF: async (year: number) => {
+    const response = await api.get(`/reports/tax/${year}/pdf`, {
+      params: { asset_class: 'securities' },
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  downloadStockTaxExcel: async (year: number) => {
+    const response = await api.get(`/reports/tax/${year}/excel`, {
+      params: { asset_class: 'securities' },
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
   downloadTransactionsPDF: async (year?: number) => {
     const params = year ? { year } : {}
     const response = await api.get('/reports/transactions/pdf', {

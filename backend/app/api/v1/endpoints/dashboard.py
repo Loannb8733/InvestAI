@@ -108,6 +108,14 @@ class AssetAllocation(BaseModel):
     staked_quantity: Optional[float] = None
 
 
+class CurrencyExposure(BaseModel):
+    """Currency exposure breakdown."""
+
+    currency: str
+    value: float
+    percentage: float
+
+
 class EarnAsset(BaseModel):
     """A single staked asset in the earn summary."""
 
@@ -253,6 +261,13 @@ class EnhancedDashboardResponse(BaseModel):
 
     # Earn / Staking
     earn_summary: Optional[EarnSummary] = None
+
+    # Currency exposure
+    currency_exposure: List[CurrencyExposure] = []
+
+    # Total return (capital gain + dividends)
+    total_dividend_income: float = 0.0
+    total_return: float = 0.0
 
     # Period context
     period_days: int = 30
@@ -589,6 +604,59 @@ async def get_dashboard(
 
     from app.core.timeframe import get_period_label_fr
 
+    # ============== Currency Exposure ==============
+    # Group asset values by their denomination currency
+    ccy_totals: dict[str, float] = {}
+    # Use assets from metrics (contains all individual asset entries with currency info)
+    for a in metrics.get("assets", []):
+        # Determine the asset's denomination currency:
+        # For crypto: typically USD. For stocks/ETF: from the asset model.
+        # The asset entry has asset_type; crypto is priced in USD by default.
+        a_type = a.get("asset_type", "")
+        a_val = a.get("current_value", 0.0)
+        if a_val <= 0:
+            continue
+        # Get currency from the asset model if available
+        a_id = a.get("id")
+        a_ccy = "EUR"  # default
+        if a_type == "crypto":
+            a_ccy = "USD"
+        elif a_type in ("crowdfunding", "real_estate", "bond"):
+            a_ccy = "EUR"
+        ccy_totals[a_ccy] = ccy_totals.get(a_ccy, 0.0) + a_val
+
+    # Also query asset-level currencies from DB for stocks/ETFs (more accurate)
+    asset_ccy_result = await db.execute(
+        select(Asset.id, Asset.currency)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        .where(Portfolio.user_id == current_user.id)
+    )
+    asset_ccy_map = {str(row[0]): (row[1] or "EUR").upper() for row in asset_ccy_result.fetchall()}
+
+    # Re-compute with accurate per-asset currencies
+    ccy_totals = {}
+    for a in metrics.get("assets", []):
+        a_val = a.get("current_value", 0.0)
+        if a_val <= 0:
+            continue
+        a_id = a.get("id", "")
+        a_type = a.get("asset_type", "")
+        if a_type == "crypto":
+            a_ccy = "USD"
+        else:
+            a_ccy = asset_ccy_map.get(a_id, "EUR")
+        ccy_totals[a_ccy] = ccy_totals.get(a_ccy, 0.0) + a_val
+
+    ccy_total_sum = sum(ccy_totals.values()) or 1.0
+    currency_exposure = [
+        CurrencyExposure(
+            currency=ccy,
+            value=round(val, 2),
+            percentage=round(val / ccy_total_sum * 100, 1),
+        )
+        for ccy, val in sorted(ccy_totals.items(), key=lambda x: x[1], reverse=True)
+    ]
+
     return EnhancedDashboardResponse(
         total_value=metrics["total_value"],
         total_invested=metrics["total_invested"],
@@ -616,6 +684,9 @@ async def get_dashboard(
         advanced_metrics=advanced_metrics,
         available_liquidity=metrics.get("available_liquidity", 0.0),
         earn_summary=earn_summary,
+        currency_exposure=currency_exposure,
+        total_dividend_income=metrics.get("total_dividend_income", 0.0),
+        total_return=metrics.get("total_return", 0.0),
         period_days=days,
         period_label=get_period_label_fr(original_days),
         forex_stale=metrics.get("forex_stale", False),

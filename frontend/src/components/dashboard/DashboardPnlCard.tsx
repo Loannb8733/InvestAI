@@ -32,11 +32,15 @@ interface DashboardPnlCardProps {
   pnlBreakdown: PnLBreakdown
   periodLabel?: string
   privacyMode?: boolean
+  totalDividendIncome?: number
+  totalReturn?: number
 }
 
-export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMode }: DashboardPnlCardProps) {
+export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMode, totalDividendIncome = 0, totalReturn }: DashboardPnlCardProps) {
   const [taxMode, setTaxMode] = useState<'pfu' | 'progressive'>('pfu')
+  const [returnMode, setReturnMode] = useState<'price' | 'total'>('price')
   const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
+  const hasDividends = totalDividendIncome > 0
 
   // Tax calculation based on selected mode
   const taxRate = taxMode === 'pfu' ? 0.3 : 0  // Progressive = 0% estimate (user must consult advisor)
@@ -50,6 +54,33 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
         <CardDescription>Distinction entre gains réalisés et latents (fiscalité)</CardDescription>
       </CardHeader>
       <CardContent>
+        {hasDividends && (
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-muted-foreground">Rendement :</span>
+            <div className="inline-flex rounded-md border border-border text-xs">
+              <button
+                className={`px-2.5 py-1 rounded-l-md transition-colors ${
+                  returnMode === 'price'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
+                onClick={() => setReturnMode('price')}
+              >
+                Price Return
+              </button>
+              <button
+                className={`px-2.5 py-1 rounded-r-md transition-colors ${
+                  returnMode === 'total'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
+                onClick={() => setReturnMode('total')}
+              >
+                Total Return
+              </button>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <MetricTooltip content="Profits/pertes sur les positions actuellement détenues. Non imposable tant que non vendu."><p className="text-xs text-muted-foreground">P&L Latent</p></MetricTooltip>
@@ -64,10 +95,28 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
             <p className="text-lg font-bold text-orange-500">-{pc(pnlBreakdown.total_fees)}</p>
           </div>
           <div>
-            <MetricTooltip content="Latent + Réalisé − Frais."><p className="text-xs text-muted-foreground">P&L Net</p></MetricTooltip>
-            <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
+            <MetricTooltip content={returnMode === 'total' ? "P&L Net + Dividendes & Rewards (Total Return)." : "Latent + Réalisé − Frais."}>
+              <p className="text-xs text-muted-foreground">{returnMode === 'total' ? 'Total Return' : 'P&L Net'}</p>
+            </MetricTooltip>
+            {returnMode === 'total' && totalReturn != null ? (
+              <p className={`text-lg font-bold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>{totalReturn >= 0 ? '\u25B2' : '\u25BC'} {pc(totalReturn)}</p>
+            ) : (
+              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
+            )}
           </div>
         </div>
+        {returnMode === 'total' && hasDividends && (
+          <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <MetricTooltip content="Revenus de dividendes et staking rewards cumulés."><p className="text-xs text-muted-foreground">Dividendes & Rewards</p></MetricTooltip>
+              <p className="text-lg font-bold text-emerald-500">+{pc(totalDividendIncome)}</p>
+            </div>
+            <div>
+              <MetricTooltip content="Plus-value hors dividendes (variation du prix des actifs)."><p className="text-xs text-muted-foreground">Price Return</p></MetricTooltip>
+              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
+            </div>
+          </div>
+        )}
         {pnlBreakdown.realized_pnl > 0 && (
           <div className="mt-4 pt-3 border-t border-border/50">
             {/* Tax mode toggle */}

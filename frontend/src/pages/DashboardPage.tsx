@@ -25,6 +25,7 @@ import CryptoClassChart from '@/components/charts/CryptoClassChart'
 import PlatformPieChart from '@/components/charts/PlatformPieChart'
 import SecurityBadge from '@/components/charts/SecurityBadge'
 import PerformanceChart from '@/components/charts/PerformanceChart'
+import CurrencyExposureChart from '@/components/charts/CurrencyExposureChart'
 import {
   TrendingUp,
   TrendingDown,
@@ -199,6 +200,9 @@ interface DashboardMetrics {
   advanced_metrics: AdvancedMetrics
   available_liquidity?: number
   earn_summary?: EarnSummary
+  currency_exposure?: Array<{ currency: string; value: number; percentage: number }>
+  total_dividend_income?: number
+  total_return?: number
   period_days?: number
   period_label?: string
   forex_stale?: boolean
@@ -644,7 +648,7 @@ export default function DashboardPage() {
                 return (
                   // P&L breakdown is always all-time (realized gains are cumulative)
                   // Show "Depuis le début" regardless of selected period to avoid misleading labels
-                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel="Depuis le début" privacyMode={privacyMode} />
+                  <DashboardPnlCard pnlBreakdown={pnl_breakdown} periodLabel="Depuis le début" privacyMode={privacyMode} totalDividendIncome={metrics.total_dividend_income} totalReturn={metrics.total_return} />
                 )
               case 'risk':
                 return (
@@ -780,6 +784,20 @@ export default function DashboardPage() {
                     <DashboardBenchmarkChart benchmarks={benchmarks} />
                   )}
                   </div>
+                )
+              case 'currency-exposure':
+                if (!metrics.currency_exposure || metrics.currency_exposure.length === 0) return null
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        Exposition Devises
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CurrencyExposureChart data={metrics.currency_exposure} />
+                    </CardContent>
+                  </Card>
                 )
               case 'allocation-transactions-alerts':
                 return (
