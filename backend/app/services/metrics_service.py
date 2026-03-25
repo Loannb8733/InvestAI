@@ -358,10 +358,20 @@ class MetricsService:
             _ZERO = Decimal("0")
 
             # FIFO layers: keyed by (symbol, exchange)
-            # Each layer: {"qty": Decimal, "unit_cost": Decimal, "is_paid": bool}
+            # Each layer: {
+            #   "qty": Decimal,
+            #   "unit_cost": Decimal,        # cost in portfolio currency
+            #   "unit_cost_base": Decimal,    # cost in transaction currency
+            #   "currency": str,              # transaction currency (e.g. "USD")
+            #   "fx_rate": Decimal,           # FX rate at purchase (base→portfolio)
+            #   "is_paid": bool,
+            # }
             # is_paid=True for BUY layers, False for free (airdrop/reward)
             FifoKey = Tuple[str, str]  # (symbol, exchange)
             fifo: Dict[FifoKey, list] = _defaultdict(list)
+
+            # Dividend income tracking per (symbol, exchange)
+            dividend_income: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
 
             # Pre-build conversion matching indices
             conv_ins = [tx for tx in all_txs if tx.transaction_type == TxType.CONVERSION_IN]
@@ -447,13 +457,9 @@ class MetricsService:
                         remaining -= layer["qty"]
                         layers.pop(0)
                     else:
-                        extracted.append(
-                            {
-                                "qty": remaining,
-                                "unit_cost": layer["unit_cost"],
-                                "is_paid": layer["is_paid"],
-                            }
-                        )
+                        partial = layer.copy()
+                        partial["qty"] = remaining
+                        extracted.append(partial)
                         layer["qty"] -= remaining
                         remaining = _ZERO
                 if remaining > 0:
@@ -485,7 +491,21 @@ class MetricsService:
                         else:
                             _pending_fee_conversions.append((sym, fee, fee_ccy))
                     layer_unit = total_cost / qty if qty > 0 else _ZERO
-                    fifo[key].append({"qty": qty, "unit_cost": layer_unit, "is_paid": True})
+
+                    # FX tracking: store original currency and rate
+                    tx_ccy = (tx.currency or "EUR").upper()
+                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                    unit_cost_base = Decimal(str(tx.price or 0))  # price in tx currency
+                    fifo[key].append(
+                        {
+                            "qty": qty,
+                            "unit_cost": layer_unit,
+                            "unit_cost_base": unit_cost_base,
+                            "currency": tx_ccy,
+                            "fx_rate": tx_fx,
+                            "is_paid": True,
+                        }
+                    )
 
                 elif ttype == TxType.SELL:
                     # O5: Warn if sell qty exceeds pool
@@ -503,7 +523,17 @@ class MetricsService:
 
                 elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
                     # Free tokens — zero cost layer
-                    fifo[key].append({"qty": qty, "unit_cost": _ZERO, "is_paid": False})
+                    tx_ccy = (tx.currency or "EUR").upper()
+                    fifo[key].append(
+                        {
+                            "qty": qty,
+                            "unit_cost": _ZERO,
+                            "unit_cost_base": _ZERO,
+                            "currency": tx_ccy,
+                            "fx_rate": Decimal("1"),
+                            "is_paid": False,
+                        }
+                    )
 
                 elif ttype == TxType.TRANSFER_OUT:
                     # Move oldest layers to a "transit" — the matching TRANSFER_IN
@@ -531,7 +561,17 @@ class MetricsService:
                             fifo[key].append(layer)
                     else:
                         # No matching transit — treat as zero-cost (external transfer in)
-                        fifo[key].append({"qty": qty, "unit_cost": _ZERO, "is_paid": False})
+                        tx_ccy = (tx.currency or "EUR").upper()
+                        fifo[key].append(
+                            {
+                                "qty": qty,
+                                "unit_cost": _ZERO,
+                                "unit_cost_base": _ZERO,
+                                "currency": tx_ccy,
+                                "fx_rate": Decimal("1"),
+                                "is_paid": False,
+                            }
+                        )
 
                 elif ttype == TxType.CONVERSION_OUT:
                     src_sym = sym
@@ -565,6 +605,8 @@ class MetricsService:
                         # Consume FIFO layers from source
                         cost_removed = _consume_fifo(key, qty)
                         # Create single layer on destination with propagated cost
+                        tx_ccy = (tx.currency or "EUR").upper()
+                        tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
                         if matched_ci_qty > 0 and cost_removed > 0:
                             dest_key: FifoKey = (dest_sym, dest_exch or exch)
                             dest_unit = cost_removed / matched_ci_qty
@@ -572,6 +614,9 @@ class MetricsService:
                                 {
                                     "qty": matched_ci_qty,
                                     "unit_cost": dest_unit,
+                                    "unit_cost_base": dest_unit / tx_fx if tx_fx else dest_unit,
+                                    "currency": tx_ccy,
+                                    "fx_rate": tx_fx,
                                     "is_paid": True,
                                 }
                             )
@@ -582,6 +627,9 @@ class MetricsService:
                                 {
                                     "qty": matched_ci_qty,
                                     "unit_cost": _ZERO,
+                                    "unit_cost_base": _ZERO,
+                                    "currency": tx_ccy,
+                                    "fx_rate": tx_fx,
                                     "is_paid": False,
                                 }
                             )
@@ -606,6 +654,22 @@ class MetricsService:
                         else:
                             _pending_fee_conversions.append((sym, fee, fee_ccy))
                     # Qty already handled by CONVERSION_OUT creating the layer
+
+                elif ttype == TxType.DIVIDEND:
+                    # Dividend: cash income — does NOT create new shares.
+                    # Record income for Total Return calculation.
+                    # tx.price = dividend per share, tx.quantity = shares (or total amount)
+                    div_amount = qty * Decimal(str(tx.price or 0))
+                    if div_amount > 0:
+                        tx_ccy = (tx.currency or "EUR").upper()
+                        portfolio_ccy = currency.upper()
+                        if tx_ccy != portfolio_ccy and tx.conversion_rate:
+                            div_amount *= Decimal(str(tx.conversion_rate))
+                        elif tx_ccy != portfolio_ccy:
+                            # Will be resolved later with forex rates
+                            _pending_fee_conversions.append((f"__div__{sym}", div_amount, tx_ccy))
+                            div_amount = _ZERO
+                        dividend_income[key] += div_amount
 
                 # STAKING/UNSTAKING: no cost impact (same exchange, same symbol)
 
@@ -651,6 +715,25 @@ class MetricsService:
                 if cost > 0:
                     invested_map[aid] = float(cost)
 
+            # FX gain decomposition per (symbol, exchange):
+            # For each layer, FX gain = qty * unit_cost_base * (current_fx - purchase_fx)
+            # This is computed later once current forex rates are available.
+            # Store the base-currency cost for decomposition.
+            fx_base_cost_by_key: Dict[FifoKey, list] = _defaultdict(list)
+            for fkey, layers in fifo.items():
+                if fkey[1].startswith("__transit__"):
+                    continue
+                for layer in layers:
+                    if layer.get("is_paid") and layer.get("currency") and layer["currency"] != currency.upper():
+                        fx_base_cost_by_key[fkey].append(
+                            {
+                                "qty": layer["qty"],
+                                "unit_cost_base": layer.get("unit_cost_base", _ZERO),
+                                "currency": layer["currency"],
+                                "fx_rate": layer.get("fx_rate", Decimal("1")),
+                            }
+                        )
+
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
         stock_symbols = [a.symbol for a in investment_assets if a.asset_type in [AssetType.STOCK, AssetType.ETF]]
@@ -679,33 +762,26 @@ class MetricsService:
                 logger.warning("Crypto price fetch failed (%s), using DB fallback", type(e).__name__)
 
         if stock_symbols:
-
-            async def _fetch_stock(sym):
-                data = await price_service.get_stock_price(sym)
-                return sym, data
+            from app.services.market_data_service import market_data_service
 
             try:
-                results = await asyncio.wait_for(
-                    asyncio.gather(*[_fetch_stock(s) for s in stock_symbols], return_exceptions=True),
-                    timeout=5.0,
+                stock_results = await asyncio.wait_for(
+                    market_data_service.get_multiple_stock_prices(stock_symbols),
+                    timeout=8.0,
                 )
-                for res in results:
-                    if isinstance(res, Exception):
-                        continue
-                    symbol, stock_data = res
-                    if stock_data:
-                        stock_price = stock_data["price"]
-                        quote_ccy = stock_data.get("quote_currency", "USD")
-                        target = currency.upper()
-                        if quote_ccy != target:
-                            try:
-                                rate = await price_service.get_forex_rate(quote_ccy, target)
-                                if rate:
-                                    stock_price = stock_price * rate
-                            except Exception:
-                                logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
-                        prices[symbol.upper()] = stock_price
-                        price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
+                for symbol, stock_data in stock_results.items():
+                    stock_price = stock_data["price"]
+                    quote_ccy = stock_data.get("quote_currency", "USD")
+                    target = currency.upper()
+                    if quote_ccy != target:
+                        try:
+                            rate = await price_service.get_forex_rate(quote_ccy, target)
+                            if rate:
+                                stock_price = stock_price * rate
+                        except Exception:
+                            logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
+                    prices[symbol.upper()] = stock_price
+                    price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
             except (asyncio.TimeoutError, Exception) as e:
                 logger.warning("Stock price fetch failed (%s), using DB fallback", type(e).__name__)
 
@@ -805,6 +881,10 @@ class MetricsService:
                     # O4: Clamp to avoid aberrations on short holding periods
                     annualized_return = round(max(-99.0, min(raw, 999.0)), 2)
 
+            # Dividend income for this asset
+            asset_fkey = (asset.symbol.upper(), (asset.exchange or "").strip())
+            asset_div_income = float(dividend_income.get(asset_fkey, _ZERO)) if inv_asset_ids else 0.0
+
             asset_entry = {
                 "id": str(asset.id),
                 "symbol": asset.symbol,
@@ -817,6 +897,7 @@ class MetricsService:
                 "first_buy_date": first_date.isoformat() if first_date else None,
                 "holding_days": holding_days,
                 "annualized_return": annualized_return,
+                "dividend_income": asset_div_income,
                 **metrics,
             }
             # Include crowdfunding fields if present
@@ -873,20 +954,31 @@ class MetricsService:
             eur_to_target, stale = await _get_rate_with_cache("EUR", target)
             forex_stale = forex_stale or stale
 
-        # B1/M2: Resolve pending fee conversions now that forex rates are available
+        # B1/M2: Resolve pending fee/dividend conversions now that forex rates are available
         if _pending_fee_conversions:
             portfolio_ccy = currency.upper()
             for sym, fee_amount, fee_ccy in _pending_fee_conversions:
                 rate, stale = await _get_rate_with_cache(fee_ccy, portfolio_ccy)
                 forex_stale = forex_stale or stale
-                converted_fee = fee_amount * Decimal(str(rate))
-                cost_by_sym[sym] += converted_fee
-                buy_cost_by_sym[sym] += converted_fee
+                converted_amount = fee_amount * Decimal(str(rate))
+
+                # Dividend conversion entries use __div__ prefix
+                if sym.startswith("__div__"):
+                    real_sym = sym[7:]  # strip __div__ prefix
+                    # Find the matching key in dividend_income
+                    for dkey in dividend_income:
+                        if dkey[0] == real_sym:
+                            dividend_income[dkey] += converted_amount
+                            break
+                    continue
+
+                cost_by_sym[sym] += converted_amount
+                buy_cost_by_sym[sym] += converted_amount
                 logger.debug(
                     "Fee conversion: %s %s -> %s %s (rate=%s) for %s",
                     fee_amount,
                     fee_ccy,
-                    converted_fee,
+                    converted_amount,
                     portfolio_ccy,
                     rate,
                     sym,
@@ -907,6 +999,42 @@ class MetricsService:
                 if total_qty > 0:
                     share = Decimal(str(a.quantity)) / total_qty
                     invested_map[aid] = float(cost_by_sym.get(sym, _ZERO) * share)
+
+        # ---- FX gain decomposition per asset ----
+        # For assets bought in foreign currency, split total G/L into:
+        #   fx_gain = qty * unit_cost_base * (current_fx - purchase_fx)
+        #   asset_gain = total_gain_loss - fx_gain
+        fx_gain_by_key: Dict[Tuple[str, str], float] = {}
+        _fx_rate_cache: Dict[str, float] = {"USD": usd_to_target, target: 1.0}
+        if target != "EUR":
+            _fx_rate_cache["EUR"] = eur_to_target
+        if inv_asset_ids:
+            for fkey, fx_layers in fx_base_cost_by_key.items():
+                total_fx_gain = 0.0
+                for fl in fx_layers:
+                    base_ccy = fl["currency"]
+                    purchase_fx = float(fl["fx_rate"])
+                    if base_ccy not in _fx_rate_cache:
+                        try:
+                            rate_val, _ = await _get_rate_with_cache(base_ccy, target)
+                            _fx_rate_cache[base_ccy] = rate_val
+                        except Exception:
+                            _fx_rate_cache[base_ccy] = purchase_fx
+                    current_fx = _fx_rate_cache[base_ccy]
+                    fx_delta = current_fx - purchase_fx
+                    layer_fx_gain = float(fl["qty"]) * float(fl["unit_cost_base"]) * fx_delta
+                    total_fx_gain += layer_fx_gain
+                fx_gain_by_key[fkey] = total_fx_gain
+
+        # Inject fx_gain and total_return into asset_metrics
+        total_dividend_income = 0.0
+        for am in asset_metrics:
+            akey = (am["symbol"].upper(), (am.get("exchange") or "").strip())
+            am["fx_gain"] = round(fx_gain_by_key.get(akey, 0.0), 2)
+            am["asset_gain"] = round(am.get("gain_loss", 0.0) - am["fx_gain"], 2)
+            div_inc = am.get("dividend_income", 0.0)
+            am["total_return"] = round(am.get("gain_loss", 0.0) + div_inc, 2)
+            total_dividend_income += div_inc
 
         # Calculate stablecoin cash value using live market prices
         # This detects depegs (e.g. USDC at $0.87 in March 2023)
@@ -1017,11 +1145,16 @@ class MetricsService:
         # Available liquidity = stablecoins + fiat assets + portfolio cash_balances
         available_liquidity = float(cash_from_stablecoins + cash_from_fiat)
 
+        # Total return = capital gain + dividends
+        total_return = float(total_gain_loss) + total_dividend_income
+
         result = {
             "total_value": float(total_value),
             "total_invested": float(total_invested),
             "total_gain_loss": float(total_gain_loss),
             "total_gain_loss_percent": total_gain_loss_percent,
+            "total_dividend_income": round(total_dividend_income, 2),
+            "total_return": round(total_return, 2),
             "assets_count": len(asset_metrics),
             "assets": asset_metrics,
             "cash_from_stablecoins": float(cash_from_stablecoins),

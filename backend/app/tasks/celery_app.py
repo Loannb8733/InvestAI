@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.emails",
         "app.tasks.cleanup",
         "app.tasks.monitor_delays",
+        "app.tasks.import_history",
     ],
 )
 

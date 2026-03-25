@@ -1463,10 +1463,81 @@ async def sync_exchange(
         }
 
     except Exception as e:
+        import traceback
+
+        logger.error(f"Sync error: {type(e).__name__}: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+
         _classify_and_mark_error(api_key, e)
         await db.commit()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de la synchronisation. Veuillez réessayer.",
+            detail=f"Sync error: {type(e).__name__}: {e}",
         )
+
+
+@router.post("/{api_key_id}/import-async", response_model=dict)
+@limiter.limit("3/minute")
+async def import_history_async(
+    request: Request,
+    api_key_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dispatch import-history to a background Celery task.
+
+    Returns immediately with a task_id that can be polled via GET /import-status/{task_id}.
+    """
+    result = await db.execute(
+        select(APIKey).where(
+            APIKey.id == api_key_id,
+            APIKey.user_id == current_user.id,
+        )
+    )
+    api_key = result.scalar_one_or_none()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clé API non trouvée",
+        )
+
+    from app.tasks.import_history import import_history_task
+
+    task = import_history_task.delay(str(api_key_id), str(current_user.id))
+
+    return {
+        "task_id": task.id,
+        "status": "dispatched",
+        "message": "Import lancé en arrière-plan",
+    }
+
+
+@router.get("/import-status/{task_id}", response_model=dict)
+async def get_import_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Poll the status of an async import task."""
+    from celery.result import AsyncResult
+
+    from app.tasks.celery_app import celery_app
+
+    result = AsyncResult(task_id, app=celery_app)
+
+    if result.state == "PENDING":
+        return {"status": "pending", "task_id": task_id}
+    elif result.state == "PROGRESS":
+        return {"status": "progress", "task_id": task_id, "meta": result.info}
+    elif result.state == "SUCCESS":
+        data = result.result or {}
+        return {"status": data.get("status", "completed"), "task_id": task_id, **data}
+    elif result.state == "FAILURE":
+        return {
+            "status": "failed",
+            "task_id": task_id,
+            "error": str(result.result),
+        }
+    else:
+        return {"status": result.state.lower(), "task_id": task_id}

@@ -105,6 +105,10 @@ class CorrelationData:
     matrix: List[List[float]]
     strongly_correlated: List[Tuple[str, str, float]]
     negatively_correlated: List[Tuple[str, str, float]]
+    # Cross-asset analysis (P1)
+    benchmark_correlations: Optional[Dict[str, Dict[str, float]]] = None  # {benchmark: {symbol: corr}}
+    portfolio_beta: Optional[float] = None  # vs S&P500
+    is_beta_heavy: bool = False  # True if portfolio is overly correlated with market
 
 
 @dataclass
@@ -986,11 +990,56 @@ class AnalyticsService:
         for i in range(full_n):
             matrix[i][i] = 1.0
 
+        # === Cross-asset benchmark correlation (P1) ===
+        # Correlate portfolio assets against major benchmarks:
+        # S&P500 (^GSPC), Nasdaq (^IXIC), Gold (PAXG)
+        _BENCHMARKS = {
+            "S&P500": ("^GSPC", "stock"),
+            "Nasdaq": ("^IXIC", "stock"),
+            "Gold": ("PAXG", "crypto"),
+        }
+        benchmark_correlations: Dict[str, Dict[str, float]] = {}
+        benchmark_returns: Dict[str, np.ndarray] = {}
+
+        for bench_label, (bench_sym, bench_type) in _BENCHMARKS.items():
+            try:
+                _, bench_prices = await self._fetch_history(bench_sym, bench_type, days=days)
+                bench_rets = _compute_returns(bench_prices)
+                if len(bench_rets) >= 5:
+                    benchmark_returns[bench_label] = bench_rets
+                    corr_map: Dict[str, float] = {}
+                    for sym in valid_symbols:
+                        sym_rets = aligned[sym]
+                        _min = min(len(sym_rets), len(bench_rets))
+                        if _min >= 5:
+                            from scipy.stats import spearmanr as _spearmanr
+
+                            c, _ = _spearmanr(sym_rets[-_min:], bench_rets[-_min:])
+                            corr_map[sym] = round(float(c) if not np.isnan(c) else 0.0, 3)
+                    if corr_map:
+                        benchmark_correlations[bench_label] = corr_map
+            except Exception as e:
+                logger.debug("Benchmark %s fetch failed: %s", bench_label, e)
+
+        # Compute portfolio Beta vs S&P500 (value-weighted)
+        portfolio_beta: Optional[float] = None
+        is_beta_heavy = False
+        sp500_corrs = benchmark_correlations.get("S&P500", {})
+        if sp500_corrs and valid_symbols:
+            # Simple average correlation with S&P500 as a proxy for Beta exposure
+            avg_sp_corr = sum(sp500_corrs.values()) / len(sp500_corrs)
+            portfolio_beta = round(avg_sp_corr, 3)
+            # Beta-Heavy: portfolio is > 0.70 correlated with S&P500 on average
+            is_beta_heavy = avg_sp_corr > 0.70
+
         return CorrelationData(
             symbols=symbols,
             matrix=matrix,
             strongly_correlated=sorted(strongly, key=lambda x: -x[2]),
             negatively_correlated=sorted(negatively, key=lambda x: x[2]),
+            benchmark_correlations=benchmark_correlations or None,
+            portfolio_beta=portfolio_beta,
+            is_beta_heavy=is_beta_heavy,
         )
 
     # ------------------------------------------------------------------

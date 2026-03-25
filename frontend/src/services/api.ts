@@ -627,6 +627,22 @@ export const apiKeysApi = {
     })
     return response.data
   },
+
+  importHistoryAsync: async (id: string) => {
+    const response = await api.post(`/api-keys/${id}/import-async`)
+    return response.data as { task_id: string; status: string; message: string }
+  },
+
+  getImportStatus: async (taskId: string) => {
+    const response = await api.get(`/api-keys/import-status/${taskId}`)
+    return response.data as {
+      status: string
+      task_id: string
+      synced?: number
+      message?: string
+      error?: string
+    }
+  },
 }
 
 // Predictions API
@@ -792,6 +808,22 @@ export const reportsApi = {
 
   downloadTaxExcel: async (year: number) => {
     const response = await api.get(`/reports/tax/${year}/excel`, {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  downloadStockTaxPDF: async (year: number) => {
+    const response = await api.get(`/reports/tax/${year}/pdf`, {
+      params: { asset_class: 'securities' },
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  downloadStockTaxExcel: async (year: number) => {
+    const response = await api.get(`/reports/tax/${year}/excel`, {
+      params: { asset_class: 'securities' },
       responseType: 'blob',
     })
     return response.data

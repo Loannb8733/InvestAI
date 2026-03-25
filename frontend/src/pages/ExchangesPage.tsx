@@ -250,51 +250,76 @@ export default function ExchangesPage() {
     },
   })
 
-  // Import history mutation
+  // Import history — async Celery version with polling
   const importMutation = useMutation({
-    mutationFn: apiKeysApi.importHistory,
-    onSuccess: (result: {
-      fiat_orders: number
-      rewards: number
-      spot_trades: number
-      assets_created: number
-      debug?: { spot_trades_count: number; fiat_orders_count: number; convert_orders_count: number }
-    }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
-      invalidateAllFinancialData(queryClient)
-
-      const details = []
-      if (result.fiat_orders > 0) details.push(`${result.fiat_orders} achat(s)`)
-      if (result.rewards > 0) details.push(`${result.rewards} reward(s)`)
-      if (result.spot_trades > 0) details.push(`${result.spot_trades} trade(s) spot`)
-      if (result.assets_created > 0) details.push(`${result.assets_created} actif(s) créé(s)`)
-
-      let description = details.length > 0 ? details.join(', ') : 'Aucune nouvelle transaction'
-      if (result.debug && details.length === 0) {
-        const debugParts = []
-        if (result.debug.spot_trades_count > 0) debugParts.push(`${result.debug.spot_trades_count} trades spot`)
-        if (result.debug.fiat_orders_count > 0) debugParts.push(`${result.debug.fiat_orders_count} ordres fiat`)
-        if (result.debug.convert_orders_count > 0) debugParts.push(`${result.debug.convert_orders_count} conversions`)
-        description += debugParts.length > 0 ? ` (trouvé: ${debugParts.join(', ')})` : ' (aucune donnée trouvée)'
-      }
-
+    mutationFn: apiKeysApi.importHistoryAsync,
+    onSuccess: (result: { task_id: string; status: string }) => {
       toast({
-        title: 'Import réussi',
-        description,
+        title: 'Import lancé',
+        description: 'L\'import tourne en arrière-plan. Cela peut prendre quelques minutes.',
       })
+      // Start polling
+      pollImportStatus(result.task_id)
     },
     onError: (error: unknown) => {
       const axiosError = error as import('axios').AxiosError<{ detail?: string }>
       toast({
         variant: 'destructive',
         title: 'Erreur d\'import',
-        description: axiosError.response?.data?.detail || 'Impossible d\'importer l\'historique.',
+        description: axiosError.response?.data?.detail || 'Impossible de lancer l\'import.',
       })
-    },
-    onSettled: () => {
       setImportingId(null)
     },
   })
+
+  const pollImportStatus = (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await apiKeysApi.getImportStatus(taskId)
+
+        if (status.status === 'completed') {
+          clearInterval(interval)
+          setImportingId(null)
+
+          queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
+          invalidateAllFinancialData(queryClient)
+
+          const synced = status.synced ?? 0
+          toast({
+            title: 'Import réussi',
+            description: synced > 0
+              ? `${synced} transaction(s) synchronisée(s)`
+              : 'Aucune nouvelle transaction',
+          })
+        } else if (status.status === 'failed') {
+          clearInterval(interval)
+          setImportingId(null)
+
+          toast({
+            variant: 'destructive',
+            title: 'Erreur d\'import',
+            description: status.error || 'L\'import a échoué.',
+          })
+        }
+        // else: still pending/progress — continue polling
+      } catch {
+        clearInterval(interval)
+        setImportingId(null)
+
+        toast({
+          variant: 'destructive',
+          title: 'Erreur',
+          description: 'Impossible de vérifier le statut de l\'import.',
+        })
+      }
+    }, 5000) // Poll every 5 seconds
+
+    // Safety: stop polling after 10 minutes
+    setTimeout(() => {
+      clearInterval(interval)
+      setImportingId(null)
+    }, 600000)
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
