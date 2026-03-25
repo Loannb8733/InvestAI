@@ -627,6 +627,22 @@ export const apiKeysApi = {
     })
     return response.data
   },
+
+  importHistoryAsync: async (id: string) => {
+    const response = await api.post(`/api-keys/${id}/import-async`)
+    return response.data as { task_id: string; status: string; message: string }
+  },
+
+  getImportStatus: async (taskId: string) => {
+    const response = await api.get(`/api-keys/import-status/${taskId}`)
+    return response.data as {
+      status: string
+      task_id: string
+      synced?: number
+      message?: string
+      error?: string
+    }
+  },
 }
 
 // Predictions API
