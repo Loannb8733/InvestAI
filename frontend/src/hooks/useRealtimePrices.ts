@@ -47,9 +47,11 @@ export function useRealtimePrices(symbols: string[]) {
     // Don't open a second socket
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const url = `${protocol}//${host}/api/v1/ws/prices`
+    const apiUrl = import.meta.env.VITE_API_URL || '/api/v1'
+    const wsBase = apiUrl.replace(/^http/, 'ws')
+    const url = apiUrl.startsWith('http')
+      ? `${wsBase}/ws/prices`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${apiUrl}/ws/prices`
 
     const ws = new WebSocket(url)
     wsRef.current = ws
