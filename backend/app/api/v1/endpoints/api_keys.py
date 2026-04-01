@@ -1477,6 +1477,36 @@ async def sync_exchange(
         )
 
 
+# In-memory store for background import task status (replaces Celery result backend)
+_import_tasks: dict[str, dict] = {}
+
+
+async def _run_import_background(task_id: str, api_key_id: str) -> None:
+    """Run exchange import in background and store result in memory."""
+    try:
+        from app.tasks.sync_exchanges import _sync_single_exchange
+
+        result = await _sync_single_exchange(api_key_id)
+
+        if result.get("success"):
+            _import_tasks[task_id] = {
+                "status": "completed",
+                "synced": result.get("synced", 0),
+                "message": "Import réussi",
+            }
+        else:
+            _import_tasks[task_id] = {
+                "status": "failed",
+                "error": result.get("error", "Unknown error"),
+            }
+    except Exception as e:
+        logger.error(f"Background import error: {type(e).__name__}: {e}")
+        _import_tasks[task_id] = {
+            "status": "failed",
+            "error": f"{type(e).__name__}: {e}",
+        }
+
+
 @router.post("/{api_key_id}/import-async", response_model=dict)
 @limiter.limit("3/minute")
 async def import_history_async(
@@ -1485,7 +1515,7 @@ async def import_history_async(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dispatch import-history to a background Celery task.
+    """Launch import-history as a FastAPI background task.
 
     Returns immediately with a task_id that can be polled via GET /import-status/{task_id}.
     """
@@ -1503,12 +1533,16 @@ async def import_history_async(
             detail="Clé API non trouvée",
         )
 
-    from app.tasks.import_history import import_history_task
+    import asyncio
+    import uuid
 
-    task = import_history_task.delay(str(api_key_id), str(current_user.id))
+    task_id = uuid.uuid4().hex
+    _import_tasks[task_id] = {"status": "pending"}
+
+    asyncio.create_task(_run_import_background(task_id, str(api_key_id)))
 
     return {
-        "task_id": task.id,
+        "task_id": task_id,
         "status": "dispatched",
         "message": "Import lancé en arrière-plan",
     }
@@ -1519,25 +1553,13 @@ async def get_import_status(
     task_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Poll the status of an async import task."""
-    from celery.result import AsyncResult
+    """Poll the status of a background import task."""
+    task_info = _import_tasks.get(task_id)
 
-    from app.tasks.celery_app import celery_app
+    if not task_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
 
-    result = AsyncResult(task_id, app=celery_app)
-
-    if result.state == "PENDING":
-        return {"status": "pending", "task_id": task_id}
-    elif result.state == "PROGRESS":
-        return {"status": "progress", "task_id": task_id, "meta": result.info}
-    elif result.state == "SUCCESS":
-        data = result.result or {}
-        return {"status": data.get("status", "completed"), "task_id": task_id, **data}
-    elif result.state == "FAILURE":
-        return {
-            "status": "failed",
-            "task_id": task_id,
-            "error": str(result.result),
-        }
-    else:
-        return {"status": result.state.lower(), "task_id": task_id}
+    return {"task_id": task_id, **task_info}
