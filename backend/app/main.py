@@ -634,9 +634,26 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware with restricted methods and headers
+# Allow Vercel preview URLs (*.vercel.app) dynamically
+_vercel_suffix = ".vercel.app"
+
+
+def _is_allowed_origin(origin: str) -> bool:
+    """Check if origin is in explicit list or is a Vercel preview deploy."""
+    if origin in settings.CORS_ORIGINS:
+        return True
+    if origin.startswith("https://") and origin.endswith(_vercel_suffix):
+        return True
+    return False
+
+
+# Use allow_origin_regex to match both explicit origins and Vercel previews
+_explicit_escaped = [o.replace(".", r"\.").replace("://", r"://") for o in settings.CORS_ORIGINS]
+_cors_regex = "|".join([*_explicit_escaped, r"https://.*\.vercel\.app"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=f"^({_cors_regex})$",
     allow_credentials=True,
     allow_methods=settings.CORS_ALLOWED_METHODS,  # Restricted, not "*"
     allow_headers=settings.CORS_ALLOWED_HEADERS,  # Restricted, not "*"
