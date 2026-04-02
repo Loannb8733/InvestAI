@@ -137,12 +137,16 @@ export default function PortfolioPage() {
     })
   }
 
-  // Fetch portfolios
-  const { data: portfolios, isLoading: loadingPortfolios } = useQuery<Portfolio[]>({
+  // Fetch portfolios (exclude crowdfunding — managed via dedicated page)
+  const { data: allPortfolios, isLoading: loadingPortfolios } = useQuery<Portfolio[]>({
     queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
     staleTime: 60_000,
   })
+  const portfolios = useMemo(
+    () => allPortfolios?.filter((p) => p.name !== 'Crowdfunding') ?? [],
+    [allPortfolios],
+  )
 
   // Fetch portfolio metrics (current holdings)
   const { data: portfolioMetrics, isLoading: loadingMetrics } = useQuery<PortfolioMetrics>({
