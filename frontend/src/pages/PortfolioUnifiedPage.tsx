@@ -1,12 +1,13 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Wallet, ArrowRightLeft, Link2, Loader2 } from 'lucide-react'
 import Breadcrumb from '@/components/layout/Breadcrumb'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
-const PortfolioPage = lazy(() => import('@/pages/PortfolioPage'))
-const TransactionsPage = lazy(() => import('@/pages/TransactionsPage'))
-const ExchangesPage = lazy(() => import('@/pages/ExchangesPage'))
+const PortfolioPage = lazyWithRetry(() => import('@/pages/PortfolioPage'))
+const TransactionsPage = lazyWithRetry(() => import('@/pages/TransactionsPage'))
+const ExchangesPage = lazyWithRetry(() => import('@/pages/ExchangesPage'))
 
 function TabLoader() {
   return (

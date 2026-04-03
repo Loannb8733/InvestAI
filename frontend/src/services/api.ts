@@ -1337,4 +1337,46 @@ export const crowdfundingApi = {
   },
 }
 
+// Strategies API
+export const strategiesApi = {
+  list: async () => {
+    const response = await api.get('/strategies')
+    return response.data
+  },
+
+  create: async (data: { name: string; description?: string; params?: Record<string, unknown>; actions?: { action: string; symbol?: string; amount?: number; currency?: string; reason?: string }[] }) => {
+    const response = await api.post('/strategies', data)
+    return response.data
+  },
+
+  update: async (id: string, data: { name?: string; description?: string; status?: string; params?: Record<string, unknown> }) => {
+    const response = await api.patch(`/strategies/${id}`, data)
+    return response.data
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/strategies/${id}`)
+  },
+
+  aiSuggest: async () => {
+    const response = await api.post('/strategies/ai-suggest', {}, { timeout: ANALYTICS_TIMEOUT })
+    return response.data
+  },
+
+  accept: async (id: string) => {
+    const response = await api.patch(`/strategies/${id}/accept`)
+    return response.data
+  },
+
+  reject: async (id: string) => {
+    const response = await api.patch(`/strategies/${id}/reject`)
+    return response.data
+  },
+
+  updateAction: async (actionId: string, data: { status: string }) => {
+    const response = await api.patch(`/strategies/actions/${actionId}`, data)
+    return response.data
+  },
+}
+
 export default api

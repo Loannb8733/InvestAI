@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -15,19 +15,21 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
+
 // Lazy loaded (behind auth, loaded on demand)
-const MasterDashboardPage = lazy(() => import('@/pages/MasterDashboardPage'))
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
-const PortfolioUnifiedPage = lazy(() => import('@/pages/PortfolioUnifiedPage'))
-const IntelligencePage = lazy(() => import('@/pages/IntelligencePage'))
-const StrategyPage = lazy(() => import('@/pages/StrategyPage'))
-const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
-const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
-const AdminPage = lazy(() => import('@/pages/AdminPage'))
-const NotesPage = lazy(() => import('@/pages/NotesPage'))
-const CalendarPage = lazy(() => import('@/pages/CalendarPage'))
-const CrowdfundingMesProjectsPage = lazy(() => import('@/pages/CrowdfundingMesProjectsPage'))
-const CrowdfundingAuditLabPage = lazy(() => import('@/pages/CrowdfundingAuditLabPage'))
+const MasterDashboardPage = lazyWithRetry(() => import('@/pages/MasterDashboardPage'))
+const DashboardPage = lazyWithRetry(() => import('@/pages/DashboardPage'))
+const PortfolioUnifiedPage = lazyWithRetry(() => import('@/pages/PortfolioUnifiedPage'))
+const IntelligencePage = lazyWithRetry(() => import('@/pages/IntelligencePage'))
+const StrategyPage = lazyWithRetry(() => import('@/pages/StrategyPage'))
+const ReportsPage = lazyWithRetry(() => import('@/pages/ReportsPage'))
+const SettingsPage = lazyWithRetry(() => import('@/pages/SettingsPage'))
+const AdminPage = lazyWithRetry(() => import('@/pages/AdminPage'))
+const NotesPage = lazyWithRetry(() => import('@/pages/NotesPage'))
+const CalendarPage = lazyWithRetry(() => import('@/pages/CalendarPage'))
+const CrowdfundingMesProjectsPage = lazyWithRetry(() => import('@/pages/CrowdfundingMesProjectsPage'))
+const CrowdfundingAuditLabPage = lazyWithRetry(() => import('@/pages/CrowdfundingAuditLabPage'))
 
 function PageLoader() {
   return (

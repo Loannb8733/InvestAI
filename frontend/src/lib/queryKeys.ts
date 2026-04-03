@@ -151,6 +151,11 @@ export const queryKeys = {
     availableYears: ['reports', 'availableYears'] as const,
   },
 
+  strategies: {
+    all: ['strategies'] as const,
+    list: ['strategies', 'list'] as const,
+  },
+
   crowdfunding: {
     all: ['crowdfunding'] as const,
     list: ['crowdfunding', 'list'] as const,

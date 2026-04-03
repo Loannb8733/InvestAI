@@ -1,14 +1,16 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Zap, Brain, BarChart3, TrendingUp, Bell, Loader2 } from 'lucide-react'
+import { Zap, Brain, BarChart3, TrendingUp, Bell, Swords, Loader2 } from 'lucide-react'
 import Breadcrumb from '@/components/layout/Breadcrumb'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
-const InsightsPage = lazy(() => import('@/pages/InsightsPage'))
-const SmartInsightsPage = lazy(() => import('@/pages/SmartInsightsPage'))
-const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
-const PredictionsPage = lazy(() => import('@/pages/PredictionsPage'))
-const AlertsPage = lazy(() => import('@/pages/AlertsPage'))
+const InsightsPage = lazyWithRetry(() => import('@/pages/InsightsPage'))
+const SmartInsightsPage = lazyWithRetry(() => import('@/pages/SmartInsightsPage'))
+const AnalyticsPage = lazyWithRetry(() => import('@/pages/AnalyticsPage'))
+const PredictionsPage = lazyWithRetry(() => import('@/pages/PredictionsPage'))
+const AlertsPage = lazyWithRetry(() => import('@/pages/AlertsPage'))
+const StrategiesPage = lazyWithRetry(() => import('@/pages/StrategiesPage'))
 
 function TabLoader() {
   return (
@@ -24,6 +26,7 @@ const TABS = [
   { value: 'analytics', label: 'Analyses', icon: BarChart3 },
   { value: 'predictions', label: 'Prédictions', icon: TrendingUp },
   { value: 'alerts', label: 'Alertes', icon: Bell },
+  { value: 'strategies', label: 'Stratégies', icon: Swords },
 ] as const
 
 export default function IntelligencePage() {
@@ -39,11 +42,11 @@ export default function IntelligencePage() {
       <Breadcrumb items={[{ label: 'Univers Crypto' }, { label: 'Analyses IA' }]} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="flex w-full max-w-2xl">
+        <TabsList className="inline-flex h-10 w-auto overflow-x-auto">
           {TABS.map(({ value, label, icon: Icon }) => (
-            <TabsTrigger key={value} value={value} className="flex items-center gap-2 flex-1">
-              <Icon className="h-4 w-4 hidden sm:block" />
-              {label}
+            <TabsTrigger key={value} value={value} className="flex items-center gap-1.5 px-3 whitespace-nowrap">
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">{label}</span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -75,6 +78,12 @@ export default function IntelligencePage() {
         <TabsContent value="alerts" className="mt-6">
           <Suspense fallback={<TabLoader />}>
             <AlertsPage />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="strategies" className="mt-6">
+          <Suspense fallback={<TabLoader />}>
+            <StrategiesPage />
           </Suspense>
         </TabsContent>
       </Tabs>

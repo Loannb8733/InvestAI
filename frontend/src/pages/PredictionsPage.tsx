@@ -73,19 +73,58 @@ export default function PredictionsPage() {
 
       {/* Bear market mode banner */}
       {marketCycle?.market_regime?.dominant_regime === 'bearish' && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
+        <div className="rounded-lg border-2 border-blue-500/40 bg-blue-500/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-blue-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              Mode Accumulation — Marché baissier
+              <Badge variant="secondary" className="text-xs">
+                Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
+              </Badge>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Les prix sont décotés — c'est historiquement le meilleur moment pour accumuler.
+              Privilégiez le DCA/VCA agressif sur les actifs à fort alpha.
+              &quot;Be greedy when others are fearful.&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Bull market mode banner */}
+      {marketCycle?.market_regime?.dominant_regime === 'bullish' && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
+        <div className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              Mode Prise de Profits — Marché haussier
+              <Badge variant="secondary" className="text-xs">
+                Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
+              </Badge>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Le marché est en phase haussière — préparez vos niveaux de sortie.
+              Sécurisez des gains partiels et remontez vos stop-loss.
+              &quot;Be fearful when others are greedy.&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Top market mode banner */}
+      {['top', 'topping', 'distribution'].includes(marketCycle?.market_regime?.dominant_regime ?? '') && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
         <div className="rounded-lg border-2 border-red-500/40 bg-red-500/5 p-4 flex items-start gap-3">
           <ShieldAlert className="h-6 w-6 text-red-500 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-              Mode marché baissier actif
+              Mode Distribution — Prenez vos profits
               <Badge variant="destructive" className="text-xs">
                 Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
               </Badge>
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Les projections tiennent compte du régime baissier détecté.
-              Les prédictions haussières ont été atténuées et les intervalles de confiance élargis.
-              Privilégiez la prudence et le DCA progressif.
+              Signes de sommet détectés — sécurisez 20-30% de vos gains maintenant.
+              Ne soyez pas le dernier à vendre. Gardez du cash pour accumuler au prochain creux.
             </p>
           </div>
         </div>

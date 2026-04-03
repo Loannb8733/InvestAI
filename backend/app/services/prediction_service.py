@@ -1684,7 +1684,7 @@ class PredictionService:
             )
 
         # ── DCA amount suggestion based on real portfolio value ──
-        # risk_multiplier adjusts DCA sizing: 0.5× in bear → 1.5× in bull
+        # risk_multiplier adjusts DCA sizing: 1.5× in bear (accumulate!) → 0.5× in bull
         from app.ml.regime_detector import RegimeConfig
 
         _rcfg = RegimeConfig.from_regime(regime)
@@ -1725,13 +1725,13 @@ class PredictionService:
         elif regime == "bearish":
             advice.append(
                 {
-                    "title": "Patience et cash",
+                    "title": "Zone d'accumulation — Be greedy when others are fearful",
                     "description": (
-                        "Marché baissier confirmé — évitez les achats émotionnels. "
-                        "Constituez une réserve de cash (20-40% du portefeuille) "
-                        "pour accumuler quand les signaux de creux apparaîtront."
+                        "Marché baissier = opportunité d'accumulation ! "
+                        "Les prix sont décotés, c'est historiquement le meilleur moment "
+                        "pour construire son portefeuille via DCA/VCA agressif." + _dca_hint()
                     ),
-                    "action": "CONSERVER",
+                    "action": "DCA",
                     "priority": "high",
                 }
             )
@@ -1739,8 +1739,8 @@ class PredictionService:
                 {
                     "title": "Évitez le levier",
                     "description": (
-                        "Le levier en bear market est le moyen le plus rapide de tout perdre. "
-                        "Les liquidations en cascade amplifient les baisses."
+                        "Accumulez avec du capital réel, jamais avec du levier. "
+                        "Les liquidations en cascade amplifient les baisses en bear market."
                     ),
                     "action": "RISQUE",
                     "priority": "high",
@@ -1748,12 +1748,13 @@ class PredictionService:
             )
             advice.append(
                 {
-                    "title": "DCA progressif",
+                    "title": "VCA > DCA en bear market",
                     "description": (
-                        "Si vous souhaitez accumuler, faites-le par petites tranches régulières "
-                        "(DCA hebdomadaire) plutôt qu'en une seule fois." + _dca_hint()
+                        "Le Value Cost Averaging (investir plus quand les prix baissent) "
+                        "surperforme le DCA classique en marché volatile. "
+                        "Augmentez vos montants d'achat quand les prix chutent davantage."
                     ),
-                    "action": "DCA",
+                    "action": "VCA",
                     "priority": "medium",
                 }
             )
@@ -1793,23 +1794,35 @@ class PredictionService:
         elif regime == "bullish":
             advice.append(
                 {
-                    "title": "Laissez courir",
+                    "title": "Préparez la prise de profits",
                     "description": (
-                        "Tendance haussière — laissez vos positions gagnantes courir. "
-                        "Remontez progressivement vos stop-loss pour verrouiller les gains."
+                        "Tendance haussière — laissez courir vos positions mais "
+                        "définissez VOS niveaux de sortie maintenant. "
+                        '"Be fearful when others are greedy." Ne soyez pas le dernier à vendre.'
                     ),
-                    "action": "MAINTENIR",
+                    "action": "PLANIFIER",
                     "priority": "high",
                 }
             )
             advice.append(
                 {
-                    "title": "Préparez votre sortie",
+                    "title": "Stop-loss progressifs",
                     "description": (
-                        "Définissez maintenant vos objectifs de prix pour la prise de profits. "
-                        "Quand l'euphorie arrivera, vous aurez un plan."
+                        "Remontez progressivement vos stop-loss pour verrouiller les gains. "
+                        "Un trailing stop sous l'EMA-20 protège sans couper trop tôt."
                     ),
-                    "action": "PLANIFIER",
+                    "action": "PROTÉGER",
+                    "priority": "high",
+                }
+            )
+            advice.append(
+                {
+                    "title": "Réduisez le DCA",
+                    "description": (
+                        "En marché haussier, les prix sont chers. Réduisez vos montants "
+                        "d'achat réguliers et gardez du cash pour accumuler au prochain creux."
+                    ),
+                    "action": "ATTENDRE",
                     "priority": "medium",
                 }
             )
@@ -3336,20 +3349,20 @@ class PredictionService:
             if regime == "bearish":
                 if trend == "bearish" and trend_strength > 50:
                     return (
-                        "Marché baissier confirmé — Conservez vos positions long-terme, "
-                        "évitez le levier. Réservez du cash pour accumuler en DCA "
-                        f"si le support à {current_price * 0.9:.0f} tient."
+                        "Marché baissier confirmé — Zone d'accumulation ! "
+                        "Les prix sont décotés, accumulez via DCA sur les actifs à fort alpha. "
+                        f'Support clé à {current_price * 0.9:.0f} — "Be greedy when others are fearful."'
                     )
                 if trend == "bullish":
                     return (
-                        "Rebond technique en marché baissier — Prudence, ce n'est "
-                        "probablement pas un retournement. Évitez de renforcer sur un "
-                        "simple rebond, attendez une confirmation de tendance."
+                        "Signal haussier en marché baissier — Possible retournement. "
+                        "Renforcez vos positions sur les actifs de qualité. "
+                        "Le DCA agressif dans ces zones génère historiquement les meilleurs rendements."
                     )
                 return (
-                    "Marché baissier — Patience recommandée. Surveillez les signaux "
-                    "de capitulation (volume élevé + forte baisse) qui pourraient "
-                    "indiquer un creux."
+                    "Marché baissier — Phase d'accumulation. "
+                    "Accumulez progressivement via DCA/VCA sur les actifs avec un alpha élevé. "
+                    "Les meilleurs portefeuilles se construisent en bear market."
                 )
             if regime == "top":
                 return (
@@ -3360,24 +3373,24 @@ class PredictionService:
             if regime == "bullish":
                 if trend == "bullish" and trend_strength > 50:
                     return (
-                        "Tendance haussière forte — Laissez courir vos positions gagnantes. "
-                        "Commencez à définir vos niveaux de prise de profits et "
-                        "remontez progressivement vos stop-loss."
+                        "Tendance haussière forte — Laissez courir vos positions gagnantes "
+                        "mais préparez votre plan de sortie. Définissez vos niveaux de prise "
+                        'de profits et remontez vos stop-loss. "Be fearful when others are greedy."'
                     )
                 return (
-                    "Marché haussier — Maintenez vos positions. Résistance à surveiller : "
-                    f"{resistance:.0f}. Un franchissement pourrait accélérer la hausse."
+                    "Marché haussier — Maintenez vos positions mais commencez à sécuriser "
+                    f"des gains partiels. Résistance à surveiller : {resistance:.0f}."
                 )
 
         # Fallback: trend-based recommendations
         if trend == "bullish" and trend_strength > 50:
-            return "Tendance haussière forte — Maintenir ou renforcer la position"
+            return "Tendance haussière forte — Maintenez vos positions, préparez la prise de profits"
         elif trend == "bullish":
             return "Tendance légèrement haussière — Maintenir la position"
         elif trend == "bearish" and trend_strength > 50:
-            return "Tendance baissière forte — Envisager de réduire l'exposition"
+            return "Tendance baissière forte — Opportunité d'accumulation via DCA/VCA"
         elif trend == "bearish":
-            return "Tendance légèrement baissière — Surveiller les supports"
+            return "Tendance légèrement baissière — Envisagez d'accumuler sur les supports"
         return "Tendance neutre — Attendre un signal plus clair avant de prendre position"
 
     @staticmethod

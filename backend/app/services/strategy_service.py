@@ -82,7 +82,7 @@ class StrategyService:
         try:
             from app.services.prediction_service import prediction_service
 
-            strategy_data = await prediction_service.get_strategy_table(db, user_id)
+            strategy_data = await prediction_service.get_strategy_map(db, user_id)
             assets = strategy_data.get("assets", [])
             # Find the first buy/DCA signal
             for asset in assets:

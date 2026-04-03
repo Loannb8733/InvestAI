@@ -1,11 +1,12 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Target, Calculator, Loader2 } from 'lucide-react'
 import Breadcrumb from '@/components/layout/Breadcrumb'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
-const GoalsPage = lazy(() => import('@/pages/GoalsPage'))
-const SimulationsPage = lazy(() => import('@/pages/SimulationsPage'))
+const GoalsPage = lazyWithRetry(() => import('@/pages/GoalsPage'))
+const SimulationsPage = lazyWithRetry(() => import('@/pages/SimulationsPage'))
 
 function TabLoader() {
   return (
@@ -13,6 +14,11 @@ function TabLoader() {
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
   )
+}
+
+const TAB_LABELS: Record<string, string> = {
+  goals: 'Objectifs',
+  simulations: 'Simulations',
 }
 
 const TABS = [
@@ -30,10 +36,10 @@ export default function StrategyPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: 'Stratégie' }, { label: activeTab === 'goals' ? 'Objectifs' : 'Simulations' }]} />
+      <Breadcrumb items={[{ label: 'Stratégie' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }]} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full max-w-sm grid-cols-2">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
           {TABS.map(({ value, label, icon: Icon }) => (
             <TabsTrigger key={value} value={value} className="flex items-center gap-2">
               <Icon className="h-4 w-4" />

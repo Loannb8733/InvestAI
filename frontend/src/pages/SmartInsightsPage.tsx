@@ -580,13 +580,21 @@ export default function SmartInsightsPage() {
                           {insight.actions.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {insight.actions.map((action, aidx) => (
-                                <Badge key={aidx} variant="secondary" className="text-xs">
+                                <Badge key={aidx} variant="secondary" className="text-xs" title={
+                                  action.type === 'buy' && isBearMode ? 'Accumulation — les prix sont décotés' :
+                                  action.type === 'buy' && isBullMode ? 'Achat modéré — les prix sont élevés' :
+                                  action.type === 'sell' && isBearMode ? 'Vente différée — éviter de vendre en bear' :
+                                  action.type === 'sell' && isBullMode ? 'Prise de profits recommandée' :
+                                  undefined
+                                }>
                                   {action.type === 'buy' ? (
                                     <ArrowUpRight className="h-3 w-3 mr-1 text-green-500" />
                                   ) : action.type === 'sell' ? (
                                     <ArrowDownRight className="h-3 w-3 mr-1 text-red-500" />
                                   ) : null}
-                                  {action.type.toUpperCase()} {action.symbol}
+                                  {action.type === 'buy' && isBearMode ? 'ACCUMULER' :
+                                   action.type === 'sell' && isBullMode ? 'PRENDRE PROFITS' :
+                                   action.type.toUpperCase()} {action.symbol}
                                   {action.amount_eur && ` (${formatCurrency(action.amount_eur)})`}
                                 </Badge>
                               ))}
@@ -643,7 +651,7 @@ export default function SmartInsightsPage() {
                               ) : (
                                 <ArrowDownRight className="h-3 w-3 mr-1" />
                               )}
-                              {order.action === 'buy' ? 'Acheter' : order.action === 'hold' ? 'Conserver' : 'Vendre'}
+                              {order.action === 'buy' ? (isBearMode ? 'Accumuler' : 'Acheter') : order.action === 'hold' ? 'Conserver' : (isBullMode ? 'Prendre profits' : 'Vendre')}
                             </Badge>
                           </td>
                           <td className="p-2 text-right">{((order.current_weight ?? 0) * 100).toFixed(1)}%</td>

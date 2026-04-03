@@ -54,7 +54,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: 'STRATÉGIE',
+    label: 'OUTILS',
     items: [
       { icon: Target, label: 'Objectifs', path: '/strategy' },
       { icon: FileText, label: 'Rapports', path: '/reports' },
