@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from '@/hooks/use-toast'
 
@@ -11,6 +11,26 @@ const api = axios.create({
   },
   withCredentials: true,
   timeout: 60000,
+})
+
+// Retry on network errors (handles Render cold start 503 → CORS block)
+const MAX_RETRIES = 2
+const RETRY_DELAY = 3000 // 3s between retries
+
+api.interceptors.response.use(undefined, async (error: AxiosError) => {
+  const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number }
+  if (!config) return Promise.reject(error)
+
+  const isNetworkError = !error.response && error.code !== 'ECONNABORTED'
+  const is503 = error.response?.status === 503
+
+  if ((isNetworkError || is503) && (config._retryCount ?? 0) < MAX_RETRIES) {
+    config._retryCount = (config._retryCount ?? 0) + 1
+    await new Promise((r) => setTimeout(r, RETRY_DELAY))
+    return api.request(config)
+  }
+
+  return Promise.reject(error)
 })
 
 // Request interceptor to add auth token
@@ -110,7 +130,7 @@ api.interceptors.response.use(
     } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       toast({ title: 'Timeout', description: 'Le serveur met trop de temps à répondre.', variant: 'destructive' })
     } else if (!error.response) {
-      toast({ title: 'Erreur réseau', description: 'Impossible de contacter le serveur. Vérifiez votre connexion.', variant: 'destructive' })
+      toast({ title: 'Erreur réseau', description: 'Le serveur est en cours de démarrage. Rechargez la page dans quelques secondes.', variant: 'destructive' })
     }
 
     return Promise.reject(error)
