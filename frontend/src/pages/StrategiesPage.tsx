@@ -26,6 +26,7 @@ import {
   ChevronUp,
   CircleDot,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 
 // Types
@@ -155,6 +156,22 @@ function StrategyCard({
 
       {expanded && strategy.actions.length > 0 && (
         <CardContent className="pt-0">
+          {strategy.source === 'AI' && (strategy.params?.available_liquidity as number) > 0 && (
+            <div className="mb-3 flex items-center gap-4 p-2.5 rounded-md bg-emerald-500/5 border border-emerald-500/10 text-sm">
+              <div className="flex items-center gap-1.5 text-emerald-400">
+                <Wallet className="h-3.5 w-3.5" />
+                <span className="font-medium">
+                  Munitions : {(strategy.params.available_liquidity as number).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                </span>
+              </div>
+              {(strategy.params?.total_proposed_amount as number) > 0 && (
+                <span className="text-muted-foreground">
+                  Montant proposé : {(strategy.params.total_proposed_amount as number).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  {' '}({(strategy.params.proposed_pct_of_liquidity as number)?.toFixed(1)}% des liquidités)
+                </span>
+              )}
+            </div>
+          )}
           {strategy.ai_reasoning && strategy.source === 'AI' && (
             <div className="mb-4 p-3 rounded-md bg-indigo-500/5 border border-indigo-500/10">
               <p className="text-sm text-muted-foreground italic">{strategy.ai_reasoning}</p>

@@ -107,7 +107,7 @@ class AIStrategyService:
                 strategies.append(rebalance)
 
         # 6. Swing Trading — in volatile sideways markets
-        swing = self._build_swing_strategy(assets, regime_name, regime_confidence, has_high_volatility)
+        swing = self._build_swing_strategy(assets, regime_name, regime_confidence, has_high_volatility, liquidity)
         if swing:
             strategies.append(swing)
 
@@ -153,6 +153,20 @@ class AIStrategyService:
                 }
             )
 
+        # Inject liquidity context into each strategy's params (persisted in DB)
+        for s in strategies:
+            params = s.get("params", {})
+            params["available_liquidity"] = round(liquidity, 2)
+            params["total_portfolio_value"] = round(total_value, 2)
+            # Compute total proposed buy amount for this strategy
+            buy_actions = ("VCA", "DCA", "ACHAT", "ACHAT FORT", "RENFORCER")
+            total_proposed = sum(
+                a.get("amount", 0) or 0 for a in s.get("actions", []) if a.get("action") in buy_actions
+            )
+            params["total_proposed_amount"] = round(total_proposed, 2)
+            params["proposed_pct_of_liquidity"] = round(total_proposed / liquidity * 100, 1) if liquidity > 0 else 0
+            s["params"] = params
+
         return strategies
 
     # --- Strategy Builders ---
@@ -182,9 +196,11 @@ class AIStrategyService:
         sorted_assets = sorted(buy_assets, key=lambda a: a.get("alpha_score", 0), reverse=True)
         top = sorted_assets[:4]
 
-        # VCA: base amount + bonus inversely proportional to current price vs avg
+        # VCA: base amount proportional to liquidity + alpha multiplier
         actions = []
-        base_amount = round(liquidity * 0.04, 2) if liquidity > 0 else 50.0
+        if liquidity <= 0:
+            return None  # Pas de munitions = pas de stratégie d'achat
+        base_amount = round(liquidity * 0.04, 2)
         for asset in top:
             # Higher alpha = more aggressive VCA multiplier
             alpha = asset.get("alpha_score", 50)
@@ -197,23 +213,25 @@ class AIStrategyService:
                     "amount": amount,
                     "currency": "EUR",
                     "reason": (
-                        f"Alpha {alpha}/100 — investir {amount}€ (montant variable selon la valorisation). "
-                        f"{asset.get('description', '')}"
+                        f"Alpha {alpha}/100 — investir {amount}€ soit ~{round(amount / liquidity * 100, 1)}% "
+                        f"de vos liquidités. {asset.get('description', '')}"
                     ),
                 }
             )
 
+        total_vca = sum(a["amount"] for a in actions)
         if is_accumulation:
             desc = (
                 f"Marché en phase '{regime}' — les prix sont bas, c'est le moment d'accumuler. "
-                "Le VCA investit davantage quand les prix baissent, maximisant les quantités achetées. "
-                "Historiquement, les meilleurs rendements viennent des achats en bear market."
+                f"Budget total : {total_vca:.0f}€ sur {round(liquidity, 0):.0f}€ de liquidités disponibles "
+                f"({round(total_vca / liquidity * 100, 1)}%). "
+                "Le VCA investit davantage quand les prix baissent, maximisant les quantités achetées."
             )
         else:
             desc = (
                 f"Marché en phase '{regime}' avec forte volatilité. "
-                "Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts. "
-                "Plus efficace que le DCA en marché volatile."
+                f"Budget total : {total_vca:.0f}€ sur {round(liquidity, 0):.0f}€ de liquidités disponibles. "
+                "Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts."
             )
 
         return {
@@ -275,11 +293,15 @@ class AIStrategyService:
             pct = 0.03
             reasoning = f"Marché en phase '{regime}'. " "DCA uniquement sur les assets avec les meilleurs scores alpha."
 
+        if liquidity <= 0:
+            return None  # Pas de munitions = pas de DCA
+
         actions = []
         for asset in top:
             amount = abs(asset.get("impact_eur", 0))
-            if amount == 0:
-                amount = round(liquidity * pct, 2) if liquidity > 0 else 50.0
+            if amount == 0 or amount > liquidity * 0.5:
+                # Fallback ou cap : proportionnel à la liquidité
+                amount = round(liquidity * pct, 2)
             actions.append(
                 {
                     "action": "DCA",
@@ -287,7 +309,9 @@ class AIStrategyService:
                     "amount": amount,
                     "currency": "EUR",
                     "reason": (
-                        f"Alpha {asset.get('alpha_score', 0)}/100 — " f"{asset.get('description', 'Signal favorable')}"
+                        f"Alpha {asset.get('alpha_score', 0)}/100 — {amount}€ "
+                        f"({round(amount / liquidity * 100, 1)}% de vos liquidités). "
+                        f"{asset.get('description', 'Signal favorable')}"
                     ),
                 }
             )
@@ -422,6 +446,7 @@ class AIStrategyService:
         regime: str,
         confidence: float,
         has_high_volatility: bool,
+        liquidity: float = 0.0,
     ) -> Optional[Dict[str, Any]]:
         """Swing trading — exploit short-term price oscillations.
 
@@ -439,6 +464,12 @@ class AIStrategyService:
 
         top = sorted(swing_candidates, key=lambda a: abs(a.get("predicted_7d_pct", 0)), reverse=True)[:3]
 
+        if liquidity <= 0:
+            return None  # Pas de munitions pour du swing
+
+        swing_budget = round(liquidity * 0.15, 2)  # Max 15% de la liquidité en swing
+        per_asset = round(swing_budget / len(top), 2)
+
         actions = []
         for asset in top:
             pred = asset.get("predicted_7d_pct", 0)
@@ -447,19 +478,24 @@ class AIStrategyService:
                     {
                         "action": "ACHAT",
                         "symbol": asset["symbol"],
-                        "amount": round(asset.get("value", 0) * 0.1, 2),
+                        "amount": per_asset,
                         "currency": "EUR",
-                        "reason": f"Prédiction +{pred:.1f}% à 7j — position swing haussière",
+                        "reason": (
+                            f"Prédiction +{pred:.1f}% à 7j — position swing haussière. "
+                            f"{per_asset}€ ({round(per_asset / liquidity * 100, 1)}% de vos liquidités)"
+                        ),
                     }
                 )
             else:
+                # Pour vendre, on se base sur la valeur détenue
+                sell_amount = round(asset.get("value", 0) * 0.1, 2)
                 actions.append(
                     {
                         "action": "ALLÉGER",
                         "symbol": asset["symbol"],
-                        "amount": round(asset.get("value", 0) * 0.1, 2),
+                        "amount": sell_amount,
                         "currency": "EUR",
-                        "reason": f"Prédiction {pred:.1f}% à 7j — alléger avant la baisse",
+                        "reason": f"Prédiction {pred:.1f}% à 7j — alléger 10% de la position avant la baisse",
                     }
                 )
 
@@ -527,7 +563,8 @@ class AIStrategyService:
                 "amount": park_amount,
                 "currency": "EUR",
                 "reason": (
-                    f"Placer {park_amount}€ en USDC pour générer du yield (~3-5% APY) "
+                    f"Placer {park_amount}€ (50% de vos {round(liquidity, 0):.0f}€ de liquidités) "
+                    "en USDC pour générer du yield (~3-5% APY) "
                     "tout en restant liquide pour saisir les opportunités."
                 ),
             }
@@ -723,8 +760,11 @@ class AIStrategyService:
 
         top = sorted(candidates, key=lambda a: a.get("alpha_score", 0), reverse=True)[:3]
 
-        # Larger position sizes for conviction buys
-        base_amount = round(liquidity * 0.08, 2) if liquidity > 0 else 100.0
+        if liquidity <= 0:
+            return None  # Pas de munitions pour un achat conviction
+
+        # Larger position sizes for conviction buys — 8% de la liquidité
+        base_amount = round(liquidity * 0.08, 2)
 
         actions = []
         for asset in top:
@@ -738,7 +778,8 @@ class AIStrategyService:
                     "currency": "EUR",
                     "reason": (
                         f"Fear & Greed à {fear_greed}/100 (peur extrême) + Alpha {alpha}/100. "
-                        f"Signal d'achat conviction — {amount}€."
+                        f"Signal d'achat conviction — {amount}€ "
+                        f"({round(amount / liquidity * 100, 1)}% de vos liquidités)."
                     ),
                 }
             )
