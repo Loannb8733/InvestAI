@@ -68,4 +68,5 @@ class StrategyResponse(BaseModel):
 
 
 class StrategyActionUpdate(BaseModel):
-    status: str  # EXECUTED or SKIPPED
+    status: Optional[str] = None  # EXECUTED or SKIPPED
+    amount: Optional[float] = None  # Allow user to override AI-proposed amount

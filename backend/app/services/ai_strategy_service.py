@@ -153,11 +153,37 @@ class AIStrategyService:
                 }
             )
 
-        # Inject liquidity context into each strategy's params (persisted in DB)
+        # Risk/performance classification per strategy type
+        # risk_level: 1=conservateur, 2=modéré, 3=dynamique, 4=agressif
+        # performance_potential: 1=faible, 2=moyen, 3=élevé, 4=très élevé
+        _RISK_MAP = {
+            "observation": (1, 1),
+            "stablecoin_yield": (1, 1),
+            "defensive": (1, 2),
+            "rebalance": (2, 2),
+            "dca_sélectif": (2, 2),
+            "dca_modéré": (2, 2),
+            "profit_taking": (2, 3),
+            "progressive_profit": (2, 3),
+            "rotation": (3, 3),
+            "dca_agressif": (3, 3),
+            "vca": (3, 4),
+            "swing": (4, 4),
+            "conviction_buy": (4, 4),
+        }
+
+        # Inject liquidity context + risk classification into each strategy's params
         for s in strategies:
             params = s.get("params", {})
             params["available_liquidity"] = round(liquidity, 2)
             params["total_portfolio_value"] = round(total_value, 2)
+
+            # Risk classification
+            stype = str(params.get("type", "")).lower()
+            risk_level, perf_potential = _RISK_MAP.get(stype, (2, 2))
+            params["risk_level"] = risk_level
+            params["performance_potential"] = perf_potential
+
             # Compute total proposed buy amount for this strategy
             buy_actions = ("VCA", "DCA", "ACHAT", "ACHAT FORT", "RENFORCER")
             total_proposed = sum(
@@ -166,6 +192,14 @@ class AIStrategyService:
             params["total_proposed_amount"] = round(total_proposed, 2)
             params["proposed_pct_of_liquidity"] = round(total_proposed / liquidity * 100, 1) if liquidity > 0 else 0
             s["params"] = params
+
+        # Sort strategies: highest performance potential first, then by risk (higher risk first for same perf)
+        strategies.sort(
+            key=lambda s: (
+                -(s.get("params", {}).get("performance_potential", 2)),
+                -(s.get("params", {}).get("risk_level", 2)),
+            )
+        )
 
         return strategies
 

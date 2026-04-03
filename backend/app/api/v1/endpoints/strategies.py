@@ -260,11 +260,19 @@ async def update_action_status(
     if not action:
         raise HTTPException(status_code=404, detail="Action non trouvée")
 
-    action.status = ActionStatus(data.status)
-    if data.status == "EXECUTED":
-        from datetime import datetime, timezone
+    if data.amount is not None:
+        action.amount = data.amount
 
-        action.executed_at = datetime.now(timezone.utc)
+    if data.status is not None:
+        action.status = ActionStatus(data.status)
+        if data.status == "EXECUTED":
+            from datetime import datetime, timezone
+
+            action.executed_at = datetime.now(timezone.utc)
 
     await db.commit()
-    return {"id": str(action.id), "status": action.status.value}
+    return {
+        "id": str(action.id),
+        "status": action.status.value,
+        "amount": float(action.amount) if action.amount else None,
+    }

@@ -82,23 +82,45 @@ function getStrategyIcon(params: Record<string, unknown>) {
   return TrendingUp
 }
 
+const RISK_LABELS: Record<number, { label: string; color: string }> = {
+  1: { label: 'Conservateur', color: 'text-emerald-400 border-emerald-400/30' },
+  2: { label: 'Modéré', color: 'text-blue-400 border-blue-400/30' },
+  3: { label: 'Dynamique', color: 'text-amber-400 border-amber-400/30' },
+  4: { label: 'Agressif', color: 'text-red-400 border-red-400/30' },
+}
+
+const PERF_LABELS: Record<number, string> = {
+  1: 'Faible',
+  2: 'Moyen',
+  3: 'Élevé',
+  4: 'Très élevé',
+}
+
 function StrategyCard({
   strategy,
   onAccept,
   onReject,
   onDelete,
   onMarkAction,
+  onUpdateAmount,
 }: {
   strategy: Strategy
   onAccept: (id: string) => void
   onReject: (id: string) => void
   onDelete: (id: string) => void
   onMarkAction: (actionId: string, status: string) => void
+  onUpdateAmount: (actionId: string, amount: number) => void
 }) {
   const [expanded, setExpanded] = useState(strategy.status === 'PROPOSED')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editAmount, setEditAmount] = useState('')
   const Icon = getStrategyIcon(strategy.params)
   const statusBadge = STATUS_BADGE[strategy.status] || STATUS_BADGE.ACTIVE
   const pendingActions = strategy.actions.filter((a) => a.status === 'PENDING')
+  const riskLevel = (strategy.params?.risk_level as number) || 0
+  const perfLevel = (strategy.params?.performance_potential as number) || 0
+  const riskInfo = RISK_LABELS[riskLevel]
+  const perfLabel = PERF_LABELS[perfLevel]
 
   return (
     <Card className={strategy.status === 'PROPOSED' ? 'border-indigo-500/30 bg-indigo-500/5' : ''}>
@@ -122,6 +144,16 @@ function StrategyCard({
                   <Badge variant="outline" className="text-xs">
                     {strategy.market_regime}
                     {strategy.confidence ? ` · ${(strategy.confidence * 100).toFixed(0)}%` : ''}
+                  </Badge>
+                )}
+                {riskInfo && (
+                  <Badge variant="outline" className={`text-xs ${riskInfo.color}`}>
+                    {riskInfo.label}
+                  </Badge>
+                )}
+                {perfLabel && (
+                  <Badge variant="outline" className="text-xs">
+                    Perf. {perfLabel}
                   </Badge>
                 )}
               </div>
@@ -183,6 +215,7 @@ function StrategyCard({
             </p>
             {strategy.actions.map((action) => {
               const actionBadge = ACTION_BADGE[action.status] || ACTION_BADGE.PENDING
+              const isEditing = editingId === action.id
               return (
                 <div
                   key={action.id}
@@ -197,9 +230,63 @@ function StrategyCard({
                           <Badge variant="outline" className="text-xs">{action.symbol}</Badge>
                         )}
                         {action.amount != null && action.amount > 0 && (
-                          <span className="text-sm text-muted-foreground">
-                            {action.amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} {action.currency}
-                          </span>
+                          isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-7 w-24 text-sm"
+                                value={editAmount}
+                                onChange={(e) => setEditAmount(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseFloat(editAmount)
+                                    if (val > 0) onUpdateAmount(action.id, val)
+                                    setEditingId(null)
+                                  }
+                                  if (e.key === 'Escape') setEditingId(null)
+                                }}
+                                autoFocus
+                              />
+                              <span className="text-xs text-muted-foreground">{action.currency}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  const val = parseFloat(editAmount)
+                                  if (val > 0) onUpdateAmount(action.id, val)
+                                  setEditingId(null)
+                                }}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => setEditingId(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`text-sm ${action.status === 'PENDING' ? 'text-foreground underline decoration-dashed underline-offset-4 cursor-pointer hover:text-primary' : 'text-muted-foreground'}`}
+                              disabled={action.status !== 'PENDING'}
+                              onClick={() => {
+                                if (action.status === 'PENDING') {
+                                  setEditingId(action.id)
+                                  setEditAmount(String(action.amount))
+                                }
+                              }}
+                              title={action.status === 'PENDING' ? 'Cliquer pour modifier le montant' : undefined}
+                            >
+                              {action.amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} {action.currency}
+                            </button>
+                          )
                         )}
                         <Badge variant={actionBadge.variant} className="text-xs">{actionBadge.label}</Badge>
                       </div>
@@ -343,6 +430,16 @@ export default function StrategiesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.strategies.all }),
   })
 
+  // Update action amount
+  const updateAmountMutation = useMutation({
+    mutationFn: ({ actionId, amount }: { actionId: string; amount: number }) =>
+      strategiesApi.updateAction(actionId, { amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.strategies.all })
+      toast({ title: 'Montant mis à jour' })
+    },
+  })
+
   // Group strategies
   const proposed = useMemo(() => strategies.filter((s) => s.status === 'PROPOSED'), [strategies])
   const active = useMemo(() => strategies.filter((s) => s.status === 'ACTIVE'), [strategies])
@@ -400,6 +497,7 @@ export default function StrategiesPage() {
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
+              onUpdateAmount={(actionId, amount) => updateAmountMutation.mutate({ actionId, amount })}
             />
           ))}
         </div>
@@ -417,6 +515,7 @@ export default function StrategiesPage() {
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
+              onUpdateAmount={(actionId, amount) => updateAmountMutation.mutate({ actionId, amount })}
             />
           ))}
         </div>
@@ -456,6 +555,7 @@ export default function StrategiesPage() {
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
+              onUpdateAmount={(actionId, amount) => updateAmountMutation.mutate({ actionId, amount })}
             />
           ))}
         </div>

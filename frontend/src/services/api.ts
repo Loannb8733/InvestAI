@@ -1373,7 +1373,7 @@ export const strategiesApi = {
     return response.data
   },
 
-  updateAction: async (actionId: string, data: { status: string }) => {
+  updateAction: async (actionId: string, data: { status?: string; amount?: number }) => {
     const response = await api.patch(`/strategies/actions/${actionId}`, data)
     return response.data
   },
