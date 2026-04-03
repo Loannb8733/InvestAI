@@ -425,6 +425,35 @@ function StrategyTable() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Regime context banner */}
+          {['bearish', 'bottom', 'bottoming', 'accumulation', 'markdown'].includes(data.market_regime) && (
+            <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-blue-600 dark:text-blue-400">Mode Accumulation</span> — Les signaux DCA/ACHAT sont renforcés.
+                Les prix sont décotés, accumulez sur les actifs à fort alpha. Les signaux de vente sont atténués.
+              </p>
+            </div>
+          )}
+          {['bullish', 'markup'].includes(data.market_regime) && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-amber-600 dark:text-amber-400">Mode Expansion</span> — Laissez courir vos positions mais préparez vos niveaux de sortie.
+                Réduisez les montants DCA et définissez vos objectifs de prise de profits.
+              </p>
+            </div>
+          )}
+          {['top', 'topping', 'distribution'].includes(data.market_regime) && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-red-600 dark:text-red-400">Mode Prise de Profits</span> — Les signaux de vente sont prioritaires.
+                Sécurisez vos gains partiellement, gardez du cash pour accumuler au prochain creux.
+              </p>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

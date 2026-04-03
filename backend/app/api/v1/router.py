@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     reports,
     simulations,
     smart_insights,
+    strategies,
     system,
     telegram_webhook,
     transactions,
@@ -50,4 +51,5 @@ api_router.include_router(websocket.router, tags=["WebSocket"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals"])
 api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
 api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
+api_router.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 api_router.include_router(system.router, prefix="/system", tags=["System"])

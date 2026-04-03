@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo, lazy, Suspense, type ReactNode } from 'react'
+import { useState, useRef, useMemo, Suspense, type ReactNode } from 'react'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 import type { PnLBreakdown } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -347,7 +348,7 @@ function CustomizePanel({
 
 // ============== Main Component ==============
 
-const OnboardingWizard = lazy(() => import('@/components/OnboardingWizard'))
+const OnboardingWizard = lazyWithRetry(() => import('@/components/OnboardingWizard'))
 
 export default function DashboardPage() {
   const navigate = useNavigate()

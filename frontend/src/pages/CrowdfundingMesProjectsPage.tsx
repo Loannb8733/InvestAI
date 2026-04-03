@@ -1,12 +1,13 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LayoutDashboard, FolderOpen, BarChart3, Loader2 } from 'lucide-react'
 import Breadcrumb from '@/components/layout/Breadcrumb'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
-const CrowdfundingDashboardPage = lazy(() => import('@/pages/CrowdfundingDashboardPage'))
-const CrowdfundingProjectsPage = lazy(() => import('@/pages/CrowdfundingProjectsPage'))
-const CrowdfundingPerformancePage = lazy(() => import('@/pages/CrowdfundingPerformancePage'))
+const CrowdfundingDashboardPage = lazyWithRetry(() => import('@/pages/CrowdfundingDashboardPage'))
+const CrowdfundingProjectsPage = lazyWithRetry(() => import('@/pages/CrowdfundingProjectsPage'))
+const CrowdfundingPerformancePage = lazyWithRetry(() => import('@/pages/CrowdfundingPerformancePage'))
 
 function TabLoader() {
   return (

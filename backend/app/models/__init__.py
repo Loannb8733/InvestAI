@@ -28,6 +28,7 @@ from app.models.prediction_log import PredictionLog  # noqa: E402, F401
 from app.models.project_audit import ProjectAudit  # noqa: E402, F401
 from app.models.project_document import ProjectDocument  # noqa: E402, F401
 from app.models.simulation import Simulation  # noqa: E402, F401
+from app.models.strategy import Strategy, StrategyAction  # noqa: E402, F401
 from app.models.transaction import Transaction  # noqa: E402, F401
 
 # Import all models so Base.metadata.create_all() picks them up

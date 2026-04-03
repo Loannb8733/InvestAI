@@ -58,7 +58,7 @@ class RegimeConfig:
     from a single source of truth.
     """
 
-    risk_multiplier: float  # DCA position sizing: 0.5 (bear) → 1.5 (bull)
+    risk_multiplier: float  # DCA position sizing: 1.5 (bear, accumulate!) → 0.5 (bull, take profits)
     alpha_threshold: int  # Min alpha to act: 85 (bear, stricter) → 60 (bull)
     gold_relevance: str  # "high" (bear) / "medium" (neutral) / "low" (bull)
     mode_label: str  # UI badge: "Mode Survie" / "Mode Expansion" / etc.
@@ -68,18 +68,20 @@ class RegimeConfig:
     def from_regime(dominant_regime: str, confidence: float = 0.5) -> "RegimeConfig":
         """Build config from the dominant regime name."""
         _MAP = {
-            # Bear-family
-            "bearish": RegimeConfig(0.5, 85, "high", "Mode Survie Actif", "stress"),
-            "markdown": RegimeConfig(0.5, 85, "high", "Mode Survie Actif", "stress"),
-            "distribution": RegimeConfig(0.6, 80, "high", "Mode Prudence", "stress"),
-            "bottom": RegimeConfig(0.7, 75, "medium", "Mode Accumulation", "normal"),
-            "bottoming": RegimeConfig(0.7, 75, "medium", "Mode Accumulation", "normal"),
-            "accumulation": RegimeConfig(0.8, 70, "medium", "Mode Accumulation", "normal"),
-            # Bull-family
-            "bullish": RegimeConfig(1.5, 60, "low", "Mode Expansion Actif", "low"),
-            "markup": RegimeConfig(1.5, 60, "low", "Mode Expansion Actif", "low"),
-            "topping": RegimeConfig(0.8, 75, "medium", "Mode Prudence", "normal"),
-            "top": RegimeConfig(0.8, 75, "medium", "Mode Prudence", "normal"),
+            # Bear-family — "Be greedy when others are fearful"
+            # Higher risk_multiplier = buy MORE (accumulation opportunity)
+            "bearish": RegimeConfig(1.5, 85, "high", "Mode Accumulation Actif", "stress"),
+            "markdown": RegimeConfig(1.5, 85, "high", "Mode Accumulation Actif", "stress"),
+            "distribution": RegimeConfig(0.8, 80, "high", "Mode Prudence", "stress"),
+            "bottom": RegimeConfig(1.8, 75, "medium", "Mode Accumulation Fort", "normal"),
+            "bottoming": RegimeConfig(1.8, 75, "medium", "Mode Accumulation Fort", "normal"),
+            "accumulation": RegimeConfig(1.5, 70, "medium", "Mode Accumulation", "normal"),
+            # Bull-family — "Be fearful when others are greedy"
+            # Lower risk_multiplier = buy LESS, prepare to take profits
+            "bullish": RegimeConfig(0.8, 60, "low", "Mode Expansion", "low"),
+            "markup": RegimeConfig(0.8, 60, "low", "Mode Expansion", "low"),
+            "topping": RegimeConfig(0.4, 75, "medium", "Mode Prise de Profits", "normal"),
+            "top": RegimeConfig(0.4, 75, "medium", "Mode Prise de Profits", "normal"),
         }
         cfg = _MAP.get(dominant_regime, RegimeConfig(1.0, 70, "medium", "Mode Normal", "normal"))
         # If confidence is low, pull towards neutral
