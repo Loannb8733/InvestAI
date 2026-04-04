@@ -1098,7 +1098,7 @@ class PredictionService:
             # ── Pre-fetch histories + prices in parallel ──────────────
             import asyncio as _aio
 
-            _top_assets = list(asset_map.values())[:10]
+            _top_assets = list(asset_map.values())[:7]
 
             async def _prefetch_history(a: object) -> tuple:
                 """Return (symbol, prices) — fetches from cache then network."""
@@ -1978,9 +1978,35 @@ class PredictionService:
                 pass
             return (sym, [])
 
-        _items = list(asset_map.items())[:10]
+        # Limit assets to reduce memory usage on free-tier hosting (512 MB)
+        _MAX_ASSETS = 7
+        _PREDICTION_BATCH_SIZE = 3  # Process ensemble predictions in small batches
+
+        _items = list(asset_map.items())[:_MAX_ASSETS]
         history_results = await _aio.gather(*[_fetch_history(s, a.asset_type.value) for s, a in _items])
         history_map: Dict[str, List[float]] = {sym: prices for sym, prices in history_results}
+
+        # ── Pre-fetch 7d predictions in batches to limit memory ──
+        import gc
+
+        _prediction_cache: Dict[str, Optional[PricePrediction]] = {}
+
+        async def _fetch_prediction(sym: str, atype: AssetType) -> tuple:
+            try:
+                pred = await self.get_price_prediction(sym, atype, days_ahead=7)
+                return (sym, pred)
+            except Exception as e:
+                logger.debug("7d prediction failed for %s: %s", sym, e)
+                return (sym, None)
+
+        for batch_start in range(0, len(_items), _PREDICTION_BATCH_SIZE):
+            batch = _items[batch_start : batch_start + _PREDICTION_BATCH_SIZE]
+            batch_results = await _aio.gather(*[_fetch_prediction(s, a.asset_type) for s, a in batch])
+            for sym, pred in batch_results:
+                _prediction_cache[sym] = pred
+
+            # Free memory between batches
+            gc.collect()
 
         # ── Score each asset ──
         scored_assets = []
@@ -2133,35 +2159,28 @@ class PredictionService:
                     )
 
                 # ── 7d price prediction (Decimal precision) ──
+                # Use pre-fetched batch prediction if available
                 predicted_7d_pct = Decimal("0")
                 prediction_source = "none"
-                try:
-                    prediction = await self.get_price_prediction(
-                        symbol,
-                        asset.asset_type,
-                        days_ahead=7,
-                    )
-                    if prediction and prediction.predictions:
-                        last_pred = prediction.predictions[-1]
-                        pred_price = last_pred.get("price", 0)
-                        if pred_price > 0 and price > 0:
-                            raw_pct = (Decimal(str(pred_price)) / price_dec - 1) * 100
-                            # Sanity check: reject > ±50% moves
-                            if abs(raw_pct) > 50:
-                                logger.warning(
-                                    "SANITY CHECK (alpha): %s ensemble 7d prediction "
-                                    "unrealistic (%.1f%%). Falling back to EMA-20.",
-                                    symbol,
-                                    float(raw_pct),
-                                )
-                                # Force EMA-20 fallback below
-                                predicted_7d_pct = Decimal("0")
-                                prediction_source = "none"
-                            else:
-                                predicted_7d_pct = raw_pct
-                                prediction_source = "ensemble"
-                except Exception as e:
-                    logger.debug("7d prediction failed for %s: %s", symbol, e)
+                prediction = _prediction_cache.get(symbol)
+                if prediction and prediction.predictions:
+                    last_pred = prediction.predictions[-1]
+                    pred_price = last_pred.get("price", 0)
+                    if pred_price > 0 and price > 0:
+                        raw_pct = (Decimal(str(pred_price)) / price_dec - 1) * 100
+                        # Sanity check: reject > ±50% moves
+                        if abs(raw_pct) > 50:
+                            logger.warning(
+                                "SANITY CHECK (alpha): %s ensemble 7d prediction "
+                                "unrealistic (%.1f%%). Falling back to EMA-20.",
+                                symbol,
+                                float(raw_pct),
+                            )
+                            predicted_7d_pct = Decimal("0")
+                            prediction_source = "none"
+                        else:
+                            predicted_7d_pct = raw_pct
+                            prediction_source = "ensemble"
 
                 # EMA-20 slope fallback: extrapolate 7 days if model unavailable
                 if predicted_7d_pct == 0 and len(a_prices) >= 20:
@@ -2298,9 +2317,13 @@ class PredictionService:
         Calls get_top_alpha_asset() and get_market_cycle() then merges
         per-asset data using a decision matrix.
         """
-        # Fetch both datasets concurrently-ish (they share DB session)
-        alpha_data = await self.get_top_alpha_asset(db, user_id)
-        cycle_data = await self.get_market_cycle(db, user_id)
+        # Fetch both datasets in parallel (independent operations)
+        import asyncio as _aio
+
+        alpha_data, cycle_data = await _aio.gather(
+            self.get_top_alpha_asset(db, user_id),
+            self.get_market_cycle(db, user_id),
+        )
 
         total_value = alpha_data.get("total_portfolio_value", 0.0)
         alpha_scores = alpha_data.get("all_scores", [])
