@@ -36,7 +36,9 @@ export default function NotificationBell() {
   const { data: countData } = useQuery<NotificationCount>({
     queryKey: queryKeys.notifications.unreadCount,
     queryFn: notificationsApi.getUnreadCount,
-    refetchInterval: pageVisible ? 30000 : false,
+    refetchInterval: pageVisible ? 60000 : false,
+    retry: 1,
+    retryDelay: 5000,
   })
 
   const { data: notifications } = useQuery<Notification[]>({

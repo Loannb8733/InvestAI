@@ -13,18 +13,26 @@ const api = axios.create({
   timeout: 60000,
 })
 
-// Retry on network errors (handles Render cold start 503 → CORS block)
+// Retry on network errors (handles Render cold start 502/503 → CORS block)
 const MAX_RETRIES = 2
 const RETRY_DELAY = 3000 // 3s between retries
+// Skip retries for background polling endpoints to avoid flooding
+const NO_RETRY_PATHS = ['/notifications/count', '/notifications']
 
 api.interceptors.response.use(undefined, async (error: AxiosError) => {
   const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number }
   if (!config) return Promise.reject(error)
 
-  const isNetworkError = !error.response && error.code !== 'ECONNABORTED'
-  const is503 = error.response?.status === 503
+  // Don't retry background polling — let react-query handle it
+  const url = config.url || ''
+  if (NO_RETRY_PATHS.some((p) => url.includes(p))) {
+    return Promise.reject(error)
+  }
 
-  if ((isNetworkError || is503) && (config._retryCount ?? 0) < MAX_RETRIES) {
+  const isNetworkError = !error.response && error.code !== 'ECONNABORTED'
+  const isServerDown = error.response?.status === 502 || error.response?.status === 503
+
+  if ((isNetworkError || isServerDown) && (config._retryCount ?? 0) < MAX_RETRIES) {
     config._retryCount = (config._retryCount ?? 0) + 1
     await new Promise((r) => setTimeout(r, RETRY_DELAY))
     return api.request(config)
