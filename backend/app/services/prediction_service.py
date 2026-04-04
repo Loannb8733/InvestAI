@@ -1095,9 +1095,52 @@ class PredictionService:
                 except Exception:
                     total_value += qty
 
-            for asset in list(asset_map.values())[:10]:
+            # ── Pre-fetch histories + prices in parallel ──────────────
+            import asyncio as _aio
+
+            _top_assets = list(asset_map.values())[:10]
+
+            async def _prefetch_history(a: object) -> tuple:
+                """Return (symbol, prices) — fetches from cache then network."""
+                sym = a.symbol
+                atype = a.asset_type.value
+                if sym == "BTC" and btc_prices:
+                    p = btc_prices[-90:] if len(btc_prices) > 90 else list(btc_prices)
+                    return (sym, p)
+                for try_days in [_HISTORY_DAYS, 90]:
+                    cached = await get_cached_history(sym, atype, try_days)
+                    if cached and cached.get("prices"):
+                        p = cached["prices"]
+                        return (sym, p[-90:] if len(p) > 90 else p)
                 try:
-                    price = await self._get_current_price(asset.symbol, asset.asset_type)
+                    a_dates, a_prices = await self.data_fetcher.get_history(sym, atype, days=90)
+                    if a_dates and a_prices:
+                        await cache_history(
+                            sym, atype, 90, {"dates": [d.isoformat() for d in a_dates], "prices": a_prices}
+                        )
+                        return (sym, a_prices)
+                except Exception:
+                    logger.warning("Failed to fetch history for %s, skipping", sym)
+                return (sym, [])
+
+            async def _prefetch_price(a: object) -> tuple:
+                """Return (symbol, price)."""
+                try:
+                    p = await self._get_current_price(a.symbol, a.asset_type)
+                    return (a.symbol, p)
+                except Exception:
+                    return (a.symbol, 0)
+
+            _hist_results, _price_results = await _aio.gather(
+                _aio.gather(*[_prefetch_history(a) for a in _top_assets]),
+                _aio.gather(*[_prefetch_price(a) for a in _top_assets]),
+            )
+            _hist_map: Dict[str, list] = {sym: prices for sym, prices in _hist_results}
+            _price_map: Dict[str, float] = {sym: price for sym, price in _price_results}
+
+            for asset in _top_assets:
+                try:
+                    price = _price_map.get(asset.symbol, 0)
                     if price == 0:
                         continue
                     price_dec = Decimal(str(price))
@@ -1106,32 +1149,7 @@ class PredictionService:
                     total_value += value_dec
                     value = float(value_dec)
 
-                    # Reuse btc_prices if this asset is BTC (already fetched above)
-                    a_prices = None
-                    if asset.symbol == "BTC" and btc_prices:
-                        a_prices = btc_prices[-90:] if len(btc_prices) > 90 else list(btc_prices)
-                    else:
-                        for try_days in [_HISTORY_DAYS, 90]:
-                            cached_hist = await get_cached_history(asset.symbol, asset.asset_type.value, try_days)
-                            if cached_hist and cached_hist.get("prices"):
-                                a_prices = cached_hist["prices"]
-                                if len(a_prices) > 90:
-                                    a_prices = a_prices[-90:]
-                                break
-                        if not a_prices:
-                            try:
-                                a_dates, a_prices = await self.data_fetcher.get_history(
-                                    asset.symbol, asset.asset_type.value, days=90
-                                )
-                                if a_dates and a_prices:
-                                    await cache_history(
-                                        asset.symbol,
-                                        asset.asset_type.value,
-                                        90,
-                                        {"dates": [d.isoformat() for d in a_dates], "prices": a_prices},
-                                    )
-                            except Exception:
-                                logger.warning("Failed to fetch history for %s, skipping", asset.symbol)
+                    a_prices = _hist_map.get(asset.symbol)
 
                     if a_prices and len(a_prices) >= 7:
                         # Bear market indicators
@@ -1941,12 +1959,35 @@ class PredictionService:
             except Exception:
                 pass
 
+        # ── Pre-fetch all 90d histories in parallel ──
+        import asyncio as _aio
+
+        async def _fetch_history(sym: str, atype: str) -> tuple:
+            """Fetch 90d history from cache or API."""
+            cached_hist = await get_cached_history(sym, atype, 90)
+            if cached_hist and cached_hist.get("prices"):
+                return (sym, cached_hist["prices"])
+            try:
+                a_dates, a_prices_raw = await self.data_fetcher.get_history(sym, atype, days=90)
+                if a_dates and a_prices_raw:
+                    await cache_history(
+                        sym, atype, 90, {"dates": [d.isoformat() for d in a_dates], "prices": a_prices_raw}
+                    )
+                    return (sym, a_prices_raw)
+            except Exception:
+                pass
+            return (sym, [])
+
+        _items = list(asset_map.items())[:10]
+        history_results = await _aio.gather(*[_fetch_history(s, a.asset_type.value) for s, a in _items])
+        history_map: Dict[str, List[float]] = {sym: prices for sym, prices in history_results}
+
         # ── Score each asset ──
         scored_assets = []
         total_value = Decimal("0")
         value_map: Dict[str, float] = {}
 
-        for symbol, asset in list(asset_map.items())[:10]:
+        for symbol, asset in _items:
             try:
                 price = price_map.get(symbol.upper(), 0.0)
                 if price <= 0:
@@ -1962,26 +2003,7 @@ class PredictionService:
                 value = float(value_dec)
                 value_map[symbol] = value
 
-                # Fetch 90d history
-                a_prices: List[float] = []
-                cached_hist = await get_cached_history(symbol, asset.asset_type.value, 90)
-                if cached_hist and cached_hist.get("prices"):
-                    a_prices = cached_hist["prices"]
-                else:
-                    try:
-                        a_dates, a_prices_raw = await self.data_fetcher.get_history(
-                            symbol, asset.asset_type.value, days=90
-                        )
-                        if a_dates and a_prices_raw:
-                            a_prices = a_prices_raw
-                            await cache_history(
-                                symbol,
-                                asset.asset_type.value,
-                                90,
-                                {"dates": [d.isoformat() for d in a_dates], "prices": a_prices},
-                            )
-                    except Exception:
-                        pass
+                a_prices = history_map.get(symbol, [])
 
                 if len(a_prices) < 20:
                     continue

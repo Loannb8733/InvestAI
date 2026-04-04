@@ -1379,7 +1379,7 @@ export const strategiesApi = {
   },
 
   aiSuggest: async () => {
-    const response = await api.post('/strategies/ai-suggest', {}, { timeout: ANALYTICS_TIMEOUT })
+    const response = await api.post('/strategies/ai-suggest', {}, { timeout: 300000 }) // 5 min — fetches historical prices
     return response.data
   },
 
