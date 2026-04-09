@@ -139,6 +139,7 @@ export const queryKeys = {
     health: (days: number) => [...queryKeys.smartInsights.all, 'health', days] as const,
     rebalancing: ['smartInsights', 'rebalancing'] as const,
     anomaliesImpact: ['smartInsights', 'anomaliesImpact'] as const,
+    summary: (days: number) => [...queryKeys.smartInsights.all, 'summary', days] as const,
   },
 
   admin: {

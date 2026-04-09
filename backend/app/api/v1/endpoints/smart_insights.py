@@ -266,6 +266,61 @@ async def get_portfolio_health(
     )
 
 
+class TopAlphaResponse(BaseModel):
+    """Top alpha signal summary."""
+
+    symbol: str
+    alpha_score: float
+
+
+class TopInsightResponse(BaseModel):
+    """Top insight summary."""
+
+    title: str
+    message: str
+    severity: str
+    category: str
+
+
+class DashboardSummaryResponse(BaseModel):
+    """Lightweight IA summary for dashboard widget."""
+
+    health_score: int
+    health_status: str
+    top_insight: Optional[TopInsightResponse] = None
+    breakeven_pct: Optional[float] = None
+    top_alpha: Optional[TopAlphaResponse] = None
+    anomaly_count: int
+    regime: Optional[str] = None
+    generated_at: str
+
+
+@router.get("/summary", response_model=DashboardSummaryResponse)
+async def get_dashboard_summary(
+    days: int = Query(30, ge=7, le=365, description="Période d'analyse en jours"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DashboardSummaryResponse:
+    """
+    Résumé IA léger pour le widget dashboard Bento.
+
+    Retourne le score de santé, l'insight principal, la distance au breakeven,
+    le top signal alpha, le nombre d'anomalies et le régime de marché.
+    """
+    data = await smart_insights_service.get_dashboard_summary(db, str(current_user.id), days)
+
+    return DashboardSummaryResponse(
+        health_score=data["health_score"],
+        health_status=data["health_status"],
+        top_insight=TopInsightResponse(**data["top_insight"]) if data.get("top_insight") else None,
+        breakeven_pct=data.get("breakeven_pct"),
+        top_alpha=TopAlphaResponse(**data["top_alpha"]) if data.get("top_alpha") else None,
+        anomaly_count=data["anomaly_count"],
+        regime=data.get("regime"),
+        generated_at=data["generated_at"],
+    )
+
+
 @router.get("/rebalancing", response_model=List[RebalancingOrderResponse])
 async def get_rebalancing_suggestions(
     current_user: User = Depends(get_current_user),
