@@ -23,6 +23,10 @@ import {
   Shield,
   ChevronDown,
   ChevronUp,
+  Calculator,
+  Percent,
+  Wallet,
+  Calendar,
 } from 'lucide-react'
 import {
   RadarChart,
@@ -210,6 +214,120 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Investment Simulation */}
+      {audit.investment_simulation && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Simulation d'investissement
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const sim = audit.investment_simulation
+              return (
+                <div className="space-y-4">
+                  {/* Main figures */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-blue-400 text-xs mb-1">
+                        <Wallet className="h-3 w-3" />
+                        Investissement suggéré
+                      </div>
+                      <p className="text-2xl font-bold text-blue-500">
+                        {formatCurrency(sim.investment_amount)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        minimum 100 € obligatoire
+                      </p>
+                    </div>
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-green-400 text-xs mb-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Gain net estimé
+                      </div>
+                      <p className="text-2xl font-bold text-green-500">
+                        +{formatCurrency(sim.net_interest)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        après flat tax 30%
+                      </p>
+                    </div>
+                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-purple-400 text-xs mb-1">
+                        <Banknote className="h-3 w-3" />
+                        Total récupéré
+                      </div>
+                      <p className="text-2xl font-bold text-purple-500">
+                        {formatCurrency(sim.total_at_end)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        capital + intérêts nets
+                      </p>
+                    </div>
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-orange-400 text-xs mb-1">
+                        <Percent className="h-3 w-3" />
+                        ROI net
+                      </div>
+                      <p className="text-2xl font-bold text-orange-500">
+                        {sim.roi_net_percent}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        sur {sim.duration_months} mois
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Detail breakdown */}
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Détail de la simulation
+                    </h4>
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Montant investi</span>
+                        <span className="font-medium">{formatCurrency(sim.investment_amount)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Taux annuel (TRI)</span>
+                        <span className="font-medium">{sim.tri_percent}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Durée estimée</span>
+                        <span className="font-medium">{sim.duration_months} mois</span>
+                      </div>
+                      <div className="border-t border-muted pt-2 mt-1 flex justify-between">
+                        <span className="text-muted-foreground">Intérêts bruts</span>
+                        <span className="font-medium text-green-500">+{formatCurrency(sim.gross_interest)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Flat tax (30%)</span>
+                        <span className="font-medium text-red-400">-{formatCurrency(sim.tax_amount)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Intérêts nets</span>
+                        <span className="font-medium text-green-500">+{formatCurrency(sim.net_interest)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Rendement mensuel brut</span>
+                        <span className="font-medium">{formatCurrency(sim.monthly_gross_return)}/mois</span>
+                      </div>
+                      <div className="border-t border-muted pt-2 mt-1 flex justify-between text-base">
+                        <span className="font-semibold">Total récupéré</span>
+                        <span className="font-bold text-green-500">{formatCurrency(sim.total_at_end)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Guarantees Table */}
       {audit.guarantees.length > 0 && (

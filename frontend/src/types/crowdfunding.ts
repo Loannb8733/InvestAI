@@ -127,6 +127,18 @@ export interface GuaranteeInfo {
   strength: 'forte' | 'moyenne' | 'faible'
 }
 
+export interface InvestmentSimulation {
+  investment_amount: number
+  duration_months: number
+  tri_percent: number
+  gross_interest: number
+  tax_amount: number
+  net_interest: number
+  monthly_gross_return: number
+  total_at_end: number
+  roi_net_percent: number
+}
+
 export interface ProjectAudit {
   id: string
   project_id: string | null
@@ -160,6 +172,7 @@ export interface ProjectAudit {
   diversification_impact: string | null
   correlation_score: number | null
   portfolio_concentration: Record<string, number> | null
+  investment_simulation: InvestmentSimulation | null
   created_at: string
 }
 
