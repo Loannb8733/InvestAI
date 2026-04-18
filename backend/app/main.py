@@ -651,6 +651,10 @@ def _is_allowed_origin(origin: str) -> bool:
 _explicit_escaped = [o.replace(".", r"\.").replace("://", r"://") for o in settings.CORS_ORIGINS]
 _cors_regex = "|".join([*_explicit_escaped, r"https://.*\.vercel\.app"])
 
+# Middleware order matters: last added = outermost.
+# CORS must be outermost so headers are always present, even on 500 errors.
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=f"^({_cors_regex})$",
@@ -660,12 +664,6 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-Request-ID"],  # Pagination + tracing
     max_age=600,  # Cache preflight for 10 minutes
 )
-
-# GZip compression (min 500 bytes to avoid overhead on small responses)
-app.add_middleware(GZipMiddleware, minimum_size=500)
-
-# Request logging middleware
-app.add_middleware(RequestLoggingMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
