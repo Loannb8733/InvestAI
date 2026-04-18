@@ -298,6 +298,54 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         logger.info("Claude response received (%d chars)", len(raw_text))
         return raw_text
 
+    async def _call_groq(self, messages: list[dict]) -> str:
+        """Call Groq API (free tier, fast inference) and return raw text response."""
+        import httpx
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": messages[0]["content"]},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4096,
+            "response_format": {"type": "json_object"},
+        }
+
+        logger.info("Calling Groq API (llama-3.1-8b-instant) for crowdfunding analysis")
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            try:
+                resp = await client.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                )
+            except httpx.TimeoutException as exc:
+                raise ValueError("Timeout de connexion à l'API Groq") from exc
+            except httpx.ConnectError as exc:
+                raise ValueError("Erreur de connexion à l'API Groq") from exc
+
+        if resp.status_code == 401:
+            raise ValueError("Clé API Groq invalide — vérifiez GROQ_API_KEY")
+        if resp.status_code == 429:
+            raise ValueError("Limite de requêtes Groq atteinte — réessayez dans quelques minutes")
+        if resp.status_code != 200:
+            raise ValueError(f"Erreur Groq (HTTP {resp.status_code}) : {resp.text[:200]}")
+
+        data = resp.json()
+        try:
+            raw_text = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Réponse Groq inattendue : {str(data)[:200]}") from exc
+
+        logger.info("Groq response received (%d chars)", len(raw_text))
+        return raw_text
+
     async def _call_gemini(self, messages: list[dict]) -> str:
         """Call Google Gemini API (free tier) and return raw text response."""
         import httpx
@@ -347,9 +395,27 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         logger.info("Gemini response received (%d chars)", len(raw_text))
         return raw_text
 
+    def _is_ollama_reachable(self) -> bool:
+        """Check if OLLAMA_URL points to a likely reachable host.
+
+        In production (Render, Railway), Docker-internal hostnames like 'ollama'
+        are not reachable. In development (Docker Compose), they are.
+        """
+        if settings.APP_ENV == "production":
+            from urllib.parse import urlparse
+
+            parsed = urlparse(settings.OLLAMA_URL)
+            hostname = parsed.hostname or ""
+            if hostname and "." not in hostname and hostname not in ("localhost", "127"):
+                return False
+        return True
+
     async def _call_ollama(self, messages: list[dict]) -> str:
         """Call local Ollama API and return raw text response."""
         import httpx
+
+        if not self._is_ollama_reachable():
+            raise ValueError(f"Ollama skipped (Docker-internal URL: {settings.OLLAMA_URL})")
 
         url = f"{settings.OLLAMA_URL}/api/chat"
         payload = {
@@ -363,11 +429,13 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
             "options": {"temperature": 0.2, "num_predict": 4096},
         }
 
-        logger.info("Calling Ollama (%s) for crowdfunding analysis", settings.OLLAMA_MODEL)
-        async with httpx.AsyncClient(timeout=180.0) as client:
+        logger.info("Calling Ollama (%s) at %s", settings.OLLAMA_MODEL, url)
+        timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 resp = await client.post(url, json=payload)
             except (httpx.ConnectError, httpx.TimeoutException) as exc:
+                logger.error("Ollama connection failed: %s: %s", type(exc).__name__, exc)
                 raise ValueError(f"Ollama non disponible ({settings.OLLAMA_URL})") from exc
 
         if resp.status_code != 200:
@@ -518,14 +586,17 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
 
         messages = self._build_messages(texts, munitions, total_capital)
 
-        # Provider cascade: Ollama → Gemini → Anthropic → Static
+        # Provider cascade: Groq → Gemini → Anthropic → Ollama → Static
+        # Cloud providers first (fast, reliable), Ollama last (slow on CPU)
         providers: list[tuple[str, object]] = []
-        if settings.OLLAMA_URL:
-            providers.append(("Ollama", self._call_ollama))
+        if settings.GROQ_API_KEY:
+            providers.append(("Groq", self._call_groq))
         if settings.GEMINI_API_KEY:
             providers.append(("Gemini", self._call_gemini))
         if settings.ANTHROPIC_API_KEY:
             providers.append(("Anthropic", self._call_anthropic))
+        if settings.OLLAMA_URL:
+            providers.append(("Ollama", self._call_ollama))
 
         raw_text = None
         data = None

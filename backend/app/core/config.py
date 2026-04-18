@@ -155,6 +155,7 @@ class Settings(BaseSettings):
     # AI / LLM (optional — falls back to static analysis if none configured)
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     OLLAMA_URL: str = "http://ollama:11434"
     OLLAMA_MODEL: str = "mistral"
 

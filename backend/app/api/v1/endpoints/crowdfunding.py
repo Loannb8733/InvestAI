@@ -455,7 +455,7 @@ async def analyze_documents(
         for a in assets_result.scalars().all():
             val = float(a.current_price or 0) * float(a.quantity or 0)
             total_capital += val
-            if a.asset_type in (AssetType.STABLECOIN,):
+            if a.symbol and a.symbol.upper() in {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}:
                 munitions += val
 
     try:
