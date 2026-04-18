@@ -636,6 +636,7 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         data.update(diversification)
 
         # Calculate suggested investment (reduce if highly correlated)
+        MIN_INVESTMENT = 100.0  # Minimum obligatoire crowdfunding
         max_allocation = total_capital * 0.05 if total_capital > 0 else 500.0
         correlation = data.get("correlation_score", 0)
         if correlation > 0.5:
@@ -643,6 +644,7 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         elif correlation > 0.3:
             max_allocation *= 0.7  # ~3.5% instead of 5%
         suggested = min(max_allocation, munitions * 0.5) if munitions > 0 else max_allocation
+        suggested = max(suggested, MIN_INVESTMENT)
         data["suggested_investment"] = round(suggested, 2)
 
         # Add diversification warning to points_vigilance if needed

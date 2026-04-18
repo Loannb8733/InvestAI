@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.models.crowdfunding_project import ProjectStatus, RepaymentType
 from app.models.crowdfunding_repayment import PaymentType
@@ -212,6 +212,37 @@ class ProjectAuditResponse(BaseModel):
     @classmethod
     def none_to_default_verdict(cls, v):  # noqa: N805
         return v if v is not None else "VIGILANCE"
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def investment_simulation(self) -> Optional[dict]:
+        """Compute investment simulation from audit data."""
+        if self.suggested_investment is None or self.tri is None:
+            return None
+
+        invest = self.suggested_investment
+        tri_pct = self.tri / 100.0
+        dur_min = self.duration_min or 12
+        dur_max = self.duration_max or dur_min
+        dur_avg = (dur_min + dur_max) / 2.0
+        tax_rate = 0.30  # Flat tax France
+
+        gross_interest = round(invest * tri_pct * (dur_avg / 12.0), 2)
+        net_interest = round(gross_interest * (1 - tax_rate), 2)
+        monthly_gross = round(gross_interest / dur_avg, 2) if dur_avg > 0 else 0
+        total_at_end = round(invest + net_interest, 2)
+
+        return {
+            "investment_amount": invest,
+            "duration_months": round(dur_avg),
+            "tri_percent": self.tri,
+            "gross_interest": gross_interest,
+            "tax_amount": round(gross_interest * tax_rate, 2),
+            "net_interest": net_interest,
+            "monthly_gross_return": monthly_gross,
+            "total_at_end": total_at_end,
+            "roi_net_percent": round((net_interest / invest) * 100, 2) if invest > 0 else 0,
+        }
 
     class Config:
         from_attributes = True
