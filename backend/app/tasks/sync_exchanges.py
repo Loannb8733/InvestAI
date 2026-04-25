@@ -834,6 +834,34 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
                     synced_count += 1
 
+            # === STEP 3: Zero out assets no longer on Binance (fully sold/converted) ===
+            balance_symbols = {b.symbol for b in balances}
+            for symbol, asset in existing_assets.items():
+                if (
+                    asset.exchange == service.exchange_name
+                    and float(asset.quantity) > 0
+                    and symbol not in balance_symbols
+                    and symbol not in fiat_currencies
+                    and not _is_earn_variant(symbol)
+                ):
+                    logger.info(
+                        f"Asset {symbol} no longer on {service.exchange_name} (balance=0), zeroing quantity from {asset.quantity}"
+                    )
+                    sync_ts = int(datetime.utcnow().timestamp())
+                    transaction = Transaction(
+                        asset_id=asset.id,
+                        transaction_type=TransactionType.TRANSFER_OUT,
+                        quantity=float(asset.quantity),
+                        price=0,
+                        fee=0,
+                        currency="EUR",
+                        external_id=f"{service.exchange_name}_zero_{symbol}_{sync_ts}",
+                        notes=f"Solde zéro sur {service.exchange_name} (vendu/converti)",
+                    )
+                    await _add_transaction_if_new(db, transaction)
+                    asset.quantity = 0
+                    synced_count += 1
+
             # Update last sync time
             api_key.last_sync_at = datetime.utcnow()
             api_key.mark_success()
