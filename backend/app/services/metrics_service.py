@@ -1356,6 +1356,10 @@ class MetricsService:
 
         # Calculate metrics for each portfolio
         total_value = Decimal("0")
+        # pnl_value = total_value + stablecoins + fiat: used only for net_gain_loss.
+        # When selling OM→USDT, the USDT is the realized value but excluded from
+        # total_value (display-only). Including it here gives a correct all-time P&L.
+        pnl_value = Decimal("0")
         total_invested = Decimal("0")
         total_sold = Decimal("0")
         total_realized = Decimal("0")
@@ -1370,6 +1374,9 @@ class MetricsService:
             # Get historical total invested (sum of all buy transactions)
             portfolio_history = await self.get_portfolio_history(db, str(portfolio.id), currency)
             total_value += Decimal(str(portfolio_metrics["total_value"]))
+            pnl_value += Decimal(str(portfolio_metrics["total_value"]))
+            pnl_value += Decimal(str(portfolio_metrics.get("cash_from_stablecoins", 0)))
+            pnl_value += Decimal(str(portfolio_metrics.get("cash_from_fiat", 0)))
             total_invested += Decimal(str(portfolio_history["total_invested_all_time"]))
             # Use total_sold_fiat (only SELL, not conversions) for net_capital
             total_sold += Decimal(str(portfolio_history.get("total_sold_fiat", 0)))
@@ -1385,9 +1392,8 @@ class MetricsService:
             all_assets.extend(portfolio_metrics["assets"])
             any_forex_stale = any_forex_stale or portfolio_metrics.get("forex_stale", False)
 
-        # total_gain_loss: gain/loss relative to total ever invested (includes sold positions)
-        # This is used for the "brut" view; net_gain_loss below is the primary P&L metric
-        total_gain_loss = total_value - total_invested
+        # total_gain_loss: same base as net_gain_loss (pnl_value includes stablecoins/fiat)
+        total_gain_loss = pnl_value - total_invested
         if total_invested > 0:
             total_gain_loss_percent = float(total_gain_loss / total_invested * 100)
         else:
@@ -1470,10 +1476,9 @@ class MetricsService:
         # CONVERSION_OUT excluded: crypto→crypto swaps don't change capital deployed
         net_capital = total_invested - total_sold
 
-        # Unified P&L: ALL indicators use the same root formula:
-        #   net_gain_loss = total_value - total_invested
-        # This is the single source of truth. No "Richesse vs Comptable" split.
-        net_gain_loss = total_value - total_invested
+        # Unified P&L: pnl_value includes stablecoins + fiat so that proceeds from
+        # selling (e.g. OM→USDT) are counted in the gain/loss, not just investment assets.
+        net_gain_loss = pnl_value - total_invested
         if total_invested > 0:
             net_gain_loss_percent = float(net_gain_loss / total_invested * 100)
         else:
