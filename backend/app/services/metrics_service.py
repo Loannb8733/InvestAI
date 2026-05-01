@@ -118,10 +118,14 @@ class MetricsService:
         # Priority: FIFO per-exchange cost > symbol-wide buy_pra > asset.avg_buy_price
         # Using buy_pra as primary would blend costs across exchanges and inflate/deflate
         # G/L for assets bought at different prices on different platforms.
+        #
+        # avg_buy_price is kept as asset.avg_buy_price (fee-exclusive weighted average
+        # stored in DB) so the displayed PRA matches the user's expectation. Fees are a
+        # real cost that affect G/L via total_invested but are shown separately via
+        # breakeven_price, not baked into the displayed average price.
         if actual_invested is not None:
             total_invested = Decimal(str(actual_invested))
-            if quantity > 0:
-                avg_buy_price = total_invested / quantity
+            # avg_buy_price stays as asset.avg_buy_price (fee-exclusive, exchange-specific)
         elif buy_pra is not None and buy_pra > 0:
             avg_buy_price = Decimal(str(buy_pra))
             total_invested = quantity * avg_buy_price
