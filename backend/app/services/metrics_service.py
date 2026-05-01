@@ -942,10 +942,17 @@ class MetricsService:
             else:
                 total_invested += Decimal(str(metrics["total_invested"]))
 
-            # Per-asset fees and break-even price
+            # Per-asset fees and break-even price.
+            # When FIFO is active (asset_invested is not None), transaction fees are
+            # already baked into each layer's unit_cost — adding fees_map would
+            # double-count them.  The PRA-based fallback path keeps fees separate so
+            # they must be added here.
             asset_fees = fees_map.get(str(asset.id), 0.0)
             qty = metrics["quantity"]
-            breakeven_price = (metrics["total_invested"] + asset_fees) / qty if qty > 0 else None
+            if asset_invested is not None:
+                breakeven_price = metrics["total_invested"] / qty if qty > 0 else None
+            else:
+                breakeven_price = (metrics["total_invested"] + asset_fees) / qty if qty > 0 else None
 
             # Holding duration and annualized return
             first_date = first_buy_map.get(str(asset.id))
