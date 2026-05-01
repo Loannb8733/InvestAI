@@ -190,6 +190,28 @@ class TestGetAssetMetrics:
         assert pytest.approx(result["gain_loss"], rel=1e-4) == 8.55 - 9.6
 
     @pytest.mark.asyncio
+    async def test_avg_buy_price_excludes_fees_from_display(self, metrics_service):
+        """When actual_invested includes transaction fees, avg_buy_price must show
+        the fee-exclusive DB value (asset.avg_buy_price) so the displayed PRA matches
+        what the user expects. Fees raise G/L cost but must not inflate the PRA column."""
+        # PAXG Kraken: DB avg = 4086.82€ (fee-exclusive)
+        # actual_invested = 4.31385€ (includes fees) > 0.001 × 4086.82 = 4.08682€
+        asset = _make_asset(quantity="0.001", avg_buy_price="4086.82")
+        result = await metrics_service.get_asset_metrics(
+            asset,
+            current_price=Decimal("3800"),
+            actual_invested=4.31385,
+            buy_pra=None,
+        )
+
+        # G/L uses FIFO cost (with fees)
+        assert pytest.approx(result["total_invested"], rel=1e-4) == 4.31385
+        assert pytest.approx(result["current_value"], rel=1e-4) == 3.8
+        assert pytest.approx(result["gain_loss"], rel=1e-4) == 3.8 - 4.31385
+        # Displayed PRA stays fee-exclusive (DB value)
+        assert pytest.approx(result["avg_buy_price"], rel=1e-4) == 4086.82
+
+    @pytest.mark.asyncio
     async def test_buy_pra_used_as_fallback_when_no_actual_invested(self, metrics_service):
         """buy_pra should be the fallback when FIFO actual_invested is unavailable."""
         asset = _make_asset(quantity="2.0", avg_buy_price="50.0")
