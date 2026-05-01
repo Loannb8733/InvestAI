@@ -383,16 +383,16 @@ class MetricsService:
             )
             all_txs = all_tx_result.scalars().all()
 
+            # Fetch ALL portfolio assets (including qty=0) for FIFO symbol/exchange
+            # lookups — zero-qty assets may have TRANSFER_OUT transactions whose
+            # layers we need to track through to matching TRANSFER_IN.
+            all_assets_full_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id_val))
+            all_assets_full = all_assets_full_result.scalars().all()
+
             # Build symbol + exchange lookups for each asset_id
             aid_to_symbol: Dict[str, str] = {}
             aid_to_exchange: Dict[str, str] = {}
-            for tx in all_txs:
-                aid_to_symbol[str(tx.asset_id)] = ""
-                aid_to_exchange[str(tx.asset_id)] = ""
-            for a in investment_assets:
-                aid_to_symbol[str(a.id)] = a.symbol.upper()
-                aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
-            for a in all_assets:
+            for a in all_assets_full:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
                 aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
 
@@ -566,16 +566,21 @@ class MetricsService:
                     _consume_fifo(key, qty)
 
                 elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
-                    # Free tokens — zero cost layer
+                    # Rewards/airdrops: use market price at receipt when available
+                    # (required for correct fiscal cost basis — staking rewards are
+                    # taxable income at their market value on the day received).
+                    # Falls back to zero-cost only when no price is recorded.
                     tx_ccy = (tx.currency or "EUR").upper()
+                    reward_price = Decimal(str(tx.price or 0))
+                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
                     fifo[key].append(
                         {
                             "qty": qty,
-                            "unit_cost": _ZERO,
-                            "unit_cost_base": _ZERO,
+                            "unit_cost": reward_price,
+                            "unit_cost_base": reward_price,
                             "currency": tx_ccy,
-                            "fx_rate": Decimal("1"),
-                            "is_paid": False,
+                            "fx_rate": tx_fx,
+                            "is_paid": reward_price > _ZERO,
                         }
                     )
 
@@ -600,9 +605,20 @@ class MetricsService:
                                 best_match_diff = diff
                                 matched_transit = tkey
                     if matched_transit and fifo[matched_transit]:
-                        # Move transit layers to destination exchange
-                        for layer in fifo.pop(matched_transit):
-                            fifo[key].append(layer)
+                        transit_layers = fifo.pop(matched_transit)
+                        transit_total_qty = sum(ly["qty"] for ly in transit_layers)
+                        if transit_total_qty > qty:
+                            # Network fee: transit sent more than received — trim to received qty.
+                            # The excess (fee burned on-chain) is discarded from cost basis.
+                            temp_key = (sym, f"__trim__{matched_transit[1]}")
+                            fifo[temp_key] = transit_layers
+                            trimmed = _consume_fifo_layers(temp_key, qty)
+                            fifo.pop(temp_key, None)
+                            for layer in trimmed:
+                                fifo[key].append(layer)
+                        else:
+                            for layer in transit_layers:
+                                fifo[key].append(layer)
                     else:
                         # No matching transit — treat as zero-cost (external transfer in)
                         tx_ccy = (tx.currency or "EUR").upper()
@@ -726,9 +742,11 @@ class MetricsService:
             # Aggregate cost by (symbol, exchange) from remaining FIFO layers
             cost_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
             paid_qty_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            fifo_seen_keys: set = set()  # tracks all keys touched by FIFO (incl. zero-cost)
             for fkey, layers in fifo.items():
                 if fkey[1].startswith("__transit__"):
                     continue  # skip unmatched transit layers
+                fifo_seen_keys.add(fkey)
                 for layer in layers:
                     cost_by_key[fkey] += layer["qty"] * layer["unit_cost"]
                     if layer["is_paid"]:
@@ -758,6 +776,10 @@ class MetricsService:
                 cost = cost_by_key.get(fkey, _ZERO)
                 if cost > 0:
                     invested_map[aid] = float(cost)
+                elif fkey in fifo_seen_keys:
+                    # Zero-cost asset (pure airdrop / staking reward) — must record
+                    # 0.0 explicitly so get_asset_metrics doesn't fall back to buy_pra.
+                    invested_map[aid] = 0.0
 
             # FX gain decomposition per (symbol, exchange):
             # For each layer, FX gain = qty * unit_cost_base * (current_fx - purchase_fx)
@@ -809,6 +831,8 @@ class MetricsService:
                 cost = cost_by_key.get(fkey, _ZERO)
                 if cost > 0:
                     invested_map[aid] = float(cost)
+                elif fkey in fifo_seen_keys:
+                    invested_map[aid] = 0.0
             for sym in cost_by_sym:
                 cq = cost_qty_by_sym.get(sym, _ZERO)
                 if cq > 0 and cost_by_sym[sym] > 0:
@@ -922,7 +946,11 @@ class MetricsService:
             else:
                 current_price = prices.get(asset.symbol.upper())
                 asset_invested = invested_map.get(str(asset.id))
-                asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper())
+                # Only pass buy_pra when this asset has its own FIFO layers.
+                # Using a symbol-wide PRU from a different exchange would give a
+                # wrong cost basis for assets with no transactions of their own.
+                asset_fkey_check = (asset.symbol.upper(), (asset.exchange or "").strip())
+                asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper()) if asset_fkey_check in fifo_seen_keys else None
                 metrics = await self.get_asset_metrics(asset, current_price, asset_invested, asset_buy_pra)
 
                 # Post-filter: skip dust positions based on actual current value
