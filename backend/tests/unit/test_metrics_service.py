@@ -18,7 +18,6 @@ from app.services.metrics_service import (
     is_stablecoin,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -170,6 +169,56 @@ class TestGetAssetMetrics:
 
         assert result["current_price"] == 150.0
         assert result["current_value"] == 150.0
+
+    @pytest.mark.asyncio
+    async def test_actual_invested_takes_priority_over_buy_pra(self, metrics_service):
+        """FIFO actual_invested must override buy_pra for G/L so that assets bought
+        at different prices on different exchanges aren't blended incorrectly."""
+        # Kraken PAXG: 0.003 units bought at 3200€ → actual invested = 9.6€
+        # Blended symbol buy_pra = 2550€ (contaminated by a cheaper exchange)
+        asset = _make_asset(quantity="0.003", avg_buy_price="3200.0")
+        result = await metrics_service.get_asset_metrics(
+            asset,
+            current_price=Decimal("2850"),
+            actual_invested=9.6,
+            buy_pra=2550.0,
+        )
+
+        assert pytest.approx(result["total_invested"], rel=1e-4) == 9.6
+        assert pytest.approx(result["avg_buy_price"], rel=1e-2) == 3200.0
+        assert pytest.approx(result["current_value"], rel=1e-4) == 8.55
+        assert pytest.approx(result["gain_loss"], rel=1e-4) == 8.55 - 9.6
+
+    @pytest.mark.asyncio
+    async def test_buy_pra_used_as_fallback_when_no_actual_invested(self, metrics_service):
+        """buy_pra should be the fallback when FIFO actual_invested is unavailable."""
+        asset = _make_asset(quantity="2.0", avg_buy_price="50.0")
+        result = await metrics_service.get_asset_metrics(
+            asset,
+            current_price=Decimal("80"),
+            actual_invested=None,
+            buy_pra=100.0,
+        )
+
+        assert result["total_invested"] == 200.0
+        assert result["avg_buy_price"] == 100.0
+        assert result["current_value"] == 160.0
+        assert result["gain_loss"] == -40.0
+
+    @pytest.mark.asyncio
+    async def test_actual_invested_zero_gains_treated_as_free_tokens(self, metrics_service):
+        """When actual_invested=0 (all free/airdrop), gain_loss equals current_value."""
+        asset = _make_asset(quantity="5.0", avg_buy_price="0.0")
+        result = await metrics_service.get_asset_metrics(
+            asset,
+            current_price=Decimal("10"),
+            actual_invested=0.0,
+            buy_pra=None,
+        )
+
+        assert result["total_invested"] == 0.0
+        assert result["gain_loss"] == 50.0
+        assert result["gain_loss_percent"] == 0.0
 
 
 # ---------------------------------------------------------------------------

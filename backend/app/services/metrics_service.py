@@ -107,23 +107,24 @@ class MetricsService:
         """Calculate metrics for a single asset.
 
         Args:
-            buy_pra: Undiluted PRA from BUY transactions only (not diluted by
-                     free rewards/conversions). When provided, G/L is computed
-                     relative to the real purchase price so that free quantity
-                     doesn't mask losses on actual purchases.
+            actual_invested: Exact FIFO cost basis for this (symbol, exchange).
+                             Takes priority over buy_pra for G/L accuracy.
+            buy_pra: Symbol-wide undiluted PRA (across all exchanges). Used as
+                     fallback when actual_invested is unavailable.
         """
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
 
-        # Use undiluted buy PRA if available — this is the real avg purchase
-        # price, not diluted by free rewards converted into this asset
-        if buy_pra is not None and buy_pra > 0:
-            avg_buy_price = Decimal(str(buy_pra))
-            total_invested = quantity * avg_buy_price
-        elif actual_invested is not None:
+        # Priority: FIFO per-exchange cost > symbol-wide buy_pra > asset.avg_buy_price
+        # Using buy_pra as primary would blend costs across exchanges and inflate/deflate
+        # G/L for assets bought at different prices on different platforms.
+        if actual_invested is not None:
             total_invested = Decimal(str(actual_invested))
             if quantity > 0:
                 avg_buy_price = total_invested / quantity
+        elif buy_pra is not None and buy_pra > 0:
+            avg_buy_price = Decimal(str(buy_pra))
+            total_invested = quantity * avg_buy_price
         else:
             total_invested = quantity * avg_buy_price
 
@@ -283,8 +284,47 @@ class MetricsService:
         cost_qty_by_sym: Dict[str, Decimal] = {}  # symbol -> cost-bearing qty
         buy_cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total buy cost
         first_buy_map: Dict[str, datetime] = {}  # first transaction date per asset
-        # B1/M2: Fees needing currency conversion (resolved after forex rates available)
+        # Fees/dividends needing currency conversion: entries are either
+        #   (fkey: Tuple[str,str], amount: Decimal, ccy: str)  for fees
+        #   (str starting "__div__", amount: Decimal, ccy: str) for dividends
         _pending_fee_conversions: list = []
+
+        # Forex setup — must be available before FIFO so fees can be converted
+        # immediately after the FIFO pass, before per-asset G/L is computed.
+        from app.core.redis_client import cache_forex_rate, get_cached_forex_rate
+
+        target = currency.upper()
+        usd_to_target = 1.0
+        eur_to_target = 1.0
+        _HARDCODED_FALLBACK_RATES = {
+            "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
+            "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
+        }
+        forex_stale = False
+
+        async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
+            """Fetch rate: live API → Redis cache → hardcoded fallback."""
+            try:
+                rate = await price_service.get_forex_rate(from_ccy, to_ccy)
+                if rate:
+                    rate_f = float(rate)
+                    await cache_forex_rate(from_ccy, to_ccy, rate_f)
+                    return rate_f, False
+            except Exception:
+                pass
+            cached = await get_cached_forex_rate(from_ccy, to_ccy)
+            if cached and cached.get("rate"):
+                return cached["rate"], False
+            fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
+            return fallback, True
+
+        if target != "USD":
+            usd_to_target, stale = await _get_rate_with_cache("USD", target)
+            forex_stale = forex_stale or stale
+        if target != "EUR":
+            eur_to_target, stale = await _get_rate_with_cache("EUR", target)
+            forex_stale = forex_stale or stale
+
         if inv_asset_ids:
             # Fetch first transaction date per asset (for holding duration)
             first_tx_result = await db.execute(
@@ -489,7 +529,7 @@ class MetricsService:
                         if fee_ccy == portfolio_ccy:
                             total_cost += fee
                         else:
-                            _pending_fee_conversions.append((sym, fee, fee_ccy))
+                            _pending_fee_conversions.append((key, fee, fee_ccy))
                     layer_unit = total_cost / qty if qty > 0 else _ZERO
 
                     # FX tracking: store original currency and rate
@@ -648,11 +688,11 @@ class MetricsService:
                                 old_total = last["qty"] * last["unit_cost"]
                                 last["unit_cost"] = (old_total + fee) / last["qty"] if last["qty"] > 0 else _ZERO
                             else:
-                                # No layer yet — CONVERSION_OUT handler will create it
-                                # Store fee for later application
-                                _pending_fee_conversions.append((sym, fee, fee_ccy))
+                                # No layer yet — CONVERSION_OUT will create it later;
+                                # store fee keyed by (sym, exchange) for post-FIFO application
+                                _pending_fee_conversions.append((key, fee, fee_ccy))
                         else:
-                            _pending_fee_conversions.append((sym, fee, fee_ccy))
+                            _pending_fee_conversions.append((key, fee, fee_ccy))
                     # Qty already handled by CONVERSION_OUT creating the layer
 
                 elif ttype == TxType.DIVIDEND:
@@ -733,6 +773,42 @@ class MetricsService:
                                 "fx_rate": layer.get("fx_rate", Decimal("1")),
                             }
                         )
+
+        # Apply pending fee/dividend conversions now that FIFO is complete.
+        # Fees keyed by (sym, exchange) are added to cost_by_key so they're
+        # reflected in invested_map — and therefore in per-asset G/L — before
+        # get_asset_metrics() is called below.
+        if _pending_fee_conversions:
+            portfolio_ccy = currency.upper()
+            for entry_key, amount, entry_ccy in _pending_fee_conversions:
+                rate, stale = await _get_rate_with_cache(entry_ccy, portfolio_ccy)
+                forex_stale = forex_stale or stale
+                converted = amount * Decimal(str(rate))
+
+                if isinstance(entry_key, str) and entry_key.startswith("__div__"):
+                    real_sym = entry_key[7:]
+                    for dkey in dividend_income:
+                        if dkey[0] == real_sym:
+                            dividend_income[dkey] += converted
+                            break
+                    continue
+
+                fkey = entry_key  # (sym, exchange)
+                cost_by_key[fkey] = cost_by_key.get(fkey, _ZERO) + converted
+                cost_by_sym[fkey[0]] = cost_by_sym.get(fkey[0], _ZERO) + converted
+                buy_cost_by_sym[fkey[0]] = buy_cost_by_sym.get(fkey[0], _ZERO) + converted
+
+            # Rebuild invested_map and buy_pra_by_sym with fees now included
+            for a in investment_assets:
+                aid = str(a.id)
+                fkey = (a.symbol.upper(), (a.exchange or "").strip())
+                cost = cost_by_key.get(fkey, _ZERO)
+                if cost > 0:
+                    invested_map[aid] = float(cost)
+            for sym in cost_by_sym:
+                cq = cost_qty_by_sym.get(sym, _ZERO)
+                if cq > 0 and cost_by_sym[sym] > 0:
+                    buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
 
         # Group assets by type for batch price fetching
         crypto_symbols = [a.symbol for a in investment_assets if a.asset_type == AssetType.CRYPTO]
@@ -908,97 +984,6 @@ class MetricsService:
                 asset_entry["invested_amount"] = float(asset.invested_amount) if asset.invested_amount else None
 
             asset_metrics.append(asset_entry)
-
-        # Fetch forex rates for stablecoin/fiat valuation in target currency
-        # Strategy: live API → Redis cache (24h TTL) → hardcoded fallback (last resort)
-        from app.core.redis_client import cache_forex_rate, get_cached_forex_rate
-
-        target = currency.upper()
-        usd_to_target = 1.0  # identity if target is USD
-        eur_to_target = 1.0  # identity if target is EUR
-        _HARDCODED_FALLBACK_RATES = {
-            "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
-            "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
-        }
-        forex_stale = False  # flag for frontend warning
-
-        async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
-            """Fetch rate: live API → Redis cache → hardcoded fallback.
-
-            Returns (rate, is_stale) where is_stale=True if using cache >24h
-            or hardcoded fallback.
-            """
-            # 1. Try live API
-            try:
-                rate = await price_service.get_forex_rate(from_ccy, to_ccy)
-                if rate:
-                    rate_f = float(rate)
-                    await cache_forex_rate(from_ccy, to_ccy, rate_f)
-                    return rate_f, False
-            except Exception:
-                pass
-
-            # 2. Try Redis cache
-            cached = await get_cached_forex_rate(from_ccy, to_ccy)
-            if cached and cached.get("rate"):
-                return cached["rate"], False  # within 24h TTL
-
-            # 3. Hardcoded fallback (last resort)
-            fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
-            return fallback, True
-
-        if target != "USD":
-            usd_to_target, stale = await _get_rate_with_cache("USD", target)
-            forex_stale = forex_stale or stale
-        if target != "EUR":
-            eur_to_target, stale = await _get_rate_with_cache("EUR", target)
-            forex_stale = forex_stale or stale
-
-        # B1/M2: Resolve pending fee/dividend conversions now that forex rates are available
-        if _pending_fee_conversions:
-            portfolio_ccy = currency.upper()
-            for sym, fee_amount, fee_ccy in _pending_fee_conversions:
-                rate, stale = await _get_rate_with_cache(fee_ccy, portfolio_ccy)
-                forex_stale = forex_stale or stale
-                converted_amount = fee_amount * Decimal(str(rate))
-
-                # Dividend conversion entries use __div__ prefix
-                if sym.startswith("__div__"):
-                    real_sym = sym[7:]  # strip __div__ prefix
-                    # Find the matching key in dividend_income
-                    for dkey in dividend_income:
-                        if dkey[0] == real_sym:
-                            dividend_income[dkey] += converted_amount
-                            break
-                    continue
-
-                cost_by_sym[sym] += converted_amount
-                buy_cost_by_sym[sym] += converted_amount
-                logger.debug(
-                    "Fee conversion: %s %s -> %s %s (rate=%s) for %s",
-                    fee_amount,
-                    fee_ccy,
-                    converted_amount,
-                    portfolio_ccy,
-                    rate,
-                    sym,
-                )
-            # Re-compute PRA with updated cost
-            for sym in cost_by_sym:
-                cq = cost_qty_by_sym.get(sym, _ZERO)
-                if cq > 0 and cost_by_sym[sym] > 0:
-                    buy_pra_by_sym[sym] = cost_by_sym[sym] / cq
-            # Re-distribute converted fees into invested_map per asset
-            for a in investment_assets:
-                aid = str(a.id)
-                fkey = (a.symbol.upper(), (a.exchange or "").strip())
-                # Proportional share of symbol-level fee addition
-                sym = a.symbol.upper()
-                sym_assets = sym_to_aids.get(sym, [])
-                total_qty = sum(Decimal(str(sa.quantity)) for sa in sym_assets)
-                if total_qty > 0:
-                    share = Decimal(str(a.quantity)) / total_qty
-                    invested_map[aid] = float(cost_by_sym.get(sym, _ZERO) * share)
 
         # ---- FX gain decomposition per asset ----
         # For assets bought in foreign currency, split total G/L into:
