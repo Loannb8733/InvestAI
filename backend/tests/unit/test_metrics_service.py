@@ -13,6 +13,7 @@ from app.services.metrics_service import (
     FIAT_SYMBOLS,
     STABLECOIN_SYMBOLS,
     MetricsService,
+    compute_cump_pru,
     is_cash_like,
     is_fiat,
     is_stablecoin,
@@ -329,3 +330,185 @@ class TestCalculateCAGR:
         # 6 months
         cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1050"), 0.5)
         assert cagr > 0
+
+
+# ---------------------------------------------------------------------------
+# CUMP PRU computation
+# ---------------------------------------------------------------------------
+
+
+def _make_tx(asset_id, ttype, qty, price, fee=0.0, executed_at=None):
+    """Build a mock Transaction object."""
+    from datetime import datetime
+
+    from app.models.transaction import TransactionType
+
+    tx = MagicMock()
+    tx.asset_id = asset_id
+    tx.transaction_type = TransactionType(ttype)
+    tx.quantity = Decimal(str(qty))
+    tx.price = Decimal(str(price))
+    tx.fee = Decimal(str(fee))
+    tx.fee_currency = "EUR"
+    tx.currency = "EUR"
+    tx.conversion_rate = None
+    tx.notes = ""
+    tx.exchange = "Binance"
+    tx.executed_at = executed_at or datetime(2025, 1, 1)
+    return tx
+
+
+class TestComputeCumpPru:
+    """Tests for compute_cump_pru — the 3 CUMP rules."""
+
+    AID = "asset-001"
+    SYM = "BTC"
+    EXCH = "Binance"
+    FKEY = ("BTC", "Binance")
+
+    def _run(self, txns):
+        aid_to_sym = {self.AID: self.SYM}
+        aid_to_exch = {self.AID: self.EXCH}
+        return compute_cump_pru(txns, aid_to_sym, aid_to_exch)
+
+    # Rule 1: PRU = (Σ buy_amount + fees) / Σ buy_qty
+    def test_single_buy_no_fee(self):
+        txns = [_make_tx(self.AID, "buy", "1.0", "50000.0")]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 50000.0
+
+    def test_single_buy_with_fee(self):
+        # 1 BTC at 50000, fee 100 → PRU = 50100
+        txns = [_make_tx(self.AID, "buy", "1.0", "50000.0", fee="100.0")]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 50100.0
+
+    def test_two_buys_weighted_average(self):
+        # Buy 1 BTC @50000, then 1 BTC @60000 → PRU = 55000
+        txns = [
+            _make_tx(self.AID, "buy", "1.0", "50000.0"),
+            _make_tx(self.AID, "buy", "1.0", "60000.0"),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 55000.0
+
+    def test_fees_included_in_weighted_average(self):
+        # Buy 2 BTC @50000 fee=200, then 1 BTC @62000 fee=100
+        # PRU = (100200 + 62100) / 3 = 54100
+        txns = [
+            _make_tx(self.AID, "buy", "2.0", "50000.0", fee="200.0"),
+            _make_tx(self.AID, "buy", "1.0", "62000.0", fee="100.0"),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY]), rel=1e-4) == 54100.0
+
+    # Rule 2: Sells don't change PRU
+    def test_sell_does_not_change_pru(self):
+        txns = [
+            _make_tx(self.AID, "buy", "2.0", "50000.0"),
+            _make_tx(self.AID, "sell", "1.0", "70000.0"),  # sell at profit
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 50000.0
+
+    def test_partial_sell_keeps_pru(self):
+        txns = [
+            _make_tx(self.AID, "buy", "3.0", "40000.0"),
+            _make_tx(self.AID, "buy", "2.0", "60000.0"),  # PRU = (120000+120000)/5 = 48000
+            _make_tx(self.AID, "sell", "4.0", "55000.0"),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 48000.0
+
+    # Rule 3: Position reset when qty = 0
+    def test_position_reset_after_full_sell(self):
+        # Buy 1 @50000, sell 1 (qty→0), buy 1 @30000 → PRU must be 30000
+        from datetime import datetime
+
+        txns = [
+            _make_tx(self.AID, "buy", "1.0", "50000.0", executed_at=datetime(2025, 1, 1)),
+            _make_tx(self.AID, "sell", "1.0", "70000.0", executed_at=datetime(2025, 1, 2)),
+            _make_tx(self.AID, "buy", "1.0", "30000.0", executed_at=datetime(2025, 1, 3)),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 30000.0
+
+    def test_staking_rewards_do_not_change_pru(self):
+        # Buy 1 @50000, receive 0.5 as reward → PRU stays 50000
+        txns = [
+            _make_tx(self.AID, "buy", "1.0", "50000.0"),
+            _make_tx(self.AID, "staking_reward", "0.5", "0.0"),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 50000.0
+
+    def test_airdrop_does_not_change_pru(self):
+        txns = [
+            _make_tx(self.AID, "buy", "2.0", "60000.0"),
+            _make_tx(self.AID, "airdrop", "1.0", "0.0"),
+        ]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 60000.0
+
+    # Stablecoin position cycle (USDC scenario)
+    def test_usdc_buy_sell_reset_staking_reward(self):
+        """After selling all USDC (qty→0), staking rewards start a fresh position at PRU=0."""
+        txns = [
+            _make_tx(self.AID, "buy", "12.46", "0.869", executed_at=MagicMock()),
+            _make_tx(self.AID, "sell", "12.46", "0.898", executed_at=MagicMock()),  # qty→0
+            _make_tx(self.AID, "staking_reward", "229.96", "0.0", executed_at=MagicMock()),
+        ]
+        result = self._run(txns)
+        # After reset, no new buy → no PRU entry (or 0)
+        assert result.get(self.FKEY, Decimal("0")) == Decimal("0")
+
+
+# ---------------------------------------------------------------------------
+# Stablecoin card — verify USDC appears in get_asset_metrics output
+# ---------------------------------------------------------------------------
+class TestCumpPruInAssetMetrics:
+    """CUMP PRU is used as the displayed avg_buy_price."""
+
+    @pytest.mark.asyncio
+    async def test_cump_pru_overrides_db_avg_buy_price(self):
+        """When cump_pru is provided it replaces the DB avg_buy_price for display."""
+        asset = _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="72000.0")
+        ms = MetricsService()
+        # Fee-inclusive CUMP is 73000 (e.g., two buys with fees)
+        result = await ms.get_asset_metrics(
+            asset,
+            current_price=Decimal("80000"),
+            actual_invested=73000.0,  # FIFO cost (matches cump)
+            cump_pru=Decimal("73000.0"),
+        )
+        assert result["avg_buy_price"] == pytest.approx(73000.0)
+        assert result["total_invested"] == pytest.approx(73000.0)
+        assert result["gain_loss"] == pytest.approx(7000.0)
+
+    @pytest.mark.asyncio
+    async def test_cump_pru_zero_falls_back_to_db(self):
+        """A zero/None cump_pru falls back to DB avg_buy_price."""
+        asset = _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="72000.0")
+        ms = MetricsService()
+        result = await ms.get_asset_metrics(
+            asset,
+            current_price=Decimal("80000"),
+            actual_invested=72000.0,
+            cump_pru=Decimal("0"),  # treated as not available
+        )
+        assert result["avg_buy_price"] == pytest.approx(72000.0)
+
+    @pytest.mark.asyncio
+    async def test_stablecoin_card_usdc_value(self):
+        """Sanity check: USDC quantity 470 × ~0.92 EUR/USDC ≈ 432 EUR (backend correct)."""
+        asset = _make_asset(symbol="USDC", quantity="470.0", avg_buy_price="0.869")
+        asset.symbol = "USDC"
+        ms = MetricsService()
+        result = await ms.get_asset_metrics(
+            asset,
+            current_price=Decimal("0.9265"),  # typical USDC/EUR rate
+            actual_invested=None,
+        )
+        expected_value = 470.0 * 0.9265
+        assert result["current_value"] == pytest.approx(expected_value, rel=0.01)
+        assert result["current_value"] > 0, "Stablecoin card value must be > 0"

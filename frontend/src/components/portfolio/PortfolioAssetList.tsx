@@ -184,7 +184,7 @@ export default function PortfolioAssetList({
         // Weighted avg buy price
         const totalQty = existing.assets.reduce((s, a) => s + a.quantity, 0)
         existing.avgBuyPrice = totalQty > 0
-          ? existing.assets.reduce((s, a) => s + a.avg_buy_price * a.quantity, 0) / totalQty
+          ? existing.totalInvested / totalQty
           : 0
         existing.totalGainLossPercent = existing.totalInvested > 0
           ? ((existing.totalValue - existing.totalInvested) / existing.totalInvested) * 100
