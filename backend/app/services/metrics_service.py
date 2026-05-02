@@ -94,6 +94,92 @@ def is_safe_haven(symbol: str) -> bool:
     return symbol.upper() in _GOLD_SYMBOLS
 
 
+def compute_cump_pru(
+    all_txs: list,
+    aid_to_symbol: Dict[str, str],
+    aid_to_exchange: Dict[str, str],
+) -> Dict[Tuple[str, str], Decimal]:
+    """Compute CUMP (Weighted Average Cost) PRU per (symbol, exchange).
+
+    Rules:
+    1. PRU = (Σ buy_amount + fees) / Σ buy_qty  — fee-inclusive weighted average
+    2. Sells reduce qty but never change PRU
+    3. Position reset: when qty falls to 0, the next buy starts a fresh average
+    """
+    from app.models.transaction import TransactionType as TxType
+
+    _ZERO = Decimal("0")
+    state: Dict[Tuple[str, str], Dict] = {}
+
+    for tx in all_txs:
+        aid = str(tx.asset_id)
+        sym = aid_to_symbol.get(aid, "")
+        if not sym:
+            continue
+        exch = aid_to_exchange.get(aid, "")
+        fkey = (sym, exch)
+
+        if fkey not in state:
+            state[fkey] = {
+                "cost": _ZERO,
+                "buy_qty": _ZERO,
+                "current_qty": _ZERO,
+                "pru": _ZERO,
+                "needs_reset": False,
+            }
+
+        s = state[fkey]
+        qty = Decimal(str(tx.quantity or 0))
+        price = Decimal(str(tx.price or 0))
+        fee = Decimal(str(tx.fee or 0))
+        ttype = tx.transaction_type
+
+        if ttype == TxType.BUY:
+            if s["needs_reset"]:
+                s["cost"] = _ZERO
+                s["buy_qty"] = _ZERO
+                s["needs_reset"] = False
+            invested = qty * price + fee
+            s["cost"] += invested
+            s["buy_qty"] += qty
+            s["current_qty"] += qty
+            if s["buy_qty"] > _ZERO:
+                s["pru"] = s["cost"] / s["buy_qty"]
+
+        elif ttype == TxType.SELL:
+            s["current_qty"] = max(_ZERO, s["current_qty"] - qty)
+            if s["current_qty"] <= _ZERO:
+                s["current_qty"] = _ZERO
+                s["needs_reset"] = True
+
+        elif ttype == TxType.TRANSFER_IN:
+            if price > _ZERO:
+                s["cost"] += qty * price
+                s["buy_qty"] += qty
+                if s["buy_qty"] > _ZERO:
+                    s["pru"] = s["cost"] / s["buy_qty"]
+            s["current_qty"] += qty
+
+        elif ttype == TxType.TRANSFER_OUT:
+            s["current_qty"] = max(_ZERO, s["current_qty"] - qty)
+
+        elif ttype in (TxType.STAKING_REWARD, TxType.AIRDROP):
+            s["current_qty"] += qty
+
+        elif ttype == TxType.CONVERSION_IN:
+            if price > _ZERO:
+                s["cost"] += qty * price
+                s["buy_qty"] += qty
+                if s["buy_qty"] > _ZERO:
+                    s["pru"] = s["cost"] / s["buy_qty"]
+            s["current_qty"] += qty
+
+        elif ttype == TxType.CONVERSION_OUT:
+            s["current_qty"] = max(_ZERO, s["current_qty"] - qty)
+
+    return {fkey: s["pru"] for fkey, s in state.items() if s["pru"] > _ZERO and not s["needs_reset"]}
+
+
 class MetricsService:
     """Service for calculating portfolio metrics."""
 
@@ -103,6 +189,7 @@ class MetricsService:
         current_price: Optional[Decimal] = None,
         actual_invested: Optional[float] = None,
         buy_pra: Optional[float] = None,
+        cump_pru: Optional[Decimal] = None,
     ) -> Dict:
         """Calculate metrics for a single asset.
 
@@ -111,24 +198,22 @@ class MetricsService:
                              Takes priority over buy_pra for G/L accuracy.
             buy_pra: Symbol-wide undiluted PRA (across all exchanges). Used as
                      fallback when actual_invested is unavailable.
+            cump_pru: Live-computed fee-inclusive CUMP PRU from transaction history.
+                      Overrides avg_buy_price for display when provided.
         """
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
 
-        # Priority: FIFO per-exchange cost > symbol-wide buy_pra > asset.avg_buy_price
-        # Using buy_pra as primary would blend costs across exchanges and inflate/deflate
-        # G/L for assets bought at different prices on different platforms.
-        #
-        # avg_buy_price is kept as asset.avg_buy_price (fee-exclusive weighted average
-        # stored in DB) so the displayed PRA matches the user's expectation. Fees are a
-        # real cost that affect G/L via total_invested but are shown separately via
-        # breakeven_price, not baked into the displayed average price.
+        # Display PRU: prefer live-computed CUMP (fee-inclusive) over DB value.
+        # Falls back to buy_pra (symbol-wide), then DB avg_buy_price.
+        if cump_pru is not None and cump_pru > Decimal("0"):
+            avg_buy_price = cump_pru
+        elif actual_invested is None and buy_pra is not None and buy_pra > 0:
+            avg_buy_price = Decimal(str(buy_pra))
+
+        # G/L cost basis: FIFO actual_invested > PRA-derived fallback
         if actual_invested is not None:
             total_invested = Decimal(str(actual_invested))
-            # avg_buy_price stays as asset.avg_buy_price (fee-exclusive, exchange-specific)
-        elif buy_pra is not None and buy_pra > 0:
-            avg_buy_price = Decimal(str(buy_pra))
-            total_invested = quantity * avg_buy_price
         else:
             total_invested = quantity * avg_buy_price
 
@@ -395,6 +480,9 @@ class MetricsService:
             for a in all_assets_full:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
                 aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
+
+            # Compute CUMP PRU from transaction history (fee-inclusive, follows 3 rules)
+            cump_pru_by_fkey: Dict[Tuple[str, str], Decimal] = compute_cump_pru(all_txs, aid_to_symbol, aid_to_exchange)
 
             import re as _re
             from collections import defaultdict as _defaultdict
@@ -951,7 +1039,10 @@ class MetricsService:
                 # wrong cost basis for assets with no transactions of their own.
                 asset_fkey_check = (asset.symbol.upper(), (asset.exchange or "").strip())
                 asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper()) if asset_fkey_check in fifo_seen_keys else None
-                metrics = await self.get_asset_metrics(asset, current_price, asset_invested, asset_buy_pra)
+                asset_cump_pru = cump_pru_by_fkey.get(asset_fkey_check)
+                metrics = await self.get_asset_metrics(
+                    asset, current_price, asset_invested, asset_buy_pra, asset_cump_pru
+                )
 
                 # Post-filter: skip dust positions based on actual current value
                 if (
