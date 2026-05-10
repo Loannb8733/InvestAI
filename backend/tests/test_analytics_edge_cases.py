@@ -110,7 +110,11 @@ def main():
     # ── 4. Short history (1 day) → should have "global" warning ──
     print(f"\nFetching analytics (1d) from {BASE_URL}/analytics ...")
     r_short = httpx.get(f"{BASE_URL}/analytics", params={"days": 1}, headers=headers, timeout=30)
-    check("A9: Analytics 1d returns 200", r_short.status_code == 200, f"status={r_short.status_code}")
+    check(
+        "A9: Analytics 1d returns 200",
+        r_short.status_code == 200,
+        f"status={r_short.status_code}",
+    )
 
     if r_short.status_code == 200:
         short_data = r_short.json()

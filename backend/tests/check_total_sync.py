@@ -44,7 +44,11 @@ def _headers() -> dict:
 
 
 async def _fetch(
-    client: httpx.AsyncClient, name: str, url: str, params: Optional[dict] = None, source_function: str = ""
+    client: httpx.AsyncClient,
+    name: str,
+    url: str,
+    params: Optional[dict] = None,
+    source_function: str = "",
 ) -> EndpointResult:
     """Fetch an endpoint and extract total_value."""
     t0 = time.monotonic()
@@ -96,16 +100,36 @@ async def run_parity_check() -> bool:
     """Run all endpoints simultaneously, check parity. Returns True if all pass."""
 
     endpoints = [
-        ("Dashboard", f"{BASE_URL}/analytics", {"days": 30}, "analytics_service.get_portfolio_analytics"),
-        ("Top Alpha", f"{BASE_URL}/predictions/top-alpha", None, "prediction_service.get_top_alpha_asset"),
-        ("Strategy Map", f"{BASE_URL}/predictions/strategy-map", None, "prediction_service.get_strategy_map"),
+        (
+            "Dashboard",
+            f"{BASE_URL}/analytics",
+            {"days": 30},
+            "analytics_service.get_portfolio_analytics",
+        ),
+        (
+            "Top Alpha",
+            f"{BASE_URL}/predictions/top-alpha",
+            None,
+            "prediction_service.get_top_alpha_asset",
+        ),
+        (
+            "Strategy Map",
+            f"{BASE_URL}/predictions/strategy-map",
+            None,
+            "prediction_service.get_strategy_map",
+        ),
         (
             "Smart Insights",
             f"{BASE_URL}/smart-insights/health",
             {"days": 30},
             "smart_insights_service.get_portfolio_health",
         ),
-        ("Monte Carlo", f"{BASE_URL}/analytics/monte-carlo", {"horizon_days": 90}, "analytics_service.monte_carlo"),
+        (
+            "Monte Carlo",
+            f"{BASE_URL}/analytics/monte-carlo",
+            {"horizon_days": 90},
+            "analytics_service.monte_carlo",
+        ),
     ]
 
     print("=" * 70)

@@ -170,7 +170,10 @@ async def binance_price_stream(symbols: Set[str]) -> None:
 
                             await broadcast_price_update(symbol, price, change_pct, asset_type="crypto")
 
-                    elif msg.type in (aiohttp.WSMsgType.ERROR, aiohttp.WSMsgType.CLOSED):
+                    elif msg.type in (
+                        aiohttp.WSMsgType.ERROR,
+                        aiohttp.WSMsgType.CLOSED,
+                    ):
                         break
     except Exception as e:
         logger.warning("Binance WS stream error: %s", e)

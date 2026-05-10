@@ -234,7 +234,11 @@ def update_exchange_rates():
                 logger.warning(f"Error fetching exchange rate {base_currency}/{currency}: {e}")
 
         logger.info(f"Exchange rate update complete: {updated_count} rates updated")
-        return {"updated": updated_count, "base": base_currency, "currencies": currencies}
+        return {
+            "updated": updated_count,
+            "base": base_currency,
+            "currencies": currencies,
+        }
 
     return run_async(_update())
 

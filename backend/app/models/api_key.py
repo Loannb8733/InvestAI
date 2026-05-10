@@ -23,7 +23,12 @@ class APIKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     exchange = Column(String(50), nullable=False)
     label = Column(String(100), nullable=True)
     encrypted_api_key = Column(Text, nullable=False)
@@ -31,7 +36,12 @@ class APIKey(Base):
     encrypted_passphrase = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     status = Column(
-        Enum(APIKeyStatus, name="apikeystatus", values_callable=lambda x: [e.value for e in x], create_type=False),
+        Enum(
+            APIKeyStatus,
+            name="apikeystatus",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
         nullable=False,
         server_default="active",
     )

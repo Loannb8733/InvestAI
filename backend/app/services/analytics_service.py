@@ -383,7 +383,11 @@ class AnalyticsService:
                         return rate_decimal
 
         except Exception as e:
-            logger.warning("Failed to fetch ECB risk-free rate: %s — using fallback %.1f%%", e, RISK_FREE_RATE * 100)
+            logger.warning(
+                "Failed to fetch ECB risk-free rate: %s — using fallback %.1f%%",
+                e,
+                RISK_FREE_RATE * 100,
+            )
 
         return RISK_FREE_RATE
 
@@ -1489,7 +1493,13 @@ class AnalyticsService:
         w0 = np.array([1.0 / n] * n)
 
         if objective == "min_volatility":
-            res = sp_optimize.minimize(portfolio_vol, w0, bounds=bounds, constraints=constraints, method="SLSQP")
+            res = sp_optimize.minimize(
+                portfolio_vol,
+                w0,
+                bounds=bounds,
+                constraints=constraints,
+                method="SLSQP",
+            )
         else:
             res = sp_optimize.minimize(neg_sharpe, w0, bounds=bounds, constraints=constraints, method="SLSQP")
 
@@ -1579,13 +1589,22 @@ class AnalyticsService:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
 
-            if tx.transaction_type in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
+            if tx.transaction_type in [
+                TransactionType.BUY,
+                TransactionType.TRANSFER_IN,
+            ]:
                 # Cash outflow (investment) — negative for XIRR convention
                 cashflows.append((dt, -(amount + fee)))
-            elif tx.transaction_type in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
+            elif tx.transaction_type in [
+                TransactionType.SELL,
+                TransactionType.TRANSFER_OUT,
+            ]:
                 # Cash inflow — positive
                 cashflows.append((dt, amount - fee))
-            elif tx.transaction_type in [TransactionType.STAKING_REWARD, TransactionType.AIRDROP]:
+            elif tx.transaction_type in [
+                TransactionType.STAKING_REWARD,
+                TransactionType.AIRDROP,
+            ]:
                 cashflows.append((dt, amount))
 
         if skipped > 0:
@@ -1635,7 +1654,13 @@ class AnalyticsService:
             "id": "covid_2020",
             "name": "COVID-19 (Mars 2020)",
             "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs en 30 jours",
-            "shocks": {"crypto": -50, "stock": -35, "etf": -30, "real_estate": -10, "crowdfunding": -5},
+            "shocks": {
+                "crypto": -50,
+                "stock": -35,
+                "etf": -30,
+                "real_estate": -10,
+                "crowdfunding": -5,
+            },
             "duration_days": 30,
             "historical_recovery_months": 5,
         },
@@ -1643,7 +1668,13 @@ class AnalyticsService:
             "id": "luna_ftx_2022",
             "name": "LUNA/FTX (2022)",
             "description": "Effondrement crypto (Luna Mai + FTX Nov) — altcoins -60%, BTC -40%",
-            "shocks": {"crypto": -60, "stock": -20, "etf": -15, "real_estate": -5, "crowdfunding": -3},
+            "shocks": {
+                "crypto": -60,
+                "stock": -20,
+                "etf": -15,
+                "real_estate": -5,
+                "crowdfunding": -3,
+            },
             "duration_days": 60,
             "historical_recovery_months": 18,
         },
@@ -1651,7 +1682,13 @@ class AnalyticsService:
             "id": "crisis_2008",
             "name": "Crise financière 2008",
             "description": "Crise systémique bancaire — chute massive des actions et immobilier",
-            "shocks": {"crypto": -30, "stock": -50, "etf": -45, "real_estate": -25, "crowdfunding": -15},
+            "shocks": {
+                "crypto": -30,
+                "stock": -50,
+                "etf": -45,
+                "real_estate": -25,
+                "crowdfunding": -15,
+            },
             "duration_days": 180,
             "historical_recovery_months": 48,
         },
@@ -1659,7 +1696,13 @@ class AnalyticsService:
             "id": "bull_run_2021",
             "name": "Bull Run 2021",
             "description": "Hausse généralisée — crypto +100%, actions +25%, ETF +20%",
-            "shocks": {"crypto": 100, "stock": 25, "etf": 20, "real_estate": 10, "crowdfunding": 5},
+            "shocks": {
+                "crypto": 100,
+                "stock": 25,
+                "etf": 20,
+                "real_estate": 10,
+                "crowdfunding": 5,
+            },
             "duration_days": 365,
             "historical_recovery_months": 0,
         },
@@ -1667,7 +1710,13 @@ class AnalyticsService:
             "id": "rate_hike",
             "name": "Hausse des taux (+300bp)",
             "description": "Resserrement monétaire brutal — impact sur les valorisations",
-            "shocks": {"crypto": -25, "stock": -18, "etf": -15, "real_estate": -10, "crowdfunding": -5},
+            "shocks": {
+                "crypto": -25,
+                "stock": -18,
+                "etf": -15,
+                "real_estate": -10,
+                "crowdfunding": -5,
+            },
             "duration_days": 90,
             "historical_recovery_months": 12,
         },
@@ -1675,7 +1724,13 @@ class AnalyticsService:
             "id": "flash_crash",
             "name": "Flash Crash",
             "description": "Chute éclair intra-journalière sur tous les marchés",
-            "shocks": {"crypto": -15, "stock": -10, "etf": -8, "real_estate": -3, "crowdfunding": -1},
+            "shocks": {
+                "crypto": -15,
+                "stock": -10,
+                "etf": -8,
+                "real_estate": -3,
+                "crowdfunding": -1,
+            },
             "duration_days": 1,
             "historical_recovery_months": 1,
         },
@@ -1704,7 +1759,12 @@ class AnalyticsService:
         portfolios = result.scalars().all()
 
         if not portfolios:
-            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
+            return {
+                "scenarios": [],
+                "total_value": 0,
+                "currency": currency,
+                "max_drawdown": None,
+            }
 
         # Collect per-asset live data with risk_weight
         all_assets = []
@@ -1715,11 +1775,21 @@ class AnalyticsService:
             all_assets.extend(pm.get("assets", []))
 
         if not all_assets:
-            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
+            return {
+                "scenarios": [],
+                "total_value": 0,
+                "currency": currency,
+                "max_drawdown": None,
+            }
 
         total_value = float(sum(Decimal(str(a.get("current_value", 0))) for a in all_assets))
         if total_value <= 0:
-            return {"scenarios": [], "total_value": 0, "currency": currency, "max_drawdown": None}
+            return {
+                "scenarios": [],
+                "total_value": 0,
+                "currency": currency,
+                "max_drawdown": None,
+            }
 
         # Compute risk-weight statistics for modulation
         n_assets = len(all_assets)
@@ -1851,7 +1921,11 @@ class AnalyticsService:
         raw_assets = await self._get_user_assets(db, user_id, portfolio_id=portfolio_id)
 
         if not raw_assets:
-            return {"assets": [], "portfolio_beta_crypto": None, "portfolio_beta_stock": None}
+            return {
+                "assets": [],
+                "portfolio_beta_crypto": None,
+                "portfolio_beta_stock": None,
+            }
 
         # Deduplicate
         seen: Dict[str, Asset] = {}

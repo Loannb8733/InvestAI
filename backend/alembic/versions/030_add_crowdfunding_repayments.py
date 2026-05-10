@@ -24,7 +24,8 @@ def upgrade() -> None:
         "END $$;"
     )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE crowdfunding_repayments (
             id UUID PRIMARY KEY,
             project_id UUID NOT NULL REFERENCES crowdfunding_projects(id) ON DELETE CASCADE,
@@ -35,9 +36,16 @@ def upgrade() -> None:
             notes TEXT,
             created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         )
-    """)
-    op.create_index("ix_crowdfunding_repayments_project_id", "crowdfunding_repayments", ["project_id"])
-    op.create_index("ix_crowdfunding_repayments_user_id", "crowdfunding_repayments", ["user_id"])
+    """
+    )
+    op.create_index(
+        "ix_crowdfunding_repayments_project_id",
+        "crowdfunding_repayments",
+        ["project_id"],
+    )
+    op.create_index(
+        "ix_crowdfunding_repayments_user_id", "crowdfunding_repayments", ["user_id"]
+    )
 
 
 def downgrade() -> None:

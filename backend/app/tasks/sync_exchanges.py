@@ -236,7 +236,11 @@ async def _sync_detailed_transactions(
 
                 # Get or create the asset
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    base_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 is_sell = trade.trade_id.startswith("convert_sell_")
@@ -315,7 +319,11 @@ async def _sync_detailed_transactions(
                     continue
 
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    base_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 qty = float(trade.quantity)
@@ -366,7 +374,11 @@ async def _sync_detailed_transactions(
                     continue
 
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    base_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 trans_type = TransactionType.BUY if order.side == "buy" else TransactionType.SELL
@@ -421,7 +433,11 @@ async def _sync_detailed_transactions(
                     continue
 
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    base_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 qty = float(order.crypto_amount)
@@ -485,7 +501,11 @@ async def _sync_detailed_transactions(
 
             # Get or create asset
             asset = await _get_or_create_asset(
-                db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                db,
+                portfolio.id,
+                base_asset,
+                existing_assets,
+                exchange=service.exchange_name,
             )
 
             trans_type = TransactionType.BUY if trade.side == "buy" else TransactionType.SELL
@@ -543,7 +563,11 @@ async def _sync_detailed_transactions(
                     continue
 
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, reward_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    reward_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 # Determine transaction type
@@ -596,7 +620,11 @@ async def _sync_detailed_transactions(
                     continue
 
                 asset = await _get_or_create_asset(
-                    db, portfolio.id, base_asset, existing_assets, exchange=service.exchange_name
+                    db,
+                    portfolio.id,
+                    base_asset,
+                    existing_assets,
+                    exchange=service.exchange_name,
                 )
 
                 qty = float(deposit.amount)

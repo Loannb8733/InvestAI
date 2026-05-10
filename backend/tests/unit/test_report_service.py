@@ -213,7 +213,10 @@ class TestTaxExcel:
     @pytest.mark.asyncio
     async def test_generates_bytes(self, report_service, tax_summary_with_cession):
         with patch.object(
-            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+            report_service,
+            "compute_tax_2086",
+            new_callable=AsyncMock,
+            return_value=tax_summary_with_cession,
         ):
             result = await report_service.generate_tax_excel(None, "test_user", 2025)
         assert isinstance(result, bytes)
@@ -221,7 +224,10 @@ class TestTaxExcel:
     @pytest.mark.asyncio
     async def test_sheet_title_contains_year(self, report_service, tax_summary_with_cession):
         with patch.object(
-            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+            report_service,
+            "compute_tax_2086",
+            new_callable=AsyncMock,
+            return_value=tax_summary_with_cession,
         ):
             result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
@@ -230,7 +236,10 @@ class TestTaxExcel:
     @pytest.mark.asyncio
     async def test_transaction_count(self, report_service, tax_summary_with_cession):
         with patch.object(
-            report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_with_cession
+            report_service,
+            "compute_tax_2086",
+            new_callable=AsyncMock,
+            return_value=tax_summary_with_cession,
         ):
             result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
@@ -240,7 +249,12 @@ class TestTaxExcel:
 
     @pytest.mark.asyncio
     async def test_empty_transactions(self, report_service, tax_summary_empty):
-        with patch.object(report_service, "compute_tax_2086", new_callable=AsyncMock, return_value=tax_summary_empty):
+        with patch.object(
+            report_service,
+            "compute_tax_2086",
+            new_callable=AsyncMock,
+            return_value=tax_summary_empty,
+        ):
             result = await report_service.generate_tax_excel(None, "test_user", 2025)
         wb = load_workbook(io.BytesIO(result))
         ws = wb.active

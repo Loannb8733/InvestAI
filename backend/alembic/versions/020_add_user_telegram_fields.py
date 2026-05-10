@@ -21,7 +21,12 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("telegram_chat_id", sa.String(100), nullable=True))
     op.add_column(
         "users",
-        sa.Column("telegram_enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "telegram_enabled",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
 
 

@@ -16,13 +16,25 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("prediction_logs", sa.Column("predicted_price", sa.Float(), nullable=True))
-    op.add_column("prediction_logs", sa.Column("target_date", sa.DateTime(), nullable=True))
-    op.add_column("prediction_logs", sa.Column("horizon_days", sa.Integer(), nullable=True))
-    op.add_column("prediction_logs", sa.Column("actual_price", sa.Float(), nullable=True))
+    op.add_column(
+        "prediction_logs", sa.Column("predicted_price", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "prediction_logs", sa.Column("target_date", sa.DateTime(), nullable=True)
+    )
+    op.add_column(
+        "prediction_logs", sa.Column("horizon_days", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "prediction_logs", sa.Column("actual_price", sa.Float(), nullable=True)
+    )
     op.add_column("prediction_logs", sa.Column("error_pct", sa.Float(), nullable=True))
-    op.add_column("prediction_logs", sa.Column("models_detail", sa.JSON(), nullable=True))
-    op.create_index("ix_prediction_logs_target_date", "prediction_logs", ["target_date"])
+    op.add_column(
+        "prediction_logs", sa.Column("models_detail", sa.JSON(), nullable=True)
+    )
+    op.create_index(
+        "ix_prediction_logs_target_date", "prediction_logs", ["target_date"]
+    )
 
 
 def downgrade() -> None:

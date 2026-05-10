@@ -235,9 +235,7 @@ class TestBinanceCSVParser:
 
     def test_parse_csv_with_errors(self, parser):
         csv_content = (
-            "UTC_Time,Operation,Coin,Change\n"
-            "2025-01-15 10:00:00,Buy,BTC,0.5\n"
-            "invalid-date,Buy,ETH,1.0\n"
+            "UTC_Time,Operation,Coin,Change\n" "2025-01-15 10:00:00,Buy,BTC,0.5\n" "invalid-date,Buy,ETH,1.0\n"
         )
         txs, errors = parser.parse_csv(csv_content)
         assert len(txs) == 1
@@ -701,7 +699,15 @@ class TestGenericCSVParser:
 
     def test_french_type_mapping(self, parser):
         """French transaction types should be mapped."""
-        row = {"symbol": "BTC", "type": "achat", "quantity": "1", "price": "50000", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "BTC",
+            "type": "achat",
+            "quantity": "1",
+            "price": "50000",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         txs = parser.parse_row(row)
         assert txs[0].transaction_type == "buy"
 
@@ -710,22 +716,54 @@ class TestGenericCSVParser:
         assert txs[0].transaction_type == "sell"
 
     def test_deposit_mapping(self, parser):
-        row = {"symbol": "SOL", "type": "deposit", "quantity": "10", "price": "0", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "SOL",
+            "type": "deposit",
+            "quantity": "10",
+            "price": "0",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         txs = parser.parse_row(row)
         assert txs[0].transaction_type == "transfer_in"
 
     def test_empty_symbol_skipped(self, parser):
-        row = {"symbol": "", "type": "buy", "quantity": "1", "price": "100", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "",
+            "type": "buy",
+            "quantity": "1",
+            "price": "100",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         txs = parser.parse_row(row)
         assert len(txs) == 0
 
     def test_empty_type_skipped(self, parser):
-        row = {"symbol": "BTC", "type": "", "quantity": "1", "price": "100", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "BTC",
+            "type": "",
+            "quantity": "1",
+            "price": "100",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         txs = parser.parse_row(row)
         assert len(txs) == 0
 
     def test_invalid_number_raises(self, parser):
-        row = {"symbol": "BTC", "type": "buy", "quantity": "abc", "price": "100", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "BTC",
+            "type": "buy",
+            "quantity": "abc",
+            "price": "100",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         with pytest.raises(ValueError, match="Invalid number"):
             parser.parse_row(row)
 
@@ -756,7 +794,15 @@ class TestGenericCSVParser:
         assert txs[0].timestamp.year == 2025
 
     def test_no_date_uses_now(self, parser):
-        row = {"symbol": "BTC", "type": "buy", "quantity": "1", "price": "100", "fee": "0", "date": "", "notes": ""}
+        row = {
+            "symbol": "BTC",
+            "type": "buy",
+            "quantity": "1",
+            "price": "100",
+            "fee": "0",
+            "date": "",
+            "notes": "",
+        }
         txs = parser.parse_row(row)
         # Should be close to now
         assert (datetime.now() - txs[0].timestamp).total_seconds() < 5
@@ -880,10 +926,7 @@ class TestMalformedCSV:
 
     def test_extra_columns_ignored(self):
         parser = GenericCSVParser()
-        csv_content = (
-            "symbol,type,quantity,price,extra_col1,extra_col2\n"
-            "BTC,buy,1,50000,foo,bar\n"
-        )
+        csv_content = "symbol,type,quantity,price,extra_col1,extra_col2\n" "BTC,buy,1,50000,foo,bar\n"
         txs, errors = parser.parse_csv(csv_content)
         assert len(txs) == 1
         assert len(errors) == 0

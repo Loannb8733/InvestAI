@@ -550,7 +550,9 @@ async def import_trade_history(
             # Pass exclude_refids for Kraken to avoid duplicates with instant buys
             if instant_buy_refids:
                 conversions = await service.get_crypto_conversions(
-                    limit=500, exclude_refids=instant_buy_refids, ledgers=_cached_ledgers
+                    limit=500,
+                    exclude_refids=instant_buy_refids,
+                    ledgers=_cached_ledgers,
                 )
             else:
                 conversions = await service.get_crypto_conversions(limit=500, ledgers=_cached_ledgers)
@@ -716,7 +718,17 @@ async def import_trade_history(
         for trade in trades:
             # Extract base asset from trading pair (e.g., BTCUSDT -> BTC)
             symbol = trade.symbol
-            for quote in ["USDT", "FDUSD", "USDC", "BUSD", "EUR", "USD", "BTC", "ETH", "BNB"]:
+            for quote in [
+                "USDT",
+                "FDUSD",
+                "USDC",
+                "BUSD",
+                "EUR",
+                "USD",
+                "BTC",
+                "ETH",
+                "BNB",
+            ]:
                 if symbol.endswith(quote):
                     base_asset = symbol[: -len(quote)]
                     asset_trades[base_asset].append(trade)
@@ -751,7 +763,18 @@ async def import_trade_history(
                 is_crypto_sell = fiat_order.order_id.startswith("sell_") or (
                     fiat_order.side == "sell"
                     and fiat_order.fiat_currency
-                    not in ["EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"]
+                    not in [
+                        "EUR",
+                        "USD",
+                        "GBP",
+                        "TRY",
+                        "RUB",
+                        "UAH",
+                        "BRL",
+                        "AUD",
+                        "CAD",
+                        "JPY",
+                    ]
                 )
                 if base_order_id in conversion_base_ids and not is_crypto_sell:
                     logger.debug(f"Skipping fiat order {fiat_order.order_id} (already imported as conversion)")
@@ -761,9 +784,25 @@ async def import_trade_history(
                 fiat_order_ids.add(f"fiat_{fiat_order.order_id}")
 
         # Add withdrawals to asset_trades as TRANSFER_OUT
-        fiat_currencies = ["USD", "EUR", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"]
+        fiat_currencies = [
+            "USD",
+            "EUR",
+            "GBP",
+            "TRY",
+            "RUB",
+            "UAH",
+            "BRL",
+            "AUD",
+            "CAD",
+            "JPY",
+        ]
         for withdrawal in withdrawals:
-            if withdrawal.status.lower() not in ("success", "complete", "completed", "settled"):
+            if withdrawal.status.lower() not in (
+                "success",
+                "complete",
+                "completed",
+                "settled",
+            ):
                 continue  # Skip pending/failed withdrawals
             symbol = withdrawal.symbol
             if symbol in fiat_currencies:
@@ -1109,8 +1148,14 @@ async def import_trade_history(
                     func.coalesce(
                         func.sum(
                             case(
-                                (Transaction.transaction_type.in_(add_types), Transaction.quantity),
-                                (Transaction.transaction_type.in_(sub_types), -Transaction.quantity),
+                                (
+                                    Transaction.transaction_type.in_(add_types),
+                                    Transaction.quantity,
+                                ),
+                                (
+                                    Transaction.transaction_type.in_(sub_types),
+                                    -Transaction.quantity,
+                                ),
                                 else_=0,
                             )
                         ),
@@ -1228,7 +1273,18 @@ async def import_trade_history(
                 await db.flush()
 
         # Create assets for API balances that have no transactions (e.g. airdrops, dust)
-        fiat_currencies = {"EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"}
+        fiat_currencies = {
+            "EUR",
+            "USD",
+            "GBP",
+            "TRY",
+            "RUB",
+            "UAH",
+            "BRL",
+            "AUD",
+            "CAD",
+            "JPY",
+        }
         for balance in balances:
             symbol = balance.symbol
             # Skip earn variants — they're merged into base asset
@@ -1288,7 +1344,8 @@ async def import_trade_history(
             "conversions": conversions_count,
             "withdrawals": withdrawals_imported,
             "spot_trades": max(
-                0, imported_count - fiat_orders_count - rewards_count - conversions_count - withdrawals_imported
+                0,
+                imported_count - fiat_orders_count - rewards_count - conversions_count - withdrawals_imported,
             ),
             "assets_created": assets_updated,
             "reconciled_assets": reconciled_count,
@@ -1407,7 +1464,18 @@ async def sync_exchange(
 
         synced_count = 0
         # Only skip fiat currencies, not stablecoins (users may want to track USDT, USDC, etc.)
-        fiat_currencies = ["USD", "EUR", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"]
+        fiat_currencies = [
+            "USD",
+            "EUR",
+            "GBP",
+            "TRY",
+            "RUB",
+            "UAH",
+            "BRL",
+            "AUD",
+            "CAD",
+            "JPY",
+        ]
 
         for balance in balances:
             # Skip fiat currencies only

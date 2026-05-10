@@ -21,23 +21,28 @@ def upgrade() -> None:
     op.execute("BEGIN")
 
     # Create enums via raw SQL to avoid SQLAlchemy checkfirst issues
-    op.execute("""
+    op.execute(
+        """
         DO $$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'repaymenttype') THEN
                 CREATE TYPE repaymenttype AS ENUM ('in_fine', 'amortizable');
             END IF;
         END $$;
-    """)
-    op.execute("""
+    """
+    )
+    op.execute(
+        """
         DO $$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'projectstatus') THEN
                 CREATE TYPE projectstatus AS ENUM ('funding', 'active', 'completed', 'delayed', 'defaulted');
             END IF;
         END $$;
-    """)
+    """
+    )
 
     # Use raw SQL to create the table to avoid SQLAlchemy enum before_create events
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS crowdfunding_projects (
             id UUID PRIMARY KEY,
             asset_id UUID NOT NULL UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
@@ -57,8 +62,11 @@ def upgrade() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """)
-    op.execute("CREATE INDEX IF NOT EXISTS ix_crowdfunding_projects_asset_id ON crowdfunding_projects(asset_id)")
+    """
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_crowdfunding_projects_asset_id ON crowdfunding_projects(asset_id)"
+    )
 
 
 def downgrade() -> None:

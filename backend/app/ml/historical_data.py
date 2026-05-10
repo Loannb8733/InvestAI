@@ -66,7 +66,12 @@ class HistoricalDataFetcher:
         await self.http_client.aclose()
 
     async def _coingecko_get(
-        self, url: str, params: dict, symbol: str, max_retries: int = 3, fast: bool = False
+        self,
+        url: str,
+        params: dict,
+        symbol: str,
+        max_retries: int = 3,
+        fast: bool = False,
     ) -> Optional[dict]:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
         for attempt in range(max_retries):
@@ -77,13 +82,22 @@ class HistoricalDataFetcher:
                     return response.json()
                 if response.status_code == 429:
                     wait = 2 if fast else (attempt + 1) * 10  # fast: 2s, normal: 10s, 20s, 30s
-                    logger.warning("CoinGecko 429 for %s — retry %d/%d in %ds", symbol, attempt + 1, max_retries, wait)
+                    logger.warning(
+                        "CoinGecko 429 for %s — retry %d/%d in %ds",
+                        symbol,
+                        attempt + 1,
+                        max_retries,
+                        wait,
+                    )
                     await asyncio.sleep(wait)
                     continue
                 if response.status_code == 401:
                     global _api_key_invalid
                     if not _api_key_invalid:
-                        logger.warning("CoinGecko 401 for %s — API key invalid, retrying without key", symbol)
+                        logger.warning(
+                            "CoinGecko 401 for %s — API key invalid, retrying without key",
+                            symbol,
+                        )
                         _api_key_invalid = True
                         self.http_client.headers.pop("x-cg-demo-api-key", None)
                         continue  # retry this attempt without the key
@@ -260,7 +274,11 @@ class HistoricalDataFetcher:
         if volumes_data and len(volumes_data) >= len(prices_data):
             volumes = [v[1] for v in volumes_data[: len(prices_data)]]
 
-        logger.info("Fetched %d data points (with volume) for %s from CoinGecko", len(prices), symbol)
+        logger.info(
+            "Fetched %d data points (with volume) for %s from CoinGecko",
+            len(prices),
+            symbol,
+        )
         return HistoricalDataResult(dates, prices, volumes)
 
     async def get_stock_history_extended(
@@ -314,7 +332,11 @@ class HistoricalDataFetcher:
             prices = [float(c) for _, c, _ in valid]
             volumes = [float(v) if v is not None else 0.0 for _, _, v in valid]
 
-            logger.info("Fetched %d data points (with volume) for %s from Yahoo", len(prices), symbol)
+            logger.info(
+                "Fetched %d data points (with volume) for %s from Yahoo",
+                len(prices),
+                symbol,
+            )
             return HistoricalDataResult(dates, prices, volumes)
 
         except Exception as e:

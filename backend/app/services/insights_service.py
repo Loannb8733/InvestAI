@@ -104,7 +104,11 @@ class InsightsService:
         """Identify positions with unrealized losses that could be sold for tax optimization."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
-            return {"opportunities": [], "total_harvestable": 0, "estimated_tax_saving": 0}
+            return {
+                "opportunities": [],
+                "total_harvestable": 0,
+                "estimated_tax_saving": 0,
+            }
 
         pids = [p.id for p in portfolios]
         result = await db.execute(

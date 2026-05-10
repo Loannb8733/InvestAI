@@ -15,7 +15,6 @@ from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset, AssetType
 from app.services.alert_service import AlertService, AlertTrigger
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -345,26 +344,22 @@ class TestGetAssetPriceDelegation:
     @pytest.mark.asyncio
     async def test_crypto_routes_to_get_crypto_price(self, alert_service):
         asset = _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO)
-        alert_service.price_service.get_crypto_price = AsyncMock(
-            return_value={"price": Decimal("45000")}
-        )
+        alert_service.price_service.get_crypto_price = AsyncMock(return_value={"price": Decimal("45000")})
 
         # The actual _get_asset_price in the service expects get_crypto_price to
         # return a dict with "price" key or a float directly. The current implementation
         # calls get_crypto_price which returns a dict. The method returns the result directly.
         # Looking at the actual code, it returns the result of get_crypto_price directly
         # (not extracting "price"), so we test the actual behavior.
-        result = await alert_service._get_asset_price(asset)
+        await alert_service._get_asset_price(asset)
         alert_service.price_service.get_crypto_price.assert_called_once_with(asset.symbol)
 
     @pytest.mark.asyncio
     async def test_stock_routes_to_get_stock_price(self, alert_service):
         asset = _make_asset(symbol="AAPL", asset_type=AssetType.STOCK)
-        alert_service.price_service.get_stock_price = AsyncMock(
-            return_value={"price": Decimal("175")}
-        )
+        alert_service.price_service.get_stock_price = AsyncMock(return_value={"price": Decimal("175")})
 
-        result = await alert_service._get_asset_price(asset)
+        await alert_service._get_asset_price(asset)
         alert_service.price_service.get_stock_price.assert_called_once_with(asset.symbol)
 
     @pytest.mark.asyncio

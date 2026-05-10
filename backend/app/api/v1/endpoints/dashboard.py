@@ -360,8 +360,14 @@ async def get_dashboard(
             Asset.symbol,
             func.sum(
                 sa_case(
-                    (Transaction.transaction_type == TransactionType.STAKING, Transaction.quantity),
-                    (Transaction.transaction_type == TransactionType.UNSTAKING, -Transaction.quantity),
+                    (
+                        Transaction.transaction_type == TransactionType.STAKING,
+                        Transaction.quantity,
+                    ),
+                    (
+                        Transaction.transaction_type == TransactionType.UNSTAKING,
+                        -Transaction.quantity,
+                    ),
                     else_=0,
                 )
             ),

@@ -74,7 +74,16 @@ class TestFormatMutationAlert:
 
     def test_all_regime_pairs_produce_valid_message(self):
         """Every possible regime pair should produce a non-empty message."""
-        regimes = ["bearish", "markdown", "bottom", "accumulation", "markup", "bullish", "topping", "top"]
+        regimes = [
+            "bearish",
+            "markdown",
+            "bottom",
+            "accumulation",
+            "markup",
+            "bullish",
+            "topping",
+            "top",
+        ]
         for old in regimes:
             for new in regimes:
                 if old == new:

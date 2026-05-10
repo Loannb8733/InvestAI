@@ -135,7 +135,13 @@ class TestCacheBehavior:
     def test_cache_price_redis_error_no_raise(self, price_service, mock_redis):
         """Cache write failures should be silently ignored."""
         mock_redis.hset.side_effect = Exception("Redis write error")
-        data = {"price": Decimal("100"), "change_24h": 0, "change_percent_24h": 0, "volume_24h": 0, "market_cap": 0}
+        data = {
+            "price": Decimal("100"),
+            "change_24h": 0,
+            "change_percent_24h": 0,
+            "volume_24h": 0,
+            "market_cap": 0,
+        }
         # Should not raise
         price_service._cache_price("crypto", "BTC", data, 60)
 

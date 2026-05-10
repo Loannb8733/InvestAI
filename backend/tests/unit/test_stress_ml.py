@@ -241,7 +241,10 @@ class TestDriftDetectorStress:
         ref = 100 + rng.normal(0, 1, 150)  # Mean 100, vol 1
         cur = 200 + rng.normal(0, 10, 50)  # Mean 200, vol 10
         result = check_drift(ref, cur, symbol="SHIFT")
-        assert result.status in ("warning", "drift"), f"Expected drift, got {result.status}"
+        assert result.status in (
+            "warning",
+            "drift",
+        ), f"Expected drift, got {result.status}"
 
     def test_drift_result_fields(self):
         """DriftResult should have all expected fields."""

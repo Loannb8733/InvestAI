@@ -28,7 +28,9 @@ def upgrade() -> None:
         sa.Column("total_value", sa.Numeric(precision=18, scale=2), nullable=False),
         sa.Column("total_invested", sa.Numeric(precision=18, scale=2), nullable=False),
         sa.Column("total_gain_loss", sa.Numeric(precision=18, scale=2), nullable=False),
-        sa.Column("currency", sa.String(length=10), nullable=False, server_default="EUR"),
+        sa.Column(
+            "currency", sa.String(length=10), nullable=False, server_default="EUR"
+        ),
         sa.ForeignKeyConstraint(
             ["portfolio_id"],
             ["portfolios.id"],
@@ -39,11 +41,23 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_portfolio_snapshots_snapshot_date", "portfolio_snapshots", ["snapshot_date"], unique=False)
-    op.create_index("ix_portfolio_snapshots_user_id", "portfolio_snapshots", ["user_id"], unique=False)
+    op.create_index(
+        "ix_portfolio_snapshots_snapshot_date",
+        "portfolio_snapshots",
+        ["snapshot_date"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_portfolio_snapshots_user_id",
+        "portfolio_snapshots",
+        ["user_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
     op.drop_index("ix_portfolio_snapshots_user_id", table_name="portfolio_snapshots")
-    op.drop_index("ix_portfolio_snapshots_snapshot_date", table_name="portfolio_snapshots")
+    op.drop_index(
+        "ix_portfolio_snapshots_snapshot_date", table_name="portfolio_snapshots"
+    )
     op.drop_table("portfolio_snapshots")

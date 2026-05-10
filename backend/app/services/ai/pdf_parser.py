@@ -145,7 +145,13 @@ class PDFParser:
         # Prix de revient / coût total
         result.prix_revient = _find_number_near(
             text,
-            ["prix de revient", "coût total", "coût de revient", "budget total", "coût global"],
+            [
+                "prix de revient",
+                "coût total",
+                "coût de revient",
+                "budget total",
+                "coût global",
+            ],
         )
 
         # Compute margin if both available
@@ -158,7 +164,11 @@ class PDFParser:
         if result.chiffre_affaires is None:
             result.chiffre_affaires = _find_number_near(
                 text,
-                ["valeur vénale estimée", "valeur vénale après", "valeur après travaux"],
+                [
+                    "valeur vénale estimée",
+                    "valeur vénale après",
+                    "valeur après travaux",
+                ],
                 window=300,
             )
 
@@ -172,7 +182,12 @@ class PDFParser:
         if result.marge_brute_percent is None:
             result.marge_brute_percent = _find_number_near(
                 text,
-                ["marge brute", "marge promoteur", "marge de sécurité", "marge opération"],
+                [
+                    "marge brute",
+                    "marge promoteur",
+                    "marge de sécurité",
+                    "marge opération",
+                ],
                 is_percent=True,
             )
 
@@ -237,7 +252,12 @@ class PDFParser:
         # Pré-commercialisation
         result.pre_commercialisation = _find_number_near(
             text,
-            ["pré-commercialisation", "pré commercialisation", "réservation", "lots vendus"],
+            [
+                "pré-commercialisation",
+                "pré commercialisation",
+                "réservation",
+                "lots vendus",
+            ],
             is_percent=True,
         )
 
@@ -258,14 +278,24 @@ class PDFParser:
             logger.warning("PDF extraction: TRI=%.1f%% out of bounds, discarding", result.tri)
             result.tri = None
         if result.marge_brute_percent is not None and not (-50 < result.marge_brute_percent <= 80):
-            logger.warning("PDF extraction: margin=%.1f%% out of bounds, discarding", result.marge_brute_percent)
+            logger.warning(
+                "PDF extraction: margin=%.1f%% out of bounds, discarding",
+                result.marge_brute_percent,
+            )
             result.marge_brute_percent = None
         if result.pre_commercialisation is not None and not (0 <= result.pre_commercialisation <= 100):
-            logger.warning("PDF extraction: pre-comm=%.1f%% out of bounds, discarding", result.pre_commercialisation)
+            logger.warning(
+                "PDF extraction: pre-comm=%.1f%% out of bounds, discarding",
+                result.pre_commercialisation,
+            )
             result.pre_commercialisation = None
         # Cross-field: LTC should generally be >= LTV
         if result.ltv is not None and result.ltc is not None and result.ltc < result.ltv * 0.5:
-            logger.warning("PDF extraction: LTC (%.1f%%) << LTV (%.1f%%), possible swap", result.ltc, result.ltv)
+            logger.warning(
+                "PDF extraction: LTC (%.1f%%) << LTV (%.1f%%), possible swap",
+                result.ltc,
+                result.ltv,
+            )
 
         logger.info(
             "PDF extraction: CA=%s, PR=%s, margin=%.2f%%, TRI=%s%%",

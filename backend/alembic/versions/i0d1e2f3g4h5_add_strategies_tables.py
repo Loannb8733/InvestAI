@@ -20,12 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Create enums via raw SQL (idempotent)
-    op.execute("DO $$ BEGIN CREATE TYPE strategysource AS ENUM ('AI', 'USER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
-    op.execute("DO $$ BEGIN CREATE TYPE strategystatus AS ENUM ('PROPOSED', 'ACTIVE', 'PAUSED', 'COMPLETED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
-    op.execute("DO $$ BEGIN CREATE TYPE actionstatus AS ENUM ('PENDING', 'EXECUTED', 'SKIPPED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
+    op.execute(
+        "DO $$ BEGIN CREATE TYPE strategysource AS ENUM ('AI', 'USER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$"
+    )
+    op.execute(
+        "DO $$ BEGIN CREATE TYPE strategystatus AS ENUM ('PROPOSED', 'ACTIVE', 'PAUSED', 'COMPLETED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$"
+    )
+    op.execute(
+        "DO $$ BEGIN CREATE TYPE actionstatus AS ENUM ('PENDING', 'EXECUTED', 'SKIPPED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$"
+    )
 
     # Create tables via raw SQL to avoid SQLAlchemy re-creating enums
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE strategies (
             id UUID PRIMARY KEY,
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -40,10 +47,12 @@ def upgrade() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """)
+    """
+    )
     op.create_index("ix_strategies_user_id", "strategies", ["user_id"])
 
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE strategy_actions (
             id UUID PRIMARY KEY,
             strategy_id UUID NOT NULL REFERENCES strategies(id) ON DELETE CASCADE,
@@ -57,8 +66,11 @@ def upgrade() -> None:
             executed_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """)
-    op.create_index("ix_strategy_actions_strategy_id", "strategy_actions", ["strategy_id"])
+    """
+    )
+    op.create_index(
+        "ix_strategy_actions_strategy_id", "strategy_actions", ["strategy_id"]
+    )
 
 
 def downgrade() -> None:

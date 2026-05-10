@@ -309,12 +309,22 @@ async def get_performance_summary(
             "cvar_95": analytics.cvar_95,
         },
         "top_gainers": [
-            {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
+            {
+                "symbol": a.symbol,
+                "name": a.name,
+                "asset_type": a.asset_type,
+                "gain_loss_percent": a.gain_loss_percent,
+            }
             for a in by_gain[:5]
             if a.gain_loss_percent > 0
         ],
         "top_losers": [
-            {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "gain_loss_percent": a.gain_loss_percent}
+            {
+                "symbol": a.symbol,
+                "name": a.name,
+                "asset_type": a.asset_type,
+                "gain_loss_percent": a.gain_loss_percent,
+            }
             for a in reversed(by_gain[-5:])
             if a.gain_loss_percent < 0
         ],
@@ -329,7 +339,12 @@ async def get_performance_summary(
             for a in by_value[:5]
         ],
         "most_volatile": [
-            {"symbol": a.symbol, "name": a.name, "asset_type": a.asset_type, "volatility": a.volatility_30d}
+            {
+                "symbol": a.symbol,
+                "name": a.name,
+                "asset_type": a.asset_type,
+                "volatility": a.volatility_30d,
+            }
             for a in by_vol[:5]
         ],
     }
@@ -432,7 +447,11 @@ async def get_stress_test(
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     ids = [s.strip() for s in scenario_ids.split(",") if s.strip()] if scenario_ids else None
     return await analytics_service.stress_test(
-        db, str(current_user.id), portfolio_id=portfolio_id, currency=currency, scenario_ids=ids
+        db,
+        str(current_user.id),
+        portfolio_id=portfolio_id,
+        currency=currency,
+        scenario_ids=ids,
     )
 
 
@@ -457,7 +476,10 @@ async def get_monte_carlo(
     ),
     ter_percentage: float = Query(0.0, ge=0, le=5, description="Annual TER/expense ratio (%)"),
     monthly_withdrawal: float = Query(
-        0.0, ge=0, le=1_000_000, description="Fixed monthly withdrawal (€) — absolute mode, overrides rate"
+        0.0,
+        ge=0,
+        le=1_000_000,
+        description="Fixed monthly withdrawal (€) — absolute mode, overrides rate",
     ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

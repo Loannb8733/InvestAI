@@ -240,7 +240,10 @@ async def delete_asset(
     # Also clear references within the asset's own transactions
     await db.execute(
         sql_update(Transaction)
-        .where(Transaction.asset_id == asset_id, Transaction.related_transaction_id.isnot(None))
+        .where(
+            Transaction.asset_id == asset_id,
+            Transaction.related_transaction_id.isnot(None),
+        )
         .values(related_transaction_id=None)
     )
     await db.flush()

@@ -189,7 +189,10 @@ class NotificationService:
 
         logger.info(
             f"Created in-app notification for user {user_id}: {title}",
-            extra={"user_id": str(user_id), "notification_type": notification_type.value},
+            extra={
+                "user_id": str(user_id),
+                "notification_type": notification_type.value,
+            },
         )
 
         return notification

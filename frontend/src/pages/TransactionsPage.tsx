@@ -406,7 +406,6 @@ export default function TransactionsPage() {
     return sortedTransactions.slice(start, start + ITEMS_PER_PAGE)
   }, [sortedTransactions, currentPage])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setCurrentPage(1)
     setSelectedIds(new Set())

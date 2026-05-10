@@ -78,7 +78,10 @@ class TestBullMarketRegimeDetection:
         prices = _generate_bull_prices(120)
         detector = MarketRegimeDetector()
         result = detector.detect(prices, "BTC_BULL")
-        assert result.dominant_regime in ("bullish", "top"), f"Expected bullish or top, got {result.dominant_regime}"
+        assert result.dominant_regime in (
+            "bullish",
+            "top",
+        ), f"Expected bullish or top, got {result.dominant_regime}"
 
     def test_6phase_markup_in_bull(self):
         """Bullish regime → refine_to_6phase should return 'markup'."""

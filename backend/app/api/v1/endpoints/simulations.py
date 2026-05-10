@@ -56,7 +56,8 @@ class FIREParameters(BaseModel):
     """Parameters for FIRE calculation."""
 
     current_portfolio_value: Optional[float] = Field(
-        None, description="Override portfolio value. If omitted, uses live dashboard value."
+        None,
+        description="Override portfolio value. If omitted, uses live dashboard value.",
     )
     monthly_contribution: float = Field(default=0, ge=0)
     monthly_expenses: float = Field(..., gt=0)

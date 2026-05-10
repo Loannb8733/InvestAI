@@ -17,16 +17,20 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     # Check if columns already exist (SQLAlchemy create_all may have added them)
-    result = conn.execute(sa.text(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_name = 'goals' AND column_name = 'deadline_date'"
-    ))
+    result = conn.execute(
+        sa.text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'goals' AND column_name = 'deadline_date'"
+        )
+    )
     if result.fetchone():
         return  # Columns already exist
 
     # Create enum types (checkfirst handles existing enums from create_all)
     goal_priority = sa.Enum("LOW", "MEDIUM", "HIGH", name="goalpriority")
-    goal_strategy = sa.Enum("AGGRESSIVE", "MODERATE", "CONSERVATIVE", name="goalstrategy")
+    goal_strategy = sa.Enum(
+        "AGGRESSIVE", "MODERATE", "CONSERVATIVE", name="goalstrategy"
+    )
     goal_priority.create(conn, checkfirst=True)
     goal_strategy.create(conn, checkfirst=True)
 
@@ -37,7 +41,9 @@ def upgrade() -> None:
     )
     op.add_column(
         "goals",
-        sa.Column("strategy_type", goal_strategy, server_default="MODERATE", nullable=False),
+        sa.Column(
+            "strategy_type", goal_strategy, server_default="MODERATE", nullable=False
+        ),
     )
 
 

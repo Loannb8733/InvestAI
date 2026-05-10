@@ -292,7 +292,10 @@ def cycle_position(ctx: MarketContext, regime_probs: Optional[dict] = None) -> f
         ("bearish", "top"): +3,  # bear + top = early bear
         ("bearish", "bullish"): -2,
         ("bottom", "bearish"): +5,  # bottom + bear = early bottom
-        ("bottom", "bullish"): -3,  # bottom + bull = late bottom, moving to accumulation
+        (
+            "bottom",
+            "bullish",
+        ): -3,  # bottom + bull = late bottom, moving to accumulation
         ("bullish", "bottom"): +3,  # bull + bottom = early bull
         ("bullish", "top"): -3,  # bull + top = late bull
         ("top", "bullish"): +3,  # top + bull = early distribution
@@ -378,7 +381,9 @@ def sharpe_classification() -> Tuple[float, float, float, float]:
     return 1.5, 1.0, 0.5, 0.0
 
 
-def volatility_warning_thresholds(ctx: Optional[MarketContext] = None) -> Tuple[float, float]:
+def volatility_warning_thresholds(
+    ctx: Optional[MarketContext] = None,
+) -> Tuple[float, float]:
     """Return (high_pct, extreme_pct) annualized volatility warning thresholds.
 
     Adapted by asset type: crypto naturally has higher volatility.

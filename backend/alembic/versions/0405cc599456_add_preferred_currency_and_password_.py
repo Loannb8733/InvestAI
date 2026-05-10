@@ -21,9 +21,22 @@ def upgrade() -> None:
     op.add_column("notes", sa.Column("transaction_ids", sa.Text(), nullable=True))
     op.add_column("notes", sa.Column("attachments", sa.Text(), nullable=True))
     op.add_column("notes", sa.Column("sentiment", sa.String(length=20), nullable=True))
-    op.add_column("users", sa.Column("preferred_currency", sa.String(length=10), server_default="EUR", nullable=False))
-    op.add_column("users", sa.Column("password_reset_token", sa.String(length=100), nullable=True))
-    op.add_column("users", sa.Column("password_reset_expires", sa.String(length=30), nullable=True))
+    op.add_column(
+        "users",
+        sa.Column(
+            "preferred_currency",
+            sa.String(length=10),
+            server_default="EUR",
+            nullable=False,
+        ),
+    )
+    op.add_column(
+        "users", sa.Column("password_reset_token", sa.String(length=100), nullable=True)
+    )
+    op.add_column(
+        "users",
+        sa.Column("password_reset_expires", sa.String(length=30), nullable=True),
+    )
 
 
 def downgrade() -> None:
