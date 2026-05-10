@@ -122,7 +122,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
             logger.error(f"Middleware error: {type(e).__name__}: {e}")
             logger.error(f"Traceback:\n{traceback.format_exc()}")
-            raise
+            # Return a proper response instead of re-raising: re-raising a
+            # BaseHTTPMiddleware exception bypasses CORSMiddleware's send
+            # wrapper, resulting in 500 responses without CORS headers.
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+                headers={"X-Request-ID": trace_id},
+            )
 
 
 def _fix_multiplatform_assets():
@@ -672,9 +679,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     detail = "An internal error occurred. Please try again later."
     if settings.APP_ENV != "production":
         detail = f"{type(exc).__name__}: {exc}\n{tb}"
+    # Safety net: add CORS headers directly in case the exception propagated
+    # past the CORSMiddleware send wrapper (e.g. from an async generator edge case).
+    origin = request.headers.get("origin", "")
+    extra_headers: dict = {}
+    if origin and _is_allowed_origin(origin):
+        extra_headers["Access-Control-Allow-Origin"] = origin
+        extra_headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
         content={"detail": detail},
+        headers=extra_headers if extra_headers else None,
     )
 
 

@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -469,10 +469,11 @@ class MetricsService:
             all_txs = all_tx_result.scalars().all()
             # TRANSFER_OUT must be processed before TRANSFER_IN at the same timestamp
             # so FIFO transit layers exist when the matching TRANSFER_IN is consumed.
+            _epoch = datetime.min.replace(tzinfo=timezone.utc)
             all_txs = sorted(
                 all_txs,
                 key=lambda tx: (
-                    tx.executed_at or datetime.min,
+                    tx.executed_at or _epoch,
                     0 if tx.transaction_type == TxType.TRANSFER_OUT else 1,
                     str(tx.id),
                 ),
