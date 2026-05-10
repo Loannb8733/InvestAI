@@ -39,7 +39,7 @@ async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
 
     result = await db.execute(
         select(
-            sqlfunc.sum(Transaction.quantity * Transaction.price),
+            sqlfunc.sum(Transaction.quantity * Transaction.price + Transaction.fee),
             sqlfunc.sum(Transaction.quantity),
         ).where(
             Transaction.asset_id == asset.id,

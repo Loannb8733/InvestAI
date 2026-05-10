@@ -154,7 +154,7 @@ def compute_cump_pru(
 
         elif ttype == TxType.TRANSFER_IN:
             if price > _ZERO:
-                s["cost"] += qty * price
+                s["cost"] += qty * price + fee
                 s["buy_qty"] += qty
                 if s["buy_qty"] > _ZERO:
                     s["pru"] = s["cost"] / s["buy_qty"]
@@ -467,6 +467,16 @@ class MetricsService:
                 .order_by(Transaction.executed_at, Transaction.id)
             )
             all_txs = all_tx_result.scalars().all()
+            # TRANSFER_OUT must be processed before TRANSFER_IN at the same timestamp
+            # so FIFO transit layers exist when the matching TRANSFER_IN is consumed.
+            all_txs = sorted(
+                all_txs,
+                key=lambda tx: (
+                    tx.executed_at or datetime.min,
+                    0 if tx.transaction_type == TxType.TRANSFER_OUT else 1,
+                    str(tx.id),
+                ),
+            )
 
             # Fetch ALL portfolio assets (including qty=0) for FIFO symbol/exchange
             # lookups — zero-qty assets may have TRANSFER_OUT transactions whose
