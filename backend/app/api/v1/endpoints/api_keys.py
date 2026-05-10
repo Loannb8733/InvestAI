@@ -1205,8 +1205,46 @@ async def import_trade_history(
         # Create STAKING transactions for Earn variants (LDUSDC → staking USDC, etc.)
         staking_created = 0
         for base_sym, staked_qty in earn_staked.items():
-            if staked_qty <= 0 or base_sym not in existing_assets:
+            if staked_qty <= 0:
                 continue
+            if base_sym not in existing_assets:
+                # Earn-only asset: user never traded the base symbol on spot, so
+                # _get_or_create_asset was never called.  Create it now from the
+                # merged normalized balance so the stablecoin card picks it up.
+                earn_balance = balance_map.get(base_sym)
+                if not earn_balance:
+                    logger.warning("%s: earn_staked entry but no balance_map entry, skipping", base_sym)
+                    continue
+                existing_earn_check = await db.execute(
+                    select(Asset).where(
+                        Asset.portfolio_id == portfolio.id,
+                        Asset.symbol == base_sym,
+                        Asset.exchange == service.exchange_name,
+                    )
+                )
+                existing_earn_asset = existing_earn_check.scalar_one_or_none()
+                if existing_earn_asset:
+                    existing_assets[base_sym] = existing_earn_asset
+                else:
+                    new_earn_asset = Asset(
+                        portfolio_id=portfolio.id,
+                        symbol=base_sym,
+                        name=base_sym,
+                        asset_type=AssetType.CRYPTO,
+                        quantity=float(earn_balance.total),
+                        avg_buy_price=0,
+                        currency="EUR",
+                        exchange=service.exchange_name,
+                    )
+                    db.add(new_earn_asset)
+                    await db.flush()
+                    existing_assets[base_sym] = new_earn_asset
+                    logger.info(
+                        "%s: created earn-only asset from balance (%s %.8f)",
+                        base_sym,
+                        service.exchange_name,
+                        float(earn_balance.total),
+                    )
             asset = existing_assets[base_sym]
             # Check if a staking tx already exists for this asset
             existing_staking = await db.execute(
@@ -1477,14 +1515,35 @@ async def sync_exchange(
             "JPY",
         ]
 
-        for balance in balances:
+        # Normalize earn variants (LDUSDC → USDC, etc.) and merge quantities
+        # so Binance savings balances are tracked under the base symbol.
+        from app.services.exchanges.base import ExchangeBalance as _ExchangeBalance
+        from app.tasks.sync_exchanges import _normalize_earn_variant
+
+        normalized_sync_balances: dict = {}
+        for _b in balances:
+            _norm = _normalize_earn_variant(_b.symbol) or _b.symbol
+            if _norm in normalized_sync_balances:
+                _prev = normalized_sync_balances[_norm]
+                normalized_sync_balances[_norm] = _ExchangeBalance(
+                    symbol=_norm,
+                    free=_prev.free + _b.free,
+                    locked=_prev.locked + _b.locked,
+                    total=_prev.total + _b.total,
+                )
+            else:
+                normalized_sync_balances[_norm] = _ExchangeBalance(
+                    symbol=_norm, free=_b.free, locked=_b.locked, total=_b.total
+                )
+
+        for symbol, balance in normalized_sync_balances.items():
             # Skip fiat currencies only
-            if balance.symbol in fiat_currencies:
+            if symbol in fiat_currencies:
                 continue
 
-            if balance.symbol in existing_assets:
+            if symbol in existing_assets:
                 # Update existing asset
-                asset = existing_assets[balance.symbol]
+                asset = existing_assets[symbol]
 
                 # Skip assets transferred to cold wallets (exchange != this exchange)
                 if asset.exchange and asset.exchange != service.exchange_name:
@@ -1501,8 +1560,8 @@ async def sync_exchange(
                 # Create new asset
                 asset = Asset(
                     portfolio_id=portfolio.id,
-                    symbol=balance.symbol,
-                    name=balance.symbol,
+                    symbol=symbol,
+                    name=symbol,
                     asset_type=AssetType.CRYPTO,
                     quantity=float(balance.total),
                     avg_buy_price=0,
