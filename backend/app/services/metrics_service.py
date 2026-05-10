@@ -540,7 +540,7 @@ class MetricsService:
                             matched_qty = Decimal(str(ci.quantity))
                             break
                 else:
-                    # Kraken / generic: match trade_id suffix
+                    # Kraken / generic: match trade_id suffix in notes
                     m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
                     if m:
                         suffix = m.group(1)
@@ -561,6 +561,32 @@ class MetricsService:
                                         co_tx.id,
                                     )
                                 break
+
+                    if not dest_sym:
+                        # Fallback: match via external_id for records synced before
+                        # the notes-format fix (those records have no trade_id in notes
+                        # but do carry external_id="convert_sell_{refid}").
+                        ext_id = getattr(co_tx, "external_id", None) or ""
+                        if ext_id.startswith("convert_sell_"):
+                            suffix = ext_id[len("convert_sell_") :]
+                            for ci in conv_ins:
+                                ci_ext = getattr(ci, "external_id", None) or ""
+                                if ci_ext == f"convert_buy_{suffix}":
+                                    candidate = aid_to_symbol.get(str(ci.asset_id), "")
+                                    if candidate and candidate != src_sym:
+                                        dest_sym = candidate
+                                        dest_exch = (ci.exchange or "").strip()
+                                        matched_qty = Decimal(str(ci.quantity))
+                                    else:
+                                        logger.warning(
+                                            "Kraken conversion match (ext_id fallback) rejected: "
+                                            "src=%s == dest=%s (suffix=%s, tx_id=%s)",
+                                            src_sym,
+                                            candidate,
+                                            suffix,
+                                            co_tx.id,
+                                        )
+                                    break
 
                 return dest_sym, dest_exch, matched_qty
 
@@ -752,7 +778,41 @@ class MetricsService:
                     else:
                         # O5: Warn if conversion qty exceeds pool
                         pool_qty = sum(ly["qty"] for ly in fifo.get(key, []))
-                        if qty > pool_qty:
+
+                        # Stablecoin with no tracked history: seed synthetic EUR
+                        # layers so the cost basis propagates to the destination.
+                        # (e.g. USDC acquired off-platform then converted to PAXG)
+                        if pool_qty == _ZERO and is_stablecoin(src_sym):
+                            if src_sym.upper() in {"EURC", "EURT"}:
+                                eur_per_unit = Decimal("1")
+                                layer_ccy = "EUR"
+                                fx = Decimal("1")
+                            else:
+                                # USD-pegged stablecoin: 1 unit ≈ 1 USD → convert to EUR
+                                eur_per_unit = Decimal(str(usd_to_target))
+                                layer_ccy = "USD"
+                                fx = eur_per_unit
+                            fifo[key].append(
+                                {
+                                    "qty": qty,
+                                    "unit_cost": eur_per_unit,
+                                    "unit_cost_base": Decimal("1"),
+                                    "currency": layer_ccy,
+                                    "fx_rate": fx,
+                                    "is_paid": True,
+                                }
+                            )
+                            pool_qty = qty
+                            logger.info(
+                                "Seeded synthetic %s layer for stablecoin %s@%s " "qty=%s unit_cost=%s (tx_id=%s)",
+                                layer_ccy,
+                                src_sym,
+                                exch,
+                                qty,
+                                eur_per_unit,
+                                tx.id,
+                            )
+                        elif qty > pool_qty:
                             logger.warning(
                                 "Over-conversion: CONVERSION_OUT qty=%s > pool=%s " "for %s@%s (tx_id=%s)",
                                 qty,
