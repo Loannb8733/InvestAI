@@ -261,7 +261,8 @@ async def _sync_detailed_transactions(
                         executed_at=trade.timestamp,
                         external_id=trade.trade_id,
                         exchange=service.exchange_name,
-                        notes=f"Conversion {base_asset} -> autre crypto",
+                        # trade_id in notes enables _match_conversion_in regex matching
+                        notes=f"Conversion {base_asset} -> autre crypto (trade_id:{trade.trade_id})",
                     )
                     await _add_transaction_if_new(db, transaction)
                     existing_external_ids.add(trade.trade_id)
@@ -271,20 +272,18 @@ async def _sync_detailed_transactions(
                     # CONVERSION_IN: increase asset quantity
                     trans_type = TransactionType.CONVERSION_IN
 
-                    # Note: price from conversion is a crypto ratio, not EUR price
-                    # Don't use it for avg_buy_price calculation (set to 0)
                     transaction = Transaction(
                         asset_id=asset.id,
                         transaction_type=trans_type,
                         quantity=qty,
-                        price=0,  # No EUR price available for conversions
+                        price=0,
                         fee=float(trade.fee) if trade.fee else 0,
                         fee_currency=trade.fee_currency,
                         currency="EUR",
                         executed_at=trade.timestamp,
                         external_id=trade.trade_id,
                         exchange=service.exchange_name,
-                        notes=f"Conversion autre crypto -> {base_asset}",
+                        notes=f"Conversion autre crypto -> {base_asset} (trade_id:{trade.trade_id})",
                     )
                     await _add_transaction_if_new(db, transaction)
                     existing_external_ids.add(trade.trade_id)
