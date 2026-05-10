@@ -102,7 +102,13 @@ class CryptoComCSVParser(BaseCSVParser):
     """Parser for Crypto.com CSV exports."""
 
     name = "Crypto.com"
-    supported_headers = ["timestamp (utc)", "transaction description", "currency", "amount", "transaction kind"]
+    supported_headers = [
+        "timestamp (utc)",
+        "transaction description",
+        "currency",
+        "amount",
+        "transaction kind",
+    ]
 
     # Map Crypto.com transaction kinds to our types
     KIND_MAPPING = {

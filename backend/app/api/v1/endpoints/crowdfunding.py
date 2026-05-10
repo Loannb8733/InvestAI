@@ -382,7 +382,11 @@ async def get_performance(
                 "projected_total_interest": round(projected_total, 2),
                 "total_received": received,
                 "interest_earned": round(
-                    max(0, received - (invested if p.status == ProjectStatus.COMPLETED else 0)), 2
+                    max(
+                        0,
+                        received - (invested if p.status == ProjectStatus.COMPLETED else 0),
+                    ),
+                    2,
                 ),
                 "elapsed_months": round(elapsed_months, 1),
                 "progress_percent": round(min(100, elapsed_months / max(1, months) * 100), 1),
@@ -455,7 +459,14 @@ async def analyze_documents(
         for a in assets_result.scalars().all():
             val = float(a.current_price or 0) * float(a.quantity or 0)
             total_capital += val
-            if a.symbol and a.symbol.upper() in {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}:
+            if a.symbol and a.symbol.upper() in {
+                "USDT",
+                "USDC",
+                "DAI",
+                "BUSD",
+                "TUSD",
+                "USDG",
+            }:
                 munitions += val
 
     try:
@@ -670,7 +681,11 @@ async def download_document(
     )
 
 
-@router.post("/{project_id}/documents", response_model=list[ProjectDocumentResponse], status_code=201)
+@router.post(
+    "/{project_id}/documents",
+    response_model=list[ProjectDocumentResponse],
+    status_code=201,
+)
 @limiter.limit("10/minute")
 async def upload_documents(
     request: Request,
@@ -826,7 +841,12 @@ async def get_project(
     docs_map = await _get_docs_for_projects(db, [project.id])
     reps_map = await _get_repayments_for_projects(db, [project.id])
     sched_map = await _get_schedules_for_projects(db, [project.id])
-    return _enrich(project, docs_map.get(project.id, []), reps_map.get(project.id, []), sched_map.get(project.id, []))
+    return _enrich(
+        project,
+        docs_map.get(project.id, []),
+        reps_map.get(project.id, []),
+        sched_map.get(project.id, []),
+    )
 
 
 @router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)

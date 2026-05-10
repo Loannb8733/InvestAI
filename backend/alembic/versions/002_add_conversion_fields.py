@@ -25,21 +25,31 @@ def upgrade() -> None:
     op.add_column(
         "transactions",
         sa.Column(
-            "related_transaction_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("transactions.id"), nullable=True
+            "related_transaction_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("transactions.id"),
+            nullable=True,
         ),
     )
 
     # Add conversion_rate field
-    op.add_column("transactions", sa.Column("conversion_rate", sa.Numeric(18, 12), nullable=True))
+    op.add_column(
+        "transactions", sa.Column("conversion_rate", sa.Numeric(18, 12), nullable=True)
+    )
 
     # Create index for related_transaction_id
     op.create_index(
-        op.f("ix_transactions_related_transaction_id"), "transactions", ["related_transaction_id"], unique=False
+        op.f("ix_transactions_related_transaction_id"),
+        "transactions",
+        ["related_transaction_id"],
+        unique=False,
     )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_transactions_related_transaction_id"), table_name="transactions")
+    op.drop_index(
+        op.f("ix_transactions_related_transaction_id"), table_name="transactions"
+    )
     op.drop_column("transactions", "conversion_rate")
     op.drop_column("transactions", "related_transaction_id")
     # Note: Cannot easily remove enum values in PostgreSQL

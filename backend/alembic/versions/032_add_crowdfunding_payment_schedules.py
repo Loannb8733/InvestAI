@@ -37,9 +37,7 @@ def upgrade() -> None:
             nullable=False,
             server_default="0",
         ),
-        sa.Column(
-            "is_completed", sa.Boolean, nullable=False, server_default="false"
-        ),
+        sa.Column("is_completed", sa.Boolean, nullable=False, server_default="false"),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "repayment_id",

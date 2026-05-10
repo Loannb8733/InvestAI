@@ -172,7 +172,18 @@ class TestForexFallback:
 
     def test_stablecoin_symbol_sets_are_disjoint(self):
         """USD-pegged and EUR-pegged stablecoin sets must not overlap."""
-        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD", "PYUSD", "FRAX", "LUSD", "USDG"}
+        usd_stablecoins = {
+            "USDT",
+            "USDC",
+            "BUSD",
+            "DAI",
+            "FDUSD",
+            "TUSD",
+            "PYUSD",
+            "FRAX",
+            "LUSD",
+            "USDG",
+        }
         eur_stablecoins = {"EURC", "EURT"}
         assert usd_stablecoins.isdisjoint(eur_stablecoins)
 

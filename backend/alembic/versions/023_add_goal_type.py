@@ -17,10 +17,12 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     # Check if column already exists
-    result = conn.execute(sa.text(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_name = 'goals' AND column_name = 'goal_type'"
-    ))
+    result = conn.execute(
+        sa.text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'goals' AND column_name = 'goal_type'"
+        )
+    )
     if result.fetchone():
         return
 

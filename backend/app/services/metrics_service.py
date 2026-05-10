@@ -961,7 +961,10 @@ class MetricsService:
                     prices[symbol.upper()] = data["price"]
                     price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
             except (asyncio.TimeoutError, Exception) as e:
-                logger.warning("Crypto price fetch failed (%s), using DB fallback", type(e).__name__)
+                logger.warning(
+                    "Crypto price fetch failed (%s), using DB fallback",
+                    type(e).__name__,
+                )
 
         if stock_symbols:
             from app.services.market_data_service import market_data_service
@@ -981,7 +984,12 @@ class MetricsService:
                             if rate:
                                 stock_price = stock_price * rate
                         except Exception:
-                            logger.warning("Forex %s→%s unavailable for stock %s", quote_ccy, target, symbol)
+                            logger.warning(
+                                "Forex %s→%s unavailable for stock %s",
+                                quote_ccy,
+                                target,
+                                symbol,
+                            )
                     prices[symbol.upper()] = stock_price
                     price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
             except (asyncio.TimeoutError, Exception) as e:
@@ -1047,7 +1055,10 @@ class MetricsService:
                 # Only pass buy_pra when this asset has its own FIFO layers.
                 # Using a symbol-wide PRU from a different exchange would give a
                 # wrong cost basis for assets with no transactions of their own.
-                asset_fkey_check = (asset.symbol.upper(), (asset.exchange or "").strip())
+                asset_fkey_check = (
+                    asset.symbol.upper(),
+                    (asset.exchange or "").strip(),
+                )
                 asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper()) if asset_fkey_check in fifo_seen_keys else None
                 asset_cump_pru = cump_pru_by_fkey.get(asset_fkey_check)
                 metrics = await self.get_asset_metrics(
@@ -1165,7 +1176,18 @@ class MetricsService:
         # This detects depegs (e.g. USDC at $0.87 in March 2023)
         cash_from_stablecoins = Decimal("0")
         stablecoin_list = []
-        usd_stablecoins = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "TUSD", "PYUSD", "FRAX", "LUSD", "USDG"}
+        usd_stablecoins = {
+            "USDT",
+            "USDC",
+            "BUSD",
+            "DAI",
+            "FDUSD",
+            "TUSD",
+            "PYUSD",
+            "FRAX",
+            "LUSD",
+            "USDG",
+        }
         eur_stablecoins = {"EURC", "EURT"}
         _DEPEG_THRESHOLD = 0.02  # 2% deviation from peg triggers warning
 
@@ -1227,7 +1249,12 @@ class MetricsService:
         # Calculate fiat cash value
         cash_from_fiat = Decimal("0")
         fiat_list = []
-        _fiat_rates = {"EUR": eur_to_target, "USD": usd_to_target, "GBP": 1.0, "CHF": 1.0}
+        _fiat_rates = {
+            "EUR": eur_to_target,
+            "USD": usd_to_target,
+            "GBP": 1.0,
+            "CHF": 1.0,
+        }
         # Fetch additional rates for non-target fiat if needed
         for sym in {"GBP", "CHF"} - {target}:
             try:
@@ -1355,7 +1382,10 @@ class MetricsService:
                     from app.ml.historical_data import HistoricalDataFetcher as HDF
 
                     coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in uncached_crypto]
-                    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+                    headers = {
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "application/json",
+                    }
                     coingecko_key = getattr(price_service, "coingecko_api_key", None)
                     if coingecko_key:
                         headers["x-cg-demo-api-key"] = coingecko_key
@@ -1661,7 +1691,8 @@ class MetricsService:
                     "avg_buy_price": (a["total_invested"] / a["total_quantity"] if a["total_quantity"] > 0 else 0.0),
                     "gain_loss_percent": round(a.get("period_change_percent", 0), 2),
                     "percentage": round(
-                        (a["current_value"] / float(total_value) * 100) if float(total_value) > 0 else 0, 2
+                        (a["current_value"] / float(total_value) * 100) if float(total_value) > 0 else 0,
+                        2,
                     ),
                 }
                 for a in aggregated
@@ -1814,7 +1845,15 @@ class MetricsService:
                 ah["total_fees"] += Decimal(str(tx.fee or 0))
 
             # Track buys (including dividend/interest which add quantity)
-            if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN", "DIVIDEND", "INTEREST"]:
+            if tx_type in [
+                "BUY",
+                "TRANSFER_IN",
+                "AIRDROP",
+                "STAKING_REWARD",
+                "CONVERSION_IN",
+                "DIVIDEND",
+                "INTEREST",
+            ]:
                 original_price = Decimal(str(tx.price))
                 resolved_price = _resolve_price(tx, symbol)
                 tx_qty = Decimal(str(tx.quantity))

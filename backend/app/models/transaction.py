@@ -67,7 +67,12 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    asset_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     transaction_type = Column(Enum(TransactionType), nullable=False)
     quantity = Column(Numeric(precision=30, scale=12), nullable=False)
     price = Column(Numeric(precision=24, scale=12), nullable=False)
@@ -80,7 +85,10 @@ class Transaction(Base):
     notes = Column(Text, nullable=True)
     conversion_rate = Column(Numeric(precision=30, scale=12), nullable=True)
     related_transaction_id = Column(
-        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("transactions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     internal_hash = Column(String(40), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

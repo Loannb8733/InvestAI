@@ -227,7 +227,10 @@ async def create_goal(
         try:
             deadline = date.fromisoformat(data.deadline_date)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid deadline_date format, expected YYYY-MM-DD")
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid deadline_date format, expected YYYY-MM-DD",
+            )
 
     # SAVINGS goals force conservative strategy
     strategy = data.strategy_type

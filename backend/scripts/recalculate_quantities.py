@@ -64,7 +64,13 @@ def recalculate_quantities():
                 quantity = Decimal(str(tx[1]))
                 price = Decimal(str(tx[2]))
 
-                if tx_type in ["BUY", "TRANSFER_IN", "AIRDROP", "STAKING_REWARD", "CONVERSION_IN"]:
+                if tx_type in [
+                    "BUY",
+                    "TRANSFER_IN",
+                    "AIRDROP",
+                    "STAKING_REWARD",
+                    "CONVERSION_IN",
+                ]:
                     total_quantity += quantity
                     total_cost += quantity * price
                     total_bought += quantity
@@ -87,7 +93,11 @@ def recalculate_quantities():
                 WHERE id = :asset_id
             """
                 ),
-                {"asset_id": asset_id, "quantity": float(total_quantity), "avg_price": float(avg_price)},
+                {
+                    "asset_id": asset_id,
+                    "quantity": float(total_quantity),
+                    "avg_price": float(avg_price),
+                },
             )
 
             print(f"[{portfolio_name}] {symbol}: {float(total_quantity):.8f} (avg: {float(avg_price):.2f})")

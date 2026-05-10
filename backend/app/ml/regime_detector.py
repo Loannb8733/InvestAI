@@ -18,7 +18,14 @@ from app.ml.market_context import MarketContext, compute_market_context
 logger = logging.getLogger(__name__)
 
 PHASES = ("bearish", "bottom", "bullish", "top")
-PHASES_6 = ("markdown", "bottoming", "accumulation", "markup", "topping", "distribution")
+PHASES_6 = (
+    "markdown",
+    "bottoming",
+    "accumulation",
+    "markup",
+    "topping",
+    "distribution",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +179,9 @@ def _ema(prices: List[float], period: int) -> Optional[List[float]]:
     return ema_vals
 
 
-def _macd(prices: List[float]) -> Optional[Tuple[List[float], List[float], List[float]]]:
+def _macd(
+    prices: List[float],
+) -> Optional[Tuple[List[float], List[float], List[float]]]:
     """Return (macd_series, signal_series, histogram_series) as full lists (P9)."""
     if len(prices) < 35:
         return None
@@ -457,7 +466,10 @@ class MarketRegimeDetector:
                 signal, strength = "top", min(1.0, abs(histogram) * scale_weak)
                 desc = "MACD positif mais ralentit — possible sommet"
             elif histogram <= 0 and hist_rising:
-                signal, strength = "bullish", min(1.0, abs(histogram) * scale_weak) * 0.5
+                signal, strength = (
+                    "bullish",
+                    min(1.0, abs(histogram) * scale_weak) * 0.5,
+                )
                 desc = "MACD positif, histogram remonte — correction temporaire"
             else:
                 signal, strength = "top", min(1.0, abs(histogram) * scale_weak)
@@ -669,7 +681,10 @@ class MarketRegimeDetector:
         return IndicatorSignal("Volatilite 14j", round(vol, 0), signal, round(strength, 2), desc)
 
     def _analyze_fear_greed(
-        self, fg: int, btc_dominance: Optional[float] = None, ctx: Optional[MarketContext] = None
+        self,
+        fg: int,
+        btc_dominance: Optional[float] = None,
+        ctx: Optional[MarketContext] = None,
     ) -> IndicatorSignal:
         # Adaptive F&G thresholds (vol-adjusted)
         if ctx:
@@ -780,7 +795,11 @@ class MarketRegimeDetector:
         return votes
 
     def _compute_confidence(
-        self, probs: Dict[str, float], num_indicators: int, num_prices: int, ctx: Optional[MarketContext] = None
+        self,
+        probs: Dict[str, float],
+        num_indicators: int,
+        num_prices: int,
+        ctx: Optional[MarketContext] = None,
     ) -> float:
         """Confidence based on indicator count, data length, and probability spread.
 
@@ -838,7 +857,12 @@ class MarketRegimeDetector:
         Returns dict with daily_regime, weekly_regime, timeframe_alignment, and note.
         """
         daily = self.detect(
-            prices, symbol, fear_greed, btc_dominance, asset_type=asset_type, market_context=market_context
+            prices,
+            symbol,
+            fear_greed,
+            btc_dominance,
+            asset_type=asset_type,
+            market_context=market_context,
         )
 
         weekly_result = None
@@ -849,7 +873,11 @@ class MarketRegimeDetector:
                 weekly_prices.append(prices[end - 1])
             if len(weekly_prices) >= 7:
                 weekly_result = self.detect(
-                    weekly_prices, f"{symbol}_weekly", fear_greed, btc_dominance, asset_type=asset_type
+                    weekly_prices,
+                    f"{symbol}_weekly",
+                    fear_greed,
+                    btc_dominance,
+                    asset_type=asset_type,
                 )
 
         if weekly_result is None:

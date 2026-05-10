@@ -176,7 +176,12 @@ class TelegramService:
             uid = user_id or "global"
             cooldown_key = f"tg:cooldown:{uid}:{alert_type}:{symbol}"
             if await self._is_on_cooldown(cooldown_key):
-                logger.debug("Telegram alert skipped (cooldown): %s/%s/%s", uid, alert_type, symbol)
+                logger.debug(
+                    "Telegram alert skipped (cooldown): %s/%s/%s",
+                    uid,
+                    alert_type,
+                    symbol,
+                )
                 return None
 
         # Priority prefix
@@ -350,8 +355,14 @@ class TelegramService:
         return _build_inline_keyboard(
             [
                 [
-                    {"text": "\U0001F50D Simuler Impact Ruine", "callback_data": f"sim_ruin:{callback_prefix}"},
-                    {"text": "\u2705 Marquer comme Planifié", "callback_data": f"plan_order:{callback_prefix}"},
+                    {
+                        "text": "\U0001F50D Simuler Impact Ruine",
+                        "callback_data": f"sim_ruin:{callback_prefix}",
+                    },
+                    {
+                        "text": "\u2705 Marquer comme Planifié",
+                        "callback_data": f"plan_order:{callback_prefix}",
+                    },
                 ]
             ]
         )

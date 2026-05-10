@@ -64,7 +64,13 @@ class AIStrategyService:
 
         # --- In bear/bottom/accumulation: best time to buy ---
         # If no explicit buy signals but market is low, treat top-alpha assets as buy candidates
-        is_accumulation_phase = regime_name in ("bearish", "bottom", "accumulation", "markdown", "bottoming")
+        is_accumulation_phase = regime_name in (
+            "bearish",
+            "bottom",
+            "accumulation",
+            "markdown",
+            "bottoming",
+        )
         if is_accumulation_phase and not buy_assets:
             # Force accumulation on top-alpha assets even without explicit buy signal
             # Lower threshold in extreme fear — any positive alpha is worth accumulating
@@ -80,7 +86,13 @@ class AIStrategyService:
         # 1. VCA — Value Cost Averaging
         # PRIORITY in bear/volatile markets — buy more when prices are low
         vca = self._build_vca_strategy(
-            buy_assets, assets, regime_name, regime_confidence, liquidity, total_value, has_high_volatility
+            buy_assets,
+            assets,
+            regime_name,
+            regime_confidence,
+            liquidity,
+            total_value,
+            has_high_volatility,
         )
         if vca:
             strategies.append(vca)
@@ -300,7 +312,12 @@ class AIStrategyService:
             return None
 
         # In bear+volatile, VCA is preferred — but still offer DCA on different assets
-        if has_high_volatility and regime in ("bearish", "bottom", "accumulation", "markdown"):
+        if has_high_volatility and regime in (
+            "bearish",
+            "bottom",
+            "accumulation",
+            "markdown",
+        ):
             # Only skip if we'd be suggesting the exact same assets as VCA
             return None
 
@@ -496,7 +513,11 @@ class AIStrategyService:
         if len(swing_candidates) < 2:
             return None
 
-        top = sorted(swing_candidates, key=lambda a: abs(a.get("predicted_7d_pct", 0)), reverse=True)[:3]
+        top = sorted(
+            swing_candidates,
+            key=lambda a: abs(a.get("predicted_7d_pct", 0)),
+            reverse=True,
+        )[:3]
 
         if liquidity <= 0:
             return None  # Pas de munitions pour du swing
@@ -641,7 +662,13 @@ class AIStrategyService:
         for a in assets:
             w = a.get("weight_pct", 0)
             if w > 0:
-                weights.append({"symbol": a["symbol"], "weight": w, "alpha": a.get("alpha_score", 50)})
+                weights.append(
+                    {
+                        "symbol": a["symbol"],
+                        "weight": w,
+                        "alpha": a.get("alpha_score", 50),
+                    }
+                )
 
         if len(weights) < 3:
             return None

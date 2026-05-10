@@ -240,7 +240,11 @@ class PriceForecaster:
             trend_scores[res.trend] += w
         final_trend = max(trend_scores, key=trend_scores.get)  # type: ignore
         final_strength = self._compute_trend(
-            prices[-1], combined_prices[-1], prices, days_ahead=days_ahead, ctx=market_context
+            prices[-1],
+            combined_prices[-1],
+            prices,
+            days_ahead=days_ahead,
+            ctx=market_context,
         )[1]
 
         # ── 5. Build model_used string and details ───────────────────
@@ -1126,7 +1130,13 @@ class PriceForecaster:
         if symbol and data_hash:
             cached = self._get_cached_model_result(symbol, model_name, data_hash, days_ahead)
             if cached is not None:
-                logger.debug("Cache hit for %s:%s:%s:%d", symbol, model_name, data_hash, days_ahead)
+                logger.debug(
+                    "Cache hit for %s:%s:%s:%d",
+                    symbol,
+                    model_name,
+                    data_hash,
+                    days_ahead,
+                )
                 return cached
 
         # Run the model
@@ -1152,7 +1162,12 @@ class PriceForecaster:
 
     @staticmethod
     def _cache_model_result(
-        symbol: str, model_name: str, data_hash: str, days: int, result: ForecastResult, ttl: int = 14400
+        symbol: str,
+        model_name: str,
+        data_hash: str,
+        days: int,
+        result: ForecastResult,
+        ttl: int = 14400,
     ) -> None:
         """Cache individual model ForecastResult in Redis (sync, default 4h TTL)."""
         try:

@@ -51,7 +51,11 @@ def main():
         headers=headers,
         timeout=60,
     )
-    check("D1: Analytics returns 200", r_dash.status_code == 200, f"status={r_dash.status_code}")
+    check(
+        "D1: Analytics returns 200",
+        r_dash.status_code == 200,
+        f"status={r_dash.status_code}",
+    )
 
     dashboard_value = 0.0
     if r_dash.status_code == 200:
@@ -65,7 +69,11 @@ def main():
         headers=headers,
         timeout=120,
     )
-    check("I1: Top Alpha returns 200", r_alpha.status_code == 200, f"status={r_alpha.status_code}")
+    check(
+        "I1: Top Alpha returns 200",
+        r_alpha.status_code == 200,
+        f"status={r_alpha.status_code}",
+    )
 
     alpha_value = 0.0
     if r_alpha.status_code == 200:
@@ -80,7 +88,11 @@ def main():
         headers=headers,
         timeout=120,
     )
-    check("S1: Strategy Map returns 200", r_strat.status_code == 200, f"status={r_strat.status_code}")
+    check(
+        "S1: Strategy Map returns 200",
+        r_strat.status_code == 200,
+        f"status={r_strat.status_code}",
+    )
 
     strategy_value = 0.0
     if r_strat.status_code == 200:
@@ -96,7 +108,11 @@ def main():
         headers=headers,
         timeout=120,
     )
-    check("H1: Smart Insights Health returns 200", r_health.status_code == 200, f"status={r_health.status_code}")
+    check(
+        "H1: Smart Insights Health returns 200",
+        r_health.status_code == 200,
+        f"status={r_health.status_code}",
+    )
 
     health_value = 0.0
     if r_health.status_code == 200:

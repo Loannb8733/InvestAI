@@ -13,8 +13,17 @@ class PortfolioSnapshot(Base):
     __tablename__ = "portfolio_snapshots"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    portfolio_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("portfolios.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     snapshot_date = Column(DateTime(timezone=True), nullable=False)
     total_value = Column(Numeric(precision=18, scale=2), nullable=False)
     total_invested = Column(Numeric(precision=18, scale=2), nullable=False)

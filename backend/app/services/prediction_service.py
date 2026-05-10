@@ -120,7 +120,11 @@ class PredictionService:
             volumes = cached_hist.get("volumes")
         else:
             hist_result = await self.data_fetcher.get_history_extended(symbol, asset_type.value, days=_HISTORY_DAYS)
-            dates, prices, volumes = hist_result.dates, hist_result.prices, hist_result.volumes
+            dates, prices, volumes = (
+                hist_result.dates,
+                hist_result.prices,
+                hist_result.volumes,
+            )
             if dates and prices:
                 cache_payload = {
                     "dates": [d.isoformat() for d in dates],
@@ -144,7 +148,10 @@ class PredictionService:
                         "BTC",
                         "crypto",
                         _HISTORY_DAYS,
-                        {"dates": [d.isoformat() for d in btc_dates], "prices": btc_prices_raw},
+                        {
+                            "dates": [d.isoformat() for d in btc_dates],
+                            "prices": btc_prices_raw,
+                        },
                     )
 
         # Fetch Fear & Greed Index
@@ -251,7 +258,12 @@ class PredictionService:
                         result_strength = ema_strength
                         result_model = "ema20_sanity_fallback"
                         result_detail = [
-                            {"name": "EMA-20 (sanity fallback)", "weight_pct": 100, "mape": None, "trend": ema_trend}
+                            {
+                                "name": "EMA-20 (sanity fallback)",
+                                "weight_pct": 100,
+                                "mape": None,
+                                "trend": ema_trend,
+                            }
                         ]
                         result_explanations = []
                     else:
@@ -485,7 +497,12 @@ class PredictionService:
             }
 
         recommendation = self._generate_recommendation(
-            trend, trend_strength, current_price, support, resistance, regime_info=regime_info
+            trend,
+            trend_strength,
+            current_price,
+            support,
+            resistance,
+            regime_info=regime_info,
         )
 
         # Log prediction for monitoring (with CI for calibration tracking)
@@ -897,9 +914,12 @@ class PredictionService:
 
             # ── Reliability score from ensemble MAPE + model consensus ──
             models_detail = prediction.models_detail or []
-            skill_score, hit_rate, hit_rate_n, hit_rate_significant = self._compute_reliability_from_ensemble(
-                models_detail, prediction.trend
-            )
+            (
+                skill_score,
+                hit_rate,
+                hit_rate_n,
+                hit_rate_significant,
+            ) = self._compute_reliability_from_ensemble(models_detail, prediction.trend)
 
             reliability_score = skill_score * 0.6 + hit_rate * 0.4
             reliability_score = round(min(reliability_score, 95.0), 1)
@@ -1116,7 +1136,13 @@ class PredictionService:
                     a_dates, a_prices = await self.data_fetcher.get_history(sym, atype, days=90)
                     if a_dates and a_prices:
                         await cache_history(
-                            sym, atype, 90, {"dates": [d.isoformat() for d in a_dates], "prices": a_prices}
+                            sym,
+                            atype,
+                            90,
+                            {
+                                "dates": [d.isoformat() for d in a_dates],
+                                "prices": a_prices,
+                            },
                         )
                         return (sym, a_prices)
                 except Exception:
@@ -1303,7 +1329,10 @@ class PredictionService:
                     }
                     # Compute per-asset MarketContext and cycle_position
                     asset_ctx = compute_market_context(
-                        a_prices_tb, sym, asset_data.get("asset_type", "crypto"), fear_greed
+                        a_prices_tb,
+                        sym,
+                        asset_data.get("asset_type", "crypto"),
+                        fear_greed,
                     )
                     asset_probs = asset_data.get("probabilities")
                     asset_cyc_pos = round(at.cycle_position(asset_ctx, regime_probs=asset_probs))
@@ -1918,7 +1947,10 @@ class PredictionService:
                 if dates and prices:
                     btc_prices = prices
                     await cache_history(
-                        "BTC", "crypto", 90, {"dates": [d.isoformat() for d in dates], "prices": prices}
+                        "BTC",
+                        "crypto",
+                        90,
+                        {"dates": [d.isoformat() for d in dates], "prices": prices},
                     )
         except Exception:
             logger.warning("Failed to fetch BTC history for alpha scoring")
@@ -1971,7 +2003,13 @@ class PredictionService:
                 a_dates, a_prices_raw = await self.data_fetcher.get_history(sym, atype, days=90)
                 if a_dates and a_prices_raw:
                     await cache_history(
-                        sym, atype, 90, {"dates": [d.isoformat() for d in a_dates], "prices": a_prices_raw}
+                        sym,
+                        atype,
+                        90,
+                        {
+                            "dates": [d.isoformat() for d in a_dates],
+                            "prices": a_prices_raw,
+                        },
                     )
                     return (sym, a_prices_raw)
             except Exception:
@@ -2270,41 +2308,141 @@ class PredictionService:
             "Alpha élevé + Bottoming : signal d'achat optimal (RSI survente + divergence)",
             5.0,
         ),
-        ("medium", "bottoming"): ("DCA", "Signal moyen + Bottoming : DCA conservateur", 3.0),
-        ("low", "bottoming"): ("OBSERVER", "Faible alpha + Bottoming : surveiller les signaux", 0.0),
+        ("medium", "bottoming"): (
+            "DCA",
+            "Signal moyen + Bottoming : DCA conservateur",
+            3.0,
+        ),
+        ("low", "bottoming"): (
+            "OBSERVER",
+            "Faible alpha + Bottoming : surveiller les signaux",
+            0.0,
+        ),
         # --- Accumulation (prix stable, Smart Money Flow positif) ---
-        ("high", "accumulation"): ("DCA", "Alpha élevé + Accumulation : accumuler progressivement", 4.0),
-        ("medium", "accumulation"): ("DCA", "Signal moyen + Accumulation : fenêtre d'entrée progressive", 2.0),
-        ("low", "accumulation"): ("OBSERVER", "Faible alpha + Accumulation : pas encore de signal clair", 0.0),
+        ("high", "accumulation"): (
+            "DCA",
+            "Alpha élevé + Accumulation : accumuler progressivement",
+            4.0,
+        ),
+        ("medium", "accumulation"): (
+            "DCA",
+            "Signal moyen + Accumulation : fenêtre d'entrée progressive",
+            2.0,
+        ),
+        ("low", "accumulation"): (
+            "OBSERVER",
+            "Faible alpha + Accumulation : pas encore de signal clair",
+            0.0,
+        ),
         # --- Mark-up (cassure de résistance, volume croissant) ---
-        ("high", "markup"): ("MAINTENIR", "Alpha élevé + Mark-up : laisser courir les gains", 0.0),
-        ("medium", "markup"): ("MAINTENIR", "Signal moyen + Mark-up : conserver les positions", 0.0),
-        ("low", "markup"): ("CONSERVER", "Faible alpha en Mark-up : ne pas vendre", 0.0),
+        ("high", "markup"): (
+            "MAINTENIR",
+            "Alpha élevé + Mark-up : laisser courir les gains",
+            0.0,
+        ),
+        ("medium", "markup"): (
+            "MAINTENIR",
+            "Signal moyen + Mark-up : conserver les positions",
+            0.0,
+        ),
+        ("low", "markup"): (
+            "CONSERVER",
+            "Faible alpha en Mark-up : ne pas vendre",
+            0.0,
+        ),
         # --- Topping (RSI > 70, divergence baissière, risque de retournement) ---
-        ("high", "topping"): ("PRENDRE PROFITS", "Alpha élevé mais Topping : sécuriser 20-30%", -2.0),
-        ("medium", "topping"): ("ALLÉGER", "Signal moyen + Topping : réduire l'exposition", -3.0),
-        ("low", "topping"): ("VENDRE", "Faible alpha + Topping : signal de vente prioritaire", -5.0),
+        ("high", "topping"): (
+            "PRENDRE PROFITS",
+            "Alpha élevé mais Topping : sécuriser 20-30%",
+            -2.0,
+        ),
+        ("medium", "topping"): (
+            "ALLÉGER",
+            "Signal moyen + Topping : réduire l'exposition",
+            -3.0,
+        ),
+        ("low", "topping"): (
+            "VENDRE",
+            "Faible alpha + Topping : signal de vente prioritaire",
+            -5.0,
+        ),
         # --- Distribution (prix stagne sur sommets, gros volumes sortants) ---
-        ("high", "distribution"): ("ALLÉGER", "Alpha élevé + Distribution : sécuriser une partie", -2.0),
-        ("medium", "distribution"): ("VENDRE", "Signal moyen + Distribution : réduire avant le markdown", -4.0),
-        ("low", "distribution"): ("VENDRE", "Faible alpha + Distribution : sortir avant la chute", -5.0),
+        ("high", "distribution"): (
+            "ALLÉGER",
+            "Alpha élevé + Distribution : sécuriser une partie",
+            -2.0,
+        ),
+        ("medium", "distribution"): (
+            "VENDRE",
+            "Signal moyen + Distribution : réduire avant le markdown",
+            -4.0,
+        ),
+        ("low", "distribution"): (
+            "VENDRE",
+            "Faible alpha + Distribution : sortir avant la chute",
+            -5.0,
+        ),
         # --- Markdown (structure descendante, Lower Highs) ---
-        ("high", "markdown"): ("DCA", "Alpha élevé en Markdown : accumuler progressivement (contrarian)", 3.0),
-        ("medium", "markdown"): ("ATTENDRE", "Signal moyen en Markdown : patience, pas de renforcement", 0.0),
-        ("low", "markdown"): ("ÉVITER", "Faible alpha en Markdown : ne pas renforcer", 0.0),
+        ("high", "markdown"): (
+            "DCA",
+            "Alpha élevé en Markdown : accumuler progressivement (contrarian)",
+            3.0,
+        ),
+        ("medium", "markdown"): (
+            "ATTENDRE",
+            "Signal moyen en Markdown : patience, pas de renforcement",
+            0.0,
+        ),
+        ("low", "markdown"): (
+            "ÉVITER",
+            "Faible alpha en Markdown : ne pas renforcer",
+            0.0,
+        ),
         # --- Backward-compat: old 4-phase names still work ---
-        ("high", "bottom"): ("ACHAT FORT", "Alpha élevé + creux de marché : signal d'achat optimal", 5.0),
-        ("high", "bearish"): ("DCA", "Alpha élevé en bear market : accumuler progressivement", 3.0),
+        ("high", "bottom"): (
+            "ACHAT FORT",
+            "Alpha élevé + creux de marché : signal d'achat optimal",
+            5.0,
+        ),
+        ("high", "bearish"): (
+            "DCA",
+            "Alpha élevé en bear market : accumuler progressivement",
+            3.0,
+        ),
         ("high", "bullish"): ("MAINTENIR", "Alpha élevé en bull : laisser courir", 0.0),
-        ("high", "top"): ("PRENDRE PROFITS", "Alpha élevé mais sommet : sécuriser 20-30%", -2.0),
+        ("high", "top"): (
+            "PRENDRE PROFITS",
+            "Alpha élevé mais sommet : sécuriser 20-30%",
+            -2.0,
+        ),
         ("medium", "bottom"): ("DCA", "Signal moyen + creux : DCA conservateur", 3.0),
         ("medium", "bearish"): ("ATTENDRE", "Signal moyen en bear : patience", 0.0),
-        ("medium", "bullish"): ("MAINTENIR", "Signal moyen en bull : conserver les positions", 0.0),
-        ("medium", "top"): ("ALLÉGER", "Signal moyen au sommet : réduire l'exposition", -3.0),
-        ("low", "bottom"): ("OBSERVER", "Faible alpha + creux : surveiller les signaux", 0.0),
+        ("medium", "bullish"): (
+            "MAINTENIR",
+            "Signal moyen en bull : conserver les positions",
+            0.0,
+        ),
+        ("medium", "top"): (
+            "ALLÉGER",
+            "Signal moyen au sommet : réduire l'exposition",
+            -3.0,
+        ),
+        ("low", "bottom"): (
+            "OBSERVER",
+            "Faible alpha + creux : surveiller les signaux",
+            0.0,
+        ),
         ("low", "bearish"): ("ÉVITER", "Faible alpha en bear : ne pas renforcer", 0.0),
-        ("low", "bullish"): ("CONSERVER", "Faible alpha en bull : ne pas vendre non plus", 0.0),
-        ("low", "top"): ("VENDRE", "Faible alpha + sommet : signal de vente prioritaire", -5.0),
+        ("low", "bullish"): (
+            "CONSERVER",
+            "Faible alpha en bull : ne pas vendre non plus",
+            0.0,
+        ),
+        ("low", "top"): (
+            "VENDRE",
+            "Faible alpha + sommet : signal de vente prioritaire",
+            -5.0,
+        ),
     }
 
     async def get_strategy_map(
@@ -2377,7 +2515,12 @@ class PredictionService:
             # Bear market validation: ACHAT FORT requires RSI < 35 confirmation
             # when the global market is in markdown/bearish/distribution
             global_regime = market_regime.get("dominant_regime", "") if market_regime else ""
-            if action == "ACHAT FORT" and global_regime in ("bearish", "top", "markdown", "distribution"):
+            if action == "ACHAT FORT" and global_regime in (
+                "bearish",
+                "top",
+                "markdown",
+                "distribution",
+            ):
                 # Check if scored asset has RSI divergence confirmation
                 has_divergence = any(r.get("label", "") == "Divergence Haussière" for r in scored.get("reasons", []))
                 if not has_divergence:
@@ -2449,7 +2592,12 @@ class PredictionService:
         portfolio_ids = [p.id for p in portfolios]
 
         if not portfolio_ids:
-            return {"current_value": 0, "simulated_value": 0, "impact_percent": 0, "per_asset": []}
+            return {
+                "current_value": 0,
+                "simulated_value": 0,
+                "impact_percent": 0,
+                "per_asset": [],
+            }
 
         result = await db.execute(
             select(Asset).where(
@@ -2602,7 +2750,11 @@ class PredictionService:
 
                 # Search from year header to next year header or end
                 start = year_section_match.start()
-                next_year = re.search(rf'class="[^"]*"[^>]*>\s*{year + 1}\s*<', html[start + 100 :], re.IGNORECASE)
+                next_year = re.search(
+                    rf'class="[^"]*"[^>]*>\s*{year + 1}\s*<',
+                    html[start + 100 :],
+                    re.IGNORECASE,
+                )
                 end = start + 100 + next_year.start() if next_year else len(html)
                 section = html[start:end]
 

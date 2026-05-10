@@ -832,7 +832,17 @@ class BinanceService(BaseExchangeService):
         conversions = []
 
         # Define what we consider fiat/stablecoins (not true crypto)
-        fiat_currencies = ["EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD"]
+        fiat_currencies = [
+            "EUR",
+            "USD",
+            "GBP",
+            "TRY",
+            "RUB",
+            "UAH",
+            "BRL",
+            "AUD",
+            "CAD",
+        ]
         stablecoins = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "FDUSD", "USDP", "GUSD"]
 
         # Sync server time

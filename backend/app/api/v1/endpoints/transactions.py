@@ -44,7 +44,11 @@ async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
         ).where(
             Transaction.asset_id == asset.id,
             Transaction.transaction_type.in_(
-                [TransactionType.BUY, TransactionType.CONVERSION_IN, TransactionType.TRANSFER_IN]
+                [
+                    TransactionType.BUY,
+                    TransactionType.CONVERSION_IN,
+                    TransactionType.TRANSFER_IN,
+                ]
             ),
             Transaction.price > 0,
         )
@@ -247,7 +251,15 @@ async def create_transaction(
     db.add(transaction)
 
     # Update asset quantity for buy/sell
-    add_types = ["buy", "conversion_in", "transfer_in", "airdrop", "staking_reward", "dividend", "interest"]
+    add_types = [
+        "buy",
+        "conversion_in",
+        "transfer_in",
+        "airdrop",
+        "staking_reward",
+        "dividend",
+        "interest",
+    ]
     subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
     if transaction_in.transaction_type.value in add_types:
@@ -503,7 +515,15 @@ async def update_transaction(
         asset_result2 = await db.execute(select(Asset).where(Asset.id == transaction.asset_id))
         asset = asset_result2.scalar_one()
 
-        add_types = ["buy", "transfer_in", "airdrop", "staking_reward", "dividend", "interest", "conversion_in"]
+        add_types = [
+            "buy",
+            "transfer_in",
+            "airdrop",
+            "staking_reward",
+            "dividend",
+            "interest",
+            "conversion_in",
+        ]
         subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
         old_type = transaction.transaction_type.value
@@ -676,7 +696,15 @@ async def delete_transaction(
     asset = asset_result.scalar_one()
 
     # Types that ADD to quantity (revert = subtract)
-    add_types = ["buy", "transfer_in", "airdrop", "staking_reward", "dividend", "interest", "conversion_in"]
+    add_types = [
+        "buy",
+        "transfer_in",
+        "airdrop",
+        "staking_reward",
+        "dividend",
+        "interest",
+        "conversion_in",
+    ]
     # Types that SUBTRACT from quantity (revert = add back)
     subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
@@ -749,7 +777,8 @@ async def import_transactions_csv(
     portfolio_id: Optional[UUID] = Query(None),
     platform: Optional[str] = Query(None),
     destination_exchange: Optional[str] = Query(
-        None, description="Destination platform for transfer_out (e.g. cold wallet name)"
+        None,
+        description="Destination platform for transfer_out (e.g. cold wallet name)",
     ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -902,7 +931,15 @@ async def import_transactions_csv(
             qty, tx_type, exec_at, sym, price = row
             if exec_at:
                 ts_key = int(exec_at.timestamp())  # Second precision
-                existing_tx_keys.add((sym.upper(), tx_type.value, f"{float(qty):.8f}", f"{float(price):.8f}", ts_key))
+                existing_tx_keys.add(
+                    (
+                        sym.upper(),
+                        tx_type.value,
+                        f"{float(qty):.8f}",
+                        f"{float(price):.8f}",
+                        ts_key,
+                    )
+                )
 
     for parsed in parsed_transactions:
         try:
@@ -1012,7 +1049,15 @@ async def import_transactions_csv(
             db.add(transaction)
 
             # Update asset quantity (avg_buy_price recalculated in batch after commit)
-            csv_add_types = ["buy", "transfer_in", "airdrop", "staking_reward", "conversion_in", "dividend", "interest"]
+            csv_add_types = [
+                "buy",
+                "transfer_in",
+                "airdrop",
+                "staking_reward",
+                "conversion_in",
+                "dividend",
+                "interest",
+            ]
             csv_subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
             if trans_type.value in csv_add_types:
                 new_total = float(asset.quantity) + quantity
@@ -1074,8 +1119,14 @@ async def import_transactions_csv(
                         func.coalesce(
                             func.sum(
                                 case(
-                                    (Transaction.transaction_type.in_(add_types), Transaction.quantity),
-                                    (Transaction.transaction_type.in_(sell_types), -Transaction.quantity),
+                                    (
+                                        Transaction.transaction_type.in_(add_types),
+                                        Transaction.quantity,
+                                    ),
+                                    (
+                                        Transaction.transaction_type.in_(sell_types),
+                                        -Transaction.quantity,
+                                    ),
                                     else_=0,
                                 )
                             ),

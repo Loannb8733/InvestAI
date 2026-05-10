@@ -150,7 +150,11 @@ class CrowdfundingCalendarService:
         if event:
             event.is_completed = True
             event.completed_at = datetime.now(timezone.utc)
-            logger.info("Marked calendar event %s as completed for project %s", event.id, project_id)
+            logger.info(
+                "Marked calendar event %s as completed for project %s",
+                event.id,
+                project_id,
+            )
 
     # ──────────────────── Private generators ────────────────────
 

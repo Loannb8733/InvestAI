@@ -194,7 +194,8 @@ class TestGetAssetMetrics:
     async def test_avg_buy_price_excludes_fees_from_display(self, metrics_service):
         """When actual_invested includes transaction fees, avg_buy_price must show
         the fee-exclusive DB value (asset.avg_buy_price) so the displayed PRA matches
-        what the user expects. Fees raise G/L cost but must not inflate the PRA column."""
+        what the user expects. Fees raise G/L cost but must not inflate the PRA column.
+        """
         # PAXG Kraken: DB avg = 4086.82€ (fee-exclusive)
         # actual_invested = 4.31385€ (includes fees) > 0.001 × 4086.82 = 4.08682€
         asset = _make_asset(quantity="0.001", avg_buy_price="4086.82")

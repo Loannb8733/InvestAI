@@ -22,9 +22,18 @@ def upgrade() -> None:
     op.add_column("transactions", sa.Column("deleted_at", sa.DateTime(), nullable=True))
 
     # Critical indexes for transactions table
-    op.create_index("ix_transactions_asset_id_executed_at", "transactions", ["asset_id", "executed_at"], unique=False)
-    op.create_index("ix_transactions_executed_at", "transactions", ["executed_at"], unique=False)
-    op.create_index("ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False)
+    op.create_index(
+        "ix_transactions_asset_id_executed_at",
+        "transactions",
+        ["asset_id", "executed_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_transactions_executed_at", "transactions", ["executed_at"], unique=False
+    )
+    op.create_index(
+        "ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False
+    )
 
     # Critical indexes for portfolio_snapshots table
     op.create_index(
@@ -41,14 +50,31 @@ def upgrade() -> None:
     )
 
     # Critical indexes for assets table
-    op.create_index("ix_assets_portfolio_id_deleted_at", "assets", ["portfolio_id", "deleted_at"], unique=False)
-    op.create_index("ix_assets_portfolio_id_symbol", "assets", ["portfolio_id", "symbol"], unique=False)
+    op.create_index(
+        "ix_assets_portfolio_id_deleted_at",
+        "assets",
+        ["portfolio_id", "deleted_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_assets_portfolio_id_symbol",
+        "assets",
+        ["portfolio_id", "symbol"],
+        unique=False,
+    )
 
     # Critical indexes for portfolios table
-    op.create_index("ix_portfolios_user_id_deleted_at", "portfolios", ["user_id", "deleted_at"], unique=False)
+    op.create_index(
+        "ix_portfolios_user_id_deleted_at",
+        "portfolios",
+        ["user_id", "deleted_at"],
+        unique=False,
+    )
 
     # Critical indexes for alerts table
-    op.create_index("ix_alerts_user_id_is_active", "alerts", ["user_id", "is_active"], unique=False)
+    op.create_index(
+        "ix_alerts_user_id_is_active", "alerts", ["user_id", "is_active"], unique=False
+    )
     op.create_index("ix_alerts_asset_id", "alerts", ["asset_id"], unique=False)
 
 
@@ -59,8 +85,13 @@ def downgrade() -> None:
     op.drop_index("ix_portfolios_user_id_deleted_at", table_name="portfolios")
     op.drop_index("ix_assets_portfolio_id_symbol", table_name="assets")
     op.drop_index("ix_assets_portfolio_id_deleted_at", table_name="assets")
-    op.drop_index("ix_portfolio_snapshots_portfolio_id_snapshot_date", table_name="portfolio_snapshots")
-    op.drop_index("ix_portfolio_snapshots_user_id_snapshot_date", table_name="portfolio_snapshots")
+    op.drop_index(
+        "ix_portfolio_snapshots_portfolio_id_snapshot_date",
+        table_name="portfolio_snapshots",
+    )
+    op.drop_index(
+        "ix_portfolio_snapshots_user_id_snapshot_date", table_name="portfolio_snapshots"
+    )
     op.drop_index("ix_transactions_deleted_at", table_name="transactions")
     op.drop_index("ix_transactions_executed_at", table_name="transactions")
     op.drop_index("ix_transactions_asset_id_executed_at", table_name="transactions")

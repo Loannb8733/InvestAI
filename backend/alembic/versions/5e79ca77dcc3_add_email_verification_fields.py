@@ -20,8 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Add email verification fields to users table
     op.add_column("users", sa.Column("email_verified", sa.Boolean(), nullable=True))
-    op.add_column("users", sa.Column("email_verification_token", sa.String(length=100), nullable=True))
-    op.add_column("users", sa.Column("email_verification_expires", sa.String(length=30), nullable=True))
+    op.add_column(
+        "users",
+        sa.Column("email_verification_token", sa.String(length=100), nullable=True),
+    )
+    op.add_column(
+        "users",
+        sa.Column("email_verification_expires", sa.String(length=30), nullable=True),
+    )
 
     # Set existing users as verified (they were created before this feature)
     op.execute("UPDATE users SET email_verified = true WHERE email_verified IS NULL")

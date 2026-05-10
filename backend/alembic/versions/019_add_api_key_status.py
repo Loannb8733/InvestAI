@@ -29,8 +29,7 @@ def upgrade() -> None:
         "ADD COLUMN status apikeystatus NOT NULL DEFAULT 'active'"
     )
     op.execute(
-        "ALTER TABLE api_keys "
-        "ADD COLUMN error_count INTEGER NOT NULL DEFAULT 0"
+        "ALTER TABLE api_keys " "ADD COLUMN error_count INTEGER NOT NULL DEFAULT 0"
     )
 
 

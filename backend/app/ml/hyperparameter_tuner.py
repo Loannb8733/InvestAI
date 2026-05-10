@@ -131,5 +131,9 @@ def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
     study = optuna.create_study(direction="minimize")
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
-    logger.info("Prophet tuning complete: MAPE=%.2f%%, params=%s", study.best_value, study.best_params)
+    logger.info(
+        "Prophet tuning complete: MAPE=%.2f%%, params=%s",
+        study.best_value,
+        study.best_params,
+    )
     return study.best_params

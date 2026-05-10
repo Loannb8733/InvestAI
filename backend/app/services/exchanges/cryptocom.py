@@ -150,7 +150,11 @@ class CryptoComService(BaseExchangeService):
                 trade_list = result.get("result", {}).get("trade_list", [])
 
                 if trade_list:
-                    logger.debug("Crypto.com: Found %d trades for %s", len(trade_list), instrument)
+                    logger.debug(
+                        "Crypto.com: Found %d trades for %s",
+                        len(trade_list),
+                        instrument,
+                    )
 
                 for trade in trade_list:
                     instrument_name = trade.get("instrument_name", "")
@@ -208,7 +212,10 @@ class CryptoComService(BaseExchangeService):
                 logger.warning("Error fetching balances for trade instruments: %s", e)
 
         instruments_list = list(instruments_to_fetch)
-        logger.debug("Crypto.com: Fetching trades for %d instruments (parallel)", len(instruments_list))
+        logger.debug(
+            "Crypto.com: Fetching trades for %d instruments (parallel)",
+            len(instruments_list),
+        )
 
         # Use semaphore for rate limiting (5 concurrent requests)
         semaphore = asyncio.Semaphore(5)
@@ -340,7 +347,10 @@ class CryptoComService(BaseExchangeService):
             balances = await self.get_balances()
             crypto_assets = [b.symbol for b in balances if b.symbol not in self.FIAT_CURRENCIES]
 
-            logger.debug("Crypto.com: Checking %d crypto assets for conversions", len(crypto_assets))
+            logger.debug(
+                "Crypto.com: Checking %d crypto assets for conversions",
+                len(crypto_assets),
+            )
 
             # Build crypto-to-crypto pairs (e.g., BTC_CRO, ETH_BTC)
             crypto_pairs = set()

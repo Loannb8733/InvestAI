@@ -39,7 +39,12 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     goal_type = Column(Enum(GoalType), default=GoalType.ASSET, nullable=False, server_default="ASSET")
     name = Column(String(200), nullable=False)
     target_amount = Column(Numeric(precision=18, scale=2), nullable=False)

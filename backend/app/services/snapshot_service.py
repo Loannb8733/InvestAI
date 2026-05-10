@@ -611,7 +611,12 @@ class SnapshotService:
                         for row in rows:
                             series[row[0].strftime("%Y-%m-%d")] = float(row[1])
                         price_series[symbol_upper] = series
-                        _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                        _cache_put(
+                            _price_cache,
+                            (symbol_upper, days),
+                            (time.time(), series),
+                            _MAX_PRICE_CACHE,
+                        )
                         continue
                 except Exception as e:
                     logger.warning("DB price lookup failed for %s: %s", symbol_upper, e)
@@ -634,7 +639,12 @@ class SnapshotService:
                 for d, p in zip(dates, prices):
                     series[d.strftime("%Y-%m-%d")] = float(p)
                 price_series[symbol_upper] = series
-                _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                _cache_put(
+                    _price_cache,
+                    (symbol_upper, days),
+                    (time.time(), series),
+                    _MAX_PRICE_CACHE,
+                )
             else:
                 symbols_need_api[symbol_upper] = asset_type
 
@@ -675,7 +685,12 @@ class SnapshotService:
                 if dates and prices:
                     series = {d.strftime("%Y-%m-%d"): float(p) for d, p in zip(dates, prices)}
                     price_series[symbol_upper] = series
-                    _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                    _cache_put(
+                        _price_cache,
+                        (symbol_upper, days),
+                        (time.time(), series),
+                        _MAX_PRICE_CACHE,
+                    )
                     # Persist to PostgreSQL for future requests
                     try:
                         await _persist_prices_to_db(symbol_upper, dates, prices)
@@ -747,9 +762,12 @@ class SnapshotService:
         replay_start = replay_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Build daily holdings
-        daily_holdings, daily_invested, daily_net_capital, asset_types = self._replay_transactions_to_daily_holdings(
-            transactions, replay_start, today
-        )
+        (
+            daily_holdings,
+            daily_invested,
+            daily_net_capital,
+            asset_types,
+        ) = self._replay_transactions_to_daily_holdings(transactions, replay_start, today)
 
         # Collect all symbols that were ever held
         all_symbols: Dict[str, str] = {}
@@ -1106,14 +1124,22 @@ class SnapshotService:
             history = await self.build_portfolio_value_series(db, user_id, days)
 
         if len(history) < 5:
-            return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
+            return {
+                "var_percent": 0.0,
+                "var_amount": 0.0,
+                "confidence_level": confidence_level,
+            }
 
         # Use TWR log returns (consistent with Sharpe/Volatility calculations)
         # Raw simple returns are distorted by capital flows (DCA buys appear as gains)
         returns = self._compute_twr_log_returns(history)
 
         if not returns:
-            return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
+            return {
+                "var_percent": 0.0,
+                "var_amount": 0.0,
+                "confidence_level": confidence_level,
+            }
 
         # Sort returns and find the percentile
         sorted_returns = sorted(returns)
@@ -1121,7 +1147,11 @@ class SnapshotService:
         # For VaR at 95%, we want the 5th percentile of returns
         # With < 20 returns, we don't have enough data for reliable VaR
         if n < 20:
-            return {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": confidence_level}
+            return {
+                "var_percent": 0.0,
+                "var_amount": 0.0,
+                "confidence_level": confidence_level,
+            }
         # Use ceil-based index for correct empirical percentile
         var_index = max(0, math.ceil((1 - confidence_level) * n) - 1)
         var_percent = abs(sorted_returns[var_index]) * 100

@@ -212,7 +212,11 @@ async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, t
     """Cache ensemble forecast result (default 4h TTL)."""
     try:
         r = await _get_redis_txt()
-        await r.setex(f"ensemble:{symbol}:{data_hash}:{days}", ttl, json.dumps(result, default=str))
+        await r.setex(
+            f"ensemble:{symbol}:{data_hash}:{days}",
+            ttl,
+            json.dumps(result, default=str),
+        )
     except Exception as e:
         logger.warning("Failed to cache ensemble: %s", e)
 
@@ -271,7 +275,11 @@ async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> Opti
         if data:
             payload = _verify_and_extract(data)
             if payload is None:
-                logger.warning("HMAC verification failed for model %s:%s — discarding", symbol, model_name)
+                logger.warning(
+                    "HMAC verification failed for model %s:%s — discarding",
+                    symbol,
+                    model_name,
+                )
                 return None
             return pickle.loads(payload)  # nosec B301 — HMAC-verified internal data
     except Exception as e:

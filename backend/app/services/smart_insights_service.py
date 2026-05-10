@@ -332,7 +332,11 @@ class SmartInsightsService:
         )
 
         # Sort insights by severity
-        severity_order = {InsightSeverity.CRITICAL: 0, InsightSeverity.WARNING: 1, InsightSeverity.INFO: 2}
+        severity_order = {
+            InsightSeverity.CRITICAL: 0,
+            InsightSeverity.WARNING: 1,
+            InsightSeverity.INFO: 2,
+        }
         insights.sort(key=lambda x: severity_order.get(x.severity, 3))
 
         return PortfolioHealthReport(
@@ -604,7 +608,12 @@ class SmartInsightsService:
             allocation_by_asset = analytics.allocation_by_asset or {}
             # allocation_by_asset values are in percentage (0-100)
             current_holdings = {
-                sym: {"symbol": sym, "weight": w / 100, "value": total_value * w / 100, "name": sym}
+                sym: {
+                    "symbol": sym,
+                    "weight": w / 100,
+                    "value": total_value * w / 100,
+                    "name": sym,
+                }
                 for sym, w in allocation_by_asset.items()
             }
 
@@ -871,12 +880,24 @@ class SmartInsightsService:
         if dominant == "bearish":
             severity = InsightSeverity.CRITICAL if prob > 0.55 else InsightSeverity.WARNING
             actions = [
-                {"type": "hold", "symbol": "PORTFOLIO", "reason": "Reduire l'exposition aux actifs risques"},
-                {"type": "hold", "symbol": "CASH", "reason": "Constituer une reserve cash (20-30%)"},
+                {
+                    "type": "hold",
+                    "symbol": "PORTFOLIO",
+                    "reason": "Reduire l'exposition aux actifs risques",
+                },
+                {
+                    "type": "hold",
+                    "symbol": "CASH",
+                    "reason": "Constituer une reserve cash (20-30%)",
+                },
             ]
             if prob > 0.60:
                 actions.append(
-                    {"type": "sell", "symbol": "PORTFOLIO", "reason": "Eviter le levier et les positions speculatives"}
+                    {
+                        "type": "sell",
+                        "symbol": "PORTFOLIO",
+                        "reason": "Eviter le levier et les positions speculatives",
+                    }
                 )
             return SmartInsight(
                 category=InsightCategory.RISK,
@@ -907,7 +928,11 @@ class SmartInsightsService:
                 metric_name="market_regime",
                 current_value=prob,
                 actions=[
-                    {"type": "buy", "symbol": "PORTFOLIO", "reason": "Zone d'accumulation potentielle via DCA"},
+                    {
+                        "type": "buy",
+                        "symbol": "PORTFOLIO",
+                        "reason": "Zone d'accumulation potentielle via DCA",
+                    },
                 ],
             )
 
@@ -940,8 +965,16 @@ class SmartInsightsService:
                 metric_name="market_regime",
                 current_value=prob,
                 actions=[
-                    {"type": "sell", "symbol": "PORTFOLIO", "reason": "Prendre des profits partiels"},
-                    {"type": "hold", "symbol": "PORTFOLIO", "reason": "Renforcer les stop-loss"},
+                    {
+                        "type": "sell",
+                        "symbol": "PORTFOLIO",
+                        "reason": "Prendre des profits partiels",
+                    },
+                    {
+                        "type": "hold",
+                        "symbol": "PORTFOLIO",
+                        "reason": "Renforcer les stop-loss",
+                    },
                 ],
             )
 

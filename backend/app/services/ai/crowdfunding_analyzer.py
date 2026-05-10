@@ -619,7 +619,10 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
                     try:
                         data = json.loads(raw_text[start:end])
                     except json.JSONDecodeError:
-                        logger.warning("LLM returned non-JSON, falling back to static: %s", raw_text[:100])
+                        logger.warning(
+                            "LLM returned non-JSON, falling back to static: %s",
+                            raw_text[:100],
+                        )
                         data = None
 
         # Ultimate fallback: static regex analysis

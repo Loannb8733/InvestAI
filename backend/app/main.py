@@ -162,7 +162,11 @@ def _fix_multiplatform_assets():
                 if key not in asset_cache:
                     existing = conn.execute(
                         text("SELECT id FROM assets WHERE portfolio_id = :pid AND symbol = :sym AND exchange = :exc"),
-                        {"pid": r.portfolio_id, "sym": r.symbol, "exc": r.tx_exchange.strip()},
+                        {
+                            "pid": r.portfolio_id,
+                            "sym": r.symbol,
+                            "exc": r.tx_exchange.strip(),
+                        },
                     ).fetchone()
 
                     if existing:
@@ -186,7 +190,12 @@ def _fix_multiplatform_assets():
                             },
                         )
                         asset_cache[key] = new_id
-                        logger.info("Created asset %s/%s (id=%s)", r.symbol, r.tx_exchange.strip(), new_id)
+                        logger.info(
+                            "Created asset %s/%s (id=%s)",
+                            r.symbol,
+                            r.tx_exchange.strip(),
+                            new_id,
+                        )
 
             # Move transactions
             for r in rows:
@@ -319,7 +328,11 @@ def _create_missing_transfer_mirrors():
                         text(
                             "SELECT id FROM assets WHERE portfolio_id = :pid" " AND symbol = :sym AND exchange = :exc"
                         ),
-                        {"pid": r.portfolio_id, "sym": r.symbol, "exc": DEFAULT_DESTINATION},
+                        {
+                            "pid": r.portfolio_id,
+                            "sym": r.symbol,
+                            "exc": DEFAULT_DESTINATION,
+                        },
                     ).fetchone()
 
                     if existing:
@@ -343,7 +356,12 @@ def _create_missing_transfer_mirrors():
                             },
                         )
                         asset_cache[key] = new_id
-                        logger.info("Created asset %s/%s (id=%s)", r.symbol, DEFAULT_DESTINATION, new_id)
+                        logger.info(
+                            "Created asset %s/%s (id=%s)",
+                            r.symbol,
+                            DEFAULT_DESTINATION,
+                            new_id,
+                        )
 
                 # Calculate mirror quantity (subtract network fee if in same asset)
                 qty = float(r.quantity)
@@ -378,7 +396,11 @@ def _create_missing_transfer_mirrors():
                 for em in existing_mirror:
                     eq = float(em.quantity)
                     if eq > 0 and abs(eq - mirror_qty) / eq < 0.01:
-                        logger.info("Skip auto-mirror for %s: transfer_in exists (id=%s)", r.symbol, em.id)
+                        logger.info(
+                            "Skip auto-mirror for %s: transfer_in exists (id=%s)",
+                            r.symbol,
+                            em.id,
+                        )
                         conn.execute(
                             text("UPDATE transactions SET related_transaction_id = :mid WHERE id = :tid"),
                             {"mid": str(em.id), "tid": r.id},
@@ -540,13 +562,22 @@ OPENAPI_TAGS = [
         "name": "Authentication",
         "description": "Login, register, MFA (TOTP), JWT refresh, password reset, email verification.",
     },
-    {"name": "Users", "description": "User management and preferences (admin: list/delete users)."},
+    {
+        "name": "Users",
+        "description": "User management and preferences (admin: list/delete users).",
+    },
     {
         "name": "Dashboard",
         "description": "Portfolio summary, allocation breakdown, performance overview, and recommendations.",
     },
-    {"name": "Portfolios", "description": "CRUD portfolios, snapshot history, rebalancing suggestions."},
-    {"name": "Assets", "description": "CRUD assets (crypto, stocks, ETF, real estate), price history, exchange sync."},
+    {
+        "name": "Portfolios",
+        "description": "CRUD portfolios, snapshot history, rebalancing suggestions.",
+    },
+    {
+        "name": "Assets",
+        "description": "CRUD assets (crypto, stocks, ETF, real estate), price history, exchange sync.",
+    },
     {
         "name": "Transactions",
         "description": "CRUD transactions (buy/sell/dividend/fee/airdrop/conversion), CSV bulk import, P&L.",
@@ -565,12 +596,18 @@ OPENAPI_TAGS = [
         "description": "ML ensemble forecasts (Prophet + ARIMA + XGBoost + EMA + Linear). "
         "Confidence intervals, model breakdown, feature importance.",
     },
-    {"name": "Alerts", "description": "Price and performance alerts with threshold conditions and notifications."},
+    {
+        "name": "Alerts",
+        "description": "Price and performance alerts with threshold conditions and notifications.",
+    },
     {
         "name": "Reports",
         "description": "Generate PDF/Excel reports: performance summary, holdings, French fiscal form 2086.",
     },
-    {"name": "Notes", "description": "Investment journal: create, search, and manage notes per asset or portfolio."},
+    {
+        "name": "Notes",
+        "description": "Investment journal: create, search, and manage notes per asset or portfolio.",
+    },
     {
         "name": "Calendar",
         "description": "Financial calendar: dividends, loyers, scheduled events with recurring support.",
@@ -579,14 +616,26 @@ OPENAPI_TAGS = [
         "name": "Simulations",
         "description": "FIRE calculator, DCA simulator, what-if scenarios, Monte Carlo projections.",
     },
-    {"name": "Notifications", "description": "User notifications: list, mark as read, delete."},
-    {"name": "Insights", "description": "Rule-based insights: concentration risk, volatility alerts, rebalancing."},
+    {
+        "name": "Notifications",
+        "description": "User notifications: list, mark as read, delete.",
+    },
+    {
+        "name": "Insights",
+        "description": "Rule-based insights: concentration risk, volatility alerts, rebalancing.",
+    },
     {
         "name": "Smart Insights",
         "description": "AI-powered recommendations, portfolio health analysis, rebalancing suggestions.",
     },
-    {"name": "Goals", "description": "Financial goals tracking with target amounts, deadlines, and progress."},
-    {"name": "WebSocket", "description": "Real-time price updates via WebSocket connection."},
+    {
+        "name": "Goals",
+        "description": "Financial goals tracking with target amounts, deadlines, and progress.",
+    },
+    {
+        "name": "WebSocket",
+        "description": "Real-time price updates via WebSocket connection.",
+    },
     {"name": "System", "description": "Health check, system stats, version info."},
 ]
 
@@ -794,7 +843,11 @@ async def admin_fix_mirrors(
                         text(
                             "SELECT id FROM assets WHERE portfolio_id = :pid" " AND symbol = :sym AND exchange = :exc"
                         ),
-                        {"pid": r.portfolio_id, "sym": r.symbol, "exc": DEFAULT_DESTINATION},
+                        {
+                            "pid": r.portfolio_id,
+                            "sym": r.symbol,
+                            "exc": DEFAULT_DESTINATION,
+                        },
                     ).fetchone()
                     if existing:
                         asset_cache[key] = str(existing.id)

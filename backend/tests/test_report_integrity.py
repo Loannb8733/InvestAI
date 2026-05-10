@@ -301,7 +301,15 @@ class ReportIntegrityVerifier:
                 ws = wb["Perf. par Plateforme"]
                 # Check header row
                 headers = [ws.cell(row=1, column=c).value for c in range(1, 8)]
-                expected_cols = ["Plateforme", "Nb Actifs", "Valeur", "Investi", "Frais", "P&L Net", "ROI %"]
+                expected_cols = [
+                    "Plateforme",
+                    "Nb Actifs",
+                    "Valeur",
+                    "Investi",
+                    "Frais",
+                    "P&L Net",
+                    "ROI %",
+                ]
                 self._check(
                     "R7b: Plateforme colonnes correctes",
                     headers == expected_cols,

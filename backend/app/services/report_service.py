@@ -494,7 +494,13 @@ class ReportService:
         platform_analysis.sort(key=lambda x: x["total_value"], reverse=True)
 
         # 6. Attribution: Alpha / Beta (BTC) / Protection (Or) / Fixed Income / Munitions
-        attribution = {"alpha": 0.0, "beta": 0.0, "protection": 0.0, "fixed_income": 0.0, "munitions": 0.0}
+        attribution = {
+            "alpha": 0.0,
+            "beta": 0.0,
+            "protection": 0.0,
+            "fixed_income": 0.0,
+            "munitions": 0.0,
+        }
         for ar in all_asset_reports:
             sym = ar.symbol.upper()
             if is_liquidity(sym):
@@ -997,7 +1003,13 @@ class ReportService:
                 tx_dt = tx_dt.replace(tzinfo=_tz.utc)
 
             # Update replay holdings
-            if ttype in (TxType.BUY, TxType.AIRDROP, TxType.STAKING_REWARD, TxType.TRANSFER_IN, TxType.CONVERSION_IN):
+            if ttype in (
+                TxType.BUY,
+                TxType.AIRDROP,
+                TxType.STAKING_REWARD,
+                TxType.TRANSFER_IN,
+                TxType.CONVERSION_IN,
+            ):
                 holdings_replay[sym] += qty
             elif ttype in (TxType.SELL, TxType.TRANSFER_OUT, TxType.CONVERSION_OUT):
                 holdings_replay[sym] = max(_ZERO, holdings_replay[sym] - qty)
@@ -1081,7 +1093,12 @@ class ReportService:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=24, spaceAfter=30, textColor=_BLUE)
         heading_style = ParagraphStyle(
-            "H", parent=styles["Heading2"], fontSize=14, spaceBefore=20, spaceAfter=10, textColor=_DARK_BLUE
+            "H",
+            parent=styles["Heading2"],
+            fontSize=14,
+            spaceBefore=20,
+            spaceAfter=10,
+            textColor=_DARK_BLUE,
         )
         normal_style = styles["Normal"]
         elements = []
@@ -1140,8 +1157,16 @@ class ReportService:
             total_attr = sum(attr.values()) or 1
             attr_data = [
                 ["Catégorie", "Valeur", "Poids"],
-                ["Alpha (Altcoins)", _money(attr.get("alpha", 0)), _pct(attr.get("alpha", 0) / total_attr * 100)],
-                ["Beta (BTC)", _money(attr.get("beta", 0)), _pct(attr.get("beta", 0) / total_attr * 100)],
+                [
+                    "Alpha (Altcoins)",
+                    _money(attr.get("alpha", 0)),
+                    _pct(attr.get("alpha", 0) / total_attr * 100),
+                ],
+                [
+                    "Beta (BTC)",
+                    _money(attr.get("beta", 0)),
+                    _pct(attr.get("beta", 0) / total_attr * 100),
+                ],
                 [
                     "Protection (Or)",
                     _money(attr.get("protection", 0)),
@@ -1244,7 +1269,19 @@ class ReportService:
         assets = data.get("assets", [])
         if assets:
             elements.append(Paragraph("Détail des Actifs", heading_style))
-            rows = [["Symbole", "Type", "Qté", "PRU", "Valeur", "+/- Value", "Perf.", "Break-even", "Risque"]]
+            rows = [
+                [
+                    "Symbole",
+                    "Type",
+                    "Qté",
+                    "PRU",
+                    "Valeur",
+                    "+/- Value",
+                    "Perf.",
+                    "Break-even",
+                    "Risque",
+                ]
+            ]
             for a in assets:
                 rows.append(
                     [
@@ -1349,7 +1386,14 @@ class ReportService:
         portfolios = data.get("portfolios", [])
         if portfolios:
             ws2 = wb.create_sheet("Portefeuilles")
-            headers = ["Nom", "Valeur", "Investi", "+/- Value", "Performance", "Nb Actifs"]
+            headers = [
+                "Nom",
+                "Valeur",
+                "Investi",
+                "+/- Value",
+                "Performance",
+                "Nb Actifs",
+            ]
             for col, h in enumerate(headers, 1):
                 c = ws2.cell(row=1, column=col, value=h)
                 c.font = _XL_HEADER_FONT
@@ -1392,7 +1436,15 @@ class ReportService:
                 c.font = _XL_HEADER_FONT
                 c.fill = _XL_HEADER_FILL
                 c.border = _XL_BORDER
-            money_cols = {6, 7, 8, 9, 10, 11, 13}  # PRU, Prix, Break-even, Investi, Valeur, +/-, Frais
+            money_cols = {
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                13,
+            }  # PRU, Prix, Break-even, Investi, Valeur, +/-, Frais
             pct_cols = {12, 14}  # Perf., Risque
             for row, a in enumerate(assets, 2):
                 vals = [
@@ -1474,7 +1526,11 @@ class ReportService:
                 ("Indice HHI", conc.get("hhi", 0), "0"),
                 ("Concentration", conc.get("interpretation", ""), None),
                 ("Actif dominant", conc.get("top_asset", ""), None),
-                ("Poids actif dominant", (conc.get("top_concentration", 0) or 0) / 100, _XL_PERCENT),
+                (
+                    "Poids actif dominant",
+                    (conc.get("top_concentration", 0) or 0) / 100,
+                    _XL_PERCENT,
+                ),
                 ("", "", None),
                 ("Stress Test -20% (perte)", st20.get("potential_loss", 0), _XL_MONEY),
                 ("Stress Test -20% (valeur)", st20.get("stressed_value", 0), _XL_MONEY),
@@ -1560,7 +1616,15 @@ class ReportService:
         platforms = data.get("platform_analysis", [])
         if platforms:
             ws_plat = wb.create_sheet("Perf. par Plateforme")
-            plat_headers = ["Plateforme", "Nb Actifs", "Valeur", "Investi", "Frais", "P&L Net", "ROI %"]
+            plat_headers = [
+                "Plateforme",
+                "Nb Actifs",
+                "Valeur",
+                "Investi",
+                "Frais",
+                "P&L Net",
+                "ROI %",
+            ]
             for col, h in enumerate(plat_headers, 1):
                 c = ws_plat.cell(row=1, column=col, value=h)
                 c.font = _XL_HEADER_FONT
@@ -1613,10 +1677,25 @@ class ReportService:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=20, spaceAfter=20, textColor=_BLUE)
         heading_style = ParagraphStyle(
-            "H", parent=styles["Heading2"], fontSize=12, spaceBefore=15, spaceAfter=8, textColor=_DARK_BLUE
+            "H",
+            parent=styles["Heading2"],
+            fontSize=12,
+            spaceBefore=15,
+            spaceAfter=8,
+            textColor=_DARK_BLUE,
         )
-        info_style = ParagraphStyle("I", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#64748b"))
-        small_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#64748b"))
+        info_style = ParagraphStyle(
+            "I",
+            parent=styles["Normal"],
+            fontSize=9,
+            textColor=colors.HexColor("#64748b"),
+        )
+        small_style = ParagraphStyle(
+            "S",
+            parent=styles["Normal"],
+            fontSize=8,
+            textColor=colors.HexColor("#64748b"),
+        )
 
         elements = []
 
@@ -1625,7 +1704,8 @@ class ReportService:
         elements.append(Paragraph("Formulaire 2086 — Plus-values sur actifs numériques", heading_style))
         elements.append(
             Paragraph(
-                f"Document généré le {_now_paris().strftime('%d/%m/%Y')} — À usage indicatif uniquement", info_style
+                f"Document généré le {_now_paris().strftime('%d/%m/%Y')} — À usage indicatif uniquement",
+                info_style,
             )
         )
         elements.append(Spacer(1, 20))
@@ -1698,7 +1778,12 @@ class ReportService:
 
         if tax.net_plus_value <= 0:
             elements.append(Spacer(1, 5))
-            elements.append(Paragraph("Aucune imposition : la plus-value nette est négative ou nulle.", info_style))
+            elements.append(
+                Paragraph(
+                    "Aucune imposition : la plus-value nette est négative ou nulle.",
+                    info_style,
+                )
+            )
 
         elements.append(Spacer(1, 20))
 
@@ -1713,7 +1798,16 @@ class ReportService:
             )
             elements.append(Spacer(1, 8))
 
-            header = ["Date", "Actif", "Type", "Qté", "Prix cession", "Fraction acq.", "PV/MV", "Durée"]
+            header = [
+                "Date",
+                "Actif",
+                "Type",
+                "Qté",
+                "Prix cession",
+                "Fraction acq.",
+                "PV/MV",
+                "Durée",
+            ]
             rows = [header]
             for e in sorted(tax.events, key=lambda x: x.date):
                 type_label = "Conv." if e.event_type == "conversion_out" else "Vente"
@@ -1731,7 +1825,19 @@ class ReportService:
                     ]
                 )
 
-            t = Table(rows, colWidths=[2 * cm, 1.6 * cm, 1.4 * cm, 2 * cm, 2.4 * cm, 2.4 * cm, 2.2 * cm, 1.6 * cm])
+            t = Table(
+                rows,
+                colWidths=[
+                    2 * cm,
+                    1.6 * cm,
+                    1.4 * cm,
+                    2 * cm,
+                    2.4 * cm,
+                    2.4 * cm,
+                    2.2 * cm,
+                    1.6 * cm,
+                ],
+            )
             style_cmds = [
                 ("BACKGROUND", (0, 0), (-1, 0), _BLUE),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -1750,7 +1856,12 @@ class ReportService:
             t.setStyle(TableStyle(style_cmds))
             elements.append(t)
         else:
-            elements.append(Paragraph("Aucune cession d'actifs numériques enregistrée pour cette année.", info_style))
+            elements.append(
+                Paragraph(
+                    "Aucune cession d'actifs numériques enregistrée pour cette année.",
+                    info_style,
+                )
+            )
 
         elements.append(Spacer(1, 30))
 
@@ -1803,7 +1914,11 @@ class ReportService:
             ("  dont court terme (< 2 ans)", tax.nb_court_terme, None),
             ("  dont long terme (≥ 2 ans)", tax.nb_long_terme, None),
             ("Prix total de cession", tax.total_cessions, _XL_MONEY),
-            ("Fraction d'acquisition (PMP)", tax.total_acquisitions_fraction, _XL_MONEY),
+            (
+                "Fraction d'acquisition (PMP)",
+                tax.total_acquisitions_fraction,
+                _XL_MONEY,
+            ),
             ("Total plus-values", tax.total_plus_values, _XL_MONEY),
             ("Total moins-values", tax.total_moins_values, _XL_MONEY),
             ("Plus-value nette imposable", tax.net_plus_value, _XL_MONEY),
@@ -1905,7 +2020,12 @@ class ReportService:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=20, spaceAfter=20, textColor=_BLUE)
         heading_style = ParagraphStyle(
-            "H", parent=styles["Heading2"], fontSize=12, spaceBefore=15, spaceAfter=8, textColor=_DARK_BLUE
+            "H",
+            parent=styles["Heading2"],
+            fontSize=12,
+            spaceBefore=15,
+            spaceAfter=8,
+            textColor=_DARK_BLUE,
         )
         normal_style = styles["Normal"]
         elements = []
@@ -1960,7 +2080,17 @@ class ReportService:
                 "staking": "Staking",
                 "unstaking": "Unstaking",
             }
-            rows = [["Date", "Type", "Actif", "Quantité", "Prix Unitaire", "Valeur Totale", "Frais"]]
+            rows = [
+                [
+                    "Date",
+                    "Type",
+                    "Actif",
+                    "Quantité",
+                    "Prix Unitaire",
+                    "Valeur Totale",
+                    "Frais",
+                ]
+            ]
             for tx in transactions:
                 rows.append(
                     [
@@ -1973,7 +2103,18 @@ class ReportService:
                         _money(tx.fee),
                     ]
                 )
-            t = Table(rows, colWidths=[2.2 * cm, 2.2 * cm, 2 * cm, 2.4 * cm, 2.8 * cm, 2.8 * cm, 2 * cm])
+            t = Table(
+                rows,
+                colWidths=[
+                    2.2 * cm,
+                    2.2 * cm,
+                    2 * cm,
+                    2.4 * cm,
+                    2.8 * cm,
+                    2.8 * cm,
+                    2 * cm,
+                ],
+            )
             t.setStyle(
                 TableStyle(
                     [
@@ -2020,7 +2161,15 @@ class ReportService:
             "unstaking": "Unstaking",
         }
 
-        headers = ["Date", "Type", "Actif", "Quantité", "Prix Unitaire (EUR)", "Valeur Totale (EUR)", "Frais (EUR)"]
+        headers = [
+            "Date",
+            "Type",
+            "Actif",
+            "Quantité",
+            "Prix Unitaire (EUR)",
+            "Valeur Totale (EUR)",
+            "Frais (EUR)",
+        ]
         for col, h in enumerate(headers, 1):
             c = ws.cell(row=1, column=col, value=h)
             c.font = _XL_HEADER_FONT
@@ -2030,7 +2179,9 @@ class ReportService:
         for row, tx in enumerate(transactions, 2):
             ws.cell(row=row, column=1, value=tx.date.strftime("%d/%m/%Y") if tx.date else "").border = _XL_BORDER
             ws.cell(
-                row=row, column=2, value=_TYPE_MAP.get(tx.transaction_type, tx.transaction_type)
+                row=row,
+                column=2,
+                value=_TYPE_MAP.get(tx.transaction_type, tx.transaction_type),
             ).border = _XL_BORDER
             ws.cell(row=row, column=3, value=tx.symbol).border = _XL_BORDER
             c = ws.cell(row=row, column=4, value=tx.quantity)
@@ -2062,7 +2213,15 @@ class ReportService:
         buffer = io.StringIO()
         writer = csv.writer(buffer, delimiter=";")
         writer.writerow(
-            ["Date", "Type", "Actif", "Quantité", "Prix Unitaire (EUR)", "Valeur Totale (EUR)", "Frais (EUR)"]
+            [
+                "Date",
+                "Type",
+                "Actif",
+                "Quantité",
+                "Prix Unitaire (EUR)",
+                "Valeur Totale (EUR)",
+                "Frais (EUR)",
+            ]
         )
 
         for tx in transactions:

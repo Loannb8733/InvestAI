@@ -42,12 +42,16 @@ def upgrade() -> None:
         sa.Column("tri", sa.Numeric(precision=6, scale=3), nullable=True),
         sa.Column("duration_min", sa.Integer, nullable=True),
         sa.Column("duration_max", sa.Integer, nullable=True),
-        sa.Column("collection_amount", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column(
+            "collection_amount", sa.Numeric(precision=14, scale=2), nullable=True
+        ),
         sa.Column("margin_percent", sa.Numeric(precision=6, scale=3), nullable=True),
         sa.Column("ltv", sa.Numeric(precision=6, scale=3), nullable=True),
         sa.Column("ltc", sa.Numeric(precision=6, scale=3), nullable=True),
         sa.Column("pre_sales_percent", sa.Numeric(precision=6, scale=3), nullable=True),
-        sa.Column("equity_contribution", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column(
+            "equity_contribution", sa.Numeric(precision=14, scale=2), nullable=True
+        ),
         # Guarantees & admin
         sa.Column("guarantees", JSONB, server_default="[]"),
         sa.Column("admin_status", sa.String(100), nullable=True),
@@ -63,7 +67,9 @@ def upgrade() -> None:
         sa.Column("points_vigilance", JSONB, server_default="[]"),
         sa.Column("red_flags", JSONB, server_default="[]"),
         sa.Column("verdict", sa.String(20), nullable=True),
-        sa.Column("suggested_investment", sa.Numeric(precision=12, scale=2), nullable=True),
+        sa.Column(
+            "suggested_investment", sa.Numeric(precision=12, scale=2), nullable=True
+        ),
         sa.Column("raw_analysis", sa.Text, nullable=True),
         # Timestamps
         sa.Column(

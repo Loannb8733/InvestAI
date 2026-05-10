@@ -49,7 +49,20 @@ class KrakenService(BaseExchangeService):
     }
 
     # Known quote currencies in Kraken pairs (order matters - longer first)
-    QUOTE_CURRENCIES = ["ZEUR", "ZUSD", "ZGBP", "XXBT", "XETH", "EUR", "USD", "GBP", "BTC", "ETH", "USDT", "USDC"]
+    QUOTE_CURRENCIES = [
+        "ZEUR",
+        "ZUSD",
+        "ZGBP",
+        "XXBT",
+        "XETH",
+        "EUR",
+        "USD",
+        "GBP",
+        "BTC",
+        "ETH",
+        "USDT",
+        "USDC",
+    ]
 
     # Fiat currencies (for filtering)
     FIAT_CURRENCIES = ["EUR", "USD", "GBP", "JPY", "CAD", "AUD", "CHF"]

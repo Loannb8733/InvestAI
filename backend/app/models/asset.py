@@ -24,14 +24,22 @@ class AssetType(str, enum.Enum):
 class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
-        UniqueConstraint("portfolio_id", "symbol", "exchange", name="uq_assets_portfolio_symbol_exchange"),
+        UniqueConstraint(
+            "portfolio_id",
+            "symbol",
+            "exchange",
+            name="uq_assets_portfolio_symbol_exchange",
+        ),
         CheckConstraint("quantity >= 0", name="ck_assets_quantity_positive"),
         CheckConstraint("avg_buy_price >= 0", name="ck_assets_avg_buy_price_positive"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     portfolio_id = Column(
-        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("portfolios.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     symbol = Column(String(20), nullable=False, index=True)
     name = Column(String(200), nullable=True)
@@ -50,4 +58,9 @@ class Asset(Base):
     invested_amount = Column(Numeric(precision=12, scale=2), nullable=True)  # initial EUR amount
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

@@ -89,7 +89,10 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
                 stmt = pg_insert(AssetPriceHistory).values(chunk)
                 stmt = stmt.on_conflict_do_update(
                     constraint="uq_symbol_price_date",
-                    set_={"price_eur": stmt.excluded.price_eur, "source": stmt.excluded.source},
+                    set_={
+                        "price_eur": stmt.excluded.price_eur,
+                        "source": stmt.excluded.source,
+                    },
                 )
                 await db.execute(stmt)
             await db.commit()
@@ -216,7 +219,12 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
             redis.setex(key, REDIS_HISTORY_TTL, payload)
             redis.setex(f"{key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
             await _persist_prices_to_db(symbol, dates, prices)
-            logger.info("Cached %d data points for %s (on-demand, %dd)", len(prices), symbol, days)
+            logger.info(
+                "Cached %d data points for %s (on-demand, %dd)",
+                len(prices),
+                symbol,
+                days,
+            )
             return True
     except Exception as e:
         logger.warning("Failed to cache history for %s: %s", symbol, e)
@@ -401,7 +409,11 @@ async def _deep_backfill_all():
                 if std_dates and std_prices:
                     all_dates.extend(std_dates)
                     all_prices.extend(std_prices)
-                    logger.info("Deep backfill: %s standard 365d fetch: %d points", symbol, len(std_dates))
+                    logger.info(
+                        "Deep backfill: %s standard 365d fetch: %d points",
+                        symbol,
+                        len(std_dates),
+                    )
                     await asyncio.sleep(7.0)
             except Exception as e:
                 logger.warning("Deep backfill: standard fetch failed for %s: %s", symbol, e)
@@ -422,7 +434,11 @@ async def _deep_backfill_all():
                         await _persist_prices_to_db(symbol, yf_dates, yf_prices, source="yahoo")
                         all_dates.extend(yf_dates)
                         all_prices.extend(yf_prices)
-                        logger.info("Deep backfill: %s Yahoo fallback: %d points", symbol, len(yf_dates))
+                        logger.info(
+                            "Deep backfill: %s Yahoo fallback: %d points",
+                            symbol,
+                            len(yf_dates),
+                        )
                 except Exception as e:
                     logger.warning("Deep backfill: Yahoo fallback failed for %s: %s", symbol, e)
 
@@ -431,7 +447,9 @@ async def _deep_backfill_all():
             gap_dates = await _find_missing_dates(symbol, first_tx, today)
             if gap_dates:
                 logger.info(
-                    "Deep backfill: %s has %d missing dates, filling via per-date API...", symbol, len(gap_dates)
+                    "Deep backfill: %s has %d missing dates, filling via per-date API...",
+                    symbol,
+                    len(gap_dates),
                 )
                 gap_filled = 0
                 for gap_date in gap_dates:
@@ -449,11 +467,17 @@ async def _deep_backfill_all():
                         await asyncio.sleep(15.0)  # 15s between per-date calls
                     except Exception as e:
                         logger.warning(
-                            "Deep backfill: per-date fetch failed for %s on %s: %s", symbol, gap_date.date(), e
+                            "Deep backfill: per-date fetch failed for %s on %s: %s",
+                            symbol,
+                            gap_date.date(),
+                            e,
                         )
                         await asyncio.sleep(15.0)
                 logger.info(
-                    "Deep backfill: %s filled %d/%d gap dates via per-date API", symbol, gap_filled, len(gap_dates)
+                    "Deep backfill: %s filled %d/%d gap dates via per-date API",
+                    symbol,
+                    gap_filled,
+                    len(gap_dates),
                 )
 
             # Update Redis with the most recent 365 days
@@ -472,7 +496,11 @@ async def _deep_backfill_all():
                 redis.setex(key, REDIS_HISTORY_TTL, payload)
                 redis.setex(f"{key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
                 filled += 1
-                logger.info("Deep backfill: %s complete — %d total points", symbol, len(all_dates))
+                logger.info(
+                    "Deep backfill: %s complete — %d total points",
+                    symbol,
+                    len(all_dates),
+                )
 
     finally:
         await fetcher.close()
