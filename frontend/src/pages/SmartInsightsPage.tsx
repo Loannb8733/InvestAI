@@ -254,7 +254,7 @@ export default function SmartInsightsPage() {
               <SelectItem value="365">1 an</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} aria-label="Actualiser les insights">
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>

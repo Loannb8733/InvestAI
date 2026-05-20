@@ -181,6 +181,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="vous@exemple.com"
                 className="h-12 px-4"
+                autoComplete="email"
                 {...register('email')}
               />
               {errors.email && (
@@ -205,6 +206,7 @@ export default function LoginPage() {
                 type="password"
                 placeholder="••••••••"
                 className="h-12 px-4"
+                autoComplete="current-password"
                 {...register('password')}
               />
               {errors.password && (

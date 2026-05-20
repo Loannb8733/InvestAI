@@ -282,6 +282,7 @@ export default function NotesPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => { setEditingNote(note); setSentiment(note.sentiment || '') }}
+                      aria-label="Modifier la note"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -293,6 +294,7 @@ export default function NotesPage() {
                           deleteMutation.mutate(note.id)
                         }
                       }}
+                      aria-label="Supprimer la note"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

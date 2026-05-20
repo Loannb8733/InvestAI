@@ -526,7 +526,7 @@ export default function CalendarPage() {
                             size="icon"
                             variant="outline"
                             onClick={() => completeMutation.mutate(event.id)}
-                            title="Marquer comme complété"
+                            aria-label="Marquer comme complété"
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -535,6 +535,7 @@ export default function CalendarPage() {
                           size="icon"
                           variant="ghost"
                           onClick={() => setEditingEvent(event)}
+                          aria-label="Modifier l'événement"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -546,6 +547,7 @@ export default function CalendarPage() {
                               deleteMutation.mutate(event.id)
                             }
                           }}
+                          aria-label="Supprimer l'événement"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

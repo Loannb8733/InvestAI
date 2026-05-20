@@ -17,51 +17,7 @@ import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { ALL_PLATFORMS, isColdWallet } from '@/lib/platforms'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sparkline } from '@/components/ui/sparkline'
-
-interface AssetMetrics {
-  id: string
-  symbol: string
-  name?: string
-  asset_type: string
-  exchange?: string | null
-  quantity: number
-  avg_buy_price: number
-  current_price?: number
-  current_value: number
-  total_invested: number
-  gain_loss: number
-  gain_loss_percent: number
-  total_fees?: number
-  breakeven_price?: number | null
-  risk_weight?: number
-  first_buy_date?: string | null
-  holding_days?: number | null
-  annualized_return?: number | null
-  // Crowdfunding fields
-  interest_rate?: number
-  maturity_date?: string
-  project_status?: string
-  invested_amount?: number
-}
-
-interface StablecoinEntry {
-  id: string
-  symbol: string
-  quantity: number
-  value: number
-}
-
-interface PortfolioMetrics {
-  total_value: number
-  total_invested: number
-  total_gain_loss: number
-  total_gain_loss_percent: number
-  assets: AssetMetrics[]
-  cash_from_stablecoins?: number
-  stablecoins?: StablecoinEntry[]
-  cash_from_fiat?: number
-  fiat_assets?: StablecoinEntry[]
-}
+import type { AssetMetrics, PortfolioMetrics } from '@/types'
 
 interface GroupedAsset {
   symbol: string

@@ -20,6 +20,9 @@ class PredictionLog(Base):
     prediction_data = Column(JSON, nullable=False, default=dict)
 
     # Calibration fields
+    # Float intentionally used (not Numeric) — ML outputs are IEEE 754 approximations;
+    # sub-cent precision is meaningless for price predictions, and Decimal overhead
+    # would complicate numpy/sklearn interop in the calibration pipeline.
     predicted_price = Column(Float, nullable=True)
     price_at_creation = Column(Numeric(18, 8), nullable=True)  # Baseline for direction tracking
     target_date = Column(DateTime, nullable=True, index=True)

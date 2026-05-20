@@ -249,6 +249,7 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="vous@exemple.com"
                 className="h-11 px-4"
+                autoComplete="email"
                 {...register('email')}
               />
               {errors.email && (
@@ -265,6 +266,7 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 className="h-11 px-4"
+                autoComplete="new-password"
                 {...register('password')}
               />
               {errors.password && (
@@ -284,6 +286,7 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 className="h-11 px-4"
+                autoComplete="new-password"
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
