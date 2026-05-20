@@ -3,12 +3,13 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -18,7 +19,9 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[AssetResponse])
+@limiter.limit(RATE_LIMITS["api_read"])
 async def list_assets(
+    request: Request,
     portfolio_id: UUID = None,
     skip: int = 0,
     limit: int = 50,
@@ -47,7 +50,7 @@ async def list_assets(
         if portfolio_id not in portfolio_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
         query = query.where(Asset.portfolio_id == portfolio_id)
 
@@ -75,7 +78,7 @@ async def create_asset(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     # Check if asset with same symbol AND exchange already exists in portfolio
@@ -90,7 +93,7 @@ async def create_asset(
     if existing_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Asset with this symbol already exists on this platform",
+            detail="Un actif avec ce symbole existe déjà sur cette plateforme",
         )
 
     asset = Asset(
@@ -120,7 +123,9 @@ async def create_asset(
 
 
 @router.get("/{asset_id}", response_model=AssetResponse)
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_asset(
+    request: Request,
     asset_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -145,7 +150,7 @@ async def get_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     return asset
@@ -178,7 +183,7 @@ async def update_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     update_data = asset_in.model_dump(exclude_unset=True)
@@ -221,7 +226,7 @@ async def delete_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     # Clear related_transaction_id references that point to this asset's transactions

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import numpy as np
@@ -167,7 +167,7 @@ class AnomalyDetector:
                     f"{'hausse' if pct_change > 0 else 'baisse'} de {abs(pct_change):.1f}% "
                     f"(score anomalie: {score:.2f})"
                 ),
-                detected_at=datetime.utcnow(),
+                detected_at=datetime.now(timezone.utc),
                 price_change_percent=round(pct_change, 2),
                 z_score=round(float(-score * 10), 2),
             )
@@ -219,7 +219,7 @@ class AnomalyDetector:
                     f"{'hausse' if pct_change > 0 else 'baisse'} de {abs(pct_change):.1f}% "
                     f"vs moyenne {mean_return * 100:.2f}%"
                 ),
-                detected_at=datetime.utcnow(),
+                detected_at=datetime.now(timezone.utc),
                 price_change_percent=round(pct_change, 2),
                 z_score=round(float(z), 2),
             )
@@ -290,7 +290,7 @@ class AnomalyDetector:
                     f"{'Hausse' if pct_change > 0 else 'Baisse'} significative "
                     f"de {abs(pct_change):.1f}% par rapport au prix d'achat moyen"
                 ),
-                detected_at=datetime.utcnow(),
+                detected_at=datetime.now(timezone.utc),
                 price_change_percent=round(pct_change, 2),
                 z_score=0.0,
             )

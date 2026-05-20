@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -155,6 +155,15 @@ export default function ExchangesPage() {
   const [importingId, setImportingId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<APIKey | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
+    }
+  }, [])
   const [guideExchange, setGuideExchange] = useState<string | null>(null)
 
   // Fetch supported exchanges
@@ -273,6 +282,9 @@ export default function ExchangesPage() {
   })
 
   const pollImportStatus = (taskId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
+
     const interval = setInterval(async () => {
       try {
         const status = await apiKeysApi.getImportStatus(taskId)
@@ -314,9 +326,12 @@ export default function ExchangesPage() {
       }
     }, 5000) // Poll every 5 seconds
 
+    pollIntervalRef.current = interval
+
     // Safety: stop polling after 10 minutes
-    setTimeout(() => {
+    pollTimeoutRef.current = setTimeout(() => {
       clearInterval(interval)
+      pollIntervalRef.current = null
       setImportingId(null)
     }, 600000)
   }

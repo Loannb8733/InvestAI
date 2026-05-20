@@ -418,8 +418,10 @@ export const transactionsApi = {
     return response.data
   },
 
-  deleteAll: async () => {
-    const response = await api.delete('/transactions/all')
+  deleteAll: async (portfolio_id?: string) => {
+    const response = await api.delete('/transactions/all', {
+      params: portfolio_id ? { portfolio_id } : undefined,
+    })
     return response.data
   },
 
@@ -540,8 +542,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getXirr: async () => {
-    const response = await api.get('/analytics/xirr', { timeout: ANALYTICS_TIMEOUT })
+  getXirr: async (portfolioId?: string) => {
+    const response = await api.get('/analytics/xirr', {
+      params: portfolioId ? { portfolio_id: portfolioId } : {},
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -734,8 +739,11 @@ export const predictionsApi = {
     return response.data
   },
 
-  validateSignal: async () => {
-    const response = await api.get('/predictions/validate-signal', { timeout: ANALYTICS_TIMEOUT })
+  validateSignal: async (params?: { symbol?: string; action?: string }) => {
+    const response = await api.get('/predictions/validate-signal', {
+      params,
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -842,16 +850,14 @@ export const reportsApi = {
   },
 
   downloadStockTaxPDF: async (year: number) => {
-    const response = await api.get(`/reports/tax/${year}/pdf`, {
-      params: { asset_class: 'securities' },
+    const response = await api.get(`/reports/tax/securities/${year}/pdf`, {
       responseType: 'blob',
     })
     return response.data
   },
 
   downloadStockTaxExcel: async (year: number) => {
-    const response = await api.get(`/reports/tax/${year}/excel`, {
-      params: { asset_class: 'securities' },
+    const response = await api.get(`/reports/tax/securities/${year}/excel`, {
       responseType: 'blob',
     })
     return response.data
@@ -952,7 +958,7 @@ export const notesApi = {
     return response.data
   },
 
-  list: async (params?: { tag?: string; asset_id?: string; search?: string }) => {
+  list: async (params?: { tag?: string; asset_id?: string; search?: string; skip?: number; limit?: number }) => {
     const response = await api.get('/notes', { params })
     return response.data
   },
@@ -962,6 +968,7 @@ export const notesApi = {
     content?: string
     tags?: string
     asset_id?: string
+    sentiment?: string
   }) => {
     const response = await api.post('/notes', data)
     return response.data

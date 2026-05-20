@@ -331,7 +331,7 @@ export default function AnalyticsPage() {
 
   const { data: xirrData } = useQuery<{ xirr: number | null }>({
     queryKey: queryKeys.analytics.xirr(portfolioParam),
-    queryFn: analyticsApi.getXirr,
+    queryFn: () => analyticsApi.getXirr(portfolioParam ?? undefined),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })

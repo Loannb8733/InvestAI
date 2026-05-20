@@ -45,6 +45,10 @@ function loadLayout(): DashboardLayout {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as DashboardLayout
+      const validSet = new Set<string>(ALL_WIDGETS)
+      // Remove obsolete widget IDs from previous layouts
+      parsed.order = parsed.order.filter((w) => validSet.has(w)) as WidgetId[]
+      parsed.hidden = parsed.hidden.filter((w) => validSet.has(w)) as WidgetId[]
       // Ensure all widgets are present (in case new ones are added)
       const existing = new Set([...parsed.order, ...parsed.hidden])
       for (const w of ALL_WIDGETS) {

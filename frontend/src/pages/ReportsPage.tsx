@@ -42,12 +42,17 @@ interface ReportCard {
   color: string
   bgColor: string
   yearSelector?: boolean
+  yearValue?: string
+  onYearChange?: (year: string) => void
   actions: ReportAction[]
 }
 
 export default function ReportsPage() {
   const { toast } = useToast()
-  const [selectedYear, setSelectedYear] = useState<string>(
+  const [selectedYearCrypto, setSelectedYearCrypto] = useState<string>(
+    new Date().getFullYear().toString()
+  )
+  const [selectedYearStocks, setSelectedYearStocks] = useState<string>(
     new Date().getFullYear().toString()
   )
   const [loadingReport, setLoadingReport] = useState<string | null>(null)
@@ -82,10 +87,19 @@ export default function ReportsPage() {
       downloadFile(blob, filename)
       toast({ title: 'Rapport téléchargé avec succès' })
     } catch (error) {
-      toast({
-        title: 'Erreur lors du téléchargement',
-        variant: 'destructive',
-      })
+      const status = (error as import('axios').AxiosError)?.response?.status
+      if (status === 501) {
+        toast({
+          title: 'Fonctionnalité non disponible',
+          description: 'Ce rapport est en cours de développement.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Erreur lors du téléchargement',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoadingReport(null)
     }
@@ -172,6 +186,8 @@ export default function ReportsPage() {
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     yearSelector: true,
+    yearValue: selectedYearCrypto,
+    onYearChange: setSelectedYearCrypto,
     actions: [
       {
         label: 'PDF',
@@ -179,8 +195,8 @@ export default function ReportsPage() {
         onClick: () =>
           handleDownload(
             'tax-crypto-pdf',
-            () => reportsApi.downloadTaxPDF(parseInt(selectedYear)),
-            `declaration_2086_crypto_${selectedYear}.pdf`
+            () => reportsApi.downloadTaxPDF(parseInt(selectedYearCrypto)),
+            `declaration_2086_crypto_${selectedYearCrypto}.pdf`
           ),
       },
       {
@@ -189,8 +205,8 @@ export default function ReportsPage() {
         onClick: () =>
           handleDownload(
             'tax-crypto-excel',
-            () => reportsApi.downloadTaxExcel(parseInt(selectedYear)),
-            `declaration_2086_crypto_${selectedYear}.xlsx`
+            () => reportsApi.downloadTaxExcel(parseInt(selectedYearCrypto)),
+            `declaration_2086_crypto_${selectedYearCrypto}.xlsx`
           ),
       },
     ],
@@ -204,6 +220,8 @@ export default function ReportsPage() {
     color: 'text-indigo-500',
     bgColor: 'bg-indigo-500/10',
     yearSelector: true,
+    yearValue: selectedYearStocks,
+    onYearChange: setSelectedYearStocks,
     actions: [
       {
         label: 'PDF',
@@ -211,8 +229,8 @@ export default function ReportsPage() {
         onClick: () =>
           handleDownload(
             'tax-stocks-pdf',
-            () => reportsApi.downloadStockTaxPDF(parseInt(selectedYear)),
-            `declaration_valeurs_mobilieres_${selectedYear}.pdf`
+            () => reportsApi.downloadStockTaxPDF(parseInt(selectedYearStocks)),
+            `declaration_valeurs_mobilieres_${selectedYearStocks}.pdf`
           ),
       },
       {
@@ -221,8 +239,8 @@ export default function ReportsPage() {
         onClick: () =>
           handleDownload(
             'tax-stocks-excel',
-            () => reportsApi.downloadStockTaxExcel(parseInt(selectedYear)),
-            `declaration_valeurs_mobilieres_${selectedYear}.xlsx`
+            () => reportsApi.downloadStockTaxExcel(parseInt(selectedYearStocks)),
+            `declaration_valeurs_mobilieres_${selectedYearStocks}.xlsx`
           ),
       },
     ],
@@ -244,12 +262,12 @@ export default function ReportsPage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-end">
-        {report.yearSelector && (
+        {report.yearSelector && report.yearValue !== undefined && report.onYearChange && (
           <div className="mb-4">
             <label className="text-sm font-medium mb-2 block">
               Année fiscale
             </label>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <Select value={report.yearValue} onValueChange={report.onYearChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

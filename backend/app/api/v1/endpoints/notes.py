@@ -1,12 +1,12 @@
 """Notes endpoints for investment journal."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -82,7 +82,7 @@ async def get_notes_summary(
     notes = result.scalars().all()
 
     # Count notes this month
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     notes_this_month = sum(1 for n in notes if n.created_at.year == now.year and n.created_at.month == now.month)
 
     # Collect unique tags
@@ -137,41 +137,36 @@ async def list_notes(
     db: AsyncSession = Depends(get_db),
 ) -> List[NoteResponse]:
     """List all notes for the current user."""
-    query = select(Note).where(
-        Note.user_id == current_user.id,
-        Note.user_id == current_user.id,
-    )
+    query = select(Note).where(Note.user_id == current_user.id)
 
     if asset_id:
         query = query.where(Note.asset_id == asset_id)
 
+    if tag:
+        query = query.where(Note.tags.ilike(f"%{tag}%"))
+
+    if search:
+        query = query.where(
+            or_(
+                Note.title.ilike(f"%{search}%"),
+                Note.content.ilike(f"%{search}%"),
+            )
+        )
+
     result = await db.execute(query.order_by(Note.created_at.desc()).offset(skip).limit(limit))
     notes = result.scalars().all()
 
-    # Filter by tag if specified
-    if tag:
-        notes = [n for n in notes if n.tags and tag.lower() in n.tags.lower()]
+    # Batch load assets to avoid N+1
+    asset_ids = {n.asset_id for n in notes if n.asset_id}
+    assets_by_id: dict = {}
+    if asset_ids:
+        asset_result = await db.execute(select(Asset).where(Asset.id.in_(asset_ids)))
+        for asset in asset_result.scalars().all():
+            assets_by_id[asset.id] = asset
 
-    # Filter by search term
-    if search:
-        search_lower = search.lower()
-        notes = [
-            n for n in notes if search_lower in n.title.lower() or (n.content and search_lower in n.content.lower())
-        ]
-
-    # Build response with asset info
     response = []
     for note in notes:
-        asset_symbol = None
-        asset_name = None
-
-        if note.asset_id:
-            asset_result = await db.execute(select(Asset).where(Asset.id == note.asset_id))
-            asset = asset_result.scalar_one_or_none()
-            if asset:
-                asset_symbol = asset.symbol
-                asset_name = asset.name
-
+        asset = assets_by_id.get(note.asset_id) if note.asset_id else None
         response.append(
             NoteResponse(
                 id=note.id,
@@ -179,8 +174,8 @@ async def list_notes(
                 content=note.content,
                 tags=note.tags,
                 asset_id=note.asset_id,
-                asset_symbol=asset_symbol,
-                asset_name=asset_name,
+                asset_symbol=asset.symbol if asset else None,
+                asset_name=asset.name if asset else None,
                 transaction_ids=note.transaction_ids,
                 attachments=note.attachments,
                 sentiment=note.sentiment,
@@ -223,7 +218,7 @@ async def create_note(
         if not asset:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actif non trouve",
+                detail="Actif non trouvé",
             )
         asset_symbol = asset.symbol
         asset_name = asset.name
@@ -277,7 +272,7 @@ async def get_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     asset_symbol = None
@@ -325,7 +320,7 @@ async def update_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     if note_in.title is not None:
@@ -361,7 +356,7 @@ async def update_note(
         if not asset:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actif non trouve",
+                detail="Actif non trouvé",
             )
         note.asset_id = note_in.asset_id
 
@@ -412,7 +407,7 @@ async def delete_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     await db.delete(note)

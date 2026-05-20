@@ -28,6 +28,8 @@ import {
   Coins,
   Lock,
   Unlock,
+  TrendingUp,
+  Percent,
 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
@@ -52,6 +54,8 @@ const TRANSACTION_TYPES = [
   { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30', submitBg: 'bg-amber-600 hover:bg-amber-700' },
   { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20', activeBg: 'bg-purple-500/20 border-purple-500/40 ring-1 ring-purple-500/30', submitBg: 'bg-purple-600 hover:bg-purple-700' },
   { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20', activeBg: 'bg-purple-400/20 border-purple-400/40 ring-1 ring-purple-400/30', submitBg: 'bg-purple-500 hover:bg-purple-600' },
+  { value: 'dividend', label: 'Dividende', shortLabel: 'Dividende', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', activeBg: 'bg-emerald-500/20 border-emerald-500/40 ring-1 ring-emerald-500/30', submitBg: 'bg-emerald-600 hover:bg-emerald-700' },
+  { value: 'interest', label: 'Intérêt', shortLabel: 'Intérêt', icon: Percent, color: 'text-cyan-500', bg: 'bg-cyan-500/10 border-cyan-500/20', activeBg: 'bg-cyan-500/20 border-cyan-500/40 ring-1 ring-cyan-500/30', submitBg: 'bg-cyan-600 hover:bg-cyan-700' },
 ] as const
 
 const COMMON_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'BTC', 'ETH', 'USDT', 'USDC']

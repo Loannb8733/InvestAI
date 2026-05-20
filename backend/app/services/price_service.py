@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
@@ -145,7 +145,7 @@ class PriceService:
                 if last_updated_str:
                     try:
                         last_updated = datetime.fromisoformat(last_updated_str)
-                        age = (datetime.utcnow() - last_updated).total_seconds()
+                        age = (datetime.now(timezone.utc) - last_updated).total_seconds()
                         if age > self.MAX_CACHE_AGE:
                             logger.info(
                                 "Price cache stale for %s (%s): age=%.0fs > %ds, forcing refresh",
@@ -180,7 +180,7 @@ class PriceService:
                 "change_percent_24h": str(data.get("change_percent_24h", 0)),
                 "volume_24h": str(data.get("volume_24h", 0)),
                 "market_cap": str(data.get("market_cap", 0)),
-                "last_updated": datetime.utcnow().isoformat(),
+                "last_updated": datetime.now(timezone.utc).isoformat(),
             }
             self.redis.hset(key, mapping=cache_data)
             self.redis.expire(key, ttl)

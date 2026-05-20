@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Set
 
 from sqlalchemy import select
@@ -690,7 +690,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
             balances = await service.get_balances()
 
             if not balances:
-                api_key.last_sync_at = datetime.utcnow()
+                api_key.last_sync_at = datetime.now(timezone.utc)
                 api_key.mark_success()
                 await db.commit()
                 return {"success": True, "synced": 0}
@@ -795,7 +795,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         if trans_type == TransactionType.TRANSFER_IN:
                             current_price = await _get_current_price(balance.symbol)
 
-                        sync_ts = int(datetime.utcnow().timestamp())
+                        sync_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=trans_type,
@@ -846,7 +846,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
 
                     # Create initial transfer transaction with market price
                     if float(balance.total) > 0:
-                        init_ts = int(datetime.utcnow().timestamp())
+                        init_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=TransactionType.TRANSFER_IN,
@@ -874,7 +874,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     logger.info(
                         f"Asset {symbol} no longer on {service.exchange_name} (balance=0), zeroing quantity from {asset.quantity}"
                     )
-                    sync_ts = int(datetime.utcnow().timestamp())
+                    sync_ts = int(datetime.now(timezone.utc).timestamp())
                     transaction = Transaction(
                         asset_id=asset.id,
                         transaction_type=TransactionType.TRANSFER_OUT,
@@ -890,7 +890,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     synced_count += 1
 
             # Update last sync time
-            api_key.last_sync_at = datetime.utcnow()
+            api_key.last_sync_at = datetime.now(timezone.utc)
             api_key.mark_success()
 
             await db.commit()
@@ -941,25 +941,49 @@ def sync_all_exchanges():
     return asyncio.run(_sync_all_exchanges_async())
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_single_exchange")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_single_exchange",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_single_exchange(api_key_id: str):
     """Sync a single exchange account."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_binance")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_binance",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_binance(user_id: str, api_key_id: str):
     """Sync Binance account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_kraken")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_kraken",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_kraken(user_id: str, api_key_id: str):
     """Sync Kraken account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_crypto_com")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_crypto_com",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_crypto_com(user_id: str, api_key_id: str):
     """Sync Crypto.com account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))

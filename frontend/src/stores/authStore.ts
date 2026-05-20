@@ -23,7 +23,7 @@ interface AuthState {
   isHydrating: boolean
   error: string | null
   login: (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   refreshAccessToken: () => Promise<void>
   fetchCurrentUser: () => Promise<void>
   hydrateSession: () => Promise<void>
@@ -61,9 +61,8 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        // Clear server-side cookies
-        authApi.logout()
+      logout: async () => {
+        try { await authApi.logout() } catch { /* best-effort: clear local state even if server call fails */ }
         set({
           user: null,
           accessToken: null,
@@ -145,11 +144,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Do NOT persist tokens to localStorage — they are already in httpOnly cookies.
-      // Storing JWTs in JS-accessible storage exposes them to XSS attacks.
+      // Do NOT persist tokens or PII to localStorage — tokens are in httpOnly cookies,
+      // user PII (email, role) is refetched on boot via hydrateSession/fetchCurrentUser.
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
-        user: state.user,
       }),
     }
   )

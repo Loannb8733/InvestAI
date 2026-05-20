@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -62,8 +63,9 @@ def _enrich(
     rate = float(project.annual_rate) / 100
     months = int(project.duration_months)
     received = float(project.total_received)
+    tax_multiplier = 1 - float(project.tax_rate or 0) / 100
 
-    projected_total = invested * rate * months / 12
+    projected_total = invested * rate * months / 12 * tax_multiplier
     interest_earned = max(0.0, received - invested) if project.status == ProjectStatus.COMPLETED else received
 
     progress = 0.0
@@ -130,6 +132,7 @@ async def _get_docs_for_projects(
         return {}
     result = await db.execute(
         select(ProjectDocument)
+        .options(defer(ProjectDocument.file_data))  # skip binary content in batch listing
         .where(ProjectDocument.project_id.in_(project_ids))
         .order_by(ProjectDocument.created_at.desc())
     )
@@ -309,11 +312,13 @@ async def get_dashboard(
     active = [p for p in projects if p.status == ProjectStatus.ACTIVE]
     projected_annual = sum(float(p.invested_amount) * float(p.annual_rate) / 100 for p in active)
 
+    # Include all non-defaulted projects in weighted rate (not just active)
+    _non_defaulted_statuses = {ProjectStatus.ACTIVE, ProjectStatus.DELAYED, ProjectStatus.COMPLETED}
+    rate_projects = [p for p in projects if p.status in _non_defaulted_statuses]
+    rate_invested = sum(float(p.invested_amount) for p in rate_projects)
     weighted_rate = 0.0
-    if total_invested > 0:
-        weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in active) / max(
-            1, sum(float(p.invested_amount) for p in active)
-        )
+    if rate_invested > 0:
+        weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in rate_projects) / rate_invested
 
     # Platform breakdown
     platform_map: dict[str, float] = {}
@@ -359,7 +364,8 @@ async def get_performance(
         rate = float(p.annual_rate) / 100
         months = int(p.duration_months)
         received = float(p.total_received)
-        projected_total = invested * rate * months / 12
+        tax_multiplier = 1 - float(p.tax_rate or 0) / 100
+        projected_total = invested * rate * months / 12 * tax_multiplier
 
         elapsed_months = 0.0
         on_track = True
@@ -774,6 +780,7 @@ async def list_project_documents(
     await _get_project_for_user(db, project_id, current_user.id)
     result = await db.execute(
         select(ProjectDocument)
+        .options(defer(ProjectDocument.file_data))  # skip binary content in listing
         .where(ProjectDocument.project_id == project_id)
         .order_by(ProjectDocument.created_at.desc())
     )

@@ -2,10 +2,10 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
@@ -204,7 +205,7 @@ class RiskMetrics(BaseModel):
 class AdvancedMetrics(BaseModel):
     """Advanced portfolio metrics."""
 
-    roi_annualized: float
+    roi_annualized: Optional[float] = None
     risk_metrics: RiskMetrics
     concentration: ConcentrationMetrics
     stress_tests: List[StressTest]
@@ -284,7 +285,9 @@ class EnhancedDashboardResponse(BaseModel):
 
 
 @router.get("", response_model=EnhancedDashboardResponse)
+@limiter.limit("30/minute")
 async def get_dashboard(
+    request: Request,
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -305,12 +308,12 @@ async def get_dashboard(
         .where(Portfolio.user_id == current_user.id)
     )
     _first_tx_date_cached = _first_tx_result.scalar()
-    if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is not None:
-        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=None)
+    if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is None:
+        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=timezone.utc)
 
     if days == 0:
         if _first_tx_date_cached:
-            days = max((datetime.utcnow() - _first_tx_date_cached).days + 1, 7)
+            days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days + 1, 7)
         else:
             days = 30
 
@@ -452,7 +455,13 @@ async def get_dashboard(
         )
         first_reward_date = first_staking_tx.scalar()
         if first_reward_date:
-            days_earning = max((datetime.utcnow() - first_reward_date.replace(tzinfo=None)).days, 1)
+            days_earning = max(
+                (
+                    datetime.now(timezone.utc)
+                    - first_reward_date.replace(tzinfo=first_reward_date.tzinfo or timezone.utc)
+                ).days,
+                1,
+            )
             earn_apr = round((total_rewards / total_staked_value) * (365 / days_earning) * 100, 2)
 
     earn_summary = (
@@ -492,14 +501,17 @@ async def get_dashboard(
     total_return = metrics["total_value"] + total_sold_value
     if cagr_base > 0 and total_return > 0:
         if _first_tx_date_cached:
-            actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
+            actual_days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days, 30)
         else:
             actual_days = max(days, 30)
-        years = actual_days / 365.0
-        roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
-        roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+        if actual_days >= 180:
+            years = actual_days / 365.0
+            roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
+            roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+        else:
+            roi_annualized = None
     else:
-        roi_annualized = 0.0
+        roi_annualized = None
 
     # Risk metrics — pass roi_annualized so Sharpe uses the real CAGR
     risk_data = await snapshot_service.get_all_risk_metrics(
@@ -554,9 +566,10 @@ async def get_dashboard(
     )
 
     # Stress tests
+    _default_stress = {"scenario": "unknown", "loss_amount": 0, "loss_pct": 0, "portfolio_after": 0}
     stress_tests = [
-        StressTest(**risk_data["stress_test_20"]),
-        StressTest(**risk_data["stress_test_40"]),
+        StressTest(**risk_data.get("stress_test_20", _default_stress)),
+        StressTest(**risk_data.get("stress_test_40", _default_stress)),
     ]
 
     # P&L breakdown (realized vs unrealized) — pre-computed in metrics
@@ -570,7 +583,7 @@ async def get_dashboard(
     )
 
     advanced_metrics = AdvancedMetrics(
-        roi_annualized=round(roi_annualized, 2),
+        roi_annualized=round(roi_annualized, 2) if roi_annualized is not None else None,
         risk_metrics=risk_metrics,
         concentration=concentration,
         stress_tests=stress_tests,
@@ -583,7 +596,7 @@ async def get_dashboard(
         try:
             from decimal import Decimal as _Dec
 
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             existing = await db.execute(
                 select(func.count())
                 .select_from(PortfolioSnapshot)
@@ -597,7 +610,7 @@ async def get_dashboard(
                 snap = PortfolioSnapshot(
                     user_id=user_id,
                     portfolio_id=None,
-                    snapshot_date=datetime.utcnow(),
+                    snapshot_date=datetime.now(timezone.utc),
                     total_value=_Dec(str(metrics["total_value"])),
                     total_invested=_Dec(str(metrics["total_invested"])),
                     total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
@@ -696,7 +709,7 @@ async def get_dashboard(
         period_days=days,
         period_label=get_period_label_fr(original_days),
         forex_stale=metrics.get("forex_stale", False),
-        last_updated=datetime.utcnow().isoformat(),
+        last_updated=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -722,7 +735,9 @@ class MunitionsResponse(BaseModel):
 
 
 @router.get("/munitions", response_model=MunitionsResponse)
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_munitions(
+    request: Request,
     monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
     profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
     current_user: User = Depends(get_current_user),
@@ -810,7 +825,7 @@ async def get_recent_transactions_internal(
                 quantity=float(t.quantity),
                 price=price,
                 total=float(t.quantity) * price,
-                executed_at=(t.executed_at or t.created_at or datetime.utcnow()).isoformat(),
+                executed_at=(t.executed_at or t.created_at or datetime.now(timezone.utc)).isoformat(),
             )
         )
     return result_list
@@ -874,7 +889,7 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
 
 async def get_upcoming_events_internal(db: AsyncSession, current_user: User, days: int = 30) -> List[UpcomingEvent]:
     """Get upcoming calendar events for dashboard."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
@@ -945,7 +960,9 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
 
 
 @router.get("/portfolio/{portfolio_id}")
+@limiter.limit("30/minute")
 async def get_portfolio_dashboard(
+    request: Request,
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -958,7 +975,7 @@ async def get_portfolio_dashboard(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     try:
@@ -983,7 +1000,7 @@ async def get_portfolio_history(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     history = await metrics_service.get_portfolio_history(db, portfolio_id, currency=currency)
@@ -999,8 +1016,11 @@ class SparklineData(BaseModel):
 
 
 @router.get("/portfolio/{portfolio_id}/sparklines", response_model=List[SparklineData])
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_portfolio_sparklines(
+    request: Request,
     portfolio_id: str,
+    background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1019,7 +1039,7 @@ async def get_portfolio_sparklines(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     # Get unique non-stablecoin symbols
     assets_result = await db.execute(
@@ -1030,7 +1050,7 @@ async def get_portfolio_sparklines(
         return []
 
     # Batch fetch from AssetPriceHistory
-    cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
     result = await db.execute(
         select(
             AssetPriceHistory.symbol,
@@ -1084,7 +1104,7 @@ async def get_portfolio_sparklines(
             except Exception as e:
                 logger.warning("On-demand sparkline backfill failed: %s", e)
 
-        asyncio.create_task(_fill_missing())
+        background_tasks.add_task(_fill_missing)
 
     return sparklines
 
@@ -1137,9 +1157,9 @@ async def get_historical_data(
         )
         first_date = first_tx.scalar()
         if first_date:
-            if hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
-                first_date = first_date.replace(tzinfo=None)
-            days = max((datetime.utcnow() - first_date).days + 1, 7)
+            if hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
+                first_date = first_date.replace(tzinfo=timezone.utc)
+            days = max((datetime.now(timezone.utc) - first_date).days + 1, 7)
         else:
             days = 30
 
@@ -1251,9 +1271,7 @@ async def trigger_price_backfill(
         except Exception as e:
             logger.warning("Backfill failed: %s", e)
 
-    import asyncio
-
-    asyncio.create_task(_run_backfill())
+    background_tasks.add_task(_run_backfill)
     return {"status": "started", "message": "Backfill running in background"}
 
 

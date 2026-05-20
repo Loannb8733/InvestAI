@@ -154,7 +154,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
           <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
             <ArrowRight className="h-3 w-3" />
             <span>
-              DCA 300€/mois : {pc(data.deploy_to_risk)} vers actifs risqués,{' '}
+              DCA mensuel : {pc(data.deploy_to_risk)} vers actifs risqués,{' '}
               {pc(data.keep_in_reserve)} en réserve
             </span>
           </div>

@@ -162,7 +162,7 @@ def _build_response(goal: Goal) -> dict:
         remaining_amount = float(goal.target_amount - goal.current_amount)
         if remaining_amount > 0 and days_remaining > 0:
             months_left = days_remaining / 30.44
-            monthly_needed = round(remaining_amount / months_left, 2) if months_left > 0 else None
+            monthly_needed = min(round(remaining_amount / months_left, 2), 9_999_999.99) if months_left > 0 else None
 
     return {
         "id": goal.id,
@@ -229,7 +229,7 @@ async def create_goal(
         except ValueError:
             raise HTTPException(
                 status_code=422,
-                detail="Invalid deadline_date format, expected YYYY-MM-DD",
+                detail="Format de date invalide, attendu YYYY-MM-DD",
             )
 
     # SAVINGS goals force conservative strategy
@@ -316,7 +316,7 @@ async def get_goal(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="Objectif non trouvé")
     return _build_response(goal)
 
 
@@ -336,7 +336,7 @@ async def update_goal(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
     update_data = data.model_dump(exclude_unset=True)
     # Convert deadline_date string to date object
@@ -344,7 +344,7 @@ async def update_goal(
         try:
             update_data["deadline_date"] = date.fromisoformat(update_data["deadline_date"])
         except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid deadline_date format")
+            raise HTTPException(status_code=422, detail="Format de date invalide")
     for field_name, value in update_data.items():
         setattr(goal, field_name, value)
 
@@ -376,7 +376,7 @@ async def sync_goal_with_portfolio(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
     # Calculate total portfolio value (or liquidity-only for SAVINGS goals)
     from app.services.metrics_service import is_liquidity
@@ -434,7 +434,7 @@ async def delete_goal(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
     await db.delete(goal)
     await db.commit()
@@ -463,7 +463,7 @@ async def get_goal_projection(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
     # SAVINGS goals always use conservative strategy (liquidity-only target)
     if goal.goal_type == GoalType.SAVINGS:

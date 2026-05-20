@@ -9,7 +9,7 @@ Provides:
 
 import asyncio
 import logging
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -154,7 +154,7 @@ def is_market_open(ticker: str, dt: Optional[datetime] = None) -> bool:
         True if the market is open at the given time.
     """
     if dt is None:
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
 
     exchange = _detect_exchange(ticker)
     hours = _EXCHANGE_HOURS.get(exchange)
@@ -192,7 +192,7 @@ def is_market_closed_today(ticker: str, dt: Optional[datetime] = None) -> bool:
     regardless of time. Used to avoid marking prices as stale.
     """
     if dt is None:
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
 
     if dt.weekday() in _WEEKEND:
         return True
@@ -210,7 +210,7 @@ def price_staleness_hours(ticker: str, last_update: datetime) -> Tuple[float, bo
         (staleness_hours, is_acceptable): staleness in hours and whether
         the price is considered acceptably fresh given market hours.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     raw_age_hours = (now - last_update).total_seconds() / 3600
 
     # If market is currently closed for the day, price from last trading
@@ -302,7 +302,7 @@ class MarketDataService:
                 "volume": str(data.get("volume", 0)),
                 "quote_currency": data.get("quote_currency", "USD"),
                 "exchange": data.get("exchange", ""),
-                "last_updated": datetime.utcnow().isoformat(),
+                "last_updated": datetime.now(timezone.utc).isoformat(),
             }
             self.redis.hset(key, mapping=cache_data)
             self.redis.expire(key, ttl)

@@ -3,12 +3,13 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.portfolio import CashBalanceUpdate, PortfolioCreate, PortfolioResponse, PortfolioUpdate
@@ -17,7 +18,9 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[PortfolioResponse])
+@limiter.limit(RATE_LIMITS["api_read"])
 async def list_portfolios(
+    request: Request,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
@@ -56,7 +59,9 @@ async def create_portfolio(
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioResponse)
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_portfolio(
+    request: Request,
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -73,7 +78,7 @@ async def get_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     return portfolio
@@ -98,7 +103,7 @@ async def update_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     update_data = portfolio_in.model_dump(exclude_unset=True)
@@ -133,7 +138,7 @@ async def delete_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     if delete_assets:
@@ -182,7 +187,7 @@ async def update_cash_balance(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     # Update or remove cash balance for the exchange
@@ -218,7 +223,7 @@ async def delete_cash_balance(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     cash_balances = dict(portfolio.cash_balances or {})

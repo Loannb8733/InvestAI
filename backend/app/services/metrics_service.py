@@ -187,8 +187,8 @@ class MetricsService:
         self,
         asset: Asset,
         current_price: Optional[Decimal] = None,
-        actual_invested: Optional[float] = None,
-        buy_pra: Optional[float] = None,
+        actual_invested: Optional[Decimal] = None,
+        buy_pra: Optional[Decimal] = None,
         cump_pru: Optional[Decimal] = None,
     ) -> Dict:
         """Calculate metrics for a single asset.
@@ -209,11 +209,11 @@ class MetricsService:
         if cump_pru is not None and cump_pru > Decimal("0"):
             avg_buy_price = cump_pru
         elif actual_invested is None and buy_pra is not None and buy_pra > 0:
-            avg_buy_price = Decimal(str(buy_pra))
+            avg_buy_price = buy_pra
 
         # G/L cost basis: FIFO actual_invested > PRA-derived fallback
         if actual_invested is not None:
-            total_invested = Decimal(str(actual_invested))
+            total_invested = actual_invested
         else:
             total_invested = quantity * avg_buy_price
 
@@ -252,7 +252,7 @@ class MetricsService:
 
         from app.models.asset_price_history import AssetPriceHistory
 
-        cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
 
         result = await db.execute(
             select(
@@ -366,7 +366,7 @@ class MetricsService:
         # Batch-fetch total fees, actual invested, and first buy date per asset
         inv_asset_ids = [a.id for a in investment_assets]
         fees_map: Dict[str, float] = {}
-        invested_map: Dict[str, float] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
+        invested_map: Dict[str, Decimal] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
         buy_pra_by_sym: Dict[str, Decimal] = {}  # undiluted PRA per symbol
         sym_to_aids: Dict[str, list] = {}  # symbol -> list of Asset objects
         cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total cost basis
@@ -934,11 +934,11 @@ class MetricsService:
                 fkey = (a.symbol.upper(), (a.exchange or "").strip())
                 cost = cost_by_key.get(fkey, _ZERO)
                 if cost > 0:
-                    invested_map[aid] = float(cost)
+                    invested_map[aid] = cost
                 elif fkey in fifo_seen_keys:
                     # Zero-cost asset (pure airdrop / staking reward) — must record
-                    # 0.0 explicitly so get_asset_metrics doesn't fall back to buy_pra.
-                    invested_map[aid] = 0.0
+                    # _ZERO explicitly so get_asset_metrics doesn't fall back to buy_pra.
+                    invested_map[aid] = _ZERO
 
             # FX gain decomposition per (symbol, exchange):
             # For each layer, FX gain = qty * unit_cost_base * (current_fx - purchase_fx)
@@ -989,9 +989,9 @@ class MetricsService:
                 fkey = (a.symbol.upper(), (a.exchange or "").strip())
                 cost = cost_by_key.get(fkey, _ZERO)
                 if cost > 0:
-                    invested_map[aid] = float(cost)
+                    invested_map[aid] = cost
                 elif fkey in fifo_seen_keys:
-                    invested_map[aid] = 0.0
+                    invested_map[aid] = _ZERO
             for sym in cost_by_sym:
                 cq = cost_qty_by_sym.get(sym, _ZERO)
                 if cq > 0 and cost_by_sym[sym] > 0:
@@ -1139,7 +1139,7 @@ class MetricsService:
             # not the PRA-based invested shown per asset
             real_invested = invested_map.get(str(asset.id))
             if real_invested is not None:
-                total_invested += Decimal(str(real_invested))
+                total_invested += real_invested
             else:
                 total_invested += Decimal(str(metrics["total_invested"]))
 
@@ -1157,9 +1157,9 @@ class MetricsService:
 
             # Holding duration and annualized return
             first_date = first_buy_map.get(str(asset.id))
-            if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
-                first_date = first_date.replace(tzinfo=None)
-            holding_days = (datetime.utcnow() - first_date).days if first_date else None
+            if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
+                first_date = first_date.replace(tzinfo=timezone.utc)
+            holding_days = (datetime.now(timezone.utc) - first_date).days if first_date else None
             annualized_return = None
             if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
                 years = holding_days / 365.25
@@ -1487,7 +1487,7 @@ class MetricsService:
                 from app.core.database import AsyncSessionLocal
                 from app.models.asset_price_history import AssetPriceHistory
 
-                cutoff = (datetime.utcnow() - timedelta(days=days + 5)).date()
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
                 async with AsyncSessionLocal() as _db:
                     for symbol in list(remaining):
                         sym_upper = symbol.upper()

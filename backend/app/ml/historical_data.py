@@ -217,7 +217,7 @@ class HistoricalDataFetcher:
         completely distort risk metrics (VaR, correlation, Markowitz weights).
         """
         logger.info("Generating synthetic real estate history for %s", symbol)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # France residential real estate parameters
         annual_return = 0.03
         annual_vol = 0.03

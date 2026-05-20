@@ -44,45 +44,9 @@ import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { isColdWallet } from '@/lib/platforms'
 import PortfolioAssetList from '@/components/portfolio/PortfolioAssetList'
 import CreatePortfolioForm from '@/components/portfolio/CreatePortfolioForm'
-import type { PortfolioSummary } from '@/types'
+import type { PortfolioSummary, AssetMetrics, PortfolioMetrics } from '@/types'
 
 type Portfolio = PortfolioSummary
-
-interface AssetMetrics {
-  id: string
-  symbol: string
-  name?: string
-  asset_type: string
-  quantity: number
-  avg_buy_price: number
-  current_price?: number
-  current_value: number
-  total_invested: number
-  gain_loss: number
-  gain_loss_percent: number
-  total_fees?: number
-  breakeven_price?: number | null
-  risk_weight?: number
-}
-
-interface StablecoinEntry {
-  id: string
-  symbol: string
-  quantity: number
-  value: number
-}
-
-interface PortfolioMetrics {
-  total_value: number
-  total_invested: number
-  total_gain_loss: number
-  total_gain_loss_percent: number
-  assets: AssetMetrics[]
-  cash_from_stablecoins?: number
-  stablecoins?: StablecoinEntry[]
-  cash_from_fiat?: number
-  fiat_assets?: StablecoinEntry[]
-}
 
 interface HistoricalAsset {
   id: string
@@ -144,7 +108,7 @@ export default function PortfolioPage() {
     staleTime: 60_000,
   })
   const portfolios = useMemo(
-    () => allPortfolios?.filter((p) => p.name !== 'Crowdfunding') ?? [],
+    () => allPortfolios?.filter((p) => p.name.toLowerCase() !== 'crowdfunding') ?? [],
     [allPortfolios],
   )
 

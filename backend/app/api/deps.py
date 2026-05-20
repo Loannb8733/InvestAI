@@ -45,14 +45,14 @@ async def get_current_user(
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail="Token invalide ou expiré",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     if payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
+            detail="Type de token invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -77,7 +77,7 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
+            detail="Payload du token invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -87,7 +87,7 @@ async def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Utilisateur non trouvé",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

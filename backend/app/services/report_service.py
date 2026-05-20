@@ -7,6 +7,7 @@ from collections import defaultdict as _defaultdict
 from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import datetime
+from datetime import timezone
 from datetime import timezone as _tz
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
@@ -356,7 +357,7 @@ class ReportService:
                 "pnl_data": {},
                 "risk_metrics": {},
                 "platform_analysis": [],
-                "generated_at": datetime.utcnow(),
+                "generated_at": datetime.now(timezone.utc),
                 "year": year,
             }
 
@@ -454,7 +455,7 @@ class ReportService:
             if first_tx_date:
                 if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
                     first_tx_date = first_tx_date.replace(tzinfo=None)
-                risk_days = max((datetime.utcnow() - first_tx_date).days + 1, 7)
+                risk_days = max((datetime.now(timezone.utc) - first_tx_date).days + 1, 7)
             else:
                 risk_days = 30
 
@@ -544,7 +545,7 @@ class ReportService:
             "platform_analysis": platform_analysis,
             "attribution": attribution,
             "cash_flows": cash_flows,
-            "generated_at": datetime.utcnow(),
+            "generated_at": datetime.now(timezone.utc),
             "year": year,
         }
 

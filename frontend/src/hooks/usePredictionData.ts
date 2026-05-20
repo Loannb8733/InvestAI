@@ -195,12 +195,13 @@ export function usePredictionData() {
   const whatIfChangeRef = useRef(whatIfChange)
   whatIfChangeRef.current = whatIfChange
 
-  const runWhatIf = async () => {
+  const runWhatIf = async (overrideValue?: number) => {
     if (!effectiveWhatIfSymbol) return
+    const changeValue = overrideValue !== undefined ? overrideValue : whatIfChangeRef.current
     setWhatIfResult(null)
     setWhatIfLoading(true)
     try {
-      const result = await predictionsApi.whatIf([{ symbol: effectiveWhatIfSymbol, change_percent: whatIfChangeRef.current }])
+      const result = await predictionsApi.whatIf([{ symbol: effectiveWhatIfSymbol, change_percent: changeValue }])
       setWhatIfResult(result)
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de lancer la simulation What-If', variant: 'destructive' })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,10 +37,18 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
 
-  // Profile form state
+  // Profile form state — kept in sync with store after successful save
   const [firstName, setFirstName] = useState(user?.firstName || '')
   const [lastName, setLastName] = useState(user?.lastName || '')
   const [preferredCurrency, setPreferredCurrency] = useState(user?.preferredCurrency || 'EUR')
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '')
+      setLastName(user.lastName || '')
+      setPreferredCurrency(user.preferredCurrency || 'EUR')
+    }
+  }, [user])
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -125,8 +133,8 @@ export default function SettingsPage() {
       toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' })
       return
     }
-    if (newPassword.length < 8) {
-      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.', variant: 'destructive' })
+    if (newPassword.length < 10 || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 10 caractères, une majuscule et un chiffre.', variant: 'destructive' })
       return
     }
     passwordMutation.mutate()

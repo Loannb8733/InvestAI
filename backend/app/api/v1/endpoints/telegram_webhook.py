@@ -11,7 +11,7 @@ Security:
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,10 +42,19 @@ async def _verify_chat_id(db: AsyncSession, user_id: str, chat_id: str) -> bool:
 
 
 @router.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
     """Handle incoming Telegram webhook updates (callback_query only)."""
     if not settings.telegram_bot_enabled:
         return JSONResponse({"ok": True})
+
+    # Validate Telegram webhook secret when configured
+    if settings.TELEGRAM_WEBHOOK_SECRET:
+        if x_telegram_bot_api_secret_token != settings.TELEGRAM_WEBHOOK_SECRET:
+            logger.warning("Telegram webhook rejected: invalid or missing secret token")
+            return JSONResponse({"ok": False}, status_code=403)
 
     try:
         body = await request.json()

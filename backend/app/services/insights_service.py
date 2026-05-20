@@ -1,7 +1,7 @@
 """Advanced analysis service: fees, tax-loss harvesting, passive income, DCA backtest."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from sqlalchemy import extract, select
@@ -276,7 +276,7 @@ class InsightsService:
 
         fetcher = HistoricalDataFetcher(coingecko_api_key=getattr(settings, "COINGECKO_API_KEY", None))
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         start_date = datetime(start_year, start_month, 1)
         total_months = (now.year - start_date.year) * 12 + (now.month - start_date.month)
 

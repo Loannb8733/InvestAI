@@ -4,7 +4,7 @@ import io
 from datetime import datetime
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -129,6 +129,34 @@ async def get_tax_report_excel(
         io.BytesIO(excel_content),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/tax/securities/{year}/pdf")
+@limiter.limit("10/minute")
+async def get_securities_tax_report_pdf(
+    request: Request,
+    year: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Rapport Valeurs Mobilières PDF — fonctionnalité en cours de développement."""
+    raise HTTPException(
+        status_code=501,
+        detail="Rapport Valeurs Mobilières non disponible - fonctionnalité en cours de développement",
+    )
+
+
+@router.get("/tax/securities/{year}/excel")
+@limiter.limit("10/minute")
+async def get_securities_tax_report_excel(
+    request: Request,
+    year: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Rapport Valeurs Mobilières Excel — fonctionnalité en cours de développement."""
+    raise HTTPException(
+        status_code=501,
+        detail="Rapport Valeurs Mobilières non disponible - fonctionnalité en cours de développement",
     )
 
 

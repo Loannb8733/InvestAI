@@ -3,7 +3,7 @@
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -105,7 +105,26 @@ class PredictionService:
         # Check cache first
         cached = await get_cached_prediction(symbol, days_ahead)
         if cached:
-            return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith("_")})
+            # ── C-21 Sanity check on cached result ────────────────────────
+            # Apply the ±50% guard even for cache hits so that stale entries
+            # produced before the sanity check was introduced are never served.
+            cached_preds = cached.get("predictions", [])
+            cached_price = cached.get("current_price", 0)
+            if cached_preds and cached_price > 0:
+                final_cached = cached_preds[-1]["price"]
+                cached_change_pct = (final_cached - cached_price) / cached_price * 100
+                if abs(cached_change_pct) > 50:
+                    logger.warning(
+                        "SANITY CHECK (cache): %s cached prediction unrealistic "
+                        "(%.1f%% in %dd). Invalidating cache entry.",
+                        symbol,
+                        cached_change_pct,
+                        days_ahead,
+                    )
+                    # Discard the stale cache entry and fall through to recompute
+                    cached = None
+            if cached is not None:
+                return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith("_")})
 
         current_price = await self._get_current_price(symbol, asset_type)
 
@@ -236,6 +255,7 @@ class PredictionService:
             ]
 
             # ── Sanity check: reject unrealistic ensemble predictions ─────
+            # Applied to BOTH cache hits and freshly computed results.
             # If 7d predicted move > ±50%, fallback to EMA-20 extrapolation.
             if predictions and current_price > 0:
                 final_price = predictions[-1]["price"]
@@ -1514,7 +1534,7 @@ class PredictionService:
         """
         arr = np.array(prices, dtype=float)
         n = len(arr)
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
 
         # ── OU parameters (mu, theta, sigma) ──────────────────────────
         if n >= 200:
@@ -2662,7 +2682,7 @@ class PredictionService:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         current_year = now.year
         events = []
 
@@ -2899,7 +2919,7 @@ class PredictionService:
         unique.sort(key=lambda x: x["days_until"])
         return unique[:15]
 
-    async def get_track_record(self, symbol: str, limit: int = 20) -> Dict:
+    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> Dict:
         """Get historical prediction track record for a symbol.
 
         Returns past predictions with actual outcomes for transparency.
@@ -2909,14 +2929,14 @@ class PredictionService:
 
         try:
             async with AsyncSessionLocal() as db:
+                filters = [
+                    PredictionLog.symbol == symbol.upper(),
+                    PredictionLog.accuracy_checked.isnot(None),
+                ]
+                if user_id:
+                    filters.append(PredictionLog.user_id == user_id)
                 result = await db.execute(
-                    select(PredictionLog)
-                    .where(
-                        PredictionLog.symbol == symbol.upper(),
-                        PredictionLog.accuracy_checked.isnot(None),
-                    )
-                    .order_by(PredictionLog.created_at.desc())
-                    .limit(limit)
+                    select(PredictionLog).where(*filters).order_by(PredictionLog.created_at.desc()).limit(limit)
                 )
                 logs = result.scalars().all()
 
@@ -3621,7 +3641,7 @@ class PredictionService:
 
         predictions = []
         for day in range(1, days_ahead + 1):
-            date = (datetime.utcnow() + timedelta(days=day)).strftime("%Y-%m-%d")
+            date = (datetime.now(timezone.utc) + timedelta(days=day)).strftime("%Y-%m-%d")
             predicted = current_price * (1 + daily_slope * day)
             predicted = max(0.0, predicted)
             # Conservative CI: ±3% * sqrt(day)
@@ -3674,7 +3694,7 @@ class PredictionService:
             return round(v, 2)
 
         for day in range(1, days_ahead + 1):
-            date = datetime.utcnow() + timedelta(days=day)
+            date = datetime.now(timezone.utc) + timedelta(days=day)
             # FIX3: linear projection instead of cumulative random chain
             predicted_price = base_price * (1 + trend_factor * day)
             predicted_price = max(0.0, predicted_price)

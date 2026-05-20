@@ -3,7 +3,7 @@
 import logging
 import math
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -56,7 +56,7 @@ class SnapshotService:
         snapshot = PortfolioSnapshot(
             user_id=user_id,
             portfolio_id=portfolio_id,
-            snapshot_date=datetime.utcnow(),
+            snapshot_date=datetime.now(timezone.utc),
             total_value=total_value,
             total_invested=total_invested,
             total_gain_loss=total_value - total_invested,
@@ -94,7 +94,7 @@ class SnapshotService:
         Uses a single-query check to avoid TOCTOU race conditions.
         Reuses metrics already computed by the caller if available.
         """
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         existing = await db.execute(
             select(func.count())
             .select_from(PortfolioSnapshot)
@@ -207,8 +207,8 @@ class SnapshotService:
         portfolio_id: Optional[str] = None,
     ) -> List[Dict]:
         """Get historical portfolio values for chart display."""
-        start_date = datetime.utcnow() - timedelta(days=days)
-        datetime.utcnow()
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+        datetime.now(timezone.utc)
 
         # Get invested timeline from transactions
         invested_timeline, net_capital_timeline = await self._get_invested_timeline(db, user_id, portfolio_id)
@@ -591,7 +591,7 @@ class SnapshotService:
         # 2. Check PostgreSQL first (persistent, complete after backfill)
         symbols_need_redis: Dict[str, str] = {}
         if db is not None:
-            cutoff_date = (datetime.utcnow() - timedelta(days=days + 5)).date()
+            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
             for symbol_upper, asset_type in symbols_to_fetch.items():
                 if symbol_upper in STABLECOINS:
                     price_series[symbol_upper] = {}
@@ -746,7 +746,7 @@ class SnapshotService:
         if not transactions:
             return []
 
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
         first_tx_date = transactions[0].executed_at or transactions[0].created_at
         if first_tx_date is None:
             first_tx_date = today

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, delete, func, select
 
@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
     """Delete read notifications older than specified days."""
     async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         # Count notifications to delete
         count_result = await db.execute(
             select(func.count(Notification.id)).where(
                 and_(
-                    Notification.read == True,
+                    Notification.is_read == True,
                     Notification.created_at < cutoff_date,
                 )
             )
@@ -45,7 +45,7 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
             await db.execute(
                 delete(Notification).where(
                     and_(
-                        Notification.read == True,
+                        Notification.is_read == True,
                         Notification.created_at < cutoff_date,
                     )
                 )
@@ -59,7 +59,7 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
 async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
     """Delete old prediction records older than specified days."""
     async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         # Count predictions to delete
         count_result = await db.execute(

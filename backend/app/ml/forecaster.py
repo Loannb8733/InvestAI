@@ -5,7 +5,7 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -1087,7 +1087,7 @@ class PriceForecaster:
         if len(prices) >= 2 and prices[0] > 1e-10:
             drift = (prices[-1] / prices[0]) ** (1 / len(prices)) - 1
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result_dates, result_prices, result_low, result_high = [], [], [], []
         base = current
         for i in range(1, days_ahead + 1):

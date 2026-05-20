@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuthStore } from '@/stores/authStore'
 import type { PortfolioSummary as Portfolio } from '@/types'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -105,7 +106,7 @@ const assetTypes = [
   { value: 'fiat', label: 'Fiat' },
 ]
 
-const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+const makeFmt = (currency: string) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency })
 const fmtQty = (v: number, symbol: string) => {
   const str = v.toFixed(8).replace(/\.?0+$/, '')
   return `${str} ${symbol}`
@@ -120,6 +121,8 @@ export default function AddTransactionForm({
 }: AddTransactionFormProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const preferredCurrency = useAuthStore((s) => s.user?.preferredCurrency ?? 'EUR')
+  const fmt = useMemo(() => makeFmt(preferredCurrency), [preferredCurrency])
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: queryKeys.portfolios.list(),
@@ -656,7 +659,7 @@ export default function AddTransactionForm({
         {/* 6. Fees + Total (bidirectional) — 2-column grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="fee" className="text-xs text-muted-foreground uppercase tracking-wider">Frais (EUR)</Label>
+            <Label htmlFor="fee" className="text-xs text-muted-foreground uppercase tracking-wider">Frais ({preferredCurrency})</Label>
             <Input
               id="fee"
               type="text"

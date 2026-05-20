@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -102,6 +102,18 @@ export default function CalendarPage() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showIncomeOnly, setShowIncomeOnly] = useState(false)
+  const [formEventType, setFormEventType] = useState('other')
+  const [formCurrency, setFormCurrency] = useState('EUR')
+
+  useEffect(() => {
+    if (editingEvent) {
+      setFormEventType(editingEvent.event_type || 'other')
+      setFormCurrency(editingEvent.currency || 'EUR')
+    } else if (showAddEvent) {
+      setFormEventType('other')
+      setFormCurrency('EUR')
+    }
+  }, [editingEvent, showAddEvent])
 
   // Fetch event types
   const { data: eventTypes } = useQuery<EventType[]>({
@@ -193,12 +205,12 @@ export default function CalendarPage() {
     const data = {
       title: formData.get('title') as string,
       description: formData.get('description') as string || undefined,
-      event_type: formData.get('event_type') as string,
+      event_type: formEventType,
       event_date: formData.get('event_date') as string,
       is_recurring: formData.get('is_recurring') === 'on',
       recurrence_rule: formData.get('recurrence_rule') as string || undefined,
       amount: formData.get('amount') ? parseFloat(formData.get('amount') as string) : undefined,
-      currency: formData.get('currency') as string || 'EUR',
+      currency: formCurrency || 'EUR',
     }
 
     if (editingEvent) {
@@ -209,7 +221,8 @@ export default function CalendarPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
+    const normalized = dateString.endsWith('Z') || dateString.includes('+') ? dateString : dateString + 'Z'
+    return new Date(normalized).toLocaleDateString('fr-FR', {
       weekday: 'short',
       day: '2-digit',
       month: 'short',
@@ -227,7 +240,8 @@ export default function CalendarPage() {
   }
 
   const isOverdue = (event: CalendarEvent) => {
-    return !event.is_completed && new Date(event.event_date) < new Date()
+    const normalized = event.event_date.endsWith('Z') || event.event_date.includes('+') ? event.event_date : event.event_date + 'Z'
+    return !event.is_completed && new Date(normalized) < new Date()
   }
 
   if (isLoading) {
@@ -512,7 +526,7 @@ export default function CalendarPage() {
                             size="icon"
                             variant="outline"
                             onClick={() => completeMutation.mutate(event.id)}
-                            title="Marquer comme complété"
+                            aria-label="Marquer comme complété"
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -521,6 +535,7 @@ export default function CalendarPage() {
                           size="icon"
                           variant="ghost"
                           onClick={() => setEditingEvent(event)}
+                          aria-label="Modifier l'événement"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -532,6 +547,7 @@ export default function CalendarPage() {
                               deleteMutation.mutate(event.id)
                             }
                           }}
+                          aria-label="Supprimer l'événement"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -568,6 +584,9 @@ export default function CalendarPage() {
           if (!open) {
             setShowAddEvent(false)
             setEditingEvent(null)
+          } else {
+            setFormEventType(editingEvent?.event_type || 'dividend')
+            setFormCurrency(editingEvent?.currency || 'EUR')
           }
         }}
       >
@@ -598,8 +617,8 @@ export default function CalendarPage() {
               <div className="space-y-2">
                 <Label htmlFor="event_type">Type *</Label>
                 <Select
-                  name="event_type"
-                  defaultValue={editingEvent?.event_type || 'dividend'}
+                  value={formEventType}
+                  onValueChange={setFormEventType}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionnez un type" />
@@ -649,7 +668,7 @@ export default function CalendarPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="currency">Devise</Label>
-                  <Select name="currency" defaultValue={editingEvent?.currency || 'EUR'}>
+                  <Select value={formCurrency} onValueChange={setFormCurrency}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>

@@ -100,7 +100,7 @@ async def list_transactions(
         if portfolio_id not in portfolio_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
         asset_query = asset_query.where(Asset.portfolio_id == portfolio_id)
 
@@ -121,7 +121,7 @@ async def list_transactions(
         if asset_id not in asset_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Asset not found",
+                detail="Actif non trouvé",
             )
         query = query.where(Transaction.asset_id == asset_id)
 
@@ -178,7 +178,7 @@ async def create_transaction(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     # If the transaction specifies a different exchange than the asset,
@@ -211,16 +211,11 @@ async def create_transaction(
 
     # Sanitize values to prevent numeric overflow
     # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
-    MAX_NUMERIC_VALUE = 9_999_999_999.0
+    _MAX = Decimal("9999999999")
 
-    quantity = float(transaction_in.quantity)
-    price = float(transaction_in.price)
-    fee = float(transaction_in.fee) if transaction_in.fee else 0
-
-    # Clamp values to valid ranges
-    quantity = max(0, min(quantity, MAX_NUMERIC_VALUE))
-    price = max(0, min(price, MAX_NUMERIC_VALUE))
-    fee = max(0, min(fee, MAX_NUMERIC_VALUE))
+    quantity = min(transaction_in.quantity, _MAX)
+    price = min(transaction_in.price, _MAX)
+    fee = min(transaction_in.fee if transaction_in.fee else Decimal("0"), _MAX)
 
     transaction = Transaction(
         asset_id=asset.id,
@@ -262,15 +257,14 @@ async def create_transaction(
     ]
     subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
+    _ZERO = Decimal("0")
     if transaction_in.transaction_type.value in add_types:
-        new_total = float(asset.quantity) + quantity
-        asset.quantity = min(new_total, MAX_NUMERIC_VALUE)
+        asset.quantity = min((asset.quantity or _ZERO) + quantity, _MAX)
     elif transaction_in.transaction_type.value in subtract_types:
-        new_total = float(asset.quantity) - quantity
         # Allow historical sells even when quantity was already synced to 0
         # (e.g. exchange sync updated balance before the transaction was recorded).
         # Clamp to 0 to avoid negative quantities.
-        asset.quantity = max(0, new_total)
+        asset.quantity = max(_ZERO, (asset.quantity or _ZERO) - quantity)
 
     # Recalculate avg_buy_price from all BUY + CONVERSION_IN transactions
     # (avoids the incremental formula bug that dilutes PRU with airdrop quantities)
@@ -386,7 +380,7 @@ async def export_transactions_csv(
     if not portfolio_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No portfolios found",
+            detail="Aucun portefeuille trouvé",
         )
 
     # Get user's assets with symbols
@@ -457,7 +451,7 @@ async def get_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     return transaction
@@ -490,7 +484,7 @@ async def update_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     update_data = transaction_update.model_dump(exclude_unset=True)
@@ -526,28 +520,30 @@ async def update_transaction(
         ]
         subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
+        _ZERO = Decimal("0")
         old_type = transaction.transaction_type.value
-        old_qty = float(transaction.quantity)
+        old_qty = transaction.quantity or _ZERO
 
         # Revert old effect
         if old_type in add_types:
-            asset.quantity = float(asset.quantity) - old_qty
+            asset.quantity = (asset.quantity or _ZERO) - old_qty
         elif old_type in subtract_types:
-            asset.quantity = float(asset.quantity) + old_qty
+            asset.quantity = (asset.quantity or _ZERO) + old_qty
 
         # Apply new effect
         new_type = update_data.get("transaction_type", transaction.transaction_type)
         new_type_val = new_type.value if hasattr(new_type, "value") else new_type
-        new_qty = float(update_data.get("quantity", transaction.quantity))
+        raw_new_qty = update_data.get("quantity", transaction.quantity)
+        new_qty = raw_new_qty if isinstance(raw_new_qty, Decimal) else Decimal(str(raw_new_qty))
 
         if new_type_val in add_types:
-            asset.quantity = float(asset.quantity) + new_qty
+            asset.quantity = (asset.quantity or _ZERO) + new_qty
         elif new_type_val in subtract_types:
-            asset.quantity = float(asset.quantity) - new_qty
+            asset.quantity = (asset.quantity or _ZERO) - new_qty
 
-        if asset.quantity < 0:
+        if asset.quantity < _ZERO:
             logger.warning(f"Asset {asset.symbol} quantity went negative ({asset.quantity}), clamping to 0")
-            asset.quantity = 0
+            asset.quantity = _ZERO
 
     # Update fields
     for field, value in update_data.items():
@@ -605,14 +601,20 @@ async def delete_all_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     delete_assets: bool = Query(False, description="Also delete all assets"),
+    portfolio_id: Optional[str] = Query(None, description="Restrict deletion to a specific portfolio"),
 ) -> DeleteAllResult:
     """Delete all transactions for the current user and reset asset quantities."""
     from sqlalchemy import delete as sql_delete
     from sqlalchemy import func
     from sqlalchemy import update as sql_update
 
-    # Get user's portfolio IDs
-    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
+    # Get user's portfolio IDs (filtered by portfolio_id if provided)
+    if portfolio_id:
+        portfolio_result = await db.execute(
+            select(Portfolio.id).where(Portfolio.user_id == current_user.id, Portfolio.id == portfolio_id)
+        )
+    else:
+        portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:
@@ -677,7 +679,7 @@ async def delete_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     # Capture transaction data before deletion for audit trail
@@ -803,7 +805,7 @@ async def import_transactions_csv(
     if not file.filename.endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a CSV file",
+            detail="Le fichier doit être au format CSV",
         )
 
     # Get or create portfolio
@@ -818,12 +820,12 @@ async def import_transactions_csv(
         if not portfolio:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Portfolio ID is required",
+            detail="L'identifiant du portefeuille est requis",
         )
 
     # Get existing assets — keyed by (symbol, exchange) for multi-platform support
@@ -844,7 +846,7 @@ async def import_transactions_csv(
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to read the uploaded file. Please check the file format.",
+            detail="Impossible de lire le fichier. Vérifiez le format du fichier.",
         )
 
     # Get or detect parser
@@ -861,7 +863,7 @@ async def import_transactions_csv(
             if not parser:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Could not detect CSV format. Please specify the platform.",
+                    detail="Format CSV non reconnu. Veuillez spécifier la plateforme.",
                 )
 
         logger.info(f"Using parser: {parser.name}")
@@ -871,7 +873,7 @@ async def import_transactions_csv(
         logger.error(f"Error detecting parser: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error detecting CSV format. Please specify the platform.",
+            detail="Format CSV non reconnu. Veuillez spécifier la plateforme.",
         )
 
     # Parse CSV
@@ -882,7 +884,7 @@ async def import_transactions_csv(
         logger.error(f"Error parsing CSV: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error parsing CSV file. Please check the file format and content.",
+            detail="Erreur lors de la lecture du fichier CSV. Vérifiez le format et le contenu.",
         )
 
     success_count = 0
@@ -1089,7 +1091,7 @@ async def import_transactions_csv(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="A database error occurred. Please try again.",
+            detail="Une erreur de base de données est survenue. Veuillez réessayer.",
         )
 
     # Recalculate asset quantities from transactions (incremental updates lose precision)

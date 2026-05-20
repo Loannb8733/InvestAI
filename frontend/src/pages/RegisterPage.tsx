@@ -24,7 +24,10 @@ import {
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
-  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
+  password: z.string()
+    .min(10, 'Minimum 10 caractères')
+    .regex(/[A-Z]/, 'Au moins une majuscule')
+    .regex(/\d/, 'Au moins un chiffre'),
   confirmPassword: z.string(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -246,6 +249,7 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="vous@exemple.com"
                 className="h-11 px-4"
+                autoComplete="email"
                 {...register('email')}
               />
               {errors.email && (
@@ -262,13 +266,14 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 className="h-11 px-4"
+                autoComplete="new-password"
                 {...register('password')}
               />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Minimum 8 caractères
+                Minimum 10 caractères, dont une majuscule et un chiffre
               </p>
             </div>
 
@@ -281,6 +286,7 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 className="h-11 px-4"
+                autoComplete="new-password"
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
@@ -300,13 +306,13 @@ export default function RegisterPage() {
                   className="text-sm text-muted-foreground cursor-pointer"
                 >
                   J'accepte les{' '}
-                  <span className="text-primary cursor-pointer hover:underline">
+                  <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     conditions d'utilisation
-                  </span>{' '}
+                  </a>{' '}
                   et la{' '}
-                  <span className="text-primary cursor-pointer hover:underline">
+                  <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     politique de confidentialité
-                  </span>
+                  </a>
                 </label>
                 {errors.acceptTerms && (
                   <p className="text-sm text-destructive">{errors.acceptTerms.message}</p>

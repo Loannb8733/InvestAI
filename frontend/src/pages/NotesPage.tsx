@@ -73,13 +73,17 @@ export default function NotesPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [notesPage, setNotesPage] = useState(0)
+  const NOTES_PER_PAGE = 50
 
   // Fetch notes
   const { data: notes, isLoading } = useQuery<Note[]>({
-    queryKey: queryKeys.notes.list(searchTerm, selectedTag),
+    queryKey: [...queryKeys.notes.list(searchTerm, selectedTag), notesPage],
     queryFn: () => notesApi.list({
       search: searchTerm || undefined,
       tag: selectedTag || undefined,
+      skip: notesPage * NOTES_PER_PAGE,
+      limit: NOTES_PER_PAGE,
     }),
     placeholderData: keepPreviousData,
   })
@@ -266,6 +270,7 @@ export default function NotesPage() {
 
       {/* Notes List */}
       {notes && notes.length > 0 ? (
+        <>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {notes.map((note) => (
             <Card key={note.id} className="hover:shadow-md transition-shadow">
@@ -277,6 +282,7 @@ export default function NotesPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => { setEditingNote(note); setSentiment(note.sentiment || '') }}
+                      aria-label="Modifier la note"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -288,6 +294,7 @@ export default function NotesPage() {
                           deleteMutation.mutate(note.id)
                         }
                       }}
+                      aria-label="Supprimer la note"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -336,6 +343,21 @@ export default function NotesPage() {
             </Card>
           ))}
         </div>
+        {notes && notes.length === NOTES_PER_PAGE && (
+          <div className="flex justify-center mt-4">
+            <Button variant="outline" onClick={() => setNotesPage((p) => p + 1)}>
+              Charger plus
+            </Button>
+          </div>
+        )}
+        {notesPage > 0 && (
+          <div className="flex justify-center mt-2">
+            <Button variant="ghost" size="sm" onClick={() => setNotesPage(0)}>
+              Retour au début
+            </Button>
+          </div>
+        )}
+        </>
       ) : (
         <Card>
           <CardContent className="py-12">

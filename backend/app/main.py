@@ -510,13 +510,13 @@ def _run_alembic_upgrade():
                 if row:
                     logger.info("Alembic current revision: %s", row[0])
                 else:
-                    # Table exists but empty — stamp to last schema migration
-                    logger.info("alembic_version empty, stamping to 035_delay_months")
-                    command.stamp(alembic_cfg, "035_delay_months")
+                    # Table exists but empty — stamp to head so upgrade is a no-op
+                    logger.info("alembic_version empty, stamping to head")
+                    command.stamp(alembic_cfg, "head")
             else:
-                # Table doesn't exist — DB was created by create_all, stamp it
-                logger.info("No alembic_version table, stamping to 035_delay_months")
-                command.stamp(alembic_cfg, "035_delay_months")
+                # Table doesn't exist — DB was created by create_all, stamp to head
+                logger.info("No alembic_version table, stamping to head")
+                command.stamp(alembic_cfg, "head")
         sync_engine.dispose()
 
         command.upgrade(alembic_cfg, "head")

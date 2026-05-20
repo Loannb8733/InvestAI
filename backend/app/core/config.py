@@ -196,6 +196,7 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""  # Admin fallback channel (optional)
+    TELEGRAM_WEBHOOK_SECRET: str = ""  # Set to a random string; passed to setWebhook as secret_token
 
     @property
     def telegram_bot_enabled(self) -> bool:
