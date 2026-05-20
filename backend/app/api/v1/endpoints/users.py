@@ -3,8 +3,8 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin_user
@@ -20,13 +20,15 @@ router = APIRouter()
 async def list_users(
     skip: int = 0,
     limit: int = 100,
+    active_only: bool = Query(True, description="Inclure uniquement les utilisateurs actifs"),
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[UserResponse]:
     """List all users (admin only)."""
-    result = await db.execute(
-        select(User).where(User.is_active == True).offset(skip).limit(limit).order_by(User.created_at.desc())
-    )
+    query = select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
+    if active_only:
+        query = query.where(User.is_active == True)
+    result = await db.execute(query)
     users = result.scalars().all()
     return users
 
@@ -145,6 +147,14 @@ async def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    if user.role == "admin":
+        admin_count_result = await db.execute(select(func.count()).where(User.role == "admin", User.is_active == True))
+        if (admin_count_result.scalar() or 0) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last active admin",
+            )
 
     await db.delete(user)
     await db.commit()

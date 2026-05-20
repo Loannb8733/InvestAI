@@ -211,10 +211,12 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
 
 @router.get("", response_model=PortfolioAnalyticsResponse)
 async def get_global_analytics(
-    days: int = Query(60, ge=1, le=365),
+    days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if days == 0:
+        days = 3650
     analytics = await analytics_service.get_user_analytics(db, str(current_user.id), days=days)
     return _analytics_to_response(analytics)
 
@@ -222,10 +224,12 @@ async def get_global_analytics(
 @router.get("/portfolio/{portfolio_id}", response_model=PortfolioAnalyticsResponse)
 async def get_portfolio_analytics(
     portfolio_id: UUID,
-    days: int = Query(60, ge=1, le=365),
+    days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if days == 0:
+        days = 3650
     result = await db.execute(
         select(Portfolio).where(
             Portfolio.id == portfolio_id,
@@ -242,10 +246,12 @@ async def get_portfolio_analytics(
 @router.get("/correlation", response_model=CorrelationResponse)
 async def get_correlation_matrix(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=1, le=365),
+    days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if days == 0:
+        days = 3650
     c = await analytics_service.get_correlation_matrix(db, str(current_user.id), portfolio_id=portfolio_id, days=days)
     return CorrelationResponse(
         symbols=c.symbols,
@@ -258,10 +264,12 @@ async def get_correlation_matrix(
 @router.get("/diversification", response_model=DiversificationResponse)
 async def get_diversification_analysis(
     portfolio_id: Optional[str] = Query(None),
-    days: int = Query(60, ge=1, le=365),
+    days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if days == 0:
+        days = 3650
     a = await analytics_service.get_diversification_analysis(
         db, str(current_user.id), portfolio_id=portfolio_id, days=days
     )
@@ -468,6 +476,7 @@ async def get_beta(
 
 @router.get("/monte-carlo", response_model=MonteCarloResponse)
 async def get_monte_carlo(
+    background_tasks: BackgroundTasks,
     horizon: int = Query(90, ge=7, le=365),
     simulations: int = Query(5000, ge=1000, le=20000),
     portfolio_id: Optional[str] = Query(None),
@@ -483,7 +492,6 @@ async def get_monte_carlo(
     ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Monte Carlo simulation of future portfolio returns with optional withdrawals and fees."""
     # Derive vol_regime from current market regime for regime-aware volatility

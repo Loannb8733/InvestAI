@@ -1,6 +1,7 @@
 """Calendar endpoints for financial events and reminders."""
 
-from datetime import datetime, timedelta
+import calendar
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -125,7 +126,7 @@ async def get_calendar_summary(
     result = await db.execute(select(CalendarEvent).where(CalendarEvent.user_id == current_user.id))
     events = result.scalars().all()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Count upcoming events (not completed, date >= now)
     upcoming = sum(1 for e in events if not e.is_completed and e.event_date >= now)
@@ -173,7 +174,7 @@ async def list_upcoming_events(
     db: AsyncSession = Depends(get_db),
 ) -> List[EventResponse]:
     """List upcoming events in the next N days."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
@@ -317,7 +318,7 @@ async def update_event(
     if event_in.is_completed is not None:
         event.is_completed = event_in.is_completed
         if event_in.is_completed:
-            event.completed_at = datetime.utcnow()
+            event.completed_at = datetime.now(timezone.utc)
         else:
             event.completed_at = None
 
@@ -349,7 +350,7 @@ async def complete_event(
         )
 
     event.is_completed = True
-    event.completed_at = datetime.utcnow()
+    event.completed_at = datetime.now(timezone.utc)
 
     # If recurring, create next occurrence
     if event.is_recurring and event.recurrence_rule:
@@ -415,7 +416,8 @@ def _get_next_occurrence(current_date: datetime, rule: str) -> Optional[datetime
         if month > 12:
             month = 1
             year += 1
-        day = min(current_date.day, 28)  # Safe day for all months
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(current_date.day, last_day)
         return current_date.replace(year=year, month=month, day=day)
     elif "YEARLY" in rule:
         return current_date.replace(year=current_date.year + 1)

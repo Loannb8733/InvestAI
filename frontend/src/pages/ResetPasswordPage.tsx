@@ -40,8 +40,8 @@ export default function ResetPasswordPage() {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Les mots de passe ne correspondent pas.' })
       return
     }
-    if (password.length < 8) {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.' })
+    if (password.length < 10 || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Le mot de passe doit contenir au moins 10 caractères, une majuscule et un chiffre.' })
       return
     }
     mutation.mutate({ token, new_password: password })

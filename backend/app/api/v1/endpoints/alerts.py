@@ -177,19 +177,17 @@ async def list_alerts(
     result = await db.execute(query.order_by(Alert.created_at.desc()).offset(skip).limit(limit))
     alerts = result.scalars().all()
 
-    # Get asset info for each alert
+    # Batch load assets to avoid N+1
+    asset_ids = {a.asset_id for a in alerts if a.asset_id}
+    assets_by_id: dict = {}
+    if asset_ids:
+        asset_result = await db.execute(select(Asset).where(Asset.id.in_(asset_ids)))
+        for asset in asset_result.scalars().all():
+            assets_by_id[asset.id] = asset
+
     response = []
     for alert in alerts:
-        asset_symbol = None
-        asset_name = None
-
-        if alert.asset_id:
-            asset_result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
-            asset = asset_result.scalar_one_or_none()
-            if asset:
-                asset_symbol = asset.symbol
-                asset_name = asset.name
-
+        asset = assets_by_id.get(alert.asset_id) if alert.asset_id else None
         response.append(
             AlertResponse(
                 id=alert.id,
@@ -204,8 +202,8 @@ async def list_alerts(
                 notify_email=alert.notify_email,
                 notify_in_app=alert.notify_in_app,
                 created_at=alert.created_at,
-                asset_symbol=asset_symbol,
-                asset_name=asset_name,
+                asset_symbol=asset.symbol if asset else None,
+                asset_name=asset.name if asset else None,
             )
         )
 

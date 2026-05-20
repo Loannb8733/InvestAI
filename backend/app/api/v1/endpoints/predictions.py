@@ -282,9 +282,9 @@ async def what_if_simulation(
 
 @router.get("/market-cycle", response_model=dict)
 async def get_market_cycle(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Get market cycle analysis with regime detection for BTC and portfolio assets."""
     result = await prediction_service.get_market_cycle(db, str(current_user.id))
@@ -391,9 +391,9 @@ async def _send_euphoria_alert(
 
 @router.get("/top-alpha", response_model=dict)
 async def get_top_alpha(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Detect the held asset with the highest short-term alpha potential."""
     result = await prediction_service.get_top_alpha_asset(db, str(current_user.id))
@@ -512,9 +512,9 @@ async def _send_concentration_alert(
 
 @router.get("/reconciliation-report", response_model=dict)
 async def get_reconciliation_report(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Run a reconciliation check and send Telegram summary.
 
@@ -631,13 +631,15 @@ async def _send_reconciliation_report(
 
 @router.get("/validate-signal", response_model=dict)
 async def validate_signal(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
+    symbol: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
 ):
     """Validate the top Alpha signal with Monte Carlo risk impact analysis.
 
-    1. Identifies the top alpha asset (score > 85).
+    1. Identifies the top alpha asset (score > 85), or uses the provided symbol/action.
     2. Computes the suggested order from the strategy matrix.
     3. Runs Monte Carlo BEFORE and AFTER the purchase to compare prob_ruin.
     4. Sends a detailed Telegram report.
@@ -651,21 +653,32 @@ async def validate_signal(
         return {"validated": False, "reason": "Aucun actif scoré disponible."}
 
     top = alpha_data["top_alpha"]
-    symbol = top["symbol"]
+    # If a specific symbol was requested (user clicked a row), override the top-alpha default
+    if symbol:
+        all_scores = alpha_data.get("all_scores", [])
+        matched = next((s for s in all_scores if s["symbol"] == symbol), None)
+        if matched:
+            top = matched
+    effective_symbol = top["symbol"]
     total_value = alpha_data.get("total_portfolio_value", 0)
     concentration_risk = alpha_data.get("concentration_risk", False)
 
     # ── 2. Strategy matrix action ──
     strategy_data = await prediction_service.get_strategy_map(db, str(current_user.id))
-    action = "OBSERVER"
+    # Use caller-supplied action if provided, otherwise look it up from the matrix
+    effective_action = action if action else "OBSERVER"
     impact_pct = 0.0
     regime = "unknown"
     for row in strategy_data.get("rows", []):
-        if row["symbol"] == top["symbol"]:
-            action = row["action"]
+        if row["symbol"] == effective_symbol:
+            if not action:
+                effective_action = row["action"]
             impact_pct = row["impact_pct"]
             regime = row["regime"]
             break
+    # Alias back to original names used in the rest of the function
+    symbol = effective_symbol
+    action = effective_action
 
     order_eur = round(total_value * abs(impact_pct) / 100, 2) if total_value > 0 else 0.0
 
@@ -867,9 +880,9 @@ async def _send_signal_report(
 
 @router.get("/strategy-map", response_model=dict)
 async def get_strategy_map(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Build a strategy decision table crossing Alpha scores with Cycle phases."""
     result = await prediction_service.get_strategy_map(db, str(current_user.id))

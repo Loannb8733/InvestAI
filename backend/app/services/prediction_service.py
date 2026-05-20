@@ -105,7 +105,26 @@ class PredictionService:
         # Check cache first
         cached = await get_cached_prediction(symbol, days_ahead)
         if cached:
-            return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith("_")})
+            # ── C-21 Sanity check on cached result ────────────────────────
+            # Apply the ±50% guard even for cache hits so that stale entries
+            # produced before the sanity check was introduced are never served.
+            cached_preds = cached.get("predictions", [])
+            cached_price = cached.get("current_price", 0)
+            if cached_preds and cached_price > 0:
+                final_cached = cached_preds[-1]["price"]
+                cached_change_pct = (final_cached - cached_price) / cached_price * 100
+                if abs(cached_change_pct) > 50:
+                    logger.warning(
+                        "SANITY CHECK (cache): %s cached prediction unrealistic "
+                        "(%.1f%% in %dd). Invalidating cache entry.",
+                        symbol,
+                        cached_change_pct,
+                        days_ahead,
+                    )
+                    # Discard the stale cache entry and fall through to recompute
+                    cached = None
+            if cached is not None:
+                return PricePrediction(**{k: v for k, v in cached.items() if not k.startswith("_")})
 
         current_price = await self._get_current_price(symbol, asset_type)
 
@@ -236,6 +255,7 @@ class PredictionService:
             ]
 
             # ── Sanity check: reject unrealistic ensemble predictions ─────
+            # Applied to BOTH cache hits and freshly computed results.
             # If 7d predicted move > ±50%, fallback to EMA-20 extrapolation.
             if predictions and current_price > 0:
                 final_price = predictions[-1]["price"]

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/services/api'
@@ -20,9 +20,13 @@ export default function VerifyEmailPage() {
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
+  const hasVerified = useRef(false)
 
   useEffect(() => {
     const verifyEmail = async () => {
+      if (hasVerified.current) return
+      hasVerified.current = true
+
       const token = searchParams.get('token')
 
       if (!token) {

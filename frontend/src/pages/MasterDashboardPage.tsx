@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useAuthStore } from '@/stores/authStore'
 import type { PnLBreakdown } from '@/types'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
@@ -96,10 +97,11 @@ export default function MasterDashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30)
   const pageVisible = usePageVisibility()
   const navigate = useNavigate()
+  const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
 
   // Fetch crypto dashboard metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
-    queryKey: [...queryKeys.dashboard.metrics(selectedPeriod), 'EUR'],
+    queryKey: [...queryKeys.dashboard.metrics(selectedPeriod), currency],
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -138,15 +140,15 @@ export default function MasterDashboardPage() {
       return { amount: metrics.daily_change, percent: metrics.daily_change_percent }
     }
     return {
-      amount: metrics.period_change ?? metrics.daily_change,
-      percent: metrics.period_change_percent ?? metrics.daily_change_percent,
+      amount: metrics.period_change ?? 0,
+      percent: metrics.period_change_percent ?? 0,
     }
   }, [metrics, selectedPeriod])
 
   const pnl = useMemo(() => {
     const cryptoPnl = metrics?.advanced_metrics?.pnl_breakdown?.net_pnl ?? 0
     const cfInterest = (cfDashboard?.total_received ?? 0) - (cfDashboard?.total_invested ?? 0)
-    return cryptoPnl + Math.max(0, cfInterest)
+    return cryptoPnl + cfInterest
   }, [metrics, cfDashboard])
 
   // Blend CAGR: weighted by capital

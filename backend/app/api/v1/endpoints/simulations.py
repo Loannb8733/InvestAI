@@ -249,6 +249,11 @@ async def calculate_fire(
 
     # FIRE number = annual expenses / withdrawal rate
     annual_expenses = params.monthly_expenses * 12
+    if params.withdrawal_rate <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le taux de retrait doit être supérieur à 0",
+        )
     fire_number = annual_expenses / (params.withdrawal_rate / 100)
 
     # Monthly passive income at current portfolio value
@@ -394,7 +399,7 @@ async def simulate_dca(
     monthly_volatility = params.expected_volatility / 100 / (12**0.5)
     amt_per = Decimal(str(amount_per_investment))
 
-    random.seed(42)  # For reproducibility
+    # No fixed seed — each simulation produces genuine stochastic results
 
     for i in range(num_investments):
         # Simulate price change (float OK for stochastic sampling)

@@ -454,7 +454,9 @@ export default function TransactionsPage() {
   })
 
   const deleteAllMutation = useMutation({
-    mutationFn: transactionsApi.deleteAll,
+    mutationFn: () => transactionsApi.deleteAll(
+      selectedPortfolio !== 'all' ? selectedPortfolio : undefined
+    ),
     onSuccess: (data: { deleted_count: number }) => {
       invalidateAllFinancialData(queryClient)
       toast({ title: `${data.deleted_count} transactions supprimées` })
@@ -1201,8 +1203,11 @@ export default function TransactionsPage() {
                       Supprimer toutes les transactions ?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      Cette action est irréversible. Toutes vos transactions ({transactions.length}) seront
-                      définitivement supprimées et les quantités de vos actifs seront remises à zéro.
+                      Cette action est irréversible.{' '}
+                      {selectedPortfolio !== 'all'
+                        ? `Les transactions du portefeuille sélectionné (${transactions?.length ?? 0}) seront`
+                        : `Toutes vos transactions (${transactions?.length ?? 0}) seront`}{' '}
+                      définitivement supprimées et les quantités des actifs concernés seront remises à zéro.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

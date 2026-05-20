@@ -209,7 +209,8 @@ export default function CalendarPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
+    const normalized = dateString.endsWith('Z') || dateString.includes('+') ? dateString : dateString + 'Z'
+    return new Date(normalized).toLocaleDateString('fr-FR', {
       weekday: 'short',
       day: '2-digit',
       month: 'short',
@@ -227,7 +228,8 @@ export default function CalendarPage() {
   }
 
   const isOverdue = (event: CalendarEvent) => {
-    return !event.is_completed && new Date(event.event_date) < new Date()
+    const normalized = event.event_date.endsWith('Z') || event.event_date.includes('+') ? event.event_date : event.event_date + 'Z'
+    return !event.is_completed && new Date(normalized) < new Date()
   }
 
   if (isLoading) {

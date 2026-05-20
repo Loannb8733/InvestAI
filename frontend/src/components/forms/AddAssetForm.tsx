@@ -1,4 +1,6 @@
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +25,41 @@ import { assetsApi } from '@/services/api'
 import { Loader2 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
+
+const assetFormSchema = z.object({
+  asset_type: z.string().min(1),
+  symbol: z.string().optional(),
+  name: z.string().optional(),
+  quantity: z.coerce.number().optional(),
+  avg_buy_price: z.coerce.number().optional(),
+  exchange: z.string().optional(),
+  project_name: z.string().optional(),
+  invested_amount: z.coerce.number().optional(),
+  interest_rate: z.coerce.number().optional(),
+  maturity_date: z.string().optional(),
+  currency: z.string().default('EUR'),
+}).superRefine((data, ctx) => {
+  if (data.asset_type === 'real_estate') {
+    if (!data.project_name?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Nom du projet requis', path: ['project_name'] })
+    }
+    if (!data.invested_amount || data.invested_amount <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Montant doit être supérieur à 0', path: ['invested_amount'] })
+    }
+  } else {
+    if (!data.symbol?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Symbole requis', path: ['symbol'] })
+    }
+    if (data.quantity === undefined || data.quantity < 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Quantité invalide (≥ 0)', path: ['quantity'] })
+    }
+    if (data.avg_buy_price === undefined || data.avg_buy_price < 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prix invalide (≥ 0)', path: ['avg_buy_price'] })
+    }
+  }
+})
+
+type AssetFormData = z.infer<typeof assetFormSchema>
 
 interface AddAssetFormProps {
   open: boolean
@@ -56,7 +93,8 @@ export default function AddAssetForm({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<Record<string, unknown>>({
+  } = useForm<AssetFormData>({
+    resolver: zodResolver(assetFormSchema),
     defaultValues: {
       asset_type: 'crypto',
       quantity: 0,
@@ -94,23 +132,16 @@ export default function AddAssetForm({
     },
   })
 
-  const onSubmit = (data: Record<string, unknown>) => {
+  const onSubmit = (data: AssetFormData) => {
     if (isCrowdfunding) {
-      const projectName = data.project_name as string
-      const investedAmount = Number(data.invested_amount)
-      const interestRate = Number(data.interest_rate) || undefined
-      const maturityDate = (data.maturity_date as string) || undefined
+      const projectName = data.project_name!
+      const investedAmount = data.invested_amount!
       const symbol = projectName
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .toUpperCase()
         .replace(/[^A-Z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
         .substring(0, 20)
-
-      if (!projectName || investedAmount <= 0) {
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Nom du projet et montant requis.' })
-        return
-      }
 
       mutation.mutate({
         portfolio_id: portfolioId,
@@ -120,27 +151,22 @@ export default function AddAssetForm({
         quantity: 1,
         avg_buy_price: investedAmount,
         currency: 'EUR',
-        exchange: (data.exchange as string) || undefined,
+        exchange: data.exchange || undefined,
         invested_amount: investedAmount,
-        interest_rate: interestRate,
-        maturity_date: maturityDate,
+        interest_rate: data.interest_rate || undefined,
+        maturity_date: data.maturity_date || undefined,
         project_status: 'active',
       })
     } else {
-      const symbol = (data.symbol as string || '').toUpperCase()
-      if (!symbol) {
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Symbole requis.' })
-        return
-      }
       mutation.mutate({
         portfolio_id: portfolioId,
-        symbol,
-        name: (data.name as string) || undefined,
-        asset_type: data.asset_type as string,
-        quantity: Number(data.quantity),
-        avg_buy_price: Number(data.avg_buy_price),
+        symbol: data.symbol!.toUpperCase(),
+        name: data.name || undefined,
+        asset_type: data.asset_type,
+        quantity: data.quantity ?? 0,
+        avg_buy_price: data.avg_buy_price ?? 0,
         currency: 'EUR',
-        exchange: (data.exchange as string) || undefined,
+        exchange: data.exchange || undefined,
       })
     }
   }
@@ -184,6 +210,9 @@ export default function AddAssetForm({
                     placeholder="Résidence Lyon, Bureau Paris..."
                     {...register('project_name')}
                   />
+                  {errors.project_name && (
+                    <p className="text-sm text-destructive">{errors.project_name.message}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -196,6 +225,9 @@ export default function AddAssetForm({
                       placeholder="2000"
                       {...register('invested_amount')}
                     />
+                    {errors.invested_amount && (
+                      <p className="text-sm text-destructive">{errors.invested_amount.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="interest_rate">Taux annuel (%)</Label>

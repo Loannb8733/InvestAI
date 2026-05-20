@@ -223,10 +223,10 @@ export default function CrowdfundingProjectsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => crowdfundingApi.delete(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       invalidate()
       setDeletingId(null)
-      if (selectedProjectId === deletingId) setSelectedProjectId(null)
+      if (selectedProjectId === id) setSelectedProjectId(null)
       toast({ title: 'Projet supprimé' })
     },
     onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
@@ -260,7 +260,7 @@ export default function CrowdfundingProjectsPage() {
     const interest = parseFloat(repaymentForm.interest_amount) || 0
     const capital = parseFloat(repaymentForm.capital_amount) || 0
     const tax = parseFloat(repaymentForm.tax_amount) || 0
-    const amount = interest + capital - tax
+    const amount = interest + capital
     if (amount <= 0) return
 
     const paymentType: PaymentType =

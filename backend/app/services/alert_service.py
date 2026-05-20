@@ -169,6 +169,8 @@ class AlertService:
         alerts = result.scalars().all()
 
         for alert in alerts:
+            if alert.triggered_at and (datetime.utcnow() - alert.triggered_at) < timedelta(minutes=5):
+                continue
             trigger = await self._check_single_alert(db, alert)
             if trigger:
                 triggered.append(trigger)

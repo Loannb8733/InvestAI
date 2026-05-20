@@ -495,11 +495,14 @@ async def get_dashboard(
             actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
         else:
             actual_days = max(days, 30)
-        years = actual_days / 365.0
-        roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
-        roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+        if actual_days >= 180:
+            years = actual_days / 365.0
+            roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
+            roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+        else:
+            roi_annualized = None
     else:
-        roi_annualized = 0.0
+        roi_annualized = None
 
     # Risk metrics — pass roi_annualized so Sharpe uses the real CAGR
     risk_data = await snapshot_service.get_all_risk_metrics(
@@ -1001,6 +1004,7 @@ class SparklineData(BaseModel):
 @router.get("/portfolio/{portfolio_id}/sparklines", response_model=List[SparklineData])
 async def get_portfolio_sparklines(
     portfolio_id: str,
+    background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1084,7 +1088,7 @@ async def get_portfolio_sparklines(
             except Exception as e:
                 logger.warning("On-demand sparkline backfill failed: %s", e)
 
-        asyncio.create_task(_fill_missing())
+        background_tasks.add_task(_fill_missing)
 
     return sparklines
 
@@ -1251,9 +1255,7 @@ async def trigger_price_backfill(
         except Exception as e:
             logger.warning("Backfill failed: %s", e)
 
-    import asyncio
-
-    asyncio.create_task(_run_backfill())
+    background_tasks.add_task(_run_backfill)
     return {"status": "started", "message": "Backfill running in background"}
 
 

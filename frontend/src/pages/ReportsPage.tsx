@@ -82,10 +82,19 @@ export default function ReportsPage() {
       downloadFile(blob, filename)
       toast({ title: 'Rapport téléchargé avec succès' })
     } catch (error) {
-      toast({
-        title: 'Erreur lors du téléchargement',
-        variant: 'destructive',
-      })
+      const status = (error as import('axios').AxiosError)?.response?.status
+      if (status === 501) {
+        toast({
+          title: 'Fonctionnalité non disponible',
+          description: 'Ce rapport est en cours de développement.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Erreur lors du téléchargement',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoadingReport(null)
     }

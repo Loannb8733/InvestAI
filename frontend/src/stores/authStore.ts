@@ -23,7 +23,7 @@ interface AuthState {
   isHydrating: boolean
   error: string | null
   login: (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   refreshAccessToken: () => Promise<void>
   fetchCurrentUser: () => Promise<void>
   hydrateSession: () => Promise<void>
@@ -61,9 +61,8 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        // Clear server-side cookies
-        authApi.logout()
+      logout: async () => {
+        try { await authApi.logout() } catch { /* best-effort: clear local state even if server call fails */ }
         set({
           user: null,
           accessToken: null,

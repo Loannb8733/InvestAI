@@ -62,8 +62,9 @@ def _enrich(
     rate = float(project.annual_rate) / 100
     months = int(project.duration_months)
     received = float(project.total_received)
+    tax_multiplier = 1 - float(project.tax_rate or 0) / 100
 
-    projected_total = invested * rate * months / 12
+    projected_total = invested * rate * months / 12 * tax_multiplier
     interest_earned = max(0.0, received - invested) if project.status == ProjectStatus.COMPLETED else received
 
     progress = 0.0
@@ -359,7 +360,8 @@ async def get_performance(
         rate = float(p.annual_rate) / 100
         months = int(p.duration_months)
         received = float(p.total_received)
-        projected_total = invested * rate * months / 12
+        tax_multiplier = 1 - float(p.tax_rate or 0) / 100
+        projected_total = invested * rate * months / 12 * tax_multiplier
 
         elapsed_months = 0.0
         on_track = True

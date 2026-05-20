@@ -375,9 +375,9 @@ function StrategyTable() {
     mutationFn: predictionsApi.validateSignal,
   })
 
-  const handleActionClick = () => {
+  const handleActionClick = (row: StrategyRow) => {
     setSignalModalOpen(true)
-    validateSignalMutation.mutate()
+    validateSignalMutation.mutate({ symbol: row.symbol, action: row.action })
   }
 
   if (isLoading) return <StrategyTableSkeleton />
@@ -516,7 +516,7 @@ function StrategyTable() {
                         {isActionable ? (
                           <Badge
                             className={`text-xs cursor-pointer hover:opacity-80 transition-opacity ${actionStyles[row.action] || 'bg-gray-100 text-gray-700'}`}
-                            onClick={handleActionClick}
+                            onClick={() => handleActionClick(row)}
                           >
                             {row.action}
                           </Badge>

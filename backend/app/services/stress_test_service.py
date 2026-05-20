@@ -107,9 +107,9 @@ class StressTestService:
     ) -> list[tuple[datetime, float]]:
         """Build (datetime, amount) tuples for XIRR calculation.
 
-        Convention: positive = outflow (investment), negative = inflow (receipts).
+        Convention: negative = outflow (investment), positive = inflow (receipts).
         """
-        flows: list[tuple[datetime, float]] = [(invest_date, invested)]
+        flows: list[tuple[datetime, float]] = [(invest_date, -invested)]
 
         for entry in schedule:
             payment = float(entry.expected_capital) + float(entry.expected_interest)
@@ -118,7 +118,7 @@ class StressTestService:
             due = datetime.combine(entry.due_date, datetime.min.time())
             if delay_months > 0:
                 due += relativedelta(months=delay_months)
-            flows.append((due, -payment))
+            flows.append((due, payment))
 
         return flows
 

@@ -24,7 +24,10 @@ import {
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
-  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
+  password: z.string()
+    .min(10, 'Minimum 10 caractères')
+    .regex(/[A-Z]/, 'Au moins une majuscule')
+    .regex(/\d/, 'Au moins un chiffre'),
   confirmPassword: z.string(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),

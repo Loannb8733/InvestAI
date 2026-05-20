@@ -136,7 +136,7 @@ class ReconciliationService:
         return entries
 
     def _generate_amortizable(self, project: CrowdfundingProject) -> list[CrowdfundingPaymentSchedule]:
-        """AMORTIZABLE: monthly interest, capital on last month."""
+        """AMORTIZABLE: equal monthly capital repayment + monthly interest."""
         if not project.start_date:
             return []
 
@@ -149,17 +149,20 @@ class ReconciliationService:
         monthly_interest = (invested * rate / Decimal("12") * net_mult).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
+        monthly_capital = (invested / Decimal(str(months))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         entries = []
         for m in range(1, months + 1):
             due = project.start_date + relativedelta(months=m)
             is_last = m == months
+            # Last installment absorbs rounding remainder
+            capital = (invested - monthly_capital * Decimal(str(months - 1))) if is_last else monthly_capital
             entries.append(
                 CrowdfundingPaymentSchedule(
                     id=uuid.uuid4(),
                     project_id=project.id,
                     due_date=due,
-                    expected_capital=invested if is_last else Decimal("0"),
+                    expected_capital=capital,
                     expected_interest=monthly_interest,
                 )
             )

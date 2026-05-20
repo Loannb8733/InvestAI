@@ -605,14 +605,20 @@ async def delete_all_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     delete_assets: bool = Query(False, description="Also delete all assets"),
+    portfolio_id: Optional[str] = Query(None, description="Restrict deletion to a specific portfolio"),
 ) -> DeleteAllResult:
     """Delete all transactions for the current user and reset asset quantities."""
     from sqlalchemy import delete as sql_delete
     from sqlalchemy import func
     from sqlalchemy import update as sql_update
 
-    # Get user's portfolio IDs
-    portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
+    # Get user's portfolio IDs (filtered by portfolio_id if provided)
+    if portfolio_id:
+        portfolio_result = await db.execute(
+            select(Portfolio.id).where(Portfolio.user_id == current_user.id, Portfolio.id == portfolio_id)
+        )
+    else:
+        portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:

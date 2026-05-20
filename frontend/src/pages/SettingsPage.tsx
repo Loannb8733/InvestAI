@@ -125,8 +125,8 @@ export default function SettingsPage() {
       toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' })
       return
     }
-    if (newPassword.length < 8) {
-      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.', variant: 'destructive' })
+    if (newPassword.length < 10 || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 10 caractères, une majuscule et un chiffre.', variant: 'destructive' })
       return
     }
     passwordMutation.mutate()
