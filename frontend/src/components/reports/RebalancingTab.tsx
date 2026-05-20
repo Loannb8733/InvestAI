@@ -82,7 +82,7 @@ export default function RebalancingTab() {
     [targets]
   )
 
-  const isValid = totalPct === 100
+  const isValid = Math.abs(totalPct - 100) <= 1
 
   const updateTarget = useCallback((key: string, value: number) => {
     setTargets((prev) => ({ ...prev, [key]: Math.max(0, Math.min(100, value)) }))

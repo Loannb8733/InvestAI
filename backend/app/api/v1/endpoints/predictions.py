@@ -975,7 +975,7 @@ async def get_track_record(
 
     Returns past predictions with actual outcomes for transparency.
     """
-    return await prediction_service.get_track_record(symbol.upper(), limit)
+    return await prediction_service.get_track_record(symbol.upper(), limit, str(current_user.id))
 
 
 # ── Planned Orders ──────────────────────────────────────────────

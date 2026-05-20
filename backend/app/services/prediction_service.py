@@ -2919,7 +2919,7 @@ class PredictionService:
         unique.sort(key=lambda x: x["days_until"])
         return unique[:15]
 
-    async def get_track_record(self, symbol: str, limit: int = 20) -> Dict:
+    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> Dict:
         """Get historical prediction track record for a symbol.
 
         Returns past predictions with actual outcomes for transparency.
@@ -2929,14 +2929,14 @@ class PredictionService:
 
         try:
             async with AsyncSessionLocal() as db:
+                filters = [
+                    PredictionLog.symbol == symbol.upper(),
+                    PredictionLog.accuracy_checked.isnot(None),
+                ]
+                if user_id:
+                    filters.append(PredictionLog.user_id == user_id)
                 result = await db.execute(
-                    select(PredictionLog)
-                    .where(
-                        PredictionLog.symbol == symbol.upper(),
-                        PredictionLog.accuracy_checked.isnot(None),
-                    )
-                    .order_by(PredictionLog.created_at.desc())
-                    .limit(limit)
+                    select(PredictionLog).where(*filters).order_by(PredictionLog.created_at.desc()).limit(limit)
                 )
                 logs = result.scalars().all()
 

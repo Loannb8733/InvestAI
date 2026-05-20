@@ -310,11 +310,13 @@ async def get_dashboard(
     active = [p for p in projects if p.status == ProjectStatus.ACTIVE]
     projected_annual = sum(float(p.invested_amount) * float(p.annual_rate) / 100 for p in active)
 
+    # Include all non-defaulted projects in weighted rate (not just active)
+    _non_defaulted_statuses = {ProjectStatus.ACTIVE, ProjectStatus.DELAYED, ProjectStatus.COMPLETED}
+    rate_projects = [p for p in projects if p.status in _non_defaulted_statuses]
+    rate_invested = sum(float(p.invested_amount) for p in rate_projects)
     weighted_rate = 0.0
-    if total_invested > 0:
-        weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in active) / max(
-            1, sum(float(p.invested_amount) for p in active)
-        )
+    if rate_invested > 0:
+        weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in rate_projects) / rate_invested
 
     # Platform breakdown
     platform_map: dict[str, float] = {}

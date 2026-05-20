@@ -65,6 +65,7 @@ interface DashboardRiskCardsProps {
 
 export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabel, privacyMode }: DashboardRiskCardsProps) {
   const st = thresholds?.sharpe ?? DEFAULT_DISPLAY_THRESHOLDS.sharpe
+  if (!riskMetrics) return null
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>

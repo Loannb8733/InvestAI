@@ -41,12 +41,26 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
               <div key={p.label} className="flex items-center gap-3">
                 <span className="text-xs w-28 text-muted-foreground">{p.label}</span>
                 <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden relative">
+                  {/* Fixed ±200% scale: center at 50%, each 1% = 0.25px */}
                   <div
                     className={`h-full ${p.color} rounded-full absolute`}
-                    style={{
-                      width: `${Math.min(100, Math.max(2, Math.abs(p.value)))}%`,
-                      left: p.value < 0 ? `${Math.max(0, 50 + p.value / 2)}%` : '50%',
-                    }}
+                    style={(() => {
+                      const scale = 200
+                      const centerPct = 50
+                      const valClamped = Math.max(-scale, Math.min(scale, p.value))
+                      if (valClamped >= 0) {
+                        return {
+                          left: `${centerPct}%`,
+                          width: `${Math.max(1, (valClamped / scale) * centerPct)}%`,
+                        }
+                      } else {
+                        const w = Math.max(1, (Math.abs(valClamped) / scale) * centerPct)
+                        return {
+                          left: `${centerPct - w}%`,
+                          width: `${w}%`,
+                        }
+                      }
+                    })()}
                   />
                   <div className="absolute left-1/2 top-0 bottom-0 w-px bg-foreground/30" />
                 </div>

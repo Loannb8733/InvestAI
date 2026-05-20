@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -173,13 +173,19 @@ export default function SimulationsPage() {
     expected_return: 7,
   })
   const [dcaResult, setDcaResult] = useState<DCAResult | null>(null)
+  const prefillDone = useRef(false)
 
-  // Pre-fill portfolio value when dashboard loads
+  // Pre-fill portfolio value once when dashboard data first loads
   useEffect(() => {
-    if (livePortfolioValue > 0 && fireParams.current_portfolio_value === 0) {
-      setFireParams((prev) => ({ ...prev, current_portfolio_value: Math.round(livePortfolioValue * 100) / 100 }))
+    if (!prefillDone.current && livePortfolioValue > 0) {
+      prefillDone.current = true
+      setFireParams((prev) =>
+        prev.current_portfolio_value === 0
+          ? { ...prev, current_portfolio_value: Math.round(livePortfolioValue * 100) / 100 }
+          : prev
+      )
     }
-  }, [livePortfolioValue, fireParams.current_portfolio_value])
+  }, [livePortfolioValue])
 
   // FIRE mutation
   const fireMutation = useMutation({

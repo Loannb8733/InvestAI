@@ -557,9 +557,10 @@ async def get_dashboard(
     )
 
     # Stress tests
+    _default_stress = {"scenario": "unknown", "loss_amount": 0, "loss_pct": 0, "portfolio_after": 0}
     stress_tests = [
-        StressTest(**risk_data["stress_test_20"]),
-        StressTest(**risk_data["stress_test_40"]),
+        StressTest(**risk_data.get("stress_test_20", _default_stress)),
+        StressTest(**risk_data.get("stress_test_40", _default_stress)),
     ]
 
     # P&L breakdown (realized vs unrealized) — pre-computed in metrics

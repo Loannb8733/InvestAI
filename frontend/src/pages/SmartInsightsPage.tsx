@@ -787,10 +787,10 @@ const SIGNAL_COLORS: Record<string, string> = {
 function RegimeBar({ probabilities }: { probabilities: Record<string, number> }) {
   return (
     <div className="flex w-full h-8 rounded-lg overflow-hidden border">
-      {(['bearish', 'bottom', 'bullish', 'top'] as const).map((phase) => {
+      {Object.keys(probabilities).map((phase) => {
         const pct = (probabilities[phase] ?? 0) * 100
         if (pct < 1) return null
-        const cfg = REGIME_CONFIG[phase]
+        const cfg = REGIME_CONFIG[phase] || REGIME_CONFIG.bullish
         return (
           <TooltipProvider key={phase}>
             <Tooltip>

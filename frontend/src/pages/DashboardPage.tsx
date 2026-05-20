@@ -634,7 +634,7 @@ export default function DashboardPage() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Taux moyen</p>
-                          <p className="text-lg font-bold">{cfDashboard.weighted_average_rate.toFixed(1)}%</p>
+                          <p className="text-lg font-bold">{cfDashboard.weighted_average_rate?.toFixed(1) ?? '0.0'}%</p>
                         </div>
                       </div>
                       {cfDashboard.next_maturity && (

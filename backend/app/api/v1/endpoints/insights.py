@@ -43,7 +43,7 @@ async def get_passive_income(
 
 @router.get("/backtest-dca", response_model=dict)
 async def backtest_dca(
-    symbol: str = Query(..., description="Symbole de l'actif (ex: BTC, ETH)"),
+    symbol: str = Query(..., description="Symbole de l'actif (ex: BTC, ETH)", pattern=r"^[A-Z0-9.\-]{1,20}$"),
     asset_type: str = Query("crypto", description="Type d'actif"),
     monthly_amount: float = Query(100, ge=1, le=100000, description="Montant mensuel en EUR"),
     start_year: int = Query(2020, ge=2010, description="Année de début"),

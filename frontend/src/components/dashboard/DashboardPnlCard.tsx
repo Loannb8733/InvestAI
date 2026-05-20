@@ -174,9 +174,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
             <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
-                Estimation indicative{taxMode === 'pfu' ? ' basée sur le PFU 30%' : ''}. Ne constitue pas un conseil fiscal.
-                Ne prend pas en compte les abattements, le report de moins-values ou votre situation personnelle.
-                Consultez votre conseiller fiscal.
+                Estimation maximale conservative{taxMode === 'pfu' ? ' basée sur le PFU 30%' : ''}. Calculée sur le P&L brut réalisé sans déduction des moins-values, abattements ou report déficitaire — le montant réel sera inférieur. Ne constitue pas un conseil fiscal. Consultez votre conseiller fiscal.
               </p>
             </div>
           </div>

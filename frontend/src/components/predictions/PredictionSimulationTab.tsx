@@ -39,7 +39,7 @@ interface PredictionSimulationTabProps {
   setWhatIfChange: (v: number) => void
   whatIfResult: WhatIfResult | null
   whatIfLoading: boolean
-  runWhatIf: () => void
+  runWhatIf: (overrideValue?: number) => void
 }
 
 export default function PredictionSimulationTab({
@@ -93,7 +93,7 @@ export default function PredictionSimulationTab({
                       key={scenario.value}
                       onClick={() => {
                         setWhatIfChange(scenario.value)
-                        setTimeout(runWhatIf, 50)
+                        runWhatIf(scenario.value)
                       }}
                       className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${scenario.color} ${whatIfChange === scenario.value ? 'ring-1 ring-primary' : ''}`}
                     >
@@ -107,8 +107,8 @@ export default function PredictionSimulationTab({
                   max="100"
                   value={whatIfChange}
                   onChange={(e) => setWhatIfChange(parseInt(e.target.value))}
-                  onMouseUp={runWhatIf}
-                  onTouchEnd={runWhatIf}
+                  onMouseUp={() => runWhatIf()}
+                  onTouchEnd={() => runWhatIf()}
                   className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">

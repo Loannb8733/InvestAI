@@ -542,8 +542,11 @@ export const analyticsApi = {
     return response.data
   },
 
-  getXirr: async () => {
-    const response = await api.get('/analytics/xirr', { timeout: ANALYTICS_TIMEOUT })
+  getXirr: async (portfolioId?: string) => {
+    const response = await api.get('/analytics/xirr', {
+      params: portfolioId ? { portfolio_id: portfolioId } : {},
+      timeout: ANALYTICS_TIMEOUT,
+    })
     return response.data
   },
 
@@ -955,7 +958,7 @@ export const notesApi = {
     return response.data
   },
 
-  list: async (params?: { tag?: string; asset_id?: string; search?: string }) => {
+  list: async (params?: { tag?: string; asset_id?: string; search?: string; skip?: number; limit?: number }) => {
     const response = await api.get('/notes', { params })
     return response.data
   },
@@ -965,6 +968,7 @@ export const notesApi = {
     content?: string
     tags?: string
     asset_id?: string
+    sentiment?: string
   }) => {
     const response = await api.post('/notes', data)
     return response.data

@@ -164,6 +164,9 @@ async def delete_strategy(
     if not strategy:
         raise HTTPException(status_code=404, detail="Stratégie non trouvée")
 
+    if strategy.source == StrategySource.AI:
+        raise HTTPException(status_code=403, detail="Les stratégies générées par l'IA ne peuvent pas être supprimées")
+
     await db.delete(strategy)
     await db.commit()
 

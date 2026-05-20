@@ -15,6 +15,9 @@ import {
   FolderOpen,
   ShieldCheck,
   X,
+  Bell,
+  BookOpen,
+  Lightbulb,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -58,6 +61,9 @@ const navSections: NavSection[] = [
     items: [
       { icon: Target, label: 'Objectifs', path: '/strategy' },
       { icon: FileText, label: 'Rapports', path: '/reports' },
+      { icon: Bell, label: 'Alertes', path: '/alerts' },
+      { icon: BookOpen, label: 'Notes', path: '/notes' },
+      { icon: Lightbulb, label: 'Stratégies', path: '/strategies' },
     ],
   },
 ]

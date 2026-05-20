@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -139,16 +139,24 @@ const strategyLabel = (s: string) => {
 
 function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
   const [dcaAmount, setDcaAmount] = useState(43)
+  const [debouncedDca, setDebouncedDca] = useState(43)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data, isLoading, isFetching } = useQuery<GoalProjection>({
-    queryKey: ['goals', 'projection', goalId, dcaAmount],
-    queryFn: () => goalsApi.projection(goalId, dcaAmount),
+    queryKey: ['goals', 'projection', goalId, debouncedDca],
+    queryFn: () => goalsApi.projection(goalId, debouncedDca),
     staleTime: 60_000,
     placeholderData: (prev) => prev,
   })
 
   const handleSliderChange = useCallback((value: number[]) => {
     setDcaAmount(value[0])
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => setDebouncedDca(value[0]), 300)
+  }, [])
+
+  useEffect(() => {
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current) }
   }, [])
 
   if (isLoading && !data) {
@@ -350,6 +358,7 @@ export default function GoalsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null)
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
+  const [syncingGoals, setSyncingGoals] = useState<Set<string>>(new Set())
 
   // Form state
   const [goalType, setGoalType] = useState('asset')
@@ -387,6 +396,12 @@ export default function GoalsPage() {
 
   const syncMutation = useMutation({
     mutationFn: (id: string) => goalsApi.sync(id),
+    onMutate: (id) => {
+      setSyncingGoals((prev) => new Set(prev).add(id))
+    },
+    onSettled: (_, __, id) => {
+      setSyncingGoals((prev) => { const next = new Set(prev); next.delete(id); return next })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all })
       toast({ title: 'Objectif synchronisé avec le portefeuille' })
@@ -575,7 +590,7 @@ export default function GoalsPage() {
                             className="h-7 w-7 p-0"
                             onClick={() => syncMutation.mutate(goal.id)}
                           >
-                            <RefreshCw className={`h-3 w-3 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`h-3 w-3 ${syncingGoals.has(goal.id) ? 'animate-spin' : ''}`} />
                           </Button>
                           <Button
                             variant="ghost"

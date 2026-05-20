@@ -162,7 +162,7 @@ def _build_response(goal: Goal) -> dict:
         remaining_amount = float(goal.target_amount - goal.current_amount)
         if remaining_amount > 0 and days_remaining > 0:
             months_left = days_remaining / 30.44
-            monthly_needed = round(remaining_amount / months_left, 2) if months_left > 0 else None
+            monthly_needed = min(round(remaining_amount / months_left, 2), 9_999_999.99) if months_left > 0 else None
 
     return {
         "id": goal.id,

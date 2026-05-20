@@ -331,7 +331,7 @@ export default function AnalyticsPage() {
 
   const { data: xirrData } = useQuery<{ xirr: number | null }>({
     queryKey: queryKeys.analytics.xirr(portfolioParam),
-    queryFn: analyticsApi.getXirr,
+    queryFn: () => analyticsApi.getXirr(portfolioParam ?? undefined),
     enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
   })
@@ -359,7 +359,7 @@ export default function AnalyticsPage() {
     ...analyticsQueryOpts,
   })
   const { data: historicalData } = useQuery<HistoricalDataPoint[]>({
-    queryKey: queryKeys.analytics.historicalData(periodDays),
+    queryKey: [...queryKeys.analytics.historicalData(periodDays), portfolioParam],
     queryFn: () => dashboardApi.getHistoricalData(periodDays),
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,

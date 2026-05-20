@@ -4,13 +4,14 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
@@ -413,7 +414,9 @@ async def delete_alert(
 
 
 @router.post("/check", response_model=List[AlertTriggerResponse])
+@limiter.limit("3/minute")
 async def check_alerts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[AlertTriggerResponse]:

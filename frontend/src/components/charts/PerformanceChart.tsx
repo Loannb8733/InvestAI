@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useId, useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -29,8 +29,9 @@ interface PerformanceChartProps {
 export default memo(function PerformanceChart({
   data,
   color = '#6366F1',
-  period = 30,
+  period: _period = 30,
 }: PerformanceChartProps) {
+  const uid = useId()
   const hasInvested = data?.some(d => d.invested != null && d.invested > 0) ?? false
   const hasNetCapital = data?.some(d => d.net_capital != null && d.net_capital > 0) ?? false
 
@@ -121,11 +122,11 @@ export default memo(function PerformanceChart({
         margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
       >
         <defs>
-          <linearGradient id={`colorValue-${period}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`${uid}-colorValue`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
-          <filter id="glow">
+          <filter id={`${uid}-glow`}>
             <feGaussianBlur stdDeviation="3" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
@@ -174,10 +175,10 @@ export default memo(function PerformanceChart({
           stroke={color}
           strokeWidth={2}
           fillOpacity={1}
-          fill={`url(#colorValue-${period})`}
+          fill={`url(#${uid}-colorValue)`}
           dot={data.length <= 14}
-          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', filter: 'url(#glow)' }}
-          filter="url(#glow)"
+          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', filter: `url(#${uid}-glow)` }}
+          filter={`url(#${uid}-glow)`}
         />
         {hasInvested && (
           <Area

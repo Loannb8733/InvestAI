@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import {
@@ -35,6 +36,7 @@ const chartTooltipStyle: React.CSSProperties = {
 const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
 
 export default function PortfolioEvolutionChart({ chartHistoricalData }: PortfolioEvolutionChartProps) {
+  const uid = useId()
   if (chartHistoricalData.length === 0) return null
 
   return (
@@ -51,11 +53,11 @@ export default function PortfolioEvolutionChart({ chartHistoricalData }: Portfol
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartHistoricalData}>
               <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`${uid}-colorValue`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
-                <linearGradient id="colorInvested" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`${uid}-colorInvested`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
                 </linearGradient>
@@ -71,8 +73,8 @@ export default function PortfolioEvolutionChart({ chartHistoricalData }: Portfol
                 ]}
               />
               <Legend formatter={(value) => value === 'value' ? 'Valeur actuelle' : 'Montant investi'} />
-              <Area type="monotone" dataKey="invested" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#colorInvested)" />
-              <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+              <Area type="monotone" dataKey="invested" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill={`url(#${uid}-colorInvested)`} />
+              <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill={`url(#${uid}-colorValue)`} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

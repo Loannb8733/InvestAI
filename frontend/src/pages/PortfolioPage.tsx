@@ -144,7 +144,7 @@ export default function PortfolioPage() {
     staleTime: 60_000,
   })
   const portfolios = useMemo(
-    () => allPortfolios?.filter((p) => p.name !== 'Crowdfunding') ?? [],
+    () => allPortfolios?.filter((p) => p.name.toLowerCase() !== 'crowdfunding') ?? [],
     [allPortfolios],
   )
 

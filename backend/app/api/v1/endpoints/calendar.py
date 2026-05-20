@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -123,40 +123,58 @@ async def get_calendar_summary(
     db: AsyncSession = Depends(get_db),
 ) -> CalendarSummaryResponse:
     """Get summary of user's calendar events."""
-    result = await db.execute(select(CalendarEvent).where(CalendarEvent.user_id == current_user.id))
-    events = result.scalars().all()
-
     now = datetime.now(timezone.utc)
-
-    # Count upcoming events (not completed, date >= now)
-    upcoming = sum(1 for e in events if not e.is_completed and e.event_date >= now)
-
-    # Count completed events
-    completed = sum(1 for e in events if e.is_completed)
-
-    # Events this month
-    events_this_month = sum(1 for e in events if e.event_date.year == now.year and e.event_date.month == now.month)
-
-    # Total expected income (from dividends, rent, interest)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = (month_start + timedelta(days=32)).replace(day=1)
     income_types = [EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]
-    total_income = sum(
-        float(e.amount or 0)
-        for e in events
-        if e.event_type in income_types and not e.is_completed and e.event_date >= now
-    )
 
-    # Projected income this month (income-type events this month, not completed)
-    income_this_month = sum(
-        float(e.amount or 0)
-        for e in events
-        if e.event_type in income_types
-        and not e.is_completed
-        and e.event_date.year == now.year
-        and e.event_date.month == now.month
+    base = CalendarEvent.user_id == current_user.id
+
+    total_result = await db.execute(select(func.count()).select_from(CalendarEvent).where(base))
+    total_events = total_result.scalar() or 0
+
+    upcoming_result = await db.execute(
+        select(func.count())
+        .select_from(CalendarEvent)
+        .where(base, CalendarEvent.is_completed.is_(False), CalendarEvent.event_date >= now)
     )
+    upcoming = upcoming_result.scalar() or 0
+
+    completed_result = await db.execute(
+        select(func.count()).select_from(CalendarEvent).where(base, CalendarEvent.is_completed.is_(True))
+    )
+    completed = completed_result.scalar() or 0
+
+    month_result = await db.execute(
+        select(func.count())
+        .select_from(CalendarEvent)
+        .where(base, CalendarEvent.event_date >= month_start, CalendarEvent.event_date < month_end)
+    )
+    events_this_month = month_result.scalar() or 0
+
+    income_result = await db.execute(
+        select(func.coalesce(func.sum(CalendarEvent.amount), 0)).where(
+            base,
+            CalendarEvent.event_type.in_(income_types),
+            CalendarEvent.is_completed.is_(False),
+            CalendarEvent.event_date >= now,
+        )
+    )
+    total_income = float(income_result.scalar() or 0)
+
+    income_month_result = await db.execute(
+        select(func.coalesce(func.sum(CalendarEvent.amount), 0)).where(
+            base,
+            CalendarEvent.event_type.in_(income_types),
+            CalendarEvent.is_completed.is_(False),
+            CalendarEvent.event_date >= month_start,
+            CalendarEvent.event_date < month_end,
+        )
+    )
+    income_this_month = float(income_month_result.scalar() or 0)
 
     return CalendarSummaryResponse(
-        total_events=len(events),
+        total_events=total_events,
         upcoming_events=upcoming,
         completed_events=completed,
         total_expected_income=total_income,
