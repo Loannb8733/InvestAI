@@ -158,5 +158,5 @@ async def delete_user(
                 detail="Impossible de supprimer le dernier administrateur actif",
             )
 
-    await db.delete(user)
+    user.is_active = False
     await db.commit()

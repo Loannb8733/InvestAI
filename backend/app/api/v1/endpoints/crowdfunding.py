@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -131,6 +132,7 @@ async def _get_docs_for_projects(
         return {}
     result = await db.execute(
         select(ProjectDocument)
+        .options(defer(ProjectDocument.file_data))  # skip binary content in batch listing
         .where(ProjectDocument.project_id.in_(project_ids))
         .order_by(ProjectDocument.created_at.desc())
     )
@@ -778,6 +780,7 @@ async def list_project_documents(
     await _get_project_for_user(db, project_id, current_user.id)
     result = await db.execute(
         select(ProjectDocument)
+        .options(defer(ProjectDocument.file_data))  # skip binary content in listing
         .where(ProjectDocument.project_id == project_id)
         .order_by(ProjectDocument.created_at.desc())
     )

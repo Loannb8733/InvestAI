@@ -27,6 +27,8 @@ class ProjectDocument(Base):
     )
 
     file_name = Column(String(300), nullable=False)
+    # TODO: migrate to object storage (S3/MinIO) and replace with file_url: String.
+    # For now 10 MB hard-limit enforced at upload time keeps total DB impact bounded.
     file_data = Column(LargeBinary, nullable=False)
     file_size = Column(Integer, nullable=False)
 

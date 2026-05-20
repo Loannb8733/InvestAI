@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
@@ -284,7 +285,9 @@ class EnhancedDashboardResponse(BaseModel):
 
 
 @router.get("", response_model=EnhancedDashboardResponse)
+@limiter.limit("30/minute")
 async def get_dashboard(
+    request: Request,
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -732,7 +735,9 @@ class MunitionsResponse(BaseModel):
 
 
 @router.get("/munitions", response_model=MunitionsResponse)
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_munitions(
+    request: Request,
     monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
     profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
     current_user: User = Depends(get_current_user),
@@ -955,7 +960,9 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
 
 
 @router.get("/portfolio/{portfolio_id}")
+@limiter.limit("30/minute")
 async def get_portfolio_dashboard(
+    request: Request,
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1009,7 +1016,9 @@ class SparklineData(BaseModel):
 
 
 @router.get("/portfolio/{portfolio_id}/sparklines", response_model=List[SparklineData])
+@limiter.limit(RATE_LIMITS["api_read"])
 async def get_portfolio_sparklines(
+    request: Request,
     portfolio_id: str,
     background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
