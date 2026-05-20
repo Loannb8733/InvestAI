@@ -941,25 +941,49 @@ def sync_all_exchanges():
     return asyncio.run(_sync_all_exchanges_async())
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_single_exchange")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_single_exchange",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_single_exchange(api_key_id: str):
     """Sync a single exchange account."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_binance")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_binance",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_binance(user_id: str, api_key_id: str):
     """Sync Binance account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_kraken")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_kraken",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_kraken(user_id: str, api_key_id: str):
     """Sync Kraken account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(name="app.tasks.sync_exchanges.sync_crypto_com")
+@celery_app.task(
+    name="app.tasks.sync_exchanges.sync_crypto_com",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
+)
 def sync_crypto_com(user_id: str, api_key_id: str):
     """Sync Crypto.com account for a user."""
     return asyncio.run(_sync_single_exchange(api_key_id))

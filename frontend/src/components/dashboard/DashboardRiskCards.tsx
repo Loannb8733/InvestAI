@@ -57,7 +57,7 @@ interface RiskMetrics {
 }
 
 interface DashboardRiskCardsProps {
-  riskMetrics: RiskMetrics
+  riskMetrics: RiskMetrics | undefined
   thresholds?: DisplayThresholds
   periodLabel?: string
   privacyMode?: boolean

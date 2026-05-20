@@ -587,8 +587,10 @@ async def verify_mfa(
 
 
 @router.post("/mfa/disable", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def disable_mfa(
-    request: MFAVerifyRequest,
+    request: Request,
+    request_data: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -600,7 +602,7 @@ async def disable_mfa(
         )
 
     totp = pyotp.TOTP(current_user.mfa_secret)
-    if not totp.verify(request.code):
+    if not totp.verify(request_data.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Code MFA invalide",
@@ -611,7 +613,7 @@ async def disable_mfa(
     current_user.mfa_backup_codes = None
     await db.commit()
 
-    return {"message": "MFA disabled successfully"}
+    return {"message": "MFA désactivé avec succès"}
 
 
 @router.get("/mfa/backup-codes-count")
@@ -705,7 +707,9 @@ async def update_profile(
 
 
 @router.post("/change-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

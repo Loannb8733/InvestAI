@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,10 +37,18 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
 
-  // Profile form state
+  // Profile form state — kept in sync with store after successful save
   const [firstName, setFirstName] = useState(user?.firstName || '')
   const [lastName, setLastName] = useState(user?.lastName || '')
   const [preferredCurrency, setPreferredCurrency] = useState(user?.preferredCurrency || 'EUR')
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '')
+      setLastName(user.lastName || '')
+      setPreferredCurrency(user.preferredCurrency || 'EUR')
+    }
+  }, [user])
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('')

@@ -34,7 +34,7 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
         count_result = await db.execute(
             select(func.count(Notification.id)).where(
                 and_(
-                    Notification.read == True,
+                    Notification.is_read == True,
                     Notification.created_at < cutoff_date,
                 )
             )
@@ -45,7 +45,7 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
             await db.execute(
                 delete(Notification).where(
                     and_(
-                        Notification.read == True,
+                        Notification.is_read == True,
                         Notification.created_at < cutoff_date,
                     )
                 )

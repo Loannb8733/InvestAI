@@ -242,6 +242,8 @@ export default function TransactionsPage() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
+  const [txSkip, setTxSkip] = useState(0)
+  const TX_PAGE_SIZE = 200
 
   // Sorting states
   const [sortField, setSortField] = useState<SortField>('date')
@@ -258,15 +260,33 @@ export default function TransactionsPage() {
     staleTime: 60_000,
   })
 
-  const { data: transactions, isLoading } = useQuery<Transaction[]>({
-    queryKey: queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined),
+  const { data: transactionsPage, isLoading } = useQuery<Transaction[]>({
+    queryKey: [...queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined), txSkip],
     queryFn: () =>
       transactionsApi.list({
         portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
-        limit: 500,
+        skip: txSkip,
+        limit: TX_PAGE_SIZE,
       }),
     placeholderData: keepPreviousData,
   })
+
+  const [accumulatedTx, setAccumulatedTx] = useState<Transaction[]>([])
+  useEffect(() => {
+    if (transactionsPage) {
+      if (txSkip === 0) {
+        setAccumulatedTx(transactionsPage)
+      } else {
+        setAccumulatedTx((prev) => {
+          const existingIds = new Set(prev.map((t) => t.id))
+          return [...prev, ...transactionsPage.filter((t) => !existingIds.has(t.id))]
+        })
+      }
+    }
+  }, [transactionsPage, txSkip])
+
+  const transactions = accumulatedTx
+  const hasMoreTransactions = (transactionsPage?.length ?? 0) === TX_PAGE_SIZE
 
   // ============== Derived Data ==============
 
@@ -772,7 +792,7 @@ export default function TransactionsPage() {
             {/* Compact Filters Row */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Portfolio Filter */}
-              <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
+              <Select value={selectedPortfolio} onValueChange={(v) => { setSelectedPortfolio(v); setTxSkip(0) }}>
                 <SelectTrigger className="w-40 h-9">
                   <SelectValue placeholder="Portefeuille" />
                 </SelectTrigger>
@@ -1142,6 +1162,13 @@ export default function TransactionsPage() {
                       <ChevronsRight className="h-4 w-4" />
                     </Button>
                   </div>
+                </div>
+              )}
+              {hasMoreTransactions && (
+                <div className="flex justify-center mt-4">
+                  <Button variant="outline" onClick={() => setTxSkip((s) => s + TX_PAGE_SIZE)}>
+                    Charger plus de transactions
+                  </Button>
                 </div>
               )}
             </>

@@ -211,16 +211,11 @@ async def create_transaction(
 
     # Sanitize values to prevent numeric overflow
     # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
-    MAX_NUMERIC_VALUE = 9_999_999_999.0
+    _MAX = Decimal("9999999999")
 
-    quantity = float(transaction_in.quantity)
-    price = float(transaction_in.price)
-    fee = float(transaction_in.fee) if transaction_in.fee else 0
-
-    # Clamp values to valid ranges
-    quantity = max(0, min(quantity, MAX_NUMERIC_VALUE))
-    price = max(0, min(price, MAX_NUMERIC_VALUE))
-    fee = max(0, min(fee, MAX_NUMERIC_VALUE))
+    quantity = min(transaction_in.quantity, _MAX)
+    price = min(transaction_in.price, _MAX)
+    fee = min(transaction_in.fee if transaction_in.fee else Decimal("0"), _MAX)
 
     transaction = Transaction(
         asset_id=asset.id,
@@ -262,15 +257,14 @@ async def create_transaction(
     ]
     subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
+    _ZERO = Decimal("0")
     if transaction_in.transaction_type.value in add_types:
-        new_total = float(asset.quantity) + quantity
-        asset.quantity = min(new_total, MAX_NUMERIC_VALUE)
+        asset.quantity = min((asset.quantity or _ZERO) + quantity, _MAX)
     elif transaction_in.transaction_type.value in subtract_types:
-        new_total = float(asset.quantity) - quantity
         # Allow historical sells even when quantity was already synced to 0
         # (e.g. exchange sync updated balance before the transaction was recorded).
         # Clamp to 0 to avoid negative quantities.
-        asset.quantity = max(0, new_total)
+        asset.quantity = max(_ZERO, (asset.quantity or _ZERO) - quantity)
 
     # Recalculate avg_buy_price from all BUY + CONVERSION_IN transactions
     # (avoids the incremental formula bug that dilutes PRU with airdrop quantities)
@@ -526,28 +520,30 @@ async def update_transaction(
         ]
         subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
 
+        _ZERO = Decimal("0")
         old_type = transaction.transaction_type.value
-        old_qty = float(transaction.quantity)
+        old_qty = transaction.quantity or _ZERO
 
         # Revert old effect
         if old_type in add_types:
-            asset.quantity = float(asset.quantity) - old_qty
+            asset.quantity = (asset.quantity or _ZERO) - old_qty
         elif old_type in subtract_types:
-            asset.quantity = float(asset.quantity) + old_qty
+            asset.quantity = (asset.quantity or _ZERO) + old_qty
 
         # Apply new effect
         new_type = update_data.get("transaction_type", transaction.transaction_type)
         new_type_val = new_type.value if hasattr(new_type, "value") else new_type
-        new_qty = float(update_data.get("quantity", transaction.quantity))
+        raw_new_qty = update_data.get("quantity", transaction.quantity)
+        new_qty = raw_new_qty if isinstance(raw_new_qty, Decimal) else Decimal(str(raw_new_qty))
 
         if new_type_val in add_types:
-            asset.quantity = float(asset.quantity) + new_qty
+            asset.quantity = (asset.quantity or _ZERO) + new_qty
         elif new_type_val in subtract_types:
-            asset.quantity = float(asset.quantity) - new_qty
+            asset.quantity = (asset.quantity or _ZERO) - new_qty
 
-        if asset.quantity < 0:
+        if asset.quantity < _ZERO:
             logger.warning(f"Asset {asset.symbol} quantity went negative ({asset.quantity}), clamping to 0")
-            asset.quantity = 0
+            asset.quantity = _ZERO
 
     # Update fields
     for field, value in update_data.items():

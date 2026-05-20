@@ -359,7 +359,7 @@ export default function AnalyticsPage() {
     ...analyticsQueryOpts,
   })
   const { data: historicalData } = useQuery<HistoricalDataPoint[]>({
-    queryKey: [...queryKeys.analytics.historicalData(periodDays), portfolioParam],
+    queryKey: queryKeys.analytics.historicalData(periodDays),
     queryFn: () => dashboardApi.getHistoricalData(periodDays),
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,

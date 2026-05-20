@@ -63,7 +63,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore()
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isHydrating = useAuthStore((state) => state.isHydrating)
+  const user = useAuthStore((state) => state.user)
+
+  if (isHydrating || (isAuthenticated && !user)) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
   if (!isAuthenticated) return <Navigate to="/login" />
   if (user?.role !== 'admin') return <Navigate to="/" />
   return <>{children}</>

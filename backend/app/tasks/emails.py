@@ -281,7 +281,13 @@ async def _send_daily_digest_async() -> dict:
 # === Celery Tasks ===
 
 
-@celery_app.task(name="app.tasks.emails.send_alert_email")
+@celery_app.task(
+    name="app.tasks.emails.send_alert_email",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=60,
+    retry_backoff=True,
+)
 def send_alert_email(
     user_id: str,
     alert_name: str,

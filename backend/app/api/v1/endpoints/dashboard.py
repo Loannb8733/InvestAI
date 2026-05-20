@@ -204,7 +204,7 @@ class RiskMetrics(BaseModel):
 class AdvancedMetrics(BaseModel):
     """Advanced portfolio metrics."""
 
-    roi_annualized: float
+    roi_annualized: Optional[float] = None
     risk_metrics: RiskMetrics
     concentration: ConcentrationMetrics
     stress_tests: List[StressTest]
@@ -580,7 +580,7 @@ async def get_dashboard(
     )
 
     advanced_metrics = AdvancedMetrics(
-        roi_annualized=round(roi_annualized, 2),
+        roi_annualized=round(roi_annualized, 2) if roi_annualized is not None else None,
         risk_metrics=risk_metrics,
         concentration=concentration,
         stress_tests=stress_tests,

@@ -108,7 +108,7 @@ interface RiskMetrics {
 }
 
 interface AdvancedMetrics {
-  roi_annualized: number
+  roi_annualized: number | null
   risk_metrics: RiskMetrics
   concentration: ConcentrationMetrics
   stress_tests: StressTest[]
@@ -476,9 +476,12 @@ export default function DashboardPage() {
     )
   }
 
-  const advanced_metrics = metrics.advanced_metrics ?? ({} as NonNullable<typeof metrics.advanced_metrics>)
-  const { risk_metrics, stress_tests = [], pnl_breakdown } = advanced_metrics
-  const concentration = advanced_metrics.concentration ?? { is_concentrated: false, hhi: 0, interpretation: 'N/A', top_asset: '', top_concentration: 0 }
+  const _EMPTY_PNL = { realized_pnl: 0, unrealized_pnl: 0, total_pnl: 0, total_fees: 0, net_pnl: 0 }
+  const advanced_metrics = metrics.advanced_metrics ?? null
+  const risk_metrics = advanced_metrics?.risk_metrics
+  const stress_tests = advanced_metrics?.stress_tests ?? []
+  const pnl_breakdown: typeof _EMPTY_PNL = advanced_metrics?.pnl_breakdown ?? _EMPTY_PNL
+  const concentration = advanced_metrics?.concentration ?? { is_concentrated: false, hhi: 0, interpretation: 'N/A', top_asset: '', top_concentration: 0 }
   // Always derive periodLabel from local selectedPeriod (not API) so it updates instantly on click
   const periodLabel = selectedPeriod === 0 ? 'Depuis le début' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1 an' : `${selectedPeriod}j`
 
@@ -664,7 +667,7 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <MetricTooltip content="Retour sur investissement projeté sur une année complète."><p className="text-sm text-muted-foreground">ROI Annualisé</p></MetricTooltip>
-                            <p className={`text-xl font-bold ${advanced_metrics.roi_annualized >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatPercent(advanced_metrics.roi_annualized)}</p>
+                            <p className={`text-xl font-bold ${(advanced_metrics?.roi_annualized ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>{advanced_metrics?.roi_annualized != null ? formatPercent(advanced_metrics.roi_annualized) : '—'}</p>
                           </div>
                           <BarChart3 className="h-8 w-8 text-muted-foreground" />
                         </div>
