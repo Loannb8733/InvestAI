@@ -144,11 +144,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Do NOT persist tokens to localStorage — they are already in httpOnly cookies.
-      // Storing JWTs in JS-accessible storage exposes them to XSS attacks.
+      // Do NOT persist tokens or PII to localStorage — tokens are in httpOnly cookies,
+      // user PII (email, role) is refetched on boot via hydrateSession/fetchCurrentUser.
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
-        user: state.user,
       }),
     }
   )

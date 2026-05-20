@@ -353,7 +353,8 @@ const OnboardingWizard = lazyWithRetry(() => import('@/components/OnboardingWiza
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [selectedPeriod, setSelectedPeriod] = useState(0)
-  const { showOnboarding, markDone } = useOnboarding()
+  const userId = useAuthStore((s) => s.user?.id)
+  const { showOnboarding, markDone } = useOnboarding(userId)
   const [onboardingVisible, setOnboardingVisible] = useState(showOnboarding)
   const { exportToPdf } = useExportPdf()
   const pageVisible = usePageVisibility()

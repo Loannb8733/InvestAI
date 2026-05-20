@@ -47,7 +47,7 @@ async def list_assets(
         if portfolio_id not in portfolio_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
         query = query.where(Asset.portfolio_id == portfolio_id)
 
@@ -75,7 +75,7 @@ async def create_asset(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     # Check if asset with same symbol AND exchange already exists in portfolio
@@ -90,7 +90,7 @@ async def create_asset(
     if existing_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Asset with this symbol already exists on this platform",
+            detail="Un actif avec ce symbole existe déjà sur cette plateforme",
         )
 
     asset = Asset(
@@ -145,7 +145,7 @@ async def get_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     return asset
@@ -178,7 +178,7 @@ async def update_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     update_data = asset_in.model_dump(exclude_unset=True)
@@ -221,7 +221,7 @@ async def delete_asset(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     # Clear related_transaction_id references that point to this asset's transactions

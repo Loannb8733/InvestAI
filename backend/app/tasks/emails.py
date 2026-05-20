@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
 
@@ -209,7 +209,7 @@ async def _send_daily_digest_async() -> dict:
         return {"sent": 0, "failed": 0, "skipped": "email_not_configured"}
 
     async with AsyncSessionLocal() as db:
-        yesterday = datetime.utcnow() - timedelta(days=1)
+        yesterday = datetime.now(timezone.utc) - timedelta(days=1)
 
         # Get users with notifications in last 24h
         result = await db.execute(

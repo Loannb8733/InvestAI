@@ -3,7 +3,7 @@
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
@@ -173,7 +173,7 @@ class SmartInsightsService:
                 rebalancing_orders=[],
                 anomaly_impacts=[],
                 metrics_summary={},
-                generated_at=datetime.utcnow(),
+                generated_at=datetime.now(timezone.utc),
             )
 
         # Extract key metrics from PortfolioAnalytics dataclass (sanitize NaN/Inf)
@@ -347,7 +347,7 @@ class SmartInsightsService:
             anomaly_impacts=anomaly_impacts,
             metrics_summary=metrics_summary,
             market_regime=market_regime,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
         )
 
     def _analyze_sharpe(self, sharpe: float, sortino: float) -> List[SmartInsight]:

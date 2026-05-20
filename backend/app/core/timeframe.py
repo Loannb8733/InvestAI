@@ -4,7 +4,7 @@ All services that need to compute date ranges from a period selector
 should use these functions to avoid drift between components.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def get_period_start_date(days: int) -> datetime:
@@ -18,7 +18,7 @@ def get_period_start_date(days: int) -> datetime:
     """
     if days <= 0:
         return datetime(2000, 1, 1)
-    start = datetime.utcnow() - timedelta(days=days)
+    start = datetime.now(timezone.utc) - timedelta(days=days)
     return start.replace(hour=0, minute=0, second=0, microsecond=0)
 
 

@@ -14,11 +14,13 @@ import {
   FileText,
 } from 'lucide-react'
 
-const STORAGE_KEY = 'investai-onboarding-done'
+const storageKey = (userId?: string) =>
+  userId ? `investai-onboarding-done-${userId}` : 'investai-onboarding-done'
 
-export function useOnboarding() {
-  const done = localStorage.getItem(STORAGE_KEY) === 'true'
-  const markDone = () => localStorage.setItem(STORAGE_KEY, 'true')
+export function useOnboarding(userId?: string) {
+  const key = storageKey(userId)
+  const done = localStorage.getItem(key) === 'true'
+  const markDone = () => localStorage.setItem(key, 'true')
   return { showOnboarding: !done, markDone }
 }
 
@@ -145,7 +147,6 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
   const isLast = step === steps.length - 1
 
   const handleComplete = () => {
-    localStorage.setItem(STORAGE_KEY, 'true')
     onComplete()
     navigate('/portfolio')
   }

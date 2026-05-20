@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
@@ -46,7 +46,7 @@ async def _create_all_snapshots_async() -> dict:
         for user_id in user_ids:
             try:
                 # Check if snapshot already exists for today
-                today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                 today_end = today_start + timedelta(days=1)
 
                 existing = await db.execute(
@@ -99,7 +99,7 @@ async def _create_all_snapshots_async() -> dict:
                             portfolio_snapshot = PortfolioSnapshot(
                                 user_id=user_id,
                                 portfolio_id=portfolio.id,
-                                snapshot_date=datetime.utcnow(),
+                                snapshot_date=datetime.now(timezone.utc),
                                 total_value=Decimal(str(metrics.get("total_value", 0))),
                                 total_invested=Decimal(str(metrics.get("total_invested", 0))),
                                 total_gain_loss=Decimal(str(metrics.get("total_gain_loss", 0))),
@@ -130,7 +130,7 @@ async def _create_all_snapshots_async() -> dict:
 async def _cleanup_old_snapshots_async(days_to_keep: int = 365) -> dict:
     """Delete snapshots older than specified days."""
     async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         result = await db.execute(
             select(func.count(PortfolioSnapshot.id)).where(PortfolioSnapshot.snapshot_date < cutoff_date)

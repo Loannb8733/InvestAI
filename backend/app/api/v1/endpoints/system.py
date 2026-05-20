@@ -51,7 +51,7 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
+            detail="Accès administrateur requis",
         )
     return current_user
 
@@ -159,7 +159,7 @@ async def trigger_weekly_report(
         if metrics["total_value"] == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No portfolio value to report",
+                detail="Aucune valeur de portefeuille à rapporter",
             )
 
         history = await snapshot_service.build_portfolio_value_series(db, str(current_user.id), days=7)
@@ -185,12 +185,12 @@ async def trigger_weekly_report(
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send email",
+                detail="Échec de l'envoi de l'email",
             )
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred. Please try again later.",
+            detail="Une erreur interne est survenue. Veuillez réessayer plus tard.",
         )

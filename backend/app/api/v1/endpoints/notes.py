@@ -1,6 +1,6 @@
 """Notes endpoints for investment journal."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -82,7 +82,7 @@ async def get_notes_summary(
     notes = result.scalars().all()
 
     # Count notes this month
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     notes_this_month = sum(1 for n in notes if n.created_at.year == now.year and n.created_at.month == now.month)
 
     # Collect unique tags
@@ -218,7 +218,7 @@ async def create_note(
         if not asset:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actif non trouve",
+                detail="Actif non trouvé",
             )
         asset_symbol = asset.symbol
         asset_name = asset.name
@@ -272,7 +272,7 @@ async def get_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     asset_symbol = None
@@ -320,7 +320,7 @@ async def update_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     if note_in.title is not None:
@@ -356,7 +356,7 @@ async def update_note(
         if not asset:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actif non trouve",
+                detail="Actif non trouvé",
             )
         note.asset_id = note_in.asset_id
 
@@ -407,7 +407,7 @@ async def delete_note(
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note non trouvee",
+            detail="Note non trouvée",
         )
 
     await db.delete(note)

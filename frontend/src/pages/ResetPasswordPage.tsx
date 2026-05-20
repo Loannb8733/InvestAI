@@ -93,11 +93,11 @@ export default function ResetPasswordPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Minimum 8 caractères"
+                  placeholder="Minimum 10 caractères"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={8}
+                  minLength={10}
                   autoFocus
                 />
               </div>
@@ -110,7 +110,7 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={8}
+                  minLength={10}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={mutation.isPending || !password || !confirmPassword}>

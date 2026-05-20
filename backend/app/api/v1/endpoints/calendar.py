@@ -289,7 +289,7 @@ async def get_event(
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Evenement non trouve",
+            detail="Événement non trouvé",
         )
 
     return _event_response(event)
@@ -314,7 +314,7 @@ async def update_event(
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Evenement non trouve",
+            detail="Événement non trouvé",
         )
 
     if event_in.title is not None:
@@ -364,7 +364,7 @@ async def complete_event(
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Evenement non trouve",
+            detail="Événement non trouvé",
         )
 
     event.is_completed = True
@@ -412,7 +412,7 @@ async def delete_event(
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Evenement non trouve",
+            detail="Événement non trouvé",
         )
 
     await db.delete(event)

@@ -73,7 +73,7 @@ async def get_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     return portfolio
@@ -98,7 +98,7 @@ async def update_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     update_data = portfolio_in.model_dump(exclude_unset=True)
@@ -133,7 +133,7 @@ async def delete_portfolio(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     if delete_assets:
@@ -182,7 +182,7 @@ async def update_cash_balance(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     # Update or remove cash balance for the exchange
@@ -218,7 +218,7 @@ async def delete_cash_balance(
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portfolio not found",
+            detail="Portefeuille non trouvé",
         )
 
     cash_balances = dict(portfolio.cash_balances or {})

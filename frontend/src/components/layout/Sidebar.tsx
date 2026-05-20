@@ -69,7 +69,7 @@ const navSections: NavSection[] = [
 ]
 
 const bottomItems: NavItem[] = [
-  { icon: Settings, label: 'Parametres', path: '/settings' },
+  { icon: Settings, label: 'Paramètres', path: '/settings' },
 ]
 
 const adminItems: NavItem[] = [

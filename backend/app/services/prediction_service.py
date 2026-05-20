@@ -3,7 +3,7 @@
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -1534,7 +1534,7 @@ class PredictionService:
         """
         arr = np.array(prices, dtype=float)
         n = len(arr)
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
 
         # ── OU parameters (mu, theta, sigma) ──────────────────────────
         if n >= 200:
@@ -2682,7 +2682,7 @@ class PredictionService:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         current_year = now.year
         events = []
 
@@ -3641,7 +3641,7 @@ class PredictionService:
 
         predictions = []
         for day in range(1, days_ahead + 1):
-            date = (datetime.utcnow() + timedelta(days=day)).strftime("%Y-%m-%d")
+            date = (datetime.now(timezone.utc) + timedelta(days=day)).strftime("%Y-%m-%d")
             predicted = current_price * (1 + daily_slope * day)
             predicted = max(0.0, predicted)
             # Conservative CI: ±3% * sqrt(day)
@@ -3694,7 +3694,7 @@ class PredictionService:
             return round(v, 2)
 
         for day in range(1, days_ahead + 1):
-            date = datetime.utcnow() + timedelta(days=day)
+            date = datetime.now(timezone.utc) + timedelta(days=day)
             # FIX3: linear projection instead of cumulative random chain
             predicted_price = base_price * (1 + trend_factor * day)
             predicted_price = max(0.0, predicted_price)

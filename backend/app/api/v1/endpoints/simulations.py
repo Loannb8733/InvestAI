@@ -601,7 +601,7 @@ async def get_simulation(
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Simulation non trouvee",
+            detail="Simulation non trouvée",
         )
 
     return SimulationResponse(
@@ -633,7 +633,7 @@ async def delete_simulation(
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Simulation non trouvee",
+            detail="Simulation non trouvée",
         )
 
     await db.delete(simulation)

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -305,12 +305,12 @@ async def get_dashboard(
         .where(Portfolio.user_id == current_user.id)
     )
     _first_tx_date_cached = _first_tx_result.scalar()
-    if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is not None:
-        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=None)
+    if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is None:
+        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=timezone.utc)
 
     if days == 0:
         if _first_tx_date_cached:
-            days = max((datetime.utcnow() - _first_tx_date_cached).days + 1, 7)
+            days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days + 1, 7)
         else:
             days = 30
 
@@ -452,7 +452,13 @@ async def get_dashboard(
         )
         first_reward_date = first_staking_tx.scalar()
         if first_reward_date:
-            days_earning = max((datetime.utcnow() - first_reward_date.replace(tzinfo=None)).days, 1)
+            days_earning = max(
+                (
+                    datetime.now(timezone.utc)
+                    - first_reward_date.replace(tzinfo=first_reward_date.tzinfo or timezone.utc)
+                ).days,
+                1,
+            )
             earn_apr = round((total_rewards / total_staked_value) * (365 / days_earning) * 100, 2)
 
     earn_summary = (
@@ -492,7 +498,7 @@ async def get_dashboard(
     total_return = metrics["total_value"] + total_sold_value
     if cagr_base > 0 and total_return > 0:
         if _first_tx_date_cached:
-            actual_days = max((datetime.utcnow() - _first_tx_date_cached).days, 30)
+            actual_days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days, 30)
         else:
             actual_days = max(days, 30)
         if actual_days >= 180:
@@ -587,7 +593,7 @@ async def get_dashboard(
         try:
             from decimal import Decimal as _Dec
 
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             existing = await db.execute(
                 select(func.count())
                 .select_from(PortfolioSnapshot)
@@ -601,7 +607,7 @@ async def get_dashboard(
                 snap = PortfolioSnapshot(
                     user_id=user_id,
                     portfolio_id=None,
-                    snapshot_date=datetime.utcnow(),
+                    snapshot_date=datetime.now(timezone.utc),
                     total_value=_Dec(str(metrics["total_value"])),
                     total_invested=_Dec(str(metrics["total_invested"])),
                     total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
@@ -700,7 +706,7 @@ async def get_dashboard(
         period_days=days,
         period_label=get_period_label_fr(original_days),
         forex_stale=metrics.get("forex_stale", False),
-        last_updated=datetime.utcnow().isoformat(),
+        last_updated=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -814,7 +820,7 @@ async def get_recent_transactions_internal(
                 quantity=float(t.quantity),
                 price=price,
                 total=float(t.quantity) * price,
-                executed_at=(t.executed_at or t.created_at or datetime.utcnow()).isoformat(),
+                executed_at=(t.executed_at or t.created_at or datetime.now(timezone.utc)).isoformat(),
             )
         )
     return result_list
@@ -878,7 +884,7 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
 
 async def get_upcoming_events_internal(db: AsyncSession, current_user: User, days: int = 30) -> List[UpcomingEvent]:
     """Get upcoming calendar events for dashboard."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
@@ -962,7 +968,7 @@ async def get_portfolio_dashboard(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     try:
@@ -987,7 +993,7 @@ async def get_portfolio_history(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     history = await metrics_service.get_portfolio_history(db, portfolio_id, currency=currency)
@@ -1024,7 +1030,7 @@ async def get_portfolio_sparklines(
         )
     )
     if not portfolio_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Portfolio not found")
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
     # Get unique non-stablecoin symbols
     assets_result = await db.execute(
@@ -1035,7 +1041,7 @@ async def get_portfolio_sparklines(
         return []
 
     # Batch fetch from AssetPriceHistory
-    cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
     result = await db.execute(
         select(
             AssetPriceHistory.symbol,
@@ -1142,9 +1148,9 @@ async def get_historical_data(
         )
         first_date = first_tx.scalar()
         if first_date:
-            if hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
-                first_date = first_date.replace(tzinfo=None)
-            days = max((datetime.utcnow() - first_date).days + 1, 7)
+            if hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
+                first_date = first_date.replace(tzinfo=timezone.utc)
+            days = max((datetime.now(timezone.utc) - first_date).days + 1, 7)
         else:
             days = 30
 

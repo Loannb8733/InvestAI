@@ -152,7 +152,7 @@ async def _check_prediction_accuracy():
 
     Fills: actual_price, mape, direction_correct, ci_covered, accuracy_checked.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     from sqlalchemy import and_, select
 
@@ -160,7 +160,7 @@ async def _check_prediction_accuracy():
     from app.services.price_service import PriceService
 
     price_service = PriceService()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     async with async_session_factory() as db:
         # Find predictions whose target_date has passed but haven't been checked

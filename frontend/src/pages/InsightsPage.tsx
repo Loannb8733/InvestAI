@@ -467,7 +467,7 @@ function StrategyTable() {
               </thead>
               <tbody>
                 {data.rows.map((row) => {
-                  const impactSign = row.impact_eur > 0 ? '+' : row.impact_eur < 0 ? '' : ''
+                  const impactSign = row.impact_eur > 0 ? '+' : row.impact_eur < 0 ? '-' : ''
                   const isActionable = ['ACHAT FORT', 'DCA', 'VENDRE', 'ALLÉGER', 'PRENDRE PROFITS'].includes(row.action)
 
                   return (
@@ -842,6 +842,15 @@ function TaxLossHarvesting() {
 
   return (
     <div className="space-y-4">
+      {/* Fiscal disclaimer */}
+      <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
+          Le Tax-Loss Harvesting est une stratégie fiscale soumise à des règles complexes (wash-sale, règles anti-abus).
+          Ces informations sont fournies à titre indicatif uniquement et ne constituent pas un conseil fiscal.
+          Consultez un conseiller fiscal agréé avant toute décision.
+        </p>
+      </div>
       {/* Summary */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>

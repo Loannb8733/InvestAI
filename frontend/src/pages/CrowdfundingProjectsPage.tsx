@@ -160,6 +160,7 @@ export default function CrowdfundingProjectsPage() {
   const [files, setFiles] = useState<File[]>([])
   const [uploadingDocs, setUploadingDocs] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('date_desc')
   const [repaymentDialogOpen, setRepaymentDialogOpen] = useState(false)
   const [repaymentProjectId, setRepaymentProjectId] = useState<string | null>(null)
   const [repaymentForm, setRepaymentForm] = useState(emptyRepaymentForm)
@@ -326,9 +327,17 @@ export default function CrowdfundingProjectsPage() {
     setDialogOpen(true)
   }
 
-  const filtered = statusFilter === 'all'
-    ? projects
-    : projects.filter((p) => p.status === statusFilter)
+  const filtered = useMemo(() => {
+    const list = statusFilter === 'all' ? [...projects] : projects.filter((p) => p.status === statusFilter)
+    switch (sortBy) {
+      case 'amount_desc': return list.sort((a, b) => Number(b.invested_amount) - Number(a.invested_amount))
+      case 'amount_asc': return list.sort((a, b) => Number(a.invested_amount) - Number(b.invested_amount))
+      case 'rate_desc': return list.sort((a, b) => Number(b.annual_rate) - Number(a.annual_rate))
+      case 'rate_asc': return list.sort((a, b) => Number(a.annual_rate) - Number(b.annual_rate))
+      case 'date_asc': return list.sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+      default: return list.sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
+    }
+  }, [projects, statusFilter, sortBy])
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
@@ -583,8 +592,8 @@ export default function CrowdfundingProjectsPage() {
         </Dialog>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2">
+      {/* Filter & Sort */}
+      <div className="flex gap-2 flex-wrap">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filtrer par statut" />
@@ -594,6 +603,19 @@ export default function CrowdfundingProjectsPage() {
             {Object.entries(STATUS_LABELS).map(([k, v]) => (
               <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Trier par..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">Date (récent)</SelectItem>
+            <SelectItem value="date_asc">Date (ancien)</SelectItem>
+            <SelectItem value="amount_desc">Montant (décroissant)</SelectItem>
+            <SelectItem value="amount_asc">Montant (croissant)</SelectItem>
+            <SelectItem value="rate_desc">Taux (décroissant)</SelectItem>
+            <SelectItem value="rate_asc">Taux (croissant)</SelectItem>
           </SelectContent>
         </Select>
       </div>

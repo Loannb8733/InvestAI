@@ -4,7 +4,7 @@ import base64
 import json
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Optional
 
@@ -178,6 +178,7 @@ class UserProfileUpdate(BaseModel):
 
 
 @router.post("/verify-email", response_model=Token)
+@limiter.limit("10/minute")
 async def verify_email(
     request: Request,
     data: VerifyEmailRequest,
@@ -196,9 +197,9 @@ async def verify_email(
     # Check expiration
     if user.email_verification_expires:
         expires = user.email_verification_expires
-        if hasattr(expires, "tzinfo") and expires.tzinfo is not None:
-            expires = expires.replace(tzinfo=None)
-        if datetime.utcnow() > expires:
+        if hasattr(expires, "tzinfo") and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Lien de vérification expiré. Veuillez vous réinscrire.",
@@ -240,7 +241,7 @@ async def resend_verification(
         # Generate new token
         verification_token = secrets.token_urlsafe(48)
         user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
+        user.email_verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
         await db.commit()
 
         # Send verification email
@@ -295,7 +296,7 @@ async def login(
             if fails >= 10:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Account temporarily locked. Please try again in 15 minutes.",
+                    detail="Compte temporairement verrouillé. Veuillez réessayer dans 15 minutes.",
                 )
         except HTTPException:
             raise
@@ -314,13 +315,13 @@ async def login(
                 pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Email ou mot de passe invalide",
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Account is inactive",
+            detail="Ce compte est inactif",
         )
 
     # Check MFA if enabled
@@ -366,12 +367,12 @@ async def login(
             if not matched:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid MFA code",
+                    detail="Code MFA invalide",
                 )
         else:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid MFA code",
+                detail="Code MFA invalide",
             )
 
         # Persist backup code consumption if one was used
@@ -421,7 +422,7 @@ async def refresh_token(
     if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No refresh token provided",
+            detail="Aucun token de rafraîchissement fourni",
         )
 
     payload = decode_token(raw_token)
@@ -429,7 +430,7 @@ async def refresh_token(
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail="Token de rafraîchissement invalide",
         )
 
     # Check if this refresh token has been revoked (blocklisted on logout)
@@ -456,7 +457,7 @@ async def refresh_token(
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
+            detail="Utilisateur non trouvé ou inactif",
         )
 
     # Verify refresh token fingerprint
@@ -498,7 +499,7 @@ async def logout(request: Request, response: Response) -> dict:
                 r = await _get_redis_txt()
                 # TTL = remaining token lifetime (exp - now), capped at 7 days
                 exp = payload.get("exp", 0)
-                ttl = max(1, int(exp - datetime.utcnow().timestamp()))
+                ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
                 ttl = min(ttl, 7 * 86400)
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
         except Exception:
@@ -558,8 +559,10 @@ async def setup_mfa(
 
 
 @router.post("/mfa/verify", response_model=MessageResponse)
+@limiter.limit("10/minute")
 async def verify_mfa(
-    request: MFAVerifyRequest,
+    request: Request,
+    request_data: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -567,20 +570,20 @@ async def verify_mfa(
     if not current_user.mfa_secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA setup not initiated",
+            detail="Configuration MFA non initialisée",
         )
 
     totp = pyotp.TOTP(current_user.mfa_secret)
-    if not totp.verify(request.code):
+    if not totp.verify(request_data.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid MFA code",
+            detail="Code MFA invalide",
         )
 
     current_user.mfa_enabled = True
     await db.commit()
 
-    return {"message": "MFA enabled successfully"}
+    return {"message": "MFA activé avec succès"}
 
 
 @router.post("/mfa/disable", response_model=MessageResponse)
@@ -593,14 +596,14 @@ async def disable_mfa(
     if not current_user.mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA is not enabled",
+            detail="MFA non activé",
         )
 
     totp = pyotp.TOTP(current_user.mfa_secret)
     if not totp.verify(request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid MFA code",
+            detail="Code MFA invalide",
         )
 
     current_user.mfa_enabled = False
@@ -619,7 +622,7 @@ async def get_backup_codes_count(
     if not current_user.mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA is not enabled",
+            detail="MFA non activé",
         )
     codes = json.loads(current_user.mfa_backup_codes or "[]")
     return {"remaining_codes": len(codes)}
@@ -635,14 +638,14 @@ async def regenerate_backup_codes(
     if not current_user.mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA is not enabled",
+            detail="MFA non activé",
         )
 
     totp = pyotp.TOTP(current_user.mfa_secret)
     if not totp.verify(request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid MFA code",
+            detail="Code MFA invalide",
         )
 
     # Generate new codes
@@ -721,6 +724,7 @@ async def change_password(
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def forgot_password(
     request: Request,
     data: ForgotPasswordRequest,
@@ -734,7 +738,7 @@ async def forgot_password(
         # Generate secure token
         token = secrets.token_urlsafe(48)
         user.password_reset_token = token
-        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         await db.commit()
 
         # Send email
@@ -769,7 +773,9 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def reset_password(
+    request: Request,
     data: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -786,9 +792,9 @@ async def reset_password(
     # Check expiration
     if user.password_reset_expires:
         expires = user.password_reset_expires
-        if hasattr(expires, "tzinfo") and expires.tzinfo is not None:
-            expires = expires.replace(tzinfo=None)
-        if datetime.utcnow() > expires:
+        if hasattr(expires, "tzinfo") and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires:
             user.password_reset_token = None
             user.password_reset_expires = None
             await db.commit()

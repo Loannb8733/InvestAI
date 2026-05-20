@@ -3,7 +3,7 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
@@ -169,14 +169,14 @@ class AlertService:
         alerts = result.scalars().all()
 
         for alert in alerts:
-            if alert.triggered_at and (datetime.utcnow() - alert.triggered_at) < timedelta(minutes=5):
+            if alert.triggered_at and (datetime.now(timezone.utc) - alert.triggered_at) < timedelta(minutes=5):
                 continue
             trigger = await self._check_single_alert(db, alert)
             if trigger:
                 triggered.append(trigger)
 
                 # Update alert
-                alert.triggered_at = datetime.utcnow()
+                alert.triggered_at = datetime.now(timezone.utc)
                 alert.triggered_count = (alert.triggered_count or 0) + 1
 
                 # Determine priority
@@ -275,7 +275,7 @@ class AlertService:
         asset = result.scalar_one_or_none()
 
         if not asset:
-            raise ValueError("Asset not found")
+            raise ValueError("Actif non trouvé")
 
         alert = Alert(
             user_id=user_id,
@@ -382,7 +382,7 @@ class AlertService:
                         from app.ml.anomaly_detector import AnomalyDetector
                         from app.models.asset_price_history import AssetPriceHistory
 
-                        cutoff = (datetime.utcnow() - timedelta(days=30)).date()
+                        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).date()
                         hist_result = await db.execute(
                             select(AssetPriceHistory.price_eur)
                             .where(
@@ -423,7 +423,7 @@ class AlertService:
                 condition=alert.condition.value,
                 threshold=threshold,
                 current_value=current_price,
-                triggered_at=datetime.utcnow(),
+                triggered_at=datetime.now(timezone.utc),
                 message=message,
             )
 
@@ -473,7 +473,9 @@ class AlertService:
         alerts = result.scalars().all()
 
         active_count = sum(1 for a in alerts if a.is_active)
-        triggered_today = sum(1 for a in alerts if a.triggered_at and a.triggered_at.date() == datetime.utcnow().date())
+        triggered_today = sum(
+            1 for a in alerts if a.triggered_at and a.triggered_at.date() == datetime.now(timezone.utc).date()
+        )
         total_triggered = sum(a.triggered_count or 0 for a in alerts)
 
         return {

@@ -252,7 +252,7 @@ class MetricsService:
 
         from app.models.asset_price_history import AssetPriceHistory
 
-        cutoff = (datetime.utcnow() - timedelta(days=days)).date()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
 
         result = await db.execute(
             select(
@@ -1157,9 +1157,9 @@ class MetricsService:
 
             # Holding duration and annualized return
             first_date = first_buy_map.get(str(asset.id))
-            if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is not None:
-                first_date = first_date.replace(tzinfo=None)
-            holding_days = (datetime.utcnow() - first_date).days if first_date else None
+            if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
+                first_date = first_date.replace(tzinfo=timezone.utc)
+            holding_days = (datetime.now(timezone.utc) - first_date).days if first_date else None
             annualized_return = None
             if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
                 years = holding_days / 365.25
@@ -1487,7 +1487,7 @@ class MetricsService:
                 from app.core.database import AsyncSessionLocal
                 from app.models.asset_price_history import AssetPriceHistory
 
-                cutoff = (datetime.utcnow() - timedelta(days=days + 5)).date()
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
                 async with AsyncSessionLocal() as _db:
                     for symbol in list(remaining):
                         sym_upper = symbol.upper()

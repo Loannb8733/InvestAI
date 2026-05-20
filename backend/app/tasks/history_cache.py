@@ -8,7 +8,7 @@ PostgreSQL provides persistent storage; Redis is the fast-read layer.
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from redis import Redis
@@ -103,7 +103,7 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
 async def _load_prices_from_db(symbol: str, days: int):
     """Load price history from PostgreSQL. Returns (dates, prices) or ([], [])."""
     try:
-        cutoff = datetime.utcnow().date() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc).date() - timedelta(days=days)
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
@@ -148,7 +148,7 @@ async def _fetch_and_cache_all():
                 try:
                     data = json.loads(existing)
                     # Check if data is recent enough (< 50 min old)
-                    if data.get("fetched_at", 0) > datetime.utcnow().timestamp() - 3000:
+                    if data.get("fetched_at", 0) > datetime.now(timezone.utc).timestamp() - 3000:
                         logger.debug("Skipping %s — still fresh in cache", symbol)
                         cached_count += 1
                         continue
@@ -162,7 +162,7 @@ async def _fetch_and_cache_all():
                         {
                             "dates": [d.isoformat() for d in dates],
                             "prices": prices,
-                            "fetched_at": datetime.utcnow().timestamp(),
+                            "fetched_at": datetime.now(timezone.utc).timestamp(),
                         }
                     )
                     redis.setex(key, REDIS_HISTORY_TTL, payload)
@@ -213,7 +213,7 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
                 {
                     "dates": [d.isoformat() for d in dates],
                     "prices": prices,
-                    "fetched_at": datetime.utcnow().timestamp(),
+                    "fetched_at": datetime.now(timezone.utc).timestamp(),
                 }
             )
             redis.setex(key, REDIS_HISTORY_TTL, payload)
@@ -332,7 +332,7 @@ async def _deep_backfill_all():
                 first_tx = first_tx.replace(tzinfo=None)
 
             existing_count = coverage_map.get(symbol, 0)
-            today = datetime.utcnow()
+            today = datetime.now(timezone.utc)
             total_days_needed = (today - first_tx).days + 1
 
             # If we already have >80% of needed data, just fetch the last 365 days

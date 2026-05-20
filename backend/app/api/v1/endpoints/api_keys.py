@@ -1686,7 +1686,7 @@ async def get_import_status(
     if not task_info:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found",
+            detail="Tâche non trouvée",
         )
 
     return {"task_id": task_id, **task_info}

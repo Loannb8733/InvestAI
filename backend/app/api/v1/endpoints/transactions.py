@@ -100,7 +100,7 @@ async def list_transactions(
         if portfolio_id not in portfolio_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
         asset_query = asset_query.where(Asset.portfolio_id == portfolio_id)
 
@@ -121,7 +121,7 @@ async def list_transactions(
         if asset_id not in asset_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Asset not found",
+                detail="Actif non trouvé",
             )
         query = query.where(Transaction.asset_id == asset_id)
 
@@ -178,7 +178,7 @@ async def create_transaction(
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found",
+            detail="Actif non trouvé",
         )
 
     # If the transaction specifies a different exchange than the asset,
@@ -386,7 +386,7 @@ async def export_transactions_csv(
     if not portfolio_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No portfolios found",
+            detail="Aucun portefeuille trouvé",
         )
 
     # Get user's assets with symbols
@@ -457,7 +457,7 @@ async def get_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     return transaction
@@ -490,7 +490,7 @@ async def update_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     update_data = transaction_update.model_dump(exclude_unset=True)
@@ -683,7 +683,7 @@ async def delete_transaction(
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found",
+            detail="Transaction non trouvée",
         )
 
     # Capture transaction data before deletion for audit trail
@@ -809,7 +809,7 @@ async def import_transactions_csv(
     if not file.filename.endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a CSV file",
+            detail="Le fichier doit être au format CSV",
         )
 
     # Get or create portfolio
@@ -824,12 +824,12 @@ async def import_transactions_csv(
         if not portfolio:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portfolio not found",
+                detail="Portefeuille non trouvé",
             )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Portfolio ID is required",
+            detail="L'identifiant du portefeuille est requis",
         )
 
     # Get existing assets — keyed by (symbol, exchange) for multi-platform support
@@ -850,7 +850,7 @@ async def import_transactions_csv(
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to read the uploaded file. Please check the file format.",
+            detail="Impossible de lire le fichier. Vérifiez le format du fichier.",
         )
 
     # Get or detect parser
@@ -867,7 +867,7 @@ async def import_transactions_csv(
             if not parser:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Could not detect CSV format. Please specify the platform.",
+                    detail="Format CSV non reconnu. Veuillez spécifier la plateforme.",
                 )
 
         logger.info(f"Using parser: {parser.name}")
@@ -877,7 +877,7 @@ async def import_transactions_csv(
         logger.error(f"Error detecting parser: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error detecting CSV format. Please specify the platform.",
+            detail="Format CSV non reconnu. Veuillez spécifier la plateforme.",
         )
 
     # Parse CSV
@@ -888,7 +888,7 @@ async def import_transactions_csv(
         logger.error(f"Error parsing CSV: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error parsing CSV file. Please check the file format and content.",
+            detail="Erreur lors de la lecture du fichier CSV. Vérifiez le format et le contenu.",
         )
 
     success_count = 0
@@ -1095,7 +1095,7 @@ async def import_transactions_csv(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="A database error occurred. Please try again.",
+            detail="Une erreur de base de données est survenue. Veuillez réessayer.",
         )
 
     # Recalculate asset quantities from transactions (incremental updates lose precision)

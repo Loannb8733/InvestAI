@@ -271,7 +271,7 @@ export default function RegisterPage() {
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Minimum 8 caractères
+                Minimum 10 caractères, dont une majuscule et un chiffre
               </p>
             </div>
 
@@ -303,13 +303,13 @@ export default function RegisterPage() {
                   className="text-sm text-muted-foreground cursor-pointer"
                 >
                   J'accepte les{' '}
-                  <span className="text-primary cursor-pointer hover:underline">
+                  <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     conditions d'utilisation
-                  </span>{' '}
+                  </a>{' '}
                   et la{' '}
-                  <span className="text-primary cursor-pointer hover:underline">
+                  <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     politique de confidentialité
-                  </span>
+                  </a>
                 </label>
                 {errors.acceptTerms && (
                   <p className="text-sm text-destructive">{errors.acceptTerms.message}</p>

@@ -79,7 +79,7 @@ async def get_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail="Utilisateur non trouvé",
         )
 
     return user
@@ -99,7 +99,7 @@ async def update_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail="Utilisateur non trouvé",
         )
 
     # Update fields
@@ -136,7 +136,7 @@ async def delete_user(
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete yourself",
+            detail="Vous ne pouvez pas supprimer votre propre compte",
         )
 
     result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
@@ -145,7 +145,7 @@ async def delete_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail="Utilisateur non trouvé",
         )
 
     if user.role == "admin":
@@ -153,7 +153,7 @@ async def delete_user(
         if (admin_count_result.scalar() or 0) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete the last active admin",
+                detail="Impossible de supprimer le dernier administrateur actif",
             )
 
     await db.delete(user)
