@@ -77,6 +77,13 @@ class RegimeConfigResponse(BaseModel):
     vol_regime: str
 
 
+class RiskClusterResponse(BaseModel):
+    """A cluster of highly correlated assets."""
+
+    assets: List[str]
+    avg_corr: float
+
+
 class MetricsSummaryResponse(BaseModel):
     """Summary of key metrics."""
 
@@ -88,6 +95,8 @@ class MetricsSummaryResponse(BaseModel):
     hhi: float
     total_value: float
     regime_config: Optional[RegimeConfigResponse] = None
+    avg_top5_correlation: Optional[float] = None
+    risk_clusters: Optional[List[RiskClusterResponse]] = None
 
 
 class IndicatorSignalResponse(BaseModel):
@@ -260,6 +269,9 @@ async def get_portfolio_health(
             hhi=report.metrics_summary.get("hhi", 0),
             total_value=report.metrics_summary.get("total_value", 0),
             regime_config=_safe_regime_config(report.metrics_summary.get("regime_config")),
+            avg_top5_correlation=report.metrics_summary.get("avg_top5_correlation"),
+            risk_clusters=[RiskClusterResponse(**c) for c in (report.metrics_summary.get("risk_clusters") or [])]
+            or None,
         ),
         market_regime=_build_regime_response(report.market_regime),
         generated_at=report.generated_at.isoformat(),
