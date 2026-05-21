@@ -542,6 +542,11 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Guard: add columns that may be missing when the DB was created via
+        # create_all before the column existed (Alembic stamp-to-head skips them).
+        await conn.execute(
+            text("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS" " cash_balances JSON NOT NULL DEFAULT '{}'")
+        )
 
     # Trigger historical data cache on startup — run inline (no Celery needed)
     async def _startup_backfill():
