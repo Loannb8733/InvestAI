@@ -75,6 +75,8 @@ services:
       # Security (no defaults - must be in .env)
       - SECRET_KEY=${SECRET_KEY}
       - FERNET_KEY=${FERNET_KEY}
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001}
       # External APIs (optional)
       - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}

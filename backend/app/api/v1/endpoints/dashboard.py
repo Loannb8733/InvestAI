@@ -296,6 +296,27 @@ async def get_dashboard(
 
     days=0 means "all time" (from oldest transaction).
     """
+    try:
+        return await _get_dashboard_impl(request, days, current_user, db)
+    except Exception as exc:
+        import traceback
+
+        logger.error(
+            "Dashboard 500 for user %s days=%s: %s\n%s",
+            getattr(current_user, "id", "?"),
+            days,
+            exc,
+            traceback.format_exc(),
+        )
+        raise
+
+
+async def _get_dashboard_impl(
+    request: Request,
+    days: int,
+    current_user,
+    db,
+) -> "EnhancedDashboardResponse":
     user_id = str(current_user.id)
     original_days = days  # Preserve for period label before resolution
 
@@ -566,7 +587,13 @@ async def get_dashboard(
     )
 
     # Stress tests
-    _default_stress = {"scenario": "unknown", "loss_amount": 0, "loss_pct": 0, "portfolio_after": 0}
+    _default_stress = {
+        "scenario_name": "Indisponible",
+        "current_value": 0.0,
+        "stressed_value": 0.0,
+        "potential_loss": 0.0,
+        "potential_loss_percent": 0.0,
+    }
     stress_tests = [
         StressTest(**risk_data.get("stress_test_20", _default_stress)),
         StressTest(**risk_data.get("stress_test_40", _default_stress)),
