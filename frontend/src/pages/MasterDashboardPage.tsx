@@ -12,6 +12,8 @@ import { dashboardApi, crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import AllocationChart from '@/components/charts/AllocationChart'
 import PerformanceChart from '@/components/charts/PerformanceChart'
+import AnimatedNumber from '@/components/ui/animated-number'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   TrendingUp,
   TrendingDown,
@@ -26,7 +28,6 @@ import {
   Calendar,
   Banknote,
   BarChart3,
-  Loader2,
 } from 'lucide-react'
 import type { ProjectAudit, CrowdfundingDashboard } from '@/types/crowdfunding'
 
@@ -90,6 +91,21 @@ const PERIOD_OPTIONS = [
   { label: '1an', value: 365 },
   { label: 'Tout', value: 0 },
 ]
+
+// ============== Framer Motion variants ==============
+
+const kpiVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring' as const, duration: 0.5, bounce: 0.1 },
+  },
+}
+
+const staggerContainer = {
+  visible: { transition: { staggerChildren: 0.08 } },
+}
 
 // ============== Component ==============
 
@@ -227,246 +243,336 @@ export default function MasterDashboardPage() {
   const isLoading = metricsLoading || cfLoading
   const isPositive = change.amount >= 0
 
+  // ============== Loading skeleton ==============
+
   if (isLoading && !metrics) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 w-48 bg-card rounded-xl" />
+        <div className="h-48 bg-card rounded-2xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-card rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
 
+  // ============== Render ==============
+
   return (
-    <div className="space-y-6">
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Patrimoine Global</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="text-2xl font-semibold tracking-tight">Patrimoine Global</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
             Vue d'ensemble de tous vos investissements
           </p>
         </div>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
+        <motion.div className="flex gap-1 bg-muted rounded-lg p-1">
           {PERIOD_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={selectedPeriod === opt.value ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 px-3 text-xs"
-              onClick={() => setSelectedPeriod(opt.value)}
-            >
-              {opt.label}
-            </Button>
+            <motion.div key={opt.value} whileTap={{ scale: 0.95 }}>
+              <Button
+                variant={selectedPeriod === opt.value ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => setSelectedPeriod(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
 
-      {/* Net Worth Card */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Valeur nette totale</p>
-              <p className="text-4xl font-bold tracking-tight tabular-nums">{formatCurrency(netWorth)}</p>
-              <div className="flex items-center gap-2 mt-2">
-                {isPositive ? (
-                  <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-950/20">
+      {/* Hero — Net Worth Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', duration: 0.6, bounce: 0.1 }}
+        className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-6 md:p-8"
+      >
+        {/* Ambient gradient glow */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 pointer-events-none" />
+
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground tracking-widest uppercase mb-3">
+              Patrimoine total
+            </p>
+            <AnimatedNumber
+              value={netWorth}
+              formatter={formatCurrency}
+              className="text-5xl font-bold tracking-tighter tabular"
+            />
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedPeriod}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.2 }}
+                className="mt-3"
+              >
+                <Badge
+                  variant="outline"
+                  className={
+                    isPositive
+                      ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                      : 'text-red-400 border-red-500/30 bg-red-500/10'
+                  }
+                >
+                  {isPositive ? (
                     <ArrowUpRight className="h-3 w-3 mr-1" />
-                    {formatPercent(change.percent)} ({formatCurrency(change.amount)})
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 dark:bg-red-950/20">
+                  ) : (
                     <ArrowDownRight className="h-3 w-3 mr-1" />
-                    {formatPercent(change.percent)} ({formatCurrency(change.amount)})
-                  </Badge>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {PERIOD_OPTIONS.find((o) => o.value === selectedPeriod)?.label ?? ''}
-                </span>
-              </div>
-            </div>
-            <div className="text-right text-sm text-muted-foreground">
-              {cfDashboard && (cfDashboard.active_count + cfDashboard.completed_count) > 0 && (
-                <p>dont {formatCurrency(cfDashboard.total_invested)} en crowdfunding</p>
-              )}
-            </div>
+                  )}
+                  <span className="tabular">{formatPercent(change.percent)}</span>
+                  <span className="ml-1 opacity-60">({formatCurrency(change.amount)})</span>
+                </Badge>
+              </motion.div>
+            </AnimatePresence>
           </div>
-        </CardContent>
-      </Card>
+
+          {cfDashboard && cfDashboard.active_count + cfDashboard.completed_count > 0 && (
+            <div className="text-right text-sm text-muted-foreground">
+              <p className="text-xs uppercase tracking-widest mb-1 opacity-50">dont crowdfunding</p>
+              <p className="tabular font-medium">{formatCurrency(cfDashboard.total_invested)}</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
 
       {/* KPI Row */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <div className="transition-transform hover:scale-[1.02]">
-          <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <Wallet className="h-3.5 w-3.5" />
-                Total Investi
-              </div>
-              <p className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(totalInvested)}</p>
-            </CardContent>
-          </Card>
-        </div>
+      <motion.div
+        className="grid gap-3 grid-cols-2 lg:grid-cols-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Total Investi */}
+        <motion.div variants={kpiVariants}>
+          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
+              <Wallet className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-wide">Total investi</span>
+            </div>
+            <AnimatedNumber
+              value={totalInvested}
+              formatter={formatCurrency}
+              className="text-xl font-semibold tabular tracking-tight"
+            />
+          </div>
+        </motion.div>
 
-        <div className="transition-transform hover:scale-[1.02]">
-          <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                {pnl >= 0 ? (
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                )}
-                P&L Net
-              </div>
-              <p className={`text-xl font-bold tracking-tight tabular-nums ${pnl >= 0 ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]' : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'}`}>
-                {formatCurrency(pnl)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* P&L Net */}
+        <motion.div variants={kpiVariants}>
+          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
+              {pnl >= 0 ? (
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+              )}
+              <span className="uppercase tracking-wide">P&L Net</span>
+            </div>
+            <AnimatedNumber
+              value={pnl}
+              formatter={formatCurrency}
+              className={`text-xl font-semibold tabular tracking-tight ${
+                pnl >= 0
+                  ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]'
+                  : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'
+              }`}
+            />
+          </div>
+        </motion.div>
 
-        <div className="transition-transform hover:scale-[1.02]">
-          <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <BarChart3 className="h-3.5 w-3.5" />
-                Rendement annualisé
-              </div>
-              <p className={`text-xl font-bold tracking-tight tabular-nums ${blendedReturn >= 0 ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]' : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'}`}>
-                {formatPercent(blendedReturn)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Rendement annualisé */}
+        <motion.div variants={kpiVariants}>
+          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
+              <BarChart3 className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-wide">Rendement annualisé</span>
+            </div>
+            <AnimatedNumber
+              value={blendedReturn}
+              formatter={formatPercent}
+              className={`text-xl font-semibold tabular tracking-tight ${
+                blendedReturn >= 0
+                  ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]'
+                  : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'
+              }`}
+            />
+          </div>
+        </motion.div>
 
-        <div className="transition-transform hover:scale-[1.02]">
-          <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <Banknote className="h-3.5 w-3.5" />
-                Liquidités
-              </div>
-              <p className="text-xl font-bold tracking-tight tabular-nums">
-                {formatCurrency(metrics?.available_liquidity ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        {/* Liquidités */}
+        <motion.div variants={kpiVariants}>
+          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
+              <Banknote className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-wide">Liquidités</span>
+            </div>
+            <AnimatedNumber
+              value={metrics?.available_liquidity ?? 0}
+              formatter={formatCurrency}
+              className="text-xl font-semibold tabular tracking-tight"
+            />
+          </div>
+        </motion.div>
+      </motion.div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <motion.div
+        className="grid gap-6 lg:grid-cols-2"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
         {/* Allocation Pie */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation Globale</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AllocationChart data={mergedAllocation} />
-          </CardContent>
-        </Card>
+        <motion.div variants={kpiVariants}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Allocation Globale</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AllocationChart data={mergedAllocation} />
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Performance Line */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance du Capital</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {metrics?.historical_data && metrics.historical_data.length > 0 ? (
-              <PerformanceChart
-                data={metrics.historical_data}
-                period={selectedPeriod || 365}
-              />
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                Aucune donnée historique
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        <motion.div variants={kpiVariants}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance du Capital</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {metrics?.historical_data && metrics.historical_data.length > 0 ? (
+                <PerformanceChart
+                  data={metrics.historical_data}
+                  period={selectedPeriod || 365}
+                />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                  Aucune donnée historique
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* Attention + Quick Actions row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <motion.div
+        className="grid gap-6 lg:grid-cols-2"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
         {/* Points d'Attention */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Points d'Attention
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {attentionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                Aucune alerte en cours
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {attentionItems.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                    {item.type === 'redflag' && (
-                      <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                    )}
-                    {item.type === 'alert' && (
-                      <Bell className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
-                    )}
-                    {item.type === 'event' && (
-                      <Calendar className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{item.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div variants={kpiVariants}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Points d'Attention
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {attentionItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Aucune alerte en cours
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {attentionItems.map((item, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.07, type: 'spring', duration: 0.4, bounce: 0.1 }}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border/30"
+                    >
+                      {item.type === 'redflag' && (
+                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                      )}
+                      {item.type === 'alert' && (
+                        <Bell className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                      )}
+                      {item.type === 'event' && (
+                        <Calendar className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{item.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Raccourcis</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-12"
-              onClick={() => navigate('/crowdfunding/audit-lab')}
-            >
-              <ShieldCheck className="h-5 w-5 text-blue-500" />
-              <div className="text-left">
-                <p className="font-medium text-sm">Nouvel Audit</p>
-                <p className="text-xs text-muted-foreground">Analyser un projet crowdfunding</p>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-12"
-              onClick={() => navigate('/intelligence?tab=predictions')}
-            >
-              <Crosshair className="h-5 w-5 text-green-500" />
-              <div className="text-left">
-                <p className="font-medium text-sm">Signaux Alpha</p>
-                <p className="text-xs text-muted-foreground">Top opportunités crypto</p>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-12"
-              onClick={() => navigate('/strategy?tab=simulations')}
-            >
-              <PiggyBank className="h-5 w-5 text-purple-500" />
-              <div className="text-left">
-                <p className="font-medium text-sm">Simuler DCA</p>
-                <p className="text-xs text-muted-foreground">Projeter vos dépôts de 300 €/mois</p>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <motion.div variants={kpiVariants}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Raccourcis</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
+                  onClick={() => navigate('/crowdfunding/audit-lab')}
+                >
+                  <ShieldCheck className="h-5 w-5 text-blue-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Nouvel Audit</p>
+                    <p className="text-xs text-muted-foreground">Analyser un projet crowdfunding</p>
+                  </div>
+                </Button>
+              </motion.div>
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
+                  onClick={() => navigate('/intelligence?tab=predictions')}
+                >
+                  <Crosshair className="h-5 w-5 text-emerald-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Signaux Alpha</p>
+                    <p className="text-xs text-muted-foreground">Top opportunités crypto</p>
+                  </div>
+                </Button>
+              </motion.div>
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
+                  onClick={() => navigate('/strategy?tab=simulations')}
+                >
+                  <PiggyBank className="h-5 w-5 text-purple-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Simuler DCA</p>
+                    <p className="text-xs text-muted-foreground">Projeter vos dépôts de 300 €/mois</p>
+                  </div>
+                </Button>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   )
 }
