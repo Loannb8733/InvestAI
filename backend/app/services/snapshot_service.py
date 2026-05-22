@@ -747,16 +747,17 @@ class SnapshotService:
             return []
 
         today = datetime.now(timezone.utc)
+        today_naive = today.replace(tzinfo=None)  # naive UTC for all Python-side date comparisons
         first_tx_date = transactions[0].executed_at or transactions[0].created_at
         if first_tx_date is None:
-            first_tx_date = today
+            first_tx_date = today_naive
 
         # Normalize to naive datetimes for comparison (all dates are UTC)
         if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
             first_tx_date = first_tx_date.replace(tzinfo=None)
 
         # Start from the later of: (first transaction, today - days)
-        period_start = today - timedelta(days=days)
+        period_start = today_naive - timedelta(days=days)
         # We need to replay from first transaction to get correct holdings
         replay_start = min(first_tx_date, period_start)
         replay_start = replay_start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -767,7 +768,7 @@ class SnapshotService:
             daily_invested,
             daily_net_capital,
             asset_types,
-        ) = self._replay_transactions_to_daily_holdings(transactions, replay_start, today)
+        ) = self._replay_transactions_to_daily_holdings(transactions, replay_start, today_naive)
 
         # Collect all symbols that were ever held
         all_symbols: Dict[str, str] = {}
@@ -781,7 +782,7 @@ class SnapshotService:
 
         # Fetch price data
         # Use max(days, days_since_first_tx) — cap at 1825 (5 years)
-        days_since_first = (today - replay_start).days + 5  # extra buffer
+        days_since_first = (today_naive - replay_start).days + 5  # extra buffer
         fetch_days = min(max(days, days_since_first, 90), 1825)
         price_series = await self._fetch_all_price_series(all_symbols, fetch_days, db=db)
 
