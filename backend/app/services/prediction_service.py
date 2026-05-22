@@ -2682,7 +2682,7 @@ class PredictionService:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC; all evt_date constructions are also naive
         current_year = now.year
         events = []
 
