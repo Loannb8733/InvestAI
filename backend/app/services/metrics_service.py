@@ -1586,9 +1586,41 @@ class MetricsService:
         any_forex_stale = False
 
         for portfolio in portfolios:
-            portfolio_metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
-            # Get historical total invested (sum of all buy transactions)
-            portfolio_history = await self.get_portfolio_history(db, str(portfolio.id), currency)
+            try:
+                logger.debug("get_user_dashboard_metrics: processing portfolio %s", portfolio.id)
+                portfolio_metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
+                logger.debug(
+                    "get_user_dashboard_metrics: portfolio_metrics OK, total_value=%.2f",
+                    portfolio_metrics.get("total_value", 0),
+                )
+            except Exception as _pm_exc:
+                import traceback as _tb
+
+                logger.error(
+                    "get_portfolio_metrics failed for portfolio %s: %s\n%s",
+                    portfolio.id,
+                    _pm_exc,
+                    _tb.format_exc(),
+                )
+                continue
+            try:
+                # Get historical total invested (sum of all buy transactions)
+                portfolio_history = await self.get_portfolio_history(db, str(portfolio.id), currency)
+            except Exception as _ph_exc:
+                import traceback as _tb
+
+                logger.error(
+                    "get_portfolio_history failed for portfolio %s: %s\n%s",
+                    portfolio.id,
+                    _ph_exc,
+                    _tb.format_exc(),
+                )
+                portfolio_history = {
+                    "total_invested_all_time": 0.0,
+                    "total_sold_fiat": 0.0,
+                    "realized_gains": 0.0,
+                    "total_fees": 0.0,
+                }
             total_value += Decimal(str(portfolio_metrics["total_value"]))
             pnl_value += Decimal(str(portfolio_metrics["total_value"]))
             pnl_value += Decimal(str(portfolio_metrics.get("cash_from_stablecoins", 0)))
