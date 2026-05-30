@@ -1,6 +1,8 @@
-import { memo, useMemo } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { memo, useMemo, useState } from 'react'
+import { ResponsivePie } from '@nivo/pie'
+import { motion, useReducedMotion } from 'framer-motion'
 import { formatCurrency } from '@/lib/utils'
+import { useNivoTheme } from './nivo-theme'
 
 interface AllocationItem {
   type: string
@@ -12,17 +14,17 @@ interface AllocationChartProps {
   data: AllocationItem[]
 }
 
-const COLORS = {
-  crypto: '#6366F1',
-  stock: '#818CF8',
-  etf: '#A78BFA',
-  real_estate: '#F59E0B',
-  bond: '#FBBF24',
-  crowdfunding: '#10B981',
-  other: '#64748B',
+const TOKENS: Record<string, string> = {
+  crypto: '--chart-1',
+  stock: '--chart-2',
+  crowdfunding: '--chart-3',
+  real_estate: '--chart-4',
+  etf: '--chart-5',
+  bond: '--chart-2',
+  other: '--muted-foreground',
 }
 
-const LABELS = {
+const LABELS: Record<string, string> = {
   crypto: 'Crypto',
   stock: 'Actions',
   etf: 'ETF',
@@ -33,78 +35,99 @@ const LABELS = {
 }
 
 export default memo(function AllocationChart({ data }: AllocationChartProps) {
-  const chartData = useMemo(() => (data || []).map((item) => ({
-    name: LABELS[item.type as keyof typeof LABELS] || item.type,
-    value: item.value,
-    percentage: item.percentage,
-    color: COLORS[item.type as keyof typeof COLORS] || COLORS.other,
-  })), [data])
+  const reduceMotion = useReducedMotion()
+  const { theme, color } = useNivoTheme()
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const chartData = useMemo(
+    () =>
+      (data || []).map((item) => ({
+        id: LABELS[item.type] || item.type,
+        label: LABELS[item.type] || item.type,
+        value: item.value,
+        percentage: item.percentage,
+        color: color(TOKENS[item.type] || '--muted-foreground'),
+      })),
+    [data, color]
+  )
+
+  const total = useMemo(() => chartData.reduce((sum, d) => sum + d.value, 0), [chartData])
 
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+      <div className="flex h-[300px] items-center justify-center text-muted-foreground">
         Aucune donnée disponible
       </div>
     )
   }
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; percentage: number } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      return (
-        <div className="bg-popover border rounded-lg shadow-lg p-3">
-          <p className="font-medium">{data.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {formatCurrency(data.value)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {data.percentage.toFixed(1)}%
-          </p>
-        </div>
-      )
-    }
-    return null
-  }
-
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <defs>
-          <filter id="pieGlow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <Pie
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="relative h-[260px]">
+        <ResponsivePie
           data={chartData}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={100}
-          paddingAngle={2}
-          dataKey="value"
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth={1}
-        >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip content={<CustomTooltip />} />
-        <Legend
-          formatter={(value, entry) => {
-            const percentage = (entry as { payload?: { percentage: number } }).payload?.percentage
-            return (
-              <span className="text-sm">
-                {value} ({percentage?.toFixed(1)}%)
-              </span>
-            )
-          }}
+          theme={theme}
+          margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          innerRadius={0.66}
+          padAngle={1.4}
+          cornerRadius={3}
+          colors={{ datum: 'data.color' }}
+          borderWidth={2}
+          borderColor={color('--background')}
+          enableArcLabels={false}
+          enableArcLinkLabels={false}
+          activeOuterRadiusOffset={6}
+          activeInnerRadiusOffset={2}
+          isInteractive
+          onActiveIdChange={(id) => setActiveId(id != null ? String(id) : null)}
+          animate={!reduceMotion}
+          motionConfig="gentle"
+          tooltip={({ datum }) => (
+            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+              <p className="text-sm font-medium">{datum.label}</p>
+              <p className="mt-0.5 font-mono text-sm tabular-nums">{formatCurrency(datum.value)}</p>
+              <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                {(datum.data as { percentage: number }).percentage.toFixed(1)}%
+              </p>
+            </div>
+          )}
         />
-      </PieChart>
-    </ResponsiveContainer>
+
+        {/* Center total */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">Total</span>
+          <span className="font-serif text-xl font-medium tabular-nums tracking-tight">
+            {formatCurrency(total)}
+          </span>
+        </div>
+      </div>
+
+      {/* Editorial legend */}
+      <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+        {chartData.map((entry) => (
+          <div
+            key={entry.id}
+            className={`flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors ${
+              activeId === entry.id ? 'bg-muted' : ''
+            }`}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                style={{ background: entry.color }}
+              />
+              <span className="truncate text-sm">{entry.label}</span>
+            </span>
+            <span className="font-mono text-sm tabular-nums text-muted-foreground">
+              {entry.percentage.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
   )
 })

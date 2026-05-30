@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Une erreur est survenue</h2>
+          <h2 className="text-2xl font-serif font-medium mb-2">Une erreur est survenue</h2>
           <p className="text-muted-foreground mb-6 max-w-md">
             {this.state.error?.message || "Quelque chose s'est mal passé. Veuillez réessayer."}
           </p>

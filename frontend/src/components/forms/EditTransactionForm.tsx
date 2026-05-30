@@ -44,18 +44,18 @@ interface EditTransactionFormProps {
 }
 
 const TRANSACTION_TYPES = [
-  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-green-500', bg: 'bg-green-500/10 border-green-500/20', activeBg: 'bg-green-500/20 border-green-500/40 ring-1 ring-green-500/30', submitBg: 'bg-green-600 hover:bg-green-700' },
-  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30', submitBg: 'bg-red-600 hover:bg-red-700' },
-  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30', submitBg: 'bg-blue-600 hover:bg-blue-700' },
-  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30', submitBg: 'bg-orange-600 hover:bg-orange-700' },
-  { value: 'staking_reward', label: 'Reward', shortLabel: 'Reward', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30', submitBg: 'bg-yellow-600 hover:bg-yellow-700' },
-  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30', submitBg: 'bg-pink-600 hover:bg-pink-700' },
-  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30', submitBg: 'bg-teal-600 hover:bg-teal-700' },
-  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30', submitBg: 'bg-amber-600 hover:bg-amber-700' },
-  { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20', activeBg: 'bg-purple-500/20 border-purple-500/40 ring-1 ring-purple-500/30', submitBg: 'bg-purple-600 hover:bg-purple-700' },
-  { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20', activeBg: 'bg-purple-400/20 border-purple-400/40 ring-1 ring-purple-400/30', submitBg: 'bg-purple-500 hover:bg-purple-600' },
-  { value: 'dividend', label: 'Dividende', shortLabel: 'Dividende', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', activeBg: 'bg-emerald-500/20 border-emerald-500/40 ring-1 ring-emerald-500/30', submitBg: 'bg-emerald-600 hover:bg-emerald-700' },
-  { value: 'interest', label: 'Intérêt', shortLabel: 'Intérêt', icon: Percent, color: 'text-cyan-500', bg: 'bg-cyan-500/10 border-cyan-500/20', activeBg: 'bg-cyan-500/20 border-cyan-500/40 ring-1 ring-cyan-500/30', submitBg: 'bg-cyan-600 hover:bg-cyan-700' },
+  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-gain', bg: 'bg-gain/10 border-gain/20', activeBg: 'bg-gain/20 border-gain/40 ring-1 ring-gain/30', submitBg: 'bg-gain hover:bg-gain' },
+  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-loss', bg: 'bg-loss/10 border-loss/20', activeBg: 'bg-loss/20 border-loss/40 ring-1 ring-loss/30', submitBg: 'bg-loss hover:bg-loss' },
+  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'staking_reward', label: 'Reward', shortLabel: 'Reward', icon: Coins, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-gain', bg: 'bg-gain/10 border-gain/20', activeBg: 'bg-gain/20 border-gain/40 ring-1 ring-gain/30', submitBg: 'bg-gain hover:bg-gain' },
+  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'dividend', label: 'Dividende', shortLabel: 'Dividende', icon: TrendingUp, color: 'text-gain', bg: 'bg-gain/10 border-gain/20', activeBg: 'bg-gain/20 border-gain/40 ring-1 ring-gain/30', submitBg: 'bg-gain hover:bg-gain' },
+  { value: 'interest', label: 'Intérêt', shortLabel: 'Intérêt', icon: Percent, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
 ] as const
 
 const COMMON_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'BTC', 'ETH', 'USDT', 'USDC']
@@ -208,7 +208,7 @@ export default function EditTransactionForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/[0.08] bg-background/80 backdrop-blur-xl shadow-2xl">
+      <DialogContent className="border-border bg-background/80 shadow-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {typeConfig && <typeConfig.icon className={cn('h-5 w-5', typeConfig.color)} />}
@@ -359,7 +359,7 @@ export default function EditTransactionForm({
 
             {/* Total preview */}
             {total > 0 && (
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm px-3 py-2">
+              <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-muted-foreground">Montant total</span>
                   <span className="text-sm font-semibold">{fmt.format(total)}</span>

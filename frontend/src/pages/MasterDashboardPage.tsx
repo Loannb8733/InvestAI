@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import type { PnLBreakdown } from '@/types'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
@@ -11,7 +11,9 @@ import { formatCurrency, formatPercent } from '@/lib/utils'
 import { dashboardApi, crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import AllocationChart from '@/components/charts/AllocationChart'
-import PerformanceChart from '@/components/charts/PerformanceChart'
+// Pilote Direction A — graphe d'évolution patrimoniale en TradingView
+// Lightweight Charts (canvas, ~45 Ko). Lazy-load : pas SSR-safe, hors chunk principal.
+const PortfolioAreaChart = lazy(() => import('@/components/charts/PortfolioAreaChart'))
 import AnimatedNumber from '@/components/ui/animated-number'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -161,6 +163,24 @@ export default function MasterDashboardPage() {
     }
   }, [metrics, selectedPeriod])
 
+  // Résumé narratif — « le récit avant le tableau »
+  const narrative = useMemo(() => {
+    if (!metrics) return ''
+    const periodLabel: Record<number, string> = {
+      1: 'Sur les dernières 24 heures',
+      7: 'Sur les 7 derniers jours',
+      30: 'Sur les 30 derniers jours',
+      90: 'Sur les 90 derniers jours',
+      365: 'Sur la dernière année',
+      0: 'Depuis le début',
+    }
+    const when = periodLabel[selectedPeriod] ?? 'Sur la période'
+    const verb = change.amount >= 0 ? 'progressé' : 'reculé'
+    const amount = formatCurrency(Math.abs(change.amount))
+    const pct = `${Math.abs(change.percent).toFixed(2)} %`
+    return `${when}, ton patrimoine a ${verb} de ${amount} (${pct}).`
+  }, [metrics, change, selectedPeriod])
+
   const pnl = useMemo(() => {
     const cryptoPnl = metrics?.advanced_metrics?.pnl_breakdown?.net_pnl ?? 0
     const cfInterest = (cfDashboard?.total_received ?? 0) - (cfDashboard?.total_invested ?? 0)
@@ -271,9 +291,9 @@ export default function MasterDashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Patrimoine Global</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Vue d'ensemble de tous vos investissements
+          <h1 className="font-serif text-3xl font-medium tracking-tight">Patrimoine global</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Où en est ton histoire patrimoniale aujourd'hui.
           </p>
         </div>
         <motion.div className="flex gap-1 bg-muted rounded-lg p-1">
@@ -297,20 +317,17 @@ export default function MasterDashboardPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', duration: 0.6, bounce: 0.1 }}
-        className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-6 md:p-8"
+        className="relative overflow-hidden rounded-lg border border-border bg-card p-6 md:p-8"
       >
-        {/* Ambient gradient glow */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 pointer-events-none" />
-
         <div className="relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground tracking-widest uppercase mb-3">
               Patrimoine total
             </p>
             <AnimatedNumber
               value={netWorth}
               formatter={formatCurrency}
-              className="text-5xl font-bold tracking-tighter tabular"
+              className="block font-serif font-medium tabular-nums text-5xl md:text-6xl tracking-tight leading-none text-foreground"
             />
             <AnimatePresence mode="wait">
               <motion.div
@@ -319,14 +336,14 @@ export default function MasterDashboardPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
                 transition={{ duration: 0.2 }}
-                className="mt-3"
+                className="mt-4"
               >
                 <Badge
                   variant="outline"
                   className={
                     isPositive
-                      ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-                      : 'text-red-400 border-red-500/30 bg-red-500/10'
+                      ? 'text-gain border-gain/30 bg-gain/10'
+                      : 'text-loss border-loss/30 bg-loss/10'
                   }
                 >
                   {isPositive ? (
@@ -339,12 +356,19 @@ export default function MasterDashboardPage() {
                 </Badge>
               </motion.div>
             </AnimatePresence>
+
+            {/* Résumé narratif — le récit avant le tableau */}
+            {narrative && (
+              <p className="mt-4 max-w-prose text-sm leading-relaxed text-muted-foreground">
+                {narrative}
+              </p>
+            )}
           </div>
 
           {cfDashboard && cfDashboard.active_count + cfDashboard.completed_count > 0 && (
-            <div className="text-right text-sm text-muted-foreground">
+            <div className="text-right text-sm text-muted-foreground shrink-0">
               <p className="text-xs uppercase tracking-widest mb-1 opacity-50">dont crowdfunding</p>
-              <p className="tabular font-medium">{formatCurrency(cfDashboard.total_invested)}</p>
+              <p className="tabular font-medium text-foreground">{formatCurrency(cfDashboard.total_invested)}</p>
             </div>
           )}
         </div>
@@ -359,7 +383,7 @@ export default function MasterDashboardPage() {
       >
         {/* Total Investi */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <Wallet className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Total investi</span>
@@ -374,12 +398,12 @@ export default function MasterDashboardPage() {
 
         {/* P&L Net */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               {pnl >= 0 ? (
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <TrendingUp className="h-3.5 w-3.5 text-gain" />
               ) : (
-                <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                <TrendingDown className="h-3.5 w-3.5 text-loss" />
               )}
               <span className="uppercase tracking-wide">P&L Net</span>
             </div>
@@ -387,9 +411,7 @@ export default function MasterDashboardPage() {
               value={pnl}
               formatter={formatCurrency}
               className={`text-xl font-semibold tabular tracking-tight ${
-                pnl >= 0
-                  ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]'
-                  : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'
+                pnl >= 0 ? 'text-gain' : 'text-loss'
               }`}
             />
           </div>
@@ -397,7 +419,7 @@ export default function MasterDashboardPage() {
 
         {/* Rendement annualisé */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <BarChart3 className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Rendement annualisé</span>
@@ -406,9 +428,7 @@ export default function MasterDashboardPage() {
               value={blendedReturn}
               formatter={formatPercent}
               className={`text-xl font-semibold tabular tracking-tight ${
-                blendedReturn >= 0
-                  ? 'text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]'
-                  : 'text-red-400 drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'
+                blendedReturn >= 0 ? 'text-gain' : 'text-loss'
               }`}
             />
           </div>
@@ -416,7 +436,7 @@ export default function MasterDashboardPage() {
 
         {/* Liquidités */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-default active:scale-[0.98] transition-transform">
+          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <Banknote className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Liquidités</span>
@@ -457,10 +477,18 @@ export default function MasterDashboardPage() {
             </CardHeader>
             <CardContent>
               {metrics?.historical_data && metrics.historical_data.length > 0 ? (
-                <PerformanceChart
-                  data={metrics.historical_data}
-                  period={selectedPeriod || 365}
-                />
+                <Suspense
+                  fallback={
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                      Chargement du graphique…
+                    </div>
+                  }
+                >
+                  <PortfolioAreaChart
+                    data={metrics.historical_data}
+                    period={selectedPeriod || 365}
+                  />
+                </Suspense>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
                   Aucune donnée historique
@@ -503,13 +531,13 @@ export default function MasterDashboardPage() {
                       className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border/30"
                     >
                       {item.type === 'redflag' && (
-                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                        <AlertTriangle className="h-4 w-4 text-loss shrink-0 mt-0.5" strokeWidth={1.5} />
                       )}
                       {item.type === 'alert' && (
-                        <Bell className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                        <Bell className="h-4 w-4 text-warning shrink-0 mt-0.5" strokeWidth={1.5} />
                       )}
                       {item.type === 'event' && (
-                        <Calendar className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <Calendar className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" strokeWidth={1.5} />
                       )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{item.title}</p>
@@ -536,7 +564,7 @@ export default function MasterDashboardPage() {
                   className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
                   onClick={() => navigate('/crowdfunding/audit-lab')}
                 >
-                  <ShieldCheck className="h-5 w-5 text-blue-500" />
+                  <ShieldCheck className="h-5 w-5 text-accent" strokeWidth={1.5} />
                   <div className="text-left">
                     <p className="font-medium text-sm">Nouvel Audit</p>
                     <p className="text-xs text-muted-foreground">Analyser un projet crowdfunding</p>
@@ -549,7 +577,7 @@ export default function MasterDashboardPage() {
                   className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
                   onClick={() => navigate('/intelligence?tab=predictions')}
                 >
-                  <Crosshair className="h-5 w-5 text-emerald-500" />
+                  <Crosshair className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                   <div className="text-left">
                     <p className="font-medium text-sm">Signaux Alpha</p>
                     <p className="text-xs text-muted-foreground">Top opportunités crypto</p>
@@ -562,7 +590,7 @@ export default function MasterDashboardPage() {
                   className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
                   onClick={() => navigate('/strategy?tab=simulations')}
                 >
-                  <PiggyBank className="h-5 w-5 text-purple-500" />
+                  <PiggyBank className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                   <div className="text-left">
                     <p className="font-medium text-sm">Simuler DCA</p>
                     <p className="text-xs text-muted-foreground">Projeter vos dépôts de 300 €/mois</p>

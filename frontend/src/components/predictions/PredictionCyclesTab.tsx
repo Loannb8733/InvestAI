@@ -32,17 +32,17 @@ const REGIME_LABEL: Record<string, string> = {
   bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux', neutral: 'Neutre',
 }
 const REGIME_BADGE: Record<string, string> = {
-  bullish: 'bg-green-500/10 text-green-500',
-  bearish: 'bg-red-500/10 text-red-500',
-  top: 'bg-amber-500/10 text-amber-500',
-  bottom: 'bg-blue-500/10 text-blue-500',
+  bullish: 'bg-gain/10 text-gain',
+  bearish: 'bg-loss/10 text-loss',
+  top: 'bg-warning/10 text-warning',
+  bottom: 'bg-accent/10 text-accent',
   neutral: 'bg-gray-500/10 text-gray-500',
 }
 const BAR_COLOR: Record<string, string> = {
-  bullish: 'bg-green-500', bearish: 'bg-red-500', top: 'bg-amber-500', bottom: 'bg-blue-500',
+  bullish: 'bg-gain', bearish: 'bg-loss', top: 'bg-warning', bottom: 'bg-accent',
 }
 const TEXT_COLOR: Record<string, string> = {
-  bullish: 'text-green-500', bearish: 'text-red-500', top: 'text-amber-500', bottom: 'text-blue-500', neutral: 'text-gray-500',
+  bullish: 'text-gain', bearish: 'text-loss', top: 'text-warning', bottom: 'text-accent', neutral: 'text-gray-500',
 }
 
 // ── Top / Bottom Card ────────────────────────────────────────────────
@@ -79,13 +79,13 @@ const TopBottomCard = React.memo(({ estimates }: { estimates: MarketCycleData['t
                 <th className="text-center py-2 px-3 text-xs font-medium">Prix actuel</th>
                 <th className="text-center py-2 px-3 text-xs font-medium">
                   <span className="flex items-center justify-center gap-1">
-                    <ArrowDown className="h-3 w-3 text-blue-500" />
+                    <ArrowDown className="h-3 w-3 text-accent" />
                     Bottom estimé
                   </span>
                 </th>
                 <th className="text-center py-2 px-3 text-xs font-medium">
                   <span className="flex items-center justify-center gap-1">
-                    <ArrowUp className="h-3 w-3 text-amber-500" />
+                    <ArrowUp className="h-3 w-3 text-warning" />
                     Top estimé
                   </span>
                 </th>
@@ -102,10 +102,10 @@ const TopBottomCard = React.memo(({ estimates }: { estimates: MarketCycleData['t
                         <span className="text-sm font-medium">{est.symbol}</span>
                         {isBtc && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Réf.</Badge>}
                         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                          est.current_regime === 'bearish' ? 'text-red-500 border-red-500/30' :
-                          est.current_regime === 'bullish' ? 'text-green-500 border-green-500/30' :
-                          est.current_regime === 'top' ? 'text-amber-500 border-amber-500/30' :
-                          est.current_regime === 'bottom' ? 'text-blue-500 border-blue-500/30' :
+                          est.current_regime === 'bearish' ? 'text-loss border-loss/30' :
+                          est.current_regime === 'bullish' ? 'text-gain border-gain/30' :
+                          est.current_regime === 'top' ? 'text-warning border-warning/30' :
+                          est.current_regime === 'bottom' ? 'text-accent border-accent/30' :
                           'text-gray-500'
                         }`}>
                           {REGIME_LABEL[est.current_regime] || est.current_regime}
@@ -117,25 +117,25 @@ const TopBottomCard = React.memo(({ estimates }: { estimates: MarketCycleData['t
                     </td>
                     <td className="py-3 px-3">
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-sm font-bold text-blue-500 tabular-nums">{formatCurrency(est.next_bottom.estimated_price)}</span>
+                        <span className="text-sm font-bold text-accent tabular-nums">{formatCurrency(est.next_bottom.estimated_price)}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-muted-foreground">{formatDate(est.next_bottom.estimated_date)} (~{est.next_bottom.estimated_days}j)</span>
-                          <span className="text-[10px] font-medium text-blue-500">-{est.next_bottom.distance_pct.toFixed(1)}%</span>
+                          <span className="text-[10px] font-medium text-accent">-{est.next_bottom.distance_pct.toFixed(1)}%</span>
                         </div>
                         <div className="w-20 h-1 rounded-full bg-muted overflow-hidden mt-0.5">
-                          <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, est.next_bottom.distance_pct * 3)}%` }} />
+                          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, est.next_bottom.distance_pct * 3)}%` }} />
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-sm font-bold text-amber-500 tabular-nums">{formatCurrency(est.next_top.estimated_price)}</span>
+                        <span className="text-sm font-bold text-warning tabular-nums">{formatCurrency(est.next_top.estimated_price)}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-muted-foreground">{formatDate(est.next_top.estimated_date)} (~{est.next_top.estimated_days}j)</span>
-                          <span className="text-[10px] font-medium text-amber-500">+{est.next_top.distance_pct.toFixed(1)}%</span>
+                          <span className="text-[10px] font-medium text-warning">+{est.next_top.distance_pct.toFixed(1)}%</span>
                         </div>
                         <div className="w-20 h-1 rounded-full bg-muted overflow-hidden mt-0.5">
-                          <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.min(100, est.next_top.distance_pct * 3)}%` }} />
+                          <div className="h-full rounded-full bg-warning" style={{ width: `${Math.min(100, est.next_top.distance_pct * 3)}%` }} />
                         </div>
                       </div>
                     </td>
@@ -147,15 +147,15 @@ const TopBottomCard = React.memo(({ estimates }: { estimates: MarketCycleData['t
                               <div className="w-10 h-1.5 rounded-full bg-muted overflow-hidden">
                                 <div
                                   className={`h-full rounded-full ${
-                                    est.next_bottom.confidence >= 0.6 ? 'bg-green-500' :
-                                    est.next_bottom.confidence >= 0.3 ? 'bg-yellow-500' : 'bg-red-500'
+                                    est.next_bottom.confidence >= 0.6 ? 'bg-gain' :
+                                    est.next_bottom.confidence >= 0.3 ? 'bg-warning' : 'bg-loss'
                                   }`}
                                   style={{ width: `${(est.next_bottom.confidence * 100).toFixed(0)}%` }}
                                 />
                               </div>
                               <span className={`text-[10px] font-medium ${
-                                est.next_bottom.confidence >= 0.6 ? 'text-green-500' :
-                                est.next_bottom.confidence >= 0.3 ? 'text-yellow-500' : 'text-red-500'
+                                est.next_bottom.confidence >= 0.6 ? 'text-gain' :
+                                est.next_bottom.confidence >= 0.3 ? 'text-warning' : 'text-loss'
                               }`}>
                                 {(est.next_bottom.confidence * 100).toFixed(0)}%
                               </span>
@@ -341,11 +341,11 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                       <React.Fragment key={phase}>
                         {i === 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
                         <Badge variant="outline" className={
-                          phase === 'Euphorie' ? 'text-red-500 border-red-500/30' :
-                          phase === 'Distribution' ? 'text-amber-500 border-amber-500/30' :
-                          phase === 'Expansion' ? 'text-green-500 border-green-500/30' :
-                          phase === 'Accumulation' ? 'text-cyan-500 border-cyan-500/30' :
-                          'text-blue-500 border-blue-500/30'
+                          phase === 'Euphorie' ? 'text-loss border-loss/30' :
+                          phase === 'Distribution' ? 'text-warning border-warning/30' :
+                          phase === 'Expansion' ? 'text-gain border-gain/30' :
+                          phase === 'Accumulation' ? 'text-accent border-accent/30' :
+                          'text-accent border-accent/30'
                         }>
                           {phase}
                         </Badge>
@@ -353,7 +353,7 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                     ))}
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold tabular-nums">~{marketCycle.time_to_pivot.estimated_days}</span>
+                    <span className="text-3xl font-serif font-medium tabular-nums">~{marketCycle.time_to_pivot.estimated_days}</span>
                     <span className="text-sm text-muted-foreground">jours</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -362,12 +362,12 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                 </div>
                 <div className="text-center">
                   <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center" style={{
-                    borderColor: marketCycle.time_to_pivot.confidence >= 0.6 ? '#22c55e' :
-                      marketCycle.time_to_pivot.confidence >= 0.35 ? '#eab308' : '#ef4444',
+                    borderColor: marketCycle.time_to_pivot.confidence >= 0.6 ? 'oklch(var(--chart-3))' :
+                      marketCycle.time_to_pivot.confidence >= 0.35 ? 'oklch(var(--chart-1))' : 'oklch(var(--chart-4))',
                   }}>
                     <span className="text-xs font-bold" style={{
-                      color: marketCycle.time_to_pivot.confidence >= 0.6 ? '#22c55e' :
-                        marketCycle.time_to_pivot.confidence >= 0.35 ? '#eab308' : '#ef4444',
+                      color: marketCycle.time_to_pivot.confidence >= 0.6 ? 'oklch(var(--chart-3))' :
+                        marketCycle.time_to_pivot.confidence >= 0.35 ? 'oklch(var(--chart-1))' : 'oklch(var(--chart-4))',
                     }}>
                       {(marketCycle.time_to_pivot.confidence * 100).toFixed(0)}%
                     </span>
@@ -383,7 +383,7 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Flame className="h-4 w-4 text-amber-500" />
+                <Flame className="h-4 w-4 text-warning" />
                 Diagnostic Distribution
               </CardTitle>
               <CardDescription>Actifs en zone de distribution — signaux de vente potentiels</CardDescription>
@@ -394,8 +394,8 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                   <div
                     key={diag.symbol}
                     className={`p-3 rounded-lg border ${
-                      diag.sell_priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
-                      diag.sell_priority === 'medium' ? 'border-amber-500/30 bg-amber-500/5' :
+                      diag.sell_priority === 'high' ? 'border-loss/30 bg-loss/5' :
+                      diag.sell_priority === 'medium' ? 'border-warning/30 bg-warning/5' :
                       'border-muted bg-muted/20'
                     }`}
                   >
@@ -403,8 +403,8 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{diag.symbol}</span>
                         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                          diag.sell_priority === 'high' ? 'text-red-500 border-red-500/30' :
-                          diag.sell_priority === 'medium' ? 'text-amber-500 border-amber-500/30' :
+                          diag.sell_priority === 'high' ? 'text-loss border-loss/30' :
+                          diag.sell_priority === 'medium' ? 'text-warning border-warning/30' :
                           'text-gray-500'
                         }`}>
                           {diag.sell_priority === 'high' ? 'Vente prioritaire' :
@@ -413,7 +413,7 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {diag.rsi !== null && (
-                          <span>RSI: <span className={diag.rsi > 70 ? 'text-red-500 font-medium' : ''}>{diag.rsi}</span></span>
+                          <span>RSI: <span className={diag.rsi > 70 ? 'text-loss font-medium' : ''}>{diag.rsi}</span></span>
                         )}
                         <span>Poids: {diag.weight_pct}%</span>
                       </div>
@@ -450,10 +450,10 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {marketCycle.market_signals.map((sig) => {
                 const sigColor =
-                  sig.signal === 'bullish' ? 'border-green-500/30 bg-green-500/5' :
-                  sig.signal === 'bearish' ? 'border-red-500/30 bg-red-500/5' :
-                  sig.signal === 'top' ? 'border-amber-500/30 bg-amber-500/5' :
-                  sig.signal === 'bottom' ? 'border-blue-500/30 bg-blue-500/5' :
+                  sig.signal === 'bullish' ? 'border-gain/30 bg-gain/5' :
+                  sig.signal === 'bearish' ? 'border-loss/30 bg-loss/5' :
+                  sig.signal === 'top' ? 'border-warning/30 bg-warning/5' :
+                  sig.signal === 'bottom' ? 'border-accent/30 bg-accent/5' :
                   'border-muted bg-muted/20'
 
                 return (

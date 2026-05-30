@@ -8,16 +8,8 @@ import { useToast } from '@/hooks/use-toast'
 import { reportsApi } from '@/services/api'
 import { formatCurrency } from '@/lib/utils'
 import { CRYPTO_CLASS_LABELS, CRYPTO_CLASS_COLORS } from '@/lib/constants'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import {
   ArrowRightLeft,
   TrendingDown,
@@ -72,6 +64,7 @@ const DEFAULT_TARGETS: Record<string, number> = {
 
 export default function RebalancingTab() {
   const { toast } = useToast()
+  const { theme, color } = useNivoTheme()
   const [targets, setTargets] = useState<Record<string, number>>(DEFAULT_TARGETS)
   const [data, setData] = useState<RebalancingData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -158,7 +151,7 @@ export default function RebalancingTab() {
                   <label className="text-sm font-medium flex items-center gap-2">
                     <span
                       className="w-3 h-3 rounded-full inline-block"
-                      style={{ backgroundColor: CRYPTO_CLASS_COLORS[key] || '#64748B' }}
+                      style={{ backgroundColor: CRYPTO_CLASS_COLORS[key] || 'oklch(var(--muted-foreground))' }}
                     />
                     {CRYPTO_CLASS_LABELS[key] || key}
                   </label>
@@ -219,27 +212,52 @@ export default function RebalancingTab() {
               <CardTitle>Allocation Actuelle vs Cible</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(v) => `${v}%`}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [`${value.toFixed(1)}%`]}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--popover))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="Actuel" fill="#6366F1" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Cible" fill="#10B981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="h-[300px]">
+                <ResponsiveBar
+                  data={chartData}
+                  keys={['Actuel', 'Cible']}
+                  indexBy="name"
+                  groupMode="grouped"
+                  theme={theme}
+                  margin={{ top: 28, right: 16, bottom: 40, left: 48 }}
+                  padding={0.25}
+                  innerPadding={4}
+                  colors={({ id }) => (id === 'Actuel' ? color('--chart-2') : color('--chart-3'))}
+                  borderRadius={4}
+                  enableLabel={false}
+                  enableGridY
+                  axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                  axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}%` }}
+                  valueScale={{ type: 'linear' }}
+                  tooltip={({ id, value, color: barColor }) => (
+                    <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 rounded-[2px]"
+                          style={{ backgroundColor: barColor }}
+                        />
+                        <span className="text-xs text-muted-foreground">{id}</span>
+                      </span>
+                      <p className="mt-0.5 font-mono text-sm tabular-nums">{value.toFixed(1)}%</p>
+                    </div>
+                  )}
+                  legends={[
+                    {
+                      anchor: 'top-right',
+                      direction: 'row',
+                      translateY: -22,
+                      itemWidth: 70,
+                      itemHeight: 18,
+                      symbolSize: 10,
+                      symbolShape: 'circle',
+                      itemTextColor: color('--muted-foreground'),
+                      dataFrom: 'keys',
+                    },
+                  ]}
+                  animate
+                  motionConfig="gentle"
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -267,7 +285,7 @@ export default function RebalancingTab() {
                         <td className="py-2 px-3 flex items-center gap-2">
                           <span
                             className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: CRYPTO_CLASS_COLORS[cat.category] || '#64748B' }}
+                            style={{ backgroundColor: CRYPTO_CLASS_COLORS[cat.category] || 'oklch(var(--muted-foreground))' }}
                           />
                           {cat.label}
                         </td>
@@ -276,13 +294,13 @@ export default function RebalancingTab() {
                         <td className="text-right py-2 px-3">{cat.target_pct.toFixed(1)}%</td>
                         <td className={`text-right py-2 px-3 font-medium ${
                           Math.abs(cat.drift_pct) < 3
-                            ? 'text-green-600'
-                            : 'text-red-600'
+                            ? 'text-gain'
+                            : 'text-loss'
                         }`}>
                           {cat.drift_pct > 0 ? '+' : ''}{cat.drift_pct.toFixed(1)}%
                         </td>
                         <td className={`text-right py-2 px-3 ${
-                          cat.drift_eur > 0 ? 'text-red-600' : 'text-green-600'
+                          cat.drift_eur > 0 ? 'text-loss' : 'text-gain'
                         }`}>
                           {cat.drift_eur > 0 ? '+' : ''}{formatCurrency(cat.drift_eur)}
                         </td>
@@ -307,15 +325,15 @@ export default function RebalancingTab() {
                       key={i}
                       className={`flex items-center justify-between p-3 rounded-lg border ${
                         order.action === 'sell'
-                          ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
-                          : 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30'
+                          ? 'border-loss bg-loss dark:border-loss dark:bg-loss/30'
+                          : 'border-gain bg-gain dark:border-gain dark:bg-gain/30'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         {order.action === 'sell' ? (
-                          <TrendingDown className="h-5 w-5 text-red-600" />
+                          <TrendingDown className="h-5 w-5 text-loss" />
                         ) : (
-                          <TrendingUp className="h-5 w-5 text-green-600" />
+                          <TrendingUp className="h-5 w-5 text-gain" />
                         )}
                         <div>
                           <span className="font-medium">
@@ -342,13 +360,13 @@ export default function RebalancingTab() {
                 <div className="grid gap-3 md:grid-cols-4 pt-3 border-t">
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground">Total ventes</div>
-                    <div className="text-lg font-semibold text-red-600">
+                    <div className="text-lg font-semibold text-loss">
                       {formatCurrency(data.total_sell_amount)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground">Total achats</div>
-                    <div className="text-lg font-semibold text-green-600">
+                    <div className="text-lg font-semibold text-gain">
                       {formatCurrency(data.total_buy_amount)}
                     </div>
                   </div>
@@ -360,7 +378,7 @@ export default function RebalancingTab() {
                   </div>
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground">Coût fiscal (PFU 30%)</div>
-                    <div className="text-lg font-semibold text-orange-600">
+                    <div className="text-lg font-semibold text-warning">
                       {formatCurrency(data.total_estimated_tax)}
                     </div>
                   </div>
@@ -376,7 +394,7 @@ export default function RebalancingTab() {
                     <span className="text-muted-foreground">→</span>
                     <span>
                       Après : <strong className={
-                        data.hhi_after < data.hhi_before ? 'text-green-600' : 'text-orange-600'
+                        data.hhi_after < data.hhi_before ? 'text-gain' : 'text-warning'
                       }>{data.hhi_after.toFixed(0)}</strong>
                     </span>
                   </div>

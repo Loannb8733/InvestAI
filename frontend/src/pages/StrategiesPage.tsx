@@ -83,10 +83,10 @@ function getStrategyIcon(params: Record<string, unknown>) {
 }
 
 const RISK_LABELS: Record<number, { label: string; color: string }> = {
-  1: { label: 'Conservateur', color: 'text-emerald-400 border-emerald-400/30' },
-  2: { label: 'Modéré', color: 'text-blue-400 border-blue-400/30' },
-  3: { label: 'Dynamique', color: 'text-amber-400 border-amber-400/30' },
-  4: { label: 'Agressif', color: 'text-red-400 border-red-400/30' },
+  1: { label: 'Conservateur', color: 'text-gain border-gain/30' },
+  2: { label: 'Modéré', color: 'text-accent border-accent/30' },
+  3: { label: 'Dynamique', color: 'text-warning border-warning/30' },
+  4: { label: 'Agressif', color: 'text-loss border-loss/30' },
 }
 
 const PERF_LABELS: Record<number, string> = {
@@ -123,7 +123,7 @@ function StrategyCard({
   const perfLabel = PERF_LABELS[perfLevel]
 
   return (
-    <Card className={strategy.status === 'PROPOSED' ? 'border-indigo-500/30 bg-indigo-500/5' : ''}>
+    <Card className={strategy.status === 'PROPOSED' ? 'border-accent/30 bg-accent/5' : ''}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -135,7 +135,7 @@ function StrategyCard({
                 <CardTitle className="text-base">{strategy.name}</CardTitle>
                 <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
                 {strategy.source === 'AI' && (
-                  <Badge variant="outline" className="text-indigo-400 border-indigo-400/30">
+                  <Badge variant="outline" className="text-accent border-accent/30">
                     <Sparkles className="h-3 w-3 mr-1" />
                     IA
                   </Badge>
@@ -189,8 +189,8 @@ function StrategyCard({
       {expanded && strategy.actions.length > 0 && (
         <CardContent className="pt-0">
           {strategy.source === 'AI' && (strategy.params?.available_liquidity as number) > 0 && (
-            <div className="mb-3 flex items-center gap-4 p-2.5 rounded-md bg-emerald-500/5 border border-emerald-500/10 text-sm">
-              <div className="flex items-center gap-1.5 text-emerald-400">
+            <div className="mb-3 flex items-center gap-4 p-2.5 rounded-md bg-gain/5 border border-gain/10 text-sm">
+              <div className="flex items-center gap-1.5 text-gain">
                 <Wallet className="h-3.5 w-3.5" />
                 <span className="font-medium">
                   Munitions : {(strategy.params.available_liquidity as number).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
@@ -205,7 +205,7 @@ function StrategyCard({
             </div>
           )}
           {strategy.ai_reasoning && strategy.source === 'AI' && (
-            <div className="mb-4 p-3 rounded-md bg-indigo-500/5 border border-indigo-500/10">
+            <div className="mb-4 p-3 rounded-md bg-accent/5 border border-accent/10">
               <p className="text-sm text-muted-foreground italic">{strategy.ai_reasoning}</p>
             </div>
           )}
@@ -453,7 +453,7 @@ export default function StrategiesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Stratégies</h1>
+          <h1 className="text-2xl font-serif font-medium">Stratégies</h1>
           <p className="text-muted-foreground">
             Laissez l'IA analyser votre portefeuille ou créez vos propres stratégies.
           </p>
@@ -485,7 +485,7 @@ export default function StrategiesPage() {
       {proposed.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-indigo-400" />
+            <Sparkles className="h-5 w-5 text-accent" />
             Propositions IA
             <Badge variant="secondary">{proposed.length}</Badge>
           </h2>
@@ -602,7 +602,7 @@ export default function StrategiesPage() {
               </div>
 
               {formActions.map((fa, idx) => (
-                <div key={idx} className="p-3 rounded-lg border border-white/[0.08] bg-muted/20 space-y-3">
+                <div key={idx} className="p-3 rounded-lg border border-border bg-muted/20 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-muted-foreground">Action {idx + 1}</span>
                     {formActions.length > 1 && (

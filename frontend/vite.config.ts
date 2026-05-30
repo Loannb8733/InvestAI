@@ -29,7 +29,9 @@ export default defineConfig({
         },
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // Defaults to the Docker Compose service name; override with
+        // VITE_PROXY_TARGET=http://localhost:8000 when running Vite on the host.
+        target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
         changeOrigin: true,
         ws: true,
       },

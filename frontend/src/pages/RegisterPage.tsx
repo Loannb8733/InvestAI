@@ -134,12 +134,12 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-8">
         <div className="w-full max-w-md text-center space-y-6">
-          <div className="mx-auto h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-            <Mail className="h-10 w-10 text-green-600 dark:text-green-400" />
+          <div className="mx-auto h-20 w-20 rounded-full bg-gain dark:bg-gain/30 flex items-center justify-center">
+            <Mail className="h-10 w-10 text-gain dark:text-gain" />
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Vérifiez votre email</h2>
+            <h2 className="text-2xl font-serif font-medium">Vérifiez votre email</h2>
             <p className="text-muted-foreground">
               Nous avons envoyé un lien de vérification à
             </p>
@@ -199,13 +199,13 @@ export default function RegisterPage() {
               <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
                 <TrendingUp className="h-7 w-7 text-primary" />
               </div>
-              <span className="text-2xl font-bold">InvestAI</span>
+              <span className="text-2xl font-serif font-medium">InvestAI</span>
             </div>
           </div>
 
           {/* Header */}
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold tracking-tight">Créer un compte</h2>
+            <h2 className="text-3xl font-serif font-medium tracking-tight">Créer un compte</h2>
             <p className="mt-2 text-muted-foreground">
               Commencez à gérer vos investissements dès aujourd'hui
             </p>
@@ -356,32 +356,25 @@ export default function RegisterPage() {
       </div>
 
       {/* Right side - Branding & Benefits */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-bl from-primary/90 via-primary to-primary/80 relative overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 right-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 left-20 w-96 h-96 bg-white rounded-full blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white rounded-full blur-3xl opacity-5" />
-        </div>
-
+      <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden border-l border-border">
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
+        <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <TrendingUp className="h-7 w-7" />
+            <div className="h-12 w-12 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
+              <TrendingUp className="h-7 w-7" strokeWidth={1.5} />
             </div>
-            <span className="text-2xl font-bold">InvestAI</span>
+            <span className="font-serif text-2xl font-medium tracking-tight">InvestAI</span>
           </div>
 
           {/* Main content */}
           <div className="space-y-8">
             <div className="space-y-4">
-              <h1 className="text-4xl font-bold leading-tight">
+              <h1 className="font-serif text-4xl font-medium leading-tight tracking-tight">
                 Rejoignez des milliers<br />
-                <span className="text-white/80">d'investisseurs</span>
+                <span className="text-primary-foreground/70">d'investisseurs</span>
               </h1>
-              <p className="text-lg text-white/70 max-w-md">
+              <p className="text-lg text-primary-foreground/70 max-w-md">
                 Créez votre compte gratuitement et prenez le contrôle
                 de votre avenir financier.
               </p>
@@ -392,13 +385,13 @@ export default function RegisterPage() {
               {benefits.map((benefit, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-4 p-4 rounded-xl bg-white/10 backdrop-blur border border-white/10"
+                  className="flex items-center gap-4 p-4 rounded-lg bg-primary-foreground/5 border border-primary-foreground/10"
                 >
-                  <div className="h-10 w-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <benefit.icon className="h-5 w-5" />
+                  <div className="h-10 w-10 rounded-lg bg-primary-foreground/10 flex items-center justify-center flex-shrink-0">
+                    <benefit.icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
                   <span className="font-medium">{benefit.text}</span>
-                  <Check className="h-5 w-5 ml-auto text-green-300" />
+                  <Check className="h-5 w-5 ml-auto text-gain" strokeWidth={1.5} />
                 </div>
               ))}
             </div>
@@ -406,22 +399,22 @@ export default function RegisterPage() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 pt-4">
               <div className="text-center">
-                <div className="text-3xl font-bold">100%</div>
-                <div className="text-sm text-white/60">Gratuit</div>
+                <div className="text-3xl font-serif font-medium">100%</div>
+                <div className="text-sm text-primary-foreground/60">Gratuit</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold">24/7</div>
-                <div className="text-sm text-white/60">Disponible</div>
+                <div className="text-3xl font-serif font-medium">24/7</div>
+                <div className="text-sm text-primary-foreground/60">Disponible</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold">SSL</div>
-                <div className="text-sm text-white/60">Sécurisé</div>
+                <div className="text-3xl font-serif font-medium">SSL</div>
+                <div className="text-sm text-primary-foreground/60">Sécurisé</div>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <p className="text-white/50 text-sm">
+          <p className="text-primary-foreground/50 text-sm">
             © 2026 InvestAI. Tous droits réservés.
           </p>
         </div>

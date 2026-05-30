@@ -23,9 +23,9 @@ import {
 
 function getTrendIcon(trend: string) {
   switch (trend?.toLowerCase()) {
-    case 'bullish': return <TrendingUp className="h-4 w-4 text-green-500" />
-    case 'bearish': return <TrendingDown className="h-4 w-4 text-red-500" />
-    default: return <Minus className="h-4 w-4 text-yellow-500" />
+    case 'bullish': return <TrendingUp className="h-4 w-4 text-gain" />
+    case 'bearish': return <TrendingDown className="h-4 w-4 text-loss" />
+    default: return <Minus className="h-4 w-4 text-warning" />
   }
 }
 
@@ -110,7 +110,7 @@ export default function PredictionListView({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                    <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p className="text-xs">Données historiques insuffisantes — prédiction dégradée</p>

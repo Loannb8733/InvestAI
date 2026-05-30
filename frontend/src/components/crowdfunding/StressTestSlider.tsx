@@ -17,30 +17,30 @@ const DELAY_LABELS: Record<number, string> = {
 
 function getIrrColor(irr: number | null | undefined): string {
   if (irr == null) return 'text-muted-foreground'
-  if (irr >= 6) return 'text-emerald-400'
-  if (irr >= 3) return 'text-amber-400'
-  return 'text-red-400'
+  if (irr >= 6) return 'text-gain'
+  if (irr >= 3) return 'text-warning'
+  return 'text-loss'
 }
 
 function getIrrBg(irr: number | null | undefined): string {
-  if (irr == null) return 'from-muted/20 to-muted/5'
-  if (irr >= 6) return 'from-emerald-500/10 to-emerald-500/[0.02]'
-  if (irr >= 3) return 'from-amber-500/10 to-amber-500/[0.02]'
-  return 'from-red-500/10 to-red-500/[0.02]'
+  if (irr == null) return 'bg-muted/20'
+  if (irr >= 6) return 'bg-gain/10'
+  if (irr >= 3) return 'bg-warning/10'
+  return 'bg-loss/10'
 }
 
 function getGlowRing(irr: number | null | undefined): string {
   if (irr == null) return 'ring-border/50'
-  if (irr >= 6) return 'ring-emerald-500/20'
-  if (irr >= 3) return 'ring-amber-500/20'
-  return 'ring-red-500/20'
+  if (irr >= 6) return 'ring-gain/20'
+  if (irr >= 3) return 'ring-warning/20'
+  return 'ring-loss/20'
 }
 
 function getSliderAccent(irr: number | null | undefined): string {
   if (irr == null) return ''
-  if (irr >= 6) return '[&_[role=slider]]:bg-emerald-500 [&_[role=slider]]:border-emerald-500'
-  if (irr >= 3) return '[&_[role=slider]]:bg-amber-500 [&_[role=slider]]:border-amber-500'
-  return '[&_[role=slider]]:bg-red-500 [&_[role=slider]]:border-red-500'
+  if (irr >= 6) return '[&_[role=slider]]:bg-gain [&_[role=slider]]:border-gain'
+  if (irr >= 3) return '[&_[role=slider]]:bg-warning [&_[role=slider]]:border-warning'
+  return '[&_[role=slider]]:bg-loss [&_[role=slider]]:border-loss'
 }
 
 interface StressTestSliderProps {
@@ -62,9 +62,7 @@ export default function StressTestSlider({ projectId }: StressTestSliderProps) {
   return (
     <div className="space-y-5">
       {/* IRR Hero display */}
-      <div className={`relative rounded-2xl bg-gradient-to-b ${getIrrBg(displayIrr)} ring-1 ${getGlowRing(displayIrr)} p-6 text-center transition-all duration-500`}>
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-
+      <div className={`relative rounded-lg ${getIrrBg(displayIrr)} ring-1 ${getGlowRing(displayIrr)} p-6 text-center transition-all duration-500`}>
         <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
           TRI {delayMonths > 0 ? 'dégradé' : 'contractuel'}
         </p>
@@ -75,7 +73,7 @@ export default function StressTestSlider({ projectId }: StressTestSliderProps) {
           <p className="text-sm text-destructive py-2">Calcul impossible</p>
         ) : (
           <div className="space-y-2">
-            <p className={`text-4xl font-bold tabular-nums transition-all duration-500 ${getIrrColor(displayIrr)}`}>
+            <p className={`text-4xl font-serif font-medium tabular-nums transition-all duration-500 ${getIrrColor(displayIrr)}`}>
               {displayIrr !== null && displayIrr !== undefined
                 ? `${displayIrr.toFixed(2)}%`
                 : '—'}
@@ -83,7 +81,7 @@ export default function StressTestSlider({ projectId }: StressTestSliderProps) {
             {data?.irr_delta != null && delayMonths > 0 && (
               <Badge
                 variant="outline"
-                className="text-red-400 border-red-500/20 bg-red-500/5 text-xs"
+                className="text-loss border-loss/20 bg-loss/5 text-xs"
               >
                 <TrendingDown className="h-3 w-3 mr-1" />
                 {data.irr_delta.toFixed(2)} pts

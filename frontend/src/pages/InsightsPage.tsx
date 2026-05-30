@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,17 +23,9 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { insightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { ResponsiveLine, type LineSeries } from '@nivo/line'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import {
   Receipt,
   Scissors,
@@ -81,7 +73,7 @@ export default function InsightsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Insights</h1>
+        <h1 className="text-3xl font-serif font-medium">Insights</h1>
         <p className="text-muted-foreground">Analyse avancée de votre portefeuille</p>
       </div>
 
@@ -165,8 +157,8 @@ function TopAlpha() {
   const allScores: AlphaAsset[] = data.all_scores || []
   const concentrationRisk: boolean = data.concentration_risk
 
-  const scoreColor = top.score >= 80 ? 'text-green-600' : top.score >= 50 ? 'text-yellow-600' : 'text-muted-foreground'
-  const predColor = top.predicted_7d_pct >= 0 ? 'text-green-600' : 'text-red-600'
+  const scoreColor = top.score >= 80 ? 'text-gain' : top.score >= 50 ? 'text-warning' : 'text-muted-foreground'
+  const predColor = top.predicted_7d_pct >= 0 ? 'text-gain' : 'text-loss'
 
   return (
     <div className="space-y-4">
@@ -176,7 +168,7 @@ function TopAlpha() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-yellow-500" />
+                <Zap className="h-5 w-5 text-warning" />
                 Potentiel de Sursaut
               </CardTitle>
               <CardDescription>
@@ -184,7 +176,7 @@ function TopAlpha() {
               </CardDescription>
             </div>
             <div className="text-right">
-              <div className={`text-3xl font-bold ${scoreColor}`}>{top.score.toFixed(0)}</div>
+              <div className={`text-3xl font-serif font-medium ${scoreColor}`}>{top.score.toFixed(0)}</div>
               <div className="text-xs text-muted-foreground">/100</div>
             </div>
           </div>
@@ -192,9 +184,9 @@ function TopAlpha() {
         <CardContent className="space-y-4">
           {/* Concentration Risk Warning */}
           {concentrationRisk && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
-              <ShieldAlert className="h-4 w-4 text-orange-600 shrink-0" />
-              <p className="text-sm text-orange-700 dark:text-orange-400">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-warning dark:bg-warning/30 border border-warning dark:border-warning">
+              <ShieldAlert className="h-4 w-4 text-warning shrink-0" />
+              <p className="text-sm text-warning dark:text-warning">
                 Cet actif représente déjà {top.weight_pct.toFixed(0)}% de votre portefeuille.
                 Prudence avant de renforcer.
               </p>
@@ -269,7 +261,7 @@ function TopAlpha() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className={`text-sm ${asset.predicted_7d_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`text-sm ${asset.predicted_7d_pct >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {asset.predicted_7d_pct >= 0 ? '+' : ''}{asset.predicted_7d_pct.toFixed(2)}%
                     </span>
                     <Badge variant={asset.score >= 60 ? 'default' : 'secondary'}>
@@ -321,30 +313,30 @@ const regimeLabels: Record<string, string> = {
   accumulation: 'Accumulation', distribution: 'Distribution',
 }
 const regimeColors: Record<string, string> = {
-  bullish: 'bg-green-500/10 text-green-600 border-green-500/30',
-  bearish: 'bg-red-500/10 text-red-600 border-red-500/30',
-  top: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  bottom: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  markup: 'bg-green-500/10 text-green-600 border-green-500/30',
-  markdown: 'bg-red-500/10 text-red-600 border-red-500/30',
-  topping: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  bottoming: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  accumulation: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
-  distribution: 'bg-pink-500/10 text-pink-600 border-pink-500/30',
+  bullish: 'bg-gain/10 text-gain border-gain/30',
+  bearish: 'bg-loss/10 text-loss border-loss/30',
+  top: 'bg-warning/10 text-warning border-warning/30',
+  bottom: 'bg-accent/10 text-accent border-accent/30',
+  markup: 'bg-gain/10 text-gain border-gain/30',
+  markdown: 'bg-loss/10 text-loss border-loss/30',
+  topping: 'bg-warning/10 text-warning border-warning/30',
+  bottoming: 'bg-accent/10 text-accent border-accent/30',
+  accumulation: 'bg-warning/10 text-warning border-warning/30',
+  distribution: 'bg-accent/10 text-accent border-accent/30',
 }
 
 const actionStyles: Record<string, string> = {
-  'ACHAT FORT': 'bg-green-600 text-white',
-  'DCA': 'bg-green-500/10 text-green-700 border border-green-500/30',
+  'ACHAT FORT': 'bg-gain text-white',
+  'DCA': 'bg-gain/10 text-gain border border-gain/30',
   'MAINTENIR': 'bg-gray-500/10 text-gray-700 border border-gray-500/30',
   'CONSERVER': 'bg-gray-500/10 text-gray-700 border border-gray-500/30',
-  'OBSERVER': 'bg-blue-500/10 text-blue-700 border border-blue-500/30',
-  'ATTENDRE': 'bg-yellow-500/10 text-yellow-700 border border-yellow-500/30',
-  'ÉVITER': 'bg-orange-500/10 text-orange-700 border border-orange-500/30',
-  'PRENDRE PROFITS': 'bg-amber-500/10 text-amber-700 border border-amber-500/30',
-  'ALLÉGER': 'bg-orange-500/10 text-orange-700 border border-orange-500/30',
-  'VENDRE': 'bg-red-600 text-white',
-  'PLANIFIER': 'bg-purple-500/10 text-purple-700 border border-purple-500/30',
+  'OBSERVER': 'bg-accent/10 text-accent border border-accent/30',
+  'ATTENDRE': 'bg-warning/10 text-warning border border-warning/30',
+  'ÉVITER': 'bg-warning/10 text-warning border border-warning/30',
+  'PRENDRE PROFITS': 'bg-warning/10 text-warning border border-warning/30',
+  'ALLÉGER': 'bg-warning/10 text-warning border border-warning/30',
+  'VENDRE': 'bg-loss text-white',
+  'PLANIFIER': 'bg-accent/10 text-accent border border-accent/30',
 }
 
 interface PlannedOrder {
@@ -407,12 +399,12 @@ function StrategyTable() {
             </div>
             <div className="flex items-center gap-3 text-sm">
               {data.summary.buys > 0 && (
-                <Badge className="bg-green-500/10 text-green-700 border border-green-500/30">
+                <Badge className="bg-gain/10 text-gain border border-gain/30">
                   {data.summary.buys} Achat{data.summary.buys > 1 ? 's' : ''}
                 </Badge>
               )}
               {data.summary.sells > 0 && (
-                <Badge className="bg-red-500/10 text-red-700 border border-red-500/30">
+                <Badge className="bg-loss/10 text-loss border border-loss/30">
                   {data.summary.sells} Vente{data.summary.sells > 1 ? 's' : ''}
                 </Badge>
               )}
@@ -427,28 +419,28 @@ function StrategyTable() {
         <CardContent>
           {/* Regime context banner */}
           {['bearish', 'bottom', 'bottoming', 'accumulation', 'markdown'].includes(data.market_regime) && (
-            <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 flex items-start gap-2">
-              <ShieldAlert className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <div className="mb-4 rounded-lg border border-accent/30 bg-accent/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-accent mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-blue-600 dark:text-blue-400">Mode Accumulation</span> — Les signaux DCA/ACHAT sont renforcés.
+                <span className="font-semibold text-accent dark:text-accent">Mode Accumulation</span> — Les signaux DCA/ACHAT sont renforcés.
                 Les prix sont décotés, accumulez sur les actifs à fort alpha. Les signaux de vente sont atténués.
               </p>
             </div>
           )}
           {['bullish', 'markup'].includes(data.market_regime) && (
-            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-start gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-warning mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-amber-600 dark:text-amber-400">Mode Expansion</span> — Laissez courir vos positions mais préparez vos niveaux de sortie.
+                <span className="font-semibold text-warning dark:text-warning">Mode Expansion</span> — Laissez courir vos positions mais préparez vos niveaux de sortie.
                 Réduisez les montants DCA et définissez vos objectifs de prise de profits.
               </p>
             </div>
           )}
           {['top', 'topping', 'distribution'].includes(data.market_regime) && (
-            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2">
-              <ShieldAlert className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <div className="mb-4 rounded-lg border border-loss/30 bg-loss/5 p-3 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-loss mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-red-600 dark:text-red-400">Mode Prise de Profits</span> — Les signaux de vente sont prioritaires.
+                <span className="font-semibold text-loss dark:text-loss">Mode Prise de Profits</span> — Les signaux de vente sont prioritaires.
                 Sécurisez vos gains partiellement, gardez du cash pour accumuler au prochain creux.
               </p>
             </div>
@@ -480,7 +472,7 @@ function StrategyTable() {
                               <span className="text-xs text-muted-foreground">{row.name}</span>
                             )}
                             {row.is_resilient && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600 gap-0.5">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/50 text-warning gap-0.5">
                                 <Shield className="h-3 w-3" />
                                 Bouclier
                               </Badge>
@@ -499,8 +491,8 @@ function StrategyTable() {
                       <td className="py-3 px-3 text-center">
                         <div className="flex flex-col items-center gap-0.5">
                           <span className={`text-sm font-bold ${
-                            row.alpha_score >= 60 ? 'text-green-600' :
-                            row.alpha_score >= 30 ? 'text-yellow-600' : 'text-muted-foreground'
+                            row.alpha_score >= 60 ? 'text-gain' :
+                            row.alpha_score >= 30 ? 'text-warning' : 'text-muted-foreground'
                           }`}>
                             {row.alpha_score.toFixed(0)}
                           </span>
@@ -529,15 +521,15 @@ function StrategyTable() {
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {row.impact_eur > 0 ? (
-                            <ArrowUpRight className="h-3 w-3 text-green-500" />
+                            <ArrowUpRight className="h-3 w-3 text-gain" />
                           ) : row.impact_eur < 0 ? (
-                            <ArrowDownRight className="h-3 w-3 text-red-500" />
+                            <ArrowDownRight className="h-3 w-3 text-loss" />
                           ) : (
                             <Minus className="h-3 w-3 text-muted-foreground" />
                           )}
                           <span className={`text-sm font-medium tabular-nums ${
-                            row.impact_eur > 0 ? 'text-green-600' :
-                            row.impact_eur < 0 ? 'text-red-600' : 'text-muted-foreground'
+                            row.impact_eur > 0 ? 'text-gain' :
+                            row.impact_eur < 0 ? 'text-loss' : 'text-muted-foreground'
                           }`}>
                             {impactSign}{formatCurrency(Math.abs(row.impact_eur))}
                           </span>
@@ -557,8 +549,8 @@ function StrategyTable() {
                   </td>
                   <td className="py-3 px-3 text-right">
                     <span className={`text-sm font-bold tabular-nums ${
-                      totalImpact > 0 ? 'text-green-600' :
-                      totalImpact < 0 ? 'text-red-600' : 'text-muted-foreground'
+                      totalImpact > 0 ? 'text-gain' :
+                      totalImpact < 0 ? 'text-loss' : 'text-muted-foreground'
                     }`}>
                       {totalImpact > 0 ? '+' : ''}{formatCurrency(totalImpact)}
                     </span>
@@ -612,7 +604,7 @@ function StrategyTable() {
             </div>
           ) : validateSignalMutation.isError ? (
             <div className="py-6 text-center">
-              <AlertTriangle className="h-8 w-8 mx-auto text-red-500 mb-2" />
+              <AlertTriangle className="h-8 w-8 mx-auto text-loss mb-2" />
               <p className="text-sm text-muted-foreground">Erreur lors de la validation du signal</p>
             </div>
           ) : signal ? (
@@ -637,18 +629,18 @@ function StrategyTable() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg border text-center">
                   <p className="text-xs text-muted-foreground mb-1">Prob. de ruine AVANT</p>
-                  <p className="text-2xl font-bold tabular-nums">{signal.prob_ruin_before}%</p>
+                  <p className="text-2xl font-serif font-medium tabular-nums">{signal.prob_ruin_before}%</p>
                   <p className="text-xs text-muted-foreground">
                     P(+): {signal.mc_before?.prob_positive?.toFixed(1)}%
                   </p>
                 </div>
                 <div className={`p-3 rounded-lg border text-center ${
                   signal.prob_ruin_after <= signal.prob_ruin_before
-                    ? 'border-green-500/30 bg-green-500/5'
-                    : 'border-red-500/30 bg-red-500/5'
+                    ? 'border-gain/30 bg-gain/5'
+                    : 'border-loss/30 bg-loss/5'
                 }`}>
                   <p className="text-xs text-muted-foreground mb-1">Prob. de ruine APRÈS</p>
-                  <p className="text-2xl font-bold tabular-nums">{signal.prob_ruin_after}%</p>
+                  <p className="text-2xl font-serif font-medium tabular-nums">{signal.prob_ruin_after}%</p>
                   <p className="text-xs text-muted-foreground">
                     P(+): {signal.mc_after?.prob_positive?.toFixed(1)}%
                   </p>
@@ -659,8 +651,8 @@ function StrategyTable() {
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                 <span className="text-sm font-medium">Impact risque</span>
                 <Badge variant="outline" className={
-                  signal.risk_impact === 'Diminuée' ? 'border-green-500 text-green-600' :
-                  signal.risk_impact === 'Augmentée' ? 'border-red-500 text-red-600' :
+                  signal.risk_impact === 'Diminuée' ? 'border-gain text-gain' :
+                  signal.risk_impact === 'Augmentée' ? 'border-loss text-loss' :
                   'border-gray-500 text-gray-600'
                 }>
                   {signal.risk_impact}
@@ -671,9 +663,9 @@ function StrategyTable() {
               <div className="flex items-center justify-between text-sm">
                 <span>Concentration post-achat</span>
                 <span className={`font-mono font-medium ${
-                  signal.concentration_status === 'ALERTE' ? 'text-red-500' :
-                  signal.concentration_status === 'VIGILANCE' ? 'text-yellow-500' :
-                  'text-green-500'
+                  signal.concentration_status === 'ALERTE' ? 'text-loss' :
+                  signal.concentration_status === 'VIGILANCE' ? 'text-warning' :
+                  'text-gain'
                 }`}>
                   {signal.post_purchase_weight_pct}% ({signal.concentration_status})
                 </span>
@@ -682,10 +674,10 @@ function StrategyTable() {
               {/* Verdict */}
               <div className={`p-3 rounded-lg text-center ${
                 signal.validated
-                  ? 'bg-green-500/10 border border-green-500/30'
-                  : 'bg-red-500/10 border border-red-500/30'
+                  ? 'bg-gain/10 border border-gain/30'
+                  : 'bg-loss/10 border border-loss/30'
               }`}>
-                <p className={`font-bold ${signal.validated ? 'text-green-600' : 'text-red-600'}`}>
+                <p className={`font-bold ${signal.validated ? 'text-gain' : 'text-loss'}`}>
                   {signal.validated ? 'Signal validé' : 'Signal rejeté'}
                 </p>
                 {!signal.validated && signal.reason && (
@@ -704,6 +696,7 @@ function StrategyTable() {
 // Fee Analysis Tab
 // ──────────────────────────────────────────────────────
 function FeeAnalysis() {
+  const { theme, color } = useNivoTheme()
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.insights.fees,
     queryFn: insightsApi.getFees,
@@ -735,7 +728,7 @@ function FeeAnalysis() {
             <CardTitle className="text-sm font-medium">Total des frais</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{formatCurrency(data.total_fees)}</div>
+            <div className="text-2xl font-serif font-medium text-loss">{formatCurrency(data.total_fees)}</div>
             <p className="text-xs text-muted-foreground">{data.nb_transactions_with_fees} transactions</p>
           </CardContent>
         </Card>
@@ -744,7 +737,7 @@ function FeeAnalysis() {
             <CardTitle className="text-sm font-medium">Moyenne mensuelle</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.avg_monthly_fee)}</div>
+            <div className="text-2xl font-serif font-medium">{formatCurrency(data.avg_monthly_fee)}</div>
             <p className="text-xs text-muted-foreground">par mois</p>
           </CardContent>
         </Card>
@@ -755,7 +748,7 @@ function FeeAnalysis() {
           <CardContent>
             {exchangeData.length > 0 ? (
               <>
-                <div className="text-2xl font-bold">{exchangeData[0].name}</div>
+                <div className="text-2xl font-serif font-medium">{exchangeData[0].name}</div>
                 <p className="text-xs text-muted-foreground">{formatCurrency(exchangeData[0].fees)}</p>
               </>
             ) : (
@@ -773,15 +766,29 @@ function FeeAnalysis() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(v) => `${v}€`} tick={{ fontSize: 11 }} />
-                  <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
-                  <Bar dataKey="fees" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ResponsiveBar
+                data={monthlyData}
+                keys={['fees']}
+                indexBy="month"
+                theme={theme}
+                margin={{ top: 12, right: 16, bottom: 32, left: 56 }}
+                padding={0.3}
+                colors={() => color('--chart-4')}
+                borderRadius={4}
+                enableLabel={false}
+                enableGridY
+                axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}€` }}
+                valueScale={{ type: 'linear' }}
+                tooltip={({ indexValue, value }) => (
+                  <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                    <p className="mb-0.5 text-xs text-muted-foreground">{indexValue}</p>
+                    <p className="font-mono text-sm tabular-nums">{formatCurrency(value)}</p>
+                  </div>
+                )}
+                animate
+                motionConfig="gentle"
+              />
             </div>
           </CardContent>
         </Card>
@@ -798,7 +805,7 @@ function FeeAnalysis() {
                   <div className="flex items-center gap-2">
                     <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-red-500 rounded-full"
+                        className="h-full bg-loss rounded-full"
                         style={{ width: `${data.total_fees > 0 ? Math.min(100, (item.fees / data.total_fees) * 100) : 0}%` }}
                       />
                     </div>
@@ -830,7 +837,7 @@ function TaxLossHarvesting() {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <TrendingUp className="h-12 w-12 mx-auto text-green-500 mb-3" />
+          <TrendingUp className="h-12 w-12 mx-auto text-gain mb-3" />
           <h3 className="text-lg font-semibold">Aucune opportunité</h3>
           <p className="text-muted-foreground text-sm mt-1">
             Toutes vos positions sont en plus-value. Pas de tax-loss harvesting possible.
@@ -843,9 +850,9 @@ function TaxLossHarvesting() {
   return (
     <div className="space-y-4">
       {/* Fiscal disclaimer */}
-      <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
+      <div className="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+        <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+        <p className="text-[11px] text-warning dark:text-warning leading-tight">
           Le Tax-Loss Harvesting est une stratégie fiscale soumise à des règles complexes (wash-sale, règles anti-abus).
           Ces informations sont fournies à titre indicatif uniquement et ne constituent pas un conseil fiscal.
           Consultez un conseiller fiscal agréé avant toute décision.
@@ -858,7 +865,7 @@ function TaxLossHarvesting() {
             <CardTitle className="text-sm font-medium">Moins-values totales</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{formatCurrency(data.total_harvestable)}</div>
+            <div className="text-2xl font-serif font-medium text-loss">{formatCurrency(data.total_harvestable)}</div>
             <p className="text-xs text-muted-foreground">{data.nb_candidates} positions</p>
           </CardContent>
         </Card>
@@ -867,14 +874,14 @@ function TaxLossHarvesting() {
             <CardTitle className="text-sm font-medium">Economie d'impôt estimée</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{formatCurrency(data.estimated_tax_saving)}</div>
+            <div className="text-2xl font-serif font-medium text-gain">{formatCurrency(data.estimated_tax_saving)}</div>
             <p className="text-xs text-muted-foreground">Flat tax 30%</p>
           </CardContent>
         </Card>
-        <Card className="border-yellow-500/20 bg-yellow-500/5">
+        <Card className="border-warning/20 bg-warning/5">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-1">
-              <Lightbulb className="h-4 w-4 text-yellow-500" />
+              <Lightbulb className="h-4 w-4 text-warning" />
               Conseil
             </CardTitle>
           </CardHeader>
@@ -914,9 +921,9 @@ function TaxLossHarvesting() {
                     <td className="text-right p-2">{formatCurrency(op.avg_buy_price)}</td>
                     <td className="text-right p-2">{formatCurrency(op.current_price)}</td>
                     <td className="text-right p-2">{formatCurrency(op.current_value)}</td>
-                    <td className="text-right p-2 text-red-500 font-medium">{formatCurrency(op.unrealized_loss)}</td>
-                    <td className="text-right p-2 text-red-500">{op.unrealized_loss_pct.toFixed(1)}%</td>
-                    <td className="text-right p-2 text-green-500">{formatCurrency(op.potential_tax_saving)}</td>
+                    <td className="text-right p-2 text-loss font-medium">{formatCurrency(op.unrealized_loss)}</td>
+                    <td className="text-right p-2 text-loss">{op.unrealized_loss_pct.toFixed(1)}%</td>
+                    <td className="text-right p-2 text-gain">{formatCurrency(op.potential_tax_saving)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -932,6 +939,7 @@ function TaxLossHarvesting() {
 // Passive Income Tab
 // ──────────────────────────────────────────────────────
 function PassiveIncome() {
+  const { theme, color } = useNivoTheme()
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.insights.passiveIncome,
     queryFn: () => insightsApi.getPassiveIncome(),
@@ -962,7 +970,7 @@ function PassiveIncome() {
             <CardTitle className="text-sm font-medium">Total revenus passifs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{formatCurrency(data.total_income)}</div>
+            <div className="text-2xl font-serif font-medium text-gain">{formatCurrency(data.total_income)}</div>
             <p className="text-xs text-muted-foreground">{data.nb_events} versements</p>
           </CardContent>
         </Card>
@@ -971,7 +979,7 @@ function PassiveIncome() {
             <CardTitle className="text-sm font-medium">Moyenne mensuelle</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.avg_monthly)}</div>
+            <div className="text-2xl font-serif font-medium">{formatCurrency(data.avg_monthly)}</div>
             <p className="text-xs text-muted-foreground">par mois</p>
           </CardContent>
         </Card>
@@ -980,7 +988,7 @@ function PassiveIncome() {
             <CardTitle className="text-sm font-medium">Projection annuelle</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-500">{formatCurrency(data.projected_annual)}</div>
+            <div className="text-2xl font-serif font-medium text-accent">{formatCurrency(data.projected_annual)}</div>
             <p className="text-xs text-muted-foreground">basé sur les 3 derniers mois</p>
           </CardContent>
         </Card>
@@ -993,15 +1001,29 @@ function PassiveIncome() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(v) => `${v}€`} tick={{ fontSize: 11 }} />
-                  <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
-                  <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ResponsiveBar
+                data={monthlyData}
+                keys={['income']}
+                indexBy="month"
+                theme={theme}
+                margin={{ top: 12, right: 16, bottom: 32, left: 56 }}
+                padding={0.3}
+                colors={() => color('--chart-3')}
+                borderRadius={4}
+                enableLabel={false}
+                enableGridY
+                axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}€` }}
+                valueScale={{ type: 'linear' }}
+                tooltip={({ indexValue, value }) => (
+                  <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                    <p className="mb-0.5 text-xs text-muted-foreground">{indexValue}</p>
+                    <p className="font-mono text-sm tabular-nums">{formatCurrency(value)}</p>
+                  </div>
+                )}
+                animate
+                motionConfig="gentle"
+              />
             </div>
           </CardContent>
         </Card>
@@ -1015,7 +1037,7 @@ function PassiveIncome() {
               {Object.entries((data.by_type ?? {}) as Record<string, number>).map(([type, value]) => (
                 <div key={type} className="flex items-center justify-between">
                   <span className="text-sm font-medium">{typeLabels[type] || type}</span>
-                  <span className="text-sm font-mono text-green-500">{formatCurrency(value)}</span>
+                  <span className="text-sm font-mono text-gain">{formatCurrency(value)}</span>
                 </div>
               ))}
               {Object.keys((data.by_asset ?? {}) as Record<string, number>).length > 0 && (
@@ -1043,6 +1065,8 @@ function PassiveIncome() {
 // DCA Backtest Tab
 // ──────────────────────────────────────────────────────
 function DcaBacktest() {
+  const { theme, color } = useNivoTheme()
+  const uid = useId().replace(/:/g, '')
   const [symbol, setSymbol] = useState('BTC')
   const [assetType, setAssetType] = useState('crypto')
   const [amount, setAmount] = useState(100)
@@ -1064,11 +1088,28 @@ function DcaBacktest() {
     }
   }
 
-  const chartData = data?.monthly_history?.map((m: { month: string; invested: number; value: number }) => ({
-    month: m.month,
-    invested: m.invested,
-    value: m.value,
-  })) || []
+  const chartData: { month: string; invested: number; value: number }[] =
+    data?.monthly_history?.map((m: { month: string; invested: number; value: number }) => ({
+      month: m.month,
+      invested: m.invested,
+      value: m.value,
+    })) || []
+
+  const dcaSeries: LineSeries[] = [
+    { id: 'invested', data: chartData.map((m) => ({ x: m.month, y: m.invested })) },
+    { id: 'value', data: chartData.map((m) => ({ x: m.month, y: m.value })) },
+  ]
+  const dcaLabels: Record<string, string> = { invested: 'Investi', value: 'Valeur' }
+  const dcaColors: Record<string, string> = {
+    invested: color('--muted-foreground'),
+    value: color('--chart-3'),
+  }
+  const dcaTickValues = (() => {
+    if (chartData.length === 0) return [] as string[]
+    const target = Math.min(6, chartData.length)
+    const step = Math.max(1, Math.floor(chartData.length / target))
+    return chartData.filter((_, i) => i % step === 0).map((m) => m.month)
+  })()
 
   return (
     <div className="space-y-4">
@@ -1136,7 +1177,7 @@ function DcaBacktest() {
                 <CardTitle className="text-sm font-medium">Valeur actuelle</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-xl font-bold ${data.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-xl font-bold ${data.gain_loss >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {formatCurrency(data.current_value)}
                 </div>
               </CardContent>
@@ -1146,7 +1187,7 @@ function DcaBacktest() {
                 <CardTitle className="text-sm font-medium">Plus-value</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-xl font-bold ${data.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-xl font-bold ${data.gain_loss >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {data.gain_loss >= 0 ? '+' : ''}{formatCurrency(data.gain_loss)}
                 </div>
                 <p className="text-xs text-muted-foreground">{data.gain_loss_pct >= 0 ? '+' : ''}{Number(data.gain_loss_pct).toFixed(2)}%</p>
@@ -1170,22 +1211,76 @@ function DcaBacktest() {
               </CardHeader>
               <CardContent>
                 <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="dcaValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`} tick={{ fontSize: 11 }} />
-                      <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
-                      <Area type="monotone" dataKey="invested" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 3" fillOpacity={0} name="Investi" />
-                      <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#dcaValue)" name="Valeur" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <ResponsiveLine
+                    data={dcaSeries}
+                    theme={theme}
+                    margin={{ top: 28, right: 16, bottom: 28, left: 56 }}
+                    xScale={{ type: 'point' }}
+                    yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+                    curve="monotoneX"
+                    colors={(s) => dcaColors[s.id as string]}
+                    lineWidth={2}
+                    enablePoints={false}
+                    enableGridX={false}
+                    enableArea
+                    areaOpacity={1}
+                    defs={[
+                      {
+                        id: `${uid}-value`,
+                        type: 'linearGradient',
+                        colors: [
+                          { offset: 0, color: dcaColors.value, opacity: 0.3 },
+                          { offset: 100, color: dcaColors.value, opacity: 0 },
+                        ],
+                      },
+                    ]}
+                    fill={[
+                      { match: { id: 'value' }, id: `${uid}-value` },
+                      { match: { id: 'invested' }, id: 'none' },
+                    ]}
+                    axisBottom={{ tickSize: 0, tickPadding: 8, tickValues: dcaTickValues }}
+                    axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${(Number(v) / 1000).toFixed(0)}k€` }}
+                    enableSlices="x"
+                    sliceTooltip={({ slice }) => (
+                      <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                        <p className="mb-1.5 text-xs text-muted-foreground">{slice.points[0]?.data.x as string}</p>
+                        {slice.points.map((p) => (
+                          <div key={p.id} className="flex items-center justify-between gap-4">
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="h-2 w-2 rounded-[2px]"
+                                style={{ backgroundColor: dcaColors[p.seriesId as string] }}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {dcaLabels[p.seriesId as string] ?? p.seriesId}
+                              </span>
+                            </span>
+                            <span className="font-mono text-sm tabular-nums">
+                              {formatCurrency(p.data.y as number)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    legends={[
+                      {
+                        anchor: 'top-right',
+                        direction: 'row',
+                        translateY: -22,
+                        itemWidth: 90,
+                        itemHeight: 18,
+                        symbolSize: 10,
+                        symbolShape: 'circle',
+                        itemTextColor: color('--muted-foreground'),
+                        data: [
+                          { id: 'value', label: dcaLabels.value, color: dcaColors.value },
+                          { id: 'invested', label: dcaLabels.invested, color: dcaColors.invested },
+                        ],
+                      },
+                    ]}
+                    animate
+                    motionConfig="gentle"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1194,10 +1289,10 @@ function DcaBacktest() {
       )}
 
       {data?.error && (
-        <Card className="border-red-500/20">
+        <Card className="border-loss/20">
           <CardContent className="py-6 text-center">
-            <AlertTriangle className="h-8 w-8 mx-auto text-red-500 mb-2" />
-            <p className="text-sm text-red-500">{data.error}</p>
+            <AlertTriangle className="h-8 w-8 mx-auto text-loss mb-2" />
+            <p className="text-sm text-loss">{data.error}</p>
           </CardContent>
         </Card>
       )}

@@ -27,17 +27,6 @@ const assetTypeLabels: Record<string, string> = {
   other: 'Autre',
 }
 
-// Asset type colors
-const assetTypeColors: Record<string, string> = {
-  crypto: 'from-orange-500 to-yellow-500',
-  stock: 'from-blue-500 to-cyan-500',
-  etf: 'from-purple-500 to-pink-500',
-  real_estate: 'from-green-500 to-emerald-500',
-  bond: 'from-gray-500 to-slate-500',
-  fiat: 'from-emerald-500 to-teal-500',
-  other: 'from-gray-400 to-gray-500',
-}
-
 // Custom icon URLs for symbols that don't match CoinCap naming
 const customIconUrls: Record<string, string> = {
   om: 'https://assets.coingecko.com/coins/images/12151/small/OM_Token.png',
@@ -64,7 +53,6 @@ export function AssetIcon({
   className = '',
 }: AssetIconProps) {
   const [imgError, setImgError] = useState(false)
-  const gradientColors = assetTypeColors[assetType] || assetTypeColors.other
 
   const renderIcon = () => {
     // For crypto, try to load the icon from CDN
@@ -87,7 +75,7 @@ export function AssetIcon({
     // Fallback: show initials with gradient background
     return (
       <div
-        className={`flex items-center justify-center rounded-full bg-gradient-to-br ${gradientColors} text-white font-bold ${className}`}
+        className={`flex items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold ${className}`}
         style={{ width: size, height: size, fontSize: size * 0.35 }}
       >
         {symbol.slice(0, 2).toUpperCase()}
@@ -109,7 +97,7 @@ export function AssetIcon({
         </TooltipTrigger>
         <TooltipContent
           side="top"
-          className="bg-popover text-popover-foreground border shadow-lg px-3 py-2"
+          className="bg-popover text-popover-foreground border border-border shadow-md px-3 py-2"
         >
           <div className="flex flex-col items-center gap-1">
             <span className="font-bold text-sm">{symbol}</span>
@@ -132,7 +120,6 @@ export function AssetIconCompact({
   size = 32,
 }: AssetIconProps) {
   const [imgError, setImgError] = useState(false)
-  const gradientColors = assetTypeColors[assetType] || assetTypeColors.other
 
   const renderIcon = () => {
     if (assetType === 'crypto' && !imgError) {
@@ -148,7 +135,7 @@ export function AssetIconCompact({
 
     return (
       <div
-        className={`flex items-center justify-center w-full h-full rounded-full bg-gradient-to-br ${gradientColors} text-white font-semibold`}
+        className={`flex items-center justify-center w-full h-full rounded-full bg-secondary text-secondary-foreground font-semibold`}
         style={{ fontSize: size * 0.4 }}
       >
         {symbol.slice(0, 2).toUpperCase()}
@@ -170,7 +157,7 @@ export function AssetIconCompact({
         <TooltipContent
           side="right"
           align="center"
-          className="bg-popover/95 backdrop-blur text-popover-foreground border shadow-xl px-4 py-3 rounded-xl"
+          className="bg-popover text-popover-foreground border border-border shadow-md px-4 py-3 rounded-lg"
         >
           <div className="flex items-center gap-3">
             <div
@@ -184,7 +171,7 @@ export function AssetIconCompact({
                   className="w-full h-full object-cover rounded-full"
                 />
               ) : (
-                <div className={`w-full h-full rounded-full flex items-center justify-center bg-gradient-to-br ${gradientColors} text-white font-bold text-sm`}>
+                <div className={`w-full h-full rounded-full flex items-center justify-center bg-secondary text-secondary-foreground font-bold text-sm`}>
                   {symbol.slice(0, 2).toUpperCase()}
                 </div>
               )}

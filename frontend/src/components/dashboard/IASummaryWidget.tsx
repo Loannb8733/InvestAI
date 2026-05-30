@@ -32,25 +32,25 @@ function HealthGauge({ score, status }: { score: number; status: string }) {
 
   const color =
     score >= 80
-      ? 'text-emerald-500'
+      ? 'text-gain'
       : score >= 65
-        ? 'text-green-500'
+        ? 'text-gain'
         : score >= 50
-          ? 'text-yellow-500'
+          ? 'text-warning'
           : score >= 30
-            ? 'text-orange-500'
-            : 'text-red-500'
+            ? 'text-warning'
+            : 'text-loss'
 
   const strokeColor =
     score >= 80
-      ? '#10b981'
+      ? 'oklch(var(--chart-3))'
       : score >= 65
-        ? '#22c55e'
+        ? 'oklch(var(--chart-3))'
         : score >= 50
-          ? '#eab308'
+          ? 'oklch(var(--chart-1))'
           : score >= 30
-            ? '#f97316'
-            : '#ef4444'
+            ? 'oklch(var(--chart-1))'
+            : 'oklch(var(--chart-4))'
 
   const statusLabel: Record<string, string> = {
     excellent: 'Excellent',
@@ -90,7 +90,7 @@ function HealthGauge({ score, status }: { score: number; status: string }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-3xl font-bold tabular-nums ${color}`}>{score}</span>
+          <span className={`text-3xl font-serif font-medium tabular-nums ${color}`}>{score}</span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
             / 100
           </span>
@@ -100,10 +100,10 @@ function HealthGauge({ score, status }: { score: number; status: string }) {
         variant="outline"
         className={`text-[10px] ${
           score >= 65
-            ? 'border-emerald-500/30 text-emerald-600 bg-emerald-500/10'
+            ? 'border-gain/30 text-gain bg-gain/10'
             : score >= 50
-              ? 'border-yellow-500/30 text-yellow-600 bg-yellow-500/10'
-              : 'border-red-500/30 text-red-600 bg-red-500/10'
+              ? 'border-warning/30 text-warning bg-warning/10'
+              : 'border-loss/30 text-loss bg-loss/10'
         }`}
       >
         {statusLabel[status] ?? status}
@@ -131,16 +131,16 @@ function FlashCard({
 }) {
   const variantStyles = {
     default: 'border-border/50',
-    success: 'border-emerald-500/30 bg-emerald-500/5',
-    warning: 'border-yellow-500/30 bg-yellow-500/5',
-    danger: 'border-red-500/30 bg-red-500/5',
+    success: 'border-gain/30 bg-gain/5',
+    warning: 'border-warning/30 bg-warning/5',
+    danger: 'border-loss/30 bg-loss/5',
   }
 
   const iconColor = {
     default: 'text-muted-foreground',
-    success: 'text-emerald-500',
-    warning: 'text-yellow-500',
-    danger: 'text-red-500',
+    success: 'text-gain',
+    warning: 'text-warning',
+    danger: 'text-loss',
   }
 
   return (
@@ -215,18 +215,18 @@ export default function IASummaryWidget() {
     <Card className="overflow-hidden">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Brain className="h-4 w-4 text-indigo-500" />
+          <Brain className="h-4 w-4 text-accent" />
           Résumé IA
           {data.regime && (
             <Badge
               variant="outline"
               className={`ml-1 text-[10px] ${
                 regimeVariant(data.regime) === 'success'
-                  ? 'border-emerald-500/30 text-emerald-600 bg-emerald-500/10'
+                  ? 'border-gain/30 text-gain bg-gain/10'
                   : regimeVariant(data.regime) === 'danger'
-                    ? 'border-red-500/30 text-red-600 bg-red-500/10'
+                    ? 'border-loss/30 text-loss bg-loss/10'
                     : regimeVariant(data.regime) === 'warning'
-                      ? 'border-yellow-500/30 text-yellow-600 bg-yellow-500/10'
+                      ? 'border-warning/30 text-warning bg-warning/10'
                       : ''
               }`}
             >
@@ -316,9 +316,9 @@ export default function IASummaryWidget() {
                 <div
                   className={`rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
                     data.top_insight.severity === 'critical'
-                      ? 'border-red-500/30 bg-red-500/5'
+                      ? 'border-loss/30 bg-loss/5'
                       : data.top_insight.severity === 'warning'
-                        ? 'border-yellow-500/30 bg-yellow-500/5'
+                        ? 'border-warning/30 bg-warning/5'
                         : 'border-border/50'
                   }`}
                   onClick={() => navigate('/intelligence/smart-insights')}
@@ -326,10 +326,10 @@ export default function IASummaryWidget() {
                   <div className="flex items-start gap-2">
                     <Brain className={`h-4 w-4 mt-0.5 shrink-0 ${
                       data.top_insight.severity === 'critical'
-                        ? 'text-red-500'
+                        ? 'text-loss'
                         : data.top_insight.severity === 'warning'
-                          ? 'text-yellow-500'
-                          : 'text-indigo-500'
+                          ? 'text-warning'
+                          : 'text-accent'
                     }`} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium leading-tight">{data.top_insight.title}</p>
@@ -341,10 +341,10 @@ export default function IASummaryWidget() {
                       variant="outline"
                       className={`shrink-0 text-[9px] ${
                         severityVariant(data.top_insight.severity) === 'danger'
-                          ? 'border-red-500/30 text-red-600'
+                          ? 'border-loss/30 text-loss'
                           : severityVariant(data.top_insight.severity) === 'warning'
-                            ? 'border-yellow-500/30 text-yellow-600'
-                            : 'border-emerald-500/30 text-emerald-600'
+                            ? 'border-warning/30 text-warning'
+                            : 'border-gain/30 text-gain'
                       }`}
                     >
                       {data.top_insight.severity === 'critical'

@@ -15,61 +15,76 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+        // Display / titres / gros chiffres patrimoine — serif éditorial
+        serif: ['Newsreader', 'Libre Bodoni', 'Georgia', 'serif'],
+        // Corps / UI
+        sans: ['Public Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        // Chiffres tabulaires
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "oklch(var(--border) / <alpha-value>)",
+        input: "oklch(var(--input) / <alpha-value>)",
+        ring: "oklch(var(--ring) / <alpha-value>)",
+        background: "oklch(var(--background) / <alpha-value>)",
+        foreground: "oklch(var(--foreground) / <alpha-value>)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "oklch(var(--primary) / <alpha-value>)",
+          foreground: "oklch(var(--primary-foreground) / <alpha-value>)",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "oklch(var(--secondary) / <alpha-value>)",
+          foreground: "oklch(var(--secondary-foreground) / <alpha-value>)",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "oklch(var(--destructive) / <alpha-value>)",
+          foreground: "oklch(var(--destructive-foreground) / <alpha-value>)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "oklch(var(--muted) / <alpha-value>)",
+          foreground: "oklch(var(--muted-foreground) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "oklch(var(--accent) / <alpha-value>)",
+          foreground: "oklch(var(--accent-foreground) / <alpha-value>)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "oklch(var(--popover) / <alpha-value>)",
+          foreground: "oklch(var(--popover-foreground) / <alpha-value>)",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "oklch(var(--card) / <alpha-value>)",
+          foreground: "oklch(var(--card-foreground) / <alpha-value>)",
         },
-        success: {
-          DEFAULT: "hsl(142.1 76.2% 36.3%)",
-          foreground: "hsl(355.7 100% 97.3%)",
+        // Sémantique financière — gain (sapin) / perte (bordeaux) / alerte (ambre)
+        gain: {
+          DEFAULT: "oklch(var(--gain) / <alpha-value>)",
+          foreground: "oklch(var(--gain-foreground) / <alpha-value>)",
+        },
+        loss: {
+          DEFAULT: "oklch(var(--loss) / <alpha-value>)",
+          foreground: "oklch(var(--loss-foreground) / <alpha-value>)",
         },
         warning: {
-          DEFAULT: "hsl(47.9 95.8% 53.1%)",
-          foreground: "hsl(26 83.3% 14.1%)",
+          DEFAULT: "oklch(var(--warning) / <alpha-value>)",
+          foreground: "oklch(var(--warning-foreground) / <alpha-value>)",
         },
+        // Alias success → gain (rétro-compat)
+        success: {
+          DEFAULT: "oklch(var(--gain) / <alpha-value>)",
+          foreground: "oklch(var(--gain-foreground) / <alpha-value>)",
+        },
+        // Alias legacy remappés vers la palette A (laiton / sapin)
         emerald: {
-          DEFAULT: "hsl(var(--emerald, 160 84% 39%))",
-          glow: "rgba(16,185,129,0.15)",
+          DEFAULT: "oklch(var(--emerald, 0.52 0.09 150) / <alpha-value>)",
+          glow: "oklch(0.52 0.09 150 / 0.15)",
         },
         indigo: {
-          DEFAULT: "hsl(var(--indigo, 234 89% 63%))",
-          glow: "rgba(99,102,241,0.15)",
+          DEFAULT: "oklch(var(--indigo, 0.64 0.10 78) / <alpha-value>)",
+          glow: "oklch(0.64 0.10 78 / 0.15)",
         },
         gold: {
-          DEFAULT: "hsl(var(--gold, 38 92% 50%))",
+          DEFAULT: "oklch(var(--gold, 0.64 0.10 78) / <alpha-value>)",
         },
       },
       borderRadius: {
@@ -95,8 +110,8 @@ export default {
           "50%": { transform: "translateY(-8px)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
-          "50%": { boxShadow: "0 0 16px 4px rgba(16,185,129,0.25)" },
+          "0%, 100%": { boxShadow: "0 0 0 0 oklch(0.64 0.10 78 / 0)" },
+          "50%": { boxShadow: "0 0 16px 4px oklch(0.64 0.10 78 / 0.22)" },
         },
         "counter-in": {
           "0%": { opacity: "0", transform: "translateY(8px)" },

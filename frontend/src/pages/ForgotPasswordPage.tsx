@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
         <CardContent>
           {sent ? (
             <div className="text-center space-y-4">
-              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
+              <CheckCircle2 className="h-16 w-16 text-gain mx-auto" />
               <p className="text-sm text-muted-foreground">
                 Si un compte existe avec l'adresse <strong>{email}</strong>, vous recevrez un email
                 avec un lien pour réinitialiser votre mot de passe.

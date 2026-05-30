@@ -2,63 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  InvestAI — Direction « Flux » (sombre, moderne, vivant, aéré, narratif)
+  Nuit profonde soignée (Linear × Phantom), accent violet électrique distinctif,
+  émeraude=gain / rose=perte. Profondeur par halos diffus & dégradés subtils.
+  Angles doux modernes (radius 0.875rem). Tokens OKLCH (canaux « L C H »)
+  enveloppés par Tailwind en oklch(var(--x) / <alpha>). Défaut = sombre.
+*/
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 160 84% 39.4%;
-    --chart-3: 38 92.1% 50.2%;
-    --chart-4: 0 84.2% 60.2%;
-    --chart-5: 262.1 83.3% 57.8%;
+    /* Light — clair aéré (secondaire, pour le toggle) */
+    --background: 0.99 0.002 285;
+    --foreground: 0.20 0.014 285;
+    --card: 1 0 0;
+    --card-foreground: 0.20 0.014 285;
+    --popover: 1 0 0;
+    --popover-foreground: 0.20 0.014 285;
+    --primary: 0.55 0.23 295;
+    --primary-foreground: 0.99 0.005 285;
+    --secondary: 0.965 0.004 285;
+    --secondary-foreground: 0.25 0.014 285;
+    --muted: 0.965 0.004 285;
+    --muted-foreground: 0.50 0.012 285;
+    --accent: 0.95 0.02 295;
+    --accent-foreground: 0.40 0.18 295;
+    --destructive: 0.58 0.22 18;
+    --destructive-foreground: 0.99 0.004 285;
+    --border: 0.92 0.005 285;
+    --input: 0.92 0.005 285;
+    --ring: 0.55 0.23 295;
+    --radius: 0.875rem;
+
+    /* Sémantique financière (gain / perte / alerte) */
+    --gain: 0.58 0.15 155;
+    --gain-foreground: 0.99 0.004 285;
+    --loss: 0.58 0.22 18;
+    --loss-foreground: 0.99 0.004 285;
+    --warning: 0.72 0.15 75;
+    --warning-foreground: 0.20 0.014 285;
+
+    /* Charts — violet · émeraude · cyan · ambre · rose */
+    --chart-1: 0.55 0.23 295;
+    --chart-2: 0.58 0.15 155;
+    --chart-3: 0.60 0.15 220;
+    --chart-4: 0.72 0.15 75;
+    --chart-5: 0.58 0.22 18;
+
+    /* Alias legacy (remappés sur la palette Flux pour éviter le churn) */
+    --emerald: 0.58 0.15 155;
+    --indigo: 0.55 0.23 295;
+    --gold: 0.72 0.15 75;
   }
 
   .dark {
-    --background: 220 35% 4%;
-    --foreground: 210 40% 96%;
-    --card: 220 25% 7%;
-    --card-foreground: 210 40% 96%;
-    --popover: 220 20% 9%;
-    --popover-foreground: 210 40% 96%;
-    --primary: 234 89% 63%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 11%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 220 20% 11%;
-    --muted-foreground: 215 20% 52%;
-    --accent: 220 20% 13%;
-    --accent-foreground: 210 40% 96%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 20% 13%;
-    --input: 220 20% 13%;
-    --ring: 234 89% 63%;
-    --emerald: 160 84% 39%;
-    --indigo: 234 89% 63%;
-    --gold: 38 92% 50%;
-    --chart-1: 234 89% 63%;
-    --chart-2: 160 84% 45%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 0 72% 50%;
-    --chart-5: 262 83% 62%;
+    /* Dark — nuit profonde (défaut) */
+    --background: 0.15 0.006 285;
+    --foreground: 0.96 0.003 285;
+    --card: 0.185 0.008 285;
+    --card-foreground: 0.96 0.003 285;
+    --popover: 0.185 0.008 285;
+    --popover-foreground: 0.96 0.003 285;
+    --primary: 0.64 0.22 295;
+    --primary-foreground: 0.99 0.005 285;
+    --secondary: 0.24 0.01 285;
+    --secondary-foreground: 0.96 0.003 285;
+    --muted: 0.22 0.008 285;
+    --muted-foreground: 0.68 0.012 285;
+    --accent: 0.30 0.04 295;
+    --accent-foreground: 0.92 0.04 295;
+    --destructive: 0.64 0.21 18;
+    --destructive-foreground: 0.99 0.004 285;
+    --border: 0.27 0.01 285;
+    --input: 0.27 0.01 285;
+    --ring: 0.64 0.22 295;
+
+    --gain: 0.72 0.16 155;
+    --gain-foreground: 0.15 0.006 285;
+    --loss: 0.66 0.20 18;
+    --loss-foreground: 0.99 0.004 285;
+    --warning: 0.80 0.15 75;
+    --warning-foreground: 0.15 0.006 285;
+
+    --chart-1: 0.64 0.22 295;
+    --chart-2: 0.72 0.16 155;
+    --chart-3: 0.68 0.15 220;
+    --chart-4: 0.80 0.15 75;
+    --chart-5: 0.66 0.20 18;
+
+    --emerald: 0.72 0.16 155;
+    --indigo: 0.64 0.22 295;
+    --gold: 0.80 0.15 75;
   }
 }
 
@@ -68,62 +102,70 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
-  }
-  .dark body {
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.07) 0%, transparent 60%),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
 @layer utilities {
-  .glass {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .glass-card {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
+  /* Chiffres tabulaires (tables, métriques) — les chiffres sont sacrés */
   .tabular {
     font-variant-numeric: tabular-nums;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
 
-  .spotlight-border {
-    position: relative;
-  }
-  .spotlight-border::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: radial-gradient(
-      200px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-      rgba(99, 102, 241, 0.3),
-      transparent 70%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  .spotlight-border:hover::before {
-    opacity: 1;
+  /* Filet fin éditorial (séparateur « relevé patrimonial ») */
+  .hairline {
+    border-bottom: 1px solid oklch(var(--border));
   }
 
+  /* Étiquette discrète en capitales (eyebrows / sections) */
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  /* Texte en dégradé violet → cyan (titres vivants) */
+  .gradient-text {
+    background-image: linear-gradient(
+      100deg,
+      oklch(var(--primary)) 0%,
+      oklch(var(--chart-3)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Halo de couleur diffus (profondeur, « vivant ») */
+  .glow {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Carte « verre » subtile sur fond sombre */
+  .glass {
+    background: oklch(var(--card) / 0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid oklch(var(--border) / 0.8);
+  }
+
+  /* Grain doux pour casser les aplats de dégradé */
+  .mesh {
+    background:
+      radial-gradient(60% 80% at 20% 10%, oklch(var(--primary) / 0.18), transparent 60%),
+      radial-gradient(50% 60% at 90% 30%, oklch(var(--chart-3) / 0.14), transparent 55%),
+      radial-gradient(70% 70% at 60% 100%, oklch(var(--gain) / 0.10), transparent 60%);
+  }
+
+  /* Entrées staggered discrètes (récit) */
   .stagger-item {
     opacity: 0;
     transform: translateY(16px);
@@ -173,7 +215,6 @@
 
 /* Print styles for PDF export */
 @media print {
-  /* Hide sidebar, header, and UI controls */
   nav,
   header,
   aside,
@@ -183,7 +224,6 @@
     display: none !important;
   }
 
-  /* Full-width content */
   main,
   [role="main"] {
     margin: 0 !important;
@@ -192,7 +232,6 @@
     max-width: 100% !important;
   }
 
-  /* Force light background for printing */
   body {
     background: white !important;
     color: black !important;
@@ -200,19 +239,16 @@
     print-color-adjust: exact;
   }
 
-  /* Keep card borders visible */
   .border {
     border-color: #e5e7eb !important;
   }
 
-  /* Avoid page breaks inside cards */
   .card,
   [class*="Card"] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  /* Charts: preserve colors */
   svg {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

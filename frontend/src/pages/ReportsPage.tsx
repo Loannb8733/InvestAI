@@ -111,8 +111,8 @@ export default function ReportsPage() {
       title: 'Rapport de Performance',
       description: 'Vue complète de vos portefeuilles avec gains/pertes, allocation et métriques clés.',
       icon: TrendingUp,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
       actions: [
         {
           label: 'PDF',
@@ -141,8 +141,8 @@ export default function ReportsPage() {
       title: 'Historique des Transactions',
       description: 'Export complet de toutes vos transactions pour archivage ou comptabilité.',
       icon: Calendar,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
       actions: [
         {
           label: 'PDF',
@@ -183,8 +183,8 @@ export default function ReportsPage() {
     title: 'Actifs Numériques (2086)',
     description: 'Formulaire 2086 pour déclarer vos plus-values sur actifs numériques. Régime fiscal spécifique crypto.',
     icon: Bitcoin,
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-500/10',
+    color: 'text-warning',
+    bgColor: 'bg-warning/10',
     yearSelector: true,
     yearValue: selectedYearCrypto,
     onYearChange: setSelectedYearCrypto,
@@ -217,8 +217,8 @@ export default function ReportsPage() {
     title: 'Valeurs Mobilières (Flat Tax)',
     description: 'Plus-values sur actions, ETF et obligations. Prélèvement forfaitaire unique (PFU) 30% ou barème progressif.',
     icon: BarChart3,
-    color: 'text-indigo-500',
-    bgColor: 'bg-indigo-500/10',
+    color: 'text-accent',
+    bgColor: 'bg-accent/10',
     yearSelector: true,
     yearValue: selectedYearStocks,
     onYearChange: setSelectedYearStocks,
@@ -306,7 +306,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Rapports</h1>
+        <h1 className="text-3xl font-serif font-medium">Rapports</h1>
         <p className="text-muted-foreground">
           Générez et téléchargez vos rapports de performance et fiscaux
         </p>

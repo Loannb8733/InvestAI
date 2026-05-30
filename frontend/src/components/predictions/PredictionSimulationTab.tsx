@@ -9,26 +9,18 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import type { PortfolioPrediction, WhatIfResult } from '@/types/predictions'
 import { Loader2, Target } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 
 const STABLECOINS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'FDUSD', 'PYUSD']
 
 const SCENARIOS = [
-  { label: 'Crash', value: -50, color: 'bg-red-500/10 text-red-500 hover:bg-red-500/20' },
-  { label: 'Bear', value: -30, color: 'bg-red-500/10 text-red-400 hover:bg-red-500/20' },
-  { label: 'Correction', value: -15, color: 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20' },
-  { label: 'Rebond', value: 20, color: 'bg-green-500/10 text-green-500 hover:bg-green-500/20' },
-  { label: 'Bull', value: 50, color: 'bg-green-500/10 text-green-400 hover:bg-green-500/20' },
-  { label: 'Moon', value: 100, color: 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' },
+  { label: 'Crash', value: -50, color: 'bg-loss/10 text-loss hover:bg-loss/20' },
+  { label: 'Bear', value: -30, color: 'bg-loss/10 text-loss hover:bg-loss/20' },
+  { label: 'Correction', value: -15, color: 'bg-warning/10 text-warning hover:bg-warning/20' },
+  { label: 'Rebond', value: 20, color: 'bg-gain/10 text-gain hover:bg-gain/20' },
+  { label: 'Bull', value: 50, color: 'bg-gain/10 text-gain hover:bg-gain/20' },
+  { label: 'Moon', value: 100, color: 'bg-gain/10 text-gain hover:bg-gain/20' },
 ]
 
 interface PredictionSimulationTabProps {
@@ -52,11 +44,12 @@ export default function PredictionSimulationTab({
   whatIfLoading,
   runWhatIf,
 }: PredictionSimulationTabProps) {
+  const { theme, color } = useNivoTheme()
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-blue-500" />
+          <Target className="h-5 w-5 text-accent" />
           Scénario What-If
         </CardTitle>
         <CardDescription>Simulez l'impact d'une variation de prix sur votre portefeuille</CardDescription>
@@ -83,7 +76,7 @@ export default function PredictionSimulationTab({
 
               <div>
                 <label className="text-sm font-medium mb-2 block">
-                  Variation: <span className={`font-bold ${whatIfChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  Variation: <span className={`font-bold ${whatIfChange >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {whatIfChange >= 0 ? '+' : ''}{whatIfChange}%
                   </span>
                 </label>
@@ -127,14 +120,14 @@ export default function PredictionSimulationTab({
                       <p className="text-xs text-muted-foreground">Valeur actuelle</p>
                       <p className="text-lg font-bold">{formatCurrency(whatIfResult.current_value)}</p>
                     </div>
-                    <div className={`p-3 rounded-lg ${whatIfResult.impact_percent >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                    <div className={`p-3 rounded-lg ${whatIfResult.impact_percent >= 0 ? 'bg-gain/10' : 'bg-loss/10'}`}>
                       <p className="text-xs text-muted-foreground">Valeur simulée</p>
-                      <p className={`text-lg font-bold ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      <p className={`text-lg font-bold ${whatIfResult.impact_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
                         {formatCurrency(whatIfResult.simulated_value)}
                       </p>
                     </div>
                   </div>
-                  <p className={`text-center font-bold text-lg ${whatIfResult.impact_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <p className={`text-center font-bold text-lg ${whatIfResult.impact_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {whatIfResult.impact_percent >= 0 ? '+' : ''}{whatIfResult.impact_percent.toFixed(2)}% sur le portefeuille
                   </p>
                 </div>
@@ -149,22 +142,38 @@ export default function PredictionSimulationTab({
                 <div>
                   <p className="text-sm font-medium mb-2">Impact par actif</p>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredAssets.map(a => ({ name: a.symbol, impact: a.impact }))}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" tickFormatter={(v) => formatCurrency(v).replace('€', '')} />
-                        <YAxis type="category" dataKey="name" width={50} tick={{ fontSize: 12 }} />
-                        <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
-                        <Bar dataKey="impact" radius={4}>
-                          {filteredAssets.map((a, i) => (
-                            <Cell key={i} fill={a.impact >= 0 ? '#10b981' : '#ef4444'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <ResponsiveBar
+                      data={filteredAssets.map((a) => ({ name: a.symbol, impact: a.impact }))}
+                      keys={['impact']}
+                      indexBy="name"
+                      layout="horizontal"
+                      theme={theme}
+                      margin={{ top: 4, right: 16, bottom: 28, left: 56 }}
+                      padding={0.3}
+                      colors={(bar) =>
+                        (bar.data.impact as number) >= 0 ? color('--chart-3') : color('--chart-4')
+                      }
+                      borderRadius={4}
+                      enableLabel={false}
+                      enableGridY={false}
+                      axisBottom={{
+                        tickSize: 0,
+                        tickPadding: 8,
+                        format: (v) => formatCurrency(v as number).replace('€', ''),
+                      }}
+                      axisLeft={{ tickSize: 0, tickPadding: 6 }}
+                      valueScale={{ type: 'linear' }}
+                      tooltip={({ indexValue, value }) => (
+                        <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                          <p className="text-sm font-medium">{indexValue}</p>
+                          <p className="mt-0.5 font-mono text-sm tabular-nums">
+                            {formatCurrency(value)}
+                          </p>
+                        </div>
+                      )}
+                      animate
+                      motionConfig="gentle"
+                    />
                   </div>
                 </div>
               ) : null

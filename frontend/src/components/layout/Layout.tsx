@@ -1,6 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import Sidebar from './Sidebar'
+import NavRail from './NavRail'
 import Header from './Header'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
@@ -35,7 +35,7 @@ class RouteErrorBoundary extends Component<
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Une erreur est survenue</h2>
+          <h2 className="text-2xl font-serif font-medium mb-2">Une erreur est survenue</h2>
           <p className="text-muted-foreground mb-6 max-w-md">
             {this.state.error?.message || "Quelque chose s'est mal passé."}
           </p>
@@ -64,7 +64,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
+      <NavRail isOpen={sidebarOpen} onClose={handleCloseSidebar} />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header onMenuClick={handleToggleSidebar} />
         <main className="flex-1 overflow-y-auto p-6">

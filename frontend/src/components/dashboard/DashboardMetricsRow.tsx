@@ -61,7 +61,7 @@ export default function DashboardMetricsRow({
           <Wallet className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{pc(totalValue)}</div>
+          <div className="text-2xl font-serif font-medium">{pc(totalValue)}</div>
           <p className="text-xs text-muted-foreground">
             {assetsCount} actifs{availableLiquidity != null && availableLiquidity > 0 && ` · dont ${pc(availableLiquidity)} de liquidité`}
           </p>
@@ -87,7 +87,7 @@ export default function DashboardMetricsRow({
           <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{pc(netCapital)}</div>
+          <div className="text-2xl font-serif font-medium">{pc(netCapital)}</div>
           <p className="text-xs text-muted-foreground">{pc(totalInvested)} investi au total</p>
         </CardContent>
       </Card>
@@ -101,21 +101,21 @@ export default function DashboardMetricsRow({
               <TooltipContent className="max-w-xs"><p className="text-sm">Patrimoine Total − Capital Net. Mesure la variation de richesse globale (inclut ventes passées).</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          {isPositive ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+          {isPositive ? <TrendingUp className="h-4 w-4 text-gain" /> : <TrendingDown className="h-4 w-4 text-loss" />}
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pc(netGainLoss)}</div>
-          <p className={`text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pp(netGainLossPercent)}</p>
+          <div className={`text-2xl font-serif font-medium ${isPositive ? 'text-gain' : 'text-loss'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pc(netGainLoss)}</div>
+          <p className={`text-xs ${isPositive ? 'text-gain' : 'text-loss'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pp(netGainLossPercent)}</p>
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Variation {periodLabel}</CardTitle>
-          {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
+          {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-gain" /> : <ArrowDownRight className="h-4 w-4 text-loss" />}
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pc(dailyChange)}</div>
-          <p className={`text-xs ${isDailyPositive ? 'text-green-500' : 'text-red-500'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pp(dailyChangePercent)}</p>
+          <div className={`text-2xl font-serif font-medium ${isDailyPositive ? 'text-gain' : 'text-loss'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pc(dailyChange)}</div>
+          <p className={`text-xs ${isDailyPositive ? 'text-gain' : 'text-loss'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pp(dailyChangePercent)}</p>
         </CardContent>
       </Card>
       <Card>
@@ -124,7 +124,7 @@ export default function DashboardMetricsRow({
           <PieChart className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{portfoliosCount}</div>
+          <div className="text-2xl font-serif font-medium">{portfoliosCount}</div>
           <p className="text-xs text-muted-foreground">portefeuille{portfoliosCount > 1 ? 's' : ''} actif{portfoliosCount > 1 ? 's' : ''}</p>
         </CardContent>
       </Card>

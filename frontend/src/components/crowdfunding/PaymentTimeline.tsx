@@ -32,24 +32,24 @@ const STATUS_CONFIG: Record<
 > = {
   paid: {
     icon: CheckCircle2,
-    color: 'text-emerald-400',
+    color: 'text-gain',
     label: 'Payé',
-    bg: 'bg-emerald-500/10 ring-1 ring-emerald-500/20',
-    dot: 'bg-emerald-500',
+    bg: 'bg-gain/10 ring-1 ring-gain/20',
+    dot: 'bg-gain',
   },
   pending: {
     icon: Circle,
-    color: 'text-amber-400',
+    color: 'text-warning',
     label: 'En attente',
-    bg: 'bg-amber-500/10 ring-1 ring-amber-500/20',
-    dot: 'bg-amber-500',
+    bg: 'bg-warning/10 ring-1 ring-warning/20',
+    dot: 'bg-warning',
   },
   overdue: {
     icon: AlertTriangle,
-    color: 'text-red-400',
+    color: 'text-loss',
     label: 'En retard',
-    bg: 'bg-red-500/10 ring-1 ring-red-500/20',
-    dot: 'bg-red-500',
+    bg: 'bg-loss/10 ring-1 ring-loss/20',
+    dot: 'bg-loss',
   },
 }
 
@@ -187,30 +187,30 @@ export default function PaymentTimeline({ project }: PaymentTimelineProps) {
     <div className="space-y-5">
       {/* Summary stats row */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/10 p-3 text-center">
-          <p className="text-2xl font-bold tabular-nums text-emerald-400">{stats.paidCount}</p>
+        <div className="rounded-xl bg-gain/5 border border-gain/10 p-3 text-center">
+          <p className="text-2xl font-serif font-medium tabular-nums text-gain">{stats.paidCount}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Payées</p>
         </div>
-        <div className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 text-center">
-          <p className="text-2xl font-bold tabular-nums text-amber-400">{stats.pendingCount}</p>
+        <div className="rounded-xl bg-warning/5 border border-warning/10 p-3 text-center">
+          <p className="text-2xl font-serif font-medium tabular-nums text-warning">{stats.pendingCount}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">En attente</p>
         </div>
-        <div className={`rounded-xl p-3 text-center ${stats.overdueCount > 0 ? 'bg-red-500/5 border border-red-500/10' : 'bg-muted/30 border border-border/50'}`}>
-          <p className={`text-2xl font-bold tabular-nums ${stats.overdueCount > 0 ? 'text-red-400' : 'text-muted-foreground'}`}>{stats.overdueCount}</p>
+        <div className={`rounded-xl p-3 text-center ${stats.overdueCount > 0 ? 'bg-loss/5 border border-loss/10' : 'bg-muted/30 border border-border/50'}`}>
+          <p className={`text-2xl font-serif font-medium tabular-nums ${stats.overdueCount > 0 ? 'text-loss' : 'text-muted-foreground'}`}>{stats.overdueCount}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">En retard</p>
         </div>
         <div className="rounded-xl bg-muted/30 border border-border/50 p-3 text-center">
-          <p className="text-2xl font-bold tabular-nums">{stats.recoveryPercent.toFixed(0)}%</p>
+          <p className="text-2xl font-serif font-medium tabular-nums">{stats.recoveryPercent.toFixed(0)}%</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Capital récupéré</p>
         </div>
       </div>
 
       {/* Delay banner */}
       {project.delay_months > 0 && (
-        <div className="flex items-center gap-2 rounded-lg bg-orange-500/10 border border-orange-500/20 px-3 py-2">
-          <Timer className="h-4 w-4 text-orange-400 shrink-0" />
+        <div className="flex items-center gap-2 rounded-lg bg-warning/10 border border-warning/20 px-3 py-2">
+          <Timer className="h-4 w-4 text-warning shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-orange-400">
+            <p className="text-xs font-medium text-warning">
               Retard constaté : +{project.delay_months} mois
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -238,7 +238,7 @@ export default function PaymentTimeline({ project }: PaymentTimelineProps) {
         </div>
         <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-emerald-500 to-emerald-400"
+            className="h-full rounded-full transition-all duration-700 ease-out bg-gain"
             style={{ width: `${stats.recoveryPercent}%` }}
           />
         </div>
@@ -327,14 +327,14 @@ function TimelineRow({
     <div
       className={`group flex items-center gap-3 rounded-lg px-3 transition-colors duration-150 ${
         compact ? 'py-1.5' : 'py-2.5 hover:bg-muted/30'
-      } ${effectiveStatus === 'overdue' ? 'bg-red-500/[0.03]' : ''}`}
+      } ${effectiveStatus === 'overdue' ? 'bg-loss/[0.03]' : ''}`}
     >
       {/* Status icon */}
       <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 ${config.bg} transition-all duration-300 ${
         isOptimistic ? 'scale-110' : ''
       }`}>
         {isOptimistic ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-gain" />
         ) : (
           <Icon className={`h-3.5 w-3.5 ${config.color}`} />
         )}
@@ -370,9 +370,9 @@ function TimelineRow({
       {/* Total amount */}
       <span className={`text-sm font-semibold tabular-nums shrink-0 ${
         effectiveStatus === 'paid'
-          ? 'text-emerald-400'
+          ? 'text-gain'
           : effectiveStatus === 'overdue'
-            ? 'text-red-400'
+            ? 'text-loss'
             : ''
       }`}>
         {formatCurrency(displayAmount)}
@@ -386,7 +386,7 @@ function TimelineRow({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500/10 hover:text-emerald-400"
+                className="h-7 px-2.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gain/10 hover:text-gain"
                 disabled={isPendingMutation}
               >
                 <Banknote className="h-3.5 w-3.5 mr-1" />
@@ -428,7 +428,7 @@ function TimelineRow({
                 </div>
                 <Button
                   size="sm"
-                  className="w-full h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full h-7 text-xs bg-gain hover:bg-gain"
                   onClick={() => {
                     onMarkPaid(paymentDate, parseFloat(editedAmount) || expectedAmount)
                     setPopoverOpen(false)
@@ -447,7 +447,7 @@ function TimelineRow({
           </Popover>
         )}
         {effectiveStatus === 'paid' && !isOptimistic && !compact && (
-          <Badge variant="outline" className="text-emerald-400 border-emerald-500/20 text-[10px] px-1.5">
+          <Badge variant="outline" className="text-gain border-gain/20 text-[10px] px-1.5">
             Payé
           </Badge>
         )}

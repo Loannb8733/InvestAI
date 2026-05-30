@@ -183,13 +183,13 @@ export default function PortfolioAssetList({
   const statusBadge = (status?: string) => {
     switch (status) {
       case 'active':
-        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-500">En cours</span>
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-gain/10 text-gain">En cours</span>
       case 'completed':
         return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">Remboursé</span>
       case 'delayed':
-        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-500">Retardé</span>
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning/10 text-warning">Retardé</span>
       case 'defaulted':
-        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-500">Défaut</span>
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-loss/10 text-loss">Défaut</span>
       default:
         return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{status || '-'}</span>
     }
@@ -209,7 +209,7 @@ export default function PortfolioAssetList({
             <button className={`text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
               asset.exchange
                 ? isColdWallet(asset.exchange)
-                  ? 'bg-blue-500/10 text-blue-500'
+                  ? 'bg-accent/10 text-accent'
                   : 'bg-muted text-muted-foreground'
                 : 'bg-muted/50 text-muted-foreground'
             }`}>
@@ -231,7 +231,7 @@ export default function PortfolioAssetList({
                     setPlatformPopover(null)
                   }}
                 >
-                  {isColdWallet(platform) && <Shield className="h-3 w-3 text-blue-500 shrink-0" />}
+                  {isColdWallet(platform) && <Shield className="h-3 w-3 text-accent shrink-0" />}
                   {!isColdWallet(platform) && <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />}
                   {platform}
                 </button>
@@ -256,7 +256,7 @@ export default function PortfolioAssetList({
       return (
         <span className={`text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 ${
           isColdWallet(asset.exchange)
-            ? 'bg-blue-500/10 text-blue-500'
+            ? 'bg-accent/10 text-accent'
             : 'bg-muted text-muted-foreground'
         }`}>
           {isColdWallet(asset.exchange) && <Shield className="h-3 w-3" />}
@@ -286,8 +286,8 @@ export default function PortfolioAssetList({
             >
               <CardContent className="py-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                    <Banknote className="h-5 w-5 text-emerald-500" />
+                  <div className="h-10 w-10 rounded-full bg-gain/20 flex items-center justify-center shrink-0">
+                    <Banknote className="h-5 w-5 text-gain" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-muted-foreground">Cash disponible</p>
@@ -313,8 +313,8 @@ export default function PortfolioAssetList({
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                <span className="text-blue-500 font-bold text-sm">$</span>
+              <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                <span className="text-accent font-bold text-sm">$</span>
               </div>
               <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Stablecoins</p>
@@ -350,7 +350,7 @@ export default function PortfolioAssetList({
                     : platformFilter
                       ? 'opacity-50 hover:opacity-75'
                       : isWallet
-                        ? 'border-blue-500/20 hover:border-blue-500/40'
+                        ? 'border-accent/20 hover:border-accent/40'
                         : 'hover:bg-muted/50'
                 }`}
                 onClick={() => setPlatformFilter(isActive ? null : platform)}
@@ -358,19 +358,19 @@ export default function PortfolioAssetList({
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center gap-2 mb-1.5">
                     {isWallet ? (
-                      <Shield className="h-4 w-4 text-blue-500 shrink-0" />
+                      <Shield className="h-4 w-4 text-accent shrink-0" />
                     ) : isUnassigned ? null : (
                       <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
-                    <span className={`text-sm font-medium truncate ${isWallet ? 'text-blue-500' : ''}`}>
+                    <span className={`text-sm font-medium truncate ${isWallet ? 'text-accent' : ''}`}>
                       {platform}
                     </span>
                   </div>
                   <p className="text-lg font-bold">{formatCurrency(value)}</p>
-                  <p className={`text-sm font-medium ${netPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <p className={`text-sm font-medium ${netPnl >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {netPnl >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(Math.abs(netPnl))}
                   </p>
-                  <p className={`text-xs ${roi >= 0 ? 'text-green-500/80' : 'text-red-500/80'}`}>
+                  <p className={`text-xs ${roi >= 0 ? 'text-gain/80' : 'text-loss/80'}`}>
                     ROI: {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -479,7 +479,7 @@ export default function PortfolioAssetList({
                       {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
                     </td>
                     <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
-                    <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-gain' : 'text-loss'}`}>
                       <div>
                         <p>{group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.totalGainLoss)}</p>
                         <p className="text-xs">
@@ -500,9 +500,9 @@ export default function PortfolioAssetList({
                     <td className="text-center py-3 hidden lg:table-cell">
                       {group.assets[0].risk_weight != null && group.assets[0].risk_weight > 0 ? (
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          group.assets[0].risk_weight > 30 ? 'bg-red-500/10 text-red-500' :
-                          group.assets[0].risk_weight > 15 ? 'bg-orange-500/10 text-orange-500' :
-                          'bg-green-500/10 text-green-500'
+                          group.assets[0].risk_weight > 30 ? 'bg-loss/10 text-loss' :
+                          group.assets[0].risk_weight > 15 ? 'bg-warning/10 text-warning' :
+                          'bg-gain/10 text-gain'
                         }`}>
                           {group.assets[0].risk_weight.toFixed(1)}%
                         </span>
@@ -567,7 +567,7 @@ export default function PortfolioAssetList({
                         {group.currentPrice ? formatCurrency(group.currentPrice) : '-'}
                       </td>
                       <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
-                      <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      <td className={`text-center py-3 ${group.totalGainLoss >= 0 ? 'text-gain' : 'text-loss'}`}>
                         <div>
                           <p>{group.totalGainLoss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.totalGainLoss)}</p>
                           <p className="text-xs">
@@ -591,9 +591,9 @@ export default function PortfolioAssetList({
                           if (riskWt <= 0) return '-'
                           return (
                             <span className={`text-xs px-2 py-0.5 rounded ${
-                              riskWt > 30 ? 'bg-red-500/10 text-red-500' :
-                              riskWt > 15 ? 'bg-orange-500/10 text-orange-500' :
-                              'bg-green-500/10 text-green-500'
+                              riskWt > 30 ? 'bg-loss/10 text-loss' :
+                              riskWt > 15 ? 'bg-warning/10 text-warning' :
+                              'bg-gain/10 text-gain'
                             }`}>
                               {riskWt.toFixed(1)}%
                             </span>
@@ -628,15 +628,15 @@ export default function PortfolioAssetList({
                           {asset.current_price ? formatCurrency(asset.current_price) : '-'}
                         </td>
                         <td className="text-center py-2 text-sm">{formatCurrency(asset.current_value)}</td>
-                        <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <td className={`text-center py-2 text-sm ${asset.gain_loss >= 0 ? 'text-gain' : 'text-loss'}`}>
                           {asset.gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.gain_loss)}
                         </td>
                         <td className="text-center py-2 hidden lg:table-cell">
                           {asset.risk_weight != null && asset.risk_weight > 0 ? (
                             <span className={`text-xs px-2 py-0.5 rounded ${
-                              asset.risk_weight > 30 ? 'bg-red-500/10 text-red-500' :
-                              asset.risk_weight > 15 ? 'bg-orange-500/10 text-orange-500' :
-                              'bg-green-500/10 text-green-500'
+                              asset.risk_weight > 30 ? 'bg-loss/10 text-loss' :
+                              asset.risk_weight > 15 ? 'bg-warning/10 text-warning' :
+                              'bg-gain/10 text-gain'
                             }`}>
                               {asset.risk_weight.toFixed(1)}%
                             </span>

@@ -69,7 +69,7 @@ export default function VerifyEmailPage() {
             <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
               <TrendingUp className="h-7 w-7 text-primary" />
             </div>
-            <span className="text-2xl font-bold">InvestAI</span>
+            <span className="text-2xl font-serif font-medium">InvestAI</span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export default function VerifyEmailPage() {
               <Loader2 className="h-10 w-10 text-primary animate-spin" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Vérification en cours...</h2>
+              <h2 className="text-2xl font-serif font-medium">Vérification en cours...</h2>
               <p className="text-muted-foreground">
                 Veuillez patienter pendant que nous vérifions votre email.
               </p>
@@ -89,11 +89,11 @@ export default function VerifyEmailPage() {
 
         {status === 'success' && (
           <>
-            <div className="mx-auto h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+            <div className="mx-auto h-20 w-20 rounded-full bg-gain dark:bg-gain/30 flex items-center justify-center">
+              <CheckCircle2 className="h-10 w-10 text-gain dark:text-gain" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Email vérifié !</h2>
+              <h2 className="text-2xl font-serif font-medium">Email vérifié !</h2>
               <p className="text-muted-foreground">
                 Votre compte a été activé avec succès.
                 Vous pouvez maintenant accéder à toutes les fonctionnalités.
@@ -111,11 +111,11 @@ export default function VerifyEmailPage() {
 
         {status === 'error' && (
           <>
-            <div className="mx-auto h-20 w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+            <div className="mx-auto h-20 w-20 rounded-full bg-loss dark:bg-loss/30 flex items-center justify-center">
+              <XCircle className="h-10 w-10 text-loss dark:text-loss" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Vérification échouée</h2>
+              <h2 className="text-2xl font-serif font-medium">Vérification échouée</h2>
               <p className="text-muted-foreground">
                 {errorMessage}
               </p>

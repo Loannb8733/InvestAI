@@ -5,19 +5,12 @@ import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { Loader2, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingPerformanceItem } from '@/types/crowdfunding'
 
 export default function CrowdfundingPerformancePage() {
+  const { theme, color } = useNivoTheme()
   const { data, isLoading } = useQuery<{ projects: CrowdfundingPerformanceItem[] }>({
     queryKey: queryKeys.crowdfunding.performance,
     queryFn: crowdfundingApi.getPerformance,
@@ -37,7 +30,7 @@ export default function CrowdfundingPerformancePage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Performance Crowdfunding</h1>
+          <h1 className="text-3xl font-serif font-medium">Performance Crowdfunding</h1>
           <p className="text-muted-foreground">Aucun projet à analyser</p>
         </div>
       </div>
@@ -63,7 +56,7 @@ export default function CrowdfundingPerformancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Performance Crowdfunding</h1>
+        <h1 className="text-3xl font-serif font-medium">Performance Crowdfunding</h1>
         <p className="text-muted-foreground">
           Suivi des rendements projetés vs réalisés
         </p>
@@ -74,10 +67,10 @@ export default function CrowdfundingPerformancePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Intérêts Projetés (Total)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-gain" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">
+            <div className="text-2xl font-serif font-medium text-gain">
               {formatCurrency(totalProjectedInterest)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -89,10 +82,10 @@ export default function CrowdfundingPerformancePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Reçu</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-blue-500" />
+            <CheckCircle2 className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalReceived)}</div>
+            <div className="text-2xl font-serif font-medium">{formatCurrency(totalReceived)}</div>
             <p className="text-xs text-muted-foreground">
               {totalProjectedInterest > 0
                 ? `${((totalReceived / totalProjectedInterest) * 100).toFixed(0)}% des intérêts projetés`
@@ -105,13 +98,13 @@ export default function CrowdfundingPerformancePage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Projets On Track</CardTitle>
             {onTrackCount === activeCount ? (
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-gain" />
             ) : (
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              <AlertTriangle className="h-4 w-4 text-warning" />
             )}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-serif font-medium">
               {onTrackCount}/{activeCount}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -130,40 +123,57 @@ export default function CrowdfundingPerformancePage() {
             <CardTitle>Projeté vs Reçu par Projet</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis
-                  tickFormatter={(v) => `${v}€`}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <Tooltip
-                  formatter={(v: number) => formatCurrency(v)}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend />
-                <Bar
-                  dataKey="Intérêts projetés"
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                  opacity={0.3}
-                />
-                <Bar
-                  dataKey="Reçu"
-                  fill="#10b981"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="h-[300px]">
+              <ResponsiveBar
+                data={chartData}
+                keys={['Intérêts projetés', 'Reçu']}
+                indexBy="name"
+                groupMode="grouped"
+                theme={theme}
+                margin={{ top: 28, right: 16, bottom: 40, left: 56 }}
+                padding={0.25}
+                innerPadding={4}
+                colors={({ id }) =>
+                  id === 'Intérêts projetés' ? color('--primary', 0.3) : color('--chart-3')
+                }
+                borderRadius={4}
+                enableLabel={false}
+                enableGridY
+                axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}€` }}
+                valueScale={{ type: 'linear' }}
+                tooltip={({ id, value, indexValue, color: barColor }) => (
+                  <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                    <p className="text-xs font-medium">{indexValue}</p>
+                    <span className="mt-0.5 flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-[2px]"
+                        style={{ backgroundColor: barColor }}
+                      />
+                      <span className="text-xs text-muted-foreground">{id}</span>
+                    </span>
+                    <p className="mt-0.5 font-mono text-sm tabular-nums">
+                      {formatCurrency(value)}
+                    </p>
+                  </div>
+                )}
+                legends={[
+                  {
+                    anchor: 'top-right',
+                    direction: 'row',
+                    translateY: -22,
+                    itemWidth: 70,
+                    itemHeight: 18,
+                    symbolSize: 10,
+                    symbolShape: 'circle',
+                    itemTextColor: color('--muted-foreground'),
+                    dataFrom: 'keys',
+                  },
+                ]}
+                animate
+                motionConfig="gentle"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -197,7 +207,7 @@ export default function CrowdfundingPerformancePage() {
                     <td className="py-3 text-muted-foreground">{p.platform}</td>
                     <td className="py-3 text-right">{formatCurrency(p.invested_amount)}</td>
                     <td className="py-3 text-right">{p.annual_rate}%</td>
-                    <td className="py-3 text-right text-green-500">
+                    <td className="py-3 text-right text-gain">
                       {formatCurrency(p.projected_total_interest)}
                     </td>
                     <td className="py-3 text-right">{formatCurrency(p.total_received)}</td>
@@ -216,11 +226,11 @@ export default function CrowdfundingPerformancePage() {
                     </td>
                     <td className="py-3 text-center">
                       {p.on_track ? (
-                        <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                        <Badge variant="secondary" className="bg-gain/10 text-gain">
                           OK
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-orange-500/10 text-orange-500">
+                        <Badge variant="secondary" className="bg-warning/10 text-warning">
                           Retard
                         </Badge>
                       )}
