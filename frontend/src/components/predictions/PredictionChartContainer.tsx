@@ -30,17 +30,8 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react'
-import {
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Line,
-  ComposedChart,
-} from 'recharts'
+import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 
 // ── Regime labels/colors (shared) ────────────────────────────────────
 
@@ -48,14 +39,14 @@ const REGIME_LABELS: Record<string, string> = {
   bullish: 'Haussier', bearish: 'Baissier', top: 'Sommet', bottom: 'Creux', neutral: 'Neutre',
 }
 const REGIME_COLORS: Record<string, string> = {
-  bullish: 'text-green-500 bg-green-500/10',
-  bearish: 'text-red-500 bg-red-500/10',
-  top: 'text-amber-500 bg-amber-500/10',
-  bottom: 'text-blue-500 bg-blue-500/10',
+  bullish: 'text-gain bg-gain/10',
+  bearish: 'text-loss bg-loss/10',
+  top: 'text-warning bg-warning/10',
+  bottom: 'text-accent bg-accent/10',
   neutral: 'text-gray-500 bg-gray-500/10',
 }
 const REGIME_BAR_COLORS: Record<string, string> = {
-  bullish: 'bg-green-500', bearish: 'bg-red-500', top: 'bg-amber-500', bottom: 'bg-blue-500',
+  bullish: 'bg-gain', bearish: 'bg-loss', top: 'bg-warning', bottom: 'bg-accent',
 }
 
 // ── Track Record Panel ───────────────────────────────────────────────
@@ -84,9 +75,9 @@ const TrackRecordPanel = React.memo(({ symbol }: { symbol: string }) => {
   }
 
   const s = data.summary
-  const mapeColor = s.avg_mape != null ? (s.avg_mape <= 5 ? 'text-green-500' : s.avg_mape <= 10 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
-  const dirColor = s.direction_accuracy != null ? (s.direction_accuracy >= 60 ? 'text-green-500' : s.direction_accuracy >= 50 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
-  const ciColor = s.ci_coverage != null ? (s.ci_coverage >= 90 ? 'text-green-500' : s.ci_coverage >= 70 ? 'text-yellow-500' : 'text-red-500') : 'text-muted-foreground'
+  const mapeColor = s.avg_mape != null ? (s.avg_mape <= 5 ? 'text-gain' : s.avg_mape <= 10 ? 'text-warning' : 'text-loss') : 'text-muted-foreground'
+  const dirColor = s.direction_accuracy != null ? (s.direction_accuracy >= 60 ? 'text-gain' : s.direction_accuracy >= 50 ? 'text-warning' : 'text-loss') : 'text-muted-foreground'
+  const ciColor = s.ci_coverage != null ? (s.ci_coverage >= 90 ? 'text-gain' : s.ci_coverage >= 70 ? 'text-warning' : 'text-loss') : 'text-muted-foreground'
 
   return (
     <div className="mt-4 p-4 rounded-lg bg-muted/30 border">
@@ -137,16 +128,16 @@ const TrackRecordPanel = React.memo(({ symbol }: { symbol: string }) => {
                     {r.actual_price != null ? formatCurrency(r.actual_price) : '—'}
                   </td>
                   <td className={`py-1.5 px-2 text-[10px] text-right tabular-nums ${
-                    r.mape != null ? (r.mape <= 5 ? 'text-green-500' : r.mape <= 10 ? 'text-yellow-500' : 'text-red-500') : ''
+                    r.mape != null ? (r.mape <= 5 ? 'text-gain' : r.mape <= 10 ? 'text-warning' : 'text-loss') : ''
                   }`}>
                     {r.mape != null ? `${r.mape.toFixed(1)}%` : '—'}
                   </td>
                   <td className="py-1.5 px-2 text-center">
                     {r.direction_correct != null ? (
                       r.direction_correct ? (
-                        <CheckCircle className="h-3 w-3 text-green-500 mx-auto" />
+                        <CheckCircle className="h-3 w-3 text-gain mx-auto" />
                       ) : (
-                        <XCircle className="h-3 w-3 text-red-500 mx-auto" />
+                        <XCircle className="h-3 w-3 text-loss mx-auto" />
                       )
                     ) : <span className="text-[10px] text-muted-foreground">—</span>}
                   </td>
@@ -188,6 +179,117 @@ export default function PredictionChartContainer({
   dt,
   formatPrice,
 }: PredictionChartContainerProps) {
+  const { theme, color } = useNivoTheme()
+
+  const cConfidence = color('--chart-5')
+  const cPrice = color('--chart-5')
+  const cActual = color('--chart-3')
+  const cPast = color('--muted-foreground')
+  const cSupport = color('--chart-4')
+  const cResistance = color('--chart-3')
+
+  const { yMin, yMax } = (() => {
+    const prices = chartData.flatMap((d) =>
+      [d.confidence_high, d.confidence_low, d.actual, d.price].filter(
+        (v): v is number => v != null
+      )
+    )
+    if (prices.length === 0) return { yMin: 0, yMax: 100 }
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    const range = max - min || max * 0.1 || 1
+    return { yMin: Math.max(0, min - range * 0.1), yMax: max + range * 0.1 }
+  })()
+
+  const seriesFor = (key: 'price' | 'actual' | 'predicted_past' | 'confidence_high' | 'confidence_low') => ({
+    id: key,
+    data: chartData
+      .filter((d) => (d as unknown as Record<string, number | null>)[key] != null)
+      .map((d) => ({ x: d.date, y: (d as unknown as Record<string, number>)[key] })),
+  })
+
+  const series: LineSeries[] = [
+    seriesFor('confidence_high'),
+    seriesFor('confidence_low'),
+    seriesFor('price'),
+    ...(showReality ? [seriesFor('actual'), seriesFor('predicted_past')] : []),
+  ]
+
+  const tickValues = (() => {
+    const dates = chartData.map((d) => d.date)
+    const target = Math.min(6, dates.length)
+    const step = Math.max(1, Math.floor(dates.length / target))
+    return dates.filter((_, i) => i % step === 0)
+  })()
+
+  const SERIES_LABELS: Record<string, string> = {
+    confidence_high: 'Borne haute',
+    confidence_low: 'Borne basse',
+    price: 'Prix prédit',
+    actual: 'Prix réel',
+    predicted_past: 'Prédiction passée',
+  }
+
+  // Confidence band (area between low and high), drawn beneath the lines.
+  const BandLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+    const sx = xScale as (v: string) => number
+    const sy = yScale as (v: number) => number
+    const band = chartData.filter((d) => d.confidence_high != null && d.confidence_low != null)
+    if (band.length < 2) return null
+    const top = band.map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(d.date)},${sy(d.confidence_high as number)}`)
+    const bottom = [...band]
+      .reverse()
+      .map((d) => `L${sx(d.date)},${sy(d.confidence_low as number)}`)
+    return <path d={`${top.join(' ')} ${bottom.join(' ')} Z`} fill={cConfidence} fillOpacity={0.12} />
+  }
+
+  // All trend lines, drawn with per-series dash/dots that Nivo can't express natively.
+  const LinesLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+    const sx = xScale as (v: string) => number
+    const sy = yScale as (v: number) => number
+    const path = (key: 'price' | 'actual' | 'predicted_past') =>
+      chartData
+        .filter((d) => (d as unknown as Record<string, number | null>)[key] != null)
+        .map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(d.date)},${sy((d as unknown as Record<string, number>)[key])}`)
+        .join(' ')
+    return (
+      <>
+        <path d={path('price')} fill="none" stroke={cPrice} strokeWidth={2} strokeDasharray="6 3" />
+        {showReality && (
+          <>
+            <path d={path('predicted_past')} fill="none" stroke={cPast} strokeWidth={1.5} strokeDasharray="4 3" />
+            <path d={path('actual')} fill="none" stroke={cActual} strokeWidth={2.5} />
+            {chartData
+              .filter((d) => d.actual != null)
+              .map((d) => (
+                <circle key={d.date} cx={sx(d.date)} cy={sy(d.actual as number)} r={3} fill={cActual} />
+              ))}
+          </>
+        )}
+      </>
+    )
+  }
+
+  // Horizontal support / resistance markers.
+  const RefLinesLayer = ({ yScale, innerWidth }: CommonCustomLayerProps<LineSeries>) => {
+    if (!showSupportResistance) return null
+    const sy = yScale as (v: number) => number
+    const line = (y: number, stroke: string, label: string) => (
+      <g>
+        <line x1={0} x2={innerWidth} y1={sy(y)} y2={sy(y)} stroke={stroke} strokeWidth={1} strokeDasharray="4 4" />
+        <text x={4} y={sy(y) - 4} fontSize={10} fill={stroke}>
+          {label}
+        </text>
+      </g>
+    )
+    return (
+      <>
+        {line(selectedPrediction.support_level, cSupport, 'Support')}
+        {line(selectedPrediction.resistance_level, cResistance, 'Résistance')}
+      </>
+    )
+  }
+
   return (
     <div className="mt-6 pt-6 border-t">
       <h4 className="font-medium mb-1">
@@ -200,10 +302,10 @@ export default function PredictionChartContainer({
           <span className="text-muted-foreground">Actuel:</span>
           <span className="font-bold">{formatCurrency(selectedPrediction.current_price)}</span>
           <span className="text-muted-foreground">→</span>
-          <span className={`font-bold ${selectedPrediction.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`font-bold ${selectedPrediction.change_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
             {formatCurrency(selectedPrediction.predicted_price)}
           </span>
-          <span className={`text-xs ${selectedPrediction.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`text-xs ${selectedPrediction.change_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
             ({selectedPrediction.change_percent >= 0 ? '+' : ''}{selectedPrediction.change_percent.toFixed(2)}%)
           </span>
         </div>
@@ -212,8 +314,8 @@ export default function PredictionChartContainer({
           <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full rounded-full ${
-                selectedPrediction.trend_strength > dt.trend_strength.strong ? 'bg-green-500' :
-                selectedPrediction.trend_strength > dt.trend_strength.moderate ? 'bg-yellow-500' : 'bg-gray-400'
+                selectedPrediction.trend_strength > dt.trend_strength.strong ? 'bg-gain' :
+                selectedPrediction.trend_strength > dt.trend_strength.moderate ? 'bg-warning' : 'bg-gray-400'
               }`}
               style={{ width: `${Math.min(100, selectedPrediction.trend_strength)}%` }}
             />
@@ -224,19 +326,19 @@ export default function PredictionChartContainer({
 
       {/* Model disagreement warning */}
       {selectedPrediction.models_agree === false && (
-        <div className="mb-3 flex items-start gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
-          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+        <div className="mb-3 flex items-start gap-2 p-2 rounded bg-warning/10 border border-warning/20">
+          <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+          <p className="text-xs text-warning dark:text-warning">
             Les modèles divergent sur la direction — fiabilité réduite
           </p>
         </div>
       )}
 
       {selectedPrediction.regime_info?.regime_price_adjustment && (
-        <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-          <ShieldAlert className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+        <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-loss/10 border border-loss/20">
+          <ShieldAlert className="h-5 w-5 text-loss mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+            <p className="text-sm font-semibold text-loss dark:text-loss">
               Correction régime appliquée
             </p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -287,7 +389,7 @@ export default function PredictionChartContainer({
               </Badge>
             )}
             {backtestData.needs_retraining && (
-              <span className="text-xs text-red-500 font-medium">
+              <span className="text-xs text-loss font-medium">
                 Modèle en cours de réentraînement
               </span>
             )}
@@ -307,9 +409,9 @@ export default function PredictionChartContainer({
                   <span className="text-muted-foreground ml-0.5">(MAPE {m.mape.toFixed(1)}%)</span>
                 )}
                 {m.trend === 'bullish' ? (
-                  <ArrowUp className="h-3 w-3 text-emerald-500" />
+                  <ArrowUp className="h-3 w-3 text-gain" />
                 ) : m.trend === 'bearish' ? (
-                  <ArrowDown className="h-3 w-3 text-red-500" />
+                  <ArrowDown className="h-3 w-3 text-loss" />
                 ) : (
                   <Minus className="h-3 w-3 text-gray-400" />
                 )}
@@ -320,7 +422,7 @@ export default function PredictionChartContainer({
         <div className="flex items-center gap-2 mb-4">
           <p className="text-xs text-muted-foreground">Modèle: {selectedPrediction.model_used}</p>
           {selectedPrediction.model_used === 'random_walk' && (
-            <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">
+            <Badge variant="outline" className="text-xs text-warning border-warning/30">
               <AlertTriangle className="h-3 w-3 mr-1" />
               Données insuffisantes
             </Badge>
@@ -330,86 +432,52 @@ export default function PredictionChartContainer({
 
       {/* ── Chart ── */}
       <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData}>
-            <defs>
-              <linearGradient id="confGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-            <YAxis
-              domain={[
-                (dataMin: number) => {
-                  const prices = chartData.flatMap(d => [
-                    d.confidence_high, d.confidence_low, d.actual,
-                  ].filter((v): v is number => v != null))
-                  const min = prices.length > 0 ? Math.min(...prices) : dataMin
-                  const max = prices.length > 0 ? Math.max(...prices) : dataMin
-                  const range = max - min || min * 0.1
-                  return Math.max(0, min - range * 0.1)
-                },
-                (dataMax: number) => {
-                  const prices = chartData.flatMap(d => [
-                    d.confidence_high, d.confidence_low, d.actual,
-                  ].filter((v): v is number => v != null))
-                  const max = prices.length > 0 ? Math.max(...prices) : dataMax
-                  const min = prices.length > 0 ? Math.min(...prices) : dataMax
-                  const range = max - min || max * 0.1
-                  return max + range * 0.1
-                },
-              ]}
-              tickFormatter={formatPrice}
-              tick={{ fontSize: 11 }}
-              width={90}
-              allowDecimals
-            />
-            <RechartsTooltip
-              formatter={(value: number, name: string) => {
-                const labels: Record<string, string> = {
-                  confidence_high: 'Borne haute',
-                  confidence_low: 'Borne basse',
-                  price: 'Prix prédit',
-                  actual: 'Prix réel',
-                  predicted_past: 'Prédiction passée',
-                }
-                return [formatCurrency(value), labels[name] || name]
-              }}
-            />
-            <Area type="monotone" dataKey="confidence_high" stroke="none" fill="url(#confGradient)" fillOpacity={1} />
-            <Area type="monotone" dataKey="confidence_low" stroke="none" fill="hsl(var(--background))" fillOpacity={1} />
-            <Line type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls />
-            {showReality && (
-              <>
-                <Line type="monotone" dataKey="actual" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3, fill: '#22c55e' }} connectNulls />
-                <Line type="monotone" dataKey="predicted_past" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls />
-              </>
-            )}
-            {showSupportResistance && (
-              <>
-                <ReferenceLine y={selectedPrediction.support_level} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Support', position: 'left', fontSize: 10, fill: '#ef4444' }} />
-                <ReferenceLine y={selectedPrediction.resistance_level} stroke="#10b981" strokeDasharray="4 4" label={{ value: 'Résistance', position: 'left', fontSize: 10, fill: '#10b981' }} />
-              </>
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
+        <ResponsiveLine
+          data={series}
+          theme={theme}
+          margin={{ top: 12, right: 16, bottom: 28, left: 72 }}
+          xScale={{ type: 'point' }}
+          yScale={{ type: 'linear', min: yMin, max: yMax, stacked: false }}
+          curve="monotoneX"
+          enablePoints={false}
+          enableGridX={false}
+          axisBottom={{ tickSize: 0, tickPadding: 8, tickValues }}
+          axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => formatPrice(v as number) }}
+          layers={['grid', 'axes', BandLayer, RefLinesLayer, LinesLayer, 'slices']}
+          enableSlices="x"
+          sliceTooltip={({ slice }) => (
+            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+              <p className="mb-1.5 text-xs text-muted-foreground">{slice.points[0]?.data.x as string}</p>
+              {slice.points.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">
+                    {SERIES_LABELS[p.seriesId as string] ?? p.seriesId}
+                  </span>
+                  <span className="font-mono text-sm tabular-nums">
+                    {formatCurrency(p.data.y as number)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          animate
+          motionConfig="gentle"
+        />
       </div>
 
       {/* Chart legend */}
       {showReality && (
         <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-[#22c55e] inline-block rounded" />
+            <span className="w-4 h-0.5 bg-[oklch(var(--chart-3))] inline-block rounded" />
             Prix réel
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-[#3b82f6] inline-block rounded" style={{ borderTop: '2px dashed #3b82f6', height: 0 }} />
+            <span className="w-4 h-0.5 bg-[oklch(var(--chart-5))] inline-block rounded" style={{ borderTop: '2px dashed oklch(var(--chart-5))', height: 0 }} />
             Prix prédit
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-[#94a3b8] inline-block rounded" />
+            <span className="w-4 h-0.5 bg-[oklch(var(--muted-foreground))] inline-block rounded" />
             Prédiction passée
           </span>
         </div>
@@ -449,17 +517,17 @@ export default function PredictionChartContainer({
                     </span>
                     <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${isUp ? 'bg-green-500' : 'bg-red-500'}`}
+                        className={`h-full rounded-full ${isUp ? 'bg-gain' : 'bg-loss'}`}
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
                     <div className="flex items-center gap-1 w-16 justify-end">
                       {isUp ? (
-                        <ArrowUp className="h-3 w-3 text-green-500" />
+                        <ArrowUp className="h-3 w-3 text-gain" />
                       ) : (
-                        <ArrowDown className="h-3 w-3 text-red-500" />
+                        <ArrowDown className="h-3 w-3 text-loss" />
                       )}
-                      <span className={`text-xs font-medium ${isUp ? 'text-green-500' : 'text-red-500'}`}>
+                      <span className={`text-xs font-medium ${isUp ? 'text-gain' : 'text-loss'}`}>
                         {exp.direction}
                       </span>
                     </div>
@@ -529,9 +597,9 @@ export default function PredictionChartContainer({
             )}
 
             {ri.liquidity_warning && (
-              <div className="mt-2 flex items-start gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
-                <Droplets className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-600 dark:text-amber-400">{ri.liquidity_warning}</p>
+              <div className="mt-2 flex items-start gap-2 p-2 rounded bg-warning/10 border border-warning/20">
+                <Droplets className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <p className="text-xs text-warning dark:text-warning">{ri.liquidity_warning}</p>
               </div>
             )}
           </div>

@@ -3,21 +3,14 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { motion } from 'framer-motion'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import {
-  TrendingUp,
-  Loader2,
-  BarChart3,
-  Shield,
-  Zap,
-  PieChart,
-  ArrowRight
-} from 'lucide-react'
+import { Loader2, ArrowRight, Sparkles } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -27,6 +20,9 @@ const loginSchema = z.object({
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
+
+const fieldClass =
+  'h-12 rounded-xl border-border bg-secondary/40 px-4 text-base transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary/50'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -51,10 +47,7 @@ export default function LoginPage() {
     clearError()
     try {
       await login(data.email, data.password, data.mfaCode, data.rememberMe)
-      toast({
-        title: 'Connexion réussie',
-        description: 'Bienvenue sur InvestAI',
-      })
+      toast({ title: 'Connexion réussie', description: 'Bienvenue sur InvestAI' })
       navigate('/')
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
@@ -70,107 +63,87 @@ export default function LoginPage() {
     }
   }
 
-  const features = [
-    {
-      icon: BarChart3,
-      title: 'Analyses avancées',
-      description: 'Visualisez vos performances en temps réel',
-    },
-    {
-      icon: Shield,
-      title: 'Sécurité maximale',
-      description: 'Vos données sont chiffrées et protégées',
-    },
-    {
-      icon: Zap,
-      title: 'Synchronisation auto',
-      description: 'Connectez vos exchanges en un clic',
-    },
-    {
-      icon: PieChart,
-      title: 'Diversification',
-      description: 'Optimisez votre allocation d\'actifs',
-    },
-  ]
+  const univers = ['Crypto', 'Actions', 'Crowdfunding', 'Prédictions']
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Branding & Features */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/90 via-primary to-primary/80 relative overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white rounded-full blur-3xl opacity-5" />
-        </div>
+    <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-background">
+      {/* Left — immersive brand panel */}
+      <div className="relative hidden overflow-hidden border-r border-border/60 lg:flex">
+        <div className="absolute inset-0 mesh" />
+        <div className="glow left-[-10%] top-[-10%] h-[420px] w-[420px] bg-[oklch(var(--primary))]" />
+        <div className="glow bottom-[-15%] right-[-5%] h-[380px] w-[380px] bg-[oklch(var(--chart-3))]" />
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="relative z-10 flex w-full flex-col justify-between p-14"
+        >
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <TrendingUp className="h-7 w-7" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
+              <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
             </div>
-            <span className="text-2xl font-bold">InvestAI</span>
+            <span className="text-xl font-semibold tracking-tight">InvestAI</span>
           </div>
 
-          {/* Main content */}
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <h1 className="text-4xl font-bold leading-tight">
-                Gérez vos investissements<br />
-                <span className="text-white/80">intelligemment</span>
-              </h1>
-              <p className="text-lg text-white/70 max-w-md">
-                La plateforme tout-en-un pour suivre, analyser et optimiser
-                votre portefeuille d'investissement.
-              </p>
-            </div>
+          {/* Narrative headline */}
+          <div className="max-w-lg space-y-6">
+            <div className="eyebrow text-primary">Votre patrimoine, une seule histoire</div>
+            <h1 className="text-5xl font-semibold leading-[1.08] tracking-tight">
+              Tout votre patrimoine,
+              <br />
+              <span className="gradient-text">lu d'un seul regard.</span>
+            </h1>
+            <p className="text-lg leading-relaxed text-muted-foreground">
+              Crypto, actions, crowdfunding et prédictions réunis dans un récit clair —
+              piloté par l'IA, sans le bruit.
+            </p>
 
-            {/* Features grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="p-4 rounded-xl bg-white/10 backdrop-blur border border-white/10 hover:bg-white/15 transition-colors"
+            {/* Univers pills */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {univers.map((u) => (
+                <span
+                  key={u}
+                  className="rounded-full border border-border/70 bg-card/40 px-4 py-1.5 text-sm text-foreground/80 backdrop-blur-sm"
                 >
-                  <feature.icon className="h-8 w-8 mb-3 text-white/90" />
-                  <h3 className="font-semibold mb-1">{feature.title}</h3>
-                  <p className="text-sm text-white/60">{feature.description}</p>
-                </div>
+                  {u}
+                </span>
               ))}
             </div>
           </div>
 
           {/* Footer */}
-          <p className="text-white/50 text-sm">
-            © 2026 InvestAI. Tous droits réservés.
-          </p>
-        </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-[oklch(var(--gain))]" />
+            Chiffrement de bout en bout · © 2026 InvestAI
+          </div>
+        </motion.div>
       </div>
 
-      {/* Right side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md space-y-8">
+      {/* Right — form */}
+      <div className="relative flex items-center justify-center p-6 lg:p-12">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="w-full max-w-sm"
+        >
           {/* Mobile logo */}
-          <div className="lg:hidden flex justify-center mb-8">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                <TrendingUp className="h-7 w-7 text-primary" />
-              </div>
-              <span className="text-2xl font-bold">InvestAI</span>
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
+              <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
             </div>
+            <span className="text-xl font-semibold tracking-tight">InvestAI</span>
           </div>
 
           {/* Header */}
-          <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold tracking-tight">Bon retour !</h2>
-            <p className="mt-2 text-muted-foreground">
-              Connectez-vous pour accéder à votre tableau de bord
-            </p>
+          <div className="mb-8 space-y-2">
+            <div className="eyebrow text-primary">Connexion</div>
+            <h2 className="text-3xl font-semibold tracking-tight">Bon retour</h2>
+            <p className="text-muted-foreground">Reprenez le fil de votre patrimoine.</p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium">
@@ -180,7 +153,7 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="vous@exemple.com"
-                className="h-12 px-4"
+                className={fieldClass}
                 autoComplete="email"
                 {...register('email')}
               />
@@ -196,16 +169,16 @@ export default function LoginPage() {
                 </Label>
                 <Link
                   to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
+                  className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
                 >
-                  Mot de passe oublié ?
+                  Oublié ?
                 </Link>
               </div>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                className="h-12 px-4"
+                className={fieldClass}
                 autoComplete="current-password"
                 {...register('password')}
               />
@@ -220,7 +193,7 @@ export default function LoginPage() {
                 checked={rememberMe}
                 onCheckedChange={(checked) => setValue('rememberMe', checked === true)}
               />
-              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal">
                 Rester connecté
               </Label>
             </div>
@@ -233,61 +206,53 @@ export default function LoginPage() {
                 <Input
                   id="mfaCode"
                   type="text"
-                  placeholder="123456"
+                  placeholder="000000"
                   maxLength={6}
-                  className="h-12 px-4 text-center text-2xl tracking-[0.5em] font-mono"
+                  className="h-14 rounded-xl border-primary/40 bg-secondary/40 text-center text-2xl tracking-[0.5em] focus-visible:ring-2 focus-visible:ring-primary"
                   {...register('mfaCode')}
                 />
-                <p className="text-xs text-muted-foreground text-center">
-                  Entrez le code de votre application d'authentification
+                <p className="text-xs text-muted-foreground">
+                  Saisissez le code de votre application TOTP.
                 </p>
               </div>
             )}
 
             {error && (
-              <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             <Button
               type="submit"
-              className="w-full h-12 text-base font-semibold"
+              className="group h-12 w-full rounded-xl bg-[linear-gradient(100deg,oklch(var(--primary)),oklch(var(--chart-3)))] text-base font-semibold text-primary-foreground shadow-[0_8px_30px_-8px_oklch(var(--primary)/0.7)] transition-all hover:shadow-[0_10px_40px_-6px_oklch(var(--primary)/0.85)]"
               disabled={isLoading}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Connexion en cours...
+                  Connexion…
                 </>
               ) : (
                 <>
                   Se connecter
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-0.5" />
                 </>
               )}
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Nouveau sur InvestAI ?
-              </span>
-            </div>
-          </div>
-
-          {/* Register link */}
-          <Link to="/register">
-            <Button variant="outline" className="w-full h-12 text-base">
-              Créer un compte gratuit
-            </Button>
-          </Link>
-        </div>
+          {/* Register */}
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Pas encore de compte ?{' '}
+            <Link
+              to="/register"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Ouvrir un compte
+            </Link>
+          </p>
+        </motion.div>
       </div>
     </div>
   )

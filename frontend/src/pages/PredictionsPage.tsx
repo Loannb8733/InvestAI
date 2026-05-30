@@ -59,10 +59,10 @@ export default function PredictionsPage() {
   return (
     <div className="space-y-6">
       {/* Disclaimer banner */}
-      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+      <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
         <div>
-          <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">Analyse exploratoire</p>
+          <p className="text-sm font-semibold text-warning dark:text-warning">Analyse exploratoire</p>
           <p className="text-xs text-muted-foreground mt-1">
             Ces projections sont basées sur des modèles statistiques appliqués aux prix historiques.
             Elles ne constituent pas des conseils d'investissement. Les marchés crypto sont hautement
@@ -73,10 +73,10 @@ export default function PredictionsPage() {
 
       {/* Bear market mode banner */}
       {marketCycle?.market_regime?.dominant_regime === 'bearish' && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
-        <div className="rounded-lg border-2 border-blue-500/40 bg-blue-500/5 p-4 flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 text-blue-500 mt-0.5 shrink-0" />
+        <div className="rounded-lg border-2 border-accent/40 bg-accent/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-accent mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <p className="text-sm font-bold text-accent dark:text-accent flex items-center gap-2">
               Mode Accumulation — Marché baissier
               <Badge variant="secondary" className="text-xs">
                 Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
@@ -93,10 +93,10 @@ export default function PredictionsPage() {
 
       {/* Bull market mode banner */}
       {marketCycle?.market_regime?.dominant_regime === 'bullish' && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
-        <div className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-4 flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 text-amber-500 mt-0.5 shrink-0" />
+        <div className="rounded-lg border-2 border-warning/40 bg-warning/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-warning mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+            <p className="text-sm font-bold text-warning dark:text-warning flex items-center gap-2">
               Mode Prise de Profits — Marché haussier
               <Badge variant="secondary" className="text-xs">
                 Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
@@ -113,10 +113,10 @@ export default function PredictionsPage() {
 
       {/* Top market mode banner */}
       {['top', 'topping', 'distribution'].includes(marketCycle?.market_regime?.dominant_regime ?? '') && (marketCycle?.market_regime?.confidence ?? 0) > 0.5 && (
-        <div className="rounded-lg border-2 border-red-500/40 bg-red-500/5 p-4 flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 text-red-500 mt-0.5 shrink-0" />
+        <div className="rounded-lg border-2 border-loss/40 bg-loss/5 p-4 flex items-start gap-3">
+          <ShieldAlert className="h-6 w-6 text-loss mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+            <p className="text-sm font-bold text-loss dark:text-loss flex items-center gap-2">
               Mode Distribution — Prenez vos profits
               <Badge variant="destructive" className="text-xs">
                 Confiance {((marketCycle?.market_regime?.confidence ?? 0) * 100).toFixed(0)}%
@@ -133,7 +133,7 @@ export default function PredictionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Analyse & Projections</h1>
+          <h1 className="text-3xl font-serif font-medium">Analyse & Projections</h1>
           <p className="text-muted-foreground">Projections statistiques et sentiment de marché</p>
         </div>
         <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export default function PredictionsPage() {
             {summary ? (
               <div className="space-y-4">
                 <div className="text-center">
-                  <div className={`text-4xl font-bold flex items-center justify-center gap-2 ${summary.expected_change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <div className={`text-4xl font-serif font-medium flex items-center justify-center gap-2 ${summary.expected_change_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {summary.expected_change_percent >= 0 ? <ArrowUp className="h-7 w-7" /> : <ArrowDown className="h-7 w-7" />}
                     {Math.abs(summary.expected_change_percent).toFixed(2)}%
                   </div>
@@ -218,16 +218,16 @@ export default function PredictionsPage() {
                     const total = summary.bullish_assets + summary.neutral_assets + summary.bearish_assets
                     return total > 0 ? (
                       <div className="flex h-3 rounded-full overflow-hidden bg-muted">
-                        {summary.bullish_assets > 0 && <div className="bg-green-500 transition-all" style={{ width: `${(summary.bullish_assets / total) * 100}%` }} />}
-                        {summary.neutral_assets > 0 && <div className="bg-yellow-500 transition-all" style={{ width: `${(summary.neutral_assets / total) * 100}%` }} />}
-                        {summary.bearish_assets > 0 && <div className="bg-red-500 transition-all" style={{ width: `${(summary.bearish_assets / total) * 100}%` }} />}
+                        {summary.bullish_assets > 0 && <div className="bg-gain transition-all" style={{ width: `${(summary.bullish_assets / total) * 100}%` }} />}
+                        {summary.neutral_assets > 0 && <div className="bg-warning transition-all" style={{ width: `${(summary.neutral_assets / total) * 100}%` }} />}
+                        {summary.bearish_assets > 0 && <div className="bg-loss transition-all" style={{ width: `${(summary.bearish_assets / total) * 100}%` }} />}
                       </div>
                     ) : <div className="flex h-3 rounded-full overflow-hidden bg-muted" />
                   })()}
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />{summary.bullish_assets} haussier</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" />{summary.neutral_assets} neutre</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />{summary.bearish_assets} baissier</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gain" />{summary.bullish_assets} haussier</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning" />{summary.neutral_assets} neutre</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-loss" />{summary.bearish_assets} baissier</span>
                   </div>
                 </div>
               </div>
@@ -249,7 +249,7 @@ export default function PredictionsPage() {
           </TabsTrigger>
           <TabsTrigger value="signals" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />Signaux
-            {highAlerts > 0 && <span className="ml-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">{highAlerts}</span>}
+            {highAlerts > 0 && <span className="ml-1 w-5 h-5 rounded-full bg-loss text-white text-xs flex items-center justify-center">{highAlerts}</span>}
           </TabsTrigger>
           <TabsTrigger value="simulation" className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4" />Simulation
@@ -274,7 +274,16 @@ export default function PredictionsPage() {
               formatPrice={formatPrice}
             />
           ) : (
-            <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Aucune prédiction disponible</p></CardContent></Card>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
+                <h2 className="text-xl font-serif font-medium mb-2">Pas encore de projection</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Ajoute des actifs à ton portefeuille pour que l'analyse statistique
+                  puisse dessiner les scénarios à venir.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 

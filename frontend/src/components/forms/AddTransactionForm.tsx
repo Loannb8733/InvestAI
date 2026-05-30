@@ -85,16 +85,16 @@ interface AddTransactionFormProps {
 }
 
 const transactionTypes = [
-  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-green-500', bg: 'bg-green-500/10 border-green-500/20', activeBg: 'bg-green-500/20 border-green-500/40 ring-1 ring-green-500/30', submitBg: 'bg-green-600 hover:bg-green-700' },
-  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', activeBg: 'bg-red-500/20 border-red-500/40 ring-1 ring-red-500/30', submitBg: 'bg-red-600 hover:bg-red-700' },
-  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', activeBg: 'bg-blue-500/20 border-blue-500/40 ring-1 ring-blue-500/30', submitBg: 'bg-blue-600 hover:bg-blue-700' },
-  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', activeBg: 'bg-orange-500/20 border-orange-500/40 ring-1 ring-orange-500/30', submitBg: 'bg-orange-600 hover:bg-orange-700' },
-  { value: 'staking_reward', label: 'Reward', shortLabel: 'Reward', icon: Coins, color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', activeBg: 'bg-yellow-500/20 border-yellow-500/40 ring-1 ring-yellow-500/30', submitBg: 'bg-yellow-600 hover:bg-yellow-700' },
-  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/20', activeBg: 'bg-pink-500/20 border-pink-500/40 ring-1 ring-pink-500/30', submitBg: 'bg-pink-600 hover:bg-pink-700' },
-  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20', activeBg: 'bg-teal-500/20 border-teal-500/40 ring-1 ring-teal-500/30', submitBg: 'bg-teal-600 hover:bg-teal-700' },
-  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', activeBg: 'bg-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30', submitBg: 'bg-amber-600 hover:bg-amber-700' },
-  { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20', activeBg: 'bg-purple-500/20 border-purple-500/40 ring-1 ring-purple-500/30', submitBg: 'bg-purple-600 hover:bg-purple-700' },
-  { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20', activeBg: 'bg-purple-400/20 border-purple-400/40 ring-1 ring-purple-400/30', submitBg: 'bg-purple-500 hover:bg-purple-600' },
+  { value: 'buy', label: 'Achat', shortLabel: 'Achat', icon: ArrowDownRight, color: 'text-gain', bg: 'bg-gain/10 border-gain/20', activeBg: 'bg-gain/20 border-gain/40 ring-1 ring-gain/30', submitBg: 'bg-gain hover:bg-gain' },
+  { value: 'sell', label: 'Vente', shortLabel: 'Vente', icon: ArrowUpRight, color: 'text-loss', bg: 'bg-loss/10 border-loss/20', activeBg: 'bg-loss/20 border-loss/40 ring-1 ring-loss/30', submitBg: 'bg-loss hover:bg-loss' },
+  { value: 'transfer_in', label: 'Transfert entrant', shortLabel: 'Transfert In', icon: ArrowDownRight, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'transfer_out', label: 'Transfert sortant', shortLabel: 'Transfert Out', icon: ArrowUpRight, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'staking_reward', label: 'Reward', shortLabel: 'Reward', icon: Coins, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'airdrop', label: 'Airdrop', shortLabel: 'Airdrop', icon: Gift, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'conversion_in', label: 'Conversion entrante', shortLabel: 'Conv. In', icon: ArrowLeftRight, color: 'text-gain', bg: 'bg-gain/10 border-gain/20', activeBg: 'bg-gain/20 border-gain/40 ring-1 ring-gain/30', submitBg: 'bg-gain hover:bg-gain' },
+  { value: 'conversion_out', label: 'Conversion sortante', shortLabel: 'Conv. Out', icon: ArrowLeftRight, color: 'text-warning', bg: 'bg-warning/10 border-warning/20', activeBg: 'bg-warning/20 border-warning/40 ring-1 ring-warning/30', submitBg: 'bg-warning hover:bg-warning' },
+  { value: 'staking', label: 'Staking', shortLabel: 'Staking', icon: Lock, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
+  { value: 'unstaking', label: 'Unstaking', shortLabel: 'Unstaking', icon: Unlock, color: 'text-accent', bg: 'bg-accent/10 border-accent/20', activeBg: 'bg-accent/20 border-accent/40 ring-1 ring-accent/30', submitBg: 'bg-accent hover:bg-accent' },
 ] as const
 
 const assetTypes = [
@@ -450,7 +450,7 @@ export default function AddTransactionForm({
 
         {/* Inline new asset creation */}
         {selectedPortfolioId && showNewAsset && (
-          <div className="space-y-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3">
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between">
               <Label className="font-medium">Nouvel actif</Label>
               <Button
@@ -709,7 +709,7 @@ export default function AddTransactionForm({
 
         {/* 8. Impact Summary */}
         {selectedAsset && quantity > 0 && (
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-3 space-y-2">
+          <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
             <div className="flex items-center gap-1.5">
               <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-xs font-medium text-muted-foreground">Résumé de l'impact</p>
@@ -728,7 +728,7 @@ export default function AddTransactionForm({
                   </p>
                   <p className={cn(
                     'text-sm font-semibold',
-                    isFreeCrypto ? 'text-muted-foreground' : isInbound ? 'text-red-400' : 'text-green-400',
+                    isFreeCrypto ? 'text-muted-foreground' : isInbound ? 'text-loss' : 'text-gain',
                   )}>
                     {isFreeCrypto ? '≈ ' : isInbound ? '-' : '+'}{fmt.format(total)}
                   </p>
@@ -761,7 +761,7 @@ export default function AddTransactionForm({
   if (open !== undefined && onOpenChange !== undefined) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="border-white/[0.08] bg-background/80 backdrop-blur-xl shadow-2xl">
+        <DialogContent className="border-border bg-background/80 shadow-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {typeConfig && <typeConfig.icon className={cn('h-5 w-5', typeConfig.color)} />}

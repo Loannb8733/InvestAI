@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
         <CardContent>
           {success ? (
             <div className="text-center space-y-4">
-              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
+              <CheckCircle2 className="h-16 w-16 text-gain mx-auto" />
               <p className="text-sm text-muted-foreground">
                 Votre mot de passe a été réinitialisé avec succès.
               </p>

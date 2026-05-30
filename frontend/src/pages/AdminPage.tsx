@@ -129,7 +129,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Administration</h1>
+        <h1 className="text-3xl font-serif font-medium">Administration</h1>
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvel utilisateur
@@ -144,27 +144,27 @@ export default function AdminPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{usersList.length}</div>
+            <div className="text-2xl font-serif font-medium">{usersList.length}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Utilisateurs actifs</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-green-500" />
+            <ShieldCheck className="h-4 w-4 text-gain" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeCount}</div>
+            <div className="text-2xl font-serif font-medium">{activeCount}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">MFA activé</CardTitle>
-            <Shield className="h-4 w-4 text-blue-500" />
+            <Shield className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mfaCount}</div>
+            <div className="text-2xl font-serif font-medium">{mfaCount}</div>
           </CardContent>
         </Card>
       </div>
@@ -217,7 +217,7 @@ export default function AdminPage() {
                     </td>
                     <td className="py-3">
                       {user.mfa_enabled ? (
-                        <Shield className="h-4 w-4 text-green-500" />
+                        <Shield className="h-4 w-4 text-gain" />
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>
                       )}

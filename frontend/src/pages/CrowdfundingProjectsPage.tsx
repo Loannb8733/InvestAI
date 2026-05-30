@@ -44,11 +44,11 @@ import StressTestSlider from '@/components/crowdfunding/StressTestSlider'
 import PaymentTimeline from '@/components/crowdfunding/PaymentTimeline'
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
-  funding: 'bg-yellow-500/10 text-yellow-500',
-  active: 'bg-green-500/10 text-green-500',
-  completed: 'bg-blue-500/10 text-blue-500',
-  delayed: 'bg-orange-500/10 text-orange-500',
-  defaulted: 'bg-red-500/10 text-red-500',
+  funding: 'bg-warning/10 text-warning',
+  active: 'bg-gain/10 text-gain',
+  completed: 'bg-accent/10 text-accent',
+  delayed: 'bg-warning/10 text-warning',
+  defaulted: 'bg-loss/10 text-loss',
 }
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -91,9 +91,9 @@ function getScheduleHealth(project: CrowdfundingProject): ScheduleHealth {
 
 const HEALTH_CONFIG: Record<ScheduleHealth, { dot: string; label: string; icon: typeof CheckCircle2 }> = {
   none: { dot: 'bg-muted-foreground', label: 'Pas d\'échéancier', icon: Clock },
-  healthy: { dot: 'bg-emerald-500', label: 'À jour', icon: CheckCircle2 },
-  warning: { dot: 'bg-amber-500', label: 'En attente', icon: Clock },
-  danger: { dot: 'bg-red-500', label: 'Retard détecté', icon: AlertTriangle },
+  healthy: { dot: 'bg-gain', label: 'À jour', icon: CheckCircle2 },
+  warning: { dot: 'bg-warning', label: 'En attente', icon: Clock },
+  danger: { dot: 'bg-loss', label: 'Retard détecté', icon: AlertTriangle },
 }
 
 // ─── Form types ───
@@ -345,7 +345,7 @@ export default function CrowdfundingProjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Mes Projets</h1>
+          <h1 className="text-3xl font-serif font-medium">Mes Projets</h1>
           <p className="text-muted-foreground">
             Gérez vos investissements crowdfunding
           </p>
@@ -710,7 +710,7 @@ export default function CrowdfundingProjectsPage() {
                     {p.projected_total_interest !== null && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Intérêts projetés : </span>
-                        <span className="font-medium text-green-500">
+                        <span className="font-medium text-gain">
                           {formatCurrency(p.projected_total_interest)}
                         </span>
                       </div>
@@ -754,7 +754,7 @@ export default function CrowdfundingProjectsPage() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Reçu</span>
                         <span>
-                          <span className="font-medium text-green-500">{formatCurrency(p.total_received)}</span>
+                          <span className="font-medium text-gain">{formatCurrency(p.total_received)}</span>
                           <span className="text-muted-foreground"> / {formatCurrency(p.projected_total_interest ?? 0)}</span>
                         </span>
                       </div>
@@ -766,7 +766,7 @@ export default function CrowdfundingProjectsPage() {
                                 {new Date(r.payment_date).toLocaleDateString('fr-FR')} — {PAYMENT_TYPE_LABELS[r.payment_type]}
                               </span>
                               <span className="flex items-center gap-1">
-                                <span className="font-medium text-green-500">+{formatCurrency(r.amount)}</span>
+                                <span className="font-medium text-gain">+{formatCurrency(r.amount)}</span>
                                 <button
                                   onClick={() => deleteRepaymentMutation.mutate({ projectId: p.id, repaymentId: r.id })}
                                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
@@ -801,7 +801,7 @@ export default function CrowdfundingProjectsPage() {
                         <span className="flex-1 text-left text-muted-foreground">
                           Sentinel — {paidCount}/{scheduleLen}
                           {overdueCount > 0 && (
-                            <span className="text-red-400 ml-1.5">({overdueCount} retard{overdueCount > 1 ? 's' : ''})</span>
+                            <span className="text-loss ml-1.5">({overdueCount} retard{overdueCount > 1 ? 's' : ''})</span>
                           )}
                         </span>
                         <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isSelected ? 'rotate-90' : ''}`} />
@@ -842,10 +842,7 @@ export default function CrowdfundingProjectsPage() {
 
           {/* ═══ Full-width Sentinel Panel ═══ */}
           {selectedProject && (selectedProject.schedule?.length ?? 0) > 0 && (
-            <div className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
-              {/* Glassmorphism overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-
+            <div className="relative rounded-lg border border-border bg-card overflow-hidden">
               {/* Header */}
               <div className="relative flex items-center justify-between border-b border-border/50 px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -987,7 +984,7 @@ export default function CrowdfundingProjectsPage() {
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Montant versé</span>
-                    <span className={`font-semibold tabular-nums ${netAmount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                    <span className={`font-semibold tabular-nums ${netAmount > 0 ? 'text-gain' : 'text-muted-foreground'}`}>
                       {formatCurrency(netAmount > 0 ? netAmount : 0)}
                     </span>
                   </div>

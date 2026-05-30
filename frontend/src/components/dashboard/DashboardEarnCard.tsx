@@ -21,17 +21,17 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
   const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
 
   return (
-    <Card className="border-purple-500/20">
+    <Card className="border-accent/20">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Lock className="h-4 w-4 text-purple-400" />
+          <Lock className="h-4 w-4 text-accent" />
           Earn / Staking
           {earnSummary.apr != null && earnSummary.apr > 0 && (
-            <Badge className="bg-green-500/10 text-green-500 border-green-500/30 text-[10px]">
+            <Badge className="bg-gain/10 text-gain border-gain/30 text-[10px]">
               Yield {earnSummary.apr.toFixed(1)}%
             </Badge>
           )}
-          <Badge className="ml-auto bg-purple-500/10 text-purple-400 border-purple-500/30 text-[10px]">
+          <Badge className="ml-auto bg-accent/10 text-accent border-accent/30 text-[10px]">
             {earnSummary.assets.length} actif{earnSummary.assets.length > 1 ? 's' : ''}
           </Badge>
         </CardTitle>
@@ -41,14 +41,14 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Valeur en Staking</p>
-            <p className="text-2xl font-bold text-purple-400">{pc(earnSummary.total_staked_value)}</p>
+            <p className="text-2xl font-serif font-medium text-accent">{pc(earnSummary.total_staked_value)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
               Rewards cumules
             </p>
-            <p className={`text-lg font-bold ${earnSummary.total_rewards > 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
+            <p className={`text-lg font-bold ${earnSummary.total_rewards > 0 ? 'text-gain' : 'text-muted-foreground'}`}>
               {earnSummary.total_rewards > 0 ? '+' : ''}{pc(earnSummary.total_rewards)}
             </p>
           </div>
@@ -61,7 +61,7 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
               <div className="flex items-center gap-2">
                 <AssetIconCompact symbol={asset.symbol} name={asset.symbol} assetType="crypto" size={24} />
                 <span className="text-sm font-medium">{asset.symbol}</span>
-                <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-[10px] px-1.5 py-0">
+                <Badge className="bg-accent/10 text-accent border-accent/30 text-[10px] px-1.5 py-0">
                   Staked
                 </Badge>
               </div>

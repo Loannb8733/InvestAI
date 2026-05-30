@@ -113,19 +113,19 @@ const typeLabels: Record<string, string> = {
 }
 
 const typeColors: Record<string, string> = {
-  buy: 'text-green-500',
-  sell: 'text-red-500',
-  transfer_in: 'text-blue-500',
-  transfer_out: 'text-orange-500',
-  staking_reward: 'text-yellow-500',
-  airdrop: 'text-pink-500',
-  conversion_in: 'text-teal-500',
-  conversion_out: 'text-amber-500',
-  dividend: 'text-emerald-500',
-  interest: 'text-cyan-500',
-  fee: 'text-red-400',
-  staking: 'text-purple-500',
-  unstaking: 'text-purple-400',
+  buy: 'text-gain',
+  sell: 'text-loss',
+  transfer_in: 'text-accent',
+  transfer_out: 'text-warning',
+  staking_reward: 'text-warning',
+  airdrop: 'text-accent',
+  conversion_in: 'text-gain',
+  conversion_out: 'text-warning',
+  dividend: 'text-gain',
+  interest: 'text-accent',
+  fee: 'text-loss',
+  staking: 'text-accent',
+  unstaking: 'text-accent',
 }
 
 const typeOptions = [
@@ -620,7 +620,12 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold">Transactions</h1>
+        <div>
+          <h1 className="text-3xl font-serif font-medium">Transactions</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Chaque mouvement qui a façonné ton patrimoine.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {/* Export Dropdown */}
           <DropdownMenu>
@@ -702,12 +707,12 @@ export default function TransactionsPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
+                <div className="p-2 rounded-lg bg-gain/10">
+                  <TrendingUp className="h-4 w-4 text-gain" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total achats{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-green-600">{formatCurrency(stats.totalBought)}</p>
+                  <p className="text-lg font-semibold text-gain">{formatCurrency(stats.totalBought)}</p>
                 </div>
               </div>
             </CardContent>
@@ -716,12 +721,12 @@ export default function TransactionsPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-red-500/10">
-                  <TrendingDown className="h-4 w-4 text-red-500" />
+                <div className="p-2 rounded-lg bg-loss/10">
+                  <TrendingDown className="h-4 w-4 text-loss" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total ventes{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-red-600">{formatCurrency(stats.totalSold)}</p>
+                  <p className="text-lg font-semibold text-loss">{formatCurrency(stats.totalSold)}</p>
                 </div>
               </div>
             </CardContent>
@@ -730,12 +735,12 @@ export default function TransactionsPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Receipt className="h-4 w-4 text-orange-500" />
+                <div className="p-2 rounded-lg bg-warning/10">
+                  <Receipt className="h-4 w-4 text-warning" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total frais{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-orange-600">{formatCurrency(stats.totalFees)}</p>
+                  <p className="text-lg font-semibold text-warning">{formatCurrency(stats.totalFees)}</p>
                 </div>
               </div>
             </CardContent>
@@ -744,12 +749,12 @@ export default function TransactionsPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${stats.netFlow >= 0 ? 'bg-blue-500/10' : 'bg-purple-500/10'}`}>
-                  <Coins className={`h-4 w-4 ${stats.netFlow >= 0 ? 'text-blue-500' : 'text-purple-500'}`} />
+                <div className={`p-2 rounded-lg ${stats.netFlow >= 0 ? 'bg-accent/10' : 'bg-accent/10'}`}>
+                  <Coins className={`h-4 w-4 ${stats.netFlow >= 0 ? 'text-accent' : 'text-accent'}`} />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Flux net{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className={`text-lg font-semibold ${stats.netFlow >= 0 ? 'text-blue-600' : 'text-purple-600'}`}>
+                  <p className={`text-lg font-semibold ${stats.netFlow >= 0 ? 'text-accent' : 'text-accent'}`}>
                     {formatCurrency(stats.netFlow)}
                   </p>
                 </div>
@@ -1045,7 +1050,7 @@ export default function TransactionsPage() {
                         <td className="py-3 text-center">
                           <span className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${
                             tx.exchange && isColdWallet(tx.exchange)
-                              ? 'bg-blue-500/10 text-blue-500'
+                              ? 'bg-accent/10 text-accent'
                               : 'bg-muted'
                           }`}>
                             {tx.exchange && isColdWallet(tx.exchange) && <Shield className="h-3 w-3" />}

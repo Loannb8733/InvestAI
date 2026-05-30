@@ -217,7 +217,12 @@ export default function PortfolioPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Portefeuille</h1>
+        <div>
+          <h1 className="text-3xl font-serif font-medium">Portefeuille</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Le détail de ce que tu possèdes, ligne par ligne.
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowImportCSV(true)}>
             <Upload className="h-4 w-4 mr-2" />
@@ -286,10 +291,10 @@ export default function PortfolioPage() {
               <div className="flex items-center gap-4">
                 {portfolioMetrics && (
                   <div className="text-right">
-                    <p className="text-2xl font-bold">
+                    <p className="text-2xl font-serif font-medium">
                       {formatCurrency(portfolioMetrics.total_value)}
                     </p>
-                    <p className={`text-sm ${portfolioMetrics.total_gain_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <p className={`text-sm ${portfolioMetrics.total_gain_loss >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {portfolioMetrics.total_gain_loss >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(portfolioMetrics.total_gain_loss)} ({formatPercent(portfolioMetrics.total_gain_loss_percent)})
                     </p>
                   </div>
@@ -354,8 +359,8 @@ export default function PortfolioPage() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                              <PiggyBank className="h-5 w-5 text-blue-500" />
+                            <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
+                              <PiggyBank className="h-5 w-5 text-accent" />
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Total investi (historique)</p>
@@ -367,8 +372,8 @@ export default function PortfolioPage() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                              <TrendingUp className="h-5 w-5 text-green-500" />
+                            <div className="h-10 w-10 rounded-full bg-gain/20 flex items-center justify-center">
+                              <TrendingUp className="h-5 w-5 text-gain" />
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Total vendu</p>
@@ -380,8 +385,8 @@ export default function PortfolioPage() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                              <History className="h-5 w-5 text-orange-500" />
+                            <div className="h-10 w-10 rounded-full bg-warning/20 flex items-center justify-center">
+                              <History className="h-5 w-5 text-warning" />
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Frais totaux</p>
@@ -431,7 +436,7 @@ export default function PortfolioPage() {
                                           : historyPlatformFilter
                                             ? 'opacity-50 hover:opacity-75'
                                             : isWallet
-                                              ? 'border-blue-500/20 hover:border-blue-500/40'
+                                              ? 'border-accent/20 hover:border-accent/40'
                                               : 'hover:bg-muted/50'
                                       }`}
                                       onClick={() => setHistoryPlatformFilter(isActive ? null : platform)}
@@ -439,11 +444,11 @@ export default function PortfolioPage() {
                                       <CardContent className="py-3 px-4">
                                         <div className="flex items-center gap-2 mb-1.5">
                                           {isWallet ? (
-                                            <Shield className="h-4 w-4 text-blue-500 shrink-0" />
+                                            <Shield className="h-4 w-4 text-accent shrink-0" />
                                           ) : isUnassigned ? null : (
                                             <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                                           )}
-                                          <span className={`text-sm font-medium truncate ${isWallet ? 'text-blue-500' : ''}`}>
+                                          <span className={`text-sm font-medium truncate ${isWallet ? 'text-accent' : ''}`}>
                                             {platform}
                                           </span>
                                         </div>
@@ -524,7 +529,7 @@ export default function PortfolioPage() {
                                           <td className="text-center py-3">{formatCurrency(asset.total_bought_value)}</td>
                                           <td className="text-center py-3">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
                                           <td className="text-center py-3">{formatCurrency(asset.total_sold_value)}</td>
-                                          <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                          <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                             {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
                                           </td>
                                         </tr>
@@ -552,7 +557,7 @@ export default function PortfolioPage() {
                                           <td className="text-center py-3 font-medium">{formatCurrency(group.totalBoughtValue)}</td>
                                           <td className="text-center py-3 font-medium">{group.totalSold.toFixed(group.totalSold < 1 ? 8 : 2)}</td>
                                           <td className="text-center py-3 font-medium">{formatCurrency(group.totalSoldValue)}</td>
-                                          <td className={`text-center py-3 font-medium ${group.realizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                          <td className={`text-center py-3 font-medium ${group.realizedGain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                             {group.realizedGain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.realizedGain)}
                                           </td>
                                         </tr>
@@ -568,7 +573,7 @@ export default function PortfolioPage() {
                                             <td className="text-center py-2 text-sm">{formatCurrency(asset.total_bought_value)}</td>
                                             <td className="text-center py-2 text-sm">{asset.total_sold.toFixed(asset.total_sold < 1 ? 8 : 2)}</td>
                                             <td className="text-center py-2 text-sm">{formatCurrency(asset.total_sold_value)}</td>
-                                            <td className={`text-center py-2 text-sm ${asset.realized_gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                            <td className={`text-center py-2 text-sm ${asset.realized_gain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                               {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
                                             </td>
                                           </tr>

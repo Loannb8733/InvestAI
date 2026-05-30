@@ -41,7 +41,7 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-orange-500" />
+            <ShieldAlert className="h-5 w-5 text-warning" />
             Signaux & alertes
           </CardTitle>
           <CardDescription>Alertes prédictives et signaux de marché combinés</CardDescription>
@@ -53,14 +53,14 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
                 <div
                   key={i}
                   className={`p-4 rounded-lg border flex items-start gap-3 ${
-                    alert.severity === 'high' ? 'bg-red-500/10 border-red-500/20' :
-                    alert.severity === 'medium' ? 'bg-yellow-500/10 border-yellow-500/20' :
-                    'bg-green-500/10 border-green-500/20'
+                    alert.severity === 'high' ? 'bg-loss/10 border-loss/20' :
+                    alert.severity === 'medium' ? 'bg-warning/10 border-warning/20' :
+                    'bg-gain/10 border-gain/20'
                   }`}
                 >
                   <div className={
-                    alert.severity === 'high' ? 'text-red-500' :
-                    alert.severity === 'medium' ? 'text-yellow-500' : 'text-green-500'
+                    alert.severity === 'high' ? 'text-loss' :
+                    alert.severity === 'medium' ? 'text-warning' : 'text-gain'
                   }>
                     {getAlertIcon(alert.icon)}
                   </div>
@@ -86,9 +86,9 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
 
       {/* Anomalies */}
       {anomaliesError && (
-        <Card className="border-yellow-500/20">
+        <Card className="border-warning/20">
           <CardContent className="py-6 text-center">
-            <AlertTriangle className="h-8 w-8 mx-auto text-yellow-500 mb-2" />
+            <AlertTriangle className="h-8 w-8 mx-auto text-warning mb-2" />
             <p className="text-sm text-muted-foreground">Impossible de charger les anomalies</p>
           </CardContent>
         </Card>
@@ -97,7 +97,7 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               Anomalies détectées
             </CardTitle>
           </CardHeader>
@@ -107,9 +107,9 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
                 <div
                   key={index}
                   className={`p-4 rounded-lg border ${
-                    anomaly.severity === 'high' ? 'bg-red-500/10 border-red-500/20' :
-                    anomaly.severity === 'medium' ? 'bg-yellow-500/10 border-yellow-500/20' :
-                    'bg-blue-500/10 border-blue-500/20'
+                    anomaly.severity === 'high' ? 'bg-loss/10 border-loss/20' :
+                    anomaly.severity === 'medium' ? 'bg-warning/10 border-warning/20' :
+                    'bg-accent/10 border-accent/20'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -119,7 +119,7 @@ export default function PredictionSignalsTab({ unifiedAlerts, anomalies, anomali
                         {anomaly.anomaly_type}
                       </Badge>
                     </div>
-                    <span className={`font-medium ${anomaly.price_change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`font-medium ${anomaly.price_change_percent >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {anomaly.price_change_percent >= 0 ? '+' : ''}{anomaly.price_change_percent.toFixed(2)}%
                     </span>
                   </div>

@@ -97,15 +97,15 @@ const LOGO_URLS: Record<string, string> = {
 
 const FALLBACK_COLORS: Record<string, string> = {
   binance: 'bg-[#F3BA2F]',
-  kraken: 'bg-[#5741D9]',
+  kraken: 'bg-[oklch(var(--chart-2))]',
   coinbase: 'bg-[#0052FF]',
   cryptocom: 'bg-[#002D74]',
-  kucoin: 'bg-[#23AF91]',
+  kucoin: 'bg-[oklch(var(--chart-3))]',
   bybit: 'bg-[#F7A600]',
-  okx: 'bg-[#000000]',
-  bitpanda: 'bg-[#5A6773]',
-  bitstamp: 'bg-[#4A9F3F]',
-  gateio: 'bg-[#2354E6]',
+  okx: 'bg-[oklch(var(--foreground))]',
+  bitpanda: 'bg-[oklch(var(--muted-foreground))]',
+  bitstamp: 'bg-[oklch(var(--chart-3))]',
+  gateio: 'bg-[oklch(var(--chart-5))]',
 }
 
 const FALLBACK_LABELS: Record<string, string> = {
@@ -136,7 +136,7 @@ const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number
 
   return (
     <div
-      className={`${FALLBACK_COLORS[exchange] || 'bg-primary/20'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
+      className={`${FALLBACK_COLORS[exchange] || 'bg-muted-foreground'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
       style={{ width: size, height: size, fontSize: size * 0.35 }}
     >
       {FALLBACK_LABELS[exchange] || <Coins style={{ width: size * 0.5, height: size * 0.5 }} />}
@@ -388,7 +388,7 @@ export default function ExchangesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Exchanges</h1>
+          <h1 className="text-3xl font-serif font-medium">Exchanges</h1>
           <p className="text-muted-foreground">
             Connectez vos exchanges pour synchroniser automatiquement vos positions.
           </p>
@@ -411,7 +411,7 @@ export default function ExchangesPage() {
             return (
               <Card key={apiKey.id} className="relative overflow-hidden">
                 {/* Status indicator bar */}
-                <div className={`absolute top-0 left-0 right-0 h-1 ${apiKey.is_active ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div className={`absolute top-0 left-0 right-0 h-1 ${apiKey.is_active ? 'bg-gain' : 'bg-loss'}`} />
 
                 <CardHeader className="pb-3 pt-5">
                   <div className="flex items-start justify-between gap-3">
@@ -458,7 +458,7 @@ export default function ExchangesPage() {
 
                   {/* Error message */}
                   {apiKey.last_error && (
-                    <div className="flex items-start gap-2 text-sm text-red-500 bg-red-500/10 p-2 rounded-md">
+                    <div className="flex items-start gap-2 text-sm text-loss bg-loss/10 p-2 rounded-md">
                       <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                       <span className="line-clamp-2">{apiKey.last_error}</span>
                     </div>
@@ -557,7 +557,7 @@ export default function ExchangesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-500" />
+            <Shield className="h-5 w-5 text-accent" />
             Mes wallets
           </CardTitle>
           <CardDescription>
@@ -568,10 +568,10 @@ export default function ExchangesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {COLD_WALLETS.map((wallet) => {
               const walletColors: Record<string, string> = {
-                Tangem: 'bg-[#000000]',
-                Ledger: 'bg-[#000000]',
-                Trezor: 'bg-[#00854D]',
-                SafePal: 'bg-[#4A33D0]',
+                Tangem: 'bg-[oklch(var(--foreground))]',
+                Ledger: 'bg-[oklch(var(--foreground))]',
+                Trezor: 'bg-[oklch(var(--chart-3))]',
+                SafePal: 'bg-[oklch(var(--chart-2))]',
                 Metamask: 'bg-[#E2761B]',
               }
               const walletLabels: Record<string, string> = {
@@ -587,7 +587,7 @@ export default function ExchangesPage() {
                   className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30"
                 >
                   <div
-                    className={`${walletColors[wallet] || 'bg-blue-500/20'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
+                    className={`${walletColors[wallet] || 'bg-muted-foreground'} text-white rounded-xl flex items-center justify-center font-bold shrink-0`}
                     style={{ width: 40, height: 40, fontSize: 14 }}
                   >
                     {walletLabels[wallet] || <Shield style={{ width: 20, height: 20 }} />}
@@ -596,7 +596,7 @@ export default function ExchangesPage() {
                     <h3 className="font-medium">{wallet}</h3>
                     <p className="text-xs text-muted-foreground">Suivi manuel</p>
                   </div>
-                  <Badge variant="outline" className="text-xs text-blue-500 border-blue-500/30">
+                  <Badge variant="outline" className="text-xs text-accent border-accent/30">
                     <Shield className="h-3 w-3 mr-1" />
                     Self-custody
                   </Badge>
@@ -791,8 +791,8 @@ export default function ExchangesPage() {
                 </div>
               )}
 
-              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3 text-sm">
-                <p className="text-yellow-600 dark:text-yellow-500">
+              <div className="rounded-lg bg-warning/10 border border-warning/20 p-3 text-sm">
+                <p className="text-warning dark:text-warning">
                   <strong>Conseil sécurité:</strong> Créez des clés API en lecture seule
                   sans permission de retrait pour protéger vos fonds.
                 </p>
@@ -817,9 +817,9 @@ export default function ExchangesPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {testResult?.success ? (
-                <CheckCircle className="h-5 w-5 text-green-500" />
+                <CheckCircle className="h-5 w-5 text-gain" />
               ) : (
-                <XCircle className="h-5 w-5 text-red-500" />
+                <XCircle className="h-5 w-5 text-loss" />
               )}
               {testResult?.success ? 'Connexion réussie' : 'Échec de connexion'}
             </DialogTitle>
@@ -871,11 +871,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de retrait ou de trading.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -917,22 +917,22 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Lecture seule</strong> (Enable Reading)</span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Enable Spot & Margin Trading</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Enable Withdrawals</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Enable Futures</span>
                         </div>
                       </div>
@@ -961,7 +961,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>
@@ -1002,11 +1002,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1045,34 +1045,34 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Dans la section <strong>"Permissions"</strong>, cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Query Funds</strong> — consulter vos soldes</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Query Open Orders & Trades</strong> — lire l'historique de trades</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Query Closed Orders & Trades</strong> — lire les ordres passés</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Query Ledger Entries</strong> — lire les mouvements de fonds</span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Create & Modify Orders</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Cancel/Close Orders</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Withdraw Funds</span>
                         </div>
                       </div>
@@ -1101,7 +1101,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Private Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>
@@ -1142,11 +1142,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de création, d'achat, de vente ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1181,42 +1181,42 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>wallet:accounts:read</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>wallet:trades:read</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>wallet:transactions:read</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>wallet:deposits:read</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>wallet:withdrawals:read</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">wallet:accounts:create</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">wallet:buys:create</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">wallet:sells:create</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">wallet:withdrawals:create</span>
                         </div>
                       </div>
@@ -1245,7 +1245,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         L'API Secret n'est affiché qu'une seule fois ! Copiez-le immédiatement.
                       </p>
                     </div>
@@ -1286,11 +1286,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1325,18 +1325,18 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Read Only</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Can Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Can Withdraw</span>
                         </div>
                       </div>
@@ -1365,7 +1365,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>
@@ -1406,11 +1406,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de transfert.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1445,18 +1445,18 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>General</strong> — consulter vos soldes et historique</span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Transfer</span>
                         </div>
                       </div>
@@ -1492,7 +1492,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement. KuCoin nécessite 3 champs (incluez le passphrase !).
                       </p>
                     </div>
@@ -1533,11 +1533,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading, retrait ou transfert.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1572,22 +1572,22 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Read-Only</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Withdraw</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Transfer</span>
                         </div>
                       </div>
@@ -1616,7 +1616,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>
@@ -1657,11 +1657,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1696,18 +1696,18 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Read Only</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Withdraw</span>
                         </div>
                       </div>
@@ -1743,7 +1743,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement. OKX nécessite 3 champs (incluez le passphrase !).
                       </p>
                     </div>
@@ -1784,11 +1784,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1823,18 +1823,18 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Read</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Withdraw</span>
                         </div>
                       </div>
@@ -1856,7 +1856,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         Bitpanda ne nécessite QU'UNE clé API, pas de secret. Seul le champ "Clé API" est requis.
                       </p>
                     </div>
@@ -1897,11 +1897,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions d'achat, de vente ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -1936,22 +1936,22 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Account balance</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>User transactions</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Buy/Sell</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Withdrawals</span>
                         </div>
                       </div>
@@ -1980,7 +1980,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>
@@ -2021,11 +2021,11 @@ export default function ExchangesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                   <div className="flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">Important : lecture seule</p>
+                      <p className="font-medium text-warning dark:text-warning">Important : lecture seule</p>
                       <p className="text-muted-foreground mt-1">
                         Ne cochez <strong>jamais</strong> les permissions de trading ou de retrait.
                         InvestAI a uniquement besoin de <strong>lire</strong> vos soldes et votre historique.
@@ -2060,22 +2060,22 @@ export default function ExchangesPage() {
                       <p className="text-sm text-muted-foreground mt-1">Cochez uniquement :</p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Spot Read-Only</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-gain" />
                           <span><strong>Wallet Read-Only</strong></span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         <p className="text-sm text-muted-foreground">Ne cochez <strong>PAS</strong> :</p>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Spot Trade</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-loss" />
                           <span className="text-muted-foreground">Wallet Withdraw</span>
                         </div>
                       </div>
@@ -2104,7 +2104,7 @@ export default function ExchangesPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-red-500 mt-2 font-medium">
+                      <p className="text-sm text-loss mt-2 font-medium">
                         La Secret Key n'est affichée qu'une seule fois ! Copiez-la immédiatement.
                       </p>
                     </div>

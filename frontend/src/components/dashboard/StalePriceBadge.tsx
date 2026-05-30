@@ -21,7 +21,7 @@ export default function StalePriceBadge({ wsConnected, forexStale }: StalePriceB
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-amber-600 border-amber-500/50 bg-amber-500/10 gap-1 text-xs">
+              <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
                 <WifiOff className="h-3 w-3" />
                 Prix fig&eacute;s
               </Badge>
@@ -36,7 +36,7 @@ export default function StalePriceBadge({ wsConnected, forexStale }: StalePriceB
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 gap-1 text-xs">
+              <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
                 <AlertTriangle className="h-3 w-3" />
                 Taux de change anciens
               </Badge>

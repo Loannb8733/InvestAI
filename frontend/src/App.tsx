@@ -87,7 +87,7 @@ function App() {
   }, [hydrateSession])
 
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="investai-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="investai-theme-flux">
       <ErrorBoundary>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

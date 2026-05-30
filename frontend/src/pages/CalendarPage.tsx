@@ -235,8 +235,8 @@ export default function CalendarPage() {
   }
 
   const getEventColor = (event: CalendarEvent) => {
-    if (event.source_project_id) return '#10b981' // emerald for crowdfunding
-    return getEventTypeInfo(event.event_type)?.color || '#71717a'
+    if (event.source_project_id) return 'oklch(var(--chart-3))' // emerald for crowdfunding
+    return getEventTypeInfo(event.event_type)?.color || 'oklch(var(--muted-foreground))'
   }
 
   const isOverdue = (event: CalendarEvent) => {
@@ -256,7 +256,7 @@ export default function CalendarPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Calendrier</h1>
+          <h1 className="text-3xl font-serif font-medium">Calendrier</h1>
           <p className="text-muted-foreground">
             Gérez vos échéances et événements financiers.
           </p>
@@ -277,7 +277,7 @@ export default function CalendarPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.upcoming_events}</div>
+              <div className="text-2xl font-serif font-medium">{summary.upcoming_events}</div>
             </CardContent>
           </Card>
           <Card>
@@ -287,7 +287,7 @@ export default function CalendarPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.events_this_month}</div>
+              <div className="text-2xl font-serif font-medium">{summary.events_this_month}</div>
             </CardContent>
           </Card>
           <Card>
@@ -297,7 +297,7 @@ export default function CalendarPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-serif font-medium text-gain">
                 {summary.total_expected_income.toLocaleString('fr-FR')} EUR
               </div>
             </CardContent>
@@ -309,7 +309,7 @@ export default function CalendarPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.completed_events}</div>
+              <div className="text-2xl font-serif font-medium">{summary.completed_events}</div>
             </CardContent>
           </Card>
         </div>
@@ -317,13 +317,13 @@ export default function CalendarPage() {
 
       {/* Revenue Banner */}
       {summary && summary.projected_income_this_month > 0 && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <Card className="border-gain/30 bg-gain/5">
           <CardContent className="py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+            <span className="text-sm font-medium text-gain flex items-center gap-2">
               <Landmark className="h-4 w-4" />
               Total revenus projetés ce mois
             </span>
-            <span className="text-lg font-bold text-emerald-400">
+            <span className="text-lg font-bold text-gain">
               +{summary.projected_income_this_month.toLocaleString('fr-FR')} EUR
             </span>
           </CardContent>
@@ -335,7 +335,7 @@ export default function CalendarPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-blue-500" />
+              <Globe className="h-5 w-5 text-accent" />
               Événements marché à venir
             </CardTitle>
           </CardHeader>
@@ -344,8 +344,8 @@ export default function CalendarPage() {
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-muted" />
               <div className="space-y-4">
                 {marketEvents.slice(0, 8).map((event, i) => {
-                  const dotColor = event.category === 'crypto' ? 'bg-blue-500' : event.category === 'macro' ? 'bg-purple-500' : 'bg-orange-500'
-                  const textColor = event.category === 'crypto' ? 'text-blue-500' : event.category === 'macro' ? 'text-purple-500' : 'text-orange-500'
+                  const dotColor = event.category === 'crypto' ? 'bg-accent' : event.category === 'macro' ? 'bg-accent' : 'bg-warning'
+                  const textColor = event.category === 'crypto' ? 'text-accent' : event.category === 'macro' ? 'text-accent' : 'text-warning'
                   return (
                     <div key={i} className="relative flex items-start gap-4 pl-10">
                       <div className={`absolute left-2.5 top-1.5 w-3 h-3 rounded-full ${dotColor} ring-2 ring-background`} />
@@ -371,9 +371,9 @@ export default function CalendarPage() {
               </div>
             </div>
             <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs text-muted-foreground">
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500" /> Crypto</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-purple-500" /> Macro</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500" /> Fiscal</div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-accent" /> Crypto</div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-accent" /> Macro</div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-warning" /> Fiscal</div>
             </div>
           </CardContent>
         </Card>
@@ -415,7 +415,7 @@ export default function CalendarPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       {event.amount && (
-                        <span className="font-medium text-green-600">
+                        <span className="font-medium text-gain">
                           +{event.amount.toLocaleString('fr-FR')} {event.currency}
                         </span>
                       )}
@@ -466,7 +466,7 @@ export default function CalendarPage() {
             return (
               <Card
                 key={event.id}
-                className={`${event.is_completed ? 'opacity-60' : ''} ${overdue ? 'border-red-500' : ''}`}
+                className={`${event.is_completed ? 'opacity-60' : ''} ${overdue ? 'border-loss' : ''}`}
               >
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
@@ -487,7 +487,7 @@ export default function CalendarPage() {
                             {event.title}
                           </h3>
                           {event.source_project_id && (
-                            <Badge variant="outline" className="text-xs text-emerald-500 border-emerald-500/30">
+                            <Badge variant="outline" className="text-xs text-gain border-gain/30">
                               Crowdfunding
                             </Badge>
                           )}
@@ -512,7 +512,7 @@ export default function CalendarPage() {
                     <div className="flex items-center gap-4">
                       {event.amount && (
                         <div className="text-right">
-                          <p className="font-medium text-green-600">
+                          <p className="font-medium text-gain">
                             +{event.amount.toLocaleString('fr-FR')} {event.currency}
                           </p>
                           <Badge style={{ backgroundColor: typeInfo?.color }} className="text-white text-xs">

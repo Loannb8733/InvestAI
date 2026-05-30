@@ -65,8 +65,8 @@ export default function NotificationBell() {
 
   const priorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'text-red-500'
-      case 'high': return 'text-orange-500'
+      case 'urgent': return 'text-loss'
+      case 'high': return 'text-warning'
       default: return 'text-muted-foreground'
     }
   }

@@ -21,13 +21,13 @@ interface CorrelationMatrixProps {
   thresholds?: DisplayThresholds['correlation']
 }
 
-// Build color for correlation value: blue (negative) -> gray (0) -> red (positive)
+// Diverging scale: bleu-gris (negative / diversifying) -> neutral (0) -> bordeaux (positive / concentration risk)
 const corrColor = (v: number, isDiag: boolean) => {
   if (isDiag) return 'bg-muted'
   const abs = Math.abs(v)
-  if (v > 0.01) return `rgba(239, 68, 68, ${Math.min(abs * 0.85, 0.85)})`   // red
-  if (v < -0.01) return `rgba(59, 130, 246, ${Math.min(abs * 0.85, 0.85)})`  // blue
-  return 'rgba(148, 163, 184, 0.1)'
+  if (v > 0.01) return `oklch(var(--loss) / ${Math.min(abs * 0.85, 0.85)})`
+  if (v < -0.01) return `oklch(var(--chart-5) / ${Math.min(abs * 0.85, 0.85)})`
+  return 'oklch(var(--muted-foreground) / 0.1)'
 }
 
 const corrTextColor = (v: number) => {
@@ -123,11 +123,11 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
         <div className="flex items-center justify-center gap-2">
           <span className="text-xs text-muted-foreground">-1</span>
           <div className="flex h-3 w-48 rounded-full overflow-hidden">
-            <div className="flex-1" style={{ background: 'rgba(59, 130, 246, 0.85)' }} />
-            <div className="flex-1" style={{ background: 'rgba(59, 130, 246, 0.45)' }} />
-            <div className="flex-1" style={{ background: 'rgba(148, 163, 184, 0.2)' }} />
-            <div className="flex-1" style={{ background: 'rgba(239, 68, 68, 0.45)' }} />
-            <div className="flex-1" style={{ background: 'rgba(239, 68, 68, 0.85)' }} />
+            <div className="flex-1" style={{ background: 'oklch(var(--chart-5) / 0.85)' }} />
+            <div className="flex-1" style={{ background: 'oklch(var(--chart-5) / 0.45)' }} />
+            <div className="flex-1" style={{ background: 'oklch(var(--muted-foreground) / 0.2)' }} />
+            <div className="flex-1" style={{ background: 'oklch(var(--loss) / 0.45)' }} />
+            <div className="flex-1" style={{ background: 'oklch(var(--loss) / 0.85)' }} />
           </div>
           <span className="text-xs text-muted-foreground">+1</span>
         </div>
@@ -136,26 +136,26 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
         {(correlation.strongly_correlated.length > 0 || correlation.negatively_correlated.length > 0) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {correlation.strongly_correlated.length > 0 && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                <p className="text-xs font-semibold text-red-500 mb-2">Fortement corrélés (risque de concentration)</p>
+              <div className="rounded-lg border border-loss/20 bg-loss/5 p-3">
+                <p className="text-xs font-semibold text-loss mb-2">Fortement corrélés (risque de concentration)</p>
                 <div className="space-y-1.5">
                   {correlation.strongly_correlated.slice(0, 4).map(([s1, s2, v]) => (
                     <div key={`${s1}-${s2}`} className="flex items-center justify-between">
                       <span className="text-xs">{s1} \u2014 {s2}</span>
-                      <span className="text-xs font-mono font-semibold text-red-500">{typeof v === 'number' ? v.toFixed(2) : v}</span>
+                      <span className="text-xs font-mono font-semibold text-loss">{typeof v === 'number' ? v.toFixed(2) : v}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {correlation.negatively_correlated.length > 0 && (
-              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                <p className="text-xs font-semibold text-blue-500 mb-2">Corrélation inverse (bonne diversification)</p>
+              <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
+                <p className="text-xs font-semibold text-accent mb-2">Corrélation inverse (bonne diversification)</p>
                 <div className="space-y-1.5">
                   {correlation.negatively_correlated.slice(0, 4).map(([s1, s2, v]) => (
                     <div key={`${s1}-${s2}`} className="flex items-center justify-between">
                       <span className="text-xs">{s1} \u2014 {s2}</span>
-                      <span className="text-xs font-mono font-semibold text-blue-500">{typeof v === 'number' ? v.toFixed(2) : v}</span>
+                      <span className="text-xs font-mono font-semibold text-accent">{typeof v === 'number' ? v.toFixed(2) : v}</span>
                     </div>
                   ))}
                 </div>
