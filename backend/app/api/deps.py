@@ -106,6 +106,10 @@ async def get_current_user(
             detail="User is inactive",
         )
 
+    # Expose the authenticated user id for downstream middleware (e.g. cache
+    # invalidation on mutating requests).
+    request.state.user_id = str(user.id)
+
     return user
 
 

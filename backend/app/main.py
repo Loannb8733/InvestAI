@@ -766,6 +766,32 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def dashboard_cache_invalidation_middleware(request: Request, call_next):
+    """Invalidate a user's cached dashboard after any successful write.
+
+    The dashboard response is cached per user (see endpoints/dashboard.py). Any
+    mutating request (POST/PUT/PATCH/DELETE) that completes with a 2xx status for
+    an authenticated user drops all of their dashboard cache entries. Over-
+    invalidation is harmless (it only forces a recompute on the next dashboard
+    load); under-invalidation never happens, so a cache hit is never stale.
+    """
+    response = await call_next(request)
+    try:
+        if request.method in _MUTATING_METHODS and 200 <= response.status_code < 300:
+            user_id = getattr(request.state, "user_id", None)
+            if user_id:
+                from app.core.redis_client import invalidate_dashboard_cache
+
+                await invalidate_dashboard_cache(user_id)
+    except Exception:  # never let cache bookkeeping break a successful request
+        pass
+    return response
+
+
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 

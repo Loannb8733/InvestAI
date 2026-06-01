@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import RATE_LIMITS, limiter
+from app.core.redis_client import cache_dashboard, get_cached_dashboard
 from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
@@ -296,8 +297,17 @@ async def get_dashboard(
 
     days=0 means "all time" (from oldest transaction).
     """
+    user_id = str(current_user.id)
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+
+    cached = await get_cached_dashboard(user_id, days, currency)
+    if cached is not None:
+        return EnhancedDashboardResponse(**cached)
+
     try:
-        return await _get_dashboard_impl(request, days, current_user, db)
+        result = await _get_dashboard_impl(request, days, current_user, db)
+        await cache_dashboard(user_id, days, currency, result.model_dump(mode="json"))
+        return result
     except Exception as exc:
         import traceback
 
