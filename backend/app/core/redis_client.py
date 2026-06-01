@@ -130,6 +130,57 @@ async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
         logger.warning("Failed to cache forex rate %s→%s: %s", from_ccy, to_ccy, e)
 
 
+# ── Dashboard response cache (use text client) ───────────────────────
+# The dashboard aggregates many DB queries. We cache the full serialized
+# response per (user, period, currency) with a short safety TTL. Any
+# mutating request by the user invalidates all of their dashboard entries
+# (see invalidate_dashboard_cache), so a cache hit is never stale.
+
+_DASHBOARD_TTL = 300  # 5 minutes safety cap (invalidated eagerly on writes)
+_DASHBOARD_KEY_PREFIX = "dashboard:"
+
+
+def _dashboard_key(user_id: str, days: int, currency: str) -> str:
+    return f"{_DASHBOARD_KEY_PREFIX}{user_id}:{days}:{currency}"
+
+
+async def get_cached_dashboard(user_id: str, days: int, currency: str) -> Optional[dict]:
+    """Get cached dashboard response dict, or None on miss/error."""
+    try:
+        r = await _get_redis_txt()
+        data = await r.get(_dashboard_key(user_id, days, currency))
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.debug("Redis dashboard cache miss for %s: %s", user_id, e)
+    return None
+
+
+async def cache_dashboard(user_id: str, days: int, currency: str, payload: dict, ttl: int = _DASHBOARD_TTL) -> None:
+    """Cache a dashboard response dict (JSON, default 5min TTL)."""
+    try:
+        r = await _get_redis_txt()
+        await r.setex(
+            _dashboard_key(user_id, days, currency),
+            ttl,
+            json.dumps(payload, default=str),
+        )
+    except Exception as e:
+        logger.warning("Failed to cache dashboard for %s: %s", user_id, e)
+
+
+async def invalidate_dashboard_cache(user_id: str) -> None:
+    """Delete all cached dashboard entries for a user (all periods/currencies)."""
+    try:
+        r = await _get_redis_txt()
+        pattern = f"{_DASHBOARD_KEY_PREFIX}{user_id}:*"
+        keys = [key async for key in r.scan_iter(match=pattern, count=100)]
+        if keys:
+            await r.delete(*keys)
+    except Exception as e:
+        logger.warning("Failed to invalidate dashboard cache for %s: %s", user_id, e)
+
+
 # ── JSON-based caches (use text client) ──────────────────────────────
 
 
