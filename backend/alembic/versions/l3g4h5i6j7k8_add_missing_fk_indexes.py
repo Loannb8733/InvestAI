@@ -44,9 +44,7 @@ def upgrade() -> None:
     op.create_index("ix_alerts_asset_id", "alerts", ["asset_id"])
     op.create_index("ix_notes_asset_id", "notes", ["asset_id"])
     op.create_index("ix_prediction_logs_user_id", "prediction_logs", ["user_id"])
-    op.create_index(
-        "ix_project_documents_audit_id", "project_documents", ["audit_id"]
-    )
+    op.create_index("ix_project_documents_audit_id", "project_documents", ["audit_id"])
     op.create_index(
         "ix_crowdfunding_payment_schedules_repayment_id",
         "crowdfunding_payment_schedules",
