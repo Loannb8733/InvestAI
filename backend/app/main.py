@@ -682,7 +682,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Traceback:\n{traceback.format_exc()}")
     tb = traceback.format_exc()
     detail = "An internal error occurred. Please try again later."
-    if settings.APP_ENV != "production":
+    # Fail-safe: only expose internals when we're explicitly NOT in production.
+    # settings.is_production == (APP_ENV == "production" and not DEBUG), so a
+    # misconfigured/empty APP_ENV no longer leaks tracebacks by default.
+    if not settings.is_production and settings.DEBUG:
         detail = f"{type(exc).__name__}: {exc}\n{tb}"
     # Safety net: add CORS headers directly in case the exception propagated
     # past the CORSMiddleware send wrapper (e.g. from an async generator edge case).
@@ -703,22 +706,32 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware with restricted methods and headers
-# Allow Vercel preview URLs (*.vercel.app) dynamically
+# Production frontend origin (always allowed even if CORS_ORIGINS env is unset).
+_PROD_FRONTEND_ORIGINS = ["https://investai-orcin.vercel.app"]
 _vercel_suffix = ".vercel.app"
 
 
 def _is_allowed_origin(origin: str) -> bool:
-    """Check if origin is in explicit list or is a Vercel preview deploy."""
-    if origin in settings.CORS_ORIGINS:
+    """Check if origin is in the explicit list or (non-prod only) a Vercel preview."""
+    if origin in settings.CORS_ORIGINS or origin in _PROD_FRONTEND_ORIGINS:
         return True
-    if origin.startswith("https://") and origin.endswith(_vercel_suffix):
+    # Open *.vercel.app previews are only trusted outside production to avoid
+    # treating any attacker-controlled vercel.app subdomain as a credentialed origin.
+    if not settings.is_production and origin.startswith("https://") and origin.endswith(_vercel_suffix):
         return True
     return False
 
 
-# Use allow_origin_regex to match both explicit origins and Vercel previews
-_explicit_escaped = [o.replace(".", r"\.").replace("://", r"://") for o in settings.CORS_ORIGINS]
-_cors_regex = "|".join([*_explicit_escaped, r"https://.*\.vercel\.app"])
+# Build the allowed-origin regex.
+# - Explicit origins from CORS_ORIGINS env (e.g. https://investai-orcin.vercel.app)
+# - The known production frontend origin (hardcoded fallback)
+# - The broad *.vercel.app preview wildcard ONLY in non-production environments.
+_allowed_origins = list(dict.fromkeys([*settings.CORS_ORIGINS, *_PROD_FRONTEND_ORIGINS]))
+_explicit_escaped = [o.replace(".", r"\.").replace("://", r"://") for o in _allowed_origins]
+_regex_parts = list(_explicit_escaped)
+if not settings.is_production:
+    _regex_parts.append(r"https://.*\.vercel\.app")
+_cors_regex = "|".join(_regex_parts)
 
 # Middleware order matters: last added = outermost.
 # CORS must be outermost so headers are always present, even on 500 errors.
@@ -733,6 +746,25 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-Request-ID"],  # Pagination + tracing
     max_age=600,  # Cache preflight for 10 minutes
 )
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Attach baseline security headers to every response.
+
+    The API serves JSON only, so a strict CSP isn't required, but these headers
+    harden against MIME sniffing, clickjacking and referrer leakage. HSTS is only
+    sent in production (where TLS is guaranteed) to avoid breaking local http dev.
+    """
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    if settings.is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
