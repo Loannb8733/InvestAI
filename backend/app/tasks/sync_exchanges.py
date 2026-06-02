@@ -759,26 +759,30 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
             synced_count = detailed_synced
             fiat_currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]
 
+            # Aggregate balances by normalized base symbol so Binance Earn
+            # variants (LDUSDC, ADAU, ...) fold into their base asset (USDC,
+            # ADA) instead of being dropped. Funds parked in Earn would
+            # otherwise never reach the base asset quantity, making them vanish
+            # from the portfolio (e.g. a Stablecoins card stuck at 0).
+            aggregated_balances: Dict[str, float] = {}
             for balance in balances:
-                # Skip fiat currencies only
                 if balance.symbol in fiat_currencies:
                     continue
-
-                # Skip Binance Earn variants (ADAU, SUIU, etc.) - they're tracked under base asset
-                if _is_earn_variant(balance.symbol):
-                    logger.debug(f"Skipping earn variant: {balance.symbol}")
+                normalized = _normalize_earn_variant(balance.symbol) or balance.symbol
+                if normalized in fiat_currencies:
                     continue
+                aggregated_balances[normalized] = aggregated_balances.get(normalized, 0.0) + float(balance.total)
 
-                if balance.symbol in existing_assets:
+            for symbol, exchange_quantity in aggregated_balances.items():
+                if symbol in existing_assets:
                     # Adjust for any remaining discrepancy (deposits/withdrawals not captured by trades)
-                    asset = existing_assets[balance.symbol]
+                    asset = existing_assets[symbol]
 
                     # Skip assets transferred to cold wallets (exchange != this exchange)
                     if asset.exchange and asset.exchange != service.exchange_name:
                         continue
 
                     our_quantity = float(asset.quantity)
-                    exchange_quantity = float(balance.total)
 
                     # Only adjust if there's a significant discrepancy
                     if abs(exchange_quantity - our_quantity) > 0.00000001:
@@ -786,14 +790,14 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
                         logger.info(
-                            f"Balance adjustment for {balance.symbol}: "
+                            f"Balance adjustment for {symbol}: "
                             f"our={our_quantity:.8f} exchange={exchange_quantity:.8f} diff={diff:+.8f}"
                         )
 
                         # Get current market price for TRANSFER_IN
                         current_price = 0.0
                         if trans_type == TransactionType.TRANSFER_IN:
-                            current_price = await _get_current_price(balance.symbol)
+                            current_price = await _get_current_price(symbol)
 
                         sync_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
@@ -803,7 +807,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
-                            external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
+                            external_id=f"{service.exchange_name}_sync_{symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
                         await _add_transaction_if_new(db, transaction)
@@ -820,21 +824,22 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         synced_count += 1
                 else:
                     # Get current market price for the new asset
-                    current_price = await _get_current_price(balance.symbol)
+                    current_price = await _get_current_price(symbol)
 
                     # Create new asset with current price as avg_buy_price
                     asset = Asset(
                         portfolio_id=portfolio.id,
-                        symbol=balance.symbol,
-                        name=balance.symbol,
+                        symbol=symbol,
+                        name=symbol,
                         asset_type=AssetType.CRYPTO,
-                        quantity=float(balance.total),
+                        quantity=exchange_quantity,
                         avg_buy_price=current_price,
                         currency="EUR",
                         exchange=service.exchange_name,
                     )
                     db.add(asset)
                     await db.flush()
+                    existing_assets[symbol] = asset
 
                     # Pre-cache historical data for new asset
                     try:
@@ -845,16 +850,16 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         pass
 
                     # Create initial transfer transaction with market price
-                    if float(balance.total) > 0:
+                    if exchange_quantity > 0:
                         init_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=TransactionType.TRANSFER_IN,
-                            quantity=float(balance.total),
+                            quantity=exchange_quantity,
                             price=current_price,
                             fee=0,
                             currency="EUR",
-                            external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
+                            external_id=f"{service.exchange_name}_init_{symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
                         await _add_transaction_if_new(db, transaction)
@@ -862,7 +867,9 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     synced_count += 1
 
             # === STEP 3: Zero out assets no longer on Binance (fully sold/converted) ===
-            balance_symbols = {b.symbol for b in balances}
+            # Use normalized symbols so an asset whose only on-exchange balance
+            # is an Earn variant (e.g. USDC held as LDUSDC) is NOT wrongly zeroed.
+            balance_symbols = set(aggregated_balances.keys())
             for symbol, asset in existing_assets.items():
                 if (
                     asset.exchange == service.exchange_name
