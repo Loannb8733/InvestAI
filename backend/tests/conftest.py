@@ -50,6 +50,27 @@ def event_loop() -> Generator:
     loop.close()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
+    """Flush slowapi's rate-limit buckets before every test.
+
+    The limiter is backed by Redis (fixed-window, keyed by client IP), and that
+    state outlives a single test. Without this reset, a test that deliberately
+    exhausts a bucket (e.g. test_rate_limit) leaks 429s into later auth tests
+    that share the same IP+window. Resetting up-front makes each test start with
+    a fresh budget regardless of collection order.
+    """
+    from app.core.rate_limit import limiter
+
+    try:
+        limiter.reset()
+    except Exception:
+        # swallow_errors mirrors the limiter's own behaviour; a missing Redis
+        # must never break the suite.
+        pass
+    yield
+
+
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
@@ -72,6 +93,10 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # The app sets redirect_slashes=False (see app/main.py), so collection routes
+    # declared with an empty path ("") are reachable ONLY at the no-slash URL
+    # (e.g. "/api/v1/portfolios", not ".../portfolios/"). Tests must match that
+    # exactly — there is no 307 to follow.
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
 

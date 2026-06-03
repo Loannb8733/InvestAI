@@ -29,10 +29,11 @@ class TestFormatMutationAlert:
         assert "MUTATION DE CYCLE" in msg
         assert "BEARISH" in msg
         assert "BULLISH" in msg
-        # New risk multiplier
+        # Contrarian sizing: bull takes profits → multiplier drops to ×0.8
+        # New risk multiplier (bullish)
+        assert "×0.8" in msg
+        # Old risk multiplier (bearish, accumulation)
         assert "×1.5" in msg
-        # Old risk multiplier
-        assert "×0.5" in msg
         # Alpha threshold change
         assert "60" in msg  # new bull threshold
         assert "85" in msg  # old bear threshold
@@ -40,12 +41,12 @@ class TestFormatMutationAlert:
         assert "ALLÉGER" in msg
 
     def test_bull_to_bear_message(self):
-        """Transition from bullish → bearish should show survival parameters."""
+        """Transition from bullish → bearish should show accumulation parameters."""
         msg = self.svc.format_mutation_alert("bullish", "bearish")
-        assert "×0.5" in msg  # new bear multiplier
-        assert "×1.5" in msg  # old bull multiplier
+        assert "×1.5" in msg  # new bear multiplier (accumulate the dip)
+        assert "×0.8" in msg  # old bull multiplier
         assert "RENFORCER" in msg  # gold shield high in bear
-        assert "Mode Survie" in msg
+        assert "Mode Accumulation Actif" in msg
 
     def test_same_tier_transition(self):
         """Transition between sub-phases (bottom → accumulation) still alerts."""
@@ -55,11 +56,15 @@ class TestFormatMutationAlert:
         assert "Mode Accumulation" in msg
 
     def test_risk_direction_arrows(self):
-        """Arrow should indicate risk increase (↑) or decrease (↓)."""
-        msg_up = self.svc.format_mutation_alert("bearish", "bullish")
-        assert "↑" in msg_up
-        msg_down = self.svc.format_mutation_alert("bullish", "bearish")
+        """Arrow should indicate risk-multiplier increase (↑) or decrease (↓).
+
+        Contrarian sizing: bear→bull lowers the multiplier (1.5 → 0.8, ↓),
+        bull→bear raises it (0.8 → 1.5, ↑).
+        """
+        msg_down = self.svc.format_mutation_alert("bearish", "bullish")
         assert "↓" in msg_down
+        msg_up = self.svc.format_mutation_alert("bullish", "bearish")
+        assert "↑" in msg_up
 
     def test_gold_shield_maintain_neutral(self):
         """Neutral regimes should recommend MAINTENIR for gold."""
@@ -102,14 +107,17 @@ class TestTradingParameters:
     @pytest.mark.parametrize(
         "regime,expected_mult,expected_alpha,expected_gold",
         [
-            ("bearish", 0.5, 85, "high"),
-            ("markdown", 0.5, 85, "high"),
-            ("bottom", 0.7, 75, "medium"),
-            ("accumulation", 0.8, 70, "medium"),
-            ("bullish", 1.5, 60, "low"),
-            ("markup", 1.5, 60, "low"),
-            ("topping", 0.8, 75, "medium"),
-            ("top", 0.8, 75, "medium"),
+            # Contrarian DCA sizing ("be greedy when others are fearful"):
+            # bear-family accumulates harder (high multiplier), bull-family
+            # takes profits (low multiplier). See RegimeConfig.from_regime.
+            ("bearish", 1.5, 85, "high"),
+            ("markdown", 1.5, 85, "high"),
+            ("bottom", 1.8, 75, "medium"),
+            ("accumulation", 1.5, 70, "medium"),
+            ("bullish", 0.8, 60, "low"),
+            ("markup", 0.8, 60, "low"),
+            ("topping", 0.4, 75, "medium"),
+            ("top", 0.4, 75, "medium"),
         ],
     )
     def test_regime_config_values(self, regime, expected_mult, expected_alpha, expected_gold):

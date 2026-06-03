@@ -29,9 +29,12 @@ async def test_register_rate_limit(client: AsyncClient):
     for i in range(8):
         resp = await client.post(
             "/api/v1/auth/register",
+            # Password must satisfy the strength validator (>=1 uppercase),
+            # otherwise the request 422s on body validation BEFORE reaching the
+            # rate limiter and we'd never observe a 429.
             json={
                 "email": f"test{i}@example.com",
-                "password": "password123",
+                "password": "Password123",
             },
         )
         responses.append(resp.status_code)
