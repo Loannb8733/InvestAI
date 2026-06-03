@@ -108,7 +108,7 @@ export default function AlertsPage() {
 
   useEffect(() => {
     fetchCurrentUser()
-  }, [])
+  }, [fetchCurrentUser])
 
   useEffect(() => {
     setTelegramChatId(user?.telegramChatId || '')

@@ -161,7 +161,7 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
   const lineColor = resolveColor(color, tokenColor)
   const targetColor = tokenColor('--muted-foreground')
 
-  const curve = data?.curve ?? []
+  const curve = useMemo(() => data?.curve ?? [], [data?.curve])
 
   const series = useMemo<LineSeries[]>(
     () => [
