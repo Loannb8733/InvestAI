@@ -409,15 +409,23 @@ async def _sync_detailed_transactions(
             logger.info(f"Found {len(instant_buys)} instant buys from {service.exchange_name}")
 
             for trade in instant_buys:
-                if trade.trade_id in existing_external_ids:
-                    continue
-
-                # Extract base asset from symbol (e.g., "PAXGEUR" -> "PAXG")
+                # Extract base asset + quote from symbol (e.g., "PAXGUSD" -> base PAXG, quote USD)
                 base_asset = None
+                trade_quote = None
                 for quote in ["EUR", "USD", "GBP"]:
                     if trade.symbol.endswith(quote):
                         base_asset = trade.symbol[: -len(quote)]
+                        trade_quote = quote
                         break
+
+                # Resolve FX before the dedup check so existing rows can be healed in place.
+                price = float(trade.price) if trade.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
+
+                if trade.trade_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(db, [trade.trade_id], price, tx_currency, tx_rate):
+                        healed_count += 1
+                    continue
 
                 if not base_asset or base_asset in fiat_currencies:
                     continue
@@ -431,7 +439,6 @@ async def _sync_detailed_transactions(
                 )
 
                 qty = float(trade.quantity)
-                price = float(trade.price) if trade.price else 0
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -440,13 +447,15 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(trade.fee) if trade.fee else 0,
                     fee_currency=trade.fee_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=trade.timestamp,
                     external_id=trade.trade_id,
                     exchange=service.exchange_name,
                     notes="Instant Buy",
                 )
                 await _add_transaction_if_new(db, transaction)
+                existing_external_ids.add(trade.trade_id)
 
                 # Update asset quantity and avg price
                 old_qty = float(asset.quantity)
@@ -456,7 +465,7 @@ async def _sync_detailed_transactions(
                 asset.quantity = old_qty + qty
 
                 synced_count += 1
-                logger.info(f"Created BUY (Instant): {base_asset} qty={qty} price={price}")
+                logger.info(f"Created BUY (Instant): {base_asset} qty={qty} price={price} ({tx_currency})")
 
     except Exception as e:
         logger.warning(f"Failed to sync instant buys: {e}")
