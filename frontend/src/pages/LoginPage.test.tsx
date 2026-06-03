@@ -45,7 +45,7 @@ describe('LoginPage', () => {
         <LoginPage />
       </MemoryRouter>
     )
-    expect(screen.getByText('Bon retour !')).toBeInTheDocument()
+    expect(screen.getByText('Bon retour')).toBeInTheDocument()
     expect(screen.getByLabelText('Adresse email')).toBeInTheDocument()
     expect(screen.getByLabelText('Mot de passe')).toBeInTheDocument()
     expect(screen.getByText('Se connecter')).toBeInTheDocument()
@@ -57,19 +57,19 @@ describe('LoginPage', () => {
         <LoginPage />
       </MemoryRouter>
     )
-    expect(screen.getByText('Créer un compte gratuit')).toBeInTheDocument()
+    expect(screen.getByText('Ouvrir un compte')).toBeInTheDocument()
   })
 
-  it('renders feature cards on desktop', () => {
+  it('renders the univers pills on the brand panel', () => {
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>
     )
-    expect(screen.getByText('Analyses avancées')).toBeInTheDocument()
-    expect(screen.getByText('Sécurité maximale')).toBeInTheDocument()
-    expect(screen.getByText('Synchronisation auto')).toBeInTheDocument()
-    expect(screen.getByText('Diversification')).toBeInTheDocument()
+    expect(screen.getByText('Crypto')).toBeInTheDocument()
+    expect(screen.getByText('Actions')).toBeInTheDocument()
+    expect(screen.getByText('Crowdfunding')).toBeInTheDocument()
+    expect(screen.getByText('Prédictions')).toBeInTheDocument()
   })
 
   it('calls login on form submit', async () => {
@@ -91,7 +91,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       expect(mockClearError).toHaveBeenCalled()
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', undefined)
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', undefined, false)
     })
   })
 
@@ -101,6 +101,6 @@ describe('LoginPage', () => {
         <LoginPage />
       </MemoryRouter>
     )
-    expect(screen.getByText('Mot de passe oublié ?')).toBeInTheDocument()
+    expect(screen.getByText('Oublié ?')).toBeInTheDocument()
   })
 })

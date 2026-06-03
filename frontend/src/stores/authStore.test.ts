@@ -92,7 +92,7 @@ describe('authStore', () => {
   })
 
   describe('logout', () => {
-    it('clears all auth state', () => {
+    it('clears all auth state', async () => {
       useAuthStore.setState({
         user: { id: '1', email: 'a@b.com', role: 'user', mfaEnabled: false },
         accessToken: 'token',
@@ -101,7 +101,7 @@ describe('authStore', () => {
         error: 'some error',
       })
 
-      useAuthStore.getState().logout()
+      await useAuthStore.getState().logout()
 
       const state = useAuthStore.getState()
       expect(state.user).toBeNull()
