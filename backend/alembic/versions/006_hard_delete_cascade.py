@@ -8,6 +8,7 @@ Create Date: 2026-02-01
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -27,15 +28,9 @@ def upgrade() -> None:
     op.execute("DELETE FROM users WHERE deleted_at IS NOT NULL")
 
     # 2. Drop indexes that reference deleted_at
-    op.drop_index(
-        "ix_transactions_deleted_at", table_name="transactions", if_exists=True
-    )
-    op.drop_index(
-        "ix_assets_portfolio_id_deleted_at", table_name="assets", if_exists=True
-    )
-    op.drop_index(
-        "ix_portfolios_user_id_deleted_at", table_name="portfolios", if_exists=True
-    )
+    op.drop_index("ix_transactions_deleted_at", table_name="transactions", if_exists=True)
+    op.drop_index("ix_assets_portfolio_id_deleted_at", table_name="assets", if_exists=True)
+    op.drop_index("ix_portfolios_user_id_deleted_at", table_name="portfolios", if_exists=True)
 
     # 3. Drop deleted_at columns
     for table in ["transactions", "assets", "portfolios", "notes", "goals", "users"]:
@@ -76,9 +71,7 @@ def upgrade() -> None:
     )
 
     # --- transactions.related_transaction_id -> SET NULL
-    op.drop_constraint(
-        "transactions_related_transaction_id_fkey", "transactions", type_="foreignkey"
-    )
+    op.drop_constraint("transactions_related_transaction_id_fkey", "transactions", type_="foreignkey")
     op.create_foreign_key(
         "transactions_related_transaction_id_fkey",
         "transactions",
@@ -90,9 +83,7 @@ def upgrade() -> None:
 
     # --- notes.user_id -> CASCADE
     op.drop_constraint("notes_user_id_fkey", "notes", type_="foreignkey")
-    op.create_foreign_key(
-        "notes_user_id_fkey", "notes", "users", ["user_id"], ["id"], ondelete="CASCADE"
-    )
+    op.create_foreign_key("notes_user_id_fkey", "notes", "users", ["user_id"], ["id"], ondelete="CASCADE")
 
     # --- notes.asset_id -> SET NULL
     op.drop_constraint("notes_asset_id_fkey", "notes", type_="foreignkey")
@@ -107,9 +98,7 @@ def upgrade() -> None:
 
     # --- goals.user_id -> CASCADE
     op.drop_constraint("goals_user_id_fkey", "goals", type_="foreignkey")
-    op.create_foreign_key(
-        "goals_user_id_fkey", "goals", "users", ["user_id"], ["id"], ondelete="CASCADE"
-    )
+    op.create_foreign_key("goals_user_id_fkey", "goals", "users", ["user_id"], ["id"], ondelete="CASCADE")
 
     # --- alerts.user_id -> CASCADE
     op.drop_constraint("alerts_user_id_fkey", "alerts", type_="foreignkey")
@@ -145,9 +134,7 @@ def upgrade() -> None:
     )
 
     # --- calendar_events.user_id -> CASCADE
-    op.drop_constraint(
-        "calendar_events_user_id_fkey", "calendar_events", type_="foreignkey"
-    )
+    op.drop_constraint("calendar_events_user_id_fkey", "calendar_events", type_="foreignkey")
     op.create_foreign_key(
         "calendar_events_user_id_fkey",
         "calendar_events",
@@ -169,9 +156,7 @@ def upgrade() -> None:
     )
 
     # --- portfolio_snapshots.user_id -> CASCADE
-    op.drop_constraint(
-        "portfolio_snapshots_user_id_fkey", "portfolio_snapshots", type_="foreignkey"
-    )
+    op.drop_constraint("portfolio_snapshots_user_id_fkey", "portfolio_snapshots", type_="foreignkey")
     op.create_foreign_key(
         "portfolio_snapshots_user_id_fkey",
         "portfolio_snapshots",
@@ -197,9 +182,7 @@ def upgrade() -> None:
     )
 
     # --- notifications.user_id -> CASCADE
-    op.drop_constraint(
-        "notifications_user_id_fkey", "notifications", type_="foreignkey"
-    )
+    op.drop_constraint("notifications_user_id_fkey", "notifications", type_="foreignkey")
     op.create_foreign_key(
         "notifications_user_id_fkey",
         "notifications",
@@ -220,9 +203,7 @@ def downgrade() -> None:
         op.add_column(table, sa.Column("deleted_at", sa.DateTime(), nullable=True))
 
     # Restore indexes
-    op.create_index(
-        "ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False
-    )
+    op.create_index("ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False)
     op.create_index(
         "ix_assets_portfolio_id_deleted_at",
         "assets",

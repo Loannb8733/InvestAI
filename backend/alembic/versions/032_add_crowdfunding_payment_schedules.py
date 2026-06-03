@@ -4,9 +4,10 @@ Revision ID: 032_payment_schedules
 Revises: 031_transaction_internal_hash
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "032_payment_schedules"
 down_revision = "031_transaction_internal_hash"

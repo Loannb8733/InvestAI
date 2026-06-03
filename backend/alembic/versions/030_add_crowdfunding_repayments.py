@@ -43,9 +43,7 @@ def upgrade() -> None:
         "crowdfunding_repayments",
         ["project_id"],
     )
-    op.create_index(
-        "ix_crowdfunding_repayments_user_id", "crowdfunding_repayments", ["user_id"]
-    )
+    op.create_index("ix_crowdfunding_repayments_user_id", "crowdfunding_repayments", ["user_id"])
 
 
 def downgrade() -> None:

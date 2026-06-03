@@ -8,8 +8,9 @@ Create Date: 2026-01-28
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "004_add_notifications_table"
@@ -32,33 +33,23 @@ def upgrade() -> None:
     notification_type.create(op.get_bind(), checkfirst=True)
 
     # Create notification priority enum
-    notification_priority = sa.Enum(
-        "low", "normal", "high", "urgent", name="notificationpriority"
-    )
+    notification_priority = sa.Enum("low", "normal", "high", "urgent", name="notificationpriority")
     notification_priority.create(op.get_bind(), checkfirst=True)
 
     # Create notifications table
     op.create_table(
         "notifications",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False
-        ),
+        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("type", notification_type, nullable=False),
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("message", sa.Text(), nullable=False),
-        sa.Column(
-            "priority", notification_priority, nullable=False, server_default="normal"
-        ),
+        sa.Column("priority", notification_priority, nullable=False, server_default="normal"),
         sa.Column("is_read", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("reference_type", sa.String(50), nullable=True),
         sa.Column("reference_id", UUID(as_uuid=True), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
-        ),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
 
     # Create indexes for efficient queries

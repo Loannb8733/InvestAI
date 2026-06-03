@@ -1,7 +1,8 @@
 """Add delay_months column to crowdfunding_projects."""
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "035_delay_months"
 down_revision = "034_tax_rate"

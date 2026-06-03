@@ -5,8 +5,9 @@ Revises: 032_payment_schedules
 Create Date: 2026-03-10
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "033_repayment_breakdown"
 down_revision = "032_payment_schedules"

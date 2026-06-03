@@ -7,6 +7,7 @@ Create Date: 2026-02-20
 """
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
 from alembic import op
 
 # revision identifiers, used by Alembic.

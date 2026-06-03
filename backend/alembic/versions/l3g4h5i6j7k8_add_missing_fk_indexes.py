@@ -61,9 +61,7 @@ def downgrade() -> None:
     op.drop_index("ix_prediction_logs_user_id", table_name="prediction_logs")
     op.drop_index("ix_notes_asset_id", table_name="notes")
     op.drop_index("ix_alerts_asset_id", table_name="alerts")
-    op.drop_index(
-        "ix_portfolio_snapshots_portfolio_id", table_name="portfolio_snapshots"
-    )
+    op.drop_index("ix_portfolio_snapshots_portfolio_id", table_name="portfolio_snapshots")
     op.drop_index(
         "ix_portfolio_snapshots_user_id_snapshot_date",
         table_name="portfolio_snapshots",

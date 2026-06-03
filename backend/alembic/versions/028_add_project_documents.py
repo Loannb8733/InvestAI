@@ -5,9 +5,10 @@ Revises: 027_diversification_audits
 Create Date: 2026-03-09
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "028_project_documents"
 down_revision = "027_diversification_audits"

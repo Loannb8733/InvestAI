@@ -8,8 +8,9 @@ Create Date: 2026-01-23 14:13:58.606594
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "629e2fc9ac60"
@@ -28,9 +29,7 @@ def upgrade() -> None:
         sa.Column("total_value", sa.Numeric(precision=18, scale=2), nullable=False),
         sa.Column("total_invested", sa.Numeric(precision=18, scale=2), nullable=False),
         sa.Column("total_gain_loss", sa.Numeric(precision=18, scale=2), nullable=False),
-        sa.Column(
-            "currency", sa.String(length=10), nullable=False, server_default="EUR"
-        ),
+        sa.Column("currency", sa.String(length=10), nullable=False, server_default="EUR"),
         sa.ForeignKeyConstraint(
             ["portfolio_id"],
             ["portfolios.id"],
@@ -57,7 +56,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_portfolio_snapshots_user_id", table_name="portfolio_snapshots")
-    op.drop_index(
-        "ix_portfolio_snapshots_snapshot_date", table_name="portfolio_snapshots"
-    )
+    op.drop_index("ix_portfolio_snapshots_snapshot_date", table_name="portfolio_snapshots")
     op.drop_table("portfolio_snapshots")

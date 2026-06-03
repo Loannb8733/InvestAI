@@ -6,8 +6,9 @@ Create Date: 2024-01-22
 
 """
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "001"
@@ -36,13 +37,9 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column(
-            "parameters", postgresql.JSONB(), nullable=False, server_default="{}"
-        ),
+        sa.Column("parameters", postgresql.JSONB(), nullable=False, server_default="{}"),
         sa.Column("results", postgresql.JSONB(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
-        ),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column(
             "updated_at",
             sa.DateTime(),
@@ -56,9 +53,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_simulations_user_id"), "simulations", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_simulations_user_id"), "simulations", ["user_id"], unique=False)
 
 
 def downgrade() -> None:

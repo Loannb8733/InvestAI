@@ -8,6 +8,7 @@ Create Date: 2026-01-27
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -28,12 +29,8 @@ def upgrade() -> None:
         ["asset_id", "executed_at"],
         unique=False,
     )
-    op.create_index(
-        "ix_transactions_executed_at", "transactions", ["executed_at"], unique=False
-    )
-    op.create_index(
-        "ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False
-    )
+    op.create_index("ix_transactions_executed_at", "transactions", ["executed_at"], unique=False)
+    op.create_index("ix_transactions_deleted_at", "transactions", ["deleted_at"], unique=False)
 
     # Critical indexes for portfolio_snapshots table
     op.create_index(
@@ -72,9 +69,7 @@ def upgrade() -> None:
     )
 
     # Critical indexes for alerts table
-    op.create_index(
-        "ix_alerts_user_id_is_active", "alerts", ["user_id", "is_active"], unique=False
-    )
+    op.create_index("ix_alerts_user_id_is_active", "alerts", ["user_id", "is_active"], unique=False)
     op.create_index("ix_alerts_asset_id", "alerts", ["asset_id"], unique=False)
 
 
@@ -89,9 +84,7 @@ def downgrade() -> None:
         "ix_portfolio_snapshots_portfolio_id_snapshot_date",
         table_name="portfolio_snapshots",
     )
-    op.drop_index(
-        "ix_portfolio_snapshots_user_id_snapshot_date", table_name="portfolio_snapshots"
-    )
+    op.drop_index("ix_portfolio_snapshots_user_id_snapshot_date", table_name="portfolio_snapshots")
     op.drop_index("ix_transactions_deleted_at", table_name="transactions")
     op.drop_index("ix_transactions_executed_at", table_name="transactions")
     op.drop_index("ix_transactions_asset_id_executed_at", table_name="transactions")
