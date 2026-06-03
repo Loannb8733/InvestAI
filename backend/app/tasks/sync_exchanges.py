@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +75,53 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
         return False
     db.add(transaction)
     return True
+
+
+async def _heal_transaction_fx(
+    db: AsyncSession,
+    external_ids: List[str],
+    raw_price: float,
+    tx_currency: str,
+    tx_rate: Optional[Decimal],
+) -> bool:
+    """Repair an already-imported transaction's FX fields in place (FIN-01 heal).
+
+    The dedup logic normally *skips* trades that already exist, so the FIN-01 fix only
+    reaches new imports — legacy rows keep their wrong cost basis. This re-derives
+    ``(price, currency, conversion_rate)`` from authoritative exchange data and updates
+    the matching row(s) without deleting anything. It converges both legacy shapes:
+    a raw quote-currency price mislabelled as EUR, and a price pre-converted with a
+    single spot rate. Only price/currency/conversion_rate are touched; quantity, type,
+    fees, dates and notes are preserved.
+
+    Args:
+        external_ids: candidate ``external_id`` values to match (e.g. ``["fiat_123", "123"]``).
+        raw_price: the trade's price in its quote currency, as reported by the exchange.
+        tx_currency: resolved storage currency ("EUR" or a fiat anchor like "USD").
+        tx_rate: EUR-per-1-unit-of-currency rate, or None for EUR/unresolvable.
+
+    Returns:
+        True if at least one row was modified.
+    """
+    candidates = [eid for eid in external_ids if eid]
+    if not candidates:
+        return False
+    result = await db.execute(select(Transaction).where(Transaction.external_id.in_(candidates)))
+    rows = result.scalars().all()
+    changed = False
+    for row in rows:
+        if raw_price and abs(float(row.price) - raw_price) > 1e-9:
+            row.price = raw_price
+            changed = True
+        if row.currency != tx_currency:
+            row.currency = tx_currency
+            changed = True
+        old_rate = None if row.conversion_rate is None else Decimal(str(row.conversion_rate))
+        new_rate = None if tx_rate is None else Decimal(str(tx_rate))
+        if old_rate != new_rate:
+            row.conversion_rate = tx_rate
+            changed = True
+    return changed
 
 
 def _classify_and_mark_error(api_key: APIKey, exc: Exception) -> None:
@@ -227,9 +274,16 @@ async def _sync_detailed_transactions(
     service,
     portfolio: Portfolio,
     existing_assets: Dict[str, Asset],
-) -> int:
-    """Sync detailed transactions: trades, conversions, rewards."""
+    heal_fx: bool = False,
+) -> Tuple[int, int]:
+    """Sync detailed transactions: trades, conversions, rewards.
+
+    When ``heal_fx`` is True, trades that already exist are NOT skipped: their stored
+    FX fields are repaired in place via :func:`_heal_transaction_fx` (no new rows, no
+    quantity/avg-price mutation). Returns ``(synced_count, healed_count)``.
+    """
     synced_count = 0
+    healed_count = 0
     fiat_currencies = {"USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"}
 
     # Get existing transaction external_ids to avoid duplicates
@@ -416,7 +470,14 @@ async def _sync_detailed_transactions(
             for order in fiat_orders:
                 # Use fiat_ prefix to match api_keys.py format and avoid duplicates
                 ext_id = f"fiat_{order.order_id}"
+                price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
+
                 if ext_id in existing_external_ids or order.order_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(
+                        db, [ext_id, order.order_id], price, tx_currency, tx_rate
+                    ):
+                        healed_count += 1
                     continue
 
                 base_asset = order.crypto_symbol
@@ -433,8 +494,6 @@ async def _sync_detailed_transactions(
 
                 trans_type = TransactionType.BUY if order.side == "buy" else TransactionType.SELL
                 qty = float(order.crypto_amount)
-                price = float(order.price) if order.price else 0
-                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -477,7 +536,14 @@ async def _sync_detailed_transactions(
             for order in auto_invest:
                 # Use fiat_ prefix to match api_keys.py format and avoid duplicates
                 ext_id = f"fiat_{order.order_id}"
+                price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
+
                 if ext_id in existing_external_ids or order.order_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(
+                        db, [ext_id, order.order_id], price, tx_currency, tx_rate
+                    ):
+                        healed_count += 1
                     continue
 
                 base_asset = order.crypto_symbol
@@ -493,8 +559,6 @@ async def _sync_detailed_transactions(
                 )
 
                 qty = float(order.crypto_amount)
-                price = float(order.price) if order.price else 0
-                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -531,7 +595,14 @@ async def _sync_detailed_transactions(
         logger.info(f"Found {len(trades)} trades from {service.exchange_name}")
 
         for trade in trades:
+            # Resolve FX before the dedup check so existing rows can be healed in place.
+            price = float(trade.price) if trade.price else 0
+            _, trade_quote = split_pair(trade.symbol)
+            tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
+
             if trade.trade_id in existing_external_ids:
+                if heal_fx and await _heal_transaction_fx(db, [trade.trade_id], price, tx_currency, tx_rate):
+                    healed_count += 1
                 continue
 
             # Extract base asset from symbol (e.g., "BTCEUR" -> "BTC")
@@ -564,9 +635,6 @@ async def _sync_detailed_transactions(
 
             trans_type = TransactionType.BUY if trade.side == "buy" else TransactionType.SELL
             qty = float(trade.quantity)
-            price = float(trade.price) if trade.price else 0
-            _, trade_quote = split_pair(trade.symbol)
-            tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
 
             transaction = Transaction(
                 asset_id=asset.id,
@@ -716,11 +784,17 @@ async def _sync_detailed_transactions(
     except Exception as e:
         logger.warning(f"Failed to sync deposits: {e}")
 
-    return synced_count
+    return synced_count, healed_count
 
 
-async def _sync_single_exchange(api_key_id: str) -> dict:
-    """Sync a single exchange account (async implementation)."""
+async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
+    """Sync a single exchange account (async implementation).
+
+    When ``heal_fx`` is True, this runs in repair mode: it re-fetches the trade history
+    and corrects the stored FX fields (price/currency/conversion_rate) of already-imported
+    transactions in place (FIN-01), without creating new rows or running the balance
+    reconciliation step. Used by the "Recalculer les taux FX" action.
+    """
     async with AsyncSessionLocal() as db:
         # Get API key
         result = await db.execute(select(APIKey).where(APIKey.id == api_key_id))
@@ -800,8 +874,20 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     existing_assets[a.symbol] = a
 
             # === STEP 1: Sync detailed transactions (trades, conversions, rewards) ===
-            detailed_synced = await _sync_detailed_transactions(db, service, portfolio, existing_assets)
+            detailed_synced, healed = await _sync_detailed_transactions(
+                db, service, portfolio, existing_assets, heal_fx=heal_fx
+            )
             logger.info(f"Synced {detailed_synced} detailed transactions from {service.exchange_name}")
+
+            # Repair mode stops here: we only corrected FX fields on existing rows and must
+            # NOT run the balance reconciliation (which would create adjustment transactions).
+            if heal_fx:
+                logger.info(f"FX heal: corrected {healed} transactions for {service.exchange_name}")
+                api_key.last_sync_at = datetime.now(timezone.utc)
+                api_key.mark_success()
+                await db.commit()
+                invalidate_dashboard_cache(str(api_key.user_id))
+                return {"success": True, "synced": healed, "healed": healed}
 
             # Refresh existing_assets after detailed sync (new assets may have been created)
             assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
