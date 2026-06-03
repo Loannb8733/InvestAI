@@ -77,6 +77,33 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
     return True
 
 
+# STEP 2 balance reconciliation tolerances.
+# _RECONCILE_EPSILON: anything below this is pure float noise -> ignore entirely.
+# _RECONCILE_DUST_REL: relative band (0.0001%) below which a discrepancy is treated
+# as rounding dust and the local quantity is snapped to the exchange (source of truth)
+# WITHOUT creating a phantom TRANSFER. Kept deliberately tiny so genuine small
+# deposits/withdrawals still reconcile as real transfers.
+_RECONCILE_EPSILON = 1e-8
+_RECONCILE_DUST_REL = 1e-6
+
+
+def _reconcile_balance_diff(our_quantity: float, exchange_quantity: float) -> str:
+    """Classify a balance discrepancy for STEP 2 reconciliation.
+
+    Returns:
+        "none"     -> difference is float noise, do nothing.
+        "dust"     -> rounding dust, snap local quantity to exchange, no transaction.
+        "transfer" -> real discrepancy, create a TRANSFER_IN/OUT adjustment.
+    """
+    abs_diff = abs(exchange_quantity - our_quantity)
+    if abs_diff <= _RECONCILE_EPSILON:
+        return "none"
+    dust_ceiling = max(_RECONCILE_EPSILON, abs(exchange_quantity) * _RECONCILE_DUST_REL)
+    if abs_diff <= dust_ceiling:
+        return "dust"
+    return "transfer"
+
+
 async def _heal_transaction_fx(
     db: AsyncSession,
     external_ids: List[str],
@@ -937,8 +964,18 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
 
                     our_quantity = float(asset.quantity)
 
-                    # Only adjust if there's a significant discrepancy
-                    if abs(exchange_quantity - our_quantity) > 0.00000001:
+                    decision = _reconcile_balance_diff(our_quantity, exchange_quantity)
+
+                    if decision == "dust":
+                        # Rounding dust: align to the exchange (source of truth) but do
+                        # NOT create a phantom TRANSFER for sub-0.0001% float noise.
+                        logger.debug(
+                            f"Balance dust snap for {symbol}: "
+                            f"our={our_quantity:.10f} exchange={exchange_quantity:.10f} "
+                            f"diff={exchange_quantity - our_quantity:+.10f}"
+                        )
+                        asset.quantity = exchange_quantity
+                    elif decision == "transfer":
                         diff = exchange_quantity - our_quantity
                         trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
