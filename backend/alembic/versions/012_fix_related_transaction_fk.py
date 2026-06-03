@@ -15,9 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint(
-        "transactions_related_transaction_id_fkey", "transactions", type_="foreignkey"
-    )
+    op.drop_constraint("transactions_related_transaction_id_fkey", "transactions", type_="foreignkey")
     op.create_foreign_key(
         "transactions_related_transaction_id_fkey",
         "transactions",
@@ -44,9 +42,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "transactions_related_transaction_id_fkey", "transactions", type_="foreignkey"
-    )
+    op.drop_constraint("transactions_related_transaction_id_fkey", "transactions", type_="foreignkey")
     op.create_foreign_key(
         "transactions_related_transaction_id_fkey",
         "transactions",

@@ -6,6 +6,7 @@ Create Date: 2026-02-21
 
 """
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -16,22 +17,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "prediction_logs", sa.Column("confidence_low", sa.Float(), nullable=True)
-    )
-    op.add_column(
-        "prediction_logs", sa.Column("confidence_high", sa.Float(), nullable=True)
-    )
-    op.add_column(
-        "prediction_logs", sa.Column("accuracy_checked", sa.DateTime(), nullable=True)
-    )
+    op.add_column("prediction_logs", sa.Column("confidence_low", sa.Float(), nullable=True))
+    op.add_column("prediction_logs", sa.Column("confidence_high", sa.Float(), nullable=True))
+    op.add_column("prediction_logs", sa.Column("accuracy_checked", sa.DateTime(), nullable=True))
     op.add_column("prediction_logs", sa.Column("mape", sa.Float(), nullable=True))
-    op.add_column(
-        "prediction_logs", sa.Column("direction_correct", sa.Boolean(), nullable=True)
-    )
-    op.add_column(
-        "prediction_logs", sa.Column("ci_covered", sa.Boolean(), nullable=True)
-    )
+    op.add_column("prediction_logs", sa.Column("direction_correct", sa.Boolean(), nullable=True))
+    op.add_column("prediction_logs", sa.Column("ci_covered", sa.Boolean(), nullable=True))
 
 
 def downgrade() -> None:

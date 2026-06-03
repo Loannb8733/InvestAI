@@ -3,9 +3,9 @@
 Revision ID: 022_goal_projection_fields
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "022_goal_projection_fields"
 down_revision = "021_planned_orders"
@@ -28,9 +28,7 @@ def upgrade() -> None:
 
     # Create enum types (checkfirst handles existing enums from create_all)
     goal_priority = sa.Enum("LOW", "MEDIUM", "HIGH", name="goalpriority")
-    goal_strategy = sa.Enum(
-        "AGGRESSIVE", "MODERATE", "CONSERVATIVE", name="goalstrategy"
-    )
+    goal_strategy = sa.Enum("AGGRESSIVE", "MODERATE", "CONSERVATIVE", name="goalstrategy")
     goal_priority.create(conn, checkfirst=True)
     goal_strategy.create(conn, checkfirst=True)
 
@@ -41,9 +39,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "goals",
-        sa.Column(
-            "strategy_type", goal_strategy, server_default="MODERATE", nullable=False
-        ),
+        sa.Column("strategy_type", goal_strategy, server_default="MODERATE", nullable=False),
     )
 
 

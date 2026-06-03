@@ -8,8 +8,9 @@ Create Date: 2026-03-03
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "016_asset_price_history"
@@ -48,8 +49,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_asset_price_history_symbol_date", table_name="asset_price_history"
-    )
+    op.drop_index("ix_asset_price_history_symbol_date", table_name="asset_price_history")
     op.drop_index("ix_asset_price_history_symbol", table_name="asset_price_history")
     op.drop_table("asset_price_history")

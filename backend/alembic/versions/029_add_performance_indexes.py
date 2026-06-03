@@ -13,18 +13,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_index(
-        "ix_assets_asset_type", "assets", ["asset_type"], if_not_exists=True
-    )
+    op.create_index("ix_assets_asset_type", "assets", ["asset_type"], if_not_exists=True)
     op.create_index(
         "ix_transactions_transaction_type",
         "transactions",
         ["transaction_type"],
         if_not_exists=True,
     )
-    op.create_index(
-        "ix_api_keys_exchange", "api_keys", ["exchange"], if_not_exists=True
-    )
+    op.create_index("ix_api_keys_exchange", "api_keys", ["exchange"], if_not_exists=True)
 
 
 def downgrade() -> None:

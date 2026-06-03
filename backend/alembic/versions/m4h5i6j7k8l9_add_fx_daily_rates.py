@@ -14,8 +14,9 @@ Create Date: 2026-06-03
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "m4h5i6j7k8l9"
@@ -27,11 +28,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Guard: table may already exist if DB was created via create_all().
     conn = op.get_bind()
-    exists = conn.execute(
-        sa.text(
-            "SELECT to_regclass('public.fx_daily_rates')"
-        )
-    ).scalar()
+    exists = conn.execute(sa.text("SELECT to_regclass('public.fx_daily_rates')")).scalar()
     if exists is not None:
         return
 
@@ -49,9 +46,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.UniqueConstraint(
-            "rate_date", "base_currency", "quote_currency", name="uq_fx_daily_rates_date_pair"
-        ),
+        sa.UniqueConstraint("rate_date", "base_currency", "quote_currency", name="uq_fx_daily_rates_date_pair"),
     )
     op.create_index("ix_fx_daily_rates_rate_date", "fx_daily_rates", ["rate_date"])
     op.create_index(

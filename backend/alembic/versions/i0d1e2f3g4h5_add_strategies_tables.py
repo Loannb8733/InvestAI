@@ -8,8 +8,9 @@ Create Date: 2026-04-03
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "i0d1e2f3g4h5"
@@ -68,9 +69,7 @@ def upgrade() -> None:
         )
     """
     )
-    op.create_index(
-        "ix_strategy_actions_strategy_id", "strategy_actions", ["strategy_id"]
-    )
+    op.create_index("ix_strategy_actions_strategy_id", "strategy_actions", ["strategy_id"])
 
 
 def downgrade() -> None:

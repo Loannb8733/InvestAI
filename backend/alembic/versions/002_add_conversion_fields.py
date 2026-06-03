@@ -6,8 +6,9 @@ Create Date: 2024-01-22
 
 """
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "002"
@@ -33,9 +34,7 @@ def upgrade() -> None:
     )
 
     # Add conversion_rate field
-    op.add_column(
-        "transactions", sa.Column("conversion_rate", sa.Numeric(18, 12), nullable=True)
-    )
+    op.add_column("transactions", sa.Column("conversion_rate", sa.Numeric(18, 12), nullable=True))
 
     # Create index for related_transaction_id
     op.create_index(
@@ -47,9 +46,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_transactions_related_transaction_id"), table_name="transactions"
-    )
+    op.drop_index(op.f("ix_transactions_related_transaction_id"), table_name="transactions")
     op.drop_column("transactions", "conversion_rate")
     op.drop_column("transactions", "related_transaction_id")
     # Note: Cannot easily remove enum values in PostgreSQL

@@ -39,6 +39,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_audit_logs_resource_type_resource_id", table_name="audit_logs")
-    op.drop_index(
-        "ix_transactions_asset_id_transaction_type", table_name="transactions"
-    )
+    op.drop_index("ix_transactions_asset_id_transaction_type", table_name="transactions")

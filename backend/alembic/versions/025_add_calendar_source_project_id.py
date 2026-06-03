@@ -3,10 +3,10 @@
 Revision ID: 025_calendar_source_project
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
+from alembic import op
 
 revision = "025_calendar_source_project"
 down_revision = "024_crowdfunding"

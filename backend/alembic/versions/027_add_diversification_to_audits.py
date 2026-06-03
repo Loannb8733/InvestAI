@@ -3,10 +3,10 @@
 Revision ID: 027_diversification_audits
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
+from alembic import op
 
 revision = "027_diversification_audits"
 down_revision = "026_project_audits"
