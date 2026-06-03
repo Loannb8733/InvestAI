@@ -23,8 +23,11 @@ from app.main import app
 from app.models import Base
 from app.models.user import User, UserRole
 
-# Test database URL
-TEST_DATABASE_URL = settings.DATABASE_URL.replace(settings.POSTGRES_DB, f"{settings.POSTGRES_DB}_test")
+# Test database URL — only swap the database name in the path, never the username.
+# (A naive str.replace of the DB name corrupts the user when they share a substring,
+#  e.g. user "investai" + db "investai" -> both become "investai_test".)
+_url_base, _url_db = settings.DATABASE_URL.rsplit("/", 1)
+TEST_DATABASE_URL = f"{_url_base}/{_url_db}_test"
 
 # Create test engine
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)

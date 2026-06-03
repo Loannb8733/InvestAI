@@ -216,7 +216,12 @@ class PriceService:
         return symbol.upper() in cls.STABLECOINS
 
     async def _get_eur_usd_rate(self) -> Decimal:
-        """Get EUR/USD rate with 1h cache."""
+        """Get EUR/USD rate with 1h cache.
+
+        Fallback order: fresh in-memory cache → live API → last-known in-memory rate
+        (survives transient API outages) → last-resort constant on cold start only.
+        ``get_forex_rate`` itself already layers a Redis cache underneath the API call.
+        """
         import time
 
         now = time.time()
@@ -227,7 +232,12 @@ class PriceService:
             PriceService._eur_usd_rate = rate
             PriceService._eur_usd_rate_ts = now
             return rate
-        return Decimal("0.92")  # fallback
+        # API (and its Redis layer) failed: prefer the last real rate we ever saw.
+        if self._eur_usd_rate:
+            logger.warning("USD/EUR live rate unavailable; reusing last-known rate %s", self._eur_usd_rate)
+            return self._eur_usd_rate
+        logger.warning("USD/EUR rate unavailable and no prior value; using cold-start constant 0.92")
+        return Decimal("0.92")  # last-resort cold-start fallback only
 
     async def _stablecoin_price_eur(self, symbol: str) -> Decimal:
         """Get stablecoin price in EUR using live forex rate."""

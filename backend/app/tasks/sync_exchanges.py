@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Optional, Set
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Dict, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +16,51 @@ from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.exchanges import get_exchange_service
+from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
+from app.services.fx_history_service import FxHistoryService
 from app.services.metrics_service import invalidate_dashboard_cache
 from app.services.price_service import PriceService
 from app.tasks.celery_app import celery_app
 
+# Earliest plausible trade date for FX seeding. Frankfurter (ECB) data starts 1999;
+# crypto exchanges predate none of our users, so 2017 covers all real history with margin.
+_FX_EARLIEST = date(2017, 1, 1)
+
 logger = logging.getLogger(__name__)
+
+
+async def _resolve_trade_fx(
+    fx_svc: Optional[FxHistoryService],
+    quote: Optional[str],
+    executed_at: datetime,
+) -> Tuple[str, Optional[Decimal]]:
+    """Resolve the (currency, conversion_rate) to store on a trade.
+
+    The cost-basis engine reads ``conversion_rate`` = EUR per 1 unit of ``currency``.
+    We only ever return a non-EUR currency when we have a *valid* historical rate for it;
+    otherwise we fall back to EUR/None (the legacy behaviour). This guarantees we never
+    mislabel a row with a foreign currency while implicitly using rate=1 — which would
+    re-introduce the exact ~8-9% error FIN-01 fixes.
+
+    Returns:
+        ("EUR", None) when the quote is EUR, unknown, crypto, or its rate is unavailable.
+        (anchor, rate) when the quote maps to a fiat with a resolvable EUR rate.
+    """
+    anchor = quote_fx_currency(quote) if quote else None
+    if anchor is None or anchor == "EUR":
+        return "EUR", None
+    if fx_svc is None:
+        logger.warning("No FX service available; storing %s trade as EUR fallback", anchor)
+        return "EUR", None
+    rate = await fx_svc.get_rate(executed_at.date(), anchor, "EUR")
+    if rate is None:
+        logger.warning(
+            "No historical FX rate for %s->EUR on %s; storing as EUR fallback",
+            anchor,
+            executed_at.date(),
+        )
+        return "EUR", None
+    return anchor, rate
 
 
 async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) -> bool:
@@ -199,6 +240,16 @@ async def _sync_detailed_transactions(
         )
     )
     existing_external_ids: Set[str] = {row[0] for row in existing_result.fetchall()}
+
+    # FX resolution (FIN-01): seed the USD->EUR daily series once, then resolve each
+    # trade's rate at its execution date. Seeding failure must not block the sync —
+    # _resolve_trade_fx falls back to EUR when no rate is available.
+    fx_svc: Optional[FxHistoryService] = FxHistoryService(db)
+    try:
+        await fx_svc.ensure_seeded("USD", "EUR", _FX_EARLIEST)
+    except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
+        logger.warning("FX seeding failed (%s); trades will fall back to EUR", e)
+        fx_svc = None
 
     # Helper to extract base asset from symbol like "DOGEPEPE" -> "DOGE"
     def _extract_base_asset(symbol: str) -> Optional[str]:
@@ -383,6 +434,7 @@ async def _sync_detailed_transactions(
                 trans_type = TransactionType.BUY if order.side == "buy" else TransactionType.SELL
                 qty = float(order.crypto_amount)
                 price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -391,7 +443,8 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(order.fee) if order.fee else 0,
                     fee_currency=order.fiat_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=order.timestamp,
                     external_id=ext_id,
                     exchange=service.exchange_name,
@@ -441,6 +494,7 @@ async def _sync_detailed_transactions(
 
                 qty = float(order.crypto_amount)
                 price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -449,7 +503,8 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(order.fee) if order.fee else 0,
                     fee_currency=order.fiat_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=order.timestamp,
                     external_id=ext_id,
                     exchange=service.exchange_name,
@@ -510,6 +565,8 @@ async def _sync_detailed_transactions(
             trans_type = TransactionType.BUY if trade.side == "buy" else TransactionType.SELL
             qty = float(trade.quantity)
             price = float(trade.price) if trade.price else 0
+            _, trade_quote = split_pair(trade.symbol)
+            tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
 
             transaction = Transaction(
                 asset_id=asset.id,
@@ -518,7 +575,8 @@ async def _sync_detailed_transactions(
                 price=price,
                 fee=float(trade.fee) if trade.fee else 0,
                 fee_currency=trade.fee_currency,
-                currency="EUR",
+                currency=tx_currency,
+                conversion_rate=tx_rate,
                 executed_at=trade.timestamp,
                 external_id=trade.trade_id,
                 exchange=service.exchange_name,
