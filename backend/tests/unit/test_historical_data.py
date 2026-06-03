@@ -46,9 +46,10 @@ class TestGetHistory:
     async def test_dispatches_crypto(self, fetcher, monkeypatch):
         called_with = {}
 
-        async def mock_crypto(symbol, days, currency="eur"):
+        async def mock_crypto(symbol, days, currency="eur", fast=False):
             called_with["symbol"] = symbol
             called_with["days"] = days
+            called_with["fast"] = fast
             return [], []
 
         monkeypatch.setattr(fetcher, "get_crypto_history", mock_crypto)

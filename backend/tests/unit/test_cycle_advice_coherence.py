@@ -7,7 +7,18 @@ Validates that:
 4. DCA hints include EUR amounts when portfolio_value is provided.
 """
 
+import re
+
+import pytest
+
 from app.services.prediction_service import PredictionService
+
+
+def _amount_range(description: str) -> tuple[float, float]:
+    """Extract the suggested DCA tranche range (low, high) in € from advice text."""
+    m = re.search(r"(\d+)\D+(\d+)\s*€", description)
+    assert m, f"no '<low>–<high> €' range found in: {description}"
+    return float(m.group(1)), float(m.group(2))
 
 
 class TestCycleAdviceCoherence:
@@ -79,7 +90,12 @@ class TestCycleAdviceCoherence:
         assert "DIVERSIFIER" not in actions
 
     def test_dca_amount_scales_with_portfolio(self):
-        """DCA suggestion amounts are proportional to portfolio value."""
+        """DCA suggestion amounts are proportional to portfolio value.
+
+        Asserts the *scaling relationship* (10x portfolio -> 100x tranche, since
+        100000/1000 = 100) rather than hard-coding the regime multiplier, so the
+        test survives retuning of RegimeConfig.risk_multiplier.
+        """
         advice_small = PredictionService._get_cycle_advice(
             regime="bottom",
             cycle_pos=10,
@@ -92,19 +108,23 @@ class TestCycleAdviceCoherence:
             fear_greed=15,
             portfolio_value=100000.0,
         )
-        # Small portfolio: 2-5% of 1000 × risk_multiplier (0.7 for bottom) = 14-35€
         dca_small = [a for a in advice_small if a["action"] == "DCA"][0]
-        assert (
-            "14" in dca_small["description"] or "35" in dca_small["description"]
-        ), f"DCA amounts should reflect regime multiplier: {dca_small['description']}"
-        # Large portfolio: 2-5% of 100000 × 0.7 = 1400-3500€
         dca_large = [a for a in advice_large if a["action"] == "DCA"][0]
-        assert (
-            "1400" in dca_large["description"] or "3500" in dca_large["description"]
-        ), f"DCA amounts should scale with portfolio: {dca_large['description']}"
+        low_s, high_s = _amount_range(dca_small["description"])
+        low_l, high_l = _amount_range(dca_large["description"])
+        # 100x portfolio -> 100x tranche, on both ends of the range.
+        assert low_l == pytest.approx(low_s * 100, rel=0.01), f"{low_l} vs {low_s}*100"
+        assert high_l == pytest.approx(high_s * 100, rel=0.01), f"{high_l} vs {high_s}*100"
+        # Sanity: range is a real interval (low < high) and tranche is a sane % of portfolio.
+        assert 0 < low_s < high_s
+        assert high_s < 1000.0, "single DCA tranche should be a fraction of the portfolio"
 
     def test_bearish_regime_no_panic_sell(self):
-        """Bearish regime advises patience/conservation, not panic selling."""
+        """Bearish regime accumulates (DCA/VCA), never panic-sells.
+
+        Product philosophy (commit 94e1ac4): bear = accumulate, bull = take profits.
+        A bearish regime must therefore advise spread-out buying, not selling.
+        """
         advice = PredictionService._get_cycle_advice(
             regime="bearish",
             cycle_pos=80,
@@ -112,8 +132,8 @@ class TestCycleAdviceCoherence:
             portfolio_value=863.90,
         )
         actions = [a["action"] for a in advice]
-        assert "CONSERVER" in actions
         assert "VENDRE" not in actions, "Bearish should not trigger panic sell"
+        assert "DCA" in actions or "VCA" in actions, f"Bearish should accumulate: {actions}"
 
     def test_no_dca_amount_without_portfolio_value(self):
         """Without portfolio value, DCA advice has no EUR amount."""
