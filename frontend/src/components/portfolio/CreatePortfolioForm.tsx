@@ -15,7 +15,7 @@ export default function CreatePortfolioForm({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Portefeuille</h1>
+        <h1 className="text-3xl font-serif font-medium">Portefeuille</h1>
       </div>
       <Card>
         <CardContent className="py-12">

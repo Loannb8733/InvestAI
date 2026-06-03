@@ -18,6 +18,7 @@ from app.models.calendar_event import CalendarEvent  # noqa: E402, F401
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule  # noqa: E402, F401
 from app.models.crowdfunding_project import CrowdfundingProject  # noqa: E402, F401
 from app.models.crowdfunding_repayment import CrowdfundingRepayment  # noqa: E402, F401
+from app.models.fx_rate import FxDailyRate  # noqa: E402, F401
 from app.models.goal import Goal  # noqa: E402, F401
 from app.models.note import Note  # noqa: E402, F401
 from app.models.notification import Notification  # noqa: E402, F401

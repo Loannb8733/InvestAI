@@ -10,6 +10,24 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy, stable vendors into their own long-cacheable chunks so
+        // the entry bundle (and the login page) no longer ships charts/motion.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
+            return 'react-vendor'
+          if (id.includes('@tanstack')) return 'query'
+          if (/[\\/]node_modules[\\/](@nivo|d3-|lightweight-charts)/.test(id)) return 'charts'
+          if (id.includes('framer-motion')) return 'motion'
+          if (id.includes('@radix-ui')) return 'radix'
+          return undefined
+        },
+      },
+    },
+  },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'],
   },
@@ -29,7 +47,9 @@ export default defineConfig({
         },
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // Defaults to the Docker Compose service name; override with
+        // VITE_PROXY_TARGET=http://localhost:8000 when running Vite on the host.
+        target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
         changeOrigin: true,
         ws: true,
       },

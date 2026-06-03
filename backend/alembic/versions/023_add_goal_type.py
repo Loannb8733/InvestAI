@@ -3,9 +3,9 @@
 Revision ID: 023_add_goal_type
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "023_add_goal_type"
 down_revision = "022_goal_projection_fields"

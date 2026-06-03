@@ -8,7 +8,9 @@ interface MotionCardProps {
 }
 
 const canHover =
-  typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+  typeof window !== 'undefined' &&
+  window.matchMedia('(hover: hover)').matches &&
+  !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function MotionCard({ children, className, disableHover = false }: MotionCardProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -51,7 +53,7 @@ export default function MotionCard({ children, className, disableHover = false }
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={className}
     >
-      <div className="glass-card rounded-[inherit] h-full w-full">
+      <div className="rounded-[inherit] border border-border bg-card h-full w-full">
         {children}
       </div>
     </motion.div>

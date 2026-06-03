@@ -37,13 +37,13 @@ jobs:
           pip install black==23.12.1 isort==5.13.2 flake8==7.0.0 mypy==1.8.0 types-redis==4.6.0.20240106 "sqlalchemy[mypy]==2.0.25"
 
       - name: Check formatting (black)
-        run: black --check --diff .
+        run: black --check --diff --line-length=120 .
 
       - name: Check import sorting (isort)
-        run: isort --check-only --diff .
+        run: isort --check-only --diff --profile=black --line-length=120 .
 
       - name: Lint (flake8)
-        run: flake8 app/ --max-line-length=120 --exclude=__pycache__,alembic
+        run: flake8 app/ --max-line-length=120 --extend-ignore=E402,E203,E712,W503,E501 --exclude=__pycache__,alembic
 
       - name: Type check (mypy)
         run: mypy app/ --ignore-missing-imports --no-strict-optional
@@ -66,7 +66,8 @@ jobs:
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: investai_test
+          # Base DB name; conftest derives the test DB as "<name>_test".
+          POSTGRES_DB: investai
         ports:
           - 5432:5432
         options: >-
@@ -90,10 +91,10 @@ jobs:
       POSTGRES_PORT: 5432
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
-      POSTGRES_DB: investai_test
+      POSTGRES_DB: investai
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      SECRET_KEY: test-secret-key-for-ci-only
+      SECRET_KEY: test-secret-key-for-ci-only-0123456789
       FERNET_KEY: dGVzdC1mZXJuZXQta2V5LWZvci1jaS0xMjM0NTY3OA==
       APP_ENV: testing
       DEBUG: "false"
@@ -111,7 +112,14 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev
+          sudo apt-get install -y libpq-dev postgresql-client
+
+      - name: Create test database
+        env:
+          PGPASSWORD: test
+        run: |
+          # conftest connects to "<POSTGRES_DB>_test"; create it once here.
+          psql -h localhost -U test -d investai -c "CREATE DATABASE investai_test;"
 
       - name: Install Python dependencies
         run: |

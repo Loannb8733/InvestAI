@@ -2,8 +2,9 @@
 
 from decimal import Decimal
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "034_tax_rate"
 down_revision = "033_repayment_breakdown"

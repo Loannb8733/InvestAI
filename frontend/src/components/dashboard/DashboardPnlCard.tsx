@@ -84,24 +84,24 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <MetricTooltip content="Profits/pertes sur les positions actuellement détenues. Non imposable tant que non vendu."><p className="text-xs text-muted-foreground">P&L Latent</p></MetricTooltip>
-            <p className={`text-lg font-bold ${pnlBreakdown.unrealized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.unrealized_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.unrealized_pnl)}</p>
+            <p className={`text-lg font-bold ${pnlBreakdown.unrealized_pnl >= 0 ? 'text-gain' : 'text-loss'}`}>{pnlBreakdown.unrealized_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.unrealized_pnl)}</p>
           </div>
           <div>
             <MetricTooltip content="Profits/pertes sur les actifs vendus. Soumis à imposition."><p className="text-xs text-muted-foreground">P&L Réalisé</p></MetricTooltip>
-            <p className={`text-lg font-bold ${pnlBreakdown.realized_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.realized_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.realized_pnl)}</p>
+            <p className={`text-lg font-bold ${pnlBreakdown.realized_pnl >= 0 ? 'text-gain' : 'text-loss'}`}>{pnlBreakdown.realized_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.realized_pnl)}</p>
           </div>
           <div>
             <MetricTooltip content="Total des frais de transaction payés."><p className="text-xs text-muted-foreground">Total Frais</p></MetricTooltip>
-            <p className="text-lg font-bold text-orange-500">-{pc(pnlBreakdown.total_fees)}</p>
+            <p className="text-lg font-bold text-warning">-{pc(pnlBreakdown.total_fees)}</p>
           </div>
           <div>
             <MetricTooltip content={returnMode === 'total' ? "P&L Net + Dividendes & Rewards (Total Return)." : "Latent + Réalisé − Frais."}>
               <p className="text-xs text-muted-foreground">{returnMode === 'total' ? 'Total Return' : 'P&L Net'}</p>
             </MetricTooltip>
             {returnMode === 'total' && totalReturn != null ? (
-              <p className={`text-lg font-bold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>{totalReturn >= 0 ? '\u25B2' : '\u25BC'} {pc(totalReturn)}</p>
+              <p className={`text-lg font-bold ${totalReturn >= 0 ? 'text-gain' : 'text-loss'}`}>{totalReturn >= 0 ? '\u25B2' : '\u25BC'} {pc(totalReturn)}</p>
             ) : (
-              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
+              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-gain' : 'text-loss'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
             )}
           </div>
         </div>
@@ -109,11 +109,11 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
           <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <MetricTooltip content="Revenus de dividendes et staking rewards cumulés."><p className="text-xs text-muted-foreground">Dividendes & Rewards</p></MetricTooltip>
-              <p className="text-lg font-bold text-emerald-500">+{pc(totalDividendIncome)}</p>
+              <p className="text-lg font-bold text-gain">+{pc(totalDividendIncome)}</p>
             </div>
             <div>
               <MetricTooltip content="Plus-value hors dividendes (variation du prix des actifs)."><p className="text-xs text-muted-foreground">Price Return</p></MetricTooltip>
-              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
+              <p className={`text-lg font-bold ${pnlBreakdown.net_pnl >= 0 ? 'text-gain' : 'text-loss'}`}>{pnlBreakdown.net_pnl >= 0 ? '\u25B2' : '\u25BC'} {pc(pnlBreakdown.net_pnl)}</p>
             </div>
           </div>
         )}
@@ -157,7 +157,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
                     {taxMode === 'pfu' ? 'PFU estimé (30%)' : 'Impôt estimé (barème)'}
                   </p>
                 </MetricTooltip>
-                <p className="text-lg font-bold text-orange-500">
+                <p className="text-lg font-bold text-warning">
                   {estimatedTax > 0 ? `-${pc(estimatedTax)}` : pc(0)}
                 </p>
                 {taxMode === 'progressive' && (
@@ -166,14 +166,14 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
               </div>
               <div>
                 <MetricTooltip content="P&L Net après déduction de l'impôt estimé sur les gains réalisés."><p className="text-xs text-muted-foreground">Net après impôts</p></MetricTooltip>
-                <p className={`text-lg font-bold ${netAfterTax >= 0 ? 'text-green-500' : 'text-red-500'}`}>{netAfterTax >= 0 ? '\u25B2' : '\u25BC'} {pc(netAfterTax)}</p>
+                <p className={`text-lg font-bold ${netAfterTax >= 0 ? 'text-gain' : 'text-loss'}`}>{netAfterTax >= 0 ? '\u25B2' : '\u25BC'} {pc(netAfterTax)}</p>
               </div>
             </div>
 
             {/* Fiscal disclaimer banner */}
-            <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
+            <div className="mt-3 flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+              <p className="text-[11px] text-warning dark:text-warning leading-tight">
                 Estimation maximale conservative{taxMode === 'pfu' ? ' basée sur le PFU 30%' : ''}. Calculée sur le P&L brut réalisé sans déduction des moins-values, abattements ou report déficitaire — le montant réel sera inférieur. Ne constitue pas un conseil fiscal. Consultez votre conseiller fiscal.
               </p>
             </div>

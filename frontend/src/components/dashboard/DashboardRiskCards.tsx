@@ -85,7 +85,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           <div className="flex items-center justify-between">
             <div>
               <MetricTooltip content="Rendement ajusté au risque. >1 = bon, >2 = très bon, <0 = mauvais"><p className="text-sm text-muted-foreground">Ratio de Sharpe</p></MetricTooltip>
-              <p className={`text-xl font-bold ${riskMetrics.sharpe_ratio >= st.good ? 'text-green-500' : riskMetrics.sharpe_ratio >= st.neutral ? 'text-yellow-500' : 'text-red-500'}`}>{riskMetrics.sharpe_ratio.toFixed(2)}</p>
+              <p className={`text-xl font-bold ${riskMetrics.sharpe_ratio >= st.good ? 'text-gain' : riskMetrics.sharpe_ratio >= st.neutral ? 'text-warning' : 'text-loss'}`}>{riskMetrics.sharpe_ratio.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">{riskMetrics.sharpe_ratio >= st.good ? 'Bon' : riskMetrics.sharpe_ratio >= st.neutral ? 'Moyen' : 'Faible'}</p>
             </div>
             <Zap className="h-8 w-8 text-muted-foreground" />
@@ -97,10 +97,10 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           <div className="flex items-center justify-between">
             <div>
               <MetricTooltip content="Perte maximale historique entre un pic et un creux. Mesure le pire scénario passé."><p className="text-sm text-muted-foreground">Max Drawdown</p></MetricTooltip>
-              <p className="text-xl font-bold text-red-500">-{riskMetrics.max_drawdown.max_drawdown_percent.toFixed(1)}%</p>
+              <p className="text-xl font-bold text-loss">-{riskMetrics.max_drawdown.max_drawdown_percent.toFixed(1)}%</p>
               <p className="text-xs text-muted-foreground">pire baisse {periodLabel ? `(${periodLabel})` : ''}</p>
             </div>
-            <TrendDown className="h-8 w-8 text-red-500" />
+            <TrendDown className="h-8 w-8 text-loss" />
           </div>
         </CardContent>
       </Card>
@@ -109,10 +109,10 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           <div className="flex items-center justify-between">
             <div>
               <MetricTooltip content={`Perte potentielle maximale avec ${(riskMetrics.var_95.confidence_level * 100).toFixed(0)}% de confiance sur 1 jour.`}><p className="text-sm text-muted-foreground">VaR 95%</p></MetricTooltip>
-              <p className="text-xl font-bold text-orange-500">{privacyMode ? '••••••' : formatCurrency(riskMetrics.var_95.var_amount)}</p>
+              <p className="text-xl font-bold text-warning">{privacyMode ? '••••••' : formatCurrency(riskMetrics.var_95.var_amount)}</p>
               <p className="text-xs text-muted-foreground">soit {riskMetrics.var_95.var_percent.toFixed(1)}%</p>
             </div>
-            <ShieldAlert className="h-8 w-8 text-orange-500" />
+            <ShieldAlert className="h-8 w-8 text-warning" />
           </div>
         </CardContent>
       </Card>

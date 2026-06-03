@@ -666,6 +666,11 @@ export const apiKeysApi = {
     return response.data as { task_id: string; status: string; message: string }
   },
 
+  refreshFx: async (id: string) => {
+    const response = await api.post(`/api-keys/${id}/refresh-fx`)
+    return response.data as { task_id: string; status: string; message: string }
+  },
+
   getImportStatus: async (taskId: string) => {
     const response = await api.get(`/api-keys/import-status/${taskId}`)
     return response.data as {
@@ -1205,6 +1210,20 @@ export const smartInsightsApi = {
   getAnomaliesImpact: async () => {
     const response = await api.get('/smart-insights/anomalies-impact', { timeout: ANALYTICS_TIMEOUT })
     return response.data
+  },
+
+  getSummary: async (days: number = 30) => {
+    const response = await api.get('/smart-insights/summary', { params: { days }, timeout: ANALYTICS_TIMEOUT })
+    return response.data as {
+      health_score: number
+      health_status: string
+      top_insight: { title: string; message: string; severity: string; category: string } | null
+      breakeven_pct: number | null
+      top_alpha: { symbol: string; alpha_score: number } | null
+      anomaly_count: number
+      regime: string | null
+      generated_at: string
+    }
   },
 }
 

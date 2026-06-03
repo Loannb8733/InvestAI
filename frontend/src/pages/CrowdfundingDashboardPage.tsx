@@ -16,19 +16,15 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts'
+import { ResponsivePie } from '@nivo/pie'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingDashboard } from '@/types/crowdfunding'
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+const COLOR_TOKENS = ['--chart-5', '--chart-3', '--chart-1', '--chart-4', '--chart-2', '--chart-2']
 
 export default function CrowdfundingDashboardPage() {
   const queryClient = useQueryClient()
+  const { theme, color } = useNivoTheme()
   const { data, isLoading } = useQuery<CrowdfundingDashboard>({
     queryKey: queryKeys.crowdfunding.dashboard,
     queryFn: crowdfundingApi.getDashboard,
@@ -55,7 +51,7 @@ export default function CrowdfundingDashboardPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Crowdfunding</h1>
+          <h1 className="text-3xl font-serif font-medium">Crowdfunding</h1>
           <p className="text-muted-foreground">
             Gérez vos investissements en crowdfunding immobilier et PME
           </p>
@@ -80,16 +76,18 @@ export default function CrowdfundingDashboardPage() {
     )
   }
 
-  const platformData = Object.entries(d.platform_breakdown).map(([name, value]) => ({
-    name,
+  const platformData = Object.entries(d.platform_breakdown).map(([name, value], i) => ({
+    id: name,
+    label: name,
     value,
+    color: color(COLOR_TOKENS[i % COLOR_TOKENS.length]),
   }))
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Crowdfunding</h1>
+          <h1 className="text-3xl font-serif font-medium">Crowdfunding</h1>
           <p className="text-muted-foreground">
             Vue d'ensemble de vos investissements crowdfunding
           </p>
@@ -118,7 +116,7 @@ export default function CrowdfundingDashboardPage() {
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(d.total_invested)}</div>
+            <div className="text-2xl font-serif font-medium">{formatCurrency(d.total_invested)}</div>
             <p className="text-xs text-muted-foreground">
               sur {d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count} projet(s)
             </p>
@@ -128,10 +126,10 @@ export default function CrowdfundingDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Rendement Projeté / an</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-gain" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">
+            <div className="text-2xl font-serif font-medium text-gain">
               {formatCurrency(d.projected_annual_interest)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -143,10 +141,10 @@ export default function CrowdfundingDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Reçu</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-blue-500" />
+            <CheckCircle2 className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(d.total_received)}</div>
+            <div className="text-2xl font-serif font-medium">{formatCurrency(d.total_received)}</div>
             <p className="text-xs text-muted-foreground">
               intérêts + remboursements
             </p>
@@ -159,7 +157,7 @@ export default function CrowdfundingDashboardPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-serif font-medium">
               {d.next_maturity
                 ? new Date(d.next_maturity).toLocaleDateString('fr-FR', {
                     month: 'short',
@@ -169,7 +167,7 @@ export default function CrowdfundingDashboardPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               {d.delayed_count > 0 && (
-                <span className="text-orange-500">
+                <span className="text-warning">
                   {d.delayed_count} projet(s) en retard
                 </span>
               )}
@@ -188,33 +186,39 @@ export default function CrowdfundingDashboardPage() {
           <CardContent>
             {platformData.length > 0 ? (
               <div className="flex items-center gap-6">
-                <ResponsiveContainer width="50%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={platformData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      strokeWidth={2}
-                    >
-                      {platformData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="h-[200px] w-1/2">
+                  <ResponsivePie
+                    data={platformData}
+                    theme={theme}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                    innerRadius={0.66}
+                    padAngle={1.4}
+                    cornerRadius={3}
+                    colors={{ datum: 'data.color' }}
+                    borderWidth={2}
+                    borderColor={color('--background')}
+                    enableArcLabels={false}
+                    enableArcLinkLabels={false}
+                    activeOuterRadiusOffset={6}
+                    tooltip={({ datum }) => (
+                      <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                        <p className="text-sm font-medium">{datum.label}</p>
+                        <p className="mt-0.5 font-mono text-sm tabular-nums">
+                          {formatCurrency(datum.value)}
+                        </p>
+                      </div>
+                    )}
+                  />
+                </div>
                 <div className="flex-1 space-y-2">
-                  {platformData.map((p, i) => (
-                    <div key={p.name} className="flex items-center justify-between text-sm">
+                  {platformData.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div
                           className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                          style={{ backgroundColor: p.color }}
                         />
-                        {p.name}
+                        {p.label}
                       </div>
                       <span className="font-medium">{formatCurrency(p.value)}</span>
                     </div>
@@ -234,10 +238,10 @@ export default function CrowdfundingDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { label: 'Actifs', count: d.active_count, color: 'bg-green-500', icon: TrendingUp },
-              { label: 'Terminés', count: d.completed_count, color: 'bg-blue-500', icon: CheckCircle2 },
-              { label: 'En retard', count: d.delayed_count, color: 'bg-orange-500', icon: AlertTriangle },
-              { label: 'Défaut', count: d.defaulted_count, color: 'bg-red-500', icon: AlertTriangle },
+              { label: 'Actifs', count: d.active_count, color: 'bg-gain', icon: TrendingUp },
+              { label: 'Terminés', count: d.completed_count, color: 'bg-accent', icon: CheckCircle2 },
+              { label: 'En retard', count: d.delayed_count, color: 'bg-warning', icon: AlertTriangle },
+              { label: 'Défaut', count: d.defaulted_count, color: 'bg-loss', icon: AlertTriangle },
             ]
               .filter((s) => s.count > 0)
               .map((s) => (

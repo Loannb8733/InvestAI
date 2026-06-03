@@ -1,7 +1,9 @@
 import { memo, useMemo } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { ResponsivePie } from '@nivo/pie'
+import { motion, useReducedMotion } from 'framer-motion'
 import { formatCurrency } from '@/lib/utils'
 import { AlertTriangle } from 'lucide-react'
+import { useNivoTheme } from './nivo-theme'
 
 interface CurrencyExposureItem {
   currency: string
@@ -15,34 +17,36 @@ interface CurrencyExposureChartProps {
   usdAlertThreshold?: number
 }
 
-const COLORS: Record<string, string> = {
-  EUR: '#6366F1',
-  USD: '#22C55E',
-  GBP: '#F59E0B',
-  CHF: '#EF4444',
-  JPY: '#EC4899',
-  CAD: '#8B5CF6',
-  AUD: '#14B8A6',
-  SEK: '#F97316',
-  NOK: '#06B6D4',
-  DKK: '#84CC16',
+const TOKENS: Record<string, string> = {
+  EUR: '--chart-2',
+  USD: '--chart-3',
+  GBP: '--chart-1',
+  CHF: '--chart-4',
+  JPY: '--chart-2',
+  CAD: '--chart-2',
+  AUD: '--chart-3',
+  SEK: '--chart-1',
+  NOK: '--chart-5',
+  DKK: '--chart-3',
 }
-
-const DEFAULT_COLOR = '#64748B'
 
 export default memo(function CurrencyExposureChart({
   data,
   usdAlertThreshold = 70,
 }: CurrencyExposureChartProps) {
+  const reduceMotion = useReducedMotion()
+  const { theme, color } = useNivoTheme()
+
   const chartData = useMemo(
     () =>
       (data || []).map((item) => ({
-        name: item.currency,
+        id: item.currency,
+        label: item.currency,
         value: item.value,
         percentage: item.percentage,
-        color: COLORS[item.currency] || DEFAULT_COLOR,
+        color: color(TOKENS[item.currency] || '--muted-foreground'),
       })),
-    [data]
+    [data, color]
   )
 
   const usdExposure = useMemo(
@@ -52,77 +56,67 @@ export default memo(function CurrencyExposureChart({
 
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+      <div className="flex h-[300px] items-center justify-center text-muted-foreground">
         Aucune donnée disponible
       </div>
     )
   }
 
-  const CustomTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean
-    payload?: Array<{ payload: { name: string; value: number; percentage: number } }>
-  }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      return (
-        <div className="bg-popover border rounded-lg shadow-lg p-3">
-          <p className="font-medium">{data.name}</p>
-          <p className="text-sm text-muted-foreground">{formatCurrency(data.value)}</p>
-          <p className="text-sm text-muted-foreground">{data.percentage.toFixed(1)}%</p>
-        </div>
-      )
-    }
-    return null
-  }
-
   return (
-    <div>
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <defs>
-            <filter id="ccyGlow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={90}
-            paddingAngle={2}
-            dataKey="value"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth={1}
-          >
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            formatter={(value, entry) => {
-              const percentage = (
-                entry as { payload?: { percentage: number } }
-              ).payload?.percentage
-              return (
-                <span className="text-sm">
-                  {value} ({percentage?.toFixed(1)}%)
-                </span>
-              )
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="relative h-[240px]">
+        <ResponsivePie
+          data={chartData}
+          theme={theme}
+          margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          innerRadius={0.64}
+          padAngle={1.4}
+          cornerRadius={3}
+          colors={{ datum: 'data.color' }}
+          borderWidth={2}
+          borderColor={color('--background')}
+          enableArcLabels={false}
+          enableArcLinkLabels={false}
+          activeOuterRadiusOffset={6}
+          activeInnerRadiusOffset={2}
+          isInteractive
+          animate={!reduceMotion}
+          motionConfig="gentle"
+          tooltip={({ datum }) => (
+            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+              <p className="text-sm font-medium">{datum.label}</p>
+              <p className="mt-0.5 font-mono text-sm tabular-nums">{formatCurrency(datum.value)}</p>
+              <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                {(datum.data as { percentage: number }).percentage.toFixed(1)}%
+              </p>
+            </div>
+          )}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+        {chartData.map((entry) => (
+          <div key={entry.id} className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                style={{ background: entry.color }}
+              />
+              <span className="truncate text-sm">{entry.label}</span>
+            </span>
+            <span className="font-mono text-sm tabular-nums text-muted-foreground">
+              {entry.percentage.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+
       {usdExposure > usdAlertThreshold && (
-        <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-warning/10 p-2 text-xs text-warning">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
             Exposition USD {usdExposure.toFixed(0)}% — risque de change significatif.
@@ -130,6 +124,6 @@ export default memo(function CurrencyExposureChart({
           </span>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 })

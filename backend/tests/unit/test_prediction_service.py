@@ -18,7 +18,8 @@ class TestGenerateRecommendation:
     def test_strong_bullish(self, svc):
         result = svc._generate_recommendation("bullish", 60, 100, 90, 110)
         assert "haussière forte" in result
-        assert "renforcer" in result
+        # Product philosophy (commit 94e1ac4): strong bull -> take profits, not "renforcer".
+        assert "prise de profits" in result
 
     def test_weak_bullish(self, svc):
         result = svc._generate_recommendation("bullish", 30, 100, 90, 110)

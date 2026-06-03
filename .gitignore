@@ -109,3 +109,7 @@ temp/
 !README.txt
 .vercel
 backend/tests/fixtures/*.pdf
+
+# Local design-skills tooling (not product code)
+.agents/
+skills-lock.json

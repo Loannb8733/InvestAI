@@ -150,7 +150,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Paramètres</h1>
+      <h1 className="text-3xl font-serif font-medium">Paramètres</h1>
 
       <div className="grid gap-6">
         {/* Profile */}

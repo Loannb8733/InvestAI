@@ -1,11 +1,31 @@
 """API Keys endpoints for exchange connections."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
+
+
+async def _usd_eur_rate_at(fx, trade_date: date, fallback: float) -> float:
+    """Resolve the USD→EUR rate effective on ``trade_date`` (FIN-01).
+
+    USD-denominated trades must be converted with the rate *as of their execution date*,
+    not a single current rate applied to the whole history (which skews old trades by
+    years of FX drift). Returns the forward-filled historical rate when available, else
+    ``fallback`` (the current spot rate) so a missing history never blocks an import.
+    A transient FX read error is swallowed and treated as "no rate" -> fallback.
+    """
+    if fx is not None:
+        try:
+            rate = await fx.get_rate(trade_date, "USD", "EUR")
+        except Exception:  # noqa: BLE001 - an FX read must never break the import
+            rate = None
+        if rate is not None:
+            return float(rate)
+    return fallback
+
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import case, func, select
@@ -901,7 +921,18 @@ async def import_trade_history(
         withdrawals_imported = 0
         assets_updated = 0
 
-        # Fetch current USD→EUR rate for USD-denominated pairs (fallback to 0.92)
+        # USD→EUR conversion for USD-denominated pairs.
+        #
+        # FIN-01 correctness: each trade must be converted with the USD→EUR rate *as of its
+        # execution date*. The previous code applied one *current* rate to the whole
+        # history, skewing old trades by years of FX drift (~10-20%). We seed the daily
+        # USD→EUR series in a SEPARATE session so its internal commit never touches the
+        # in-flight import transaction (which already holds pending deletes/inserts), then
+        # resolve each trade's rate by date via the read-only `fx_read` resolver below. The
+        # current spot rate is kept ONLY as a last-resort fallback when no historical rate
+        # is available.
+        from app.core.database import AsyncSessionLocal
+        from app.services.fx_history_service import FxHistoryService
         from app.services.price_service import price_service
 
         usd_eur_rate = 0.92
@@ -911,6 +942,21 @@ async def import_trade_history(
                 usd_eur_rate = float(forex_rate)
         except Exception:
             pass
+
+        try:
+            async with AsyncSessionLocal() as _fx_seed_db:
+                await FxHistoryService(_fx_seed_db).ensure_seeded("USD", "EUR", date(2017, 1, 1))
+        except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
+            logger.warning("FX seeding failed (%s); USD trades fall back to current rate", e)
+
+        fx_read = FxHistoryService(db)
+        _usd_eur_cache: dict = {}
+
+        async def _usd_eur_at(d: date) -> float:
+            """Per-date memoized USD→EUR lookup for the import loop (see _usd_eur_rate_at)."""
+            if d not in _usd_eur_cache:
+                _usd_eur_cache[d] = await _usd_eur_rate_at(fx_read, d, usd_eur_rate)
+            return _usd_eur_cache[d]
 
         for symbol, symbol_trades in asset_trades.items():
             if symbol in fiat_currencies:
@@ -996,12 +1042,13 @@ async def import_trade_history(
                 else:
                     trans_type = TransactionType.SELL
 
-                # Calculate price in EUR
-                # For USDT/USDC pairs, apply approximate USD→EUR conversion
+                # Convert the trade price to EUR using the USD→EUR rate as of the trade's
+                # execution date (FIN-01), not a single current rate for the whole history.
+                # Falls back to the current spot rate only when no historical rate exists.
                 trade_symbol = getattr(trade, "symbol", "")
                 price_eur = float(trade.price)
                 if any(trade_symbol.endswith(q) for q in ["USDT", "USDC", "BUSD", "FDUSD", "USD"]):
-                    price_eur = price_eur * usd_eur_rate
+                    price_eur = price_eur * await _usd_eur_at(trade.timestamp.date())
 
                 # For conversions, store the conversion rate
                 conversion_rate = None
@@ -1608,18 +1655,22 @@ async def sync_exchange(
 _import_tasks: dict[str, dict] = {}
 
 
-async def _run_import_background(task_id: str, api_key_id: str) -> None:
-    """Run exchange import in background and store result in memory."""
+async def _run_import_background(task_id: str, api_key_id: str, heal_fx: bool = False) -> None:
+    """Run exchange import in background and store result in memory.
+
+    When ``heal_fx`` is True, runs in FX-repair mode: corrects the stored FX fields of
+    already-imported transactions in place instead of importing new trades.
+    """
     try:
         from app.tasks.sync_exchanges import _sync_single_exchange
 
-        result = await _sync_single_exchange(api_key_id)
+        result = await _sync_single_exchange(api_key_id, heal_fx=heal_fx)
 
         if result.get("success"):
             _import_tasks[task_id] = {
                 "status": "completed",
                 "synced": result.get("synced", 0),
-                "message": "Import réussi",
+                "message": "Recalcul FX terminé" if heal_fx else "Import réussi",
             }
         else:
             _import_tasks[task_id] = {
@@ -1672,6 +1723,49 @@ async def import_history_async(
         "task_id": task_id,
         "status": "dispatched",
         "message": "Import lancé en arrière-plan",
+    }
+
+
+@router.post("/{api_key_id}/refresh-fx", response_model=dict)
+@limiter.limit("3/minute")
+async def refresh_exchange_fx(
+    request: Request,
+    api_key_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recompute historical FX (USD→EUR) on already-imported transactions (FIN-01 heal).
+
+    Re-fetches the trade history and corrects the stored price/currency/conversion_rate of
+    existing rows in place — no deletion, no new transactions. Returns a task_id pollable
+    via GET /import-status/{task_id}, same as import-async.
+    """
+    result = await db.execute(
+        select(APIKey).where(
+            APIKey.id == api_key_id,
+            APIKey.user_id == current_user.id,
+        )
+    )
+    api_key = result.scalar_one_or_none()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clé API non trouvée",
+        )
+
+    import asyncio
+    import uuid
+
+    task_id = uuid.uuid4().hex
+    _import_tasks[task_id] = {"status": "pending"}
+
+    asyncio.create_task(_run_import_background(task_id, str(api_key_id), heal_fx=True))
+
+    return {
+        "task_id": task_id,
+        "status": "dispatched",
+        "message": "Recalcul des taux FX lancé en arrière-plan",
     }
 
 

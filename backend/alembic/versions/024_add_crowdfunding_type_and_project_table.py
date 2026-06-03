@@ -3,10 +3,10 @@
 Revision ID: 024_crowdfunding
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
+from alembic import op
 
 revision = "024_crowdfunding"
 down_revision = "023_add_goal_type"
@@ -64,9 +64,7 @@ def upgrade() -> None:
         )
     """
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_crowdfunding_projects_asset_id ON crowdfunding_projects(asset_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_crowdfunding_projects_asset_id ON crowdfunding_projects(asset_id)")
 
 
 def downgrade() -> None:

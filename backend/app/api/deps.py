@@ -81,7 +81,16 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    result = await db.execute(select(User).where(User.id == UUID(user_id)))
+    try:
+        user_uuid = UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Payload du token invalide",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -96,6 +105,10 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User is inactive",
         )
+
+    # Expose the authenticated user id for downstream middleware (e.g. cache
+    # invalidation on mutating requests).
+    request.state.user_id = str(user.id)
 
     return user
 

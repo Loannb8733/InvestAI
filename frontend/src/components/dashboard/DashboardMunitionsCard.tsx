@@ -50,7 +50,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-400" />
+            <Zap className="h-4 w-4 text-warning" />
             Munitions Disponibles
           </CardTitle>
         </CardHeader>
@@ -72,7 +72,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-400" />
+            <Zap className="h-4 w-4 text-warning" />
             Munitions Disponibles
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -94,7 +94,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Big amount */}
-        <div className="text-2xl font-bold text-amber-400">
+        <div className="text-2xl font-serif font-medium text-warning">
           {pc(available_liquidity)}
         </div>
 
@@ -110,7 +110,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
               style={{ width: `${invested_pct}%` }}
             />
             <div
-              className="h-full bg-amber-400 transition-all duration-500"
+              className="h-full bg-warning transition-all duration-500"
               style={{ width: `${liquidity_pct}%` }}
             />
           </div>
@@ -124,16 +124,16 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
         {data?.next_signal_symbol && (
           <div className={`flex items-start gap-2 text-xs rounded-lg p-2.5 ${
             data.can_execute
-              ? 'bg-emerald-500/10 border border-emerald-500/20'
-              : 'bg-red-500/10 border border-red-500/20'
+              ? 'bg-gain/10 border border-gain/20'
+              : 'bg-loss/10 border border-loss/20'
           }`}>
             {data.can_execute ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-gain mt-0.5 shrink-0" />
             ) : (
-              <AlertTriangle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
+              <AlertTriangle className="h-3.5 w-3.5 text-loss mt-0.5 shrink-0" />
             )}
             <div className="space-y-0.5">
-              <div className={data.can_execute ? 'text-emerald-300' : 'text-red-300'}>
+              <div className={data.can_execute ? 'text-gain' : 'text-loss'}>
                 {data.can_execute
                   ? `Signal ${data.next_signal_action} sur ${data.next_signal_symbol} exécutable`
                   : data.message

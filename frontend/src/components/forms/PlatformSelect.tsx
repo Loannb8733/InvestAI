@@ -47,7 +47,7 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
     staleTime: 60_000,
   })
 
-  const userPlatforms = data?.platforms ?? []
+  const userPlatforms = useMemo(() => data?.platforms ?? [], [data?.platforms])
 
   const allPlatforms = useMemo(() => {
     const seen = new Map<string, { name: string; group: 'exchange' | 'wallet' | 'user' }>()

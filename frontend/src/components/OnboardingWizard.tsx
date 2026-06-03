@@ -17,6 +17,7 @@ import {
 const storageKey = (userId?: string) =>
   userId ? `investai-onboarding-done-${userId}` : 'investai-onboarding-done'
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its wizard; HMR-only warning
 export function useOnboarding(userId?: string) {
   const key = storageKey(userId)
   const done = localStorage.getItem(key) === 'true'
@@ -74,8 +75,8 @@ const steps = [
             </li>
           ))}
         </ol>
-        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-          <p className="text-xs text-blue-500">
+        <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
+          <p className="text-xs text-accent">
             Astuce : Connectez vos exchanges (Binance, Kraken...) via la page Exchanges pour importer automatiquement vos positions.
           </p>
         </div>
@@ -121,7 +122,7 @@ const steps = [
             { label: 'Alertes', desc: 'Configurez des alertes de prix et de performance' },
           ].map((item) => (
             <div key={item.label} className="flex items-start gap-2 p-2 rounded border">
-              <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+              <Check className="h-4 w-4 text-gain mt-0.5 shrink-0" />
               <div>
                 <span className="text-sm font-medium">{item.label}</span>
                 <span className="text-xs text-muted-foreground ml-1">— {item.desc}</span>
@@ -129,8 +130,8 @@ const steps = [
             </div>
           ))}
         </div>
-        <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-          <p className="text-xs text-green-500">
+        <div className="rounded-lg border border-gain/20 bg-gain/5 p-3">
+          <p className="text-xs text-gain">
             Tout est prêt ! Cliquez "Commencer" pour accéder à votre tableau de bord.
           </p>
         </div>
@@ -152,8 +153,8 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <Card className="w-full max-w-lg mx-4 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30">
+      <Card className="w-full max-w-lg mx-4 shadow-md">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">

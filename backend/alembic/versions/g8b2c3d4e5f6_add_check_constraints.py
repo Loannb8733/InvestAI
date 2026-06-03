@@ -59,13 +59,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "ck_planned_orders_amount_positive", "planned_orders", type_="check"
-    )
+    op.drop_constraint("ck_planned_orders_amount_positive", "planned_orders", type_="check")
     op.drop_constraint("ck_assets_avg_buy_price_positive", "assets", type_="check")
     op.drop_constraint("ck_assets_quantity_positive", "assets", type_="check")
     op.drop_constraint("ck_transactions_fee_positive", "transactions", type_="check")
     op.drop_constraint("ck_transactions_price_positive", "transactions", type_="check")
-    op.drop_constraint(
-        "ck_transactions_quantity_positive", "transactions", type_="check"
-    )
+    op.drop_constraint("ck_transactions_quantity_positive", "transactions", type_="check")

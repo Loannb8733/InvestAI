@@ -64,6 +64,7 @@ import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
 import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
+import IASummaryWidget from '@/components/dashboard/IASummaryWidget'
 import StalePriceBadge from '@/components/dashboard/StalePriceBadge'
 
 // ============== Interfaces ==============
@@ -331,7 +332,7 @@ function CustomizePanel({
               className="flex items-center justify-between w-full px-2 py-1.5 rounded hover:bg-muted transition-colors text-sm"
             >
               <span className={isHidden ? 'text-muted-foreground' : ''}>{WIDGET_LABELS[id]}</span>
-              {isHidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-green-500" />}
+              {isHidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-gain" />}
             </button>
           )
         })}
@@ -456,7 +457,7 @@ export default function DashboardPage() {
   if (!metrics || metrics.assets_count === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Tableau de bord</h1>
+        <h1 className="text-3xl font-serif font-medium">Tableau de bord</h1>
         <Card>
           <CardContent className="py-12">
             <div className="text-center space-y-4">
@@ -497,13 +498,13 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Tableau de bord</h1>
+          <h1 className="text-3xl font-serif font-medium">Tableau de bord</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-muted-foreground">
               Dernière mise à jour : {new Date(metrics.last_updated).toLocaleString('fr-FR')}
             </p>
             {wsConnected && (
-              <Badge variant="outline" className="text-green-600 border-green-500/50 bg-green-500/10 gap-1 text-xs">
+              <Badge variant="outline" className="text-gain border-gain/50 bg-gain/10 gap-1 text-xs">
                 <Radio className="h-3 w-3 animate-pulse" />
                 Live
               </Badge>
@@ -558,7 +559,7 @@ export default function DashboardPage() {
       {/* Alerts Section */}
       {concentration.is_concentrated && (
         <div className="space-y-2">
-          <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+          <Alert variant="destructive" className="border-loss/50 bg-loss/10">
             <ShieldAlert className="h-4 w-4" />
             <AlertDescription>
               Alerte concentration : {concentration.top_asset} représente {concentration.top_concentration}% de votre portefeuille.
@@ -608,6 +609,8 @@ export default function DashboardPage() {
                     privacyMode={privacyMode}
                   />
                 )
+              case 'ia-summary':
+                return <IASummaryWidget />
               case 'munitions':
                 return <DashboardMunitionsCard availableLiquidity={metrics.available_liquidity} totalValue={metrics.total_value} privacyMode={privacyMode} />
               case 'earn':
@@ -619,7 +622,7 @@ export default function DashboardPage() {
                   <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/crowdfunding')}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Landmark className="h-4 w-4 text-blue-400" />
+                        <Landmark className="h-4 w-4 text-accent" />
                         Crowdfunding
                         <Badge variant="outline" className="ml-auto text-[10px]">
                           {cfDashboard.active_count} actif{cfDashboard.active_count > 1 ? 's' : ''}
@@ -634,7 +637,7 @@ export default function DashboardPage() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Rendement projeté/an</p>
-                          <p className="text-lg font-bold text-green-500">+{pc(cfDashboard.projected_annual_interest)}</p>
+                          <p className="text-lg font-bold text-gain">+{pc(cfDashboard.projected_annual_interest)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Taux moyen</p>
@@ -667,7 +670,7 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <MetricTooltip content="Retour sur investissement projeté sur une année complète."><p className="text-sm text-muted-foreground">ROI Annualisé</p></MetricTooltip>
-                            <p className={`text-xl font-bold ${(advanced_metrics?.roi_annualized ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>{advanced_metrics?.roi_annualized != null ? formatPercent(advanced_metrics.roi_annualized) : '—'}</p>
+                            <p className={`text-xl font-bold ${(advanced_metrics?.roi_annualized ?? 0) >= 0 ? 'text-gain' : 'text-loss'}`}>{advanced_metrics?.roi_annualized != null ? formatPercent(advanced_metrics.roi_annualized) : '—'}</p>
                           </div>
                           <BarChart3 className="h-8 w-8 text-muted-foreground" />
                         </div>
@@ -678,7 +681,7 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <MetricTooltip content="Indice de Herfindahl-Hirschman. Mesure la concentration du portefeuille. <1500 = diversifié, 1500-2500 = modéré, >2500 = concentré"><p className="text-sm text-muted-foreground">Concentration (HHI)</p></MetricTooltip>
-                            <p className={`text-xl font-bold ${concentration.is_concentrated ? 'text-red-500' : 'text-green-500'}`}>{concentration.hhi.toFixed(0)}</p>
+                            <p className={`text-xl font-bold ${concentration.is_concentrated ? 'text-loss' : 'text-gain'}`}>{concentration.hhi.toFixed(0)}</p>
                             <p className="text-xs text-muted-foreground">{concentration.interpretation}</p>
                           </div>
                           <Target className="h-8 w-8 text-muted-foreground" />
@@ -693,7 +696,7 @@ export default function DashboardPage() {
                             {stress_tests.map((test) => (
                               <div key={test.scenario_name} className="flex justify-between items-center">
                                 <span className="text-sm">{test.scenario_name}</span>
-                                <span className="text-sm font-medium text-red-500">{pc(test.potential_loss)}</span>
+                                <span className="text-sm font-medium text-loss">{pc(test.potential_loss)}</span>
                               </div>
                             ))}
                           </div>
@@ -718,9 +721,9 @@ export default function DashboardPage() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <p className="text-sm font-medium">{idx.name}</p>
-                                {livePrices[idx.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
+                                {livePrices[idx.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />}
                               </div>
-                              <p className={`text-sm ${idx.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{idx.change_percent >= 0 ? '▲ +' : '▼ '}{idx.change_percent.toFixed(2)}%</p>
+                              <p className={`text-sm ${idx.change_percent >= 0 ? 'text-gain' : 'text-loss'}`}>{idx.change_percent >= 0 ? '▲ +' : '▼ '}{idx.change_percent.toFixed(2)}%</p>
                             </div>
                             <p className="text-sm text-muted-foreground ml-2">{pc(liveIndexPrice)}</p>
                           </div>)
@@ -729,7 +732,7 @@ export default function DashboardPage() {
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><Wallet className="h-4 w-4 text-primary" /></div>
                           <div>
                             <p className="text-sm font-medium">Votre portefeuille</p>
-                            <p className={`text-sm ${variationPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{variationPercent >= 0 ? '▲ +' : '▼ '}{variationPercent.toFixed(2)}%</p>
+                            <p className={`text-sm ${variationPercent >= 0 ? 'text-gain' : 'text-loss'}`}>{variationPercent >= 0 ? '▲ +' : '▼ '}{variationPercent.toFixed(2)}%</p>
                           </div>
                         </div>
                       </div>
@@ -747,7 +750,7 @@ export default function DashboardPage() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <PerformanceChart data={metrics.historical_data} period={selectedPeriod} color={isPositive ? '#22c55e' : '#ef4444'} />
+                        <PerformanceChart data={metrics.historical_data} period={selectedPeriod} color={isPositive ? 'oklch(var(--chart-3))' : 'oklch(var(--chart-4))'} />
                         <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => setShowBenchmarks((v) => !v)}>
                           {showBenchmarks ? 'Masquer' : 'Comparer aux benchmarks'}
                         </Button>
@@ -770,12 +773,12 @@ export default function DashboardPage() {
                                       <p className="font-medium text-sm">{asset.symbol}</p>
                                       {/* Live indicator removed: asset.value is server-computed, not updated with WS prices */}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{pc(asset.value)}{asset.staked_quantity != null && asset.staked_quantity > 0 && <span className="ml-1 text-purple-500">(dont {asset.staked_quantity.toFixed(2)} en Staking)</span>}</p>
+                                    <p className="text-xs text-muted-foreground">{pc(asset.value)}{asset.staked_quantity != null && asset.staked_quantity > 0 && <span className="ml-1 text-accent">(dont {asset.staked_quantity.toFixed(2)} en Staking)</span>}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-sm">{asset.percentage.toFixed(1)}%</p>
-                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>{asset.gain_loss_percent >= 0 ? '▲ +' : '▼ -'}{formatPercent(Math.abs(asset.gain_loss_percent))}</p>
+                                  <p className={`text-xs ${asset.gain_loss_percent >= 0 ? 'text-gain' : 'text-loss'}`}>{asset.gain_loss_percent >= 0 ? '▲ +' : '▼ -'}{formatPercent(Math.abs(asset.gain_loss_percent))}</p>
                                 </div>
                               </div>
                             ))}
@@ -840,7 +843,7 @@ export default function DashboardPage() {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className={`text-sm font-medium ${tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? 'text-red-500' : 'text-green-500'}`}>
+                                  <p className={`text-sm font-medium ${tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? 'text-loss' : 'text-gain'}`}>
                                     {tx.transaction_type.includes('sell') || tx.transaction_type.includes('out') ? '-' : '+'}{pc(tx.total)}
                                   </p>
                                   <p className="text-xs text-muted-foreground">{new Date(tx.executed_at).toLocaleDateString('fr-FR')}</p>
@@ -863,7 +866,7 @@ export default function DashboardPage() {
                               <div className="space-y-2">
                                 {metrics.active_alerts.slice(0, 3).map((alert) => (
                                   <div key={alert.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                                    <div className="flex items-center gap-2"><Bell className="h-3 w-3 text-orange-500" /><span className="text-sm">{alert.name}</span></div>
+                                    <div className="flex items-center gap-2"><Bell className="h-3 w-3 text-warning" /><span className="text-sm">{alert.name}</span></div>
                                     {alert.symbol && <span className="text-xs text-muted-foreground">{alert.symbol}</span>}
                                   </div>
                                 ))}
@@ -877,11 +880,11 @@ export default function DashboardPage() {
                                 {metrics.upcoming_events.slice(0, 3).map((event) => (
                                   <div key={event.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
                                     <div className="flex items-center gap-2">
-                                      <Calendar className="h-3 w-3 text-blue-500" />
+                                      <Calendar className="h-3 w-3 text-accent" />
                                       <div><span className="text-sm">{event.title}</span><p className="text-xs text-muted-foreground">{eventTypeLabels[event.event_type] || event.event_type}</p></div>
                                     </div>
                                     <div className="text-right">
-                                      {event.amount && (<p className="text-sm font-medium text-green-500">+{pc(event.amount)}</p>)}
+                                      {event.amount && (<p className="text-sm font-medium text-gain">+{pc(event.amount)}</p>)}
                                       <p className="text-xs text-muted-foreground">{new Date(event.event_date).toLocaleDateString('fr-FR')}</p>
                                     </div>
                                   </div>
@@ -908,7 +911,7 @@ export default function DashboardPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-green-500 flex items-center gap-2"><TrendingUp className="h-5 w-5" />Meilleures performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
+                        <CardTitle className="text-gain flex items-center gap-2"><TrendingUp className="h-5 w-5" />Meilleures performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>
                       <CardContent>
                         {metrics.top_performers.length > 0 ? (
@@ -918,11 +921,11 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
                                   <div>
-                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
+                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />}</div>
                                     <p className="text-xs text-muted-foreground">{pc(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-green-500"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">+{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
+                                <div className="flex items-center text-gain"><ArrowUpRight className="h-4 w-4 mr-1" /><span className="font-medium">+{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>
@@ -931,7 +934,7 @@ export default function DashboardPage() {
                     </Card>
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-red-500 flex items-center gap-2"><TrendingDown className="h-5 w-5" />Moins bonnes performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
+                        <CardTitle className="text-loss flex items-center gap-2"><TrendingDown className="h-5 w-5" />Moins bonnes performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>
                       <CardContent>
                         {metrics.worst_performers.length > 0 ? (
@@ -941,11 +944,11 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-3">
                                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
                                   <div>
-                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}</div>
+                                    <div className="flex items-center gap-1.5"><p className="font-medium text-sm">{item.symbol}</p>{livePrices[item.symbol.toUpperCase()] && <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />}</div>
                                     <p className="text-xs text-muted-foreground">{pc(item.current_value)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-red-500"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">-{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
+                                <div className="flex items-center text-loss"><ArrowDownRight className="h-4 w-4 mr-1" /><span className="font-medium">-{privacyMode ? '••••' : formatPercent(Math.abs(item.gain_loss_percent))}</span></div>
                               </div>
                             ))}
                           </div>

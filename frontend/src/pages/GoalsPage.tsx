@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useId, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,17 +35,8 @@ import { formatCurrency } from '@/lib/utils'
 import { goalsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import {
   Plus,
   Target,
@@ -117,10 +108,10 @@ interface GoalProjection {
 
 const probBadge = (label: string) => {
   if (label === 'Forte')
-    return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Probabilité : Forte</Badge>
+    return <Badge className="bg-gain/15 text-gain border-gain/30">Probabilité : Forte</Badge>
   if (label === 'Moyenne')
-    return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Probabilité : Moyenne</Badge>
-  return <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Probabilité : Faible</Badge>
+    return <Badge className="bg-warning/15 text-warning border-warning/30">Probabilité : Moyenne</Badge>
+  return <Badge className="bg-loss/15 text-loss border-loss/30">Probabilité : Faible</Badge>
 }
 
 const priorityBadge = (p: string) => {
@@ -133,6 +124,12 @@ const strategyLabel = (s: string) => {
   if (s === 'aggressive') return 'Agressif'
   if (s === 'conservative') return 'Conservateur'
   return 'Modéré'
+}
+
+/** Accept either a raw color (hex) or an `oklch(var(--token))` string and resolve to rgb. */
+function resolveColor(input: string, colorFn: (name: string) => string): string {
+  const m = input.match(/var\((--[\w-]+)\)/)
+  return m ? colorFn(m[1]) : input
 }
 
 // ── Projection Chart Component with DCA Slider ──────────────────
@@ -159,6 +156,29 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current) }
   }, [])
 
+  const uid = useId().replace(/:/g, '')
+  const { theme, color: tokenColor } = useNivoTheme()
+  const lineColor = resolveColor(color, tokenColor)
+  const targetColor = tokenColor('--muted-foreground')
+
+  const curve = useMemo(() => data?.curve ?? [], [data?.curve])
+
+  const series = useMemo<LineSeries[]>(
+    () => [
+      { id: 'projected_p50', data: curve.map((d) => ({ x: d.date_label, y: d.projected_p50 })) },
+      { id: 'target_line', data: curve.map((d) => ({ x: d.date_label, y: d.target_line })) },
+    ],
+    [curve]
+  )
+
+  // ~6 evenly spaced x labels regardless of point count.
+  const tickValues = useMemo(() => {
+    if (curve.length === 0) return []
+    const target = Math.min(6, curve.length)
+    const step = Math.max(1, Math.floor(curve.length / target))
+    return curve.filter((_, i) => i % step === 0).map((d) => d.date_label)
+  }, [curve])
+
   if (isLoading && !data) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -167,6 +187,16 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
     )
   }
   if (!data || data.curve.length === 0) return null
+
+  // Custom layer: p25→p75 confidence band, drawn with the chart's own scales.
+  const ConfidenceBand = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+    const x = (i: number) => xScale(curve[i].date_label as never) as number
+    const top = curve.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${yScale(d.projected_p75 as never)}`)
+    const bottom = curve
+      .map((d, i) => `L${x(i)},${yScale(d.projected_p25 as never)}`)
+      .reverse()
+    return <path d={`${top.join(' ')} ${bottom.join(' ')} Z`} fill={lineColor} fillOpacity={0.12} stroke="none" />
+  }
 
   return (
     <div className="space-y-3">
@@ -194,7 +224,7 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         {probBadge(data.probability_label)}
         {data.gold_shield_active && (
-          <Badge className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30 gap-1">
+          <Badge className="bg-warning/15 text-warning border-warning/30 gap-1">
             <Shield className="h-3 w-3" />
             Gold Shield
           </Badge>
@@ -212,80 +242,104 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
 
       {/* Alert message */}
       {data.alert_message && (
-        <div className="flex items-start gap-2 text-xs bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
-          <span className="text-amber-300">{data.alert_message}</span>
+        <div className="flex items-start gap-2 text-xs bg-warning/10 border border-warning/20 rounded-lg p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+          <span className="text-warning">{data.alert_message}</span>
         </div>
       )}
 
       {/* Gold Shield advice — garde-fou prob < 50% en Bear */}
       {data.gold_shield_advice && (
-        <div className="flex items-start gap-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5">
-          <Shield className="h-3.5 w-3.5 text-yellow-400 mt-0.5 shrink-0" />
-          <span className="text-yellow-300">{data.gold_shield_advice}</span>
+        <div className="flex items-start gap-2 text-xs bg-warning/10 border border-warning/20 rounded-lg p-2.5">
+          <Shield className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+          <span className="text-warning">{data.gold_shield_advice}</span>
         </div>
       )}
 
       {/* Area Chart */}
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data.curve} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`grad-${goalId}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={color} stopOpacity={0.05} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
-          <XAxis
-            dataKey="date_label"
-            tick={{ fontSize: 10 }}
-            className="fill-muted-foreground"
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            tick={{ fontSize: 10 }}
-            className="fill-muted-foreground"
-            tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`}
-          />
-          <Tooltip
-            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-            formatter={(value: number) => [formatCurrency(value), '']}
-            labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-          />
-          <Area
-            type="monotone"
-            dataKey="projected_p75"
-            stroke="none"
-            fill={`url(#grad-${goalId})`}
-            name="P75 (optimiste)"
-          />
-          <Area
-            type="monotone"
-            dataKey="projected_p25"
-            stroke="none"
-            fill="hsl(var(--card))"
-            name="P25 (pessimiste)"
-          />
-          <Line
-            type="monotone"
-            dataKey="projected_p50"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            name="Projection médiane"
-          />
-          <Line
-            type="monotone"
-            dataKey="target_line"
-            stroke="hsl(var(--muted-foreground))"
-            strokeWidth={1}
-            strokeDasharray="5 5"
-            dot={false}
-            name="Cible"
-          />
-          <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-        </AreaChart>
-      </ResponsiveContainer>
+      <div className="h-[220px]">
+        <ResponsiveLine
+          data={series}
+          theme={theme}
+          margin={{ top: 8, right: 12, bottom: 28, left: 48 }}
+          xScale={{ type: 'point' }}
+          yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+          curve="monotoneX"
+          colors={(s) => (s.id === 'target_line' ? targetColor : lineColor)}
+          lineWidth={2}
+          enablePoints={false}
+          enableGridX={false}
+          enableArea
+          areaOpacity={1}
+          defs={[
+            {
+              id: `grad-${uid}`,
+              type: 'linearGradient',
+              colors: [
+                { offset: 0, color: lineColor, opacity: 0.3 },
+                { offset: 100, color: lineColor, opacity: 0.05 },
+              ],
+            },
+            {
+              id: `transparent-${uid}`,
+              type: 'linearGradient',
+              colors: [
+                { offset: 0, color: lineColor, opacity: 0 },
+                { offset: 100, color: lineColor, opacity: 0 },
+              ],
+            },
+          ]}
+          fill={[
+            { match: { id: 'projected_p50' }, id: `grad-${uid}` },
+            { match: { id: 'target_line' }, id: `transparent-${uid}` },
+          ]}
+          axisBottom={{ tickSize: 0, tickPadding: 8, tickValues }}
+          axisLeft={{
+            tickSize: 0,
+            tickPadding: 6,
+            format: (v) => ((v as number) >= 1000 ? `${((v as number) / 1000).toFixed(1)}k` : `${v}`),
+          }}
+          layers={[
+            'grid',
+            'markers',
+            'areas',
+            ConfidenceBand,
+            'lines',
+            'slices',
+            'axes',
+            'points',
+            'mesh',
+          ]}
+          enableSlices="x"
+          sliceTooltip={({ slice }) => {
+            const x = slice.points[0]?.data.x as string
+            const point = curve.find((d) => d.date_label === x)
+            if (!point) return null
+            const rows: Array<{ label: string; value: number; color: string }> = [
+              { label: 'Projection médiane', value: point.projected_p50, color: lineColor },
+              { label: 'P75 (optimiste)', value: point.projected_p75, color: lineColor },
+              { label: 'P25 (pessimiste)', value: point.projected_p25, color: lineColor },
+              { label: 'Cible', value: point.target_line, color: targetColor },
+            ]
+            return (
+              <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                <p className="mb-1.5 text-xs text-muted-foreground">{x}</p>
+                {rows.map((r) => (
+                  <div key={r.label} className="flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
+                      <span className="text-xs text-muted-foreground">{r.label}</span>
+                    </span>
+                    <span className="font-mono text-sm tabular-nums">{formatCurrency(r.value)}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          }}
+          animate
+          motionConfig="gentle"
+        />
+      </div>
     </div>
   )
 }
@@ -293,9 +347,9 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
 // ── Scenario Comparison (300€/month) ──────────────────────────
 
 const STRATEGY_PARAMS: Record<string, { label: string; returnPct: number; allocation: string; color: string }> = {
-  conservative: { label: 'Conservateur', returnPct: 5, allocation: '80% Or/Stables · 20% BTC', color: '#3b82f6' },
-  moderate: { label: 'Modéré', returnPct: 8, allocation: '40% Or/Stables · 60% Alpha', color: '#8b5cf6' },
-  aggressive: { label: 'Agressif', returnPct: 12, allocation: '10% Stables · 90% Alpha', color: '#f59e0b' },
+  conservative: { label: 'Conservateur', returnPct: 5, allocation: '80% Or/Stables · 20% BTC', color: 'oklch(var(--chart-5))' },
+  moderate: { label: 'Modéré', returnPct: 8, allocation: '40% Or/Stables · 60% Alpha', color: 'oklch(var(--chart-2))' },
+  aggressive: { label: 'Agressif', returnPct: 12, allocation: '10% Stables · 90% Alpha', color: 'oklch(var(--chart-1))' },
 }
 
 function monthsToTarget(current: number, target: number, monthlyDca: number, annualReturn: number): number {
@@ -367,7 +421,7 @@ export default function GoalsPage() {
   const [deadlineDate, setDeadlineDate] = useState('')
   const [priority, setPriority] = useState('medium')
   const [strategyType, setStrategyType] = useState('moderate')
-  const [color, setColor] = useState('#6366f1')
+  const [color, setColor] = useState('oklch(var(--chart-2))')
 
   const { data: goals = [], isLoading } = useQuery<Goal[]>({
     queryKey: queryKeys.goals.list,
@@ -451,7 +505,7 @@ export default function GoalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Wealth Journey</h1>
+          <h1 className="text-3xl font-serif font-medium">Wealth Journey</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Objectifs financiers avec projections intelligentes
           </p>
@@ -538,12 +592,17 @@ export default function GoalsPage() {
       {/* Empty state */}
       {goals.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Target className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold">Aucun objectif</h2>
-            <p className="text-muted-foreground mt-2">
-              Créez votre premier objectif financier pour suivre votre progression.
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Target className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
+            <h2 className="text-xl font-serif font-medium mb-2">Ton parcours commence ici</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Fixe un premier objectif — une maison, une retraite, un coussin de sécurité —
+              et suis chaque pas qui t'en rapproche.
             </p>
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Créer mon premier objectif
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -559,13 +618,13 @@ export default function GoalsPage() {
                       <CardTitle className="flex items-center justify-between text-base">
                         <span className="flex items-center gap-2">
                           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: goal.color }} />
-                          {goal.goal_type === 'savings' && <PiggyBank className="h-4 w-4 text-amber-400" />}
+                          {goal.goal_type === 'savings' && <PiggyBank className="h-4 w-4 text-warning" />}
                           {goal.name}
                           {goal.goal_type === 'savings' && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 border-amber-500/30 text-amber-400">Épargne</Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 border-warning/30 text-warning">Épargne</Badge>
                           )}
                           {goal.is_resilient && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 border-yellow-500/30 text-yellow-400 gap-0.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 border-warning/30 text-warning gap-0.5">
                               <Shield className="h-2.5 w-2.5" />
                               Résilient
                             </Badge>
@@ -658,7 +717,7 @@ export default function GoalsPage() {
           {reachedGoals.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <CheckCircle2 className="h-5 w-5 text-gain" />
                 Objectifs atteints
               </h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -666,10 +725,10 @@ export default function GoalsPage() {
                   <Card key={goal.id} className="opacity-75">
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-green-500" />
+                        <div className="h-3 w-3 rounded-full bg-gain" />
                         <div>
                           <p className="font-medium">{goal.name}</p>
-                          <p className="text-sm text-green-500">{formatCurrency(goal.target_amount)} atteint</p>
+                          <p className="text-sm text-gain">{formatCurrency(goal.target_amount)} atteint</p>
                         </div>
                       </div>
                     </CardContent>

@@ -1,14 +1,7 @@
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  LineChart,
-  Line,
-  XAxis as RXAxis,
-  YAxis as RYAxis,
-  CartesianGrid as RCartesianGrid,
-  Tooltip as RTooltip,
-  ResponsiveContainer,
-  Legend as RLegend,
-} from 'recharts'
+import { ResponsiveLine, type LineSeries } from '@nivo/line'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 
 interface BenchmarkSeries {
   name: string
@@ -20,20 +13,38 @@ interface DashboardBenchmarkChartProps {
   benchmarks: BenchmarkSeries[]
 }
 
-const BENCH_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#22c55e']
+const BENCH_TOKENS = ['--chart-5', '--chart-1', '--chart-2', '--chart-3']
 
 export default function DashboardBenchmarkChart({ benchmarks }: DashboardBenchmarkChartProps) {
-  // Merge all series into one dataset keyed by date
-  const dateMap: Record<string, Record<string, number>> = {}
-  benchmarks.forEach((series) => {
-    series.data.forEach((p) => {
-      if (!dateMap[p.date]) dateMap[p.date] = {}
-      dateMap[p.date][series.symbol] = p.value
+  const { theme, color } = useNivoTheme()
+
+  const colorBySymbol = useMemo(() => {
+    const map: Record<string, string> = {}
+    benchmarks.forEach((s, i) => {
+      map[s.symbol] = color(BENCH_TOKENS[i % BENCH_TOKENS.length])
     })
-  })
-  const chartData = Object.entries(dateMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, vals]) => ({ date: date.slice(5), ...vals }))
+    return map
+  }, [benchmarks, color])
+
+  const series = useMemo<LineSeries[]>(
+    () =>
+      benchmarks.map((s) => ({
+        id: s.symbol,
+        data: s.data.map((p) => ({ x: p.date.slice(5), y: p.value })),
+      })),
+    [benchmarks]
+  )
+
+  const tickValues = useMemo(() => {
+    const longest = benchmarks.reduce(
+      (acc, s) => (s.data.length > acc.length ? s.data : acc),
+      [] as BenchmarkSeries['data']
+    )
+    if (longest.length === 0) return []
+    const target = Math.min(6, longest.length)
+    const step = Math.max(1, Math.floor(longest.length / target))
+    return longest.filter((_, i) => i % step === 0).map((p) => p.date.slice(5))
+  }, [benchmarks])
 
   return (
     <Card>
@@ -41,18 +52,64 @@ export default function DashboardBenchmarkChart({ benchmarks }: DashboardBenchma
         <CardTitle className="text-sm font-medium">Performance comparée (base 100)</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-            <RCartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-            <RXAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickLine={false} axisLine={false} />
-            <RYAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
-            <RTooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '0.5rem', fontSize: 12 }} />
-            <RLegend verticalAlign="top" height={30} wrapperStyle={{ fontSize: 12 }} />
-            {benchmarks.map((series, i) => (
-              <Line key={series.symbol} type="monotone" dataKey={series.symbol} name={series.name} stroke={BENCH_COLORS[i % BENCH_COLORS.length]} strokeWidth={2} dot={false} />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="h-[250px]">
+          <ResponsiveLine
+            data={series}
+            theme={theme}
+            margin={{ top: 28, right: 16, bottom: 28, left: 44 }}
+            xScale={{ type: 'point' }}
+            yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+            curve="monotoneX"
+            colors={(s) => colorBySymbol[s.id as string]}
+            lineWidth={2}
+            enablePoints={false}
+            enableGridX={false}
+            axisBottom={{ tickSize: 0, tickPadding: 8, tickValues }}
+            axisLeft={{ tickSize: 0, tickPadding: 6 }}
+            enableSlices="x"
+            sliceTooltip={({ slice }) => (
+              <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                <p className="mb-1.5 text-xs text-muted-foreground">{slice.points[0]?.data.x as string}</p>
+                {slice.points.map((p) => {
+                  const name = benchmarks.find((b) => b.symbol === p.seriesId)?.name ?? p.seriesId
+                  return (
+                    <div key={p.id} className="flex items-center justify-between gap-4">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 rounded-[2px]"
+                          style={{ backgroundColor: colorBySymbol[p.seriesId as string] }}
+                        />
+                        <span className="text-xs text-muted-foreground">{name}</span>
+                      </span>
+                      <span className="font-mono text-sm tabular-nums">
+                        {(p.data.y as number).toFixed(1)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            legends={[
+              {
+                anchor: 'top-right',
+                direction: 'row',
+                translateY: -22,
+                itemWidth: 90,
+                itemHeight: 18,
+                symbolSize: 10,
+                symbolShape: 'circle',
+                itemTextColor: color('--muted-foreground'),
+                data: benchmarks.map((s) => ({
+                  id: s.symbol,
+                  label: s.name,
+                  color: colorBySymbol[s.symbol],
+                })),
+              },
+            ]}
+            animate
+            motionConfig="gentle"
+          />
+        </div>
       </CardContent>
     </Card>
   )

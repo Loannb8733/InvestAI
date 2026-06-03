@@ -12,14 +12,14 @@ async def _setup_asset(client: AsyncClient, token: str) -> tuple[str, str]:
     headers = {"Authorization": f"Bearer {token}"}
 
     portfolio_resp = await client.post(
-        "/api/v1/portfolios/",
+        "/api/v1/portfolios",
         json={"name": "Test Portfolio"},
         headers=headers,
     )
     portfolio_id = portfolio_resp.json()["id"]
 
     asset_resp = await client.post(
-        "/api/v1/assets/",
+        "/api/v1/assets",
         json={
             "portfolio_id": portfolio_id,
             "symbol": "BTC",
@@ -41,7 +41,7 @@ async def test_create_transaction(client: AsyncClient, regular_user: User):
     _, asset_id = await _setup_asset(client, token)
 
     response = await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": asset_id,
             "transaction_type": "buy",
@@ -66,7 +66,7 @@ async def test_create_sell_transaction(client: AsyncClient, regular_user: User):
     _, asset_id = await _setup_asset(client, token)
 
     response = await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": asset_id,
             "transaction_type": "sell",
@@ -89,7 +89,7 @@ async def test_list_transactions(client: AsyncClient, regular_user: User):
 
     # Create a transaction
     await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": asset_id,
             "transaction_type": "buy",
@@ -99,7 +99,7 @@ async def test_list_transactions(client: AsyncClient, regular_user: User):
         headers=headers,
     )
 
-    response = await client.get("/api/v1/transactions/", headers=headers)
+    response = await client.get("/api/v1/transactions", headers=headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
     assert len(response.json()) >= 1
@@ -113,7 +113,7 @@ async def test_delete_transaction(client: AsyncClient, regular_user: User):
     _, asset_id = await _setup_asset(client, token)
 
     create_resp = await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": asset_id,
             "transaction_type": "buy",
@@ -132,7 +132,7 @@ async def test_delete_transaction(client: AsyncClient, regular_user: User):
 async def test_transaction_no_auth(client: AsyncClient):
     """Test creating a transaction without auth."""
     response = await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": "00000000-0000-0000-0000-000000000000",
             "transaction_type": "buy",
@@ -151,7 +151,7 @@ async def test_transaction_validation(client: AsyncClient, regular_user: User):
     _, asset_id = await _setup_asset(client, token)
 
     response = await client.post(
-        "/api/v1/transactions/",
+        "/api/v1/transactions",
         json={
             "asset_id": asset_id,
             "transaction_type": "buy",

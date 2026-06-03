@@ -4,8 +4,9 @@ Revision ID: 031_transaction_internal_hash
 Revises: 030_crowdfunding_repayments
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "031_transaction_internal_hash"
 down_revision = "030_crowdfunding_repayments"
@@ -14,9 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "transactions", sa.Column("internal_hash", sa.String(40), nullable=True)
-    )
+    op.add_column("transactions", sa.Column("internal_hash", sa.String(40), nullable=True))
     op.create_index("ix_transactions_internal_hash", "transactions", ["internal_hash"])
     # Unique partial index: only enforce uniqueness where hash is set
     op.execute(

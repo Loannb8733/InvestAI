@@ -22,11 +22,11 @@ export const FearGreedGauge = React.memo(({ value, thresholds }: {
   const fg = thresholds ?? DEFAULT_DISPLAY_THRESHOLDS.fear_greed
 
   const getColor = (v: number) => {
-    if (v >= fg.extreme_greed) return '#22c55e'
-    if (v >= fg.greed) return '#84cc16'
-    if (v >= fg.fear) return '#eab308'
-    if (v >= fg.extreme_fear) return '#f97316'
-    return '#ef4444'
+    if (v >= fg.extreme_greed) return 'oklch(var(--chart-3))'
+    if (v >= fg.greed) return 'oklch(var(--chart-3))'
+    if (v >= fg.fear) return 'oklch(var(--chart-1))'
+    if (v >= fg.extreme_fear) return 'oklch(var(--chart-1))'
+    return 'oklch(var(--chart-4))'
   }
   const getLabel = (v: number) => {
     if (v >= fg.extreme_greed) return 'Extrême avidité'
@@ -75,11 +75,11 @@ export const CycleGauge = React.memo(({ position }: { position: number }) => {
   const ny = cy + r * Math.sin(radians)
 
   const getPhase = (pos: number): { label: string; color: string } => {
-    if (pos < 15) return { label: 'Creux', color: '#3b82f6' }
-    if (pos < 40) return { label: 'Accumulation', color: '#06b6d4' }
-    if (pos < 65) return { label: 'Expansion', color: '#22c55e' }
-    if (pos < 85) return { label: 'Distribution', color: '#f59e0b' }
-    return { label: 'Euphorie', color: '#ef4444' }
+    if (pos < 15) return { label: 'Creux', color: 'oklch(var(--chart-5))' }
+    if (pos < 40) return { label: 'Accumulation', color: 'oklch(var(--chart-5))' }
+    if (pos < 65) return { label: 'Expansion', color: 'oklch(var(--chart-3))' }
+    if (pos < 85) return { label: 'Distribution', color: 'oklch(var(--chart-1))' }
+    return { label: 'Euphorie', color: 'oklch(var(--chart-4))' }
   }
   const phase = getPhase(clampedPos)
 
@@ -88,11 +88,11 @@ export const CycleGauge = React.memo(({ position }: { position: number }) => {
       <svg width="140" height="140" viewBox="0 0 120 120">
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/20" />
         {[
-          { start: -90, end: -36, c: '#3b82f6' },
-          { start: -36, end: 54, c: '#06b6d4' },
-          { start: 54, end: 144, c: '#22c55e' },
-          { start: 144, end: 216, c: '#f59e0b' },
-          { start: 216, end: 270, c: '#ef4444' },
+          { start: -90, end: -36, c: 'oklch(var(--chart-5))' },
+          { start: -36, end: 54, c: 'oklch(var(--chart-5))' },
+          { start: 54, end: 144, c: 'oklch(var(--chart-3))' },
+          { start: 144, end: 216, c: 'oklch(var(--chart-1))' },
+          { start: 216, end: 270, c: 'oklch(var(--chart-4))' },
         ].map(({ start, end, c }, i) => {
           const s = (start * Math.PI) / 180
           const e = (end * Math.PI) / 180
@@ -144,8 +144,8 @@ export const ReliabilityScore = React.memo(({
   reliabilityScore, skillScore, hitRate, hitRateSignificant, hitRateN, modelConfidence,
 }: ReliabilityScoreProps) => {
   const score = Math.round(reliabilityScore)
-  const color = score >= 60 ? 'bg-green-500' : score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-  const textColor = score >= 60 ? 'text-green-500' : score >= 40 ? 'text-yellow-500' : 'text-red-500'
+  const color = score >= 60 ? 'bg-gain' : score >= 40 ? 'bg-warning' : 'bg-loss'
+  const textColor = score >= 60 ? 'text-gain' : score >= 40 ? 'text-warning' : 'text-loss'
   const label = modelConfidence === 'useful' ? 'Utile' : modelConfidence === 'uncertain' ? 'Incertain' : 'Non fiable'
 
   return (
@@ -181,7 +181,7 @@ export const VariationBar = React.memo(({ percent }: { percent: number }) => {
     <div className="flex items-center gap-2">
       <div className="w-20 h-2 rounded-full bg-muted relative overflow-hidden">
         <div
-          className={`absolute h-full rounded-full ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
+          className={`absolute h-full rounded-full ${isPositive ? 'bg-gain' : 'bg-loss'}`}
           style={{
             width: `${width}%`,
             left: isPositive ? '50%' : `${50 - width}%`,
@@ -189,7 +189,7 @@ export const VariationBar = React.memo(({ percent }: { percent: number }) => {
         />
         <div className="absolute left-1/2 top-0 w-px h-full bg-muted-foreground/30" />
       </div>
-      <span className={`text-sm font-bold tabular-nums ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+      <span className={`text-sm font-bold tabular-nums ${isPositive ? 'text-gain' : 'text-loss'}`}>
         {isPositive ? '+' : ''}{percent.toFixed(1)}%
       </span>
     </div>

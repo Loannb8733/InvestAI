@@ -28,35 +28,30 @@ import {
   Wallet,
   Calendar,
 } from 'lucide-react'
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-} from 'recharts'
+import { ResponsiveRadar } from '@nivo/radar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { ProjectAudit } from '@/types/crowdfunding'
 import DiversificationRadar from '@/components/analytics/DiversificationRadar'
 
 const VERDICT_CONFIG = {
-  INVESTIR: { color: 'bg-green-500', text: 'Investir', icon: CheckCircle2 },
-  VIGILANCE: { color: 'bg-orange-500', text: 'Vigilance', icon: AlertTriangle },
-  NE_PAS_INVESTIR: { color: 'bg-red-500', text: 'Ne pas investir', icon: AlertTriangle },
+  INVESTIR: { color: 'bg-gain text-white', text: 'Investir', icon: CheckCircle2 },
+  VIGILANCE: { color: 'bg-warning text-foreground', text: 'Vigilance', icon: AlertTriangle },
+  NE_PAS_INVESTIR: { color: 'bg-loss text-white', text: 'Ne pas investir', icon: AlertTriangle },
 } as const
 
 function VerdictBadge({ verdict }: { verdict: string }) {
   const config = VERDICT_CONFIG[verdict as keyof typeof VERDICT_CONFIG] || VERDICT_CONFIG.VIGILANCE
   const Icon = config.icon
   return (
-    <Badge className={`${config.color} text-white text-sm px-3 py-1`}>
-      <Icon className="h-4 w-4 mr-1" />
+    <Badge className={`${config.color} text-sm px-3 py-1`}>
+      <Icon className="h-4 w-4 mr-1" strokeWidth={1.5} />
       {config.text}
     </Badge>
   )
 }
 
 function AuditResults({ audit }: { audit: ProjectAudit }) {
+  const { theme, color } = useNivoTheme()
   const radarData = [
     { subject: 'Opérateur', score: audit.score_operator ?? 0 },
     { subject: 'Localisation', score: audit.score_location ?? 0 },
@@ -70,7 +65,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{audit.project_name || 'Projet analysé'}</h2>
+          <h2 className="text-2xl font-serif font-medium">{audit.project_name || 'Projet analysé'}</h2>
           <div className="flex items-center gap-3 mt-1 text-muted-foreground">
             {audit.operator && (
               <span className="flex items-center gap-1">
@@ -125,21 +120,23 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" className="text-xs" />
-                <PolarRadiusAxis angle={90} domain={[0, 10]} tickCount={6} />
-                <Radar
-                  name="Score"
-                  dataKey="score"
-                  stroke="#6366F1"
-                  fill="#6366F1"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            <div className="h-[280px]">
+              <ResponsiveRadar
+                data={radarData}
+                keys={['score']}
+                indexBy="subject"
+                theme={theme}
+                maxValue={10}
+                margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
+                gridLevels={5}
+                gridShape="circular"
+                gridLabelOffset={12}
+                colors={[color('--chart-2')]}
+                fillOpacity={0.3}
+                borderWidth={2}
+                borderColor={{ from: 'color' }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -154,7 +151,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
               {audit.suggested_investment != null && (
                 <div>
                   <p className="text-sm text-muted-foreground">Allocation suggérée</p>
-                  <p className="text-2xl font-bold text-blue-500">
+                  <p className="text-2xl font-serif font-medium text-accent">
                     {formatCurrency(audit.suggested_investment)}
                   </p>
                   <p className="text-xs text-muted-foreground">max 5% du capital</p>
@@ -165,11 +162,11 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
             {/* Points Forts */}
             {audit.points_forts.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-green-600 mb-2">Points Forts</h4>
+                <h4 className="text-sm font-medium text-gain mb-2">Points Forts</h4>
                 <ul className="space-y-1">
                   {audit.points_forts.map((p, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-gain mt-0.5 shrink-0" />
                       {p}
                     </li>
                   ))}
@@ -180,11 +177,11 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
             {/* Points de Vigilance */}
             {audit.points_vigilance.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-orange-600 mb-2">Points de Vigilance</h4>
+                <h4 className="text-sm font-medium text-warning mb-2">Points de Vigilance</h4>
                 <ul className="space-y-1">
                   {audit.points_vigilance.map((p, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
-                      <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                      <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                       {p}
                     </li>
                   ))}
@@ -194,17 +191,17 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
 
             {/* Red Flags */}
             {audit.red_flags.length > 0 && (
-              <div className="rounded-lg ring-2 ring-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)] p-3">
-                <h4 className="text-sm font-medium text-red-600 mb-2 flex items-center gap-2">
+              <div className="rounded-lg border border-loss/30 bg-loss/5 p-3">
+                <h4 className="text-sm font-medium text-loss mb-2 flex items-center gap-2">
                   Red Flags
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold animate-pulse">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-loss text-white text-xs font-bold">
                     {audit.red_flags.length}
                   </span>
                 </h4>
                 <ul className="space-y-1">
                   {audit.red_flags.map((p, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-red-400">
-                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]" />
+                    <li key={i} className="flex items-start gap-2 text-sm text-loss">
+                      <AlertTriangle className="h-4 w-4 text-loss mt-0.5 shrink-0" strokeWidth={1.5} />
                       {p}
                     </li>
                   ))}
@@ -231,48 +228,48 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
                 <div className="space-y-4">
                   {/* Main figures */}
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-blue-400 text-xs mb-1">
+                    <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-accent text-xs mb-1">
                         <Wallet className="h-3 w-3" />
                         Investissement suggéré
                       </div>
-                      <p className="text-2xl font-bold text-blue-500">
+                      <p className="text-2xl font-serif font-medium text-accent">
                         {formatCurrency(sim.investment_amount)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         minimum 100 € obligatoire
                       </p>
                     </div>
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-green-400 text-xs mb-1">
+                    <div className="bg-gain/10 border border-gain/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-gain text-xs mb-1">
                         <TrendingUp className="h-3 w-3" />
                         Gain net estimé
                       </div>
-                      <p className="text-2xl font-bold text-green-500">
+                      <p className="text-2xl font-serif font-medium text-gain">
                         +{formatCurrency(sim.net_interest)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         après flat tax 30%
                       </p>
                     </div>
-                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-purple-400 text-xs mb-1">
+                    <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-accent text-xs mb-1">
                         <Banknote className="h-3 w-3" />
                         Total récupéré
                       </div>
-                      <p className="text-2xl font-bold text-purple-500">
+                      <p className="text-2xl font-serif font-medium text-accent">
                         {formatCurrency(sim.total_at_end)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         capital + intérêts nets
                       </p>
                     </div>
-                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-orange-400 text-xs mb-1">
+                    <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-warning text-xs mb-1">
                         <Percent className="h-3 w-3" />
                         ROI net
                       </div>
-                      <p className="text-2xl font-bold text-orange-500">
+                      <p className="text-2xl font-serif font-medium text-warning">
                         {sim.roi_net_percent}%
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -302,15 +299,15 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
                       </div>
                       <div className="border-t border-muted pt-2 mt-1 flex justify-between">
                         <span className="text-muted-foreground">Intérêts bruts</span>
-                        <span className="font-medium text-green-500">+{formatCurrency(sim.gross_interest)}</span>
+                        <span className="font-medium text-gain">+{formatCurrency(sim.gross_interest)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Flat tax (30%)</span>
-                        <span className="font-medium text-red-400">-{formatCurrency(sim.tax_amount)}</span>
+                        <span className="font-medium text-loss">-{formatCurrency(sim.tax_amount)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Intérêts nets</span>
-                        <span className="font-medium text-green-500">+{formatCurrency(sim.net_interest)}</span>
+                        <span className="font-medium text-gain">+{formatCurrency(sim.net_interest)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Rendement mensuel brut</span>
@@ -318,7 +315,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
                       </div>
                       <div className="border-t border-muted pt-2 mt-1 flex justify-between text-base">
                         <span className="font-semibold">Total récupéré</span>
-                        <span className="font-bold text-green-500">{formatCurrency(sim.total_at_end)}</span>
+                        <span className="font-bold text-gain">{formatCurrency(sim.total_at_end)}</span>
                       </div>
                     </div>
                   </div>
@@ -424,7 +421,7 @@ export default function CrowdfundingAuditLabPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-3xl font-serif font-medium flex items-center gap-2">
           <ShieldCheck className="h-8 w-8" />
           Audit Lab
         </h1>
@@ -441,14 +438,14 @@ export default function CrowdfundingAuditLabPage() {
               {...getRootProps()}
               className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
                 isDragActive
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                  ? 'border-accent bg-accent dark:bg-accent/20'
                   : 'border-muted-foreground/25 hover:border-muted-foreground/50'
               }`}
             >
               <input {...getInputProps()} />
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               {isDragActive ? (
-                <p className="text-blue-500 font-medium">Déposez les fichiers ici...</p>
+                <p className="text-accent font-medium">Déposez les fichiers ici...</p>
               ) : (
                 <div>
                   <p className="font-medium">
@@ -470,7 +467,7 @@ export default function CrowdfundingAuditLabPage() {
                     className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-red-500" />
+                      <FileText className="h-4 w-4 text-loss" />
                       <span className="text-sm font-medium">{file.name}</span>
                       <span className="text-xs text-muted-foreground">
                         ({(file.size / 1024 / 1024).toFixed(1)} MB)
@@ -507,8 +504,8 @@ export default function CrowdfundingAuditLabPage() {
                 </Button>
 
                 {analyzeMutation.isError && (
-                  <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
-                    <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+                  <div className="mt-3 p-3 bg-loss dark:bg-loss/20 border border-loss dark:border-loss rounded-lg">
+                    <p className="text-sm text-loss dark:text-loss flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                       {analyzeErrorMessage}
                     </p>

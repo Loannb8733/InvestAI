@@ -29,18 +29,8 @@ import {
   BarChart3,
   Info,
 } from 'lucide-react'
-import {
-  LineChart as RechartsLineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Area,
-  ComposedChart,
-} from 'recharts'
+import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 
 interface FIREResult {
   fire_number: number
@@ -111,6 +101,7 @@ const INFLATION_BY_CURRENCY: Record<string, { rate: number; label: string }> = {
 export default function SimulationsPage() {
   const { toast } = useToast()
   const { user } = useAuthStore()
+  const { theme, color } = useNivoTheme()
   const [activeTab, setActiveTab] = useState('fire')
 
   // Fetch live portfolio value
@@ -244,11 +235,11 @@ export default function SimulationsPage() {
   // Build Monte Carlo fan data for chart
   const mcChartData = mcResult
     ? [
-        { label: 'P5 (pessimiste)', value: mcResult.percentiles.p5, fill: '#ef4444' },
-        { label: 'P25', value: mcResult.percentiles.p25, fill: '#f97316' },
-        { label: 'P50 (médian)', value: mcResult.percentiles.p50, fill: '#3b82f6' },
-        { label: 'P75', value: mcResult.percentiles.p75, fill: '#22c55e' },
-        { label: 'P95 (optimiste)', value: mcResult.percentiles.p95, fill: '#10b981' },
+        { label: 'P5 (pessimiste)', value: mcResult.percentiles.p5, fill: 'oklch(var(--chart-4))' },
+        { label: 'P25', value: mcResult.percentiles.p25, fill: 'oklch(var(--chart-1))' },
+        { label: 'P50 (médian)', value: mcResult.percentiles.p50, fill: 'oklch(var(--chart-5))' },
+        { label: 'P75', value: mcResult.percentiles.p75, fill: 'oklch(var(--chart-3))' },
+        { label: 'P95 (optimiste)', value: mcResult.percentiles.p95, fill: 'oklch(var(--chart-3))' },
       ]
     : []
 
@@ -266,7 +257,7 @@ export default function SimulationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Simulations</h1>
+        <h1 className="text-3xl font-serif font-medium">Simulations</h1>
         <p className="text-muted-foreground">
           Calculateur FIRE, projections Monte Carlo et simulations DCA.
           {livePortfolioValue > 0 && (
@@ -303,7 +294,7 @@ export default function SimulationsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Flame className="h-5 w-5 text-orange-500" />
+                  <Flame className="h-5 w-5 text-warning" />
                   Calculateur FIRE
                 </CardTitle>
                 <CardDescription>
@@ -332,7 +323,7 @@ export default function SimulationsPage() {
                                 current_portfolio_value: Math.round(livePortfolioValue * 100) / 100,
                               })
                             }
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-500 hover:text-blue-700"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-accent hover:text-accent"
                           >
                             Réinitialiser
                           </button>
@@ -472,35 +463,35 @@ export default function SimulationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-orange-500/10">
-                      <Target className="h-8 w-8 mx-auto text-orange-500 mb-2" />
+                    <div className="text-center p-4 rounded-lg bg-warning/10">
+                      <Target className="h-8 w-8 mx-auto text-warning mb-2" />
                       <p className="text-sm text-muted-foreground">Nombre FIRE</p>
-                      <p className="text-2xl font-bold">{formatCurrency(fireResult.fire_number)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(fireResult.fire_number)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
-                      <Clock className="h-8 w-8 mx-auto text-blue-500 mb-2" />
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
+                      <Clock className="h-8 w-8 mx-auto text-accent mb-2" />
                       <p className="text-sm text-muted-foreground">Années restantes</p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-2xl font-serif font-medium">
                         {fireResult.years_to_fire !== null ? `${fireResult.years_to_fire} ans` : 'N/A'}
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-green-500/10">
-                      <DollarSign className="h-8 w-8 mx-auto text-green-500 mb-2" />
+                    <div className="text-center p-4 rounded-lg bg-gain/10">
+                      <DollarSign className="h-8 w-8 mx-auto text-gain mb-2" />
                       <p className="text-sm text-muted-foreground">Revenu passif mensuel</p>
-                      <p className="text-2xl font-bold">{formatCurrency(fireResult.monthly_passive_income)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(fireResult.monthly_passive_income)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-purple-500/10">
-                      <Percent className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
+                      <Percent className="h-8 w-8 mx-auto text-accent mb-2" />
                       <p className="text-sm text-muted-foreground">Progression</p>
-                      <p className="text-2xl font-bold">{fireResult.current_progress_percent.toFixed(1)}%</p>
+                      <p className="text-2xl font-serif font-medium">{fireResult.current_progress_percent.toFixed(1)}%</p>
                     </div>
                   </div>
 
                   {fireResult.is_fire_achieved && (
-                    <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/20 text-green-700">
+                    <div className="flex items-center gap-2 p-4 rounded-lg bg-gain/20 text-gain">
                       <CheckCircle className="h-5 w-5" />
                       <span className="font-medium">Félicitations ! Vous avez atteint le FIRE !</span>
                     </div>
@@ -513,7 +504,7 @@ export default function SimulationsPage() {
                     </div>
                     <div className="h-3 bg-muted rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all"
+                        className="h-full bg-gain transition-all"
                         style={{ width: `${Math.min(fireResult.current_progress_percent, 100)}%` }}
                       />
                     </div>
@@ -534,36 +525,92 @@ export default function SimulationsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={fireResult.projected_values}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" />
-                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(label) => `Année ${label}`}
-                      />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey="portfolio_value"
-                        name="Portefeuille"
-                        stroke="#f97316"
-                        fill="#f97316"
-                        fillOpacity={0.3}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="fire_number"
-                        name="Objectif FIRE"
-                        stroke="#ef4444"
-                        strokeDasharray="5 5"
-                        strokeWidth={2}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+                {(() => {
+                  const cPortfolio = color('--chart-1')
+                  const cFire = color('--chart-4')
+                  const fireData = fireResult.projected_values
+                  const series: LineSeries[] = [
+                    {
+                      id: 'portfolio_value',
+                      data: fireData.map((d) => ({ x: String(d.year), y: d.portfolio_value })),
+                    },
+                  ]
+                  // Dashed FIRE-objective reference line on the same value axis.
+                  const FireLineLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+                    const sx = xScale as (v: string) => number
+                    const sy = yScale as (v: number) => number
+                    const path = fireData
+                      .map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(String(d.year))},${sy(d.fire_number)}`)
+                      .join(' ')
+                    return <path d={path} fill="none" stroke={cFire} strokeWidth={2} strokeDasharray="5 5" />
+                  }
+                  return (
+                    <>
+                      <div className="h-80">
+                        <ResponsiveLine
+                          data={series}
+                          theme={theme}
+                          margin={{ top: 12, right: 16, bottom: 28, left: 56 }}
+                          xScale={{ type: 'point' }}
+                          yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+                          curve="monotoneX"
+                          colors={[cPortfolio]}
+                          lineWidth={2}
+                          enablePoints={false}
+                          enableGridX={false}
+                          enableArea
+                          areaOpacity={0.3}
+                          axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                          axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
+                          layers={['grid', 'axes', 'areas', FireLineLayer, 'lines', 'slices']}
+                          enableSlices="x"
+                          sliceTooltip={({ slice }) => {
+                            const year = slice.points[0]?.data.x as string
+                            const point = fireData.find((d) => String(d.year) === year)
+                            if (!point) return null
+                            return (
+                              <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                                <p className="mb-1.5 text-xs text-muted-foreground">Année {year}</p>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cPortfolio }} />
+                                    <span className="text-xs text-muted-foreground">Portefeuille</span>
+                                  </span>
+                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(point.portfolio_value)}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cFire }} />
+                                    <span className="text-xs text-muted-foreground">Objectif FIRE</span>
+                                  </span>
+                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(point.fire_number)}</span>
+                                </div>
+                              </div>
+                            )
+                          }}
+                          legends={[
+                            {
+                              anchor: 'top-right',
+                              direction: 'row',
+                              translateY: -12,
+                              itemWidth: 110,
+                              itemHeight: 18,
+                              symbolSize: 10,
+                              symbolShape: 'circle',
+                              itemTextColor: color('--muted-foreground'),
+                              data: [
+                                { id: 'portfolio_value', label: 'Portefeuille', color: cPortfolio },
+                                { id: 'fire_number', label: 'Objectif FIRE', color: cFire },
+                              ],
+                            },
+                          ]}
+                          animate
+                          motionConfig="gentle"
+                        />
+                      </div>
+                    </>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}
@@ -575,7 +622,7 @@ export default function SimulationsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <LineChart className="h-5 w-5 text-blue-500" />
+                  <LineChart className="h-5 w-5 text-accent" />
                   Projection de portefeuille
                 </CardTitle>
                 <CardDescription>
@@ -690,24 +737,24 @@ export default function SimulationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
                       <p className="text-sm text-muted-foreground">Valeur finale</p>
-                      <p className="text-2xl font-bold">{formatCurrency(projectionResult.final_value)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(projectionResult.final_value)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-green-500/10">
+                    <div className="text-center p-4 rounded-lg bg-gain/10">
                       <p className="text-sm text-muted-foreground">Valeur réelle (inflation)</p>
-                      <p className="text-2xl font-bold">{formatCurrency(projectionResult.real_final_value)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(projectionResult.real_final_value)}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-purple-500/10">
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
                       <p className="text-sm text-muted-foreground">Contributions totales</p>
                       <p className="text-xl font-bold">{formatCurrency(projectionResult.total_contributions)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-orange-500/10">
+                    <div className="text-center p-4 rounded-lg bg-warning/10">
                       <p className="text-sm text-muted-foreground">Gains totaux</p>
-                      <p className="text-xl font-bold text-green-600">
+                      <p className="text-xl font-bold text-gain">
                         +{formatCurrency(projectionResult.total_returns)}
                       </p>
                     </div>
@@ -723,43 +770,116 @@ export default function SimulationsPage() {
                 <CardTitle>Évolution du portefeuille</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={projectionResult.projections}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" />
-                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(label) => `Année ${label}`}
+                {(() => {
+                  const cNominal = color('--chart-5')
+                  const cReal = color('--chart-3')
+                  const cContrib = color('--chart-2')
+                  const projData = projectionResult.projections
+                  const series: LineSeries[] = [
+                    { id: 'nominal_value', data: projData.map((d) => ({ x: String(d.year), y: d.nominal_value })) },
+                    { id: 'real_value', data: projData.map((d) => ({ x: String(d.year), y: d.real_value })) },
+                  ]
+                  const seriesColors: Record<string, string> = {
+                    nominal_value: cNominal,
+                    real_value: cReal,
+                  }
+                  // Dashed contributions reference line on the same value axis.
+                  const ContribLineLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+                    const sx = xScale as (v: string) => number
+                    const sy = yScale as (v: number) => number
+                    const path = projData
+                      .map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(String(d.year))},${sy(d.contributions)}`)
+                      .join(' ')
+                    return <path d={path} fill="none" stroke={cContrib} strokeWidth={2} strokeDasharray="5 5" />
+                  }
+                  return (
+                    <div className="h-80">
+                      <ResponsiveLine
+                        data={series}
+                        theme={theme}
+                        margin={{ top: 12, right: 16, bottom: 28, left: 56 }}
+                        xScale={{ type: 'point' }}
+                        yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+                        curve="monotoneX"
+                        colors={(s) => seriesColors[s.id as string]}
+                        lineWidth={2}
+                        enablePoints={false}
+                        enableGridX={false}
+                        enableArea
+                        areaOpacity={0.3}
+                        defs={[
+                          {
+                            id: 'proj-nominal',
+                            type: 'linearGradient',
+                            colors: [
+                              { offset: 0, color: cNominal, opacity: 0.3 },
+                              { offset: 100, color: cNominal, opacity: 0 },
+                            ],
+                          },
+                          {
+                            id: 'proj-real',
+                            type: 'linearGradient',
+                            colors: [
+                              { offset: 0, color: cReal, opacity: 0.3 },
+                              { offset: 100, color: cReal, opacity: 0 },
+                            ],
+                          },
+                        ]}
+                        fill={[
+                          { match: { id: 'nominal_value' }, id: 'proj-nominal' },
+                          { match: { id: 'real_value' }, id: 'proj-real' },
+                        ]}
+                        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                        axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
+                        layers={['grid', 'axes', 'areas', ContribLineLayer, 'lines', 'slices']}
+                        enableSlices="x"
+                        sliceTooltip={({ slice }) => {
+                          const year = slice.points[0]?.data.x as string
+                          const point = projData.find((d) => String(d.year) === year)
+                          if (!point) return null
+                          const rows = [
+                            { label: 'Valeur nominale', value: point.nominal_value, color: cNominal },
+                            { label: 'Valeur réelle', value: point.real_value, color: cReal },
+                            { label: 'Contributions', value: point.contributions, color: cContrib },
+                          ]
+                          return (
+                            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                              <p className="mb-1.5 text-xs text-muted-foreground">Année {year}</p>
+                              {rows.map((r) => (
+                                <div key={r.label} className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
+                                    <span className="text-xs text-muted-foreground">{r.label}</span>
+                                  </span>
+                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(r.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        }}
+                        legends={[
+                          {
+                            anchor: 'top-right',
+                            direction: 'row',
+                            translateY: -12,
+                            itemWidth: 110,
+                            itemHeight: 18,
+                            symbolSize: 10,
+                            symbolShape: 'circle',
+                            itemTextColor: color('--muted-foreground'),
+                            data: [
+                              { id: 'nominal_value', label: 'Valeur nominale', color: cNominal },
+                              { id: 'real_value', label: 'Valeur réelle', color: cReal },
+                              { id: 'contributions', label: 'Contributions', color: cContrib },
+                            ],
+                          },
+                        ]}
+                        animate
+                        motionConfig="gentle"
                       />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey="nominal_value"
-                        name="Valeur nominale"
-                        stroke="#3b82f6"
-                        fill="#3b82f6"
-                        fillOpacity={0.3}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="real_value"
-                        name="Valeur réelle"
-                        stroke="#22c55e"
-                        fill="#22c55e"
-                        fillOpacity={0.3}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="contributions"
-                        name="Contributions"
-                        stroke="#a855f7"
-                        strokeDasharray="5 5"
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}
@@ -771,7 +891,7 @@ export default function SimulationsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-500" />
+                  <BarChart3 className="h-5 w-5 text-accent" />
                   Simulation Monte Carlo
                 </CardTitle>
                 <CardDescription>
@@ -824,8 +944,8 @@ export default function SimulationsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 text-sm text-muted-foreground">
-                  <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 text-sm text-muted-foreground">
+                  <Info className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
                   <span>
                     Les rendements sont corrélés (Cholesky) avec shrinkage de volatilité pour les horizons longs.
                     Les retraits et frais sont appliqués proportionnellement chaque jour.
@@ -857,38 +977,38 @@ export default function SimulationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
                       <p className="text-sm text-muted-foreground">Rendement attendu</p>
                       <p
-                        className={`text-2xl font-bold ${mcResult.expected_return >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        className={`text-2xl font-serif font-medium ${mcResult.expected_return >= 0 ? 'text-gain' : 'text-loss'}`}
                       >
                         {mcResult.expected_return >= 0 ? '+' : ''}
                         {mcResult.expected_return.toFixed(2)}%
                       </p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-green-500/10">
+                    <div className="text-center p-4 rounded-lg bg-gain/10">
                       <p className="text-sm text-muted-foreground">Prob. gain</p>
-                      <p className="text-2xl font-bold">{mcResult.prob_positive.toFixed(1)}%</p>
+                      <p className="text-2xl font-serif font-medium">{mcResult.prob_positive.toFixed(1)}%</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-red-500/10">
+                    <div className="text-center p-4 rounded-lg bg-loss/10">
                       <p className="text-sm text-muted-foreground">Prob. perte &gt;10%</p>
-                      <p className="text-2xl font-bold text-red-600">{mcResult.prob_loss_10.toFixed(1)}%</p>
+                      <p className="text-2xl font-serif font-medium text-loss">{mcResult.prob_loss_10.toFixed(1)}%</p>
                     </div>
                     <div
-                      className={`text-center p-4 rounded-lg ${mcResult.prob_ruin > 20 ? 'bg-red-500/20' : 'bg-orange-500/10'}`}
+                      className={`text-center p-4 rounded-lg ${mcResult.prob_ruin > 20 ? 'bg-loss/20' : 'bg-warning/10'}`}
                     >
                       <p className="text-sm text-muted-foreground">Prob. ruine</p>
-                      <p className={`text-2xl font-bold ${mcResult.prob_ruin > 20 ? 'text-red-600' : ''}`}>
+                      <p className={`text-2xl font-serif font-medium ${mcResult.prob_ruin > 20 ? 'text-loss' : ''}`}>
                         {mcResult.prob_ruin.toFixed(1)}%
                       </p>
                     </div>
                   </div>
 
                   {mcResult.prob_ruin > 20 && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/20 text-red-700 text-sm">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-loss/20 text-loss text-sm">
                       <Flame className="h-4 w-4" />
                       <span>
                         Probabilité de ruine élevée ! Envisagez de réduire le taux de retrait ou de diversifier.
@@ -908,38 +1028,71 @@ export default function SimulationsPage() {
                 <CardDescription>Distribution des rendements : P5 (pessimiste) à P95 (optimiste)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart
-                      data={mcChartData}
-                      layout="vertical"
-                      margin={{ left: 120, right: 40, top: 10, bottom: 10 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}%`} />
-                      <YAxis dataKey="label" type="category" width={110} />
-                      <Tooltip formatter={(v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`} />
-                      <Line
-                        dataKey="value"
-                        stroke="transparent"
-                        dot={({ cx, cy, index }: { cx: number; cy: number; index: number }) => {
-                          const colors = ['#ef4444', '#f97316', '#3b82f6', '#22c55e', '#10b981']
+                {(() => {
+                  // Colors per percentile band, resolved from OKLCH tokens (Nivo can't parse oklch()).
+                  const fanColors = [
+                    color('--chart-4'),
+                    color('--chart-1'),
+                    color('--chart-5'),
+                    color('--chart-3'),
+                    color('--chart-3'),
+                  ]
+                  // Nivo line has no horizontal layout: categories sit on the x (point) axis,
+                  // percentile value on the y (linear) axis — colored dots per percentile.
+                  const series: LineSeries[] = [
+                    { id: 'mc', data: mcChartData.map((d) => ({ x: d.label, y: d.value })) },
+                  ]
+                  const DotsLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+                    const sx = xScale as (v: string) => number
+                    const sy = yScale as (v: number) => number
+                    return (
+                      <>
+                        {mcChartData.map((d, i) => (
+                          <circle
+                            key={d.label}
+                            cx={sx(d.label)}
+                            cy={sy(d.value)}
+                            r={8}
+                            fill={fanColors[i]}
+                            stroke={color('--popover')}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </>
+                    )
+                  }
+                  return (
+                    <div className="h-72">
+                      <ResponsiveLine
+                        data={series}
+                        theme={theme}
+                        margin={{ left: 56, right: 24, top: 10, bottom: 60 }}
+                        xScale={{ type: 'point' }}
+                        yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+                        enablePoints={false}
+                        enableGridX={false}
+                        colors={['transparent']}
+                        axisBottom={{ tickSize: 0, tickPadding: 8, tickRotation: -20 }}
+                        axisLeft={{ tickSize: 0, tickPadding: 8, format: (v) => `${(v as number) > 0 ? '+' : ''}${v}%` }}
+                        layers={['grid', 'axes', 'lines', DotsLayer, 'mesh']}
+                        tooltip={({ point }) => {
+                          const v = point.data.y as number
                           return (
-                            <circle
-                              key={index}
-                              cx={cx}
-                              cy={cy}
-                              r={8}
-                              fill={colors[index]}
-                              stroke="white"
-                              strokeWidth={2}
-                            />
+                            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                              <p className="text-xs text-muted-foreground">{point.data.x as string}</p>
+                              <span className="font-mono text-sm tabular-nums">
+                                {v > 0 ? '+' : ''}
+                                {v.toFixed(2)}%
+                              </span>
+                            </div>
                           )
                         }}
+                        animate
+                        motionConfig="gentle"
                       />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Visual bar representation */}
                 <div className="mt-4 space-y-2">
@@ -957,7 +1110,7 @@ export default function SimulationsPage() {
                         />
                       </div>
                       <span
-                        className={`text-sm font-medium w-16 text-right ${d.value >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        className={`text-sm font-medium w-16 text-right ${d.value >= 0 ? 'text-gain' : 'text-loss'}`}
                       >
                         {d.value >= 0 ? '+' : ''}
                         {d.value.toFixed(1)}%
@@ -976,7 +1129,7 @@ export default function SimulationsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-purple-500" />
+                  <Calculator className="h-5 w-5 text-accent" />
                   Simulateur DCA
                 </CardTitle>
                 <CardDescription>
@@ -1071,25 +1224,25 @@ export default function SimulationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-purple-500/10">
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
                       <p className="text-sm text-muted-foreground">Total investi</p>
-                      <p className="text-2xl font-bold">{formatCurrency(dcaResult.total_invested)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(dcaResult.total_invested)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-green-500/10">
+                    <div className="text-center p-4 rounded-lg bg-gain/10">
                       <p className="text-sm text-muted-foreground">Valeur finale DCA</p>
-                      <p className="text-2xl font-bold">{formatCurrency(dcaResult.final_value)}</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(dcaResult.final_value)}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
+                    <div className="text-center p-4 rounded-lg bg-accent/10">
                       <p className="text-sm text-muted-foreground">Prix moyen</p>
                       <p className="text-xl font-bold">{formatCurrency(dcaResult.average_cost)}</p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-orange-500/10">
+                    <div className="text-center p-4 rounded-lg bg-warning/10">
                       <p className="text-sm text-muted-foreground">Rendement DCA</p>
                       <p
-                        className={`text-xl font-bold ${dcaResult.return_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        className={`text-xl font-bold ${dcaResult.return_percent >= 0 ? 'text-gain' : 'text-loss'}`}
                       >
                         {dcaResult.return_percent >= 0 ? '+' : ''}
                         {dcaResult.return_percent.toFixed(2)}%
@@ -1127,39 +1280,93 @@ export default function SimulationsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsLineChart data={dcaLumpSumData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="current_value"
-                        name="DCA (valeur)"
-                        stroke="#a855f7"
-                        strokeWidth={2}
+                {(() => {
+                  const cDca = color('--chart-2')
+                  const cLump = color('--chart-1')
+                  const cInvested = color('--muted-foreground')
+                  const dcaData = dcaLumpSumData
+                  // Solid DCA value as the real Nivo line; the two dashed references via a custom layer.
+                  const series: LineSeries[] = [
+                    { id: 'current_value', data: dcaData.map((d) => ({ x: String(d.period), y: d.current_value })) },
+                  ]
+                  const DashedLinesLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+                    const sx = xScale as (v: string) => number
+                    const sy = yScale as (v: number) => number
+                    const path = (key: 'lump_sum_value' | 'total_invested') =>
+                      dcaData
+                        .map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(String(d.period))},${sy(d[key])}`)
+                        .join(' ')
+                    return (
+                      <>
+                        <path d={path('lump_sum_value')} fill="none" stroke={cLump} strokeWidth={2} strokeDasharray="5 5" />
+                        <path d={path('total_invested')} fill="none" stroke={cInvested} strokeWidth={1.5} strokeDasharray="3 3" />
+                      </>
+                    )
+                  }
+                  return (
+                    <div className="h-80">
+                      <ResponsiveLine
+                        data={series}
+                        theme={theme}
+                        margin={{ top: 12, right: 16, bottom: 28, left: 56 }}
+                        xScale={{ type: 'point' }}
+                        yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+                        curve="monotoneX"
+                        colors={[cDca]}
+                        lineWidth={2}
+                        enablePoints={false}
+                        enableGridX={false}
+                        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                        axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
+                        layers={['grid', 'axes', DashedLinesLayer, 'lines', 'slices']}
+                        enableSlices="x"
+                        sliceTooltip={({ slice }) => {
+                          const period = slice.points[0]?.data.x as string
+                          const point = dcaData.find((d) => String(d.period) === period)
+                          if (!point) return null
+                          const rows = [
+                            { label: 'DCA (valeur)', value: point.current_value, color: cDca },
+                            { label: 'Lump Sum', value: point.lump_sum_value, color: cLump },
+                            { label: 'Capital investi', value: point.total_invested, color: cInvested },
+                          ]
+                          return (
+                            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                              <p className="mb-1.5 text-xs text-muted-foreground">Période {period}</p>
+                              {rows.map((r) => (
+                                <div key={r.label} className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
+                                    <span className="text-xs text-muted-foreground">{r.label}</span>
+                                  </span>
+                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(r.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        }}
+                        legends={[
+                          {
+                            anchor: 'top-right',
+                            direction: 'row',
+                            translateY: -12,
+                            itemWidth: 110,
+                            itemHeight: 18,
+                            symbolSize: 10,
+                            symbolShape: 'circle',
+                            itemTextColor: color('--muted-foreground'),
+                            data: [
+                              { id: 'current_value', label: 'DCA (valeur)', color: cDca },
+                              { id: 'lump_sum_value', label: 'Lump Sum', color: cLump },
+                              { id: 'total_invested', label: 'Capital investi', color: cInvested },
+                            ],
+                          },
+                        ]}
+                        animate
+                        motionConfig="gentle"
                       />
-                      <Line
-                        type="monotone"
-                        dataKey="lump_sum_value"
-                        name="Lump Sum"
-                        stroke="#f97316"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="total_invested"
-                        name="Capital investi"
-                        stroke="#94a3b8"
-                        strokeDasharray="3 3"
-                      />
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
-                </div>
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}

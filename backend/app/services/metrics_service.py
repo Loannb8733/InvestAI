@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -156,8 +156,15 @@ def compute_cump_pru(
             if price > _ZERO:
                 s["cost"] += qty * price + fee
                 s["buy_qty"] += qty
-                if s["buy_qty"] > _ZERO:
-                    s["pru"] = s["cost"] / s["buy_qty"]
+            elif s["pru"] > _ZERO:
+                # F-06: a zero-price transfer-in of an already-held coin is an
+                # internal wallet move; it inherits the running average cost so the
+                # PRU stays stable instead of being diluted toward zero. (Unifies
+                # behaviour with the FIFO engine's unmatched-transfer handling.)
+                s["cost"] += qty * s["pru"]
+                s["buy_qty"] += qty
+            if s["buy_qty"] > _ZERO:
+                s["pru"] = s["cost"] / s["buy_qty"]
             s["current_qty"] += qty
 
         elif ttype == TxType.TRANSFER_OUT:
@@ -203,6 +210,16 @@ class MetricsService:
         """
         quantity = Decimal(str(asset.quantity))
         avg_buy_price = Decimal(str(asset.avg_buy_price))
+
+        # Coerce cost-basis inputs to Decimal (consistent with current_price below).
+        # Production callers pass Decimal, but be robust to float to avoid
+        # Decimal/float TypeError when these participate in arithmetic.
+        if actual_invested is not None:
+            actual_invested = Decimal(str(actual_invested))
+        if buy_pra is not None:
+            buy_pra = Decimal(str(buy_pra))
+        if cump_pru is not None:
+            cump_pru = Decimal(str(cump_pru))
 
         # Display PRU: prefer live-computed CUMP (fee-inclusive) over DB value.
         # Falls back to buy_pra (symbol-wide), then DB avg_buy_price.
@@ -381,30 +398,68 @@ class MetricsService:
         # Forex setup — must be available before FIFO so fees can be converted
         # immediately after the FIFO pass, before per-asset G/L is computed.
         from app.core.redis_client import cache_forex_rate, get_cached_forex_rate
+        from app.services.fx_history_service import FxHistoryService
 
         target = currency.upper()
         usd_to_target = 1.0
         eur_to_target = 1.0
+        # Last-resort constants, used ONLY when live, cached, AND the persisted ECB
+        # table all fail. They are always flagged stale so the UI never presents a
+        # guessed rate as a real quote.
         _HARDCODED_FALLBACK_RATES = {
             "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
             "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
         }
         forex_stale = False
+        _fx_hist = FxHistoryService(db)
+
+        async def _fx_last_known(from_ccy: str, to_ccy: str) -> Optional[float]:
+            """Last-known real rate from the persisted ECB daily table (forward-filled).
+
+            Tries the direct pair, then the inverse, so we fall back to a *real*
+            reference rate (e.g. last business day's ECB fix) instead of a guess
+            whenever any history exists. Network-free (DB read only).
+            """
+            try:
+                direct = await _fx_hist.get_rate(date.today(), from_ccy, to_ccy)
+                if direct:
+                    return float(direct)
+                inverse = await _fx_hist.get_rate(date.today(), to_ccy, from_ccy)
+                if inverse and float(inverse) != 0:
+                    return 1.0 / float(inverse)
+            except Exception as e:  # noqa: BLE001 - DB fallback is best-effort
+                logger.warning("FX history fallback failed for %s->%s: %s", from_ccy, to_ccy, e)
+            return None
 
         async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
-            """Fetch rate: live API → Redis cache → hardcoded fallback."""
+            """Resolve an FX rate as (rate, stale).
+
+            Order: live API → Redis cache → persisted ECB last-known → constant.
+            ``stale`` is False only for a live or freshly-cached quote; any fallback
+            to the persisted table or the last-resort constant is flagged stale so
+            the API/UI can warn the conversion may not reflect the current market.
+            """
             try:
                 rate = await price_service.get_forex_rate(from_ccy, to_ccy)
                 if rate:
                     rate_f = float(rate)
                     await cache_forex_rate(from_ccy, to_ccy, rate_f)
                     return rate_f, False
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001 - degrade gracefully, never raise
+                logger.warning("Live forex fetch failed for %s->%s: %s", from_ccy, to_ccy, e)
             cached = await get_cached_forex_rate(from_ccy, to_ccy)
             if cached and cached.get("rate"):
                 return cached["rate"], False
+            last_known = await _fx_last_known(from_ccy, to_ccy)
+            if last_known is not None:
+                return last_known, True
             fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
+            logger.warning(
+                "No live/cached/persisted FX for %s->%s; using last-resort constant %s",
+                from_ccy,
+                to_ccy,
+                fallback,
+            )
             return fallback, True
 
         if target != "USD":
@@ -488,9 +543,19 @@ class MetricsService:
             # Build symbol + exchange lookups for each asset_id
             aid_to_symbol: Dict[str, str] = {}
             aid_to_exchange: Dict[str, str] = {}
+            # F-06: stored average buy price per asset and (symbol-wide), used as the
+            # cost-basis proxy for unmatched/zero-price TRANSFER_IN rows so they don't
+            # land at zero cost and inflate latent P&L.
+            aid_to_avg_price: Dict[str, Decimal] = {}
+            sym_avg_price: Dict[str, Decimal] = {}
             for a in all_assets_full:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
                 aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
+                _avg = Decimal(str(a.avg_buy_price)) if a.avg_buy_price else Decimal("0")
+                aid_to_avg_price[str(a.id)] = _avg
+                _sym = a.symbol.upper()
+                if _avg > 0 and sym_avg_price.get(_sym, Decimal("0")) <= 0:
+                    sym_avg_price[_sym] = _avg
 
             # Compute CUMP PRU from transaction history (fee-inclusive, follows 3 rules)
             cump_pru_by_fkey: Dict[Tuple[str, str], Decimal] = compute_cump_pru(all_txs, aid_to_symbol, aid_to_exchange)
@@ -648,8 +713,14 @@ class MetricsService:
                 ttype = tx.transaction_type
 
                 if ttype == TxType.BUY:
-                    unit_cost = Decimal(str(tx.price or 0))
-                    total_cost = qty * unit_cost
+                    # FX: cost basis is tracked in the PORTFOLIO currency. The trade
+                    # price is in the transaction currency, so convert it via the FX
+                    # rate captured at execution (conversion_rate = portfolio units per
+                    # 1 unit of tx currency; defaults to 1 for same-currency trades).
+                    tx_ccy = (tx.currency or "EUR").upper()
+                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                    unit_cost_base = Decimal(str(tx.price or 0))  # price in tx currency
+                    total_cost = qty * unit_cost_base * tx_fx  # -> portfolio currency
                     # B1/M2: Include transaction fees in cost basis
                     fee = Decimal(str(tx.fee or 0))
                     if fee > 0:
@@ -661,10 +732,6 @@ class MetricsService:
                             _pending_fee_conversions.append((key, fee, fee_ccy))
                     layer_unit = total_cost / qty if qty > 0 else _ZERO
 
-                    # FX tracking: store original currency and rate
-                    tx_ccy = (tx.currency or "EUR").upper()
-                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                    unit_cost_base = Decimal(str(tx.price or 0))  # price in tx currency
                     fifo[key].append(
                         {
                             "qty": qty,
@@ -696,12 +763,13 @@ class MetricsService:
                     # taxable income at their market value on the day received).
                     # Falls back to zero-cost only when no price is recorded.
                     tx_ccy = (tx.currency or "EUR").upper()
-                    reward_price = Decimal(str(tx.price or 0))
+                    reward_price = Decimal(str(tx.price or 0))  # price in tx currency
                     tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                    # unit_cost must be in the PORTFOLIO currency (EUR): apply fx.
                     fifo[key].append(
                         {
                             "qty": qty,
-                            "unit_cost": reward_price,
+                            "unit_cost": reward_price * tx_fx,
                             "unit_cost_base": reward_price,
                             "currency": tx_ccy,
                             "fx_rate": tx_fx,
@@ -745,16 +813,47 @@ class MetricsService:
                             for layer in transit_layers:
                                 fifo[key].append(layer)
                     else:
-                        # No matching transit — treat as zero-cost (external transfer in)
+                        # No matching transit — unmatched/external transfer in.
+                        # F-06: do NOT default to zero cost (that treats the whole
+                        # position as pure gain and inflates latent P&L). Recover a
+                        # cost basis in priority order:
+                        #   1. the row's own recorded price (converted to EUR),
+                        #   2. this asset's stored avg_buy_price,
+                        #   3. the symbol-wide avg_buy_price (same coin elsewhere).
+                        # Only when none is known do we fall back to zero cost.
                         tx_ccy = (tx.currency or "EUR").upper()
+                        tx_price = Decimal(str(tx.price or 0))
+                        if tx_price > _ZERO:
+                            tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                            unit_cost = tx_price * tx_fx
+                            unit_base = tx_price
+                            cost_known = True
+                        else:
+                            # avg_buy_price is already in the portfolio currency (EUR).
+                            proxy = aid_to_avg_price.get(str(tx.asset_id), _ZERO)
+                            if proxy <= _ZERO:
+                                proxy = sym_avg_price.get(sym, _ZERO)
+                            tx_fx = Decimal("1")
+                            unit_cost = proxy
+                            unit_base = proxy
+                            cost_known = proxy > _ZERO
+                        if not cost_known:
+                            logger.warning(
+                                "Unmatched TRANSFER_IN with no recoverable cost basis: "
+                                "tx_id=%s %s@%s qty=%s — using zero cost",
+                                tx.id,
+                                sym,
+                                exch,
+                                qty,
+                            )
                         fifo[key].append(
                             {
                                 "qty": qty,
-                                "unit_cost": _ZERO,
-                                "unit_cost_base": _ZERO,
+                                "unit_cost": unit_cost,
+                                "unit_cost_base": unit_base,
                                 "currency": tx_ccy,
-                                "fx_rate": Decimal("1"),
-                                "is_paid": False,
+                                "fx_rate": tx_fx,
+                                "is_paid": cost_known,
                             }
                         )
 
@@ -1902,10 +2001,17 @@ class MetricsService:
                 historical_prices[(row[0], row[1])] = Decimal(str(row[2]))
 
         def _resolve_price(tx, symbol: str) -> Decimal:
-            """Get transaction price, falling back to historical price if 0."""
+            """Get transaction price in the PORTFOLIO currency (EUR).
+
+            The stored ``tx.price`` is denominated in the transaction currency, so
+            it is converted via ``conversion_rate`` (EUR per 1 unit of tx currency;
+            defaults to 1 for same-currency trades). The historical fallback
+            (``AssetPriceHistory.price_eur``) is already EUR and used as-is.
+            """
             p = Decimal(str(tx.price))
             if p > 0:
-                return p
+                fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                return p * fx
             if tx.executed_at is not None:
                 hist_p = historical_prices.get((symbol, tx.executed_at.date()))
                 if hist_p:
@@ -1947,7 +2053,11 @@ class MetricsService:
                 "DIVIDEND",
                 "INTEREST",
             ]:
-                original_price = Decimal(str(tx.price))
+                original_price = Decimal(str(tx.price))  # tx currency
+                # Real capital in is tracked in the portfolio currency (EUR), so
+                # convert the stored price via the FX rate captured at execution.
+                tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                original_price_eur = original_price * tx_fx
                 resolved_price = _resolve_price(tx, symbol)
                 tx_qty = Decimal(str(tx.quantity))
                 ah["total_bought"] += tx_qty
@@ -1961,7 +2071,7 @@ class MetricsService:
                 # Airdrops/rewards/conversions are NOT capital outflow
                 # TRANSFER_IN excluded: could be from own wallet (not new capital)
                 if tx_type == "BUY" and original_price > 0:
-                    ah["total_bought_fiat_value"] += tx_qty * original_price
+                    ah["total_bought_fiat_value"] += tx_qty * original_price_eur
 
             # Track sells (real capital out)
             # TRANSFER_OUT excluded: user still owns the asset on cold wallet

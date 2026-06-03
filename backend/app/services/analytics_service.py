@@ -292,7 +292,9 @@ def _annualized_return(returns: np.ndarray, asset_type=None) -> float:
 def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Optional[float]:
     """
     Compute XIRR (Extended Internal Rate of Return) from a list of (date, amount).
-    Positive amount = outflow (investment), negative = inflow (value/withdrawal).
+    Convention used by all callers (compute_xirr, stress_test_service):
+        negative amount = cash outflow (investment), positive = cash inflow
+        (proceeds / income / current value).
     Returns annualized rate as decimal (0.12 = 12%).
     """
     if len(cashflows) < 2:
@@ -314,6 +316,67 @@ def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Option
             return float(result)
         except (ValueError, RuntimeError, TypeError, OverflowError):
             return None
+
+
+# Transaction kinds that represent EXTERNAL cash entering/leaving the portfolio.
+# Internal moves (TRANSFER_IN/OUT — auto-mirrored wallet hops) and crypto↔crypto
+# swaps (CONVERSION_IN/OUT) are deliberately excluded: they are not external cash
+# flows and would inject phantom -X/+X pairs that distort the rate (audit F-03).
+_XIRR_INFLOW_TYPES = frozenset(
+    {
+        TransactionType.SELL,
+        TransactionType.DIVIDEND,
+        TransactionType.INTEREST,
+        TransactionType.STAKING_REWARD,
+        TransactionType.AIRDROP,
+    }
+)
+
+
+def _build_xirr_cashflows(
+    transactions: "List[Transaction]",
+    eur_to_target: float = 1.0,
+) -> Tuple[List[Tuple[datetime, float]], int]:
+    """Build external cashflows for XIRR from a transaction list (pure, no I/O).
+
+    Sign convention matches ``_xirr``: negative = cash out (investment), positive =
+    cash in (proceeds / income). Each line is converted to the portfolio currency
+    using its OWN ``conversion_rate`` (EUR per unit of the trade currency, captured
+    at execution — audit F-02), then scaled by ``eur_to_target`` for non-EUR views.
+
+    Scope (audit F-02/F-03/F-04):
+      * BUY                        -> outflow (cash really spent)
+      * SELL                       -> inflow  (cash really received)
+      * DIVIDEND / INTEREST        -> inflow  (income from stocks / crowdfunding)
+      * STAKING_REWARD / AIRDROP   -> inflow  (income, market value at receipt)
+      * TRANSFER_IN / TRANSFER_OUT -> EXCLUDED (internal wallet moves)
+      * CONVERSION_IN / CONVERSION_OUT / FEE / STAKING -> EXCLUDED (not external cash)
+
+    Returns ``(cashflows, skipped)``; ``skipped`` counts rows with no execution date.
+    """
+    cashflows: List[Tuple[datetime, float]] = []
+    skipped = 0
+    for tx in transactions:
+        dt = tx.executed_at
+        if dt is None:
+            skipped += 1
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        # Per-line historical conversion to EUR, then EUR -> target currency.
+        fx = float(tx.conversion_rate) if tx.conversion_rate else 1.0
+        to_target = fx * eur_to_target
+        amount = float(tx.quantity) * float(tx.price) * to_target
+        fee = float(tx.fee or 0) * to_target
+
+        ttype = tx.transaction_type
+        if ttype == TransactionType.BUY:
+            cashflows.append((dt, -(amount + fee)))
+        elif ttype in _XIRR_INFLOW_TYPES:
+            # SELL nets the fee out of proceeds; pure income lines have fee 0.
+            cashflows.append((dt, amount - fee if ttype == TransactionType.SELL else amount))
+    return cashflows, skipped
 
 
 class AnalyticsService:
@@ -1561,51 +1624,20 @@ class AnalyticsService:
         if not transactions:
             return None
 
-        # ── Forex rate for multi-currency conversion ──
-        # Transaction amounts are stored in the asset's quote currency (usually USD).
-        # Convert to user's preferred currency for accurate XIRR.
-        usd_to_target = 1.0
+        # ── Forex for multi-currency conversion (audit F-02) ──
+        # Each transaction is converted to EUR via its OWN historical
+        # ``conversion_rate`` inside _build_xirr_cashflows; here we only need the
+        # extra EUR→target leg for users whose view currency is not EUR.
         target = currency.upper()
-        if target != "USD":
+        eur_to_target = 1.0
+        if target != "EUR":
             try:
-                rate = await self.price_service.get_forex_rate("USD", target)
-                usd_to_target = float(rate) if rate else 1.0
-            except Exception:
-                logger.warning("Forex USD→%s unavailable, using 1.0", target)
+                rate = await self.price_service.get_forex_rate("EUR", target)
+                eur_to_target = float(rate) if rate else 1.0
+            except Exception as exc:  # noqa: BLE001 - degrade gracefully
+                logger.warning("Forex EUR→%s unavailable (%s), using 1.0", target, exc)
 
-        cashflows: List[Tuple[datetime, float]] = []
-        skipped = 0
-        for tx in transactions:
-            # Guard: skip transactions without a date (data integrity issue)
-            dt = tx.executed_at
-            if dt is None:
-                skipped += 1
-                continue
-
-            amount = float(tx.quantity) * float(tx.price) * usd_to_target
-            fee = float(tx.fee or 0) * usd_to_target
-
-            # Ensure timezone-aware datetime
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-
-            if tx.transaction_type in [
-                TransactionType.BUY,
-                TransactionType.TRANSFER_IN,
-            ]:
-                # Cash outflow (investment) — negative for XIRR convention
-                cashflows.append((dt, -(amount + fee)))
-            elif tx.transaction_type in [
-                TransactionType.SELL,
-                TransactionType.TRANSFER_OUT,
-            ]:
-                # Cash inflow — positive
-                cashflows.append((dt, amount - fee))
-            elif tx.transaction_type in [
-                TransactionType.STAKING_REWARD,
-                TransactionType.AIRDROP,
-            ]:
-                cashflows.append((dt, amount))
+        cashflows, skipped = _build_xirr_cashflows(transactions, eur_to_target)
 
         if skipped > 0:
             logger.warning("XIRR: skipped %d transactions with NULL executed_at", skipped)
@@ -1625,6 +1657,15 @@ class AnalyticsService:
             for asset in assets:
                 price = await self._get_asset_price(asset)
                 current_value += float(asset.quantity) * price
+            # _get_asset_price returns the quote currency (typically USD, see F-13).
+            # Best-effort convert USD->target for this degraded fallback path only.
+            usd_to_target = 1.0
+            if target != "USD":
+                try:
+                    rate = await self.price_service.get_forex_rate("USD", target)
+                    usd_to_target = float(rate) if rate else 1.0
+                except Exception as fx_exc:  # noqa: BLE001
+                    logger.warning("XIRR fallback forex USD→%s unavailable (%s)", target, fx_exc)
             current_value *= usd_to_target
 
         if current_value <= 0:
@@ -1641,7 +1682,12 @@ class AnalyticsService:
         if rate is not None:
             # Clamp to reasonable range: -95% to +1000%
             rate_pct = round(rate * 100, 2)
-            return max(-95.0, min(rate_pct, 1000.0))
+            clamped = max(-95.0, min(rate_pct, 1000.0))
+            if clamped != rate_pct:
+                # F-14: surface aberrant values instead of hiding them silently —
+                # a clamp usually signals a data issue (bad date/price/qty).
+                logger.warning("XIRR %.2f%% out of range, clamped to %.2f%% (possible data issue)", rate_pct, clamped)
+            return clamped
         return None
 
     # ------------------------------------------------------------------

@@ -28,8 +28,7 @@ def upgrade() -> None:
         )
     except Exception as e:
         logger.warning(
-            "Could not create unique index uq_tx_asset_external_id "
-            "(possibly duplicates exist): %s",
+            "Could not create unique index uq_tx_asset_external_id " "(possibly duplicates exist): %s",
             e,
         )
 

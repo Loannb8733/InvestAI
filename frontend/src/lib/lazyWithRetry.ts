@@ -7,6 +7,7 @@ import { lazy } from 'react'
  *
  * Uses a per-module key so multiple stale chunks each get one reload attempt.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors React.lazy's own ComponentType<any> signature
 export function lazyWithRetry<T extends React.ComponentType<any>>(
   factory: () => Promise<{ default: T }>
 ) {

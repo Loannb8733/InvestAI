@@ -300,6 +300,18 @@ class SmartInsightsService:
             if vix_signals:
                 metrics_summary["vix"] = vix_signals[0].value
 
+        # === CORRELATION ANALYSIS (risk clusters & diversification penalty) ===
+        avg_top5_corr = 0.0
+        risk_clusters: List[Dict] = []
+        try:
+            corr_data = await self.analytics_service.get_correlation_matrix(db, user_id, days=days)
+            corr_insights, avg_top5_corr, risk_clusters = self._analyze_correlation(corr_data, top_holdings)
+            insights.extend(corr_insights)
+            metrics_summary["avg_top5_correlation"] = round(avg_top5_corr, 3)
+            metrics_summary["risk_clusters"] = risk_clusters
+        except Exception as e:
+            logger.debug("Correlation analysis failed: %s", e)
+
         # === SAFE-HAVEN / GOLD ANALYSIS ===
         gold_exposure, gold_beta, gold_badge = await self._analyze_safe_haven(
             db,
@@ -329,6 +341,7 @@ class SmartInsightsService:
             max_drawdown=max_drawdown,
             gold_exposure=gold_exposure,
             market_regime=market_regime,
+            avg_top5_corr=avg_top5_corr,
         )
 
         # Sort insights by severity
@@ -569,6 +582,138 @@ class SmartInsightsService:
             )
 
         return insights
+
+    def _analyze_correlation(
+        self,
+        corr_data,
+        top_holdings: List[Dict],
+    ) -> Tuple[List[SmartInsight], float, List[Dict]]:
+        """Analyze correlation matrix for risk clusters and diversification illusions.
+
+        Returns (insights, avg_top5_correlation, risk_clusters).
+        risk_clusters format: [{"assets": ["BTC", "ETH"], "avg_corr": 0.91}, ...]
+        """
+        insights: List[SmartInsight] = []
+        risk_clusters: List[Dict] = []
+
+        symbols = corr_data.symbols
+        matrix = corr_data.matrix
+        strongly_correlated = corr_data.strongly_correlated
+
+        if len(symbols) < 2:
+            return insights, 0.0, risk_clusters
+
+        # 1. Compute average pairwise correlation for top 5 holdings
+        top5_symbols = [h.get("symbol", "") for h in top_holdings[:5]]
+        top5_corrs = []
+        for i, s1 in enumerate(symbols):
+            if s1 not in top5_symbols:
+                continue
+            for j, s2 in enumerate(symbols):
+                if j <= i or s2 not in top5_symbols:
+                    continue
+                top5_corrs.append(matrix[i][j])
+
+        avg_top5_corr = sum(top5_corrs) / len(top5_corrs) if top5_corrs else 0.0
+
+        # 2. Build risk clusters (assets with corr > 0.85)
+        cluster_threshold = 0.85
+        cluster_map: Dict[str, set] = {}
+        for s1, s2, corr in strongly_correlated:
+            if corr >= cluster_threshold:
+                # Merge into existing cluster or create new
+                c1 = cluster_map.get(s1)
+                c2 = cluster_map.get(s2)
+                if c1 and c2:
+                    # Merge
+                    merged = c1 | c2
+                    for sym in merged:
+                        cluster_map[sym] = merged
+                elif c1:
+                    c1.add(s2)
+                    cluster_map[s2] = c1
+                elif c2:
+                    c2.add(s1)
+                    cluster_map[s1] = c2
+                else:
+                    new_cluster = {s1, s2}
+                    cluster_map[s1] = new_cluster
+                    cluster_map[s2] = new_cluster
+
+        # Deduplicate clusters
+        seen_clusters: List[frozenset] = []
+        for cluster_set in cluster_map.values():
+            fs = frozenset(cluster_set)
+            if fs not in seen_clusters:
+                seen_clusters.append(fs)
+                # Compute average correlation within cluster
+                cluster_corrs = []
+                cluster_list = sorted(cluster_set)
+                for ci, cs1 in enumerate(cluster_list):
+                    for cj, cs2 in enumerate(cluster_list):
+                        if cj <= ci:
+                            continue
+                        if cs1 in symbols and cs2 in symbols:
+                            idx_i = symbols.index(cs1)
+                            idx_j = symbols.index(cs2)
+                            cluster_corrs.append(matrix[idx_i][idx_j])
+                avg_cluster_corr = sum(cluster_corrs) / len(cluster_corrs) if cluster_corrs else 0.0
+                risk_clusters.append(
+                    {
+                        "assets": cluster_list,
+                        "avg_corr": round(avg_cluster_corr, 3),
+                    }
+                )
+
+        # 3. Generate insights
+        if avg_top5_corr > 0.7:
+            # Find the highest correlated pair among top 5
+            max_pair = None
+            max_corr = 0.0
+            for s1, s2, corr in strongly_correlated:
+                if s1 in top5_symbols and s2 in top5_symbols and corr > max_corr:
+                    max_pair = (s1, s2)
+                    max_corr = corr
+
+            pair_text = f" entre {max_pair[0]} et {max_pair[1]}" if max_pair else ""
+            insights.append(
+                SmartInsight(
+                    category=InsightCategory.DIVERSIFICATION,
+                    severity=InsightSeverity.CRITICAL if avg_top5_corr > 0.85 else InsightSeverity.WARNING,
+                    title="Diversification illusoire",
+                    message=(
+                        f"Forte corrélation{pair_text} "
+                        f"(moyenne top 5 : {avg_top5_corr:.0%}). "
+                        f"Vos actifs principaux bougent ensemble — "
+                        f"votre diversification est illusoire. "
+                        f"Ajoutez des actifs décorrélés (or, obligations, immobilier)."
+                    ),
+                    metric_name="avg_top5_correlation",
+                    current_value=avg_top5_corr,
+                    target_value=0.5,
+                    potential_improvement="Réduisez la corrélation sous 0.5 avec des actifs alternatifs.",
+                )
+            )
+
+        if risk_clusters:
+            for cluster in risk_clusters[:3]:  # Top 3 clusters
+                assets_str = ", ".join(cluster["assets"])
+                insights.append(
+                    SmartInsight(
+                        category=InsightCategory.RISK,
+                        severity=InsightSeverity.WARNING,
+                        title="Cluster de risque détecté",
+                        message=(
+                            f"Les actifs {assets_str} forment un cluster "
+                            f"(corrélation moyenne : {cluster['avg_corr']:.0%}). "
+                            f"En cas de chute, ils baisseront simultanément."
+                        ),
+                        metric_name="risk_cluster_corr",
+                        current_value=cluster["avg_corr"],
+                    )
+                )
+
+        return insights, avg_top5_corr, risk_clusters
 
     async def _get_rebalancing_suggestions(
         self,
@@ -1204,6 +1349,7 @@ class SmartInsightsService:
         max_drawdown: float = 0.0,
         gold_exposure: float = 0.0,
         market_regime: Optional[MarketRegime] = None,
+        avg_top5_corr: float = 0.0,
     ) -> Tuple[int, str]:
         """Calculate overall portfolio health score (0-100)."""
         score = 100
@@ -1256,6 +1402,14 @@ class SmartInsightsService:
         elif abs_dd > 0.10:
             score -= 10
 
+        # Correlation penalty: high average correlation in top 5 = illusory diversification
+        if avg_top5_corr > 0.85:
+            score -= 15
+        elif avg_top5_corr > 0.7:
+            score -= 10
+        elif avg_top5_corr > 0.6:
+            score -= 5
+
         # Safe-haven bonus: gold_relevance from RegimeConfig scales the bonus
         # high = 1.5×, medium = 1.0×, low = 0.5× (suppressed in bull)
         if gold_exposure > 0.05 and market_regime:
@@ -1282,6 +1436,70 @@ class SmartInsightsService:
             status = "critical"
 
         return score, status
+
+    async def get_dashboard_summary(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+    ) -> Dict:
+        """Lightweight summary for the dashboard IA widget.
+
+        Returns health score, top insight, breakeven distance,
+        top alpha signal, anomaly count, and data freshness.
+        """
+        report = await self.get_portfolio_health(db, user_id, days)
+
+        # Top insight: first critical, then warning, then info
+        top_insight = None
+        if report.insights:
+            best = report.insights[0]  # already sorted by severity
+            top_insight = {
+                "title": best.title,
+                "message": best.message,
+                "severity": best.severity.value,
+                "category": best.category.value,
+            }
+
+        # Breakeven distance: how far from cost basis
+        total_value = report.metrics_summary.get("total_value", 0)
+        breakeven_pct = None
+        try:
+            analytics = await self.analytics_service.get_user_analytics(db, user_id, days)
+            net_capital = getattr(analytics, "net_capital", None) or getattr(analytics, "total_invested", 0)
+            if net_capital and net_capital > 0:
+                breakeven_pct = round(((total_value / net_capital) - 1) * 100, 2)
+        except Exception:
+            pass
+
+        # Top alpha: try prediction service
+        top_alpha = None
+        try:
+            alpha_data = await self.prediction_service.get_top_alpha(db, user_id)
+            if alpha_data and isinstance(alpha_data, list) and len(alpha_data) > 0:
+                best_alpha = alpha_data[0]
+                top_alpha = {
+                    "symbol": best_alpha.get("symbol", "?"),
+                    "alpha_score": best_alpha.get("alpha_score", 0),
+                }
+        except Exception:
+            pass
+
+        # Market regime
+        regime_label = None
+        if report.market_regime and hasattr(report.market_regime, "market"):
+            regime_label = report.market_regime.market.dominant_regime
+
+        return {
+            "health_score": report.overall_score,
+            "health_status": report.overall_status,
+            "top_insight": top_insight,
+            "breakeven_pct": breakeven_pct,
+            "top_alpha": top_alpha,
+            "anomaly_count": len(report.anomaly_impacts),
+            "regime": regime_label,
+            "generated_at": report.generated_at.isoformat(),
+        }
 
     async def get_current_vol_regime(self, db: AsyncSession, user_id: str) -> str:
         """Lightweight BTC-only regime detection for Monte Carlo vol_regime.

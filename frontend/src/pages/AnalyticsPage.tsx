@@ -19,23 +19,10 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { analyticsApi, dashboardApi, portfoliosApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-} from 'recharts'
+import { ResponsivePie } from '@nivo/pie'
+import { ResponsiveBar } from '@nivo/bar'
+import { ResponsiveRadar } from '@nivo/radar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import {
   TrendingUp,
   TrendingDown,
@@ -59,18 +46,10 @@ import MonteCarloCard from '@/components/analytics/MonteCarloCard'
 import StressTestCard from '@/components/analytics/StressTestCard'
 import CorrelationMatrix from '@/components/analytics/CorrelationMatrix'
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const COLORS = ['oklch(var(--chart-5))', 'oklch(var(--chart-3))', 'oklch(var(--chart-1))', 'oklch(var(--chart-4))', 'oklch(var(--chart-2))', 'oklch(var(--chart-2))', 'oklch(var(--chart-5))', 'oklch(var(--chart-3))']
 
-const chartTooltipStyle: React.CSSProperties = {
-  backgroundColor: 'hsl(var(--popover))',
-  borderColor: 'hsl(var(--border))',
-  color: 'hsl(var(--popover-foreground))',
-  borderRadius: '0.5rem',
-  fontSize: 12,
-}
-
-const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
-const axisTickSm = { fill: 'hsl(var(--muted-foreground))', fontSize: 11 }
+// Token order matching COLORS, for resolving Nivo-compatible rgb() colors
+const COLOR_TOKENS = ['--chart-5', '--chart-3', '--chart-1', '--chart-4', '--chart-2', '--chart-2', '--chart-5', '--chart-3']
 
 interface Analytics {
   total_value: number
@@ -278,6 +257,7 @@ const MetricWithTooltip = ({ metricKey, children }: { metricKey: string; childre
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState('30d')
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all')
+  const { theme, color } = useNivoTheme()
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: queryKeys.portfolios.list(),
@@ -376,11 +356,11 @@ export default function AnalyticsPage() {
   if (errorAnalytics) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Analyses</h1>
+        <h1 className="text-3xl font-serif font-medium">Analyses</h1>
         <Card>
           <CardContent className="py-12">
             <div className="text-center space-y-4">
-              <Activity className="h-16 w-16 mx-auto text-red-500" />
+              <Activity className="h-16 w-16 mx-auto text-loss" />
               <h2 className="text-xl font-semibold">Erreur de chargement</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
                 Impossible de charger les analyses. Veuillez réessayer.
@@ -395,7 +375,7 @@ export default function AnalyticsPage() {
   if (!analytics || analytics.asset_count === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Analyses</h1>
+        <h1 className="text-3xl font-serif font-medium">Analyses</h1>
         <Card>
           <CardContent className="py-12">
             <div className="text-center space-y-4">
@@ -416,9 +396,10 @@ export default function AnalyticsPage() {
     v == null || isNaN(v) ? '—' : v.toFixed(d)
 
   // Prepare chart data
-  const allocationByTypeData = Object.entries(analytics.allocation_by_type || {}).map(([name, value]) => ({
+  const allocationByTypeData = Object.entries(analytics.allocation_by_type || {}).map(([name, value], index) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value: Math.round(value * 10) / 10,
+    color: color(COLOR_TOKENS[index % COLOR_TOKENS.length]),
   }))
 
   const allocationByAssetData = Object.entries(analytics.allocation_by_asset || {})
@@ -435,7 +416,7 @@ export default function AnalyticsPage() {
     .map((asset) => ({
       name: asset.symbol,
       performance: Math.round(asset.gain_loss_percent * 10) / 10,
-      fill: asset.gain_loss_percent >= 0 ? '#10b981' : '#ef4444',
+      fill: asset.gain_loss_percent >= 0 ? color('--chart-3') : color('--chart-4'),
     }))
 
   // Radar: each metric normalized to 0-100 where higher = better
@@ -477,17 +458,17 @@ export default function AnalyticsPage() {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'high': return 'text-red-500'
-      case 'medium': return 'text-yellow-500'
-      default: return 'text-blue-500'
+      case 'high': return 'text-loss'
+      case 'medium': return 'text-warning'
+      default: return 'text-accent'
     }
   }
 
   const getSeverityBg = (severity: string) => {
     switch (severity) {
-      case 'high': return 'bg-red-500/10 border-red-500/20'
-      case 'medium': return 'bg-yellow-500/10 border-yellow-500/20'
-      default: return 'bg-blue-500/10 border-blue-500/20'
+      case 'high': return 'bg-loss/10 border-loss/20'
+      case 'medium': return 'bg-warning/10 border-warning/20'
+      default: return 'bg-accent/10 border-accent/20'
     }
   }
 
@@ -529,7 +510,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Analyses</h1>
+          <h1 className="text-3xl font-serif font-medium">Analyses</h1>
           <p className="text-muted-foreground">
             Métriques avancées et analyse de votre portefeuille
           </p>
@@ -571,9 +552,9 @@ export default function AnalyticsPage() {
 
       {/* Short history warning */}
       {analytics.interpretations?.global && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
-          <Info className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <p className="text-sm text-amber-700 dark:text-amber-400">{analytics.interpretations.global}</p>
+        <div className="flex items-center gap-2 rounded-lg border border-warning dark:border-warning bg-warning dark:bg-warning/20 p-3">
+          <Info className="h-4 w-4 text-warning flex-shrink-0" />
+          <p className="text-sm text-warning dark:text-warning">{analytics.interpretations.global}</p>
         </div>
       )}
 
@@ -587,7 +568,7 @@ export default function AnalyticsPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{safeFixed(analytics.portfolio_volatility, 1)}%</div>
+            <div className="text-2xl font-serif font-medium">{safeFixed(analytics.portfolio_volatility, 1)}%</div>
             <p className="text-xs text-muted-foreground">
               {analytics.portfolio_volatility < 30 ? 'Faible' : analytics.portfolio_volatility < 60 ? 'Modérée' : 'Élevée'}
             </p>
@@ -602,7 +583,7 @@ export default function AnalyticsPage() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${(analytics.sharpe_ratio ?? 0) >= 1 ? 'text-green-500' : (analytics.sharpe_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+            <div className={`text-2xl font-serif font-medium ${(analytics.sharpe_ratio ?? 0) >= 1 ? 'text-gain' : (analytics.sharpe_ratio ?? 0) >= 0 ? 'text-warning' : 'text-loss'}`}>
               {safeFixed(analytics.sharpe_ratio, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -616,20 +597,20 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="relative ring-1 ring-blue-500/20">
+        <Card className="relative ring-1 ring-accent/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
               <MetricWithTooltip metricKey="sortino">
                 <CardTitle className="text-sm font-medium">Sortino</CardTitle>
               </MetricWithTooltip>
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent dark:text-accent">
                 <Zap className="h-2.5 w-2.5" /> Crypto
               </span>
             </div>
-            <Shield className="h-4 w-4 text-blue-500" />
+            <Shield className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${(analytics.sortino_ratio ?? 0) >= 1 ? 'text-green-500' : (analytics.sortino_ratio ?? 0) >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+            <div className={`text-2xl font-serif font-medium ${(analytics.sortino_ratio ?? 0) >= 1 ? 'text-gain' : (analytics.sortino_ratio ?? 0) >= 0 ? 'text-warning' : 'text-loss'}`}>
               {safeFixed(analytics.sortino_ratio, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -651,7 +632,7 @@ export default function AnalyticsPage() {
             <PieChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${(diversification?.score || 0) >= 60 ? 'text-green-500' : (diversification?.score || 0) >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
+            <div className={`text-2xl font-serif font-medium ${(diversification?.score || 0) >= 60 ? 'text-gain' : (diversification?.score || 0) >= 40 ? 'text-warning' : 'text-loss'}`}>
               {safeFixed(diversification?.score, 0)}/100
             </div>
             <p className="text-xs text-muted-foreground">{diversification?.rating}</p>
@@ -666,10 +647,10 @@ export default function AnalyticsPage() {
             <MetricWithTooltip metricKey="var">
               <CardTitle className="text-sm font-medium">VaR 95%</CardTitle>
             </MetricWithTooltip>
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
+            <ArrowDownRight className="h-4 w-4 text-loss" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
+            <div className="text-2xl font-serif font-medium text-loss">
               {analytics.var_95 != null ? formatCurrency(Math.abs(analytics.var_95)) : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -683,10 +664,10 @@ export default function AnalyticsPage() {
             <MetricWithTooltip metricKey="cvar">
               <CardTitle className="text-sm font-medium">CVaR (ES)</CardTitle>
             </MetricWithTooltip>
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
+            <ArrowDownRight className="h-4 w-4 text-loss" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
+            <div className="text-2xl font-serif font-medium text-loss">
               {analytics.cvar_95 != null ? formatCurrency(Math.abs(analytics.cvar_95)) : '—'}
             </div>
             <p className="text-xs text-muted-foreground">Expected Shortfall</p>
@@ -698,10 +679,10 @@ export default function AnalyticsPage() {
             <MetricWithTooltip metricKey="maxdd">
               <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
             </MetricWithTooltip>
-            <TrendingDown className="h-4 w-4 text-red-500" />
+            <TrendingDown className="h-4 w-4 text-loss" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
+            <div className="text-2xl font-serif font-medium text-loss">
               {safeFixed(analytics.max_drawdown, 1)}%
             </div>
             <p className="text-xs text-muted-foreground">
@@ -725,14 +706,14 @@ export default function AnalyticsPage() {
           <CardContent>
             {xirrData?.xirr != null ? (
               <>
-                <div className={`text-2xl font-bold ${xirrData.xirr >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-2xl font-serif font-medium ${xirrData.xirr >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {xirrData.xirr > 0 ? '+' : ''}{xirrData.xirr.toFixed(2)}%
                 </div>
                 <p className="text-xs text-muted-foreground">Rendement annualisé réel</p>
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold text-muted-foreground">—</div>
+                <div className="text-2xl font-serif font-medium text-muted-foreground">—</div>
                 <p className="text-xs text-muted-foreground">Pas assez de données</p>
               </>
             )}
@@ -751,32 +732,40 @@ export default function AnalyticsPage() {
             {allocationByTypeData.length <= 1 ? (
               <div className="h-64 flex flex-col items-center justify-center text-center">
                 <div className="h-24 w-24 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: `${COLORS[0]}20` }}>
-                  <span className="text-2xl font-bold" style={{ color: COLORS[0] }}>100%</span>
+                  <span className="text-2xl font-serif font-medium" style={{ color: COLORS[0] }}>100%</span>
                 </div>
                 <p className="text-sm font-medium">{allocationByTypeData[0]?.name || 'N/A'}</p>
                 <p className="text-xs text-muted-foreground mt-1">Classe unique — diversifiez pour voir la répartition</p>
               </div>
             ) : (
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={allocationByTypeData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}%`}
-                    >
-                      {allocationByTypeData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <ResponsivePie
+                  data={allocationByTypeData.map((d) => ({
+                    id: d.name,
+                    label: d.name,
+                    value: d.value,
+                    color: d.color,
+                  }))}
+                  theme={theme}
+                  margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                  innerRadius={0.62}
+                  padAngle={2}
+                  cornerRadius={3}
+                  colors={{ datum: 'data.color' }}
+                  borderWidth={2}
+                  borderColor={color('--background')}
+                  arcLabelsSkipAngle={12}
+                  arcLabel={(d) => `${d.value}%`}
+                  arcLabelsTextColor={color('--background')}
+                  enableArcLinkLabels={false}
+                  isInteractive
+                  tooltip={({ datum }) => (
+                    <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                      <p className="text-sm font-medium">{datum.label}</p>
+                      <p className="mt-0.5 font-mono text-sm tabular-nums">{datum.value}%</p>
+                    </div>
+                  )}
+                />
               </div>
             )}
           </CardContent>
@@ -801,15 +790,36 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={riskScoreData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="metric" tick={{ fill: 'currentColor', fontSize: 11 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'currentColor', fontSize: 10 }} />
-                  <Radar name="Score" dataKey="value" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.5} />
-                  <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value.toFixed(0)}/100`} />
-                </RadarChart>
-              </ResponsiveContainer>
+              <ResponsiveRadar
+                data={riskScoreData}
+                keys={['value']}
+                indexBy="metric"
+                theme={theme}
+                maxValue={100}
+                margin={{ top: 28, right: 48, bottom: 28, left: 48 }}
+                gridLevels={5}
+                gridShape="circular"
+                gridLabelOffset={12}
+                colors={[color('--chart-4')]}
+                fillOpacity={0.2}
+                borderWidth={2}
+                borderColor={{ from: 'color' }}
+                dotSize={6}
+                dotColor={color('--chart-4')}
+                dotBorderWidth={2}
+                dotBorderColor={color('--background')}
+                enableDotLabel={false}
+                isInteractive
+                motionConfig="gentle"
+                sliceTooltip={({ index, data }) => (
+                  <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                    <p className="text-sm font-medium">{index}</p>
+                    <p className="mt-0.5 font-mono text-sm tabular-nums text-muted-foreground">
+                      {(data[0]?.value as number).toFixed(0)}/100
+                    </p>
+                  </div>
+                )}
+              />
             </div>
           </CardContent>
         </Card>
@@ -828,7 +838,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shuffle className="h-5 w-5 text-blue-500" />
+                <Shuffle className="h-5 w-5 text-accent" />
                 Allocation optimale (Markowitz)
               </CardTitle>
               <CardDescription>
@@ -846,9 +856,9 @@ export default function AnalyticsPage() {
                   return (
                     <>
                       {isSingleAsset && (
-                        <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm">
-                          <Info className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
-                          <p className="text-yellow-600 dark:text-yellow-400">
+                        <div className="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30 text-sm">
+                          <Info className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                          <p className="text-warning dark:text-warning">
                             Avec seulement {Object.keys(optimization.weights).length} actif{Object.keys(optimization.weights).length > 1 ? 's' : ''}, l'optimisation concentre tout sur un seul. Ajoutez des actifs diversifiés pour une allocation plus pertinente.
                           </p>
                         </div>
@@ -861,10 +871,10 @@ export default function AnalyticsPage() {
                             <div key={symbol} className="flex items-center gap-2">
                               <span className="text-sm font-medium w-16">{symbol}</span>
                               <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${weight}%` }} />
+                                <div className="h-full bg-accent rounded-full" style={{ width: `${weight}%` }} />
                               </div>
                               <span className="text-xs font-mono w-12 text-right">{weight.toFixed(1)}%</span>
-                              <span className={`text-xs font-mono w-16 text-right ${diff > 0 ? 'text-green-500' : diff < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                              <span className={`text-xs font-mono w-16 text-right ${diff > 0 ? 'text-gain' : diff < 0 ? 'text-loss' : 'text-muted-foreground'}`}>
                                 {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
                               </span>
                             </div>
@@ -877,7 +887,7 @@ export default function AnalyticsPage() {
                 {/* Expected metrics */}
                 <div className="grid grid-cols-3 gap-3 pt-2 border-t">
                   <div className="text-center">
-                    <div className="text-lg font-bold text-green-500">{optimization.expected_return > 0 ? '+' : ''}{optimization.expected_return.toFixed(1)}%</div>
+                    <div className="text-lg font-bold text-gain">{optimization.expected_return > 0 ? '+' : ''}{optimization.expected_return.toFixed(1)}%</div>
                     <div className="text-xs text-muted-foreground">Rendement espéré</div>
                   </div>
                   <div className="text-center">
@@ -885,7 +895,7 @@ export default function AnalyticsPage() {
                     <div className="text-xs text-muted-foreground">Volatilité</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-blue-500">{optimization.sharpe_ratio.toFixed(2)}</div>
+                    <div className="text-lg font-bold text-accent">{optimization.sharpe_ratio.toFixed(2)}</div>
                     <div className="text-xs text-muted-foreground">Sharpe optimal</div>
                   </div>
                 </div>
@@ -914,13 +924,13 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-500" />
+                <Activity className="h-5 w-5 text-accent" />
                 Beta vs Benchmark
               </CardTitle>
               <CardDescription>
                 Sensibilité de vos actifs par rapport au marché
                 {periodDays > 0 && periodDays < 30 && (
-                  <span className="block text-xs text-yellow-500 mt-1">
+                  <span className="block text-xs text-warning mt-1">
                     Min. 30 jours requis pour le beta (calculé sur {betaDays}j)
                   </span>
                 )}
@@ -932,7 +942,7 @@ export default function AnalyticsPage() {
                 <div className="grid grid-cols-2 gap-3 pb-3 border-b">
                   {betaData.portfolio_beta_crypto != null && (
                     <div className="text-center">
-                      <div className={`text-lg font-bold ${betaData.portfolio_beta_crypto > 1 ? 'text-red-500' : betaData.portfolio_beta_crypto > 0.5 ? 'text-yellow-500' : 'text-green-500'}`}>
+                      <div className={`text-lg font-bold ${betaData.portfolio_beta_crypto > 1 ? 'text-loss' : betaData.portfolio_beta_crypto > 0.5 ? 'text-warning' : 'text-gain'}`}>
                         {betaData.portfolio_beta_crypto.toFixed(2)}
                       </div>
                       <div className="text-xs text-muted-foreground">Beta vs BTC</div>
@@ -940,7 +950,7 @@ export default function AnalyticsPage() {
                   )}
                   {betaData.portfolio_beta_stock != null && (
                     <div className="text-center">
-                      <div className={`text-lg font-bold ${betaData.portfolio_beta_stock > 1 ? 'text-red-500' : betaData.portfolio_beta_stock > 0.5 ? 'text-yellow-500' : 'text-green-500'}`}>
+                      <div className={`text-lg font-bold ${betaData.portfolio_beta_stock > 1 ? 'text-loss' : betaData.portfolio_beta_stock > 0.5 ? 'text-warning' : 'text-gain'}`}>
                         {betaData.portfolio_beta_stock.toFixed(2)}
                       </div>
                       <div className="text-xs text-muted-foreground">Beta vs SPY</div>
@@ -959,7 +969,7 @@ export default function AnalyticsPage() {
                             {/* Reference line at beta=1 */}
                             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-foreground/20" />
                             <div
-                              className={`h-full rounded-full absolute ${asset.beta > 1 ? 'bg-red-500' : asset.beta > 0.5 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                              className={`h-full rounded-full absolute ${asset.beta > 1 ? 'bg-loss' : asset.beta > 0.5 ? 'bg-warning' : 'bg-gain'}`}
                               style={{
                                 width: `${Math.min(100, Math.abs(asset.beta) * 50)}%`,
                                 left: asset.beta >= 0 ? '0%' : undefined,
@@ -1001,19 +1011,34 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={performanceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={axisTick} />
-                <YAxis type="category" dataKey="name" width={60} tick={axisTick} />
-                <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
-                <Bar dataKey="performance" radius={4}>
-                  {performanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBar
+              data={performanceData}
+              keys={['performance']}
+              indexBy="name"
+              layout="horizontal"
+              theme={theme}
+              margin={{ top: 8, right: 24, bottom: 32, left: 64 }}
+              padding={0.3}
+              colors={({ data }) => data.fill}
+              borderRadius={4}
+              enableLabel={false}
+              enableGridX
+              enableGridY={false}
+              axisBottom={{ tickSize: 0, tickPadding: 8, format: (v) => `${v}%` }}
+              axisLeft={{ tickSize: 0, tickPadding: 8 }}
+              valueScale={{ type: 'linear' }}
+              tooltip={({ indexValue, value, color: barColor }) => (
+                <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: barColor }} />
+                    <span className="text-xs text-muted-foreground">{indexValue}</span>
+                  </span>
+                  <p className="mt-0.5 font-mono text-sm tabular-nums">{value}%</p>
+                </div>
+              )}
+              animate
+              motionConfig="gentle"
+            />
           </div>
         </CardContent>
       </Card>
@@ -1026,15 +1051,30 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={allocationByAssetData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" tick={axisTickSm} />
-                <YAxis tickFormatter={(v) => `${v}%`} tick={axisTickSm} />
-                <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => `${value}%`} />
-                <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBar
+              data={allocationByAssetData}
+              keys={['value']}
+              indexBy="name"
+              theme={theme}
+              margin={{ top: 8, right: 16, bottom: 40, left: 48 }}
+              padding={0.3}
+              colors={() => color('--chart-1')}
+              borderRadius={4}
+              enableLabel={false}
+              enableGridY
+              enableGridX={false}
+              axisBottom={{ tickSize: 0, tickPadding: 8 }}
+              axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}%` }}
+              valueScale={{ type: 'linear' }}
+              tooltip={({ indexValue, value }) => (
+                <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                  <p className="text-xs text-muted-foreground">{indexValue}</p>
+                  <p className="mt-0.5 font-mono text-sm tabular-nums">{value}%</p>
+                </div>
+              )}
+              animate
+              motionConfig="gentle"
+            />
           </div>
         </CardContent>
       </Card>
@@ -1049,7 +1089,7 @@ export default function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-yellow-500" />
+              <Zap className="h-5 w-5 text-warning" />
               Recommandations
             </CardTitle>
             <CardDescription>Actions suggérées pour améliorer votre portefeuille</CardDescription>
@@ -1077,7 +1117,7 @@ export default function AnalyticsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-500">
+              <CardTitle className="flex items-center gap-2 text-gain">
                 <TrendingUp className="h-5 w-5" />
                 Meilleurs performers
               </CardTitle>
@@ -1088,7 +1128,7 @@ export default function AnalyticsPage() {
                   {performance.top_gainers.map((item: PerformanceItem) => (
                     <div key={item.symbol} className="flex items-center justify-between">
                       <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                      <span className="text-green-500 font-medium">+{item.gain_loss_percent.toFixed(2)}%</span>
+                      <span className="text-gain font-medium">+{item.gain_loss_percent.toFixed(2)}%</span>
                     </div>
                   ))}
                 </div>
@@ -1100,7 +1140,7 @@ export default function AnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-500">
+              <CardTitle className="flex items-center gap-2 text-loss">
                 <TrendingDown className="h-5 w-5" />
                 Moins bons performers
               </CardTitle>
@@ -1111,7 +1151,7 @@ export default function AnalyticsPage() {
                   {performance.top_losers.map((item: PerformanceItem) => (
                     <div key={item.symbol} className="flex items-center justify-between">
                       <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                      <span className="text-red-500 font-medium">{item.gain_loss_percent.toFixed(2)}%</span>
+                      <span className="text-loss font-medium">{item.gain_loss_percent.toFixed(2)}%</span>
                     </div>
                   ))}
                 </div>

@@ -39,8 +39,8 @@ import {
 } from 'lucide-react'
 
 const SENTIMENT_OPTIONS = [
-  { value: 'bullish', label: 'Bullish', icon: TrendingUp, color: 'text-green-500' },
-  { value: 'bearish', label: 'Bearish', icon: TrendingDown, color: 'text-red-500' },
+  { value: 'bullish', label: 'Bullish', icon: TrendingUp, color: 'text-gain' },
+  { value: 'bearish', label: 'Bearish', icon: TrendingDown, color: 'text-loss' },
   { value: 'neutral', label: 'Neutre', icon: Minus, color: 'text-muted-foreground' },
 ]
 
@@ -183,7 +183,7 @@ export default function NotesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Journal</h1>
+          <h1 className="text-3xl font-serif font-medium">Journal</h1>
           <p className="text-muted-foreground">
             Prenez des notes sur vos investissements et stratégies.
           </p>
@@ -204,7 +204,7 @@ export default function NotesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.total_notes}</div>
+              <div className="text-2xl font-serif font-medium">{summary.total_notes}</div>
             </CardContent>
           </Card>
           <Card>
@@ -214,7 +214,7 @@ export default function NotesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.notes_this_month}</div>
+              <div className="text-2xl font-serif font-medium">{summary.notes_this_month}</div>
             </CardContent>
           </Card>
           <Card>
@@ -224,7 +224,7 @@ export default function NotesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.unique_tags.length}</div>
+              <div className="text-2xl font-serif font-medium">{summary.unique_tags.length}</div>
             </CardContent>
           </Card>
         </div>

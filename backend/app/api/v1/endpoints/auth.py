@@ -95,7 +95,14 @@ def _set_auth_cookies(
 
     common = {
         "httponly": True,
-        "samesite": "lax",
+        # The deployed frontend (Vercel) and API (Render) are on different
+        # sites, so the auth cookies are cross-site. Browsers only attach a
+        # cookie on a cross-site XHR (e.g. POST /auth/refresh on page reload)
+        # when it is SameSite=None; Secure. SameSite=Lax cookies are withheld
+        # on such requests, which silently breaks session hydration and logs
+        # the user out on every refresh. Fall back to Lax in local dev (http,
+        # COOKIE_SECURE=False) where SameSite=None without Secure is rejected.
+        "samesite": "none" if settings.COOKIE_SECURE else "lax",
         "secure": settings.COOKIE_SECURE,
         "domain": settings.COOKIE_DOMAIN,
     }
@@ -505,8 +512,18 @@ async def logout(request: Request, response: Response) -> dict:
         except Exception:
             pass  # Best-effort revocation; cookie deletion still provides baseline protection
 
-    response.delete_cookie("access_token", path="/api")
-    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    # Deletion attributes (samesite/secure/domain) must match those used when
+    # the cookies were set, otherwise the browser ignores the clearing
+    # Set-Cookie in a cross-site context and the cookie lingers.
+    from app.core.config import settings
+
+    delete_attrs = {
+        "samesite": "none" if settings.COOKIE_SECURE else "lax",
+        "secure": settings.COOKIE_SECURE,
+        "domain": settings.COOKIE_DOMAIN,
+    }
+    response.delete_cookie("access_token", path="/api", **delete_attrs)
+    response.delete_cookie("refresh_token", path="/api/v1/auth", **delete_attrs)
     return {"message": "Déconnexion réussie"}
 
 

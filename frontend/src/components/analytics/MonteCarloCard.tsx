@@ -20,7 +20,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-purple-500" />
+          <Zap className="h-5 w-5 text-accent" />
           Simulation Monte Carlo
         </CardTitle>
         <CardDescription>
@@ -32,11 +32,11 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
           {/* Distribution bars */}
           <div className="space-y-2">
             {[
-              { label: 'Pessimiste (5%)', value: monteCarlo.percentiles.p5, color: 'bg-red-500' },
-              { label: 'Bas (25%)', value: monteCarlo.percentiles.p25, color: 'bg-orange-500' },
-              { label: 'Médian (50%)', value: monteCarlo.percentiles.p50, color: 'bg-blue-500' },
-              { label: 'Haut (75%)', value: monteCarlo.percentiles.p75, color: 'bg-green-400' },
-              { label: 'Optimiste (95%)', value: monteCarlo.percentiles.p95, color: 'bg-green-600' },
+              { label: 'Pessimiste (5%)', value: monteCarlo.percentiles.p5, color: 'bg-loss' },
+              { label: 'Bas (25%)', value: monteCarlo.percentiles.p25, color: 'bg-warning' },
+              { label: 'Médian (50%)', value: monteCarlo.percentiles.p50, color: 'bg-accent' },
+              { label: 'Haut (75%)', value: monteCarlo.percentiles.p75, color: 'bg-gain' },
+              { label: 'Optimiste (95%)', value: monteCarlo.percentiles.p95, color: 'bg-gain' },
             ].map((p) => (
               <div key={p.label} className="flex items-center gap-3">
                 <span className="text-xs w-28 text-muted-foreground">{p.label}</span>
@@ -64,7 +64,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
                   />
                   <div className="absolute left-1/2 top-0 bottom-0 w-px bg-foreground/30" />
                 </div>
-                <span className={`text-xs font-mono w-16 text-right ${p.value >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-xs font-mono w-16 text-right ${p.value >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {p.value > 0 ? '+' : ''}{p.value.toFixed(1)}%
                 </span>
               </div>
@@ -77,15 +77,15 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
               <div className="text-xs text-muted-foreground">Rendement moyen</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold text-green-500">{monteCarlo.prob_positive.toFixed(0)}%</div>
+              <div className="text-lg font-bold text-gain">{monteCarlo.prob_positive.toFixed(0)}%</div>
               <div className="text-xs text-muted-foreground">Prob. gain</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold text-red-500">{monteCarlo.prob_loss_10.toFixed(0)}%</div>
+              <div className="text-lg font-bold text-loss">{monteCarlo.prob_loss_10.toFixed(0)}%</div>
               <div className="text-xs text-muted-foreground">Prob. perte &gt;10%</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold text-red-700">{(monteCarlo.prob_ruin ?? 0).toFixed(1)}%</div>
+              <div className="text-lg font-bold text-loss">{(monteCarlo.prob_ruin ?? 0).toFixed(1)}%</div>
               <div className="text-xs text-muted-foreground">Prob. ruine</div>
             </div>
           </div>

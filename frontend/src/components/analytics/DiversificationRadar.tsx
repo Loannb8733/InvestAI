@@ -1,20 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CheckCircle2, Globe, Building2, TrendingUp } from 'lucide-react'
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-} from 'recharts'
+import { ResponsiveRadar } from '@nivo/radar'
+import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { ProjectAudit } from '@/types/crowdfunding'
 
 const IMPACT_CONFIG = {
-  ameliore: { label: 'Améliore la diversification', color: 'bg-green-500', icon: CheckCircle2 },
-  neutre: { label: 'Impact neutre', color: 'bg-yellow-500', icon: AlertTriangle },
-  degrade: { label: 'Dégrade la diversification', color: 'bg-red-500', icon: AlertTriangle },
+  ameliore: { label: 'Améliore la diversification', color: 'bg-gain', icon: CheckCircle2 },
+  neutre: { label: 'Impact neutre', color: 'bg-warning', icon: AlertTriangle },
+  degrade: { label: 'Dégrade la diversification', color: 'bg-loss', icon: AlertTriangle },
 } as const
 
 interface DiversificationRadarProps {
@@ -22,6 +16,7 @@ interface DiversificationRadarProps {
 }
 
 export default function DiversificationRadar({ audit }: DiversificationRadarProps) {
+  const { theme, color } = useNivoTheme()
   const { diversification_impact, correlation_score, portfolio_concentration } = audit
 
   if (!diversification_impact && correlation_score == null) return null
@@ -69,21 +64,38 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Radar */}
           <div>
-            <ResponsiveContainer width="100%" height={250}>
-              <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="axis" className="text-xs" />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} />
-                <Radar
-                  name="Concentration"
-                  dataKey="value"
-                  stroke="#ef4444"
-                  fill="#ef4444"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            <div className="h-[250px]">
+              <ResponsiveRadar
+                data={radarData}
+                keys={['value']}
+                indexBy="axis"
+                theme={theme}
+                maxValue={100}
+                margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
+                gridLevels={5}
+                gridShape="circular"
+                gridLabelOffset={12}
+                colors={[color('--chart-4')]}
+                fillOpacity={0.2}
+                borderWidth={2}
+                borderColor={{ from: 'color' }}
+                dotSize={6}
+                dotColor={color('--chart-4')}
+                dotBorderWidth={2}
+                dotBorderColor={color('--background')}
+                enableDotLabel={false}
+                isInteractive
+                motionConfig="gentle"
+                sliceTooltip={({ index, data }) => (
+                  <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                    <p className="text-sm font-medium">{index}</p>
+                    <p className="mt-0.5 font-mono text-sm tabular-nums text-muted-foreground">
+                      {data[0]?.value}%
+                    </p>
+                  </div>
+                )}
+              />
+            </div>
             <p className="text-xs text-center text-muted-foreground mt-1">
               Concentration actuelle par axe (%)
             </p>
@@ -100,10 +112,10 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
                     <div
                       className={`h-full rounded-full transition-all ${
                         correlationPct > 60
-                          ? 'bg-red-500'
+                          ? 'bg-loss'
                           : correlationPct > 30
-                            ? 'bg-yellow-500'
-                            : 'bg-green-500'
+                            ? 'bg-warning'
+                            : 'bg-gain'
                       }`}
                       style={{ width: `${correlationPct}%` }}
                     />
@@ -132,7 +144,7 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${
-                          item.value > 60 ? 'bg-red-400' : item.value > 30 ? 'bg-yellow-400' : 'bg-green-400'
+                          item.value > 60 ? 'bg-loss' : item.value > 30 ? 'bg-warning' : 'bg-gain'
                         }`}
                         style={{ width: `${item.value}%` }}
                       />
@@ -145,8 +157,8 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
 
             {/* Allocation Impact */}
             {audit.suggested_investment != null && impact === 'degrade' && (
-              <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
-                <p className="text-sm text-orange-700 dark:text-orange-300">
+              <div className="bg-warning dark:bg-warning/20 border border-warning dark:border-warning rounded-lg p-3">
+                <p className="text-sm text-warning dark:text-warning">
                   <AlertTriangle className="h-4 w-4 inline mr-1" />
                   L'allocation a été réduite de 5% à ~2% du capital en raison de la forte corrélation
                   avec votre portefeuille existant.

@@ -87,7 +87,7 @@ function App() {
   }, [hydrateSession])
 
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="investai-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="investai-theme-flux">
       <ErrorBoundary>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -121,6 +121,7 @@ function App() {
             <Route path="analytics" element={<Navigate to="/intelligence?tab=analytics" replace />} />
             <Route path="alerts" element={<Navigate to="/intelligence?tab=alerts" replace />} />
             <Route path="predictions" element={<Navigate to="/intelligence?tab=predictions" replace />} />
+            <Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace />} />
             <Route path="insights" element={<Navigate to="/intelligence" replace />} />
             <Route path="smart-insights" element={<Navigate to="/intelligence?tab=smart" replace />} />
             <Route path="simulations" element={<Navigate to="/strategy?tab=simulations" replace />} />

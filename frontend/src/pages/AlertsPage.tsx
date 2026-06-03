@@ -108,7 +108,7 @@ export default function AlertsPage() {
 
   useEffect(() => {
     fetchCurrentUser()
-  }, [])
+  }, [fetchCurrentUser])
 
   useEffect(() => {
     setTelegramChatId(user?.telegramChatId || '')
@@ -276,15 +276,15 @@ export default function AlertsPage() {
 
   const getConditionIcon = (conditionValue: string) => {
     if (conditionValue === 'target_break_even') {
-      return <CheckCircle className="h-4 w-4 text-green-500" />
+      return <CheckCircle className="h-4 w-4 text-gain" />
     }
     if (conditionValue === 'volatility_spike') {
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />
+      return <AlertTriangle className="h-4 w-4 text-warning" />
     }
     if (conditionValue.includes('up') || conditionValue.includes('above')) {
-      return <TrendingUp className="h-4 w-4 text-green-500" />
+      return <TrendingUp className="h-4 w-4 text-gain" />
     }
-    return <TrendingDown className="h-4 w-4 text-red-500" />
+    return <TrendingDown className="h-4 w-4 text-loss" />
   }
 
   const isAutoCondition = (condition: string) =>
@@ -302,7 +302,7 @@ export default function AlertsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Alertes</h1>
+          <h1 className="text-3xl font-serif font-medium">Alertes</h1>
           <p className="text-muted-foreground">
             Configurez des alertes sur vos actifs
           </p>
@@ -458,7 +458,7 @@ export default function AlertsPage() {
               <Bell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.total_alerts}</div>
+              <div className="text-2xl font-serif font-medium">{summary.total_alerts}</div>
               <p className="text-xs text-muted-foreground">
                 Alertes configurées
               </p>
@@ -468,10 +468,10 @@ export default function AlertsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Actives</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-gain" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-500">{summary.active_alerts}</div>
+              <div className="text-2xl font-serif font-medium text-gain">{summary.active_alerts}</div>
               <p className="text-xs text-muted-foreground">
                 Alertes en surveillance
               </p>
@@ -484,7 +484,7 @@ export default function AlertsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{summary.triggered_today}</div>
+              <div className="text-2xl font-serif font-medium text-warning">{summary.triggered_today}</div>
               <p className="text-xs text-muted-foreground">
                 Déclenchées aujourd'hui
               </p>
@@ -497,7 +497,7 @@ export default function AlertsPage() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.total_triggers}</div>
+              <div className="text-2xl font-serif font-medium">{summary.total_triggers}</div>
               <p className="text-xs text-muted-foreground">
                 Nombre total de déclenchements
               </p>
@@ -597,10 +597,11 @@ export default function AlertsPage() {
             </Table>
           ) : (
             <div className="text-center py-12">
-              <Bell className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold mt-4">Aucune alerte</h2>
-              <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                Créez votre première alerte pour être notifié des variations de prix de vos actifs.
+              <Bell className="h-16 w-16 mx-auto text-muted-foreground" strokeWidth={1.5} />
+              <h2 className="text-xl font-serif font-medium mt-4 mb-2">Reste informé sans surveiller</h2>
+              <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+                Crée une première alerte et laisse InvestAI te prévenir dès qu'un actif
+                franchit le seuil qui compte pour toi.
               </p>
               <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />

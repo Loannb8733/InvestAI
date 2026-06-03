@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Optional, Set
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +16,51 @@ from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.exchanges import get_exchange_service
+from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
+from app.services.fx_history_service import FxHistoryService
 from app.services.metrics_service import invalidate_dashboard_cache
 from app.services.price_service import PriceService
 from app.tasks.celery_app import celery_app
 
+# Earliest plausible trade date for FX seeding. Frankfurter (ECB) data starts 1999;
+# crypto exchanges predate none of our users, so 2017 covers all real history with margin.
+_FX_EARLIEST = date(2017, 1, 1)
+
 logger = logging.getLogger(__name__)
+
+
+async def _resolve_trade_fx(
+    fx_svc: Optional[FxHistoryService],
+    quote: Optional[str],
+    executed_at: datetime,
+) -> Tuple[str, Optional[Decimal]]:
+    """Resolve the (currency, conversion_rate) to store on a trade.
+
+    The cost-basis engine reads ``conversion_rate`` = EUR per 1 unit of ``currency``.
+    We only ever return a non-EUR currency when we have a *valid* historical rate for it;
+    otherwise we fall back to EUR/None (the legacy behaviour). This guarantees we never
+    mislabel a row with a foreign currency while implicitly using rate=1 — which would
+    re-introduce the exact ~8-9% error FIN-01 fixes.
+
+    Returns:
+        ("EUR", None) when the quote is EUR, unknown, crypto, or its rate is unavailable.
+        (anchor, rate) when the quote maps to a fiat with a resolvable EUR rate.
+    """
+    anchor = quote_fx_currency(quote) if quote else None
+    if anchor is None or anchor == "EUR":
+        return "EUR", None
+    if fx_svc is None:
+        logger.warning("No FX service available; storing %s trade as EUR fallback", anchor)
+        return "EUR", None
+    rate = await fx_svc.get_rate(executed_at.date(), anchor, "EUR")
+    if rate is None:
+        logger.warning(
+            "No historical FX rate for %s->EUR on %s; storing as EUR fallback",
+            anchor,
+            executed_at.date(),
+        )
+        return "EUR", None
+    return anchor, rate
 
 
 async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) -> bool:
@@ -34,6 +75,80 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
         return False
     db.add(transaction)
     return True
+
+
+# STEP 2 balance reconciliation tolerances.
+# _RECONCILE_EPSILON: anything below this is pure float noise -> ignore entirely.
+# _RECONCILE_DUST_REL: relative band (0.0001%) below which a discrepancy is treated
+# as rounding dust and the local quantity is snapped to the exchange (source of truth)
+# WITHOUT creating a phantom TRANSFER. Kept deliberately tiny so genuine small
+# deposits/withdrawals still reconcile as real transfers.
+_RECONCILE_EPSILON = 1e-8
+_RECONCILE_DUST_REL = 1e-6
+
+
+def _reconcile_balance_diff(our_quantity: float, exchange_quantity: float) -> str:
+    """Classify a balance discrepancy for STEP 2 reconciliation.
+
+    Returns:
+        "none"     -> difference is float noise, do nothing.
+        "dust"     -> rounding dust, snap local quantity to exchange, no transaction.
+        "transfer" -> real discrepancy, create a TRANSFER_IN/OUT adjustment.
+    """
+    abs_diff = abs(exchange_quantity - our_quantity)
+    if abs_diff <= _RECONCILE_EPSILON:
+        return "none"
+    dust_ceiling = max(_RECONCILE_EPSILON, abs(exchange_quantity) * _RECONCILE_DUST_REL)
+    if abs_diff <= dust_ceiling:
+        return "dust"
+    return "transfer"
+
+
+async def _heal_transaction_fx(
+    db: AsyncSession,
+    external_ids: List[str],
+    raw_price: float,
+    tx_currency: str,
+    tx_rate: Optional[Decimal],
+) -> bool:
+    """Repair an already-imported transaction's FX fields in place (FIN-01 heal).
+
+    The dedup logic normally *skips* trades that already exist, so the FIN-01 fix only
+    reaches new imports — legacy rows keep their wrong cost basis. This re-derives
+    ``(price, currency, conversion_rate)`` from authoritative exchange data and updates
+    the matching row(s) without deleting anything. It converges both legacy shapes:
+    a raw quote-currency price mislabelled as EUR, and a price pre-converted with a
+    single spot rate. Only price/currency/conversion_rate are touched; quantity, type,
+    fees, dates and notes are preserved.
+
+    Args:
+        external_ids: candidate ``external_id`` values to match (e.g. ``["fiat_123", "123"]``).
+        raw_price: the trade's price in its quote currency, as reported by the exchange.
+        tx_currency: resolved storage currency ("EUR" or a fiat anchor like "USD").
+        tx_rate: EUR-per-1-unit-of-currency rate, or None for EUR/unresolvable.
+
+    Returns:
+        True if at least one row was modified.
+    """
+    candidates = [eid for eid in external_ids if eid]
+    if not candidates:
+        return False
+    result = await db.execute(select(Transaction).where(Transaction.external_id.in_(candidates)))
+    rows = result.scalars().all()
+    changed = False
+    for row in rows:
+        if raw_price and abs(float(row.price) - raw_price) > 1e-9:
+            row.price = raw_price
+            changed = True
+        if row.currency != tx_currency:
+            row.currency = tx_currency
+            changed = True
+        old_rate = None if row.conversion_rate is None else Decimal(str(row.conversion_rate))
+        new_rate = None if tx_rate is None else Decimal(str(tx_rate))
+        if old_rate != new_rate:
+            row.conversion_rate = tx_rate
+            changed = True
+    return changed
 
 
 def _classify_and_mark_error(api_key: APIKey, exc: Exception) -> None:
@@ -186,9 +301,16 @@ async def _sync_detailed_transactions(
     service,
     portfolio: Portfolio,
     existing_assets: Dict[str, Asset],
-) -> int:
-    """Sync detailed transactions: trades, conversions, rewards."""
+    heal_fx: bool = False,
+) -> Tuple[int, int]:
+    """Sync detailed transactions: trades, conversions, rewards.
+
+    When ``heal_fx`` is True, trades that already exist are NOT skipped: their stored
+    FX fields are repaired in place via :func:`_heal_transaction_fx` (no new rows, no
+    quantity/avg-price mutation). Returns ``(synced_count, healed_count)``.
+    """
     synced_count = 0
+    healed_count = 0
     fiat_currencies = {"USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"}
 
     # Get existing transaction external_ids to avoid duplicates
@@ -199,6 +321,16 @@ async def _sync_detailed_transactions(
         )
     )
     existing_external_ids: Set[str] = {row[0] for row in existing_result.fetchall()}
+
+    # FX resolution (FIN-01): seed the USD->EUR daily series once, then resolve each
+    # trade's rate at its execution date. Seeding failure must not block the sync —
+    # _resolve_trade_fx falls back to EUR when no rate is available.
+    fx_svc: Optional[FxHistoryService] = FxHistoryService(db)
+    try:
+        await fx_svc.ensure_seeded("USD", "EUR", _FX_EARLIEST)
+    except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
+        logger.warning("FX seeding failed (%s); trades will fall back to EUR", e)
+        fx_svc = None
 
     # Helper to extract base asset from symbol like "DOGEPEPE" -> "DOGE"
     def _extract_base_asset(symbol: str) -> Optional[str]:
@@ -304,15 +436,23 @@ async def _sync_detailed_transactions(
             logger.info(f"Found {len(instant_buys)} instant buys from {service.exchange_name}")
 
             for trade in instant_buys:
-                if trade.trade_id in existing_external_ids:
-                    continue
-
-                # Extract base asset from symbol (e.g., "PAXGEUR" -> "PAXG")
+                # Extract base asset + quote from symbol (e.g., "PAXGUSD" -> base PAXG, quote USD)
                 base_asset = None
+                trade_quote = None
                 for quote in ["EUR", "USD", "GBP"]:
                     if trade.symbol.endswith(quote):
                         base_asset = trade.symbol[: -len(quote)]
+                        trade_quote = quote
                         break
+
+                # Resolve FX before the dedup check so existing rows can be healed in place.
+                price = float(trade.price) if trade.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
+
+                if trade.trade_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(db, [trade.trade_id], price, tx_currency, tx_rate):
+                        healed_count += 1
+                    continue
 
                 if not base_asset or base_asset in fiat_currencies:
                     continue
@@ -326,7 +466,6 @@ async def _sync_detailed_transactions(
                 )
 
                 qty = float(trade.quantity)
-                price = float(trade.price) if trade.price else 0
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -335,13 +474,15 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(trade.fee) if trade.fee else 0,
                     fee_currency=trade.fee_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=trade.timestamp,
                     external_id=trade.trade_id,
                     exchange=service.exchange_name,
                     notes="Instant Buy",
                 )
                 await _add_transaction_if_new(db, transaction)
+                existing_external_ids.add(trade.trade_id)
 
                 # Update asset quantity and avg price
                 old_qty = float(asset.quantity)
@@ -351,7 +492,7 @@ async def _sync_detailed_transactions(
                 asset.quantity = old_qty + qty
 
                 synced_count += 1
-                logger.info(f"Created BUY (Instant): {base_asset} qty={qty} price={price}")
+                logger.info(f"Created BUY (Instant): {base_asset} qty={qty} price={price} ({tx_currency})")
 
     except Exception as e:
         logger.warning(f"Failed to sync instant buys: {e}")
@@ -365,7 +506,14 @@ async def _sync_detailed_transactions(
             for order in fiat_orders:
                 # Use fiat_ prefix to match api_keys.py format and avoid duplicates
                 ext_id = f"fiat_{order.order_id}"
+                price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
+
                 if ext_id in existing_external_ids or order.order_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(
+                        db, [ext_id, order.order_id], price, tx_currency, tx_rate
+                    ):
+                        healed_count += 1
                     continue
 
                 base_asset = order.crypto_symbol
@@ -382,7 +530,6 @@ async def _sync_detailed_transactions(
 
                 trans_type = TransactionType.BUY if order.side == "buy" else TransactionType.SELL
                 qty = float(order.crypto_amount)
-                price = float(order.price) if order.price else 0
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -391,7 +538,8 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(order.fee) if order.fee else 0,
                     fee_currency=order.fiat_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=order.timestamp,
                     external_id=ext_id,
                     exchange=service.exchange_name,
@@ -424,7 +572,14 @@ async def _sync_detailed_transactions(
             for order in auto_invest:
                 # Use fiat_ prefix to match api_keys.py format and avoid duplicates
                 ext_id = f"fiat_{order.order_id}"
+                price = float(order.price) if order.price else 0
+                tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, order.fiat_currency, order.timestamp)
+
                 if ext_id in existing_external_ids or order.order_id in existing_external_ids:
+                    if heal_fx and await _heal_transaction_fx(
+                        db, [ext_id, order.order_id], price, tx_currency, tx_rate
+                    ):
+                        healed_count += 1
                     continue
 
                 base_asset = order.crypto_symbol
@@ -440,7 +595,6 @@ async def _sync_detailed_transactions(
                 )
 
                 qty = float(order.crypto_amount)
-                price = float(order.price) if order.price else 0
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -449,7 +603,8 @@ async def _sync_detailed_transactions(
                     price=price,
                     fee=float(order.fee) if order.fee else 0,
                     fee_currency=order.fiat_currency,
-                    currency="EUR",
+                    currency=tx_currency,
+                    conversion_rate=tx_rate,
                     executed_at=order.timestamp,
                     external_id=ext_id,
                     exchange=service.exchange_name,
@@ -476,7 +631,14 @@ async def _sync_detailed_transactions(
         logger.info(f"Found {len(trades)} trades from {service.exchange_name}")
 
         for trade in trades:
+            # Resolve FX before the dedup check so existing rows can be healed in place.
+            price = float(trade.price) if trade.price else 0
+            _, trade_quote = split_pair(trade.symbol)
+            tx_currency, tx_rate = await _resolve_trade_fx(fx_svc, trade_quote, trade.timestamp)
+
             if trade.trade_id in existing_external_ids:
+                if heal_fx and await _heal_transaction_fx(db, [trade.trade_id], price, tx_currency, tx_rate):
+                    healed_count += 1
                 continue
 
             # Extract base asset from symbol (e.g., "BTCEUR" -> "BTC")
@@ -509,7 +671,6 @@ async def _sync_detailed_transactions(
 
             trans_type = TransactionType.BUY if trade.side == "buy" else TransactionType.SELL
             qty = float(trade.quantity)
-            price = float(trade.price) if trade.price else 0
 
             transaction = Transaction(
                 asset_id=asset.id,
@@ -518,7 +679,8 @@ async def _sync_detailed_transactions(
                 price=price,
                 fee=float(trade.fee) if trade.fee else 0,
                 fee_currency=trade.fee_currency,
-                currency="EUR",
+                currency=tx_currency,
+                conversion_rate=tx_rate,
                 executed_at=trade.timestamp,
                 external_id=trade.trade_id,
                 exchange=service.exchange_name,
@@ -658,11 +820,17 @@ async def _sync_detailed_transactions(
     except Exception as e:
         logger.warning(f"Failed to sync deposits: {e}")
 
-    return synced_count
+    return synced_count, healed_count
 
 
-async def _sync_single_exchange(api_key_id: str) -> dict:
-    """Sync a single exchange account (async implementation)."""
+async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
+    """Sync a single exchange account (async implementation).
+
+    When ``heal_fx`` is True, this runs in repair mode: it re-fetches the trade history
+    and corrects the stored FX fields (price/currency/conversion_rate) of already-imported
+    transactions in place (FIN-01), without creating new rows or running the balance
+    reconciliation step. Used by the "Recalculer les taux FX" action.
+    """
     async with AsyncSessionLocal() as db:
         # Get API key
         result = await db.execute(select(APIKey).where(APIKey.id == api_key_id))
@@ -742,8 +910,20 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     existing_assets[a.symbol] = a
 
             # === STEP 1: Sync detailed transactions (trades, conversions, rewards) ===
-            detailed_synced = await _sync_detailed_transactions(db, service, portfolio, existing_assets)
+            detailed_synced, healed = await _sync_detailed_transactions(
+                db, service, portfolio, existing_assets, heal_fx=heal_fx
+            )
             logger.info(f"Synced {detailed_synced} detailed transactions from {service.exchange_name}")
+
+            # Repair mode stops here: we only corrected FX fields on existing rows and must
+            # NOT run the balance reconciliation (which would create adjustment transactions).
+            if heal_fx:
+                logger.info(f"FX heal: corrected {healed} transactions for {service.exchange_name}")
+                api_key.last_sync_at = datetime.now(timezone.utc)
+                api_key.mark_success()
+                await db.commit()
+                invalidate_dashboard_cache(str(api_key.user_id))
+                return {"success": True, "synced": healed, "healed": healed}
 
             # Refresh existing_assets after detailed sync (new assets may have been created)
             assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
@@ -759,41 +939,55 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
             synced_count = detailed_synced
             fiat_currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]
 
+            # Aggregate balances by normalized base symbol so Binance Earn
+            # variants (LDUSDC, ADAU, ...) fold into their base asset (USDC,
+            # ADA) instead of being dropped. Funds parked in Earn would
+            # otherwise never reach the base asset quantity, making them vanish
+            # from the portfolio (e.g. a Stablecoins card stuck at 0).
+            aggregated_balances: Dict[str, float] = {}
             for balance in balances:
-                # Skip fiat currencies only
                 if balance.symbol in fiat_currencies:
                     continue
-
-                # Skip Binance Earn variants (ADAU, SUIU, etc.) - they're tracked under base asset
-                if _is_earn_variant(balance.symbol):
-                    logger.debug(f"Skipping earn variant: {balance.symbol}")
+                normalized = _normalize_earn_variant(balance.symbol) or balance.symbol
+                if normalized in fiat_currencies:
                     continue
+                aggregated_balances[normalized] = aggregated_balances.get(normalized, 0.0) + float(balance.total)
 
-                if balance.symbol in existing_assets:
+            for symbol, exchange_quantity in aggregated_balances.items():
+                if symbol in existing_assets:
                     # Adjust for any remaining discrepancy (deposits/withdrawals not captured by trades)
-                    asset = existing_assets[balance.symbol]
+                    asset = existing_assets[symbol]
 
                     # Skip assets transferred to cold wallets (exchange != this exchange)
                     if asset.exchange and asset.exchange != service.exchange_name:
                         continue
 
                     our_quantity = float(asset.quantity)
-                    exchange_quantity = float(balance.total)
 
-                    # Only adjust if there's a significant discrepancy
-                    if abs(exchange_quantity - our_quantity) > 0.00000001:
+                    decision = _reconcile_balance_diff(our_quantity, exchange_quantity)
+
+                    if decision == "dust":
+                        # Rounding dust: align to the exchange (source of truth) but do
+                        # NOT create a phantom TRANSFER for sub-0.0001% float noise.
+                        logger.debug(
+                            f"Balance dust snap for {symbol}: "
+                            f"our={our_quantity:.10f} exchange={exchange_quantity:.10f} "
+                            f"diff={exchange_quantity - our_quantity:+.10f}"
+                        )
+                        asset.quantity = exchange_quantity
+                    elif decision == "transfer":
                         diff = exchange_quantity - our_quantity
                         trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
                         logger.info(
-                            f"Balance adjustment for {balance.symbol}: "
+                            f"Balance adjustment for {symbol}: "
                             f"our={our_quantity:.8f} exchange={exchange_quantity:.8f} diff={diff:+.8f}"
                         )
 
                         # Get current market price for TRANSFER_IN
                         current_price = 0.0
                         if trans_type == TransactionType.TRANSFER_IN:
-                            current_price = await _get_current_price(balance.symbol)
+                            current_price = await _get_current_price(symbol)
 
                         sync_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
@@ -803,7 +997,7 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
-                            external_id=f"{service.exchange_name}_sync_{balance.symbol}_{sync_ts}",
+                            external_id=f"{service.exchange_name}_sync_{symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
                         await _add_transaction_if_new(db, transaction)
@@ -820,21 +1014,22 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         synced_count += 1
                 else:
                     # Get current market price for the new asset
-                    current_price = await _get_current_price(balance.symbol)
+                    current_price = await _get_current_price(symbol)
 
                     # Create new asset with current price as avg_buy_price
                     asset = Asset(
                         portfolio_id=portfolio.id,
-                        symbol=balance.symbol,
-                        name=balance.symbol,
+                        symbol=symbol,
+                        name=symbol,
                         asset_type=AssetType.CRYPTO,
-                        quantity=float(balance.total),
+                        quantity=exchange_quantity,
                         avg_buy_price=current_price,
                         currency="EUR",
                         exchange=service.exchange_name,
                     )
                     db.add(asset)
                     await db.flush()
+                    existing_assets[symbol] = asset
 
                     # Pre-cache historical data for new asset
                     try:
@@ -845,16 +1040,16 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                         pass
 
                     # Create initial transfer transaction with market price
-                    if float(balance.total) > 0:
+                    if exchange_quantity > 0:
                         init_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=TransactionType.TRANSFER_IN,
-                            quantity=float(balance.total),
+                            quantity=exchange_quantity,
                             price=current_price,
                             fee=0,
                             currency="EUR",
-                            external_id=f"{service.exchange_name}_init_{balance.symbol}_{init_ts}",
+                            external_id=f"{service.exchange_name}_init_{symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
                         await _add_transaction_if_new(db, transaction)
@@ -862,7 +1057,9 @@ async def _sync_single_exchange(api_key_id: str) -> dict:
                     synced_count += 1
 
             # === STEP 3: Zero out assets no longer on Binance (fully sold/converted) ===
-            balance_symbols = {b.symbol for b in balances}
+            # Use normalized symbols so an asset whose only on-exchange balance
+            # is an Earn variant (e.g. USDC held as LDUSDC) is NOT wrongly zeroed.
+            balance_symbols = set(aggregated_balances.keys())
             for symbol, asset in existing_assets.items():
                 if (
                     asset.exchange == service.exchange_name

@@ -75,6 +75,11 @@ class BinanceService(BaseExchangeService):
         await self._throttle()
         return await client.get(url, **kwargs)
 
+    async def _api_post(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+        """Throttled POST request."""
+        await self._throttle()
+        return await client.post(url, **kwargs)
+
     async def _sync_server_time(self) -> None:
         """Synchronize with Binance server time to avoid timestamp errors."""
         try:
@@ -202,6 +207,43 @@ class BinanceService(BaseExchangeService):
         except Exception as e:
             logger.warning(f"Failed to fetch/apply earn positions, using spot balances only: {e}")
 
+        # Enrich with Funding wallet balances (Binance Convert results land here,
+        # not in the Spot wallet — without this they look like "missing" holdings
+        # and trigger phantom balance-reconciliation transfers).
+        try:
+            funding_balances = await self._get_funding_positions()
+            if funding_balances:
+                balance_map = {b.symbol: b for b in balances}
+                for symbol, amount in funding_balances.items():
+                    if amount <= 0:
+                        continue
+                    # Track for trade-history discovery too
+                    self._all_account_symbols.add(symbol)
+                    if symbol in balance_map:
+                        existing = balance_map[symbol]
+                        new_total = existing.total + amount
+                        logger.info(
+                            f"Funding wallet {symbol}: adding {float(amount):.8f} "
+                            f"to spot {float(existing.total):.8f} → {float(new_total):.8f}"
+                        )
+                        balance_map[symbol] = ExchangeBalance(
+                            symbol=symbol,
+                            free=existing.free + amount,
+                            locked=existing.locked,
+                            total=new_total,
+                        )
+                    else:
+                        logger.info(f"Funding wallet {symbol}: {float(amount):.8f} (not in spot)")
+                        balance_map[symbol] = ExchangeBalance(
+                            symbol=symbol,
+                            free=amount,
+                            locked=Decimal("0"),
+                            total=amount,
+                        )
+                balances = list(balance_map.values())
+        except Exception as e:
+            logger.warning(f"Failed to fetch/apply funding positions, using spot/earn balances only: {e}")
+
         return balances
 
     async def _get_earn_positions(self) -> dict[str, Decimal]:
@@ -251,6 +293,50 @@ class BinanceService(BaseExchangeService):
         if earn_totals:
             logger.info(f"Earn positions found: {dict((k, float(v)) for k, v in earn_totals.items())}")
         return earn_totals
+
+    async def _get_funding_positions(self) -> dict[str, Decimal]:
+        """Fetch Binance Funding wallet balances.
+
+        Binance Convert results (and some transfers) land in the Funding wallet,
+        which is separate from the Spot wallet read by /api/v3/account. Returns
+        dict of {symbol: total_amount} where total = free + locked + freeze +
+        withdrawing. Uses POST /sapi/v1/asset/get-funding-asset.
+        """
+        funding_totals: dict[str, Decimal] = {}
+
+        # Note: server time already synced by get_balances() caller
+        async with self._get_http_client(timeout=30.0) as client:
+            try:
+                params = self._sign_request({})
+                response = await self._api_post(
+                    client,
+                    f"{self.BASE_URL}/sapi/v1/asset/get-funding-asset",
+                    params=params,
+                    headers=self._get_headers(),
+                )
+                if response.status_code != 200:
+                    logger.warning(f"Funding wallet: HTTP {response.status_code} — {response.text}")
+                    return funding_totals
+                data = response.json()
+                for row in data or []:
+                    asset = row.get("asset", "")
+                    if not asset:
+                        continue
+                    total = (
+                        Decimal(str(row.get("free", "0")))
+                        + Decimal(str(row.get("locked", "0")))
+                        + Decimal(str(row.get("freeze", "0")))
+                        + Decimal(str(row.get("withdrawing", "0")))
+                    )
+                    if total > 0:
+                        funding_totals[asset] = funding_totals.get(asset, Decimal("0")) + total
+                        logger.debug(f"Funding wallet: {asset} total={total}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch funding wallet: {e}")
+
+        if funding_totals:
+            logger.info(f"Funding wallet positions found: {dict((k, float(v)) for k, v in funding_totals.items())}")
+        return funding_totals
 
     async def _get_all_account_symbols(self) -> set:
         """Get ALL symbols from the account (including 0 balance).

@@ -281,13 +281,13 @@ export default function ImportCSVForm({
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-4">
             {importResult.success_count > 0 && (
-              <div className="flex items-center gap-2 text-green-500">
+              <div className="flex items-center gap-2 text-gain">
                 <CheckCircle className="h-5 w-5" />
                 <span>{importResult.success_count} importées</span>
               </div>
             )}
             {importResult.error_count > 0 && (
-              <div className="flex items-center gap-2 text-red-500">
+              <div className="flex items-center gap-2 text-loss">
                 <XCircle className="h-5 w-5" />
                 <span>{importResult.error_count} erreurs</span>
               </div>
@@ -299,7 +299,7 @@ export default function ImportCSVForm({
               <p className="text-sm font-medium text-muted-foreground">Erreurs :</p>
               <div className="max-h-32 overflow-y-auto text-xs space-y-1">
                 {importResult.errors.map((error, index) => (
-                  <p key={index} className="text-red-500">
+                  <p key={index} className="text-loss">
                     {error}
                   </p>
                 ))}

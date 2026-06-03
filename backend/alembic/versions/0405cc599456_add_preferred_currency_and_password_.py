@@ -8,6 +8,7 @@ Create Date: 2026-02-01 14:21:05.758282
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -30,9 +31,7 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.add_column(
-        "users", sa.Column("password_reset_token", sa.String(length=100), nullable=True)
-    )
+    op.add_column("users", sa.Column("password_reset_token", sa.String(length=100), nullable=True))
     op.add_column(
         "users",
         sa.Column("password_reset_expires", sa.String(length=30), nullable=True),

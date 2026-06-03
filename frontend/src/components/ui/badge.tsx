@@ -2,7 +2,8 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
-const badgeVariants = cva(
+// eslint-disable-next-line react-refresh/only-export-components -- cva() variants co-located with component (shadcn convention); HMR-only warning
+export const badgeVariants = cva(
   'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
@@ -13,6 +14,10 @@ const badgeVariants = cva(
           'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive:
           'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
+        accent: 'border-transparent bg-accent text-accent-foreground hover:bg-accent/80',
+        gain: 'border-gain/30 bg-gain/10 text-gain',
+        loss: 'border-loss/30 bg-loss/10 text-loss',
+        warning: 'border-warning/30 bg-warning/10 text-warning',
         outline: 'text-foreground',
       },
     },
@@ -26,10 +31,8 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+export function Badge({ className, variant, ...props }: BadgeProps) {
   return (
     <div className={cn(badgeVariants({ variant }), className)} {...props} />
   )
 }
-
-export { Badge, badgeVariants }

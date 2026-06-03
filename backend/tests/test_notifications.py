@@ -34,7 +34,7 @@ async def test_list_notifications(client: AsyncClient, regular_user: User, db_se
     await _create_notification(db_session, regular_user.id, "Alert 1")
     await _create_notification(db_session, regular_user.id, "Alert 2")
 
-    response = await client.get("/api/v1/notifications/", headers=headers)
+    response = await client.get("/api/v1/notifications", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
@@ -51,7 +51,7 @@ async def test_list_unread_only(client: AsyncClient, regular_user: User, db_sess
     n2.is_read = True
     await db_session.commit()
 
-    response = await client.get("/api/v1/notifications/?unread_only=true", headers=headers)
+    response = await client.get("/api/v1/notifications?unread_only=true", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -124,5 +124,5 @@ async def test_mark_nonexistent_notification(client: AsyncClient, regular_user: 
 @pytest.mark.asyncio
 async def test_notifications_no_auth(client: AsyncClient):
     """Test accessing notifications without auth."""
-    response = await client.get("/api/v1/notifications/")
+    response = await client.get("/api/v1/notifications")
     assert response.status_code in (401, 403)
