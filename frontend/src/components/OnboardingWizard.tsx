@@ -17,6 +17,7 @@ import {
 const storageKey = (userId?: string) =>
   userId ? `investai-onboarding-done-${userId}` : 'investai-onboarding-done'
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its wizard; HMR-only warning
 export function useOnboarding(userId?: string) {
   const key = storageKey(userId)
   const done = localStorage.getItem(key) === 'true'

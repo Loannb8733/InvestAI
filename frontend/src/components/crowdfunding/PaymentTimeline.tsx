@@ -65,7 +65,7 @@ export default function PaymentTimeline({ project }: PaymentTimelineProps) {
   const [optimisticPaid, setOptimisticPaid] = useState<Set<string>>(new Set())
   const [showPaid, setShowPaid] = useState(false)
 
-  const schedule = project.schedule ?? []
+  const schedule = useMemo(() => project.schedule ?? [], [project.schedule])
 
   const markPaidMutation = useMutation({
     mutationFn: async ({ entry, paymentDate, amount }: { entry: PaymentScheduleEntry; paymentDate: string; amount: number }) => {
