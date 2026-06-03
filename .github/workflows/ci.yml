@@ -93,7 +93,7 @@ jobs:
       POSTGRES_DB: investai_test
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      SECRET_KEY: test-secret-key-for-ci-only
+      SECRET_KEY: test-secret-key-for-ci-only-0123456789
       FERNET_KEY: dGVzdC1mZXJuZXQta2V5LWZvci1jaS0xMjM0NTY3OA==
       APP_ENV: testing
       DEBUG: "false"
