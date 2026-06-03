@@ -493,10 +493,10 @@ def _run_alembic_upgrade():
     stamp it at the last schema migration so only data-fix migrations run.
     """
     try:
-        from alembic import command
-        from alembic.config import Config
         from sqlalchemy import create_engine, inspect, text
 
+        from alembic import command
+        from alembic.config import Config
         from app.core.config import settings
 
         alembic_cfg = Config("alembic.ini")
