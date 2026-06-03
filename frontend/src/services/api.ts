@@ -666,6 +666,11 @@ export const apiKeysApi = {
     return response.data as { task_id: string; status: string; message: string }
   },
 
+  refreshFx: async (id: string) => {
+    const response = await api.post(`/api-keys/${id}/refresh-fx`)
+    return response.data as { task_id: string; status: string; message: string }
+  },
+
   getImportStatus: async (taskId: string) => {
     const response = await api.get(`/api-keys/import-status/${taskId}`)
     return response.data as {

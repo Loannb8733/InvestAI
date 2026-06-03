@@ -153,6 +153,7 @@ export default function ExchangesPage() {
   const [testingId, setTestingId] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [importingId, setImportingId] = useState<string | null>(null)
+  const [refreshingFxId, setRefreshingFxId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<APIKey | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -281,7 +282,45 @@ export default function ExchangesPage() {
     },
   })
 
-  const pollImportStatus = (taskId: string) => {
+  // Recompute historical FX on already-imported transactions (FIN-01 heal) — async + polling
+  const refreshFxMutation = useMutation({
+    mutationFn: apiKeysApi.refreshFx,
+    onSuccess: (result: { task_id: string; status: string }) => {
+      toast({
+        title: 'Recalcul lancé',
+        description: 'Les taux de change historiques sont recalculés en arrière-plan.',
+      })
+      pollImportStatus(result.task_id, {
+        onClear: () => setRefreshingFxId(null),
+        successTitle: 'Recalcul terminé',
+        errorTitle: 'Erreur de recalcul',
+        describe: (n) =>
+          n > 0 ? `${n} transaction(s) corrigée(s)` : 'Aucune correction nécessaire',
+      })
+    },
+    onError: (error: unknown) => {
+      const axiosError = error as import('axios').AxiosError<{ detail?: string }>
+      toast({
+        variant: 'destructive',
+        title: 'Erreur de recalcul',
+        description: axiosError.response?.data?.detail || 'Impossible de lancer le recalcul.',
+      })
+      setRefreshingFxId(null)
+    },
+  })
+
+  // Polls a background task (import OR FX recalculation). `opts` lets the FX-recalc flow
+  // reuse the exact same polling/cleanup with its own spinner and success wording.
+  const pollImportStatus = (
+    taskId: string,
+    opts?: {
+      onClear?: () => void
+      successTitle?: string
+      describe?: (synced: number) => string
+      errorTitle?: string
+    },
+  ) => {
+    const clear = opts?.onClear ?? (() => setImportingId(null))
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
 
@@ -291,37 +330,39 @@ export default function ExchangesPage() {
 
         if (status.status === 'completed') {
           clearInterval(interval)
-          setImportingId(null)
+          clear()
 
           queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
           invalidateAllFinancialData(queryClient)
 
           const synced = status.synced ?? 0
           toast({
-            title: 'Import réussi',
-            description: synced > 0
-              ? `${synced} transaction(s) synchronisée(s)`
-              : 'Aucune nouvelle transaction',
+            title: opts?.successTitle ?? 'Import réussi',
+            description: opts?.describe
+              ? opts.describe(synced)
+              : synced > 0
+                ? `${synced} transaction(s) synchronisée(s)`
+                : 'Aucune nouvelle transaction',
           })
         } else if (status.status === 'failed') {
           clearInterval(interval)
-          setImportingId(null)
+          clear()
 
           toast({
             variant: 'destructive',
-            title: 'Erreur d\'import',
-            description: status.error || 'L\'import a échoué.',
+            title: opts?.errorTitle ?? 'Erreur d\'import',
+            description: status.error || 'L\'opération a échoué.',
           })
         }
         // else: still pending/progress — continue polling
       } catch {
         clearInterval(interval)
-        setImportingId(null)
+        clear()
 
         toast({
           variant: 'destructive',
           title: 'Erreur',
-          description: 'Impossible de vérifier le statut de l\'import.',
+          description: 'Impossible de vérifier le statut de l\'opération.',
         })
       }
     }, 5000) // Poll every 5 seconds
@@ -332,7 +373,7 @@ export default function ExchangesPage() {
     pollTimeoutRef.current = setTimeout(() => {
       clearInterval(interval)
       pollIntervalRef.current = null
-      setImportingId(null)
+      clear()
     }, 600000)
   }
 
@@ -527,6 +568,26 @@ export default function ExchangesPage() {
                       <span className="text-xs">Suppr.</span>
                     </Button>
                   </div>
+
+                  {/* Maintenance: recompute historical FX on already-imported transactions */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full gap-2 text-xs text-muted-foreground"
+                    title="Recalcule le taux de change historique (USD→EUR) du coût de revient sur vos transactions déjà importées, sans rien supprimer."
+                    onClick={() => {
+                      setRefreshingFxId(apiKey.id)
+                      refreshFxMutation.mutate(apiKey.id)
+                    }}
+                    disabled={refreshingFxId === apiKey.id}
+                  >
+                    {refreshingFxId === apiKey.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Coins className="h-4 w-4" />
+                    )}
+                    Recalculer les taux de change
+                  </Button>
                 </CardContent>
               </Card>
             )
