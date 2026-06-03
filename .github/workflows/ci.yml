@@ -66,7 +66,8 @@ jobs:
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: investai_test
+          # Base DB name; conftest derives the test DB as "<name>_test".
+          POSTGRES_DB: investai
         ports:
           - 5432:5432
         options: >-
@@ -90,7 +91,7 @@ jobs:
       POSTGRES_PORT: 5432
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
-      POSTGRES_DB: investai_test
+      POSTGRES_DB: investai
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       SECRET_KEY: test-secret-key-for-ci-only-0123456789
@@ -111,7 +112,14 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev
+          sudo apt-get install -y libpq-dev postgresql-client
+
+      - name: Create test database
+        env:
+          PGPASSWORD: test
+        run: |
+          # conftest connects to "<POSTGRES_DB>_test"; create it once here.
+          psql -h localhost -U test -d investai -c "CREATE DATABASE investai_test;"
 
       - name: Install Python dependencies
         run: |

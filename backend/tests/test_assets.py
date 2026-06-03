@@ -10,7 +10,7 @@ from app.models.user import User
 async def _create_portfolio(client: AsyncClient, token: str) -> str:
     """Helper to create a portfolio and return its ID."""
     resp = await client.post(
-        "/api/v1/portfolios/",
+        "/api/v1/portfolios",
         json={"name": "Test Portfolio"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -26,7 +26,7 @@ async def test_create_asset(client: AsyncClient, regular_user: User):
     portfolio_id = await _create_portfolio(client, token)
 
     response = await client.post(
-        "/api/v1/assets/",
+        "/api/v1/assets",
         json={
             "portfolio_id": portfolio_id,
             "symbol": "BTC",
@@ -60,8 +60,8 @@ async def test_create_duplicate_asset(client: AsyncClient, regular_user: User):
         "avg_buy_price": "3000",
     }
 
-    await client.post("/api/v1/assets/", json=asset_data, headers=headers)
-    response = await client.post("/api/v1/assets/", json=asset_data, headers=headers)
+    await client.post("/api/v1/assets", json=asset_data, headers=headers)
+    response = await client.post("/api/v1/assets", json=asset_data, headers=headers)
     assert response.status_code == 400
 
 
@@ -74,7 +74,7 @@ async def test_list_assets(client: AsyncClient, regular_user: User):
 
     # Create asset
     await client.post(
-        "/api/v1/assets/",
+        "/api/v1/assets",
         json={
             "portfolio_id": portfolio_id,
             "symbol": "AAPL",
@@ -85,7 +85,7 @@ async def test_list_assets(client: AsyncClient, regular_user: User):
         headers=headers,
     )
 
-    response = await client.get("/api/v1/assets/", headers=headers)
+    response = await client.get("/api/v1/assets", headers=headers)
     assert response.status_code == 200
     assert len(response.json()) >= 1
 
@@ -97,7 +97,7 @@ async def test_list_assets_filtered_by_portfolio(client: AsyncClient, regular_us
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
-    response = await client.get(f"/api/v1/assets/?portfolio_id={portfolio_id}", headers=headers)
+    response = await client.get(f"/api/v1/assets?portfolio_id={portfolio_id}", headers=headers)
     assert response.status_code == 200
 
 
@@ -109,7 +109,7 @@ async def test_update_asset(client: AsyncClient, regular_user: User):
     portfolio_id = await _create_portfolio(client, token)
 
     create_resp = await client.post(
-        "/api/v1/assets/",
+        "/api/v1/assets",
         json={
             "portfolio_id": portfolio_id,
             "symbol": "SOL",
@@ -138,7 +138,7 @@ async def test_delete_asset(client: AsyncClient, regular_user: User):
     portfolio_id = await _create_portfolio(client, token)
 
     create_resp = await client.post(
-        "/api/v1/assets/",
+        "/api/v1/assets",
         json={
             "portfolio_id": portfolio_id,
             "symbol": "XRP",

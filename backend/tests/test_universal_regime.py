@@ -1,8 +1,8 @@
 """Stress-test multi-cycle : Flash Crash, Slow Bleed, Moon Mission.
 
 Scénario A (Flash Crash) : VaR explose, ordres Alpha bloqués.
-Scénario B (Slow Bleed / Bear) : Or privilégié, DCA réduit.
-Scénario C (Moon Mission / Bull) : Positions plus larges, traque le sommet.
+Scénario B (Slow Bleed / Bear) : Or privilégié, DCA renforcé (accumulation contrarian).
+Scénario C (Moon Mission / Bull) : Positions réduites (prise de profits), traque le sommet.
 Point 5 : total_value invariant quel que soit le régime.
 """
 
@@ -76,10 +76,15 @@ class TestFlashCrash:
         ), f"Post-crash should be bearish/bottom, got {result.dominant_regime}"
 
     def test_regime_config_blocks_aggressive_alpha(self):
-        """In crash regime, alpha_threshold should be high (85) = fewer actions."""
+        """In crash regime, alpha_threshold should be high (85) = fewer actions.
+
+        The high alpha bar is what gates new positions; the risk_multiplier is
+        deliberately *high* (contrarian accumulation), so selectivity comes from
+        the threshold, not from shrinking DCA tranches.
+        """
         cfg = RegimeConfig.from_regime("bearish", confidence=0.8)
         assert cfg.alpha_threshold >= 80, f"Bear alpha threshold should be >= 80, got {cfg.alpha_threshold}"
-        assert cfg.risk_multiplier <= 0.6, f"Bear risk_multiplier should be <= 0.6, got {cfg.risk_multiplier}"
+        assert cfg.risk_multiplier >= 1.0, f"Bear risk_multiplier should accumulate (>= 1.0), got {cfg.risk_multiplier}"
 
     def test_achat_fort_blocked_in_bear_without_divergence(self):
         """ACHAT FORT should be downgraded to DCA in bear without RSI divergence."""
@@ -95,7 +100,7 @@ class TestFlashCrash:
 
 
 class TestSlowBleedBear:
-    """Gold should be privileged and DCA reduced in bear market."""
+    """Gold should be privileged and DCA reinforced in bear market (contrarian accumulation)."""
 
     def test_regime_detects_bear(self):
         prices = _slow_bleed_prices(120)
@@ -110,18 +115,18 @@ class TestSlowBleedBear:
         cfg = RegimeConfig.from_regime("bearish")
         assert cfg.gold_relevance == "high"
 
-    def test_dca_reduced_in_bear(self):
-        """risk_multiplier = 0.5 → DCA halved vs normal."""
+    def test_dca_increased_in_bear(self):
+        """Contrarian sizing: bear risk_multiplier (1.5) > bull (0.8) → accumulate the dip."""
         cfg_bear = RegimeConfig.from_regime("bearish")
-        cfg_normal = RegimeConfig.from_regime("bullish")
-        # Bear DCA = portfolio * 0.02-0.05 * 0.5 = 1-2.5%
-        # Bull DCA = portfolio * 0.02-0.05 * 1.5 = 3-7.5%
+        cfg_bull = RegimeConfig.from_regime("bullish")
+        # Bear DCA = portfolio * 0.02-0.05 * 1.5 (accumulate harder)
+        # Bull DCA = portfolio * 0.02-0.05 * 0.8 (take profits)
         portfolio = 1000.0
         bear_low = portfolio * 0.02 * cfg_bear.risk_multiplier
-        bull_low = portfolio * 0.02 * cfg_normal.risk_multiplier
-        assert bear_low < bull_low, f"Bear DCA should be less than Bull: {bear_low:.2f} vs {bull_low:.2f}"
-        # Verify 3:1 ratio
-        assert bull_low / bear_low == pytest.approx(3.0, rel=0.01)
+        bull_low = portfolio * 0.02 * cfg_bull.risk_multiplier
+        assert bear_low > bull_low, f"Bear DCA should exceed Bull: {bear_low:.2f} vs {bull_low:.2f}"
+        # Verify 1.5 : 0.8 ratio (≈1.875)
+        assert bear_low / bull_low == pytest.approx(1.5 / 0.8, rel=0.01)
 
     def test_vol_regime_stress_in_bear(self):
         cfg = RegimeConfig.from_regime("bearish")
@@ -138,7 +143,7 @@ class TestSlowBleedBear:
 
 
 class TestMoonMissionBull:
-    """System should allow larger positions and track the top."""
+    """System should reduce position sizing (take profits) and track the top."""
 
     def test_regime_detects_bull(self):
         prices = _moon_mission_prices(120)
@@ -149,20 +154,21 @@ class TestMoonMissionBull:
             "top",
         ), f"Moon mission should be bullish or top, got {result.dominant_regime}"
 
-    def test_risk_multiplier_high_in_bull(self):
+    def test_risk_multiplier_low_in_bull(self):
+        """Contrarian sizing: bull takes profits → risk_multiplier reduced (0.8)."""
         cfg = RegimeConfig.from_regime("bullish")
-        assert cfg.risk_multiplier >= 1.5
+        assert cfg.risk_multiplier <= 1.0
         assert cfg.gold_relevance == "low"
 
-    def test_larger_positions_in_bull(self):
-        """Bull DCA is 1.5× normal → larger tranches."""
+    def test_smaller_positions_in_bull(self):
+        """Bull DCA is 0.8× → smaller tranches (taking profits, not chasing)."""
         cfg = RegimeConfig.from_regime("markup")
         portfolio = 860.0
         bull_low = round(portfolio * 0.02 * cfg.risk_multiplier, 2)
         bull_high = round(portfolio * 0.05 * cfg.risk_multiplier, 2)
-        # 860€ * 2% * 1.5 = 25.80€, 860€ * 5% * 1.5 = 64.50€
-        assert bull_low == pytest.approx(25.80, abs=0.01)
-        assert bull_high == pytest.approx(64.50, abs=0.01)
+        # 860€ * 2% * 0.8 = 13.76€, 860€ * 5% * 0.8 = 34.40€
+        assert bull_low == pytest.approx(13.76, abs=0.01)
+        assert bull_high == pytest.approx(34.40, abs=0.01)
 
     def test_trailing_stop_in_markup(self):
         """Strategy rows in markup should suggest trailing stop."""
