@@ -1336,10 +1336,10 @@ async def import_trade_history(
         # so assets moved to cold wallets (e.g. Tangem) appear on destination.
         # This runs AFTER avg_buy_price is calculated so the cost basis propagates.
         if withdrawals_imported > 0:
-            from app.services.transfer_service import create_mirror_transfer_in
+            from app.services.transfer_service import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 
             # Default destination for crypto withdrawals (cold wallet)
-            cold_wallet_destination = "Tangem"
+            cold_wallet_destination = COLD_WALLET_DESTINATION
 
             withdrawal_asset_ids = [a.id for a in existing_assets.values()]
             if withdrawal_asset_ids:

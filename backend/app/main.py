@@ -272,8 +272,8 @@ def _create_missing_transfer_mirrors():
         from sqlalchemy import create_engine, text
 
         from app.core.config import settings
+        from app.services.transfer_service import COLD_WALLET_DESTINATION as DEFAULT_DESTINATION
 
-        DEFAULT_DESTINATION = "Tangem"
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)
         with sync_engine.begin() as conn:
             # Ensure related_transaction_id column exists (may be missing if
@@ -812,7 +812,8 @@ async def admin_fix_mirrors(
     admin_logger = get_logger("admin.fix_mirrors")
     admin_logger.info("fix-mirrors triggered by user_id=%s", current_user.id)
 
-    DEFAULT_DESTINATION = "Tangem"
+    from app.services.transfer_service import COLD_WALLET_DESTINATION as DEFAULT_DESTINATION
+
     log = ["version=pr51-broken-refs"]
     try:
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)

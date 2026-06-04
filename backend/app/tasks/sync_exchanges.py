@@ -1217,11 +1217,15 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         f"Asset {symbol} no longer on {service.exchange_name} (balance=0), zeroing quantity from {asset.quantity}"
                     )
                     sync_ts = int(datetime.now(timezone.utc).timestamp())
+                    # Price the zeroing TRANSFER_OUT at cost (avg_buy_price) rather
+                    # than 0, so it reads as a neutral transfer-at-cost instead of a
+                    # giveaway — keeps cost-basis/realized-P&L coherent. Genuine
+                    # withdrawals are already captured upstream (section 8).
                     transaction = Transaction(
                         asset_id=asset.id,
                         transaction_type=TransactionType.TRANSFER_OUT,
                         quantity=float(asset.quantity),
-                        price=0,
+                        price=float(asset.avg_buy_price or 0),
                         fee=0,
                         currency="EUR",
                         external_id=f"{service.exchange_name}_zero_{symbol}_{sync_ts}",
