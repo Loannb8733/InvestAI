@@ -683,6 +683,31 @@ export const apiKeysApi = {
   },
 }
 
+export interface ColdWallet {
+  id: string
+  address: string
+  label: string
+  created_at: string
+}
+
+// Cold wallets API — name your withdrawal destination addresses so the sync
+// routes each withdrawal to the right cold wallet (Tangem, Ledger, …).
+export const coldWalletsApi = {
+  list: async (): Promise<ColdWallet[]> => {
+    const response = await api.get('/cold-wallets')
+    return response.data
+  },
+
+  upsert: async (data: { address: string; label: string }): Promise<ColdWallet> => {
+    const response = await api.post('/cold-wallets', data)
+    return response.data
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/cold-wallets/${id}`)
+  },
+}
+
 // Predictions API
 export const predictionsApi = {
   getAssetPrediction: async (symbol: string, assetType: string = 'crypto', days: number = 7) => {
