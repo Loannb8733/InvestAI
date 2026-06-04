@@ -74,8 +74,13 @@ class ReconciliationService:
         return len(new_entries)
 
     def _get_net_multiplier(self, project: CrowdfundingProject) -> Decimal:
-        """Return (1 - tax_rate/100) to convert gross interest to net."""
-        tax_rate = Decimal(str(project.tax_rate)) if project.tax_rate else Decimal("30")
+        """Return (1 - tax_rate/100) to convert gross interest to net.
+
+        Default to 30% (French flat tax) only when tax_rate is unset. A tax_rate
+        of 0 is a valid value (e.g. tax-free wrappers) and must stay 0 — the old
+        ``if project.tax_rate`` truthiness check wrongly taxed 0% projects at 30%.
+        """
+        tax_rate = Decimal(str(project.tax_rate)) if project.tax_rate is not None else Decimal("30")
         return Decimal("1") - tax_rate / Decimal("100")
 
     def _generate_in_fine(self, project: CrowdfundingProject) -> list[CrowdfundingPaymentSchedule]:
