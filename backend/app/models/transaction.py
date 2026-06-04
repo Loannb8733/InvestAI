@@ -3,7 +3,7 @@
 import enum
 import hashlib
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, localcontext
 
 from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
@@ -23,8 +23,14 @@ def compute_transaction_hash(
 ) -> str:
     """Compute a deterministic hash for transaction deduplication.
 
-    Based on: asset_id + type + quantity (8 decimals) + price (8 decimals)
+    Based on: asset_id + type + quantity (12 decimals) + price (12 decimals)
               + executed_at (DATE precision only).
+
+    Quantity and price are hashed at the FULL column precision (Numeric scale 12)
+    via Decimal, not float-formatted to 8 decimals. The old ``f"{float(x):.8f}"``
+    collapsed micro-price assets to "0.00000000" (e.g. PEPE at 1e-9), so two
+    distinct same-day trades hashed identically and the second was wrongly
+    dropped as a duplicate.
 
     Intentionally excludes exchange and external_id so the same real-world
     transaction imported from different sources (CSV vs exchange sync)
@@ -39,12 +45,30 @@ def compute_transaction_hash(
     parts = [
         str(asset_id),
         str(transaction_type),
-        f"{float(quantity):.8f}",
-        f"{float(price):.8f}",
+        _canonical_decimal(quantity, 12),
+        _canonical_decimal(price, 12),
         date_str,
     ]
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:40]
+
+
+def _canonical_decimal(value: object, scale: int) -> str:
+    """Format a numeric value as a canonical fixed-scale decimal string.
+
+    Uses a wide local context (prec 50) so high-supply quantities at
+    Numeric(30,12) never overflow the default 28-digit precision. Invalid
+    inputs degrade to "0" rather than raising.
+    """
+    try:
+        d = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return "0"
+    with localcontext() as ctx:
+        ctx.prec = 50
+        # format(..., "f") forces fixed-point (no scientific notation like 1.2E-9),
+        # so the hashed string is stable and human-readable.
+        return format(d.quantize(Decimal(1).scaleb(-scale)), "f")
 
 
 class TransactionType(str, enum.Enum):
