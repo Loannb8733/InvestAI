@@ -574,31 +574,72 @@ async def _rehash_transactions_internal_hash():
         logger.warning("Transaction rehash skipped or failed: %s", e)
 
 
+# Fixed key serializing concurrent boot migrations across processes.
+_BOOT_LOCK_KEY = 4242424242
+
+
+async def _run_startup_migrations():
+    """Run boot migrations + idempotent one-shots under a Postgres advisory lock.
+
+    Serializes concurrent boots (multi-worker / zero-downtime deploy overlap) so
+    Alembic, create_all and the data one-shots never race. The lock is held for
+    the whole sequence and released (or auto-released on process crash via the
+    closed connection). Fail-open: if the lock cannot be acquired, proceed
+    unlocked — identical to the previous behaviour, never blocks startup.
+    """
+    lock_conn = None
+    try:
+        lock_conn = await engine.connect()
+        await lock_conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _BOOT_LOCK_KEY})
+        logger.info("Acquired boot advisory lock")
+    except Exception as e:
+        logger.warning("Boot advisory lock unavailable, proceeding without it: %s", e)
+        if lock_conn is not None:
+            try:
+                await lock_conn.close()
+            except Exception:
+                pass
+        lock_conn = None
+
+    try:
+        # Run Alembic migrations before creating tables
+        _run_alembic_upgrade()
+        # One-shot fix: split transactions with mismatched exchange into separate assets
+        _fix_multiplatform_assets()
+        # One-shot fix: create mirror transfer_in for existing transfer_out (→ Tangem)
+        _create_missing_transfer_mirrors()
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            # Guard: add columns that may be missing when the DB was created via
+            # create_all before the column existed (Alembic stamp-to-head skips them).
+            await conn.execute(
+                text("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS cash_balances JSON NOT NULL DEFAULT '{}'")
+            )
+
+        # One-shot (idempotent): migrate internal_hash to the precise Decimal formula.
+        await _rehash_transactions_internal_hash()
+    finally:
+        if lock_conn is not None:
+            try:
+                await lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"))
+            except Exception:
+                pass
+            try:
+                await lock_conn.close()
+            except Exception:
+                pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     logger.info(f"Starting {settings.APP_NAME} (env={settings.APP_ENV}, debug={settings.DEBUG})")
 
-    # Run Alembic migrations before creating tables
-    _run_alembic_upgrade()
-
-    # One-shot fix: split transactions with mismatched exchange into separate assets
-    _fix_multiplatform_assets()
-
-    # One-shot fix: create mirror transfer_in for existing transfer_out (→ Tangem)
-    _create_missing_transfer_mirrors()
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Guard: add columns that may be missing when the DB was created via
-        # create_all before the column existed (Alembic stamp-to-head skips them).
-        await conn.execute(
-            text("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS" " cash_balances JSON NOT NULL DEFAULT '{}'")
-        )
-
-    # One-shot (idempotent): migrate internal_hash to the precise Decimal formula.
-    await _rehash_transactions_internal_hash()
+    # Boot migrations + idempotent one-shots, serialized by a Postgres advisory
+    # lock so concurrent boots (multi-worker / deploy overlap) cannot race.
+    await _run_startup_migrations()
 
     # Trigger historical data cache on startup — run inline (no Celery needed)
     async def _startup_backfill():
