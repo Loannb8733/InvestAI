@@ -28,6 +28,7 @@ from app.models.asset import Asset, AssetType
 from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
+from app.services.fifo import consume_fifo, consume_fifo_with_dates, extract_fifo_layers
 from app.services.metrics_service import is_liquidity, is_safe_haven, metrics_service
 from app.services.snapshot_service import snapshot_service
 
@@ -708,20 +709,7 @@ class ReportService:
 
         def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
             """Remove qty from FIFO layers, return total cost removed."""
-            layers = fifo.get(key, [])
-            remaining = qty_to_remove
-            cost_removed = _ZERO
-            while remaining > 0 and layers:
-                layer = layers[0]
-                if layer["qty"] <= remaining:
-                    cost_removed += layer["qty"] * layer["unit_cost"]
-                    remaining -= layer["qty"]
-                    layers.pop(0)
-                else:
-                    cost_removed += remaining * layer["unit_cost"]
-                    layer["qty"] -= remaining
-                    remaining = _ZERO
-            return cost_removed
+            return consume_fifo(fifo.get(key, []), qty_to_remove)
 
         def _consume_fifo_with_dates(
             key: FifoKey,
@@ -731,46 +719,11 @@ class ReportService:
 
             The oldest layer's acquired_at determines the holding period (M1).
             """
-            layers = fifo.get(key, [])
-            remaining = qty_to_remove
-            cost_removed = _ZERO
-            oldest_date: Optional[datetime] = None
-            while remaining > 0 and layers:
-                layer = layers[0]
-                if oldest_date is None:
-                    oldest_date = layer.get("acquired_at")
-                take = min(layer["qty"], remaining)
-                cost_removed += take * layer["unit_cost"]
-                remaining -= take
-                if take >= layer["qty"]:
-                    layers.pop(0)
-                else:
-                    layer["qty"] -= take
-            return cost_removed, oldest_date
+            return consume_fifo_with_dates(fifo.get(key, []), qty_to_remove)
 
         def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
             """Extract layers preserving unit costs (for transfers)."""
-            layers = fifo.get(key, [])
-            remaining = qty_to_remove
-            extracted: list = []
-            while remaining > 0 and layers:
-                layer = layers[0]
-                if layer["qty"] <= remaining:
-                    extracted.append(layer.copy())
-                    remaining -= layer["qty"]
-                    layers.pop(0)
-                else:
-                    extracted.append(
-                        {
-                            "qty": remaining,
-                            "unit_cost": layer["unit_cost"],
-                            "is_paid": layer["is_paid"],
-                            "acquired_at": layer.get("acquired_at"),
-                        }
-                    )
-                    layer["qty"] -= remaining
-                    remaining = _ZERO
-            return extracted
+            return extract_fifo_layers(fifo.get(key, []), qty_to_remove)
 
         # ── 3. Single-pass chronological processing ───────────────────
         # holdings tracks total qty per symbol (for portfolio_value calc)
@@ -2509,19 +2462,7 @@ class ReportService:
         qty: Decimal,
     ) -> Decimal:
         """Simple FIFO consume (no dates). Returns cost removed."""
-        layers = fifo.get(key, [])
-        remaining = qty
-        cost = _ZERO
-        while remaining > 0 and layers:
-            layer = layers[0]
-            take = min(layer["qty"], remaining)
-            cost += take * layer["unit_cost"]
-            remaining -= take
-            if take >= layer["qty"]:
-                layers.pop(0)
-            else:
-                layer["qty"] -= take
-        return cost
+        return consume_fifo(fifo.get(key, []), qty)
 
     @staticmethod
     def _extract_fifo_simple(
@@ -2530,20 +2471,7 @@ class ReportService:
         qty: Decimal,
     ) -> list:
         """Extract FIFO layers preserving unit costs."""
-        layers = fifo.get(key, [])
-        remaining = qty
-        extracted: list = []
-        while remaining > 0 and layers:
-            layer = layers[0]
-            if layer["qty"] <= remaining:
-                extracted.append(layer.copy())
-                remaining -= layer["qty"]
-                layers.pop(0)
-            else:
-                extracted.append({"qty": remaining, "unit_cost": layer["unit_cost"]})
-                layer["qty"] -= remaining
-                remaining = _ZERO
-        return extracted
+        return extract_fifo_layers(fifo.get(key, []), qty)
 
     # ── Rebalancing PDF ───────────────────────────────────────────────
 

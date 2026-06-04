@@ -16,6 +16,7 @@ from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
+from app.services.fifo import consume_fifo, extract_fifo_layers
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
@@ -657,52 +658,12 @@ class MetricsService:
 
             def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
                 """Remove qty from FIFO layers, return total cost removed."""
-                layers = fifo.get(key, [])
-                remaining = qty_to_remove
-                cost_removed = _ZERO
-                while remaining > 0 and layers:
-                    layer = layers[0]
-                    if layer["qty"] <= remaining:
-                        cost_removed += layer["qty"] * layer["unit_cost"]
-                        remaining -= layer["qty"]
-                        layers.pop(0)
-                    else:
-                        cost_removed += remaining * layer["unit_cost"]
-                        layer["qty"] -= remaining
-                        remaining = _ZERO
-                if remaining > 0:
-                    logger.warning(
-                        "FIFO underflow: wanted to remove %s more from %s " "but no layers left",
-                        remaining,
-                        key,
-                    )
-                return cost_removed
+                return consume_fifo(fifo.get(key, []), qty_to_remove)
 
             def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
                 """Remove qty from FIFO layers, return list of extracted layers
                 (preserving original unit costs for transfer/conversion)."""
-                layers = fifo.get(key, [])
-                remaining = qty_to_remove
-                extracted: list = []
-                while remaining > 0 and layers:
-                    layer = layers[0]
-                    if layer["qty"] <= remaining:
-                        extracted.append(layer.copy())
-                        remaining -= layer["qty"]
-                        layers.pop(0)
-                    else:
-                        partial = layer.copy()
-                        partial["qty"] = remaining
-                        extracted.append(partial)
-                        layer["qty"] -= remaining
-                        remaining = _ZERO
-                if remaining > 0:
-                    logger.warning(
-                        "FIFO underflow: wanted to extract %s more from %s " "but no layers left",
-                        remaining,
-                        key,
-                    )
-                return extracted
+                return extract_fifo_layers(fifo.get(key, []), qty_to_remove)
 
             # ---- Single-pass chronological processing ----
             for tx in all_txs:
