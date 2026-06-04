@@ -278,6 +278,12 @@ async def resend_verification(
     return {"message": "Si un compte non vérifié existe avec cette adresse, un email a été envoyé."}
 
 
+# Pre-computed bcrypt hash used to equalize login timing when the email does not
+# exist, so a missing account takes the same time as a wrong password — prevents
+# account enumeration via response-time differences.
+_DUMMY_PASSWORD_HASH = hash_password("not-a-real-password-timing-equalizer")
+
+
 @router.post("/login", response_model=Token)
 @limiter.limit(RATE_LIMITS["auth_login"])
 async def login(
@@ -310,8 +316,16 @@ async def login(
         except Exception:
             pass  # Redis down — fail open
 
-    if not user or not verify_password(login_data.password, user.password_hash):
-        # Track per-account failed attempts (even if user not found, use email hash)
+    # Always perform a bcrypt comparison so a missing account takes the same time
+    # as a wrong password (prevents email enumeration by timing).
+    if user:
+        password_ok = verify_password(login_data.password, user.password_hash)
+    else:
+        verify_password(login_data.password, _DUMMY_PASSWORD_HASH)
+        password_ok = False
+
+    if not password_ok:
+        # Track per-account failed attempts (only when the account exists).
         if user:
             try:
                 r = await _get_redis_txt()
