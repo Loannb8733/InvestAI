@@ -1,5 +1,6 @@
 """ML Prediction service for price forecasting and anomaly detection."""
 
+import asyncio
 import logging
 import math
 from dataclasses import dataclass
@@ -214,7 +215,11 @@ class PredictionService:
 
                 result = ForecastResult(**cached_ens)
             else:
-                result = self.forecaster.ensemble_forecast(
+                # ensemble_forecast fits Prophet/ARIMA/XGBoost synchronously (CPU-bound,
+                # seconds). Offload to a thread so it never blocks the async event loop /
+                # other concurrent requests on the worker.
+                result = await asyncio.to_thread(
+                    self.forecaster.ensemble_forecast,
                     prices,
                     dates,
                     days_ahead,
