@@ -125,6 +125,11 @@ export const queryKeys = {
     list: ['exchanges', 'list'] as const,
   },
 
+  coldWallets: {
+    all: ['coldWallets'] as const,
+    list: ['coldWallets', 'list'] as const,
+  },
+
   insights: {
     all: ['insights'] as const,
     fees: ['insights', 'fees'] as const,

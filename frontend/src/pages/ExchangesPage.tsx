@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { apiKeysApi } from '@/services/api'
+import ColdWalletsManager from '@/components/exchanges/ColdWalletsManager'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDate } from '@/lib/utils'
@@ -670,6 +671,9 @@ export default function ExchangesPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Cold wallet address → name routing (drives the auto-mirror destination) */}
+      <ColdWalletsManager />
 
       {/* Actions explanation */}
       <Card className="bg-muted/30">
