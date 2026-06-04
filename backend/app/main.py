@@ -525,6 +525,55 @@ def _run_alembic_upgrade():
         logger.warning("Alembic migration skipped or failed: %s", e)
 
 
+async def _rehash_transactions_internal_hash():
+    """One-shot, idempotent: recompute internal_hash with the precise formula.
+
+    The dedup hash formula moved from float(.8f) to full Decimal(12) precision
+    (fixes micro-price assets like PEPE collapsing to a single hash). Existing
+    rows still carry the OLD hash, so a re-import would no longer dedup against
+    them. This rewrites every row's internal_hash to the new formula. It only
+    writes when a value actually changes, so after the first deploy it is a
+    no-op pass. Collisions within the pass (genuinely near-identical rows kept
+    intentionally) are excluded from the unique index by setting NULL.
+    """
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.transaction import Transaction, compute_transaction_hash
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Transaction))
+            txs = result.scalars().all()
+            seen: dict = {}
+            changed = 0
+            nulled = 0
+            for tx in txs:
+                ts = tx.executed_at.strftime("%Y-%m-%d") if tx.executed_at else ""
+                ttype = tx.transaction_type.value if hasattr(tx.transaction_type, "value") else str(tx.transaction_type)
+                target = compute_transaction_hash(
+                    asset_id=str(tx.asset_id),
+                    transaction_type=ttype,
+                    quantity=str(tx.quantity),
+                    price=str(tx.price),
+                    executed_at=ts,
+                )
+                if target in seen:
+                    if tx.internal_hash is not None:
+                        tx.internal_hash = None
+                        nulled += 1
+                    continue
+                seen[target] = tx.id
+                if tx.internal_hash != target:
+                    tx.internal_hash = target
+                    changed += 1
+            if changed or nulled:
+                await db.commit()
+                logger.info("Rehashed transactions: %d updated, %d nulled on collision", changed, nulled)
+    except Exception as e:
+        logger.warning("Transaction rehash skipped or failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
@@ -547,6 +596,9 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             text("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS" " cash_balances JSON NOT NULL DEFAULT '{}'")
         )
+
+    # One-shot (idempotent): migrate internal_hash to the precise Decimal formula.
+    await _rehash_transactions_internal_hash()
 
     # Trigger historical data cache on startup — run inline (no Celery needed)
     async def _startup_backfill():
