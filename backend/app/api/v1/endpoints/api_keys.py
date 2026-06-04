@@ -1439,6 +1439,8 @@ async def import_trade_history(
             "debug": debug_info,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
 
@@ -1448,9 +1450,11 @@ async def import_trade_history(
         _classify_and_mark_error(api_key, e)
         await db.commit()
 
+        # Do not leak the exception type/message to the client (it can contain
+        # internal details). The full error + traceback is in the server logs.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Import error: {type(e).__name__}: {e}",
+            detail="L'import a échoué. Réessayez ; si le problème persiste, contactez le support.",
         )
 
 
@@ -1636,6 +1640,8 @@ async def sync_exchange(
             "portfolio_name": portfolio.name,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
 
@@ -1645,9 +1651,11 @@ async def sync_exchange(
         _classify_and_mark_error(api_key, e)
         await db.commit()
 
+        # Do not leak the exception type/message to the client (it can contain
+        # internal details). The full error + traceback is in the server logs.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sync error: {type(e).__name__}: {e}",
+            detail="La synchronisation a échoué. Réessayez ; si le problème persiste, contactez le support.",
         )
 
 
