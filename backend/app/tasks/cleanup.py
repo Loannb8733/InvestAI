@@ -113,25 +113,29 @@ async def _cleanup_duplicate_transactions_async() -> dict:
 
 
 async def _validate_portfolio_consistency_async() -> dict:
-    """Validate that asset quantities match transaction sums."""
+    """Validate that asset quantities match transaction sums.
+
+    Cold-wallet / unassigned assets have no external source of truth (no exchange
+    balance to reconcile against), so when their stored quantity drifts from the
+    transaction-derived total we heal them in place. Exchange-backed assets are
+    left report-only — STEP 2 of the sync reconciles those to the exchange balance,
+    which is authoritative and may legitimately differ from the transaction sum.
+    """
     from app.models.asset import Asset
     from app.models.portfolio import Portfolio
     from app.models.transaction import Transaction, TransactionType
+    from app.services.transfer_service import COLD_WALLET_DESTINATION
 
     async with AsyncSessionLocal() as db:
-        # Get all assets with their calculated quantities from transactions
-        query = select(
-            Asset.id,
-            Asset.symbol,
-            Asset.quantity,
-            Portfolio.name.label("portfolio_name"),
-        ).join(Portfolio, Asset.portfolio_id == Portfolio.id)
-
-        result = await db.execute(query)
-        assets = result.fetchall()
+        # Fetch Asset ORM objects (so we can heal in place) + their portfolio name.
+        result = await db.execute(
+            select(Asset, Portfolio.name.label("portfolio_name")).join(Portfolio, Asset.portfolio_id == Portfolio.id)
+        )
+        assets = result.all()
 
         inconsistencies = []
-        for asset in assets:
+        healed = []
+        for asset, portfolio_name in assets:
             # Calculate expected quantity from transactions
             calc_result = await db.execute(
                 select(
@@ -183,15 +187,36 @@ async def _validate_portfolio_consistency_async() -> dict:
                     {
                         "asset_id": str(asset.id),
                         "symbol": asset.symbol,
-                        "portfolio": asset.portfolio_name,
+                        "portfolio": portfolio_name,
                         "stored_qty": stored_qty,
                         "calculated_qty": calc_qty,
                         "difference": stored_qty - calc_qty,
                     }
                 )
 
+                # Heal only cold-wallet / unassigned assets (no exchange to
+                # reconcile against). A negative calc would violate the
+                # quantity >= 0 CHECK, so skip those and just report.
+                is_cold_or_unassigned = (asset.exchange or "") in ("", COLD_WALLET_DESTINATION)
+                if is_cold_or_unassigned and calc_qty >= 0:
+                    asset.quantity = calc_qty
+                    healed.append(
+                        {
+                            "asset_id": str(asset.id),
+                            "symbol": asset.symbol,
+                            "portfolio": portfolio_name,
+                            "from": stored_qty,
+                            "to": calc_qty,
+                        }
+                    )
+
+        if healed:
+            await db.commit()
+
         if inconsistencies:
-            logger.warning(f"Found {len(inconsistencies)} portfolio inconsistencies")
+            logger.warning(
+                f"Found {len(inconsistencies)} portfolio inconsistencies; healed {len(healed)} cold-wallet assets"
+            )
             for inc in inconsistencies[:10]:  # Log first 10
                 logger.warning(
                     f"  {inc['portfolio']}/{inc['symbol']}: "
@@ -201,7 +226,9 @@ async def _validate_portfolio_consistency_async() -> dict:
         return {
             "total_assets_checked": len(assets),
             "inconsistencies_found": len(inconsistencies),
+            "healed_count": len(healed),
             "details": inconsistencies[:20],  # Return first 20
+            "healed": healed[:20],
         }
 
 
