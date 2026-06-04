@@ -273,19 +273,25 @@ async def create_goal(
         total_value = Decimal("0")
         price_service = PriceService()
         is_savings = goal.goal_type == GoalType.SAVINGS
-        for portfolio in portfolios:
-            assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))
-            assets = assets_result.scalars().all()
-            for asset in assets:
-                if float(asset.quantity) > 0:
-                    if is_savings and not is_liquidity(asset.symbol):
-                        continue
+        # Batch: one asset query for all portfolios (was one per portfolio), and
+        # dedupe price lookups per symbol (same get_price → identical values).
+        portfolio_ids = [p.id for p in portfolios]
+        assets_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
+        assets = assets_result.scalars().all()
+        price_cache: dict = {}
+        for asset in assets:
+            if float(asset.quantity) > 0:
+                if is_savings and not is_liquidity(asset.symbol):
+                    continue
+                pkey = (asset.symbol, asset.asset_type.value)
+                if pkey not in price_cache:
                     try:
-                        price = await price_service.get_price(asset.symbol, asset.asset_type.value)
-                        total_value += asset.quantity * Decimal(str(price))
+                        price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
                     except Exception:
-                        pass
-            if is_savings:
+                        price_cache[pkey] = 0
+                total_value += asset.quantity * Decimal(str(price_cache[pkey]))
+        if is_savings:
+            for portfolio in portfolios:
                 for _ccy, amount in (portfolio.cash_balances or {}).items():
                     total_value += Decimal(str(amount))
 
@@ -391,22 +397,24 @@ async def sync_goal_with_portfolio(
     total_value = Decimal("0")
     price_service = PriceService()
     is_savings = goal.goal_type == GoalType.SAVINGS
-    for portfolio in portfolios:
-        assets_result = await db.execute(
-            select(Asset).where(
-                Asset.portfolio_id == portfolio.id,
-            )
-        )
-        assets = assets_result.scalars().all()
-        for asset in assets:
-            if float(asset.quantity) > 0:
-                # SAVINGS goals only count liquidity (cash/stables/gold)
-                if is_savings and not is_liquidity(asset.symbol):
-                    continue
-                price = await price_service.get_price(asset.symbol, asset.asset_type.value)
-                total_value += asset.quantity * Decimal(str(price))
-        # Include portfolio cash_balances for SAVINGS goals
-        if is_savings:
+    # Batch: one asset query for all portfolios (was one per portfolio), and
+    # dedupe price lookups per symbol (same get_price → identical values).
+    portfolio_ids = [p.id for p in portfolios]
+    assets_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
+    assets = assets_result.scalars().all()
+    price_cache: dict = {}
+    for asset in assets:
+        if float(asset.quantity) > 0:
+            # SAVINGS goals only count liquidity (cash/stables/gold)
+            if is_savings and not is_liquidity(asset.symbol):
+                continue
+            pkey = (asset.symbol, asset.asset_type.value)
+            if pkey not in price_cache:
+                price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
+            total_value += asset.quantity * Decimal(str(price_cache[pkey]))
+    # Include portfolio cash_balances for SAVINGS goals
+    if is_savings:
+        for portfolio in portfolios:
             for _ccy, amount in (portfolio.cash_balances or {}).items():
                 total_value += Decimal(str(amount))
 
