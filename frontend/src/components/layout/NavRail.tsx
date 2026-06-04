@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -81,6 +81,47 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
   const handleNavClick = useCallback(() => {
     onClose?.()
   }, [onClose])
+
+  // Mobile drawer a11y: focus management, Escape-to-close, Tab focus-trap, and
+  // `inert` when closed so the off-screen links aren't tabbable/announced.
+  const drawerRef = useRef<HTMLElement>(null)
+  const lastFocusedRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const node = drawerRef.current
+    if (node) node.toggleAttribute('inert', !isOpen)
+    if (!isOpen) return
+
+    lastFocusedRef.current = document.activeElement as HTMLElement | null
+    node?.focus()
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose?.()
+        return
+      }
+      if (e.key === 'Tab' && node) {
+        const focusables = node.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusables.length === 0) return
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      lastFocusedRef.current?.focus?.()
+    }
+  }, [isOpen, onClose])
 
   // When `expanded` is true (mobile drawer) labels are always visible;
   // otherwise they fade in on hover of the rail (group).
@@ -206,8 +247,13 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
         aria-hidden="true"
       />
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation principale"
+        tabIndex={-1}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 border-r border-border/60 bg-card transition-transform duration-300 ease-in-out lg:hidden',
+          'fixed inset-y-0 left-0 z-50 w-64 border-r border-border/60 bg-card outline-none transition-transform duration-300 ease-in-out lg:hidden',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
