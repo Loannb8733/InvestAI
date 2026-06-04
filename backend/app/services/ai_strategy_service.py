@@ -12,7 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis_client import get_cached_contrarian_stats
 from app.models.strategy import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
+from app.services.contrarian_stats_service import format_reasoning
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +149,11 @@ class AIStrategyService:
             strategies.append(stablecoin)
 
         # 9. Conviction Buy — extreme fear = strongest buy signal
+        # Read the daily-refreshed contrarian backtest stats (Redis) so the
+        # reasoning shows live figures; None on miss → qualitative fallback.
+        contrarian_stats = await get_cached_contrarian_stats()
         conviction = self._build_conviction_buy_strategy(
-            buy_assets, assets, regime_name, regime_confidence, fear_greed, liquidity
+            buy_assets, assets, regime_name, regime_confidence, fear_greed, liquidity, contrarian_stats
         )
         if conviction:
             strategies.append(conviction)
@@ -821,6 +826,7 @@ class AIStrategyService:
         confidence: float,
         fear_greed: Optional[int],
         liquidity: float,
+        contrarian_stats: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Conviction buy — extreme fear is the strongest buy signal.
 
@@ -875,23 +881,10 @@ class AIStrategyService:
                 "regime": regime,
                 "assets": [a["symbol"] for a in top],
             },
-            # Backtest réel (reproductible) — BTC daily (Binance BTCUSDT) vs
-            # Crypto Fear & Greed Index (api.alternative.me, la source utilisée
-            # par l'app). Période fév. 2018 → juin 2026, n=508 journées sous
-            # F&G 25 disposant de 12 mois de recul. Rendement BTC à 12 mois :
-            # médiane +36%, moyenne +100% (tirée par l'outlier krach COVID 2020),
-            # 61% de cas positifs, dispersion -70% à +1092%. À court terme (90j)
-            # la médiane est négative (-4%). Chiffres à rafraîchir périodiquement.
-            "ai_reasoning": (
-                f"Fear & Greed à {fear_greed} = peur extrême. "
-                "Sur données réelles BTC depuis 2018 (508 journées sous F&G 25, "
-                "source alternative.me), le rendement à 12 mois a été en médiane "
-                "de +36% (moyenne +100%, fortement tirée par le rebond post-krach "
-                "2020), positif dans 61% des cas — mais avec une dispersion extrême "
-                "(-70% à +1092%) et une médiane négative à court terme (-4% à 90 "
-                "jours). Signal contrarian de long terme, pas une garantie : les "
-                "performances passées ne préjugent pas des performances futures."
-            ),
+            # Real figures from the daily Fear & Greed backtest (Redis cache,
+            # source alternative.me + Binance). Falls back to a qualitative
+            # sentence with no numbers on cache miss — never a fabricated stat.
+            "ai_reasoning": format_reasoning(fear_greed, contrarian_stats),
             "market_regime": regime,
             "confidence": confidence,
             "actions": actions,

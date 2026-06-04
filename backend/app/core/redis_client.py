@@ -181,6 +181,28 @@ async def invalidate_dashboard_cache(user_id: str) -> None:
         logger.warning("Failed to invalidate dashboard cache for %s: %s", user_id, e)
 
 
+# ── Contrarian (Fear & Greed) backtest stats ─────────────────────────
+# A daily Celery task recomputes the BTC-vs-Fear&Greed backtest and stores
+# the result here. The conviction-buy strategy reads it to display live
+# figures. TTL is generous (8 days) so a few failed refreshes still leave a
+# usable, only-slightly-stale value rather than falling back to no numbers.
+
+CONTRARIAN_STATS_KEY = "contrarian_stats:btc:fng"
+CONTRARIAN_STATS_TTL = 691200  # 8 days
+
+
+async def get_cached_contrarian_stats() -> Optional[dict]:
+    """Get cached contrarian backtest stats dict, or None on miss/error."""
+    try:
+        r = await _get_redis_txt()
+        data = await r.get(CONTRARIAN_STATS_KEY)
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.debug("Redis contrarian-stats cache miss: %s", e)
+    return None
+
+
 # ── JSON-based caches (use text client) ──────────────────────────────
 
 

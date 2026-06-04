@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.tasks.cleanup",
         "app.tasks.monitor_delays",
         "app.tasks.import_history",
+        "app.tasks.contrarian_stats",
     ],
 )
 
@@ -130,5 +131,10 @@ celery_app.conf.beat_schedule = {
     "check-crowdfunding-delays": {
         "task": "app.tasks.monitor_delays.check_crowdfunding_delays",
         "schedule": crontab(hour=8, minute=30),  # Daily at 08:30 UTC (09:30 Paris)
+    },
+    # === Contrarian (Fear & Greed) backtest stats ===
+    "refresh-contrarian-stats": {
+        "task": "app.tasks.contrarian_stats.refresh_contrarian_stats",
+        "schedule": crontab(hour=2, minute=15),  # Daily at 02:15 UTC (off-peak)
     },
 }
