@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -20,6 +20,7 @@ from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.fx_history_service import FxHistoryService
 from app.services.metrics_service import invalidate_dashboard_cache
 from app.services.price_service import PriceService
+from app.services.transfer_service import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.tasks.celery_app import celery_app
 
 # Earliest plausible trade date for FX seeding. Frankfurter (ECB) data starts 1999;
@@ -93,6 +94,51 @@ _RECONCILE_DUST_REL = 1e-6
 # (Crypto.com, Gate.io, Bitstamp, Coinbase) — which then corrupted cost basis in
 # STEP 2. Match the full success vocabulary instead.
 _SUCCESSFUL_DEPOSIT_STATUSES = frozenset({"success", "credited", "completed", "complete", "done", "ok", "settled"})
+
+# Withdrawal statuses (normalised, case-insensitive) that mean "funds left the
+# exchange". Connectors map native codes to: completed / success / sent / etc.
+_SUCCESSFUL_WITHDRAWAL_STATUSES = frozenset({"success", "completed", "complete", "done", "ok", "sent", "processed"})
+
+# Window used to detect a withdrawal already recorded manually as a TRANSFER_OUT
+# (so the scheduled sync does not create a duplicate). Mirrors the dedup logic in
+# transfer_service.create_mirror_transfer_in.
+_WITHDRAWAL_DEDUP_DAYS = 1
+_WITHDRAWAL_DEDUP_REL = 0.01  # 1% quantity tolerance
+
+
+def _to_aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Return a timezone-aware UTC datetime (naive values are assumed UTC)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+async def _has_recent_transfer_out(db: AsyncSession, asset_id, when: datetime, qty: float) -> bool:
+    """True if a TRANSFER_OUT already exists for this asset near (when, qty).
+
+    Prevents the scheduled withdrawal sync from duplicating a TRANSFER_OUT the
+    user already entered manually. Matches within ±1 day and 1% quantity.
+    """
+    when_utc = _to_aware_utc(when)
+    if when_utc is None:
+        return False
+    lo = when_utc - timedelta(days=_WITHDRAWAL_DEDUP_DAYS)
+    hi = when_utc + timedelta(days=_WITHDRAWAL_DEDUP_DAYS)
+    result = await db.execute(
+        select(Transaction.quantity).where(
+            Transaction.asset_id == asset_id,
+            Transaction.transaction_type == TransactionType.TRANSFER_OUT,
+            Transaction.executed_at >= lo,
+            Transaction.executed_at <= hi,
+        )
+    )
+    for (existing_qty,) in result.fetchall():
+        eq = float(existing_qty)
+        if eq > 0 and abs(eq - qty) / eq < _WITHDRAWAL_DEDUP_REL:
+            return True
+    return False
 
 
 def _reconcile_balance_diff(our_quantity: float, exchange_quantity: float) -> str:
@@ -310,12 +356,17 @@ async def _sync_detailed_transactions(
     portfolio: Portfolio,
     existing_assets: Dict[str, Asset],
     heal_fx: bool = False,
+    withdrawal_cutoff: Optional[datetime] = None,
 ) -> Tuple[int, int]:
-    """Sync detailed transactions: trades, conversions, rewards.
+    """Sync detailed transactions: trades, conversions, rewards, withdrawals.
 
     When ``heal_fx`` is True, trades that already exist are NOT skipped: their stored
     FX fields are repaired in place via :func:`_heal_transaction_fx` (no new rows, no
     quantity/avg-price mutation). Returns ``(synced_count, healed_count)``.
+
+    ``withdrawal_cutoff`` (UTC) gates the withdrawal sync to go-forward only:
+    withdrawals at/before this instant are treated as historical and skipped,
+    so we never re-process (or duplicate) the user's existing reconciled data.
     """
     synced_count = 0
     healed_count = 0
@@ -828,6 +879,86 @@ async def _sync_detailed_transactions(
     except Exception as e:
         logger.warning(f"Failed to sync deposits: {e}")
 
+    # === 8. Sync withdrawals (transfers out → mirror to cold wallet) ===
+    # Go-forward only: a withdrawal to a self-custody wallet must (a) reduce the
+    # source asset and (b) create a mirror TRANSFER_IN on the cold wallet so the
+    # coins keep being counted with their cost basis. Without this, STEP 2/3 only
+    # shrank the source and the coins vanished from the portfolio total.
+    try:
+        if not heal_fx and hasattr(service, "get_withdrawals"):
+            withdrawals = await service.get_withdrawals(limit=500)
+            logger.info(f"Found {len(withdrawals)} withdrawals from {service.exchange_name}")
+
+            for w in withdrawals:
+                if (w.status or "").strip().lower() not in _SUCCESSFUL_WITHDRAWAL_STATUSES:
+                    continue
+
+                # Go-forward gate: skip historical withdrawals (already reconciled).
+                w_ts = _to_aware_utc(w.timestamp)
+                if withdrawal_cutoff is not None and w_ts is not None and w_ts <= withdrawal_cutoff:
+                    continue
+
+                ext_id = f"withdrawal_{w.withdrawal_id}"
+                if ext_id in existing_external_ids:
+                    continue
+
+                base_asset = w.symbol
+                if not base_asset or base_asset in fiat_currencies:
+                    continue
+
+                # Only mirror coins we actually track on this exchange — we cannot
+                # withdraw what we never recorded.
+                asset = existing_assets.get(base_asset)
+                if asset is None or (asset.exchange and asset.exchange != service.exchange_name):
+                    continue
+
+                qty = float(w.amount)
+                if qty <= 0:
+                    continue
+
+                # Skip if the user already recorded this withdrawal manually.
+                if await _has_recent_transfer_out(db, asset.id, w.timestamp, qty):
+                    existing_external_ids.add(ext_id)
+                    continue
+
+                # Price the TRANSFER_OUT at the source avg buy price so the mirror
+                # propagates cost basis (mirror falls back to avg_buy_price when 0).
+                src_price = float(asset.avg_buy_price or 0)
+
+                transaction = Transaction(
+                    asset_id=asset.id,
+                    transaction_type=TransactionType.TRANSFER_OUT,
+                    quantity=qty,
+                    price=src_price,
+                    fee=float(w.fee or 0),
+                    fee_currency=base_asset,
+                    currency="EUR",
+                    executed_at=w.timestamp,
+                    external_id=ext_id,
+                    exchange=service.exchange_name,
+                    notes=f"Retrait {service.exchange_name} → {COLD_WALLET_DESTINATION}",
+                )
+                if not await _add_transaction_if_new(db, transaction):
+                    existing_external_ids.add(ext_id)
+                    continue
+                await db.flush()  # assign transaction.id for the mirror link
+                existing_external_ids.add(ext_id)
+
+                # Reduce source quantity; STEP 2 then sees ~0 diff (no phantom).
+                asset.quantity = max(0.0, float(asset.quantity) - qty)
+
+                # Create the matching TRANSFER_IN on the cold wallet (cost basis).
+                try:
+                    await create_mirror_transfer_in(db, transaction, asset, COLD_WALLET_DESTINATION)
+                except Exception as mirror_err:  # noqa: BLE001 - mirror is best-effort
+                    logger.warning("Mirror transfer_in failed for %s: %s", base_asset, mirror_err)
+
+                synced_count += 1
+                logger.info(f"Created TRANSFER_OUT + mirror: {base_asset} qty={qty} → {COLD_WALLET_DESTINATION}")
+
+    except Exception as e:
+        logger.warning(f"Failed to sync withdrawals: {e}")
+
     return synced_count, healed_count
 
 
@@ -917,9 +1048,15 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                 elif a.exchange == "" and a.symbol not in existing_assets:
                     existing_assets[a.symbol] = a
 
-            # === STEP 1: Sync detailed transactions (trades, conversions, rewards) ===
+            # === STEP 1: Sync detailed transactions (trades, conversions, rewards, withdrawals) ===
+            # Capture the previous sync time BEFORE it is refreshed below: it is the
+            # go-forward cutoff for withdrawals (only those since the last sync are
+            # mirrored). First-ever sync (None) → now, so all history is skipped.
+            withdrawal_cutoff = api_key.last_sync_at or datetime.now(timezone.utc)
+            if withdrawal_cutoff.tzinfo is None:
+                withdrawal_cutoff = withdrawal_cutoff.replace(tzinfo=timezone.utc)
             detailed_synced, healed = await _sync_detailed_transactions(
-                db, service, portfolio, existing_assets, heal_fx=heal_fx
+                db, service, portfolio, existing_assets, heal_fx=heal_fx, withdrawal_cutoff=withdrawal_cutoff
             )
             logger.info(f"Synced {detailed_synced} detailed transactions from {service.exchange_name}")
 

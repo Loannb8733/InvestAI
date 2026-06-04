@@ -12,6 +12,11 @@ from app.models.transaction import Transaction, TransactionType
 
 logger = logging.getLogger(__name__)
 
+# Default destination platform for coins withdrawn from an exchange to a
+# self-custody / cold wallet. Used by both the manual import path and the
+# scheduled sync so the mirror TRANSFER_IN always lands on the same asset.
+COLD_WALLET_DESTINATION = "Tangem"
+
 
 async def create_mirror_transfer_in(
     db: AsyncSession,
