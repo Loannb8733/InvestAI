@@ -578,19 +578,21 @@ async def _rehash_transactions_internal_hash():
 _BOOT_LOCK_KEY = 4242424242
 
 
-async def _run_startup_migrations():
-    """Run boot migrations + idempotent one-shots under a Postgres advisory lock.
+@asynccontextmanager
+async def _boot_advisory_lock(key: int, lock_engine=None):
+    """Hold a Postgres session-level advisory lock for the block's duration.
 
-    Serializes concurrent boots (multi-worker / zero-downtime deploy overlap) so
-    Alembic, create_all and the data one-shots never race. The lock is held for
-    the whole sequence and released (or auto-released on process crash via the
-    closed connection). Fail-open: if the lock cannot be acquired, proceed
-    unlocked — identical to the previous behaviour, never blocks startup.
+    Serializes concurrent boots (multi-worker / zero-downtime deploy overlap).
+    Fail-open: if the lock can't be acquired, the block still runs (unlocked),
+    identical to the pre-lock behaviour — it never blocks startup. The lock is
+    released on exit, or auto-released if the process dies (connection closes).
+    ``lock_engine`` defaults to the app engine and is injectable for tests.
     """
+    eng = lock_engine if lock_engine is not None else engine
     lock_conn = None
     try:
-        lock_conn = await engine.connect()
-        await lock_conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _BOOT_LOCK_KEY})
+        lock_conn = await eng.connect()
+        await lock_conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": key})
         logger.info("Acquired boot advisory lock")
     except Exception as e:
         logger.warning("Boot advisory lock unavailable, proceeding without it: %s", e)
@@ -600,8 +602,28 @@ async def _run_startup_migrations():
             except Exception:
                 pass
         lock_conn = None
-
     try:
+        yield
+    finally:
+        if lock_conn is not None:
+            try:
+                await lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
+            except Exception:
+                pass
+            try:
+                await lock_conn.close()
+            except Exception:
+                pass
+
+
+async def _run_startup_migrations():
+    """Run boot migrations + idempotent one-shots under the boot advisory lock.
+
+    The lock serializes concurrent boots so Alembic, create_all and the data
+    one-shots never race; everything inside is idempotent so a second waiter
+    runs as a no-op.
+    """
+    async with _boot_advisory_lock(_BOOT_LOCK_KEY):
         # Run Alembic migrations before creating tables
         _run_alembic_upgrade()
         # One-shot fix: split transactions with mismatched exchange into separate assets
@@ -619,16 +641,6 @@ async def _run_startup_migrations():
 
         # One-shot (idempotent): migrate internal_hash to the precise Decimal formula.
         await _rehash_transactions_internal_hash()
-    finally:
-        if lock_conn is not None:
-            try:
-                await lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"))
-            except Exception:
-                pass
-            try:
-                await lock_conn.close()
-            except Exception:
-                pass
 
 
 @asynccontextmanager
