@@ -86,6 +86,14 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
 _RECONCILE_EPSILON = 1e-8
 _RECONCILE_DUST_REL = 1e-6
 
+# Deposit statuses (normalised, case-insensitive) that mean "funds credited".
+# Connectors map their native codes to varied strings: Binance -> success/credited,
+# Crypto.com/Gate.io/Bitstamp/Coinbase -> completed, etc. The previous filter only
+# accepted ("success", "credited"), silently dropping every "completed" deposit
+# (Crypto.com, Gate.io, Bitstamp, Coinbase) — which then corrupted cost basis in
+# STEP 2. Match the full success vocabulary instead.
+_SUCCESSFUL_DEPOSIT_STATUSES = frozenset({"success", "credited", "completed", "complete", "done", "ok", "settled"})
+
 
 def _reconcile_balance_diff(our_quantity: float, exchange_quantity: float) -> str:
     """Classify a balance discrepancy for STEP 2 reconciliation.
@@ -767,8 +775,8 @@ async def _sync_detailed_transactions(
             logger.info(f"Found {len(deposits)} deposits from {service.exchange_name}")
 
             for deposit in deposits:
-                # Skip if not successful
-                if deposit.status not in ("success", "credited"):
+                # Skip if not successfully credited (normalised, case-insensitive).
+                if (deposit.status or "").strip().lower() not in _SUCCESSFUL_DEPOSIT_STATUSES:
                     continue
 
                 # Use tx_id or deposit_id as external_id
