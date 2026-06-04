@@ -13,6 +13,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import decrypt_api_key
 from app.models.api_key import APIKey
 from app.models.asset import Asset, AssetType
+from app.models.cold_wallet_address import ColdWalletAddress
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.exchanges import get_exchange_service
@@ -104,6 +105,18 @@ _SUCCESSFUL_WITHDRAWAL_STATUSES = frozenset({"success", "completed", "complete",
 # transfer_service.create_mirror_transfer_in.
 _WITHDRAWAL_DEDUP_DAYS = 1
 _WITHDRAWAL_DEDUP_REL = 0.01  # 1% quantity tolerance
+
+
+def _resolve_cold_wallet_destination(address: Optional[str], wallet_map: Dict[str, str]) -> str:
+    """Map a withdrawal address to its named cold wallet, else the default.
+
+    ``wallet_map`` keys are normalised (stripped + lowercased) addresses.
+    """
+    if address:
+        label = wallet_map.get(address.strip().lower())
+        if label:
+            return label
+    return COLD_WALLET_DESTINATION
 
 
 def _to_aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -357,6 +370,7 @@ async def _sync_detailed_transactions(
     existing_assets: Dict[str, Asset],
     heal_fx: bool = False,
     withdrawal_cutoff: Optional[datetime] = None,
+    cold_wallet_map: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, int]:
     """Sync detailed transactions: trades, conversions, rewards, withdrawals.
 
@@ -925,6 +939,9 @@ async def _sync_detailed_transactions(
                 # propagates cost basis (mirror falls back to avg_buy_price when 0).
                 src_price = float(asset.avg_buy_price or 0)
 
+                # Route to the named cold wallet for this address (1f), else default.
+                destination = _resolve_cold_wallet_destination(w.address, cold_wallet_map or {})
+
                 transaction = Transaction(
                     asset_id=asset.id,
                     transaction_type=TransactionType.TRANSFER_OUT,
@@ -936,7 +953,7 @@ async def _sync_detailed_transactions(
                     executed_at=w.timestamp,
                     external_id=ext_id,
                     exchange=service.exchange_name,
-                    notes=f"Retrait {service.exchange_name} → {COLD_WALLET_DESTINATION}",
+                    notes=f"Retrait {service.exchange_name} → {destination}",
                 )
                 if not await _add_transaction_if_new(db, transaction):
                     existing_external_ids.add(ext_id)
@@ -949,12 +966,12 @@ async def _sync_detailed_transactions(
 
                 # Create the matching TRANSFER_IN on the cold wallet (cost basis).
                 try:
-                    await create_mirror_transfer_in(db, transaction, asset, COLD_WALLET_DESTINATION)
+                    await create_mirror_transfer_in(db, transaction, asset, destination)
                 except Exception as mirror_err:  # noqa: BLE001 - mirror is best-effort
                     logger.warning("Mirror transfer_in failed for %s: %s", base_asset, mirror_err)
 
                 synced_count += 1
-                logger.info(f"Created TRANSFER_OUT + mirror: {base_asset} qty={qty} → {COLD_WALLET_DESTINATION}")
+                logger.info(f"Created TRANSFER_OUT + mirror: {base_asset} qty={qty} → {destination}")
 
     except Exception as e:
         logger.warning(f"Failed to sync withdrawals: {e}")
@@ -1055,8 +1072,24 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             withdrawal_cutoff = api_key.last_sync_at or datetime.now(timezone.utc)
             if withdrawal_cutoff.tzinfo is None:
                 withdrawal_cutoff = withdrawal_cutoff.replace(tzinfo=timezone.utc)
+
+            # Cold-wallet address → label map (1f): route withdrawals to the
+            # right named wallet. Keys normalised (stripped + lowercased).
+            cw_result = await db.execute(
+                select(ColdWalletAddress.address, ColdWalletAddress.label).where(
+                    ColdWalletAddress.user_id == api_key.user_id
+                )
+            )
+            cold_wallet_map = {addr.strip().lower(): label for addr, label in cw_result.all()}
+
             detailed_synced, healed = await _sync_detailed_transactions(
-                db, service, portfolio, existing_assets, heal_fx=heal_fx, withdrawal_cutoff=withdrawal_cutoff
+                db,
+                service,
+                portfolio,
+                existing_assets,
+                heal_fx=heal_fx,
+                withdrawal_cutoff=withdrawal_cutoff,
+                cold_wallet_map=cold_wallet_map,
             )
             logger.info(f"Synced {detailed_synced} detailed transactions from {service.exchange_name}")
 
