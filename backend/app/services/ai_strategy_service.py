@@ -16,6 +16,16 @@ from app.models.strategy import ActionStatus, Strategy, StrategyAction, Strategy
 
 logger = logging.getLogger(__name__)
 
+# Mandatory disclaimer appended to every AI strategy suggestion.
+# InvestAI is not a licensed investment adviser; suggestions are informational
+# only and must never be presented as personalised financial advice.
+AI_DISCLAIMER = (
+    "⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en "
+    "investissement. InvestAI n'est pas un conseiller financier agréé. Les "
+    "performances passées ne préjugent pas des performances futures. Faites vos "
+    "propres recherches et consultez un professionnel avant toute décision."
+)
+
 
 class AIStrategyService:
     """Generate investment strategy suggestions based on portfolio analysis."""
@@ -204,6 +214,13 @@ class AIStrategyService:
             params["total_proposed_amount"] = round(total_proposed, 2)
             params["proposed_pct_of_liquidity"] = round(total_proposed / liquidity * 100, 1) if liquidity > 0 else 0
             s["params"] = params
+
+            # Append the mandatory non-advice disclaimer to every suggestion.
+            # This single hook covers both the API response and persistence,
+            # since save_suggestions() reads ai_reasoning from these same dicts.
+            existing_reasoning = (s.get("ai_reasoning") or "").rstrip()
+            if AI_DISCLAIMER not in existing_reasoning:
+                s["ai_reasoning"] = f"{existing_reasoning}\n\n{AI_DISCLAIMER}".strip()
 
         # Sort strategies: highest performance potential first, then by risk (higher risk first for same perf)
         strategies.sort(
@@ -860,9 +877,10 @@ class AIStrategyService:
             },
             "ai_reasoning": (
                 f"Fear & Greed à {fear_greed} = peur extrême. "
-                "Les données historiques montrent que les achats effectués sous F&G 25 "
-                "génèrent en moyenne +80% de rendement sur 12 mois. "
-                "C'est un signal contrarian fort."
+                "Historiquement, les phases de peur extrême ont souvent coïncidé "
+                "avec des points d'entrée intéressants pour les investisseurs "
+                "contrariens, mais rien ne garantit que ce soit le cas cette fois. "
+                "C'est un signal contrarian à pondérer avec votre propre analyse."
             ),
             "market_regime": regime,
             "confidence": confidence,
