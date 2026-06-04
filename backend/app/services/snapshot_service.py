@@ -18,6 +18,15 @@ from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
 
+# Replay ordering for same-day transactions: apply IN/BUY before OUT/SELL so a
+# same-timestamp OUT cannot clamp holdings to 0 before its matching IN (2b).
+# Python's sort is stable, so executed_at order is preserved within each group.
+_TX_REPLAY_ORDER: Dict[TransactionType, int] = {
+    TransactionType.SELL: 1,
+    TransactionType.TRANSFER_OUT: 1,
+    TransactionType.CONVERSION_OUT: 1,
+}
+
 # In-memory price cache: {(symbol, days): (timestamp, {date_str: price})}
 _price_cache: Dict[Tuple[str, int], Tuple[float, Dict[str, float]]] = {}
 _PRICE_CACHE_TTL = 1800  # 30 minutes — historical daily prices don't change
@@ -179,17 +188,14 @@ class SnapshotService:
             elif tx_type in [TransactionType.TRANSFER_IN] and price > 0:
                 cumulative += tx_amount
                 cumulative_net += tx_amount
-            elif tx_type in [TransactionType.CONVERSION_IN] and price > 0:
-                # CONVERSION_IN is a form change (crypto→crypto), not new capital
-                # Only add to net_capital (asset form change), NOT to cumulative invested
-                cumulative_net += tx_amount
-            # Net capital decreases on sells only (not transfers to cold wallets)
-            # TRANSFER_OUT = moving to cold wallet, user still owns the asset
+            # Net capital decreases on real sells only (cash leaves to fiat/stable).
+            # TRANSFER_OUT = moving to a cold wallet (user still owns it) → unchanged.
             elif tx_type in [TransactionType.SELL]:
                 cumulative_net -= tx_amount
-            # Conversions are neutral: asset form changes, no capital leaves
-            elif tx_type == TransactionType.CONVERSION_OUT:
-                cumulative_net -= tx_amount
+            # CONVERSION_IN / CONVERSION_OUT are net_capital-NEUTRAL: a crypto→crypto
+            # form change conserves invested capital. (Bug fix: CONVERSION_OUT used to
+            # subtract the real OUT value while CONVERSION_IN added nothing — price=0
+            # from the sync — so every swap wrongly drained net_capital.)
 
             # Don't clamp cumulative_net to 0: negative means user recovered
             # more than invested, which is valid and should be shown accurately
@@ -497,9 +503,12 @@ class SnapshotService:
         while current <= end_date:
             date_str = current.strftime("%Y-%m-%d")
 
-            # Apply transactions for this day
+            # Apply transactions for this day. Process IN/BUY before OUT/SELL on the
+            # same day (stable sort preserves executed_at order within each group) so
+            # a same-timestamp OUT can't clamp holdings to 0 before its matching IN.
             if date_str in tx_by_date:
-                for tx in tx_by_date[date_str]:
+                day_txs = sorted(tx_by_date[date_str], key=lambda t: _TX_REPLAY_ORDER.get(t.transaction_type, 0))
+                for tx in day_txs:
                     symbol = tx.symbol.upper()
                     quantity = float(tx.quantity)
                     price = float(tx.price)
@@ -529,12 +538,13 @@ class SnapshotService:
                         # Don't reduce net_capital: user still owns the asset on cold wallet
                     elif tx_type == TransactionType.CONVERSION_OUT:
                         holdings[symbol] = max(0.0, holdings.get(symbol, 0.0) - quantity)
-                        # Conversion = form change, reduce net_capital (symmetric with CONVERSION_IN)
-                        cumulative_net_capital -= tx_amount
+                        # Form change: holdings move, net_capital stays NEUTRAL.
                     elif tx_type == TransactionType.CONVERSION_IN:
                         holdings[symbol] = holdings.get(symbol, 0.0) + quantity
-                        # Conversion = form change, add to net_capital (not to invested)
-                        cumulative_net_capital += tx_amount
+                        # Form change: holdings move, net_capital stays NEUTRAL.
+                        # (Bug fix: previously += tx_amount, but sync CONVERSION_IN
+                        # has price=0 so it added nothing while CONVERSION_OUT
+                        # subtracted the real value → swaps drained net_capital.)
 
                     # Don't clamp cumulative_net_capital to 0: negative means user
                     # recovered more than invested, which is valid and needed for TWR.
