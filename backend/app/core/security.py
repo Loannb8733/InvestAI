@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import bcrypt
-from cryptography.fernet import Fernet, MultiFernet
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from jose import JWTError, jwt
 
 from app.core.config import settings
@@ -135,3 +135,23 @@ def decrypt_api_key(encrypted_key: str) -> str:
         raise ValueError("FERNET_KEY not configured")
     decrypted: str = fernet.decrypt(encrypted_key.encode()).decode()
     return decrypted
+
+
+def decrypt_mfa_secret(stored: Optional[str]) -> Optional[str]:
+    """Decrypt a stored TOTP secret, tolerating legacy plaintext.
+
+    MFA secrets used to be stored in plaintext. To avoid locking out users
+    enrolled before at-rest encryption was added, fall back to the raw value
+    when it isn't a valid Fernet token. New secrets are written encrypted via
+    ``encrypt_api_key``; a user's stored value upgrades to ciphertext the next
+    time they (re-)enroll in MFA.
+    """
+    if not stored:
+        return stored
+    fernet = get_fernet()
+    if not fernet:
+        return stored
+    try:
+        return fernet.decrypt(stored.encode()).decode()
+    except InvalidToken:
+        return stored  # legacy plaintext secret
