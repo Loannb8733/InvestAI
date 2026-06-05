@@ -153,6 +153,7 @@ class SnapshotService:
                 Transaction.quantity,
                 Transaction.price,
                 Transaction.fee,
+                Transaction.conversion_rate,
                 Transaction.created_at,
             )
             .join(Asset, Transaction.asset_id == Asset.id)
@@ -178,7 +179,12 @@ class SnapshotService:
             quantity = Decimal(str(tx.quantity))
             price = Decimal(str(tx.price))
             _ = Decimal(str(tx.fee or 0))  # fee tracked in total_fees
-            tx_amount = quantity * price
+            # price is in the transaction currency; convert to the portfolio currency
+            # via the FX rate captured at execution (defaults to 1 for same-currency
+            # trades). Mirrors metrics_service so the invested/net-capital timeline
+            # matches the headline metrics for non-EUR trades.
+            fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+            tx_amount = quantity * price * fx
 
             # Invested: Only count money going IN with a real price (never decreases)
             # Fees are tracked separately in total_fees, not included in invested
@@ -441,6 +447,7 @@ class SnapshotService:
                 Transaction.price,
                 Transaction.fee,
                 Transaction.currency,
+                Transaction.conversion_rate,
                 Asset.symbol,
                 Asset.asset_type,
                 Transaction.created_at,
@@ -513,7 +520,10 @@ class SnapshotService:
                     quantity = float(tx.quantity)
                     price = float(tx.price)
                     tx_type = tx.transaction_type
-                    tx_amount = quantity * price
+                    # Convert tx-currency price to portfolio currency (EUR) via the
+                    # captured FX rate (defaults to 1 for same-currency trades).
+                    fx = float(tx.conversion_rate) if tx.conversion_rate else 1.0
+                    tx_amount = quantity * price * fx
 
                     if tx_type in (TransactionType.BUY,):
                         holdings[symbol] = holdings.get(symbol, 0.0) + quantity
@@ -829,9 +839,11 @@ class SnapshotService:
                 return [
                     {
                         "date": self._format_date_for_period(
-                            s.snapshot_date.replace(tzinfo=None)
-                            if hasattr(s.snapshot_date, "tzinfo") and s.snapshot_date.tzinfo
-                            else s.snapshot_date,
+                            (
+                                s.snapshot_date.replace(tzinfo=None)
+                                if hasattr(s.snapshot_date, "tzinfo") and s.snapshot_date.tzinfo
+                                else s.snapshot_date
+                            ),
                             days,
                         ),
                         "full_date": (
