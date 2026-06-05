@@ -25,6 +25,8 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    decrypt_mfa_secret,
+    encrypt_api_key,
     hash_password,
     verify_password,
 )
@@ -367,7 +369,7 @@ async def login(
         except Exception:
             pass  # Redis down — fail open
 
-        totp = pyotp.TOTP(user.mfa_secret)
+        totp = pyotp.TOTP(decrypt_mfa_secret(user.mfa_secret))
         if totp.verify(login_data.mfa_code):
             # Mark code as used to prevent replay
             try:
@@ -577,8 +579,8 @@ async def setup_mfa(
     plain_codes = [secrets.token_hex(4) for _ in range(10)]
     hashed_codes = [hash_password(code) for code in plain_codes]
 
-    # Store secret and backup codes (not enabled yet)
-    current_user.mfa_secret = secret
+    # Store secret (encrypted at rest) and backup codes (not enabled yet)
+    current_user.mfa_secret = encrypt_api_key(secret)
     current_user.mfa_backup_codes = json.dumps(hashed_codes)
     await db.commit()
 
@@ -604,7 +606,7 @@ async def verify_mfa(
             detail="Configuration MFA non initialisée",
         )
 
-    totp = pyotp.TOTP(current_user.mfa_secret)
+    totp = pyotp.TOTP(decrypt_mfa_secret(current_user.mfa_secret))
     if not totp.verify(request_data.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -632,7 +634,7 @@ async def disable_mfa(
             detail="MFA non activé",
         )
 
-    totp = pyotp.TOTP(current_user.mfa_secret)
+    totp = pyotp.TOTP(decrypt_mfa_secret(current_user.mfa_secret))
     if not totp.verify(request_data.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -674,7 +676,7 @@ async def regenerate_backup_codes(
             detail="MFA non activé",
         )
 
-    totp = pyotp.TOTP(current_user.mfa_secret)
+    totp = pyotp.TOTP(decrypt_mfa_secret(current_user.mfa_secret))
     if not totp.verify(request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
