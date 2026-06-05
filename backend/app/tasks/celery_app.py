@@ -21,6 +21,7 @@ celery_app = Celery(
         "app.tasks.monitor_delays",
         "app.tasks.import_history",
         "app.tasks.contrarian_stats",
+        "app.tasks.regime_alerts",
     ],
 )
 
