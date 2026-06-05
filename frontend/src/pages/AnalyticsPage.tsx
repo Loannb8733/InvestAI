@@ -277,6 +277,8 @@ export default function AnalyticsPage() {
       ? analyticsApi.getGlobal(periodDays)
       : analyticsApi.getPortfolio(selectedPortfolio, periodDays),
     ...analyticsQueryOpts,
+    // Page shows its own isError card → opt out of the global error toast (no double-report).
+    meta: { suppressGlobalError: true },
     placeholderData: keepPreviousData,
   })
 

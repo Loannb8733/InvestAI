@@ -158,6 +158,8 @@ export default function SmartInsightsPage() {
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<PortfolioHealth>({
     queryKey: queryKeys.smartInsights.health(days),
+    // Page shows its own isError card → opt out of the global error toast (no double-report).
+    meta: { suppressGlobalError: true },
     queryFn: () => smartInsightsApi.getHealth(days),
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
