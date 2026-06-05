@@ -55,7 +55,8 @@ def fetch_fng() -> pd.DataFrame:
 
 def fetch_btc_daily() -> pd.DataFrame:
     """BTC daily close (USD) from Binance, paginated since 2017-08."""
-    base = "https://api.binance.com/api/v3/klines"
+    # Public market-data host (tolerates datacenter IPs; api.binance.com 418-bans them).
+    base = "https://data-api.binance.vision/api/v3/klines"
     start = int(dt.datetime(2017, 8, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
     rows: list = []
     while True:
