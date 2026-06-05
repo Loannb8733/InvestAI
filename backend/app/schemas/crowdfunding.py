@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.models.crowdfunding_project import ProjectStatus, RepaymentType
 from app.models.crowdfunding_repayment import PaymentType
+from app.schemas._money import Money
 
 # ---------- Request schemas ----------
 
@@ -19,14 +20,14 @@ class CrowdfundingProjectCreate(BaseModel):
     project_name: str = Field(..., max_length=300)
     description: Optional[str] = None
     project_url: Optional[str] = Field(None, max_length=500)
-    invested_amount: Decimal = Field(..., ge=0)
-    annual_rate: Decimal = Field(..., ge=0, le=100)
+    invested_amount: Money = Field(..., ge=0)
+    annual_rate: Money = Field(..., ge=0, le=100)
     duration_months: int = Field(..., ge=1, le=360)
     repayment_type: RepaymentType = RepaymentType.IN_FINE
     start_date: Optional[date] = None
     estimated_end_date: Optional[date] = None
     interest_frequency: Optional[str] = Field("at_maturity", max_length=20)
-    tax_rate: Decimal = Field(Decimal("30.00"), ge=0, le=100)
+    tax_rate: Money = Field(Decimal("30.00"), ge=0, le=100)
     delay_months: int = Field(0, ge=0, le=120)
     status: ProjectStatus = ProjectStatus.ACTIVE
 
@@ -36,8 +37,8 @@ class CrowdfundingProjectUpdate(BaseModel):
     description: Optional[str] = None
     project_url: Optional[str] = Field(None, max_length=500)
     platform: Optional[str] = Field(None, max_length=100)
-    invested_amount: Optional[Decimal] = Field(None, gt=0)
-    annual_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    invested_amount: Optional[Money] = Field(None, gt=0)
+    annual_rate: Optional[Money] = Field(None, ge=0, le=100)
     duration_months: Optional[int] = Field(None, ge=1, le=360)
     repayment_type: Optional[RepaymentType] = None
     start_date: Optional[date] = None
@@ -45,9 +46,9 @@ class CrowdfundingProjectUpdate(BaseModel):
     actual_end_date: Optional[date] = None
     status: Optional[ProjectStatus] = None
     interest_frequency: Optional[str] = Field(None, max_length=20)
-    tax_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    tax_rate: Optional[Money] = Field(None, ge=0, le=100)
     delay_months: Optional[int] = Field(None, ge=0, le=120)
-    total_received: Optional[Decimal] = Field(None, ge=0)
+    total_received: Optional[Money] = Field(None, ge=0)
 
 
 # ---------- Repayment schemas ----------
@@ -55,11 +56,11 @@ class CrowdfundingProjectUpdate(BaseModel):
 
 class RepaymentCreate(BaseModel):
     payment_date: date
-    amount: Decimal = Field(..., gt=0)
+    amount: Money = Field(..., gt=0)
     payment_type: PaymentType
-    interest_amount: Optional[Decimal] = Field(None, ge=0)
-    capital_amount: Optional[Decimal] = Field(None, ge=0)
-    tax_amount: Optional[Decimal] = Field(None, ge=0)
+    interest_amount: Optional[Money] = Field(None, ge=0)
+    capital_amount: Optional[Money] = Field(None, ge=0)
+    tax_amount: Optional[Money] = Field(None, ge=0)
     notes: Optional[str] = None
 
 
@@ -67,11 +68,11 @@ class RepaymentResponse(BaseModel):
     id: UUID
     project_id: UUID
     payment_date: date
-    amount: Decimal
+    amount: Money
     payment_type: PaymentType
-    interest_amount: Optional[Decimal] = None
-    capital_amount: Optional[Decimal] = None
-    tax_amount: Optional[Decimal] = None
+    interest_amount: Optional[Money] = None
+    capital_amount: Optional[Money] = None
+    tax_amount: Optional[Money] = None
     notes: Optional[str] = None
     created_at: datetime
 
@@ -98,8 +99,8 @@ class PaymentScheduleEntryResponse(BaseModel):
     id: UUID
     project_id: UUID
     due_date: date
-    expected_capital: Decimal
-    expected_interest: Decimal
+    expected_capital: Money
+    expected_interest: Money
     is_completed: bool
     completed_at: Optional[datetime] = None
     repayment_id: Optional[UUID] = None
@@ -116,18 +117,18 @@ class CrowdfundingProjectResponse(BaseModel):
     project_name: Optional[str] = None
     description: Optional[str] = None
     project_url: Optional[str] = None
-    invested_amount: Decimal
-    annual_rate: Decimal
+    invested_amount: Money
+    annual_rate: Money
     duration_months: int
     repayment_type: RepaymentType
     interest_frequency: Optional[str] = "at_maturity"
-    tax_rate: Decimal = Decimal("30.00")
+    tax_rate: Money = Decimal("30.00")
     delay_months: int = 0
     start_date: Optional[date] = None
     estimated_end_date: Optional[date] = None
     actual_end_date: Optional[date] = None
     status: ProjectStatus
-    total_received: Decimal
+    total_received: Money
     created_at: datetime
     updated_at: datetime
 
