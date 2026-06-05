@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     FERNET_KEY: str  # Required - no default
     FERNET_OLD_KEYS: Optional[str] = None  # Comma-separated old keys for rotation
 
+    # Shared secret for cron-triggered task endpoints (/api/v1/cron/*). When empty,
+    # those endpoints are disabled (503). Set to a long random value in prod and in
+    # the GitHub Actions cron workflow that calls them. No worker needed on free tier.
+    CRON_SECRET: str = ""
+
     # Cookie settings
     COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
     COOKIE_SECURE: bool = True  # Secure by default; overridden to False in dev via .env

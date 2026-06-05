@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     auth,
     calendar,
     cold_wallets,
+    cron,
     crowdfunding,
     dashboard,
     goals,
@@ -40,6 +41,7 @@ api_router.include_router(assets.router, prefix="/assets", tags=["Assets"])
 api_router.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
 api_router.include_router(api_keys.router, prefix="/api-keys", tags=["API Keys"])
 api_router.include_router(cold_wallets.router, prefix="/cold-wallets", tags=["Cold Wallets"])
+api_router.include_router(cron.router, prefix="/cron", tags=["Cron"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(predictions.router, prefix="/predictions", tags=["Predictions"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
