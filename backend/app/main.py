@@ -42,6 +42,8 @@ if settings.sentry_enabled:
     from sentry_sdk.integrations.redis import RedisIntegration
     from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
+    from app.core.sentry_scrub import scrub_event
+
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.APP_ENV,
@@ -55,6 +57,12 @@ if settings.sentry_enabled:
             RedisIntegration(),
         ],
         send_default_pii=False,
+        # Scrub Authorization/Cookie headers and any payload field whose name
+        # matches password/secret/token/api_key/mfa/totp/… before events leave
+        # the process. FastApiIntegration would otherwise capture login bodies,
+        # JWT bearer tokens, exchange API keys, and MFA codes.
+        before_send=scrub_event,
+        before_send_transaction=scrub_event,
     )
     logger.info("Sentry initialized (env=%s)", settings.APP_ENV)
 
