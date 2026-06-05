@@ -1,5 +1,5 @@
 """Price forecasting using an ensemble of models:
-   Prophet, ARIMA, XGBoost, EMA, Linear Regression, and Mean-Reversion (OU).
+Prophet, ARIMA, XGBoost, EMA, Linear Regression, and Mean-Reversion (OU).
 """
 
 import json
@@ -635,8 +635,12 @@ class PriceForecaster:
             feats.append(0.0)
 
         # --- RSI 14 (1 feature) --- use pre-computed array if available (P8)
-        if rsi_array is not None and idx < len(rsi_array):
-            feats.append(float(rsi_array[idx]))
+        # Use RSI as of idx-1: rsi_array[j] incorporates prices[j], so rsi_array[idx]
+        # would leak the target price[idx] into training AND mismatch predict-time
+        # (which has no future data). idx-1 matches the leak-free inline fallback below
+        # and keeps train/serve semantics identical.
+        if rsi_array is not None and idx >= 1 and idx - 1 < len(rsi_array):
+            feats.append(float(rsi_array[idx - 1]))
         elif idx >= 15:
             period = 14
             all_deltas = [prices[j] - prices[j - 1] for j in range(1, idx)]
