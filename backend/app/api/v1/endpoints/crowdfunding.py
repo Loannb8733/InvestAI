@@ -52,6 +52,29 @@ def _compute_schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
     return "pending"
 
 
+def _interest_earned(
+    project: CrowdfundingProject,
+    repayments: Optional[list[CrowdfundingRepayment]] = None,
+) -> float:
+    """Real interest earned to date.
+
+    Sum of ``CrowdfundingRepayment.interest_amount`` actually recorded — the
+    only source of truth when the schedule may vary (delays, missed coupons,
+    early repayments). Falls back to ``total_received - invested`` only once
+    the project is COMPLETED (capital is then fully back, the surplus is by
+    construction the realised interest). Returns 0 when in-progress and the
+    user hasn't filled the interest/capital split yet — better to show zero
+    than to mislabel returned capital as interest.
+    """
+    if project.status == ProjectStatus.COMPLETED:
+        received = float(project.total_received or 0)
+        invested = float(project.invested_amount or 0)
+        return max(0.0, received - invested)
+    if not repayments:
+        return 0.0
+    return float(sum((r.interest_amount or Decimal("0")) for r in repayments))
+
+
 def _enrich(
     project: CrowdfundingProject,
     documents: Optional[list[ProjectDocument]] = None,
@@ -62,11 +85,10 @@ def _enrich(
     invested = float(project.invested_amount)
     rate = float(project.annual_rate) / 100
     months = int(project.duration_months)
-    received = float(project.total_received)
     tax_multiplier = 1 - float(project.tax_rate or 0) / 100
 
     projected_total = invested * rate * months / 12 * tax_multiplier
-    interest_earned = max(0.0, received - invested) if project.status == ProjectStatus.COMPLETED else received
+    interest_earned = _interest_earned(project, repayments)
 
     progress = 0.0
     if project.start_date and months > 0:
@@ -357,6 +379,7 @@ async def get_performance(
     db: AsyncSession = Depends(get_db),
 ):
     projects = await _get_user_projects(db, current_user.id)
+    repayments_by_project = await _get_repayments_for_projects(db, [p.id for p in projects])
 
     performance = []
     for p in projects:
@@ -387,13 +410,7 @@ async def get_performance(
                 "repayment_type": p.repayment_type.value,
                 "projected_total_interest": round(projected_total, 2),
                 "total_received": received,
-                "interest_earned": round(
-                    max(
-                        0,
-                        received - (invested if p.status == ProjectStatus.COMPLETED else 0),
-                    ),
-                    2,
-                ),
+                "interest_earned": round(_interest_earned(p, repayments_by_project.get(p.id)), 2),
                 "elapsed_months": round(elapsed_months, 1),
                 "progress_percent": round(min(100, elapsed_months / max(1, months) * 100), 1),
                 "on_track": on_track,
