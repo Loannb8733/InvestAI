@@ -209,13 +209,25 @@ async def create_transaction(
             await db.flush()
         asset = target_asset
 
-    # Sanitize values to prevent numeric overflow
-    # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
-    _MAX = Decimal("9999999999")
+    # Clamp to each column's REAL capacity as a last-resort overflow guard, far
+    # above any realistic amount — and LOG if it ever triggers (never silently
+    # truncate). Real columns: Transaction.quantity Numeric(30,12),
+    # price/fee Numeric(24,12), Asset.quantity Numeric(24,8). The previous blanket
+    # 1e10 cap wrongly truncated large but legitimate holdings (high-supply
+    # memecoins like SHIB/PEPE) with no error.
+    _MAX_QTY = Decimal("9.9999e17")
+    _MAX_PRICE = Decimal("9.9999e11")
+    _MAX_ASSET_QTY = Decimal("9.9999e15")
 
-    quantity = min(transaction_in.quantity, _MAX)
-    price = min(transaction_in.price, _MAX)
-    fee = min(transaction_in.fee if transaction_in.fee else Decimal("0"), _MAX)
+    def _clamp(value: Decimal, cap: Decimal, field: str) -> Decimal:
+        if value > cap:
+            logger.warning("Transaction %s=%s exceeds column capacity; clamping to %s", field, value, cap)
+            return cap
+        return value
+
+    quantity = _clamp(transaction_in.quantity, _MAX_QTY, "quantity")
+    price = _clamp(transaction_in.price, _MAX_PRICE, "price")
+    fee = _clamp(transaction_in.fee if transaction_in.fee else Decimal("0"), _MAX_PRICE, "fee")
 
     transaction = Transaction(
         asset_id=asset.id,
@@ -259,7 +271,7 @@ async def create_transaction(
 
     _ZERO = Decimal("0")
     if transaction_in.transaction_type.value in add_types:
-        asset.quantity = min((asset.quantity or _ZERO) + quantity, _MAX)
+        asset.quantity = _clamp((asset.quantity or _ZERO) + quantity, _MAX_ASSET_QTY, "asset.quantity")
     elif transaction_in.transaction_type.value in subtract_types:
         # Allow historical sells even when quantity was already synced to 0
         # (e.g. exchange sync updated balance before the transaction was recorded).

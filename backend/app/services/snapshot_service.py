@@ -1165,7 +1165,10 @@ class SnapshotService:
             }
         # Use ceil-based index for correct empirical percentile
         var_index = max(0, math.ceil((1 - confidence_level) * n) - 1)
-        var_percent = abs(sorted_returns[var_index]) * 100
+        # VaR is a LOSS: only a negative return counts. If the 5th-percentile
+        # return is positive (no loss in the left tail), VaR is 0 — abs() would
+        # wrongly invent a loss.
+        var_percent = max(0.0, -sorted_returns[var_index]) * 100
 
         # Calculate VaR amount
         var_amount = current_value * (var_percent / 100) if current_value > 0 else 0
