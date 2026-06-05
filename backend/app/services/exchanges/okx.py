@@ -177,7 +177,7 @@ class OkxService(BaseExchangeService):
                                 price=Decimal(trade.get("fillPx", "0")),
                                 fee=abs(Decimal(trade.get("fee", "0"))),
                                 fee_currency=trade.get("feeCcy", ""),
-                                timestamp=datetime.fromtimestamp(int(ts) / 1000),
+                                timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
                             )
                         )
                         fetched += 1
@@ -246,7 +246,7 @@ class OkxService(BaseExchangeService):
                             deposit_id=deposit.get("depId", ""),
                             symbol=deposit.get("ccy", ""),
                             amount=Decimal(deposit.get("amt", "0")),
-                            timestamp=datetime.fromtimestamp(int(ts) / 1000),
+                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
                             status=status_map.get(dep_status, "unknown"),
                             tx_id=deposit.get("txId"),
                         )
@@ -312,7 +312,7 @@ class OkxService(BaseExchangeService):
                             symbol=withdrawal.get("ccy", ""),
                             amount=Decimal(withdrawal.get("amt", "0")),
                             fee=Decimal(withdrawal.get("fee", "0")),
-                            timestamp=datetime.fromtimestamp(int(ts) / 1000),
+                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
                             status=status_map.get(w_status, "unknown"),
                             tx_id=withdrawal.get("txId"),
                             address=withdrawal.get("to"),

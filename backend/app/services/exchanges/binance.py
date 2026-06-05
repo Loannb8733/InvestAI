@@ -6,7 +6,7 @@ import hmac
 import logging
 import ssl
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -449,7 +449,7 @@ class BinanceService(BaseExchangeService):
                                 price=Decimal(trade["price"]),
                                 fee=Decimal(trade["commission"]),
                                 fee_currency=trade["commissionAsset"],
-                                timestamp=datetime.utcfromtimestamp(trade["time"] / 1000),
+                                timestamp=datetime.fromtimestamp(trade["time"] / 1000, tz=timezone.utc),
                             )
                         )
 
@@ -575,7 +575,7 @@ class BinanceService(BaseExchangeService):
                         deposit_id=deposit.get("id", deposit.get("txId", "")),
                         symbol=deposit["coin"],
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.utcfromtimestamp(deposit["insertTime"] / 1000),
+                        timestamp=datetime.fromtimestamp(deposit["insertTime"] / 1000, tz=timezone.utc),
                         status=status_map.get(deposit["status"], "unknown"),
                         tx_id=deposit.get("txId"),
                     )
@@ -740,7 +740,9 @@ class BinanceService(BaseExchangeService):
                                         price=price,
                                         fee=Decimal(str(order.get("totalFee", 0))),
                                         status=order.get("status", "unknown"),
-                                        timestamp=datetime.utcfromtimestamp(order.get("createTime", 0) / 1000),
+                                        timestamp=datetime.fromtimestamp(
+                                            order.get("createTime", 0) / 1000, tz=timezone.utc
+                                        ),
                                     )
                                 )
                                 total_orders_for_type += 1
@@ -819,7 +821,7 @@ class BinanceService(BaseExchangeService):
 
                     # Move end_time to the oldest conversion in this batch for next page
                     oldest_time = min(c.get("createTime", 0) for c in convert_list)
-                    end_time = datetime.utcfromtimestamp((oldest_time - 1) / 1000)
+                    end_time = datetime.fromtimestamp((oldest_time - 1) / 1000, tz=timezone.utc)
 
                 if all_conversions:
                     logger.info(f"Convert history: {len(all_conversions)} conversions found")
@@ -847,7 +849,7 @@ class BinanceService(BaseExchangeService):
                                 price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
                     # If from is crypto and to is fiat/stablecoin -> SELL
@@ -863,7 +865,7 @@ class BinanceService(BaseExchangeService):
                                 price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
                     # Crypto to crypto conversion (e.g., BTC -> ETH)
@@ -880,7 +882,7 @@ class BinanceService(BaseExchangeService):
                                 price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
                         # And buy of to_asset
@@ -895,7 +897,7 @@ class BinanceService(BaseExchangeService):
                                 price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
 
@@ -975,7 +977,7 @@ class BinanceService(BaseExchangeService):
                         from_amount = Decimal(str(conv.get("fromAmount", 0)))
                         to_amount = Decimal(str(conv.get("toAmount", 0)))
                         order_id = str(conv.get("quoteId", conv.get("orderId", "")))
-                        timestamp = datetime.utcfromtimestamp(conv.get("createTime", 0) / 1000)
+                        timestamp = datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc)
 
                         # Skip if from is fiat (can't convert from fiat here)
                         if from_asset in fiat_currencies:
@@ -1146,7 +1148,9 @@ class BinanceService(BaseExchangeService):
                                     price=source_amount / executed_amount if executed_amount > 0 else Decimal("0"),
                                     fee=Decimal("0"),
                                     status="Completed",
-                                    timestamp=datetime.utcfromtimestamp(invest.get("transactionTime", 0) / 1000),
+                                    timestamp=datetime.fromtimestamp(
+                                        invest.get("transactionTime", 0) / 1000, tz=timezone.utc
+                                    ),
                                 )
                             )
 
@@ -1219,7 +1223,7 @@ class BinanceService(BaseExchangeService):
                             price=Decimal("0"),
                             fee=Decimal("0"),
                             status="Completed",
-                            timestamp=datetime.utcfromtimestamp(row.get("time", 0) / 1000),
+                            timestamp=datetime.fromtimestamp(row.get("time", 0) / 1000, tz=timezone.utc),
                         )
                     )
 
@@ -1274,7 +1278,7 @@ class BinanceService(BaseExchangeService):
                             if rewards_amt <= 0 or not asset:
                                 continue
                             raw_time = row.get("time", 0)
-                            ts = datetime.utcfromtimestamp(raw_time / 1000)
+                            ts = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc)
                             trades.append(
                                 ExchangeTrade(
                                     trade_id=f"reward_staking_{asset}_{reward_type}_{raw_time}",

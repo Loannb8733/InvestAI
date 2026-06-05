@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -294,7 +294,7 @@ class KrakenService(BaseExchangeService):
                             price=Decimal(trade["price"]),
                             fee=Decimal(trade["fee"]),
                             fee_currency=quote_currency,
-                            timestamp=datetime.utcfromtimestamp(trade["time"]),
+                            timestamp=datetime.fromtimestamp(trade["time"], tz=timezone.utc),
                         )
                     )
 
@@ -342,7 +342,7 @@ class KrakenService(BaseExchangeService):
                         deposit_id=deposit.get("refid", ""),
                         symbol=self._normalize_asset(deposit["asset"]),
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.utcfromtimestamp(deposit["time"]),
+                        timestamp=datetime.fromtimestamp(deposit["time"], tz=timezone.utc),
                         status=deposit["status"],
                         tx_id=deposit.get("txid"),
                     )
@@ -386,7 +386,7 @@ class KrakenService(BaseExchangeService):
                         symbol=self._normalize_asset(withdrawal["asset"]),
                         amount=Decimal(withdrawal["amount"]),
                         fee=Decimal(withdrawal.get("fee", 0)),
-                        timestamp=datetime.utcfromtimestamp(withdrawal["time"]),
+                        timestamp=datetime.fromtimestamp(withdrawal["time"], tz=timezone.utc),
                         status=withdrawal["status"],
                         tx_id=withdrawal.get("txid"),
                     )
@@ -453,7 +453,7 @@ class KrakenService(BaseExchangeService):
                         {
                             "ledger_id": ledger_id,
                             "refid": entry.get("refid", ""),
-                            "time": datetime.utcfromtimestamp(entry["time"]),
+                            "time": datetime.fromtimestamp(entry["time"], tz=timezone.utc),
                             "type": entry["type"],
                             "subtype": entry.get("subtype", ""),
                             "aclass": entry.get("aclass", ""),
