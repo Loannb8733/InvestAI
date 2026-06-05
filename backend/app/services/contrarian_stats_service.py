@@ -36,7 +36,11 @@ def _fetch_fng(httpx_mod):  # type: ignore[no-untyped-def]
 
 
 def _fetch_btc_daily(httpx_mod):  # type: ignore[no-untyped-def]
-    base = "https://api.binance.com/api/v3/klines"
+    # Use Binance's public market-data host (data-api.binance.vision) instead of
+    # api.binance.com: the latter rate-bans shared cloud IPs (Render) with HTTP 418
+    # when paginating ~8 years of klines. data-api.binance.vision serves the same
+    # /api/v3/klines schema and tolerates this from datacenter IPs.
+    base = "https://data-api.binance.vision/api/v3/klines"
     start = _BTC_START_MS
     rows: list = []
     while True:
