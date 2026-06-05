@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
@@ -68,7 +69,12 @@ async def _resolve_trade_fx(
 async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) -> bool:
     """Add transaction only if its internal_hash doesn't already exist.
 
-    Returns True if added, False if duplicate.
+    Returns True if added, False if duplicate. ``internal_hash`` carries a
+    partial UNIQUE index (``uq_transactions_internal_hash``), so the SELECT
+    check is a fast happy path and the constraint catches the rare race where
+    two concurrent sync passes both miss the existing row — instead of letting
+    the whole sync transaction fail, we treat the IntegrityError as a duplicate
+    after the fact.
     """
     transaction.compute_hash()
     existing = await db.execute(select(Transaction.id).where(Transaction.internal_hash == transaction.internal_hash))
@@ -76,6 +82,12 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
         logger.debug("Skipping duplicate transaction hash=%s", transaction.internal_hash)
         return False
     db.add(transaction)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        logger.debug("Race: transaction hash=%s inserted by concurrent sync", transaction.internal_hash)
+        return False
     return True
 
 
@@ -1279,9 +1291,14 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             return {"success": True, "synced": synced_count}
 
         except Exception as e:
+            # Log the full exception server-side; surface a generic message in the
+            # task result. ``str(e)`` can carry crypto error details (InvalidToken),
+            # DB constraint names, or upstream API noise — none of which belong in
+            # the response payload or in any user-visible monitoring view.
+            logger.exception("Sync failed for api_key=%s", api_key.id)
             _classify_and_mark_error(api_key, e)
             await db.commit()
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "sync_failed"}
 
 
 async def _sync_all_exchanges_async() -> dict:
