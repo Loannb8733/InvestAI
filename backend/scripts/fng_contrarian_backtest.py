@@ -9,7 +9,8 @@ Data sources
 ------------
 - Fear & Greed Index : https://api.alternative.me/fng/?limit=0
   (same source the app uses everywhere; history since 2018-02-01)
-- BTC daily close (USD) : Binance klines BTCUSDT 1d (history since 2017-08)
+- BTC daily close (USD) : Yahoo Finance BTC-USD 1d (full history, one request)
+  Binance is not used: it rate-bans shared cloud IPs (Render) with HTTP 418.
 
 Method
 ------
@@ -54,43 +55,22 @@ def fetch_fng() -> pd.DataFrame:
 
 
 def fetch_btc_daily() -> pd.DataFrame:
-    """BTC daily close (USD) from Binance, paginated since 2017-08."""
-    # Public market-data host (tolerates datacenter IPs; api.binance.com 418-bans them).
-    base = "https://data-api.binance.vision/api/v3/klines"
-    start = int(dt.datetime(2017, 8, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
-    rows: list = []
-    while True:
-        resp = httpx.get(
-            base,
-            params={"symbol": "BTCUSDT", "interval": "1d", "startTime": start, "limit": 1000},
-            timeout=30.0,
-        )
-        resp.raise_for_status()
-        chunk = resp.json()
-        if not chunk:
-            break
-        rows.extend(chunk)
-        if len(chunk) < 1000:
-            break
-        start = chunk[-1][0] + 86_400_000
-    df = pd.DataFrame(
-        rows,
-        columns=[
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "qav",
-            "trades",
-            "tbav",
-            "tqav",
-            "ignore",
-        ],
+    """BTC daily close (USD) from Yahoo Finance — full history in one request."""
+    resp = httpx.get(
+        "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
+        params={
+            "period1": int(dt.datetime(2017, 8, 1, tzinfo=dt.timezone.utc).timestamp()),
+            "period2": int(dt.datetime.now(dt.timezone.utc).timestamp()),
+            "interval": "1d",
+        },
+        headers={"User-Agent": "Mozilla/5.0"},  # Yahoo rejects the default httpx UA
+        timeout=30.0,
     )
-    df["date"] = pd.to_datetime(df["open_time"], unit="ms", utc=True).dt.normalize()
+    resp.raise_for_status()
+    result = resp.json()["chart"]["result"][0]
+    df = pd.DataFrame({"ts": result["timestamp"], "close": result["indicators"]["quote"][0]["close"]})
+    df = df.dropna(subset=["close"])
+    df["date"] = pd.to_datetime(df["ts"], unit="s", utc=True).dt.normalize()
     df["close"] = df["close"].astype(float)
     return df[["date", "close"]].drop_duplicates("date").sort_values("date").reset_index(drop=True)
 

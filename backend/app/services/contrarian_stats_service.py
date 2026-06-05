@@ -8,7 +8,10 @@ re-run required.
 
 Data sources (same the app already uses):
 - Fear & Greed : https://api.alternative.me/fng/?limit=0  (since 2018-02-01)
-- BTC daily close (USD) : Binance klines BTCUSDT 1d  (since 2017-08)
+- BTC daily close (USD) : Yahoo Finance BTC-USD 1d  (since 2014, one request)
+  with CryptoCompare histoday as fallback. Binance is NOT used: both
+  api.binance.com and data-api.binance.vision rate-ban shared cloud IPs
+  (Render) with HTTP 418.
 
 Everything here is synchronous (httpx + pandas) so it runs cleanly inside
 a Celery worker. The result is a small JSON-serializable dict.
@@ -26,7 +29,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_THRESHOLD = 25
 HORIZON_12M = 365
 HORIZON_SHORT = 90
-_BTC_START_MS = 1_501_545_600_000  # 2017-08-01T00:00:00Z
+_BTC_START = datetime(2017, 8, 1, tzinfo=timezone.utc)
 
 
 def _fetch_fng(httpx_mod):  # type: ignore[no-untyped-def]
@@ -35,29 +38,74 @@ def _fetch_fng(httpx_mod):  # type: ignore[no-untyped-def]
     return resp.json()["data"]
 
 
-def _fetch_btc_daily(httpx_mod):  # type: ignore[no-untyped-def]
-    # Use Binance's public market-data host (data-api.binance.vision) instead of
-    # api.binance.com: the latter rate-bans shared cloud IPs (Render) with HTTP 418
-    # when paginating ~8 years of klines. data-api.binance.vision serves the same
-    # /api/v3/klines schema and tolerates this from datacenter IPs.
-    base = "https://data-api.binance.vision/api/v3/klines"
-    start = _BTC_START_MS
+def _fetch_btc_yahoo(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
+    """BTC daily close (USD) from Yahoo Finance — full history in one request."""
+    resp = httpx_mod.get(
+        "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
+        params={
+            "period1": int(_BTC_START.timestamp()),
+            "period2": int(datetime.now(timezone.utc).timestamp()),
+            "interval": "1d",
+        },
+        headers={"User-Agent": "Mozilla/5.0"},  # Yahoo rejects the default httpx UA
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    result = resp.json()["chart"]["result"][0]
+    df = pd_mod.DataFrame({"ts": result["timestamp"], "close": result["indicators"]["quote"][0]["close"]})
+    df = df.dropna(subset=["close"])
+    df["date"] = pd_mod.to_datetime(df["ts"], unit="s", utc=True).dt.normalize()
+    df["close"] = df["close"].astype(float)
+    return df[["date", "close"]].drop_duplicates("date").sort_values("date").reset_index(drop=True)
+
+
+def _fetch_btc_cryptocompare(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
+    """BTC daily close (USD) from CryptoCompare histoday — paginated fallback."""
+    base = "https://min-api.cryptocompare.com/data/v2/histoday"
+    start_ts = int(_BTC_START.timestamp())
+    to_ts = int(datetime.now(timezone.utc).timestamp())
     rows: list = []
+    seen: set = set()
     while True:
-        resp = httpx_mod.get(
-            base,
-            params={"symbol": "BTCUSDT", "interval": "1d", "startTime": start, "limit": 1000},
-            timeout=30.0,
-        )
+        resp = httpx_mod.get(base, params={"fsym": "BTC", "tsym": "USD", "limit": 2000, "toTs": to_ts}, timeout=30.0)
         resp.raise_for_status()
-        chunk = resp.json()
-        if not chunk:
+        data = [d for d in resp.json().get("Data", {}).get("Data", []) if d.get("close")]
+        fresh = [d for d in data if d["time"] not in seen]
+        if not fresh:
             break
-        rows.extend(chunk)
-        if len(chunk) < 1000:
+        seen.update(d["time"] for d in fresh)
+        rows.extend(fresh)
+        oldest = min(d["time"] for d in fresh)
+        if oldest <= start_ts:
             break
-        start = chunk[-1][0] + 86_400_000
-    return rows
+        to_ts = oldest - 86_400
+    if not rows:
+        raise ValueError("CryptoCompare returned no rows")
+    df = pd_mod.DataFrame(rows)
+    df["date"] = pd_mod.to_datetime(df["time"], unit="s", utc=True).dt.normalize()
+    df["close"] = df["close"].astype(float)
+    df = df[df["date"] >= pd_mod.Timestamp(_BTC_START)]
+    return df[["date", "close"]].drop_duplicates("date").sort_values("date").reset_index(drop=True)
+
+
+def _fetch_btc_daily(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
+    """Daily BTC close (USD) as DataFrame[date(UTC, normalized), close].
+
+    Tries Yahoo Finance first (one request, full history, tolerates datacenter
+    IPs — the app already uses it for stocks), then CryptoCompare. Binance is
+    unusable from cloud hosts (HTTP 418 on every host).
+    """
+    errors: list[str] = []
+    for name, fn in (("yahoo", _fetch_btc_yahoo), ("cryptocompare", _fetch_btc_cryptocompare)):
+        try:
+            df = fn(httpx_mod, pd_mod)
+            if df is not None and len(df) > 300:
+                logger.info("contrarian: BTC daily from %s (%d rows)", name, len(df))
+                return df
+            errors.append(f"{name}: only {0 if df is None else len(df)} rows")
+        except Exception as exc:  # noqa: BLE001 — try the next source
+            errors.append(f"{name}: {type(exc).__name__} {exc}")
+    raise RuntimeError("All BTC daily sources failed: " + " | ".join(errors))
 
 
 def _forward_returns(closes, entry_dates, horizon: int, pd_mod) -> list[float]:  # type: ignore[no-untyped-def]
@@ -85,27 +133,7 @@ def compute_contrarian_stats(threshold: int = DEFAULT_THRESHOLD) -> dict[str, An
     fng["date"] = pd.to_datetime(fng["timestamp"].astype(int), unit="s", utc=True).dt.normalize()
     fng = fng[["date", "value"]].sort_values("date").reset_index(drop=True)
 
-    btc_raw = _fetch_btc_daily(httpx)
-    btc = pd.DataFrame(
-        btc_raw,
-        columns=[
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "qav",
-            "trades",
-            "tbav",
-            "tqav",
-            "ignore",
-        ],
-    )
-    btc["date"] = pd.to_datetime(btc["open_time"], unit="ms", utc=True).dt.normalize()
-    btc["close"] = btc["close"].astype(float)
-    btc = btc[["date", "close"]].drop_duplicates("date").sort_values("date").reset_index(drop=True)
+    btc = _fetch_btc_daily(httpx, pd)
 
     df = fng.merge(btc, on="date", how="inner").sort_values("date").reset_index(drop=True).set_index("date")
     closes = df["close"]
