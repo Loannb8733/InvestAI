@@ -183,7 +183,8 @@ class SnapshotService:
             # via the FX rate captured at execution (defaults to 1 for same-currency
             # trades). Mirrors metrics_service so the invested/net-capital timeline
             # matches the headline metrics for non-EUR trades.
-            fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+            rate = getattr(tx, "conversion_rate", None)
+            fx = Decimal(str(rate)) if rate else Decimal("1")
             tx_amount = quantity * price * fx
 
             # Invested: Only count money going IN with a real price (never decreases)
@@ -522,7 +523,8 @@ class SnapshotService:
                     tx_type = tx.transaction_type
                     # Convert tx-currency price to portfolio currency (EUR) via the
                     # captured FX rate (defaults to 1 for same-currency trades).
-                    fx = float(tx.conversion_rate) if tx.conversion_rate else 1.0
+                    rate = getattr(tx, "conversion_rate", None)
+                    fx = float(rate) if rate else 1.0
                     tx_amount = quantity * price * fx
 
                     if tx_type in (TransactionType.BUY,):
