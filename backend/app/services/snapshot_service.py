@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset
@@ -98,10 +99,14 @@ class SnapshotService:
     async def create_user_snapshot_if_missing(
         self, db: AsyncSession, user_id: str, currency: str = "EUR"
     ) -> Optional[PortfolioSnapshot]:
-        """Create today's snapshot only if one doesn't exist yet.
+        """Create today's global snapshot iff one doesn't exist yet.
 
-        Uses a single-query check to avoid TOCTOU race conditions.
-        Reuses metrics already computed by the caller if available.
+        The existence check is a fast happy path; the partial UNIQUE index
+        ``uq_portfolio_snapshots_user_day_global`` (migration n5i6j7k8l9m0)
+        enforces the actual at-most-one-per-day invariant. The earlier
+        check-then-insert was a true TOCTOU — two concurrent callers (cron +
+        manual refresh) both saw 0 and both inserted. We now catch the
+        IntegrityError that the constraint raises in the race window.
         """
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         existing = await db.execute(
@@ -117,7 +122,13 @@ class SnapshotService:
         )
         if existing.scalar() > 0:
             return None
-        return await self.create_user_snapshot(db, user_id, currency)
+        try:
+            return await self.create_user_snapshot(db, user_id, currency)
+        except IntegrityError:
+            # Race against a concurrent creator — the partial UNIQUE prevented
+            # the duplicate, treat it as "already exists".
+            await db.rollback()
+            return None
 
     async def _get_invested_timeline(
         self,

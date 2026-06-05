@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.database import AsyncSessionLocal
 from app.models.portfolio import Portfolio
@@ -78,39 +79,51 @@ async def _create_all_snapshots_async() -> dict:
 
                 for portfolio in portfolios:
                     try:
-                        # Check if portfolio snapshot exists for today
-                        existing_portfolio = await db.execute(
-                            select(func.count(PortfolioSnapshot.id)).where(
-                                and_(
-                                    PortfolioSnapshot.user_id == user_id,
-                                    PortfolioSnapshot.portfolio_id == portfolio.id,
-                                    PortfolioSnapshot.snapshot_date >= today_start,
-                                    PortfolioSnapshot.snapshot_date < today_end,
+                        # SAVEPOINT per portfolio so a UNIQUE-index conflict from
+                        # the partial index uq_portfolio_snapshots_user_portfolio_day
+                        # (race against a concurrent run) only rolls back this
+                        # portfolio, not the user's already-flushed siblings.
+                        async with db.begin_nested():
+                            # Check if portfolio snapshot exists for today
+                            existing_portfolio = await db.execute(
+                                select(func.count(PortfolioSnapshot.id)).where(
+                                    and_(
+                                        PortfolioSnapshot.user_id == user_id,
+                                        PortfolioSnapshot.portfolio_id == portfolio.id,
+                                        PortfolioSnapshot.snapshot_date >= today_start,
+                                        PortfolioSnapshot.snapshot_date < today_end,
+                                    )
                                 )
                             )
+                            if existing_portfolio.scalar() > 0:
+                                continue
+
+                            # Get portfolio metrics
+                            metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), "EUR")
+
+                            if metrics.get("total_value", 0) > 0:
+                                portfolio_snapshot = PortfolioSnapshot(
+                                    user_id=user_id,
+                                    portfolio_id=portfolio.id,
+                                    snapshot_date=datetime.now(timezone.utc),
+                                    total_value=Decimal(str(metrics.get("total_value", 0))),
+                                    total_invested=Decimal(str(metrics.get("total_invested", 0))),
+                                    total_gain_loss=Decimal(str(metrics.get("total_gain_loss", 0))),
+                                    currency="EUR",
+                                )
+                                db.add(portfolio_snapshot)
+                                await db.flush()
+                                logger.debug(
+                                    f"Created portfolio snapshot: {portfolio.name} "
+                                    f"value={metrics.get('total_value', 0)}"
+                                )
+                    except IntegrityError:
+                        # Concurrent run inserted the same (user, portfolio, day);
+                        # the savepoint was rolled back, treat as already present.
+                        logger.debug(
+                            "Race: portfolio snapshot already created for portfolio=%s",
+                            portfolio.id,
                         )
-                        if existing_portfolio.scalar() > 0:
-                            continue
-
-                        # Get portfolio metrics
-                        metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), "EUR")
-
-                        if metrics.get("total_value", 0) > 0:
-                            portfolio_snapshot = PortfolioSnapshot(
-                                user_id=user_id,
-                                portfolio_id=portfolio.id,
-                                snapshot_date=datetime.now(timezone.utc),
-                                total_value=Decimal(str(metrics.get("total_value", 0))),
-                                total_invested=Decimal(str(metrics.get("total_invested", 0))),
-                                total_gain_loss=Decimal(str(metrics.get("total_gain_loss", 0))),
-                                currency="EUR",
-                            )
-                            db.add(portfolio_snapshot)
-                            await db.flush()
-                            logger.debug(
-                                f"Created portfolio snapshot: {portfolio.name} "
-                                f"value={metrics.get('total_value', 0)}"
-                            )
                     except Exception as e:
                         logger.warning(f"Failed to create snapshot for portfolio {portfolio.id}: {e}")
 
