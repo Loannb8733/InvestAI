@@ -524,9 +524,9 @@ export default function GoalsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Type d'objectif</Label>
+                <Label htmlFor="goal-type">Type d'objectif</Label>
                 <Select value={goalType} onValueChange={setGoalType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="goal-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="asset">Investissement (actifs risqués)</SelectItem>
                     <SelectItem value="savings">Épargne de Sécurité (cash/stables)</SelectItem>
@@ -534,22 +534,22 @@ export default function GoalsPage() {
                 </Select>
               </div>
               <div>
-                <Label>Nom</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={goalType === 'savings' ? "Ex: Fonds d'urgence 3 mois" : "Ex: 100k€ de patrimoine"} />
+                <Label htmlFor="goal-name">Nom</Label>
+                <Input id="goal-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={goalType === 'savings' ? "Ex: Fonds d'urgence 3 mois" : "Ex: 100k€ de patrimoine"} />
               </div>
               <div>
-                <Label>Montant cible (€)</Label>
-                <Input type="number" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="100000" />
+                <Label htmlFor="goal-target-amount">Montant cible (€)</Label>
+                <Input id="goal-target-amount" type="number" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="100000" />
               </div>
               <div>
-                <Label>Date limite</Label>
-                <Input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
+                <Label htmlFor="goal-deadline">Date limite</Label>
+                <Input id="goal-deadline" type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
               </div>
               <div className={`grid gap-3 ${goalType === 'savings' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <div>
-                  <Label>Priorité</Label>
+                  <Label htmlFor="goal-priority">Priorité</Label>
                   <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="goal-priority"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Basse</SelectItem>
                       <SelectItem value="medium">Moyenne</SelectItem>
@@ -559,9 +559,9 @@ export default function GoalsPage() {
                 </div>
                 {goalType !== 'savings' && (
                   <div>
-                    <Label>Stratégie</Label>
+                    <Label htmlFor="goal-strategy">Stratégie</Label>
                     <Select value={strategyType} onValueChange={setStrategyType}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="goal-strategy"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="conservative">Conservateur</SelectItem>
                         <SelectItem value="moderate">Modéré</SelectItem>
@@ -577,8 +577,8 @@ export default function GoalsPage() {
                 </p>
               )}
               <div>
-                <Label>Couleur</Label>
-                <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-20" />
+                <Label htmlFor="goal-color">Couleur</Label>
+                <Input id="goal-color" type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-20" />
               </div>
               <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full">
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

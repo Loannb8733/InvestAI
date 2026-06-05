@@ -450,11 +450,11 @@ function StrategyTable() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium">Alpha</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium">Phase</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium">Action</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium">Impact Portefeuille</th>
+                  <th scope="col" className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                  <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Alpha</th>
+                  <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Phase</th>
+                  <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Action</th>
+                  <th scope="col" className="text-right py-2 px-3 text-xs font-medium">Impact Portefeuille</th>
                 </tr>
               </thead>
               <tbody>
@@ -902,13 +902,13 @@ function TaxLossHarvesting() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-2">Actif</th>
-                  <th className="text-right p-2">PRU</th>
-                  <th className="text-right p-2">Prix actuel</th>
-                  <th className="text-right p-2">Valeur</th>
-                  <th className="text-right p-2">Moins-value</th>
-                  <th className="text-right p-2">%</th>
-                  <th className="text-right p-2">Eco. impôt</th>
+                  <th scope="col" className="text-left p-2">Actif</th>
+                  <th scope="col" className="text-right p-2">PRU</th>
+                  <th scope="col" className="text-right p-2">Prix actuel</th>
+                  <th scope="col" className="text-right p-2">Valeur</th>
+                  <th scope="col" className="text-right p-2">Moins-value</th>
+                  <th scope="col" className="text-right p-2">%</th>
+                  <th scope="col" className="text-right p-2">Eco. impôt</th>
                 </tr>
               </thead>
               <tbody>

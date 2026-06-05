@@ -108,11 +108,11 @@ const TrackRecordPanel = React.memo(({ symbol }: { symbol: string }) => {
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Date</th>
-                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Prédit</th>
-                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Réel</th>
-                <th className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Erreur</th>
-                <th className="text-center py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Dir.</th>
+                <th scope="col" className="text-left py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Date</th>
+                <th scope="col" className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Prédit</th>
+                <th scope="col" className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Réel</th>
+                <th scope="col" className="text-right py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Erreur</th>
+                <th scope="col" className="text-center py-1.5 px-2 text-[10px] font-medium text-muted-foreground">Dir.</th>
               </tr>
             </thead>
             <tbody>

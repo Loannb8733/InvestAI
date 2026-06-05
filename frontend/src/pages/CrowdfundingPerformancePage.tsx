@@ -188,14 +188,14 @@ export default function CrowdfundingPerformancePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 font-medium">Projet</th>
-                  <th className="pb-2 font-medium">Plateforme</th>
-                  <th className="pb-2 font-medium text-right">Investi</th>
-                  <th className="pb-2 font-medium text-right">Taux</th>
-                  <th className="pb-2 font-medium text-right">Projeté</th>
-                  <th className="pb-2 font-medium text-right">Reçu</th>
-                  <th className="pb-2 font-medium text-center">Progression</th>
-                  <th className="pb-2 font-medium text-center">Statut</th>
+                  <th scope="col" className="pb-2 font-medium">Projet</th>
+                  <th scope="col" className="pb-2 font-medium">Plateforme</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Investi</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Taux</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Projeté</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Reçu</th>
+                  <th scope="col" className="pb-2 font-medium text-center">Progression</th>
+                  <th scope="col" className="pb-2 font-medium text-center">Statut</th>
                 </tr>
               </thead>
               <tbody>

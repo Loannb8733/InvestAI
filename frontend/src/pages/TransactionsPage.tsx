@@ -585,7 +585,7 @@ export default function TransactionsPage() {
   // ============== Render Helpers ==============
 
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <th
+    <th scope="col"
       className="text-center py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
       onClick={() => handleSort(field)}
     >
@@ -980,7 +980,7 @@ export default function TransactionsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-center py-3 w-10">
+                      <th scope="col" className="text-center py-3 w-10">
                         <Checkbox
                           checked={
                             paginatedTransactions.length > 0 &&
@@ -992,12 +992,12 @@ export default function TransactionsPage() {
                       <SortableHeader field="date">Date</SortableHeader>
                       <SortableHeader field="type">Type</SortableHeader>
                       <SortableHeader field="asset">Actif</SortableHeader>
-                      <th className="text-center py-3 text-sm font-medium text-muted-foreground">Plateforme</th>
+                      <th scope="col" className="text-center py-3 text-sm font-medium text-muted-foreground">Plateforme</th>
                       <SortableHeader field="quantity">Quantité</SortableHeader>
                       <SortableHeader field="price">Prix</SortableHeader>
                       <SortableHeader field="total">Total</SortableHeader>
                       <SortableHeader field="fee">Frais</SortableHeader>
-                      <th className="text-center py-3 text-sm font-medium text-muted-foreground w-20">Actions</th>
+                      <th scope="col" className="text-center py-3 text-sm font-medium text-muted-foreground w-20">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

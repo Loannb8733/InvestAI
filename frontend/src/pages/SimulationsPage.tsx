@@ -304,9 +304,10 @@ export default function SimulationsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Valeur actuelle du portefeuille</Label>
+                    <Label htmlFor="fire-current-value">Valeur actuelle du portefeuille</Label>
                     <div className="relative">
                       <Input
+                        id="fire-current-value"
                         type="number"
                         value={fireParams.current_portfolio_value}
                         onChange={(e) =>
@@ -336,8 +337,9 @@ export default function SimulationsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Contribution mensuelle</Label>
+                    <Label htmlFor="fire-monthly-contribution">Contribution mensuelle</Label>
                     <Input
+                      id="fire-monthly-contribution"
                       type="number"
                       value={fireParams.monthly_contribution}
                       onChange={(e) =>
@@ -348,8 +350,9 @@ export default function SimulationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Dépenses mensuelles prévues à la retraite</Label>
+                  <Label htmlFor="fire-monthly-expenses">Dépenses mensuelles prévues à la retraite</Label>
                   <Input
+                    id="fire-monthly-expenses"
                     type="number"
                     value={fireParams.monthly_expenses}
                     onChange={(e) =>
@@ -360,8 +363,9 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Rendement annuel attendu (%)</Label>
+                    <Label htmlFor="fire-expected-return">Rendement annuel attendu (%)</Label>
                     <Input
+                      id="fire-expected-return"
                       type="number"
                       step="0.1"
                       value={fireParams.expected_annual_return}
@@ -371,8 +375,9 @@ export default function SimulationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Frais annuels / TER (%)</Label>
+                    <Label htmlFor="fire-expense-ratio">Frais annuels / TER (%)</Label>
                     <Input
+                      id="fire-expense-ratio"
                       type="number"
                       step="0.05"
                       value={fireParams.expense_ratio}
@@ -386,9 +391,10 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Inflation (%)</Label>
+                    <Label htmlFor="fire-inflation">Inflation (%)</Label>
                     <div className="flex gap-2">
                       <Input
+                        id="fire-inflation"
                         type="number"
                         step="0.1"
                         value={fireParams.inflation_rate}
@@ -418,8 +424,9 @@ export default function SimulationsPage() {
                     <p className="text-xs text-muted-foreground">Taux auto-suggéré pour {userCurrency}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Taux de retrait (%)</Label>
+                    <Label htmlFor="fire-withdrawal-rate">Taux de retrait (%)</Label>
                     <Input
+                      id="fire-withdrawal-rate"
                       type="number"
                       step="0.1"
                       value={fireParams.withdrawal_rate}
@@ -431,8 +438,9 @@ export default function SimulationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Horizon (années)</Label>
+                  <Label htmlFor="fire-target-years">Horizon (années)</Label>
                   <Input
+                    id="fire-target-years"
                     type="number"
                     value={fireParams.target_years}
                     onChange={(e) =>
@@ -632,8 +640,9 @@ export default function SimulationsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Horizon (années)</Label>
+                    <Label htmlFor="projection-years">Horizon (années)</Label>
                     <Input
+                      id="projection-years"
                       type="number"
                       value={projectionParams.years}
                       onChange={(e) =>
@@ -642,8 +651,9 @@ export default function SimulationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Rendement annuel (%)</Label>
+                    <Label htmlFor="projection-expected-return">Rendement annuel (%)</Label>
                     <Input
+                      id="projection-expected-return"
                       type="number"
                       step="0.1"
                       value={projectionParams.expected_return}
@@ -656,8 +666,9 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Frais annuels / TER (%)</Label>
+                    <Label htmlFor="projection-expense-ratio">Frais annuels / TER (%)</Label>
                     <Input
+                      id="projection-expense-ratio"
                       type="number"
                       step="0.05"
                       value={projectionParams.expense_ratio}
@@ -668,8 +679,9 @@ export default function SimulationsPage() {
                     <p className="text-xs text-muted-foreground">Déduit du rendement brut</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Contribution mensuelle</Label>
+                    <Label htmlFor="projection-monthly-contribution">Contribution mensuelle</Label>
                     <Input
+                      id="projection-monthly-contribution"
                       type="number"
                       value={projectionParams.monthly_contribution}
                       onChange={(e) =>
@@ -683,9 +695,10 @@ export default function SimulationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Inflation (%)</Label>
+                  <Label htmlFor="projection-inflation">Inflation (%)</Label>
                   <div className="flex gap-2">
                     <Input
+                      id="projection-inflation"
                       type="number"
                       step="0.1"
                       value={projectionParams.inflation_rate}
@@ -900,12 +913,12 @@ export default function SimulationsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Horizon (jours)</Label>
+                  <Label htmlFor="mc-horizon">Horizon (jours)</Label>
                   <Select
                     value={String(mcParams.horizon)}
                     onValueChange={(v) => setMcParams({ ...mcParams, horizon: parseInt(v) })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="mc-horizon">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -919,8 +932,9 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Taux de retrait annuel (%)</Label>
+                    <Label htmlFor="mc-withdrawal-rate">Taux de retrait annuel (%)</Label>
                     <Input
+                      id="mc-withdrawal-rate"
                       type="number"
                       step="0.5"
                       value={mcParams.annual_withdrawal_rate}
@@ -931,8 +945,9 @@ export default function SimulationsPage() {
                     <p className="text-xs text-muted-foreground">0 = buy & hold</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>TER / Frais annuels (%)</Label>
+                    <Label htmlFor="mc-ter">TER / Frais annuels (%)</Label>
                     <Input
+                      id="mc-ter"
                       type="number"
                       step="0.05"
                       value={mcParams.ter_percentage}
@@ -1138,8 +1153,9 @@ export default function SimulationsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Montant total à investir</Label>
+                  <Label htmlFor="dca-total-amount">Montant total à investir</Label>
                   <Input
+                    id="dca-total-amount"
                     type="number"
                     value={dcaParams.total_amount}
                     onChange={(e) =>
@@ -1150,12 +1166,12 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Fréquence</Label>
+                    <Label htmlFor="dca-frequency">Fréquence</Label>
                     <Select
                       value={dcaParams.frequency}
                       onValueChange={(v) => setDcaParams({ ...dcaParams, frequency: v })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="dca-frequency">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1166,8 +1182,9 @@ export default function SimulationsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Durée (mois)</Label>
+                    <Label htmlFor="dca-duration">Durée (mois)</Label>
                     <Input
+                      id="dca-duration"
                       type="number"
                       value={dcaParams.duration_months}
                       onChange={(e) =>
@@ -1179,8 +1196,9 @@ export default function SimulationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Volatilité attendue (%)</Label>
+                    <Label htmlFor="dca-volatility">Volatilité attendue (%)</Label>
                     <Input
+                      id="dca-volatility"
                       type="number"
                       step="0.1"
                       value={dcaParams.expected_volatility}
@@ -1190,8 +1208,9 @@ export default function SimulationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Rendement attendu (%)</Label>
+                    <Label htmlFor="dca-expected-return">Rendement attendu (%)</Label>
                     <Input
+                      id="dca-expected-return"
                       type="number"
                       step="0.1"
                       value={dcaParams.expected_return}

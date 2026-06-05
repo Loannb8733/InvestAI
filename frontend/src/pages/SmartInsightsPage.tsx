@@ -707,12 +707,12 @@ export default function SmartInsightsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-2">Actif</th>
-                        <th className="text-center p-2">Action</th>
-                        <th className="text-right p-2">Poids actuel</th>
-                        <th className="text-right p-2">Poids cible</th>
-                        <th className="text-right p-2">Montant</th>
-                        <th className="text-left p-2">Raison</th>
+                        <th scope="col" className="text-left p-2">Actif</th>
+                        <th scope="col" className="text-center p-2">Action</th>
+                        <th scope="col" className="text-right p-2">Poids actuel</th>
+                        <th scope="col" className="text-right p-2">Poids cible</th>
+                        <th scope="col" className="text-right p-2">Montant</th>
+                        <th scope="col" className="text-left p-2">Raison</th>
                       </tr>
                     </thead>
                     <tbody>

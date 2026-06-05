@@ -81,11 +81,11 @@ export default function PredictionListView({
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium">Actif</th>
-                    <th className="text-left py-3 px-4 font-medium">Variation</th>
-                    <th className="text-center py-3 px-4 font-medium">Signal</th>
-                    <th className="text-center py-3 px-4 font-medium">Fiabilité</th>
-                    <th className="w-8"></th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium">Actif</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium">Variation</th>
+                    <th scope="col" className="text-center py-3 px-4 font-medium">Signal</th>
+                    <th scope="col" className="text-center py-3 px-4 font-medium">Fiabilité</th>
+                    <th scope="col" className="w-8"></th>
                   </tr>
                 </thead>
                 <tbody>

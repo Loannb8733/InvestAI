@@ -179,12 +179,12 @@ export default function AdminPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 text-sm font-medium text-muted-foreground">Utilisateur</th>
-                  <th className="text-left py-3 text-sm font-medium text-muted-foreground">Rôle</th>
-                  <th className="text-left py-3 text-sm font-medium text-muted-foreground">Statut</th>
-                  <th className="text-left py-3 text-sm font-medium text-muted-foreground">MFA</th>
-                  <th className="text-left py-3 text-sm font-medium text-muted-foreground">Créé le</th>
-                  <th className="text-right py-3 text-sm font-medium text-muted-foreground">Actions</th>
+                  <th scope="col" className="text-left py-3 text-sm font-medium text-muted-foreground">Utilisateur</th>
+                  <th scope="col" className="text-left py-3 text-sm font-medium text-muted-foreground">Rôle</th>
+                  <th scope="col" className="text-left py-3 text-sm font-medium text-muted-foreground">Statut</th>
+                  <th scope="col" className="text-left py-3 text-sm font-medium text-muted-foreground">MFA</th>
+                  <th scope="col" className="text-left py-3 text-sm font-medium text-muted-foreground">Créé le</th>
+                  <th scope="col" className="text-right py-3 text-sm font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
