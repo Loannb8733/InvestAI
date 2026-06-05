@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -217,7 +217,7 @@ class BybitService(BaseExchangeService):
                                 price=Decimal(trade.get("execPrice", "0")),
                                 fee=Decimal(trade.get("execFee", "0")),
                                 fee_currency=trade.get("feeCurrency", ""),
-                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000),
+                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000, tz=timezone.utc),
                             )
                         )
                         fetched += 1
@@ -286,9 +286,11 @@ class BybitService(BaseExchangeService):
                             deposit_id=deposit.get("id", ""),
                             symbol=deposit.get("coin", ""),
                             amount=Decimal(deposit.get("amount", "0")),
-                            timestamp=datetime.fromtimestamp(int(success_time) / 1000)
-                            if int(success_time) > 0
-                            else datetime.now(),
+                            timestamp=(
+                                datetime.fromtimestamp(int(success_time) / 1000, tz=timezone.utc)
+                                if int(success_time) > 0
+                                else datetime.now()
+                            ),
                             status=status_map.get(dep_status, "unknown"),
                             tx_id=deposit.get("txID"),
                         )
@@ -354,9 +356,11 @@ class BybitService(BaseExchangeService):
                             symbol=withdrawal.get("coin", ""),
                             amount=Decimal(withdrawal.get("amount", "0")),
                             fee=Decimal(withdrawal.get("withdrawFee", "0")),
-                            timestamp=datetime.fromtimestamp(int(create_time) / 1000)
-                            if int(create_time) > 0
-                            else datetime.now(),
+                            timestamp=(
+                                datetime.fromtimestamp(int(create_time) / 1000, tz=timezone.utc)
+                                if int(create_time) > 0
+                                else datetime.now()
+                            ),
                             status=status_map.get(w_status, "unknown"),
                             tx_id=withdrawal.get("txID"),
                             address=withdrawal.get("toAddress"),

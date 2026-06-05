@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -237,7 +237,7 @@ class GateIOService(BaseExchangeService):
                             price=Decimal(str(trade.get("price", "0"))),
                             fee=Decimal(str(trade.get("fee", "0"))),
                             fee_currency=trade.get("fee_currency", ""),
-                            timestamp=datetime.fromtimestamp(int(trade.get("create_time", 0))),
+                            timestamp=datetime.fromtimestamp(int(trade.get("create_time", 0)), tz=timezone.utc),
                         )
                     )
 
@@ -304,7 +304,7 @@ class GateIOService(BaseExchangeService):
                             deposit_id=str(deposit.get("id", "")),
                             symbol=deposit.get("currency", ""),
                             amount=Decimal(str(deposit.get("amount", "0"))),
-                            timestamp=datetime.fromtimestamp(int(deposit.get("timestamp", 0))),
+                            timestamp=datetime.fromtimestamp(int(deposit.get("timestamp", 0)), tz=timezone.utc),
                             status=status_map.get(deposit.get("status", ""), "unknown"),
                             tx_id=deposit.get("txid"),
                         )
@@ -374,7 +374,7 @@ class GateIOService(BaseExchangeService):
                             symbol=withdrawal.get("currency", ""),
                             amount=Decimal(str(withdrawal.get("amount", "0"))),
                             fee=Decimal(str(withdrawal.get("fee", "0"))),
-                            timestamp=datetime.fromtimestamp(int(withdrawal.get("timestamp", 0))),
+                            timestamp=datetime.fromtimestamp(int(withdrawal.get("timestamp", 0)), tz=timezone.utc),
                             status=status_map.get(withdrawal.get("status", ""), "unknown"),
                             tx_id=withdrawal.get("txid"),
                             address=withdrawal.get("address"),

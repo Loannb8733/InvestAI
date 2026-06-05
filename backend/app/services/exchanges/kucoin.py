@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -201,7 +201,7 @@ class KuCoinService(BaseExchangeService):
                                 price=Decimal(fill.get("price", "0")),
                                 fee=Decimal(fill.get("fee", "0")),
                                 fee_currency=fee_currency,
-                                timestamp=datetime.fromtimestamp(int(fill.get("createdAt", 0)) / 1000),
+                                timestamp=datetime.fromtimestamp(int(fill.get("createdAt", 0)) / 1000, tz=timezone.utc),
                             )
                         )
 
@@ -278,7 +278,9 @@ class KuCoinService(BaseExchangeService):
                                 deposit_id=deposit.get("id", ""),
                                 symbol=deposit.get("currency", ""),
                                 amount=Decimal(deposit.get("amount", "0")),
-                                timestamp=datetime.fromtimestamp(int(deposit.get("createdAt", 0)) / 1000),
+                                timestamp=datetime.fromtimestamp(
+                                    int(deposit.get("createdAt", 0)) / 1000, tz=timezone.utc
+                                ),
                                 status=status_map.get(deposit.get("status", ""), "unknown"),
                                 tx_id=deposit.get("walletTxId"),
                             )
@@ -358,7 +360,9 @@ class KuCoinService(BaseExchangeService):
                                 symbol=withdrawal.get("currency", ""),
                                 amount=Decimal(withdrawal.get("amount", "0")),
                                 fee=Decimal(withdrawal.get("fee", "0")),
-                                timestamp=datetime.fromtimestamp(int(withdrawal.get("createdAt", 0)) / 1000),
+                                timestamp=datetime.fromtimestamp(
+                                    int(withdrawal.get("createdAt", 0)) / 1000, tz=timezone.utc
+                                ),
                                 status=status_map.get(withdrawal.get("status", ""), "unknown"),
                                 tx_id=withdrawal.get("walletTxId"),
                                 address=withdrawal.get("address"),
