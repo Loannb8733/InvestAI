@@ -2154,45 +2154,6 @@ class MetricsService:
         raw = (pow(float(final_value / initial_value), 1 / years) - 1) * 100
         return float(max(-99.0, min(raw, 999.0)))
 
-    async def calculate_realized_unrealized_pnl(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Dict:
-        """
-        Calculate realized and unrealized P&L separately.
-        Realized: Profits/losses from assets that have been sold
-        Unrealized (Latent): Profits/losses from current holdings
-        """
-        # Get all user portfolios
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == user_id,
-            )
-        )
-        portfolios = result.scalars().all()
-
-        total_realized = Decimal("0")
-        total_unrealized = Decimal("0")
-        total_fees = Decimal("0")
-
-        for portfolio in portfolios:
-            history = await self.get_portfolio_history(db, str(portfolio.id), currency)
-            metrics = await self.get_portfolio_metrics(db, str(portfolio.id), currency)
-
-            total_fees += Decimal(str(history.get("total_fees", 0)))
-
-            # Realized P&L: from sold_assets AND current_holdings with partial sells
-            total_realized += Decimal(str(history.get("realized_gains", 0)))
-
-            # Unrealized P&L from current holdings (total_gain_loss = current_value - total_invested)
-            portfolio_gain_loss = Decimal(str(metrics.get("total_gain_loss", 0)))
-            total_unrealized += portfolio_gain_loss
-
-        return {
-            "realized_pnl": float(total_realized),
-            "unrealized_pnl": float(total_unrealized),
-            "total_pnl": float(total_realized + total_unrealized),
-            "total_fees": float(total_fees),
-            "net_pnl": float(total_realized + total_unrealized - total_fees),
-        }
-
 
 # Singleton instance
 metrics_service = MetricsService()

@@ -491,7 +491,10 @@ class ReportService:
         for p in platform_map.values():
             invested = p["total_invested"]
             p["roi_percent"] = ((p["total_value"] - invested) / invested * 100) if invested > 0 else 0
-            p["net_pnl"] = p["total_value"] - invested - p["total_fees"]
+            # `invested` is fee-inclusive (buy fees are baked into the cost basis), so
+            # subtracting total_fees again would double-count them. Net P&L is simply the
+            # gain over the fee-inclusive cost.
+            p["net_pnl"] = p["total_value"] - invested
             platform_analysis.append(p)
         platform_analysis.sort(key=lambda x: x["total_value"], reverse=True)
 
