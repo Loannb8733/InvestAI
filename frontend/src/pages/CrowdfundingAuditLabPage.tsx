@@ -343,10 +343,10 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground text-left">
-                    <th className="pb-2 font-medium">Type</th>
-                    <th className="pb-2 font-medium">Rang</th>
-                    <th className="pb-2 font-medium">Description</th>
-                    <th className="pb-2 font-medium">Force</th>
+                    <th scope="col" className="pb-2 font-medium">Type</th>
+                    <th scope="col" className="pb-2 font-medium">Rang</th>
+                    <th scope="col" className="pb-2 font-medium">Description</th>
+                    <th scope="col" className="pb-2 font-medium">Force</th>
                   </tr>
                 </thead>
                 <tbody>

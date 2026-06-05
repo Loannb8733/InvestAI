@@ -75,21 +75,21 @@ const TopBottomCard = React.memo(({ estimates }: { estimates: MarketCycleData['t
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
-                <th className="text-center py-2 px-3 text-xs font-medium">Prix actuel</th>
-                <th className="text-center py-2 px-3 text-xs font-medium">
+                <th scope="col" className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Prix actuel</th>
+                <th scope="col" className="text-center py-2 px-3 text-xs font-medium">
                   <span className="flex items-center justify-center gap-1">
                     <ArrowDown className="h-3 w-3 text-accent" />
                     Bottom estimé
                   </span>
                 </th>
-                <th className="text-center py-2 px-3 text-xs font-medium">
+                <th scope="col" className="text-center py-2 px-3 text-xs font-medium">
                   <span className="flex items-center justify-center gap-1">
                     <ArrowUp className="h-3 w-3 text-warning" />
                     Top estimé
                   </span>
                 </th>
-                <th className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
+                <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
               </tr>
             </thead>
             <tbody>
@@ -498,10 +498,10 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-3 text-xs font-medium">Actif</th>
-                    <th className="text-center py-2 px-3 text-xs font-medium">Régime</th>
-                    <th className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium">Probabilités</th>
+                    <th scope="col" className="text-left py-2 px-3 text-xs font-medium">Actif</th>
+                    <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Régime</th>
+                    <th scope="col" className="text-center py-2 px-3 text-xs font-medium">Confiance</th>
+                    <th scope="col" className="text-left py-2 px-3 text-xs font-medium">Probabilités</th>
                   </tr>
                 </thead>
                 <tbody>

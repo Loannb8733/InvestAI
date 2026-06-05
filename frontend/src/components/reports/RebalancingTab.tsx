@@ -271,12 +271,12 @@ export default function RebalancingTab() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-2 px-3">Catégorie</th>
-                      <th className="text-right py-2 px-3">Valeur</th>
-                      <th className="text-right py-2 px-3">Actuel</th>
-                      <th className="text-right py-2 px-3">Cible</th>
-                      <th className="text-right py-2 px-3">Écart</th>
-                      <th className="text-right py-2 px-3">Écart EUR</th>
+                      <th scope="col" className="text-left py-2 px-3">Catégorie</th>
+                      <th scope="col" className="text-right py-2 px-3">Valeur</th>
+                      <th scope="col" className="text-right py-2 px-3">Actuel</th>
+                      <th scope="col" className="text-right py-2 px-3">Cible</th>
+                      <th scope="col" className="text-right py-2 px-3">Écart</th>
+                      <th scope="col" className="text-right py-2 px-3">Écart EUR</th>
                     </tr>
                   </thead>
                   <tbody>

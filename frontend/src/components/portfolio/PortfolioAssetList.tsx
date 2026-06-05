@@ -392,13 +392,13 @@ export default function PortfolioAssetList({
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Projet</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Montant</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Taux</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Echéance</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Statut</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Projet</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Montant</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Taux</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Echéance</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Statut</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -436,16 +436,16 @@ export default function PortfolioAssetList({
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Quantité</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground" title="Prix de revient (frais inclus)">PRU</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Prix actuel</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Valeur</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Value</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Risque</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell w-[100px]">30j</th>
-                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Quantité</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground" title="Prix de revient (frais inclus)">PRU</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Prix actuel</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Valeur</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Value</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell">Risque</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground hidden lg:table-cell w-[100px]">30j</th>
+                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>

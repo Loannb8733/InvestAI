@@ -74,7 +74,7 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
               <tr className="border-b">
                 <th className="p-2 bg-muted/50 sticky left-0 z-10"></th>
                 {correlation.symbols.map((sym) => (
-                  <th key={sym} className="p-2 text-center font-semibold text-xs bg-muted/50 min-w-[52px]">
+                  <th key={sym} scope="col" className="p-2 text-center font-semibold text-xs bg-muted/50 min-w-[52px]">
                     {sym}
                   </th>
                 ))}

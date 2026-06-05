@@ -467,13 +467,13 @@ export default function PortfolioPage() {
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Qté achetée</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Total investi</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Qté vendue</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">Total vendu</th>
-                                <th className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Réalisé</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Actif</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Plateforme</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Qté achetée</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Total investi</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Qté vendue</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Total vendu</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Réalisé</th>
                               </tr>
                             </thead>
                             <tbody>
