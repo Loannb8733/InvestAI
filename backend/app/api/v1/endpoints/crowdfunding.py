@@ -92,7 +92,8 @@ def _enrich(
 
     progress = 0.0
     if project.start_date and months > 0:
-        elapsed = (date.today() - project.start_date).days / 30.44
+        # Clamp at 0: a future start_date (typo) would otherwise yield negative progress.
+        elapsed = max(0.0, (date.today() - project.start_date).days / 30.44)
         progress = min(100.0, elapsed / months * 100)
 
     docs = [ProjectDocumentResponse.model_validate(d) for d in (documents or [])]
