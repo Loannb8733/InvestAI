@@ -46,7 +46,9 @@ def _drop_duplicates(conn: sa.engine.Connection, scope_sql: str, partition_cols:
     ``scope_sql`` filters the rows we constrain (e.g. ``portfolio_id IS NULL``).
     ``partition_cols`` is the PARTITION BY expression matching the index.
     """
-    conn.execute(sa.text(f"""
+    conn.execute(
+        sa.text(
+            f"""
             WITH ranked AS (
                 SELECT id,
                        ROW_NUMBER() OVER (
@@ -58,7 +60,9 @@ def _drop_duplicates(conn: sa.engine.Connection, scope_sql: str, partition_cols:
             )
             DELETE FROM portfolio_snapshots
             WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-            """))
+            """
+        )
+    )
 
 
 def upgrade() -> None:
@@ -79,14 +83,18 @@ def upgrade() -> None:
             scope_sql="portfolio_id IS NULL",
             partition_cols="user_id, ((snapshot_date AT TIME ZONE 'UTC')::date)",
         )
-        op.execute(sa.text(f"""
+        op.execute(
+            sa.text(
+                f"""
                 CREATE UNIQUE INDEX IF NOT EXISTS {_GLOBAL_INDEX}
                 ON portfolio_snapshots (
                     user_id,
                     ((snapshot_date AT TIME ZONE 'UTC')::date)
                 )
                 WHERE portfolio_id IS NULL
-                """))
+                """
+            )
+        )
 
     if has_per_portfolio is None:
         _drop_duplicates(
@@ -94,7 +102,9 @@ def upgrade() -> None:
             scope_sql="portfolio_id IS NOT NULL",
             partition_cols="user_id, portfolio_id, ((snapshot_date AT TIME ZONE 'UTC')::date)",
         )
-        op.execute(sa.text(f"""
+        op.execute(
+            sa.text(
+                f"""
                 CREATE UNIQUE INDEX IF NOT EXISTS {_PER_PORTFOLIO_INDEX}
                 ON portfolio_snapshots (
                     user_id,
@@ -102,7 +112,9 @@ def upgrade() -> None:
                     ((snapshot_date AT TIME ZONE 'UTC')::date)
                 )
                 WHERE portfolio_id IS NOT NULL
-                """))
+                """
+            )
+        )
 
 
 def downgrade() -> None:
