@@ -27,6 +27,18 @@ class CryptoComService(BaseExchangeService):
 
     BASE_URL = "https://api.crypto.com/v2"
 
+    # Pool a single AsyncClient per process: hourly sync iterates many requests
+    # (balances, trades, deposits…) and a fresh AsyncClient per call opened a
+    # fresh TLS connection each time, multiplying handshake latency and TIME_WAIT
+    # sockets on Render.
+    _client: Optional[httpx.AsyncClient] = None
+
+    @classmethod
+    def _get_client(cls) -> httpx.AsyncClient:
+        if cls._client is None or cls._client.is_closed:
+            cls._client = httpx.AsyncClient(timeout=30.0)
+        return cls._client
+
     @property
     def exchange_name(self) -> str:
         return "Crypto.com"
@@ -69,14 +81,12 @@ class CryptoComService(BaseExchangeService):
             "nonce": nonce,
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.BASE_URL}/{method}",
-                json=payload,
-                timeout=30.0,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await self._get_client().post(
+            f"{self.BASE_URL}/{method}",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""

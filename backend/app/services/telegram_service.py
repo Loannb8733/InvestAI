@@ -51,6 +51,18 @@ def _build_inline_keyboard(buttons: List[List[Dict]]) -> Dict:
 class TelegramService:
     """Send smart alerts via Telegram Bot API with per-user cooldown."""
 
+    # Pool a single AsyncClient per process so a burst of alerts (regime change,
+    # contrarian signal, etc.) reuses one keep-alive connection instead of
+    # opening and TIME_WAITing a fresh TCP socket per message — that pattern
+    # caused noticeable latency and could pressure ulimit on Render free tier.
+    _client: Optional[httpx.AsyncClient] = None
+
+    @classmethod
+    def _get_client(cls) -> httpx.AsyncClient:
+        if cls._client is None or cls._client.is_closed:
+            cls._client = httpx.AsyncClient(timeout=10.0)
+        return cls._client
+
     async def _is_on_cooldown(self, key: str) -> bool:
         """Check if an alert key is within cooldown period."""
         r = await _get_redis()
@@ -87,12 +99,10 @@ class TelegramService:
             payload["reply_markup"] = json.dumps(reply_markup)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(url, json=payload)
-                resp.raise_for_status()
-                logger.info("Telegram message sent to chat %s", chat_id)
-                data = resp.json()
-                return data.get("result")
+            resp = await self._get_client().post(url, json=payload)
+            resp.raise_for_status()
+            logger.info("Telegram message sent to chat %s", chat_id)
+            return resp.json().get("result")
         except httpx.HTTPStatusError as e:
             logger.error("Telegram API error %s: %s", e.response.status_code, e.response.text)
             return None
@@ -124,10 +134,9 @@ class TelegramService:
             payload["reply_markup"] = json.dumps(reply_markup)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(url, json=payload)
-                resp.raise_for_status()
-                return True
+            resp = await self._get_client().post(url, json=payload)
+            resp.raise_for_status()
+            return True
         except Exception as e:
             logger.error("Telegram edit failed: %s", e)
             return False
@@ -149,10 +158,9 @@ class TelegramService:
             payload["show_alert"] = show_alert
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(url, json=payload)
-                resp.raise_for_status()
-                return True
+            resp = await self._get_client().post(url, json=payload)
+            resp.raise_for_status()
+            return True
         except Exception as e:
             logger.error("Telegram answer_callback failed: %s", e)
             return False
@@ -186,11 +194,11 @@ class TelegramService:
 
         # Priority prefix
         prefix = {
-            "critical": "\U0001F6A8",  # 🚨
-            "high": "\u26A0\uFE0F",  # ⚠️
-            "normal": "\U0001F514",  # 🔔
-            "low": "\U0001F4AC",  # 💬
-        }.get(priority, "\U0001F514")
+            "critical": "\U0001f6a8",  # 🚨
+            "high": "\u26a0\ufe0f",  # ⚠️
+            "normal": "\U0001f514",  # 🔔
+            "low": "\U0001f4ac",  # 💬
+        }.get(priority, "\U0001f514")
 
         formatted = f"{prefix} <b>InvestAI</b>\n\n{message}"
 
@@ -297,51 +305,51 @@ class TelegramService:
         """
         _REGIME_TONE = {
             "bottoming": (
-                "\U0001F50E Opportunité de Creux détectée",
+                "\U0001f50e Opportunité de Creux détectée",
                 "Zone sécurisée pour accumulation progressive.",
             ),
             "accumulation": (
-                "\U0001F4C8 Signal d'Accumulation",
+                "\U0001f4c8 Signal d'Accumulation",
                 "Phase d'entrée progressive — Smart Money en action.",
             ),
             "markup": (
-                "\U0001F680 Signal de Momentum confirmé",
+                "\U0001f680 Signal de Momentum confirmé",
                 "Phase d'Expansion — laissez courir vos positions.",
             ),
             "topping": (
-                "\u26A0\uFE0F Surchauffe détectée",
+                "\u26a0\ufe0f Surchauffe détectée",
                 "Prudence — sécurisez une partie de vos gains.",
             ),
             "distribution": (
-                "\U0001F6A8 Phase de Distribution",
+                "\U0001f6a8 Phase de Distribution",
                 "Prenez vos profits avant le retournement.",
             ),
             "markdown": (
-                "\U0001F4C9 Marché en Markdown",
+                "\U0001f4c9 Marché en Markdown",
                 "Patience — attendez les signaux de creux pour accumuler.",
             ),
             # Backward-compat 4-phase
             "bottom": (
-                "\U0001F50E Opportunité de Creux détectée",
+                "\U0001f50e Opportunité de Creux détectée",
                 "Zone sécurisée pour accumulation progressive.",
             ),
             "bearish": (
-                "\U0001F4C9 Marché Baissier",
+                "\U0001f4c9 Marché Baissier",
                 "Conservation recommandée — préparez votre watchlist.",
             ),
             "bullish": (
-                "\U0001F680 Signal de Momentum confirmé",
+                "\U0001f680 Signal de Momentum confirmé",
                 "Phase d'Expansion — conditions favorables.",
             ),
             "top": (
-                "\u26A0\uFE0F Sommet potentiel",
+                "\u26a0\ufe0f Sommet potentiel",
                 "Prudence — sécurisez vos gains.",
             ),
         }
 
         tone_title, tone_hint = _REGIME_TONE.get(
             regime,
-            ("\U0001F514 Alerte Stratégie", ""),
+            ("\U0001f514 Alerte Stratégie", ""),
         )
 
         return f"<b>{tone_title} — {symbol}</b>\n" f"Action : {action}\n" f"{description}\n\n" f"<i>{tone_hint}</i>"
@@ -356,7 +364,7 @@ class TelegramService:
             [
                 [
                     {
-                        "text": "\U0001F50D Simuler Impact Ruine",
+                        "text": "\U0001f50d Simuler Impact Ruine",
                         "callback_data": f"sim_ruin:{callback_prefix}",
                     },
                     {
