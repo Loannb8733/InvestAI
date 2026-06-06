@@ -524,7 +524,10 @@ export default function MasterDashboardPage() {
                 <div className="space-y-3">
                   {attentionItems.map((item, i) => (
                     <motion.div
-                      key={i}
+                      // Identity key (not index) so re-orders/inserts don't
+                      // re-mount neighbouring rows mid-animation and rebind
+                      // motion state to the wrong item.
+                      key={`${item.type}:${item.title}:${item.detail}`}
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.07, type: 'spring', duration: 0.4, bounce: 0.1 }}
