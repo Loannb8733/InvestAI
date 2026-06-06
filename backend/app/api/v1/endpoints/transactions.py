@@ -506,9 +506,11 @@ async def update_transaction(
         field: (
             getattr(transaction, field).value
             if hasattr(getattr(transaction, field), "value")
-            else float(getattr(transaction, field))
-            if isinstance(getattr(transaction, field), (Decimal, float, int))
-            else str(getattr(transaction, field))
+            else (
+                float(getattr(transaction, field))
+                if isinstance(getattr(transaction, field), (Decimal, float, int))
+                else str(getattr(transaction, field))
+            )
         )
         for field in update_data
         if hasattr(transaction, field)
@@ -557,9 +559,23 @@ async def update_transaction(
             logger.warning(f"Asset {asset.symbol} quantity went negative ({asset.quantity}), clamping to 0")
             asset.quantity = _ZERO
 
-    # Update fields
+    # Update fields. Defense-in-depth whitelist matches TransactionUpdate
+    # schema; never permit PATCH to overwrite user_id, asset_id, internal_hash,
+    # created_at, conversion_rate or any other relation/audit column.
+    _PATCHABLE = {
+        "transaction_type",
+        "quantity",
+        "price",
+        "fee",
+        "fee_currency",
+        "currency",
+        "executed_at",
+        "exchange",
+        "notes",
+    }
     for field, value in update_data.items():
-        setattr(transaction, field, value)
+        if field in _PATCHABLE:
+            setattr(transaction, field, value)
 
     # Recalculate avg_buy_price if quantity or price changed
     if quantity_changed or type_changed or "price" in update_data:
@@ -578,9 +594,11 @@ async def update_transaction(
         field: (
             getattr(transaction, field).value
             if hasattr(getattr(transaction, field), "value")
-            else float(getattr(transaction, field))
-            if isinstance(getattr(transaction, field), (Decimal, float, int))
-            else str(getattr(transaction, field))
+            else (
+                float(getattr(transaction, field))
+                if isinstance(getattr(transaction, field), (Decimal, float, int))
+                else str(getattr(transaction, field))
+            )
         )
         for field in update_data
         if hasattr(transaction, field)

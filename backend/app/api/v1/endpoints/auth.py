@@ -730,8 +730,14 @@ async def update_profile(
 ):
     """Update current user profile (first_name, last_name, preferred_currency)."""
     update_data = data.model_dump(exclude_unset=True)
+    # Defense-in-depth: only allow the three profile fields. Blocks any future
+    # field added to UserProfileUpdate (or accidentally to User) from being
+    # writable via this self-service endpoint — role, is_active, email,
+    # password_hash, mfa_* must never be reachable here.
+    _PATCHABLE = {"first_name", "last_name", "preferred_currency"}
     for field, value in update_data.items():
-        setattr(current_user, field, value)
+        if field in _PATCHABLE:
+            setattr(current_user, field, value)
 
     await db.commit()
     await db.refresh(current_user)

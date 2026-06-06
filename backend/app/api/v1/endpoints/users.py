@@ -117,8 +117,19 @@ async def update_user(
                 detail="Email already registered",
             )
 
+    # Admin-controlled endpoint: explicit whitelist locks down what an admin
+    # can change here, and keeps role / mfa_* / created_at / id out of reach
+    # (UserUpdate doesn't include them today; this defends a future drift).
+    _PATCHABLE = {
+        "email",
+        "first_name",
+        "last_name",
+        "password_hash",  # set by the password block above
+        "is_active",
+    }
     for field, value in update_data.items():
-        setattr(user, field, value)
+        if field in _PATCHABLE:
+            setattr(user, field, value)
 
     await db.commit()
     await db.refresh(user)
