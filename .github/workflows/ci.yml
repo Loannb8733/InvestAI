@@ -95,7 +95,7 @@ jobs:
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       SECRET_KEY: test-secret-key-for-ci-only-0123456789
-      FERNET_KEY: dGVzdC1mZXJuZXQta2V5LWZvci1jaS0xMjM0NTY3OA==
+      FERNET_KEY: icQAqvAxUzGIr5HCiFPkDICQtKw_tIwRDbCnZW0HW6M=
       APP_ENV: testing
       DEBUG: "false"
 

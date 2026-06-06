@@ -34,37 +34,42 @@ from app.models import Base
 setup_logging()
 logger = get_logger(__name__)
 
-# Sentry error tracking
+# Sentry error tracking — never let a bad DSN or transient sentry-sdk init
+# error take the whole process down. A 500 with no Sentry beats no app at all.
 if settings.sentry_enabled:
-    import sentry_sdk
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    from sentry_sdk.integrations.fastapi import FastApiIntegration
-    from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.redis import RedisIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-    from app.core.sentry_scrub import scrub_event
+        from app.core.sentry_scrub import scrub_event
 
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.APP_ENV,
-        release="investai@1.0.0",
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
-        integrations=[
-            FastApiIntegration(transaction_style="endpoint"),
-            SqlalchemyIntegration(),
-            CeleryIntegration(),
-            RedisIntegration(),
-        ],
-        send_default_pii=False,
-        # Scrub Authorization/Cookie headers and any payload field whose name
-        # matches password/secret/token/api_key/mfa/totp/… before events leave
-        # the process. FastApiIntegration would otherwise capture login bodies,
-        # JWT bearer tokens, exchange API keys, and MFA codes.
-        before_send=scrub_event,
-        before_send_transaction=scrub_event,
-    )
-    logger.info("Sentry initialized (env=%s)", settings.APP_ENV)
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.APP_ENV,
+            release="investai@1.0.0",
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            integrations=[
+                FastApiIntegration(transaction_style="endpoint"),
+                SqlalchemyIntegration(),
+                CeleryIntegration(),
+                RedisIntegration(),
+            ],
+            send_default_pii=False,
+            # Scrub Authorization/Cookie headers and any payload field whose
+            # name matches password/secret/token/api_key/mfa/totp/… before
+            # events leave the process. FastApiIntegration would otherwise
+            # capture login bodies, JWT bearer tokens, exchange API keys,
+            # and MFA codes.
+            before_send=scrub_event,
+            before_send_transaction=scrub_event,
+        )
+        logger.info("Sentry initialized (env=%s)", settings.APP_ENV)
+    except Exception as _sentry_err:  # noqa: BLE001 — degrade silently
+        logger.warning("Sentry init failed, continuing without it: %s", _sentry_err)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Generator
 
 # Set test env vars before any app import
 os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_1234567890")
-os.environ.setdefault("FERNET_KEY", "dGVzdGZlcm5ldGtleTEyMzQ1Njc4OTAxMjM0NTY3OA==")
+os.environ.setdefault("FERNET_KEY", "icQAqvAxUzGIr5HCiFPkDICQtKw_tIwRDbCnZW0HW6M=")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
 
