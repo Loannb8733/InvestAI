@@ -64,10 +64,18 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-background">
+      {/* WCAG 2.4.1 — let keyboard / screen-reader users bypass the nav rail
+          and header, which take ~15 tab stops before the actual content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      >
+        Aller au contenu principal
+      </a>
       <NavRail isOpen={sidebarOpen} onClose={handleCloseSidebar} />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header onMenuClick={handleToggleSidebar} />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6">
           <RouteErrorBoundary resetKey={location.pathname}>
             <Outlet />
           </RouteErrorBoundary>

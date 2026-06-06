@@ -67,7 +67,17 @@ export default memo(function AllocationChart({ data }: AllocationChartProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="relative h-[260px]">
+      <div
+        className="relative h-[260px]"
+        role="img"
+        aria-label={
+          chartData.length === 0
+            ? 'Allocation par classe d’actifs : aucune donnée'
+            : `Allocation par classe d’actifs : ${chartData
+                .map((d) => `${d.label} ${Math.round((d.value / Math.max(total, 1)) * 100)}%`)
+                .join(', ')}`
+        }
+      >
         <ResponsivePie
           data={chartData}
           theme={theme}

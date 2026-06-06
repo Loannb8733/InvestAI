@@ -126,7 +126,13 @@ export default memo(function PerformanceChart({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="h-[300px]">
+      <div
+        className="h-[300px]"
+        role="img"
+        aria-label={`Évolution de la valeur du portefeuille (graphique en ligne, ${
+          series[0]?.data?.length ?? 0
+        } points)`}
+      >
         <ResponsiveLine
           data={series}
           theme={theme}
