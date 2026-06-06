@@ -155,6 +155,75 @@ async def list_transactions(
     return enriched_transactions
 
 
+@router.get("/balance-gaps")
+async def list_balance_gaps(
+    threshold_eur: float = 5.0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """List assets where stored quantity exceeds the signed transaction sum.
+
+    Surfaces Binance reward vouchers, unrecognized airdrops, or any state where
+    the exchange reports more units than the transaction history accounts for.
+    Frontend can credit them as AIRDROPs in one click.
+    """
+    from sqlalchemy import text
+
+    rows = (
+        (
+            await db.execute(
+                text(
+                    """
+        SELECT a.id::text AS asset_id, a.symbol, COALESCE(a.exchange,'') AS exchange,
+               a.quantity AS stored, a.current_price,
+               COALESCE(SUM(CASE
+                   WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP','STAKING_REWARD')
+                       THEN t.quantity
+                   WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT')
+                       THEN -t.quantity ELSE 0
+               END), 0) AS computed
+        FROM assets a
+        JOIN portfolios p ON p.id = a.portfolio_id
+        LEFT JOIN transactions t ON t.asset_id = a.id
+        WHERE p.user_id = :uid
+        GROUP BY a.id, a.symbol, a.exchange, a.quantity, a.current_price
+    """
+                ),
+                {"uid": current_user.id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    gaps = []
+    for r in rows:
+        stored = Decimal(str(r["stored"] or 0))
+        computed = Decimal(str(r["computed"] or 0))
+        diff = stored - computed
+        if diff <= 0:
+            continue
+        price = Decimal(str(r["current_price"] or 0))
+        gap_eur = float(diff * price)
+        if gap_eur < threshold_eur:
+            continue
+        gaps.append(
+            {
+                "asset_id": r["asset_id"],
+                "symbol": r["symbol"],
+                "exchange": r["exchange"],
+                "stored": float(stored),
+                "computed": float(computed),
+                "missing_qty": float(diff),
+                "missing_eur": round(gap_eur, 2),
+                "suggested_action": "credit_airdrop",
+            }
+        )
+
+    gaps.sort(key=lambda g: g["missing_eur"], reverse=True)
+    return {"count": len(gaps), "threshold_eur": threshold_eur, "gaps": gaps}
+
+
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     request: Request,

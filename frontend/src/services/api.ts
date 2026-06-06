@@ -373,10 +373,30 @@ export const assetsApi = {
 }
 
 // Transactions API
+export interface BalanceGap {
+  asset_id: string
+  symbol: string
+  exchange: string
+  stored: number
+  computed: number
+  missing_qty: number
+  missing_eur: number
+  suggested_action: 'credit_airdrop'
+}
+
 export const transactionsApi = {
   list: async (params?: { asset_id?: string; portfolio_id?: string; skip?: number; limit?: number }) => {
     const response = await api.get('/transactions', { params })
     return response.data
+  },
+
+  /** Surfaces assets where the exchange reports more units than the
+   * transaction history (Binance reward vouchers, unrecognized airdrops). */
+  balanceGaps: async (thresholdEur = 5) => {
+    const response = await api.get('/transactions/balance-gaps', {
+      params: { threshold_eur: thresholdEur },
+    })
+    return response.data as { count: number; threshold_eur: number; gaps: BalanceGap[] }
   },
 
   create: async (data: {
