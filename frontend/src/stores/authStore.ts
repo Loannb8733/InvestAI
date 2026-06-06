@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authApi } from '@/services/api'
+import { queryClient } from '@/lib/queryClient'
 
 interface User {
   id: string
@@ -70,6 +71,11 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           error: null,
         })
+        // Wipe the cached portfolios/transactions/analytics of the previous user.
+        // Without this, the next user who logs into the same tab briefly sees the
+        // outgoing user's data (cache key is shared by HTTP path, not by user id).
+        queryClient.removeQueries()
+        queryClient.cancelQueries()
       },
 
       refreshAccessToken: async () => {
