@@ -18,17 +18,30 @@ from app.ml.market_context import MarketContext
 
 logger = logging.getLogger(__name__)
 
-# Sync Redis client for caching individual model results within sync forecaster
+# Sync Redis client for caching individual model results within sync forecaster.
+# Returned client is health-checked on every access so an Upstash blip at boot
+# (broken initial connection) cannot leave the process serving a permanently
+# dead singleton until restart. The PING failure is treated as "no cache
+# available" — callers already degrade to recompute on cache miss.
 _sync_redis: Optional[redis.Redis] = None
 
 
-def _get_sync_redis() -> redis.Redis:
+def _get_sync_redis() -> Optional[redis.Redis]:
     global _sync_redis
     if _sync_redis is None:
-        _sync_redis = redis.from_url(
-            settings.REDIS_URL,
-            decode_responses=True,
-        )
+        try:
+            _sync_redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        except Exception as e:  # noqa: BLE001 — degrade to no-cache
+            logger.warning("Sync Redis init failed (forecaster will run uncached): %s", e)
+            return None
+    try:
+        if not _sync_redis.ping():
+            _sync_redis = None
+            return None
+    except Exception as e:  # noqa: BLE001 — Upstash blip; drop the broken client
+        logger.warning("Sync Redis PING failed, dropping singleton: %s", e)
+        _sync_redis = None
+        return None
     return _sync_redis
 
 
@@ -1129,34 +1142,80 @@ class PriceForecaster:
         volumes: Optional[List[float]] = None,
         btc_prices: Optional[List[float]] = None,
     ) -> ForecastResult:
-        """Try to load a cached individual model result; run and cache on miss."""
-        # Attempt cache lookup when symbol and data_hash are provided
+        """Try to load a cached individual model result; run and cache on miss.
+
+        Adds a single-flight protection: when several concurrent requests miss
+        the cache for the same (symbol, model, data, horizon), only the first
+        one runs the expensive train. The others briefly poll the cache and
+        return the freshly computed result, avoiding parallel-ensemble CPU
+        blowup on Render.
+        """
+        import time
+
         if symbol and data_hash:
             cached = self._get_cached_model_result(symbol, model_name, data_hash, days_ahead)
             if cached is not None:
-                logger.debug(
-                    "Cache hit for %s:%s:%s:%d",
-                    symbol,
-                    model_name,
-                    data_hash,
-                    days_ahead,
-                )
+                logger.debug("Cache hit for %s:%s:%s:%d", symbol, model_name, data_hash, days_ahead)
                 return cached
+
+            # Single-flight: try to claim the compute slot.
+            if not self._claim_compute_lock(symbol, model_name, data_hash, days_ahead):
+                # Another worker is computing — poll the cache for up to 30s.
+                for _ in range(30):
+                    time.sleep(1)
+                    cached = self._get_cached_model_result(symbol, model_name, data_hash, days_ahead)
+                    if cached is not None:
+                        return cached
+                # The holder timed out (or the lock TTL expired) — fall through
+                # to compute ourselves rather than fail.
 
         # Run the model
         result = self._run_model_by_name(model_name, prices, dates, days_ahead, volumes, btc_prices)
 
-        # Cache the result for next time
+        # Cache the result for next time and release the compute lock.
         if symbol and data_hash:
             self._cache_model_result(symbol, model_name, data_hash, days_ahead, result)
+            self._release_compute_lock(symbol, model_name, data_hash, days_ahead)
 
         return result
 
     @staticmethod
+    def _claim_compute_lock(symbol: str, model_name: str, data_hash: str, days: int, ttl: int = 120) -> bool:
+        """Single-flight lock for an expensive model run.
+
+        Returns True if we acquired the lock and should compute. Returns False
+        if another worker is already computing the same (symbol, model, data,
+        horizon) — the caller then polls the result cache rather than launching
+        a duplicate train. Without this, N concurrent users requesting a fresh
+        forecast for the same symbol triggered N parallel full ensembles,
+        exhausting CPU on Render.
+        """
+        r = _get_sync_redis()
+        if r is None:
+            return True  # no Redis → no coordination → compute anyway
+        try:
+            acquired = r.set(f"computing:{symbol}:{model_name}:{data_hash}:{days}", "1", nx=True, ex=ttl)
+            return bool(acquired)
+        except Exception:  # noqa: BLE001 — degrade: compute uncoordinated
+            return True
+
+    @staticmethod
+    def _release_compute_lock(symbol: str, model_name: str, data_hash: str, days: int) -> None:
+        r = _get_sync_redis()
+        if r is None:
+            return
+        try:
+            r.delete(f"computing:{symbol}:{model_name}:{data_hash}:{days}")
+        except Exception:  # noqa: BLE001
+            pass
+
+    @staticmethod
     def _get_cached_model_result(symbol: str, model_name: str, data_hash: str, days: int) -> Optional[ForecastResult]:
         """Get cached individual model ForecastResult from Redis (sync)."""
+        r = _get_sync_redis()
+        if r is None:
+            return None
         try:
-            r = _get_sync_redis()
             data = r.get(f"{symbol}:{model_name}:{data_hash}:{days}")
             if data:
                 return ForecastResult(**json.loads(data))
@@ -1174,8 +1233,10 @@ class PriceForecaster:
         ttl: int = 14400,
     ) -> None:
         """Cache individual model ForecastResult in Redis (sync, default 4h TTL)."""
+        r = _get_sync_redis()
+        if r is None:
+            return
         try:
-            r = _get_sync_redis()
             payload = json.dumps(
                 {
                     "dates": result.dates,
