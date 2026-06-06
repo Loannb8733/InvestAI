@@ -9,6 +9,7 @@ Security:
 - Rate-limits Monte Carlo callbacks (30s per user)
 """
 
+import hmac
 import logging
 
 from fastapi import APIRouter, Header, Request
@@ -50,9 +51,12 @@ async def telegram_webhook(
     if not settings.telegram_bot_enabled:
         return JSONResponse({"ok": True})
 
-    # Validate Telegram webhook secret when configured
+    # Validate Telegram webhook secret when configured. Use a constant-time
+    # comparison: == leaks the token byte-by-byte through response latency,
+    # letting a remote attacker brute-force the secret. hmac.compare_digest is
+    # the standard mitigation.
     if settings.TELEGRAM_WEBHOOK_SECRET:
-        if x_telegram_bot_api_secret_token != settings.TELEGRAM_WEBHOOK_SECRET:
+        if not hmac.compare_digest(x_telegram_bot_api_secret_token or "", settings.TELEGRAM_WEBHOOK_SECRET):
             logger.warning("Telegram webhook rejected: invalid or missing secret token")
             return JSONResponse({"ok": False}, status_code=403)
 
@@ -201,10 +205,10 @@ async def _handle_simulate_ruin(
             emoji = "\u2705"  # ✅
         elif ruin_delta > 1:
             verdict = "RISQUÉ"
-            emoji = "\u26A0\uFE0F"  # ⚠️
+            emoji = "\u26a0\ufe0f"  # ⚠️
         else:
             verdict = "NEUTRE"
-            emoji = "\U0001F7F0"  # 🟰
+            emoji = "\U0001f7f0"  # 🟰
 
         # Edit the original message to append the simulation result
         result_text = (
@@ -217,7 +221,7 @@ async def _handle_simulate_ruin(
 
         # Since we can't easily get original text, we edit with the new text
         new_text = (
-            f"\u26A0\uFE0F <b>InvestAI</b>\n\n"
+            f"\u26a0\ufe0f <b>InvestAI</b>\n\n"
             f"🚀 <b>Signal Alpha : {symbol}</b>\n"
             f"Ordre suggéré: <b>{order_eur:,.2f} €</b>"
             f"{result_text}"
@@ -278,7 +282,7 @@ async def _handle_plan_order(
 
         # Edit message to confirm
         new_text = (
-            f"\u26A0\uFE0F <b>InvestAI</b>\n\n"
+            f"\u26a0\ufe0f <b>InvestAI</b>\n\n"
             f"🚀 <b>Signal Alpha : {symbol}</b>\n"
             f"Ordre suggéré: <b>{order_eur:,.2f} €</b>\n\n"
             f"\u2705 <b>Ordre planifié !</b>\n"

@@ -33,7 +33,18 @@ def _limiter_storage_options() -> dict:
     return redis_ssl_kwargs()
 
 
-# Create limiter instance
+# Create limiter instance.
+#
+# Resilience trade-off (single-instance Render free tier):
+# - storage = Upstash Redis when reachable (shared counter, correct under scale).
+# - swallow_errors=True + in_memory_fallback_enabled=True: if Upstash blips,
+#   slowapi falls back to a per-process counter rather than disabling limits.
+#   On the current single-web-instance topology this is still effective.
+#
+# ⚠ When scaling horizontally (paid tier, multiple instances), set
+# ``in_memory_fallback_enabled=False`` AND ``swallow_errors=False`` so a Redis
+# outage fails closed instead of degrading to per-instance counters that an
+# attacker can bypass by striping requests across replicas.
 limiter = Limiter(
     key_func=_get_real_client_ip,
     default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"],
