@@ -1,0 +1,104 @@
+name: Invariants Watchdog (weekly)
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+env:
+  BASE_URL: https://investai-api.onrender.com/api/v1/cron
+  BASELINE: ${{ vars.INVARIANTS_BASELINE || '25' }}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /cron/invariants-check
+        id: call
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" --max-time 120 \
+            -X POST "${BASE_URL}/invariants-check" \
+            -H "X-Cron-Token: ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $code"
+          cat /tmp/resp.json
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
+          total=$(jq -r '.result.total_violations' /tmp/resp.json)
+          echo "total=$total" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Decide if we alert
+        id: gate
+        run: |
+          total="${{ steps.call.outputs.total }}"
+          base="${{ env.BASELINE }}"
+          if [ "$total" -gt "$base" ]; then
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "alert=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open / refresh alert issue
+        if: steps.gate.outputs.alert == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const payload = JSON.parse(fs.readFileSync('/tmp/resp.json', 'utf8'));
+            const total = payload.result.total_violations;
+            const baseline = "${{ env.BASELINE }}";
+            const counts = payload.result.counts;
+            const details = payload.result.details;
+            const title = `Invariants watchdog: ${total} violations (baseline ${baseline})`;
+            const body = [
+              `Total violations: **${total}** (baseline: ${baseline}).`,
+              '',
+              '### Per invariant',
+              Object.entries(counts).map(([k, v]) => `- **${k}**: ${v}`).join('\n'),
+              '',
+              '### Sample offenders',
+              '```json',
+              JSON.stringify(details, null, 2).slice(0, 6000),
+              '```',
+              '',
+              '> Run `python -m scripts.check_invariants` locally with the prod `DATABASE_URL` for the full report.',
+            ].join('\n');
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: 'invariants-watchdog', state: 'open',
+            });
+            if (open.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: open[0].number, title, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['invariants-watchdog'],
+              });
+            }
+
+      - name: Close stale alert
+        if: steps.gate.outputs.alert == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: 'invariants-watchdog', state: 'open',
+            });
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number,
+                body: '✅ Back to baseline. Closing.',
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number, state: 'closed',
+              });
+            }

@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { apiKeysApi } from '@/services/api'
+import { apiKeysApi, transactionsApi } from '@/services/api'
 import ColdWalletsManager from '@/components/exchanges/ColdWalletsManager'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
@@ -345,6 +345,31 @@ export default function ExchangesPage() {
                 ? `${synced} transaction(s) synchronisée(s)`
                 : 'Aucune nouvelle transaction',
           })
+
+          // Post-sync reconciliation: surface holdings the exchange reports
+          // but the sync didn't import as transactions (Binance reward
+          // vouchers, unrecognized airdrops). The user adds them manually
+          // as AIRDROPs from the transactions page.
+          transactionsApi
+            .balanceGaps(5)
+            .then((res) => {
+              if (res.count > 0) {
+                const totalEur = res.gaps.reduce((s, g) => s + g.missing_eur, 0)
+                const top = res.gaps
+                  .slice(0, 3)
+                  .map((g) => `${g.symbol} (${g.missing_eur.toFixed(2)} €)`)
+                  .join(', ')
+                toast({
+                  title: `${res.count} récompense(s) non tracée(s) détectée(s)`,
+                  description:
+                    `Total estimé: ${totalEur.toFixed(2)} €. Top: ${top}.\n` +
+                    "Ajoutez-les manuellement depuis l'onglet Transactions (type « Airdrop »).",
+                })
+              }
+            })
+            .catch(() => {
+              /* non-blocking: silently skip if endpoint is unavailable */
+            })
         } else if (status.status === 'failed') {
           clearInterval(interval)
           clear()
