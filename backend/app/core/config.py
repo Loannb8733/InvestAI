@@ -70,9 +70,23 @@ class Settings(BaseSettings):
     @field_validator("FERNET_KEY")
     @classmethod
     def validate_fernet_key(cls, v: str) -> str:
-        """Ensure FERNET_KEY is valid."""
+        """Ensure FERNET_KEY is a *valid* Fernet key.
+
+        A length check alone lets bad base64 (or a random 44-char string) slip
+        through and only blow up at the first encrypt/decrypt call. Fail fast at
+        boot instead — easier to diagnose, and we never silently end up with
+        a process that can't read its own ciphertexts.
+        """
         if not v or len(v) < 32:
             raise ValueError("FERNET_KEY must be a valid Fernet key (44 characters base64)")
+        try:
+            # Local import: cryptography is a heavy dep and pydantic-settings
+            # imports this module very early.
+            from cryptography.fernet import Fernet
+
+            Fernet(v.encode())
+        except Exception as exc:  # noqa: BLE001 — re-raise as a config error
+            raise ValueError(f"FERNET_KEY is not a valid Fernet key: {exc}") from exc
         return v
 
     @property
