@@ -827,17 +827,25 @@ class BinanceService(BaseExchangeService):
                     logger.info(f"Convert history: {len(all_conversions)} conversions found")
 
                 for conv in all_conversions:
-                    # Determine which is crypto and which is fiat
+                    # Determine which is crypto and which is fiat.
+                    #
+                    # IMPORTANT: this loop must ONLY emit fiat<->crypto orders.
+                    # Crypto<->stablecoin and crypto<->crypto Convert operations
+                    # are emitted by ``get_crypto_conversions`` from the SAME
+                    # Binance endpoint (``/sapi/v1/convert/tradeFlow``). If we
+                    # also handled them here, every conversion landed as both a
+                    # SELL (fiat_<id>) AND a CONVERSION_OUT (convert_sell_<id>),
+                    # which is exactly the duplication that drained holdings
+                    # negative (FET, ADA, SUI, …) in the wild.
                     from_asset = conv.get("fromAsset", "")
                     to_asset = conv.get("toAsset", "")
                     from_amount = Decimal(str(conv.get("fromAmount", 0)))
                     to_amount = Decimal(str(conv.get("toAmount", 0)))
 
                     fiat_currencies = ["EUR", "USD", "GBP", "TRY", "RUB", "UAH", "BRL"]
-                    stablecoins = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "FDUSD"]
 
-                    # If from is fiat/stablecoin and to is crypto -> BUY
-                    if (from_asset in fiat_currencies or from_asset in stablecoins) and to_asset not in fiat_currencies:
+                    # Fiat -> crypto: BUY
+                    if from_asset in fiat_currencies and to_asset not in fiat_currencies:
                         orders.append(
                             ExchangeFiatOrder(
                                 order_id=str(conv.get("quoteId", conv.get("orderId", ""))),
@@ -852,8 +860,8 @@ class BinanceService(BaseExchangeService):
                                 timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
-                    # If from is crypto and to is fiat/stablecoin -> SELL
-                    elif from_asset not in fiat_currencies and (to_asset in fiat_currencies or to_asset in stablecoins):
+                    # Crypto -> fiat: SELL
+                    elif from_asset not in fiat_currencies and to_asset in fiat_currencies:
                         orders.append(
                             ExchangeFiatOrder(
                                 order_id=str(conv.get("quoteId", conv.get("orderId", ""))),
@@ -868,38 +876,8 @@ class BinanceService(BaseExchangeService):
                                 timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
                             )
                         )
-                    # Crypto to crypto conversion (e.g., BTC -> ETH)
-                    elif from_asset not in fiat_currencies and from_asset not in stablecoins:
-                        # Treat as sell of from_asset
-                        orders.append(
-                            ExchangeFiatOrder(
-                                order_id=f"sell_{conv.get('quoteId', conv.get('orderId', ''))}",
-                                crypto_symbol=from_asset,
-                                fiat_currency=to_asset,
-                                side="sell",
-                                crypto_amount=from_amount,
-                                fiat_amount=to_amount,
-                                price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
-                                fee=Decimal("0"),
-                                status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
-                            )
-                        )
-                        # And buy of to_asset
-                        orders.append(
-                            ExchangeFiatOrder(
-                                order_id=f"buy_{conv.get('quoteId', conv.get('orderId', ''))}",
-                                crypto_symbol=to_asset,
-                                fiat_currency=from_asset,
-                                side="buy",
-                                crypto_amount=to_amount,
-                                fiat_amount=from_amount,
-                                price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
-                                fee=Decimal("0"),
-                                status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
-                            )
-                        )
+                    # Everything else (crypto↔stablecoin, crypto↔crypto) is
+                    # emitted by get_crypto_conversions and intentionally skipped here.
 
             except Exception as e:
                 logger.error(f"Error fetching convert history: {e}")
