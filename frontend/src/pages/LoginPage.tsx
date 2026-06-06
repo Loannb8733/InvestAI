@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { motion } from 'framer-motion'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -73,12 +72,7 @@ export default function LoginPage() {
         <div className="glow left-[-10%] top-[-10%] h-[420px] w-[420px] bg-[oklch(var(--primary))]" />
         <div className="glow bottom-[-15%] right-[-5%] h-[380px] w-[380px] bg-[oklch(var(--chart-3))]" />
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          className="relative z-10 flex w-full flex-col justify-between p-14"
-        >
+        <div className="relative z-10 flex w-full flex-col justify-between p-14 animate-in fade-in duration-700 motion-reduce:animate-none">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
@@ -118,17 +112,12 @@ export default function LoginPage() {
             <span className="inline-block h-2 w-2 rounded-full bg-[oklch(var(--gain))]" />
             Chiffrement de bout en bout · © 2026 InvestAI
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Right — form */}
       <div className="relative flex items-center justify-center p-6 lg:p-12">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="w-full max-w-sm"
-        >
+        <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
@@ -252,7 +241,7 @@ export default function LoginPage() {
               Ouvrir un compte
             </Link>
           </p>
-        </motion.div>
+        </div>
       </div>
     </div>
   )
