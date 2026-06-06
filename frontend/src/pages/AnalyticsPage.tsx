@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { PortfolioSummary as Portfolio } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -347,6 +347,94 @@ export default function AnalyticsPage() {
     placeholderData: keepPreviousData,
   })
 
+  // ── Memoize chart datasets (hook order must be stable, so this runs BEFORE
+  //    the early returns below; the resulting arrays are unused when analytics
+  //    is undefined / empty because those branches return before any chart is
+  //    rendered).
+  const allocationByTypeData = useMemo(
+    () =>
+      Object.entries(analytics?.allocation_by_type || {}).map(([name, value], index) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: Math.round(value * 10) / 10,
+        color: color(COLOR_TOKENS[index % COLOR_TOKENS.length]),
+      })),
+    [analytics?.allocation_by_type, color]
+  )
+
+  const allocationByAssetData = useMemo(
+    () =>
+      Object.entries(analytics?.allocation_by_asset || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, value]) => ({
+          name,
+          value: Math.round(value * 10) / 10,
+        })),
+    [analytics?.allocation_by_asset]
+  )
+
+  const performanceData = useMemo(
+    () =>
+      [...(analytics?.assets || [])]
+        .sort((a, b) => b.gain_loss_percent - a.gain_loss_percent)
+        .slice(0, 10)
+        .map((asset) => ({
+          name: asset.symbol,
+          performance: Math.round(asset.gain_loss_percent * 10) / 10,
+          fill: asset.gain_loss_percent >= 0 ? color('--chart-3') : color('--chart-4'),
+        })),
+    [analytics?.assets, color]
+  )
+
+  const riskScoreData = useMemo(
+    () => [
+      {
+        metric: 'Rendement',
+        value: Math.min(100, Math.max(0, (analytics?.total_gain_loss_percent ?? 0) * 0.5 + 50)),
+        fullMark: 100,
+      },
+      {
+        metric: 'Sharpe',
+        value: Math.min(100, Math.max(0, (analytics?.sharpe_ratio ?? 0) * 25 + 50)),
+        fullMark: 100,
+      },
+      {
+        metric: 'Diversification',
+        value: diversification?.score || 0,
+        fullMark: 100,
+      },
+      {
+        metric: 'Stabilité',
+        value: Math.min(100, Math.max(0, 100 - Math.abs(analytics?.max_drawdown ?? 0) * 1.25)),
+        fullMark: 100,
+      },
+      {
+        metric: 'Sortino',
+        value: Math.min(100, Math.max(0, (analytics?.sortino_ratio ?? 0) * 25 + 50)),
+        fullMark: 100,
+      },
+    ],
+    [
+      analytics?.total_gain_loss_percent,
+      analytics?.sharpe_ratio,
+      analytics?.max_drawdown,
+      analytics?.sortino_ratio,
+      diversification?.score,
+    ]
+  )
+
+  const chartHistoricalData = useMemo(
+    () =>
+      historicalData?.map((point) => ({
+        date: point.date,
+        fullDate: point.full_date || point.date,
+        value: point.value,
+        invested: point.invested || 0,
+        gain: (point.value || 0) - (point.invested || 0),
+      })) || [],
+    [historicalData]
+  )
+
   if (loadingAnalytics || loadingDiversification) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -397,66 +485,8 @@ export default function AnalyticsPage() {
   const safeFixed = (v: number | null | undefined, d: number): string =>
     v == null || isNaN(v) ? '—' : v.toFixed(d)
 
-  // Prepare chart data
-  const allocationByTypeData = Object.entries(analytics.allocation_by_type || {}).map(([name, value], index) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value: Math.round(value * 10) / 10,
-    color: color(COLOR_TOKENS[index % COLOR_TOKENS.length]),
-  }))
-
-  const allocationByAssetData = Object.entries(analytics.allocation_by_asset || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, value]) => ({
-      name,
-      value: Math.round(value * 10) / 10,
-    }))
-
-  const performanceData = analytics.assets
-    .sort((a, b) => b.gain_loss_percent - a.gain_loss_percent)
-    .slice(0, 10)
-    .map((asset) => ({
-      name: asset.symbol,
-      performance: Math.round(asset.gain_loss_percent * 10) / 10,
-      fill: asset.gain_loss_percent >= 0 ? color('--chart-3') : color('--chart-4'),
-    }))
-
-  // Radar: each metric normalized to 0-100 where higher = better
-  const riskScoreData = [
-    {
-      metric: 'Rendement',
-      value: Math.min(100, Math.max(0, analytics.total_gain_loss_percent * 0.5 + 50)),
-      fullMark: 100,
-    },
-    {
-      metric: 'Sharpe',
-      value: Math.min(100, Math.max(0, analytics.sharpe_ratio * 25 + 50)),
-      fullMark: 100,
-    },
-    {
-      metric: 'Diversification',
-      value: diversification?.score || 0,
-      fullMark: 100,
-    },
-    {
-      metric: 'Stabilité',
-      value: Math.min(100, Math.max(0, 100 - Math.abs(analytics.max_drawdown) * 1.25)),
-      fullMark: 100,
-    },
-    {
-      metric: 'Sortino',
-      value: Math.min(100, Math.max(0, analytics.sortino_ratio * 25 + 50)),
-      fullMark: 100,
-    },
-  ]
-
-  const chartHistoricalData = historicalData?.map((point) => ({
-    date: point.date,
-    fullDate: point.full_date || point.date,
-    value: point.value,
-    invested: point.invested || 0,
-    gain: (point.value || 0) - (point.invested || 0),
-  })) || []
+  // (chart datasets are memoized above — kept before the early returns to
+  // satisfy the rules of hooks).
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
