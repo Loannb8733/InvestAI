@@ -66,7 +66,11 @@ def _fetch_btc_cryptocompare(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
     to_ts = int(datetime.now(timezone.utc).timestamp())
     rows: list = []
     seen: set = set()
-    while True:
+    # Hard cap on pages: ~10y of daily data at limit=2000 needs <3 pages.
+    # 20 pages is a defensive ceiling that protects against an API regression
+    # where ``oldest`` stops decreasing — we'd otherwise spin until rate-limited.
+    max_pages = 20
+    for _ in range(max_pages):
         resp = httpx_mod.get(base, params={"fsym": "BTC", "tsym": "USD", "limit": 2000, "toTs": to_ts}, timeout=30.0)
         resp.raise_for_status()
         data = [d for d in resp.json().get("Data", {}).get("Data", []) if d.get("close")]
@@ -79,6 +83,8 @@ def _fetch_btc_cryptocompare(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
         if oldest <= start_ts:
             break
         to_ts = oldest - 86_400
+    else:
+        logger.warning("CryptoCompare pagination hit max_pages=%d cap", max_pages)
     if not rows:
         raise ValueError("CryptoCompare returned no rows")
     df = pd_mod.DataFrame(rows)
