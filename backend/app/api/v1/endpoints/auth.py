@@ -298,7 +298,11 @@ async def login(
     from app.core.redis_client import _get_redis_txt
 
     # Find user by email
-    result = await db.execute(select(User).where(User.email == login_data.email))
+    # SELECT FOR UPDATE serializes login attempts on the same row, which
+    # closes a race on the JSON-stored mfa_backup_codes list: two concurrent
+    # logins reading the same code would both succeed before either commits
+    # the consumption, letting one backup code authenticate twice.
+    result = await db.execute(select(User).where(User.email == login_data.email).with_for_update())
     user = result.scalar_one_or_none()
 
     # Check per-account lockout BEFORE password verification to avoid
@@ -355,7 +359,10 @@ async def login(
                 detail="MFA code required",
             )
 
-        # Anti-replay: reject TOTP codes already used within this window
+        # Anti-replay: reject TOTP codes already used within this window.
+        # Fail CLOSED on Redis errors: a captured TOTP that's replayed during an
+        # Upstash blip would otherwise let an attacker bypass the one-use rule.
+        # 503 is preferable to silent MFA degradation.
         try:
             r = await _get_redis_txt()
             used_key = f"totp_used:{user.id}:{login_data.mfa_code}"
@@ -366,8 +373,12 @@ async def login(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass  # Redis down — fail open
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("MFA anti-replay store unavailable: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MFA temporarily unavailable. Please retry shortly.",
+            ) from exc
 
         totp = pyotp.TOTP(decrypt_mfa_secret(user.mfa_secret))
         if totp.verify(login_data.mfa_code):
