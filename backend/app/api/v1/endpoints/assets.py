@@ -190,8 +190,22 @@ async def update_asset(
     # Normalize exchange: always use empty string instead of null
     if "exchange" in update_data and update_data["exchange"] is None:
         update_data["exchange"] = ""
+    # Defense-in-depth whitelist (also enforced by Pydantic schema). Prevents a
+    # future contributor from accidentally widening AssetUpdate with a sensitive
+    # column (user_id, portfolio_id…) and silently exposing it to PATCH.
+    _PATCHABLE = {
+        "name",
+        "quantity",
+        "avg_buy_price",
+        "exchange",
+        "interest_rate",
+        "maturity_date",
+        "project_status",
+        "invested_amount",
+    }
     for field, value in update_data.items():
-        setattr(asset, field, value)
+        if field in _PATCHABLE:
+            setattr(asset, field, value)
 
     await db.commit()
     await db.refresh(asset)

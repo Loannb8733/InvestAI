@@ -886,8 +886,29 @@ async def update_project(
     project = await _get_project_for_user(db, project_id, current_user.id)
 
     updates = data.model_dump(exclude_unset=True)
+    # Defense-in-depth whitelist mirroring CrowdfundingProjectUpdate. Excludes
+    # asset_id / user_id / created_at / repayments — never PATCH-controllable.
+    _PATCHABLE = {
+        "project_name",
+        "description",
+        "project_url",
+        "platform",
+        "invested_amount",
+        "annual_rate",
+        "duration_months",
+        "repayment_type",
+        "start_date",
+        "estimated_end_date",
+        "actual_end_date",
+        "status",
+        "interest_frequency",
+        "tax_rate",
+        "delay_months",
+        "total_received",
+    }
     for field, value in updates.items():
-        setattr(project, field, value)
+        if field in _PATCHABLE:
+            setattr(project, field, value)
 
     # Sync key fields back to the Asset row
     asset = await db.get(Asset, project.asset_id)

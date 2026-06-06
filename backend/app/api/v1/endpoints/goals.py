@@ -351,8 +351,26 @@ async def update_goal(
             update_data["deadline_date"] = date.fromisoformat(update_data["deadline_date"])
         except ValueError:
             raise HTTPException(status_code=422, detail="Format de date invalide")
+    # Defense-in-depth whitelist mirroring GoalUpdate. user_id / created_at
+    # never reachable via PATCH even if a future field is added accidentally.
+    _PATCHABLE = {
+        "name",
+        "goal_type",
+        "target_amount",
+        "current_amount",
+        "currency",
+        "target_date",
+        "deadline_date",
+        "priority",
+        "strategy_type",
+        "status",
+        "icon",
+        "color",
+        "notes",
+    }
     for field_name, value in update_data.items():
-        setattr(goal, field_name, value)
+        if field_name in _PATCHABLE:
+            setattr(goal, field_name, value)
 
     # Auto-mark as reached
     if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:

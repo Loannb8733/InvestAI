@@ -107,8 +107,11 @@ async def update_portfolio(
         )
 
     update_data = portfolio_in.model_dump(exclude_unset=True)
+    # Defense-in-depth whitelist (also enforced by PortfolioUpdate schema).
+    _PATCHABLE = {"name", "description", "cash_balances"}
     for field, value in update_data.items():
-        setattr(portfolio, field, value)
+        if field in _PATCHABLE:
+            setattr(portfolio, field, value)
 
     await db.commit()
     await db.refresh(portfolio)
