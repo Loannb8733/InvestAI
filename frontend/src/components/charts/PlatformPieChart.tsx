@@ -72,7 +72,13 @@ export default memo(function PlatformPieChart({ onPlatformClick }: PlatformPieCh
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="relative h-[260px]">
+      <div
+        className="relative h-[260px]"
+        role="img"
+        aria-label={`Répartition par plateforme : ${chartData
+          .map((d) => `${d.id} ${Math.round(d.value)}€`)
+          .join(', ')}`}
+      >
         <ResponsivePie
           data={chartData}
           theme={theme}
