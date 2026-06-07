@@ -91,7 +91,11 @@ async def _fetchall(conn, sql: str, **params):
 
 
 async def check_holdings_qty(conn) -> List[Issue]:
-    """A. asset.quantity must equal the signed sum of its transactions."""
+    """A. asset.quantity must equal the signed sum of its transactions.
+
+    CROWDFUNDING assets are excluded — they represent off-chain real-estate
+    NFT positions without classical transactions (quantity=1 by construction).
+    """
     rows = await _fetchall(
         conn,
         """
@@ -109,6 +113,7 @@ async def check_holdings_qty(conn) -> List[Issue]:
         FROM assets a
         JOIN portfolios p ON p.id = a.portfolio_id
         LEFT JOIN transactions t ON t.asset_id = a.id
+        WHERE a.asset_type != 'CROWDFUNDING'
         GROUP BY a.id, a.symbol, a.quantity, p.user_id
         """,
     )

@@ -1210,15 +1210,35 @@ class BinanceService(BaseExchangeService):
 
         return orders
 
-    async def get_rewards(self, limit: int = 500, **kwargs) -> List[ExchangeTrade]:
+    async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs) -> List[ExchangeTrade]:
         """Get Simple Earn interest/rewards history from Binance.
 
         Queries rewardsRecord endpoints for flexible and locked earn products.
         Returns rewards as ExchangeTrade with trade_id prefix 'reward_staking_'.
+
+        The Binance ``rewardsRecord`` endpoints return at most the last 90 days
+        when called without ``startTime``/``endTime``, and refuse windows
+        wider than 30 days when called with them. To get the full history we
+        walk backwards in 29-day windows up to ``lookback_days`` (default 2y).
+        Re-imports are idempotent: trade_id encodes the Binance reward time,
+        so duplicates collapse on the unique internal_hash.
         """
         trades: list[ExchangeTrade] = []
 
         await self._sync_server_time()
+
+        # Window strategy: walk back in 29-day chunks. Binance limits each
+        # query to ~30 days, so 29 days gives a safety margin.
+        now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        window_ms = 29 * 24 * 60 * 60 * 1000
+        oldest_ms = now_ms - lookback_days * 24 * 60 * 60 * 1000
+
+        windows: list[tuple[int, int]] = []
+        cursor = now_ms
+        while cursor > oldest_ms:
+            start = max(cursor - window_ms, oldest_ms)
+            windows.append((start, cursor))
+            cursor = start
 
         async with self._get_http_client(timeout=30.0) as client:
             # Each endpoint requires a 'type' param:
@@ -1231,50 +1251,70 @@ class BinanceService(BaseExchangeService):
                 ("/sapi/v1/simple-earn/locked/history/rewardsRecord", "REWARDS"),
             ]
             for endpoint, reward_type in earn_queries:
-                try:
-                    current = 1
-                    while True:
-                        params = self._sign_request({"type": reward_type, "current": current, "size": 100})
-                        response = await self._api_get(
-                            client,
-                            f"{self.BASE_URL}{endpoint}",
-                            params=params,
-                            headers=self._get_headers(),
-                        )
-                        if response.status_code != 200:
-                            logger.warning(
-                                f"Earn rewards {endpoint} type={reward_type}: HTTP {response.status_code} — {response.text}"
+                for win_start, win_end in windows:
+                    try:
+                        current = 1
+                        while True:
+                            params = self._sign_request(
+                                {
+                                    "type": reward_type,
+                                    "current": current,
+                                    "size": 100,
+                                    "startTime": win_start,
+                                    "endTime": win_end,
+                                }
                             )
-                            break
-                        data = response.json()
-                        rows = data.get("rows", [])
-                        if not rows:
-                            break
-                        for row in rows:
-                            asset = row.get("asset", "")
-                            rewards_amt = Decimal(str(row.get("rewards", "0")))
-                            if rewards_amt <= 0 or not asset:
-                                continue
-                            raw_time = row.get("time", 0)
-                            ts = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc)
-                            trades.append(
-                                ExchangeTrade(
-                                    trade_id=f"reward_staking_{asset}_{reward_type}_{raw_time}",
-                                    symbol=f"{asset}EUR",
-                                    side="buy",
-                                    quantity=rewards_amt,
-                                    price=Decimal("0"),
-                                    fee=Decimal("0"),
-                                    fee_currency="EUR",
-                                    timestamp=ts,
+                            response = await self._api_get(
+                                client,
+                                f"{self.BASE_URL}{endpoint}",
+                                params=params,
+                                headers=self._get_headers(),
+                            )
+                            if response.status_code != 200:
+                                logger.warning(
+                                    f"Earn rewards {endpoint} type={reward_type} "
+                                    f"window={win_start}-{win_end}: HTTP {response.status_code} — {response.text}"
                                 )
-                            )
-                        total_records = data.get("total", 0)
-                        if current * 100 >= total_records:
-                            break
-                        current += 1
-                except Exception as e:
-                    logger.warning(f"Failed to fetch {endpoint} type={reward_type}: {e}")
+                                break
+                            data = response.json()
+                            rows = data.get("rows", [])
+                            if not rows:
+                                break
+                            for row in rows:
+                                asset = row.get("asset", "")
+                                rewards_amt = Decimal(str(row.get("rewards", "0")))
+                                if rewards_amt <= 0 or not asset:
+                                    continue
+                                raw_time = row.get("time", 0)
+                                ts = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc)
+                                trades.append(
+                                    ExchangeTrade(
+                                        trade_id=f"reward_staking_{asset}_{reward_type}_{raw_time}",
+                                        symbol=f"{asset}EUR",
+                                        side="buy",
+                                        quantity=rewards_amt,
+                                        price=Decimal("0"),
+                                        fee=Decimal("0"),
+                                        fee_currency="EUR",
+                                        timestamp=ts,
+                                    )
+                                )
+                            total_records = data.get("total", 0)
+                            if current * 100 >= total_records:
+                                break
+                            current += 1
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to fetch {endpoint} type={reward_type} " f"window={win_start}-{win_end}: {e}"
+                        )
 
-        logger.info(f"Binance earn rewards found: {len(trades)}")
-        return sorted(trades, key=lambda x: x.timestamp, reverse=True)
+        # Dedup by trade_id (same reward can appear in overlapping windows)
+        seen = set()
+        unique_trades = []
+        for t in trades:
+            if t.trade_id not in seen:
+                seen.add(t.trade_id)
+                unique_trades.append(t)
+
+        logger.info(f"Binance earn rewards found: {len(unique_trades)} (over {lookback_days}d)")
+        return sorted(unique_trades, key=lambda x: x.timestamp, reverse=True)
