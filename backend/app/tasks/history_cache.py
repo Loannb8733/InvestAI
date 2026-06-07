@@ -60,11 +60,17 @@ async def _get_all_crypto_symbols() -> list:
 
 
 async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: str = "coingecko"):
-    """Upsert price data into asset_price_history table.
+    """Upsert price data into asset_price_history AND mirror the latest
+    price into assets.current_price for every (non-crowdfunding) row of
+    that symbol.
 
     Deduplicates by (symbol, price_date) before inserting to avoid
     'ON CONFLICT DO UPDATE cannot affect row a second time' errors
     when CoinGecko returns duplicate dates at granularity boundaries.
+
+    Mirroring assets.current_price keeps the column live for endpoints
+    that historically used it directly (balance-gaps, crowdfunding KPIs,
+    metrics service current-value snapshots).
     """
     if not dates or not prices:
         return
@@ -95,6 +101,25 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
                     },
                 )
                 await db.execute(stmt)
+
+            # Mirror the latest price into assets.current_price (non-crowdfunding only).
+            # Crowdfunding NFTs (TOKIMO) carry their own user-entered "invested" price
+            # — never overwrite those.
+            latest = max(rows, key=lambda r: r["price_date"])
+            from sqlalchemy import text as _text
+
+            await db.execute(
+                _text(
+                    "UPDATE assets SET current_price = :px,"
+                    " last_price_update = :upd"
+                    " WHERE symbol = :sym AND asset_type != 'CROWDFUNDING'"
+                ),
+                {
+                    "px": latest["price_eur"],
+                    "upd": datetime.now(timezone.utc),
+                    "sym": symbol.upper(),
+                },
+            )
             await db.commit()
     except Exception as e:
         logger.warning("Failed to persist prices for %s to DB: %s", symbol, e)
