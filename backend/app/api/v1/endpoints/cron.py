@@ -105,8 +105,9 @@ async def cron_invariants_check() -> dict:
                        END), 0) AS computed
                 FROM assets a
                 LEFT JOIN transactions t ON t.asset_id = a.id
+                WHERE a.asset_type != 'CROWDFUNDING'
                 GROUP BY a.id, a.symbol, a.exchange, a.quantity
-            """
+"""
                     )
                 )
             )
