@@ -166,6 +166,14 @@ async def list_balance_gaps(
     Surfaces Binance reward vouchers, unrecognized airdrops, or any state where
     the exchange reports more units than the transaction history accounts for.
     Frontend can credit them as AIRDROPs in one click.
+
+    Excludes assets with an active STAKING position (Binance/Kraken Earn) —
+    the principal lives outside the transaction log by design.
+
+    Each gap carries a `source_hint`:
+    * ``earn_pending`` — recent STAKING_REWARD activity (likely missed sync of latest reward)
+    * ``airdrop`` — has past AIRDROP rows but none recent
+    * ``unknown`` — never seen any reward, treat as raw airdrop
     """
     from sqlalchemy import text
 
@@ -181,11 +189,15 @@ async def list_balance_gaps(
                        THEN t.quantity
                    WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT')
                        THEN -t.quantity ELSE 0
-               END), 0) AS computed
+               END), 0) AS computed,
+               COALESCE(SUM(CASE WHEN t.transaction_type = 'STAKING' THEN t.quantity ELSE 0 END), 0) AS staking_qty,
+               MAX(CASE WHEN t.transaction_type = 'STAKING_REWARD' THEN t.executed_at END) AS last_reward_at,
+               MAX(CASE WHEN t.transaction_type = 'AIRDROP' THEN t.executed_at END) AS last_airdrop_at
         FROM assets a
         JOIN portfolios p ON p.id = a.portfolio_id
         LEFT JOIN transactions t ON t.asset_id = a.id
         WHERE p.user_id = :uid
+          AND a.asset_type != 'CROWDFUNDING'
         GROUP BY a.id, a.symbol, a.exchange, a.quantity, a.current_price
     """
                 ),
@@ -196,6 +208,9 @@ async def list_balance_gaps(
         .all()
     )
 
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
     gaps = []
     for r in rows:
         stored = Decimal(str(r["stored"] or 0))
@@ -203,10 +218,26 @@ async def list_balance_gaps(
         diff = stored - computed
         if diff <= 0:
             continue
+        # Skip assets with an active STAKING -- the gap belongs to the
+        # principal locked in Earn, not a missed voucher.
+        staking_qty = Decimal(str(r["staking_qty"] or 0))
+        if staking_qty > 0:
+            continue
         price = Decimal(str(r["current_price"] or 0))
         gap_eur = float(diff * price)
         if gap_eur < threshold_eur:
             continue
+
+        # Source hint
+        last_reward = r["last_reward_at"]
+        last_airdrop = r["last_airdrop_at"]
+        if last_reward and (now - last_reward) < timedelta(days=30):
+            hint = "earn_pending"
+        elif last_airdrop:
+            hint = "airdrop"
+        else:
+            hint = "unknown"
+
         gaps.append(
             {
                 "asset_id": r["asset_id"],
@@ -217,11 +248,97 @@ async def list_balance_gaps(
                 "missing_qty": float(diff),
                 "missing_eur": round(gap_eur, 2),
                 "suggested_action": "credit_airdrop",
+                "source_hint": hint,
             }
         )
 
     gaps.sort(key=lambda g: g["missing_eur"], reverse=True)
     return {"count": len(gaps), "threshold_eur": threshold_eur, "gaps": gaps}
+
+
+@router.post("/balance-gaps/credit-all", status_code=status.HTTP_201_CREATED)
+async def credit_balance_gaps(
+    threshold_eur: float = 5.0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Auto-credit every detected balance gap as an AIRDROP transaction.
+
+    Calls /balance-gaps with the same threshold, then inserts one AIRDROP
+    row per gap (price = current market, executed_at = now). Idempotent
+    via external_id ``auto_credit_gap_{asset_id}_{date}``.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import text
+
+    # Re-use the same gap detection logic
+    payload = await list_balance_gaps(threshold_eur=threshold_eur, current_user=current_user, db=db)
+    gaps = payload.get("gaps", [])
+    if not gaps:
+        return {"credited": 0, "skipped": 0, "details": []}
+
+    now = datetime.now(timezone.utc)
+    today_tag = now.strftime("%Y_%m_%d")
+    credited = []
+    skipped = []
+    for g in gaps:
+        ext = f"auto_credit_gap_{g['asset_id'][:8]}_{today_tag}"
+        # Idempotence guard
+        exists = (
+            await db.execute(
+                text("SELECT 1 FROM transactions WHERE external_id = :e LIMIT 1"),
+                {"e": ext},
+            )
+        ).first()
+        if exists:
+            skipped.append({"symbol": g["symbol"], "exchange": g["exchange"], "reason": "already_credited_today"})
+            continue
+        # Use current_price as the AIRDROP cost basis (gives a positive
+        # P&L like the real Binance Earn voucher).
+        row = (
+            await db.execute(
+                text("SELECT current_price FROM assets WHERE id = :aid"),
+                {"aid": g["asset_id"]},
+            )
+        ).first()
+        price = Decimal(str(row[0] or 0)) if row else Decimal(0)
+        if price <= 0:
+            skipped.append({"symbol": g["symbol"], "exchange": g["exchange"], "reason": "no_market_price"})
+            continue
+        notes = (
+            f"Auto-credit from balance-gaps on {today_tag} "
+            f"(missing {g['missing_qty']:.6f} {g['symbol']} ~= {g['missing_eur']:.2f} EUR, "
+            f"hint={g.get('source_hint', 'unknown')})."
+        )
+        await db.execute(
+            text(
+                "INSERT INTO transactions"
+                " (id, asset_id, transaction_type, quantity, price, fee,"
+                "  currency, executed_at, external_id, notes, created_at)"
+                " VALUES (gen_random_uuid(), :aid, 'AIRDROP', :qty, :px, 0,"
+                "         'EUR', :now, :ext, :notes, :now)"
+            ),
+            {
+                "aid": g["asset_id"],
+                "qty": Decimal(str(g["missing_qty"])),
+                "px": price,
+                "now": now,
+                "ext": ext,
+                "notes": notes,
+            },
+        )
+        credited.append(
+            {
+                "symbol": g["symbol"],
+                "exchange": g["exchange"],
+                "missing_qty": g["missing_qty"],
+                "missing_eur": g["missing_eur"],
+                "source_hint": g.get("source_hint", "unknown"),
+            }
+        )
+    await db.commit()
+    return {"credited": len(credited), "skipped": len(skipped), "details": {"credited": credited, "skipped": skipped}}
 
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)

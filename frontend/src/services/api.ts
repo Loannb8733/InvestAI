@@ -382,6 +382,27 @@ export interface BalanceGap {
   missing_qty: number
   missing_eur: number
   suggested_action: 'credit_airdrop'
+  /** Heuristic origin: 'earn_pending' (recent staking reward) | 'airdrop' (past airdrop history) | 'unknown'. */
+  source_hint?: 'earn_pending' | 'airdrop' | 'unknown'
+}
+
+export interface BalanceGapCreditResult {
+  credited: number
+  skipped: number
+  details: {
+    credited: Array<{
+      symbol: string
+      exchange: string
+      missing_qty: number
+      missing_eur: number
+      source_hint: string
+    }>
+    skipped: Array<{
+      symbol: string
+      exchange: string
+      reason: string
+    }>
+  }
 }
 
 export const transactionsApi = {
@@ -397,6 +418,15 @@ export const transactionsApi = {
       params: { threshold_eur: thresholdEur },
     })
     return response.data as { count: number; threshold_eur: number; gaps: BalanceGap[] }
+  },
+
+  /** Auto-credit every detected balance gap as an AIRDROP transaction.
+   * Idempotent: re-running the same day inserts nothing. */
+  creditBalanceGaps: async (thresholdEur = 5) => {
+    const response = await api.post('/transactions/balance-gaps/credit-all', null, {
+      params: { threshold_eur: thresholdEur },
+    })
+    return response.data as BalanceGapCreditResult
   },
 
   create: async (data: {
