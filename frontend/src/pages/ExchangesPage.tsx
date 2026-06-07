@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { ToastAction } from '@/components/ui/toast'
 import { apiKeysApi, transactionsApi } from '@/services/api'
 import ColdWalletsManager from '@/components/exchanges/ColdWalletsManager'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
@@ -348,8 +349,7 @@ export default function ExchangesPage() {
 
           // Post-sync reconciliation: surface holdings the exchange reports
           // but the sync didn't import as transactions (Binance reward
-          // vouchers, unrecognized airdrops). The user adds them manually
-          // as AIRDROPs from the transactions page.
+          // vouchers, unrecognized airdrops). Offers a 1-click auto-credit.
           transactionsApi
             .balanceGaps(5)
             .then((res) => {
@@ -359,11 +359,38 @@ export default function ExchangesPage() {
                   .slice(0, 3)
                   .map((g) => `${g.symbol} (${g.missing_eur.toFixed(2)} €)`)
                   .join(', ')
+                const hasEarn = res.gaps.some((g) => g.source_hint === 'earn_pending')
                 toast({
                   title: `${res.count} récompense(s) non tracée(s) détectée(s)`,
                   description:
-                    `Total estimé: ${totalEur.toFixed(2)} €. Top: ${top}.\n` +
-                    "Ajoutez-les manuellement depuis l'onglet Transactions (type « Airdrop »).",
+                    `Total estimé: ${totalEur.toFixed(2)} €. Top: ${top}.` +
+                    (hasEarn ? ' (probables intérêts Earn)' : ''),
+                  action: (
+                    <ToastAction
+                      altText="Crediter automatiquement les récompenses en AIRDROP"
+                      onClick={async () => {
+                        try {
+                          const result = await transactionsApi.creditBalanceGaps(5)
+                          toast({
+                            title: `${result.credited} récompense(s) créditée(s) en AIRDROP`,
+                            description:
+                              result.skipped > 0
+                                ? `${result.skipped} ignorée(s) (déjà créditées ou prix marché manquant).`
+                                : 'Vous pouvez les modifier depuis Transactions.',
+                          })
+                          invalidateAllFinancialData(queryClient)
+                        } catch (e) {
+                          toast({
+                            variant: 'destructive',
+                            title: 'Erreur lors du crédit auto',
+                            description: e instanceof Error ? e.message : 'Inconnue',
+                          })
+                        }
+                      }}
+                    >
+                      Crediter auto
+                    </ToastAction>
+                  ),
                 })
               }
             })
