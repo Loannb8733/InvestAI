@@ -902,9 +902,15 @@ async def dashboard_cache_invalidation_middleware(request: Request, call_next):
         if request.method in _MUTATING_METHODS and 200 <= response.status_code < 300:
             user_id = getattr(request.state, "user_id", None)
             if user_id:
-                from app.core.redis_client import invalidate_dashboard_cache
+                from app.core.redis_client import invalidate_dashboard_cache as invalidate_redis_dashboard
+                from app.services.metrics_service import invalidate_dashboard_cache as invalidate_inmem_dashboard
 
-                await invalidate_dashboard_cache(user_id)
+                # Purge Redis (cross-worker) AND the per-process in-memory cache.
+                # Skipping in-memory left stale data live for up to TTL (2 min)
+                # after mutations -- which the user saw on 2026-06-08 when a
+                # Tangem qty fix was masked by a stale +630 EUR PnL display.
+                await invalidate_redis_dashboard(user_id)
+                invalidate_inmem_dashboard(user_id)
     except Exception:  # never let cache bookkeeping break a successful request
         pass
     return response
