@@ -28,6 +28,139 @@ from app.services.metrics_service import invalidate_dashboard_cache
 router = APIRouter()
 
 
+@router.get("/debug/btc-fifo")
+async def debug_btc_fifo(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Temporary debug endpoint: return the full FIFO trace for BTC.
+
+    Bypasses all caches. Computes the FIFO from scratch and returns
+    each step so we can pinpoint why dashboard P&L is wrong.
+    """
+    from collections import defaultdict
+    from decimal import Decimal
+
+    from sqlalchemy import text as _text
+
+    rows = (
+        await db.execute(
+            _text(
+                "SELECT t.transaction_type::text AS tt, t.quantity, t.price,"
+                " t.fee, t.executed_at, t.id::text AS tid, t.external_id,"
+                " t.related_transaction_id::text AS rel, t.notes,"
+                " a.exchange, a.symbol "
+                "FROM transactions t JOIN assets a ON a.id = t.asset_id "
+                "JOIN portfolios p ON p.id = a.portfolio_id "
+                "WHERE p.user_id = :uid AND a.symbol = 'BTC' "
+                "ORDER BY COALESCE(t.executed_at, t.created_at), "
+                " CASE WHEN t.transaction_type = 'TRANSFER_OUT' THEN 0 ELSE 1 END, "
+                " t.id"
+            ),
+            {"uid": current_user.id},
+        )
+    ).all()
+    _ZERO = Decimal("0")
+    fifo: dict = defaultdict(list)
+    trace = []
+
+    def consume(key, qty):
+        extracted = []
+        remaining = qty
+        while remaining > 0 and fifo[key]:
+            layer = fifo[key][0]
+            take = layer["qty"] if layer["qty"] <= remaining else remaining
+            extracted.append({"qty": take, "unit_cost": layer["unit_cost"], "is_paid": layer.get("is_paid", False)})
+            layer["qty"] -= take
+            remaining -= take
+            if layer["qty"] == 0:
+                fifo[key].pop(0)
+        return extracted
+
+    for tt, qty, px, fee, dt, tid, ext, rel, notes, ex, sym in rows:
+        qty = Decimal(str(qty))
+        px = Decimal(str(px or 0))
+        key = (sym, (ex or "").strip())
+        step = {
+            "tt": tt,
+            "exchange": ex,
+            "qty": str(qty),
+            "px": str(px),
+            "executed_at": str(dt) if dt else None,
+            "tid": tid[:8],
+            "ext": ext,
+            "action": None,
+            "cost_added": None,
+        }
+        if tt in ("BUY", "CONVERSION_IN"):
+            if px > 0:
+                fifo[key].append({"qty": qty, "unit_cost": px, "is_paid": True})
+                step["action"] = "BUY/CONV_IN +layer"
+                step["cost_added"] = str(qty * px)
+        elif tt == "TRANSFER_OUT":
+            extracted = consume(key, qty)
+            tkey = (sym, f"__transit__{tid}")
+            fifo[tkey] = extracted
+            cost = sum(l["qty"] * l["unit_cost"] for l in extracted)
+            step["action"] = f"OUT -> transit ({len(extracted)} layers)"
+            step["cost_added"] = str(cost)
+        elif tt == "TRANSFER_IN":
+            matched = None
+            best_diff = None
+            for tkey in list(fifo.keys()):
+                if tkey[0] == sym and tkey[1].startswith("__transit__"):
+                    tqty = sum(l["qty"] for l in fifo[tkey])
+                    diff = abs(tqty - qty)
+                    if best_diff is None or diff < best_diff:
+                        best_diff = diff
+                        matched = tkey
+            if matched and fifo[matched]:
+                transit_layers = fifo.pop(matched)
+                tqty = sum(l["qty"] for l in transit_layers)
+                if tqty > qty:
+                    temp = (sym, f"__trim__{matched[1]}")
+                    fifo[temp] = transit_layers
+                    trimmed = consume(temp, qty)
+                    fifo.pop(temp, None)
+                    for layer in trimmed:
+                        fifo[key].append(layer)
+                    cost = sum(l["qty"] * l["unit_cost"] for l in trimmed)
+                    step["action"] = f"IN matched-trim {matched[1][:18]}"
+                else:
+                    for layer in transit_layers:
+                        fifo[key].append(layer)
+                    cost = sum(l["qty"] * l["unit_cost"] for l in transit_layers)
+                    step["action"] = f"IN matched {matched[1][:18]}"
+                step["cost_added"] = str(cost)
+            else:
+                if px > 0:
+                    fifo[key].append({"qty": qty, "unit_cost": px, "is_paid": True})
+                    step["action"] = "IN unmatched (tx_price)"
+                    step["cost_added"] = str(qty * px)
+                else:
+                    step["action"] = "IN unmatched (zero-cost)"
+        elif tt in ("SELL", "CONVERSION_OUT"):
+            consume(key, qty)
+            step["action"] = "SELL/CONV_OUT (consume)"
+        trace.append(step)
+
+    final = {}
+    for key in fifo:
+        layers = fifo[key]
+        if not layers:
+            continue
+        qty = sum(l["qty"] for l in layers)
+        cost = sum(l["qty"] * l["unit_cost"] for l in layers)
+        final[f"{key[0]}|{key[1][:30]}"] = {
+            "qty": str(qty),
+            "cost": str(cost),
+            "avg": str(cost / qty) if qty > 0 else None,
+            "is_transit": key[1].startswith("__transit__"),
+            "layers": [{"qty": str(l["qty"]), "unit_cost": str(l["unit_cost"])} for l in layers],
+        }
+    return {"trace": trace, "final_fifo": final}
+
+
 async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
     """Recalculate avg_buy_price from BUY, CONVERSION_IN, and TRANSFER_IN transactions.
 
