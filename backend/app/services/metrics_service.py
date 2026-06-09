@@ -964,12 +964,43 @@ class MetricsService:
             fifo_seen_keys: set = set()  # tracks all keys touched by FIFO (incl. zero-cost)
             for fkey, layers in fifo.items():
                 if fkey[1].startswith("__transit__"):
+                    # DEBUG: log orphan transit layers so we can spot cost basis loss
+                    if fkey[0] == "BTC":
+                        _orphan_cost = sum(ly["qty"] * ly["unit_cost"] for ly in layers)
+                        _orphan_qty = sum(ly["qty"] for ly in layers)
+                        if _orphan_qty > 0:
+                            logger.warning(
+                                "[FIFO_DEBUG] BTC orphan transit %s qty=%s cost=%s layers=%s",
+                                fkey[1][:40],
+                                _orphan_qty,
+                                _orphan_cost,
+                                len(layers),
+                            )
                     continue  # skip unmatched transit layers
                 fifo_seen_keys.add(fkey)
                 for layer in layers:
                     cost_by_key[fkey] += layer["qty"] * layer["unit_cost"]
                     if layer["is_paid"]:
                         paid_qty_by_key[fkey] += layer["qty"]
+                # DEBUG: log final BTC layers per key
+                if fkey[0] == "BTC":
+                    _tot_qty = sum(ly["qty"] for ly in layers)
+                    _tot_cost = sum(ly["qty"] * ly["unit_cost"] for ly in layers)
+                    logger.warning(
+                        "[FIFO_DEBUG] BTC final %s qty=%s cost=%s layers=%s detail=%s",
+                        fkey[1],
+                        _tot_qty,
+                        _tot_cost,
+                        len(layers),
+                        [
+                            {
+                                "qty": str(ly["qty"]),
+                                "unit_cost": str(ly["unit_cost"]),
+                                "is_paid": ly.get("is_paid", False),
+                            }
+                            for ly in layers
+                        ],
+                    )
 
             # Also build symbol-level aggregates for PRA and downstream compatibility
             cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
@@ -1182,9 +1213,31 @@ class MetricsService:
                 )
                 asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper()) if asset_fkey_check in fifo_seen_keys else None
                 asset_cump_pru = cump_pru_by_fkey.get(asset_fkey_check)
+                # DEBUG: log per-asset inputs for BTC
+                if asset.symbol.upper() == "BTC":
+                    logger.warning(
+                        "[FIFO_DEBUG] BTC asset_inputs exchange=%s qty=%s avg_buy=%s "
+                        "asset_invested=%s asset_buy_pra=%s asset_cump_pru=%s",
+                        asset.exchange,
+                        asset.quantity,
+                        asset.avg_buy_price,
+                        asset_invested,
+                        asset_buy_pra,
+                        asset_cump_pru,
+                    )
                 metrics = await self.get_asset_metrics(
                     asset, current_price, asset_invested, asset_buy_pra, asset_cump_pru
                 )
+                if asset.symbol.upper() == "BTC":
+                    logger.warning(
+                        "[FIFO_DEBUG] BTC metrics_output exchange=%s total_invested=%s "
+                        "current_value=%s avg_buy_price=%s gain_loss=%s",
+                        asset.exchange,
+                        metrics.get("total_invested"),
+                        metrics.get("current_value"),
+                        metrics.get("avg_buy_price"),
+                        metrics.get("gain_loss"),
+                    )
 
                 # Post-filter: skip dust positions based on actual current value
                 if (
