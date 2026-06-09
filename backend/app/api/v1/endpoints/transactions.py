@@ -28,6 +28,41 @@ from app.services.metrics_service import invalidate_dashboard_cache
 router = APIRouter()
 
 
+@router.get("/debug/btc-metrics")
+async def debug_btc_metrics(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Call the REAL metrics_service and return intermediate BTC values.
+
+    Bypasses cache. Returns what the dashboard would receive.
+    """
+    from app.services.metrics_service import MetricsService
+
+    # Find the user's BTC asset on Tangem
+    portfolio_result = await db.execute(
+        select(Portfolio).where(Portfolio.user_id == current_user.id)
+    )
+    portfolio = portfolio_result.scalars().first()
+    if not portfolio:
+        return {"error": "no portfolio"}
+
+    svc = MetricsService()
+    # Call get_portfolio_metrics — the real path used by /dashboard
+    metrics = await svc.get_portfolio_metrics(
+        db=db, portfolio_id=str(portfolio.id), currency="EUR"
+    )
+    # Extract only BTC entries
+    btc_assets = [a for a in metrics.get("assets", []) if a.get("symbol") == "BTC"]
+    return {
+        "portfolio_id": str(portfolio.id),
+        "btc_assets": btc_assets,
+        "total_invested": metrics.get("total_invested"),
+        "total_value": metrics.get("total_value"),
+        "total_gain_loss": metrics.get("total_gain_loss"),
+    }
+
+
 @router.get("/debug/btc-fifo")
 async def debug_btc_fifo(
     current_user: User = Depends(get_current_user),
