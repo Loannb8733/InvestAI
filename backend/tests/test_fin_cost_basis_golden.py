@@ -127,6 +127,9 @@ async def test_usd_buy_cost_basis_converted_to_eur(db_session, regular_user):
     assert result["total_invested"] == pytest.approx(92.0, abs=0.01)
     assert result["total_value"] == pytest.approx(100.0, abs=0.01)
     assert result["total_gain_loss"] == pytest.approx(8.0, abs=0.01)
+    # Displayed per-asset PRU must also be in EUR (CUMP path), not the raw 100 USD.
+    # Pins the compute_cump_pru FX conversion so PRU stays consistent with G/L.
+    assert result["assets"][0]["avg_buy_price"] == pytest.approx(92.0, abs=0.01)
 
 
 @pytest.mark.asyncio
