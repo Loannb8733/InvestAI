@@ -95,6 +95,33 @@ def is_safe_haven(symbol: str) -> bool:
     return symbol.upper() in _GOLD_SYMBOLS
 
 
+def _conversion_dest_unit_cost(
+    cost_removed: Decimal,
+    matched_qty: Decimal,
+    recorded_price: Decimal,
+) -> Decimal:
+    """Cost basis per unit for a conversion destination.
+
+    A crypto-to-crypto conversion is a disposal of the source plus a re-acquisition
+    of the destination: the destination's cost basis is its market value on the
+    conversion day, i.e. the **recorded CONVERSION_IN price**. We use that whenever
+    it is known.
+
+    The legacy model instead *carried* the source's consumed cost
+    (``cost_removed / matched_qty``). A mis-matched or chained conversion can pair a
+    large source cost with a tiny destination qty, concentrating cost into
+    impossible per-unit values (observed up to ~500k EUR/BTC in prod) that overstate
+    the cost basis and compound across conversion chains. We keep the carry only as
+    a fallback for the rare case where the destination price was not recorded.
+    """
+    _Z = Decimal("0")
+    if matched_qty <= _Z:
+        return _Z
+    if recorded_price > _Z:
+        return recorded_price
+    return cost_removed / matched_qty
+
+
 def compute_cump_pru(
     all_txs: list,
     aid_to_symbol: Dict[str, str],
@@ -605,6 +632,7 @@ class MetricsService:
                 dest_sym: Optional[str] = None
                 dest_exch: Optional[str] = None
                 matched_qty = co_qty  # fallback
+                matched_price = _ZERO  # recorded dest price on the matched CONVERSION_IN
 
                 if "Crypto.com" in exch or "crypto.com" in exch.lower():
                     for ci in conv_ins:
@@ -612,6 +640,7 @@ class MetricsService:
                             dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
                             dest_exch = (ci.exchange or "").strip()
                             matched_qty = Decimal(str(ci.quantity))
+                            matched_price = Decimal(str(ci.price or 0))
                             break
                 else:
                     # Kraken / generic: match trade_id suffix in notes
@@ -626,6 +655,7 @@ class MetricsService:
                                     dest_sym = candidate
                                     dest_exch = (ci.exchange or "").strip()
                                     matched_qty = Decimal(str(ci.quantity))
+                                    matched_price = Decimal(str(ci.price or 0))
                                 else:
                                     logger.warning(
                                         "Kraken conversion match rejected: " "src=%s == dest=%s (suffix=%s, tx_id=%s)",
@@ -662,7 +692,7 @@ class MetricsService:
                                         )
                                     break
 
-                return dest_sym, dest_exch, matched_qty
+                return dest_sym, dest_exch, matched_qty, matched_price
 
             def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
                 """Remove qty from FIFO layers, return total cost removed."""
@@ -828,7 +858,7 @@ class MetricsService:
 
                 elif ttype == TxType.CONVERSION_OUT:
                     src_sym = sym
-                    dest_sym, dest_exch, matched_ci_qty = _match_conversion_in(tx, src_sym)
+                    dest_sym, dest_exch, matched_ci_qty, matched_ci_price = _match_conversion_in(tx, src_sym)
 
                     if dest_sym is None:
                         # B2: Unmatched — preserve cost on source
@@ -896,7 +926,12 @@ class MetricsService:
                         tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
                         if matched_ci_qty > 0 and cost_removed > 0:
                             dest_key: FifoKey = (dest_sym, dest_exch or exch)
-                            dest_unit = cost_removed / matched_ci_qty
+                            # Destination cost basis = its market value at conversion
+                            # (recorded CONVERSION_IN price). Carrying the source cost
+                            # instead let mis-matched/chained conversions concentrate
+                            # cost into a shrinking qty and fabricate impossible unit
+                            # costs (FIN — runaway cost basis up to ~500k EUR/BTC).
+                            dest_unit = _conversion_dest_unit_cost(cost_removed, matched_ci_qty, matched_ci_price)
                             fifo[dest_key].append(
                                 {
                                     "qty": matched_ci_qty,

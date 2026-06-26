@@ -13,11 +13,48 @@ from app.services.metrics_service import (
     FIAT_SYMBOLS,
     STABLECOIN_SYMBOLS,
     MetricsService,
+    _conversion_dest_unit_cost,
     compute_cump_pru,
     is_cash_like,
     is_fiat,
     is_stablecoin,
 )
+
+
+class TestConversionDestUnitCost:
+    """Conversion destination cost basis = its market value at conversion.
+
+    A crypto-to-crypto conversion is a disposal + re-acquisition: the destination's
+    cost basis is the recorded CONVERSION_IN price, NOT the source's carried cost.
+    Carrying source cost let mis-matched / chained conversions concentrate cost into
+    a shrinking qty, fabricating impossible unit costs (observed up to ~500k EUR/BTC
+    in prod) that overstate the cost basis.
+    """
+
+    def test_uses_recorded_price_when_available(self):
+        # Recorded BTC price at conversion is the acquisition cost, regardless of
+        # what the source carry would have produced.
+        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.0003"), Decimal("88000"))
+        assert u == pytest.approx(88000.0)
+
+    def test_recorded_price_overrides_inflated_carry(self):
+        # Source carry would give 2.64M EUR/BTC; recorded price wins.
+        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.00001"), Decimal("88000"))
+        assert float(u) == pytest.approx(88000.0)
+
+    def test_recorded_price_overrides_even_a_modest_carry(self):
+        # Carry would give ~90721; recorded 88000 is still the truth.
+        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.000291"), Decimal("88000"))
+        assert float(u) == pytest.approx(88000.0)
+
+    def test_zero_qty_returns_zero(self):
+        assert _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0"), Decimal("88000")) == Decimal("0")
+
+    def test_falls_back_to_carry_when_no_recorded_price(self):
+        # No recorded dest price (0) -> legacy carry: cost_removed / matched_qty.
+        u = _conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
+        assert float(u) == pytest.approx(500000.0)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
