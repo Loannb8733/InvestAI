@@ -131,8 +131,16 @@ def compute_cump_pru(
 
         s = state[fkey]
         qty = Decimal(str(tx.quantity or 0))
-        price = Decimal(str(tx.price or 0))
-        fee = Decimal(str(tx.fee or 0))
+        # Cost basis is tracked in the PORTFOLIO currency. The trade price/fee are
+        # in ``tx.currency``, so convert them via the FX rate captured at execution
+        # (``conversion_rate`` = portfolio units per 1 unit of tx currency; defaults
+        # to 1 for same-currency trades). Without this, a USD/USDT-pair buy stored
+        # the raw USD price as the PRU — ~8-9% above the EUR cost basis the FIFO
+        # engine reports (which already applies this same rate), leaving the
+        # displayed PRU inconsistent with the gain/loss. (FIN-01 parity.)
+        fx = Decimal(str(tx.conversion_rate)) if getattr(tx, "conversion_rate", None) else Decimal("1")
+        price = Decimal(str(tx.price or 0)) * fx
+        fee = Decimal(str(tx.fee or 0)) * fx
         ttype = tx.transaction_type
 
         if ttype == TxType.BUY:

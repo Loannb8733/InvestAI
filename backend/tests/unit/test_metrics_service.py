@@ -338,7 +338,7 @@ class TestCalculateCAGR:
 # ---------------------------------------------------------------------------
 
 
-def _make_tx(asset_id, ttype, qty, price, fee=0.0, executed_at=None):
+def _make_tx(asset_id, ttype, qty, price, fee=0.0, executed_at=None, currency="EUR", conversion_rate=None):
     """Build a mock Transaction object."""
     from datetime import datetime
 
@@ -350,9 +350,9 @@ def _make_tx(asset_id, ttype, qty, price, fee=0.0, executed_at=None):
     tx.quantity = Decimal(str(qty))
     tx.price = Decimal(str(price))
     tx.fee = Decimal(str(fee))
-    tx.fee_currency = "EUR"
-    tx.currency = "EUR"
-    tx.conversion_rate = None
+    tx.fee_currency = currency
+    tx.currency = currency
+    tx.conversion_rate = None if conversion_rate is None else Decimal(str(conversion_rate))
     tx.notes = ""
     tx.exchange = "Binance"
     tx.executed_at = executed_at or datetime(2025, 1, 1)
@@ -450,6 +450,32 @@ class TestComputeCumpPru:
         ]
         result = self._run(txns)
         assert pytest.approx(float(result[self.FKEY])) == 60000.0
+
+    # FX conversion: PRU must be in PORTFOLIO currency (EUR), like the FIFO engine
+    def test_usd_pair_buy_pru_converted_to_eur(self):
+        """A BTC buy on a USDT pair (currency=USD, rate 0.92 EUR/USD) must yield a
+        PRU in EUR, not the raw USD price. Mirrors the FIFO cost-basis engine."""
+        txns = [
+            _make_tx(self.AID, "buy", "1.0", "60000.0", currency="USD", conversion_rate="0.92"),
+        ]
+        result = self._run(txns)
+        # 60000 USD * 0.92 = 55200 EUR, NOT 60000.
+        assert pytest.approx(float(result[self.FKEY])) == 55200.0
+
+    def test_usd_pair_buy_fee_also_converted(self):
+        """Fees recorded in the trade currency convert with the same rate."""
+        txns = [
+            _make_tx(self.AID, "buy", "1.0", "60000.0", fee="100.0", currency="USD", conversion_rate="0.92"),
+        ]
+        result = self._run(txns)
+        # (60000 + 100) * 0.92 = 55292 EUR
+        assert pytest.approx(float(result[self.FKEY])) == 55292.0
+
+    def test_eur_buy_unaffected_by_conversion(self):
+        """EUR trades (conversion_rate None) keep the raw price — no regression."""
+        txns = [_make_tx(self.AID, "buy", "1.0", "50000.0")]
+        result = self._run(txns)
+        assert pytest.approx(float(result[self.FKEY])) == 50000.0
 
     # Stablecoin position cycle (USDC scenario)
     def test_usdc_buy_sell_reset_staking_reward(self):
