@@ -703,6 +703,9 @@ class MetricsService:
                                         dest_sym = candidate
                                         dest_exch = (ci.exchange or "").strip()
                                         matched_qty = Decimal(str(ci.quantity))
+                                        matched_price = _ci_price_in_portfolio_ccy(
+                                            ci.price, getattr(ci, "conversion_rate", None)
+                                        )
                                     else:
                                         logger.warning(
                                             "Kraken conversion match (ext_id fallback) rejected: "
