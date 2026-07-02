@@ -48,11 +48,24 @@ def invalidate_dashboard_cache(user_id: str) -> None:
     """Evict all cached dashboard entries for a given user.
 
     Call after any mutation (create/update/delete transaction) so the next
-    dashboard or report request picks up fresh data immediately.
+    dashboard or report request picks up fresh data immediately. Clears the
+    per-worker L1 cache synchronously and schedules a best-effort clear of the
+    shared Redis (L2) cache so *every* worker sees fresh data, not just this one.
     """
     keys_to_delete = [k for k in _dashboard_cache if k[0] == user_id]
     for k in keys_to_delete:
         del _dashboard_cache[k]
+
+    # Best-effort global (cross-worker) invalidation. Callers invoke this
+    # synchronously from async request handlers; schedule the Redis clear on the
+    # running loop and stay a no-op when there is none (pure-sync context).
+    try:
+        from app.core import redis_client
+
+        loop = asyncio.get_running_loop()
+        loop.create_task(redis_client.invalidate_dashboard_cache(user_id))
+    except RuntimeError:
+        pass
 
 
 # Fiat currencies -> counted as cash
@@ -1727,8 +1740,11 @@ class MetricsService:
         expires), only the first recomputes the full FIFO / value series; the rest
         await that same result instead of stampeding the DB and CPU.
         """
+        from app.core import redis_client
+
         cache_key = (user_id, days, currency)
         now = time.time()
+        # L1 — per-worker in-memory cache (fastest).
         if cache_key in _dashboard_cache:
             ts, cached = _dashboard_cache[cache_key]
             if now - ts < _DASHBOARD_CACHE_TTL:
@@ -1742,8 +1758,18 @@ class MetricsService:
         fut: "asyncio.Future" = asyncio.get_event_loop().create_future()
         _dashboard_inflight[cache_key] = fut
         try:
-            result = await self._compute_user_dashboard_metrics(db, user_id, currency, days)
+            # L2 — shared Redis cache (cross-worker): a result computed by any
+            # worker is reused by all, and invalidation clears it globally.
+            shared = await redis_client.get_cached_dashboard(user_id, days, currency)
+            if shared is not None:
+                _cache_put_dashboard(cache_key, (time.time(), shared))
+                if not fut.done():
+                    fut.set_result(shared)
+                return shared
+
+            result = await self._compute_dashboard_cross_worker(db, user_id, currency, days)
             _cache_put_dashboard(cache_key, (time.time(), result))
+            await redis_client.cache_dashboard(user_id, days, currency, result)
             if not fut.done():
                 fut.set_result(result)
             return result
@@ -1753,6 +1779,38 @@ class MetricsService:
             raise
         finally:
             _dashboard_inflight.pop(cache_key, None)
+
+    async def _compute_dashboard_cross_worker(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        currency: str,
+        days: int,
+    ) -> Dict:
+        """Compute the dashboard under a cross-worker Redis lock.
+
+        Only one worker computes a given key at a time; the others poll the shared
+        cache and reuse its result. Fully fail-open: if the lock is unreachable or
+        the wait times out, the worker just computes locally (never worse than the
+        single-worker path).
+        """
+        from app.core import redis_client
+
+        lock_key = f"dashboard:{user_id}:{days}:{currency}"
+        acquired = await redis_client.try_acquire_lock(lock_key, ttl=20)
+        if not acquired:
+            deadline = time.time() + 3.0
+            while time.time() < deadline:
+                await asyncio.sleep(0.15)
+                shared = await redis_client.get_cached_dashboard(user_id, days, currency)
+                if shared is not None:
+                    return shared
+            # Timed out waiting for the peer — fall through and compute anyway.
+        try:
+            return await self._compute_user_dashboard_metrics(db, user_id, currency, days)
+        finally:
+            if acquired:
+                await redis_client.release_lock(lock_key)
 
     async def _compute_user_dashboard_metrics(
         self,

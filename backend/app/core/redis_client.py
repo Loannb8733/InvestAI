@@ -79,6 +79,38 @@ async def get_redis() -> aioredis.Redis:
     return await _get_redis_bin()
 
 
+# ── Cross-worker single-flight lock ──────────────────────────────────
+# A best-effort distributed lock so that, across multiple web workers, only one
+# recomputes an expensive cached value at a time. Every path is fail-OPEN: if
+# Redis is unreachable the caller behaves exactly as it did before (compute
+# locally), never blocking on a lock it cannot reach.
+
+
+async def try_acquire_lock(key: str, ttl: int = 20) -> bool:
+    """Try to acquire ``key`` for ``ttl`` seconds. True = caller should compute.
+
+    Returns True when the lock is freshly held OR when Redis is unreachable
+    (fail-open: better to double-compute than to stall). Returns False only when
+    Redis is up and another worker already holds the lock.
+    """
+    try:
+        r = await _get_redis_txt()
+        acquired = await r.set(f"lock:{key}", "1", nx=True, ex=max(ttl, 1))
+        return bool(acquired)
+    except Exception as e:  # noqa: BLE001 — degrade to "compute anyway"
+        logger.debug("Lock acquire failed for %s (computing anyway): %s", key, e)
+        return True
+
+
+async def release_lock(key: str) -> None:
+    """Release a lock acquired with try_acquire_lock (best-effort)."""
+    try:
+        r = await _get_redis_txt()
+        await r.delete(f"lock:{key}")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("Lock release failed for %s: %s", key, e)
+
+
 def _data_hash(prices: list) -> str:
     """Hash price data to detect staleness.
 
