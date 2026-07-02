@@ -3551,69 +3551,82 @@ class PredictionService:
         resistance: float,
         regime_info: Optional[Dict] = None,
     ) -> str:
-        """Generate trading recommendation in French, enriched by regime context."""
+        """Observational regime/trend context, always suffixed with the non-advice disclaimer.
+
+        Trust & Safety: framed as observations (what the detected regime is
+        historically associated with), never as prescriptive orders — InvestAI is
+        not a licensed adviser. The mandatory disclaimer is appended to every output.
+        """
+        # Lazy import avoids a circular import (ai_strategy_service imports this module).
+        from app.services.ai_strategy_service import AI_DISCLAIMER
+
+        body = self._recommendation_body(trend, trend_strength, current_price, support, resistance, regime_info)
+        return f"{body}\n\n{AI_DISCLAIMER}"
+
+    def _recommendation_body(
+        self,
+        trend: str,
+        trend_strength: float,
+        current_price: float,
+        support: float,
+        resistance: float,
+        regime_info: Optional[Dict] = None,
+    ) -> str:
+        """Observational regime/trend context in French (no prescriptive orders)."""
         regime = regime_info.get("dominant_regime") if regime_info else None
         reg_conf = regime_info.get("confidence", 0) if regime_info else 0
 
-        # Regime-first recommendations when confidence is high enough
+        # Regime-first observations when confidence is high enough
         if reg_conf > 0.4 and regime:
             if regime == "bottom":
                 if trend == "bearish":
                     return (
-                        "Zone de creux potentiel — Envisagez le DCA (achat périodique) "
-                        "pour construire votre position progressivement. "
-                        "Ne tentez pas de timer le bottom exact."
+                        "Zone de creux potentiel avec une tendance encore baissière. "
+                        "Historiquement, ces phases ont été associées à une accumulation "
+                        "progressive plutôt qu'à un timing précis du point bas."
                     )
                 return (
-                    "Signaux de creux détectés — Opportunité d'accumulation. "
-                    "DCA recommandé, le rebond pourrait se confirmer."
+                    "Signaux de creux détectés ; un rebond pourrait se confirmer. "
+                    "Ces configurations ont historiquement précédé des phases de reprise."
                 )
             if regime == "bearish":
                 if trend == "bearish" and trend_strength > 50:
                     return (
-                        "Marché baissier confirmé — Zone d'accumulation ! "
-                        "Les prix sont décotés, accumulez via DCA sur les actifs à fort alpha. "
-                        f'Support clé à {current_price * 0.9:.0f} — "Be greedy when others are fearful."'
+                        "Marché baissier confirmé : les prix sont décotés par rapport aux "
+                        f"plus hauts récents. Support technique estimé vers {current_price * 0.9:.0f}."
                     )
                 if trend == "bullish":
                     return (
-                        "Signal haussier en marché baissier — Possible retournement. "
-                        "Renforcez vos positions sur les actifs de qualité. "
-                        "Le DCA agressif dans ces zones génère historiquement les meilleurs rendements."
+                        "Signal haussier en marché baissier — possible retournement, sans garantie. "
+                        "Ces zones ont historiquement présenté un rapport rendement/risque plus favorable."
                     )
                 return (
-                    "Marché baissier — Phase d'accumulation. "
-                    "Accumulez progressivement via DCA/VCA sur les actifs avec un alpha élevé. "
-                    "Les meilleurs portefeuilles se construisent en bear market."
+                    "Marché baissier — contexte historiquement associé aux phases "
+                    "d'accumulation ; les creux de cycle s'y sont souvent formés."
                 )
             if regime == "top":
                 return (
-                    "Signes de sommet de marché — Prenez des profits partiels (20-30%), "
-                    "placez des stop-loss sous le support, évitez les achats impulsifs. "
-                    "Le risque de correction est élevé."
+                    "Signes de sommet de marché : le risque de correction est "
+                    f"historiquement élevé dans ces configurations. Support à surveiller : {support:.0f}."
                 )
             if regime == "bullish":
                 if trend == "bullish" and trend_strength > 50:
                     return (
-                        "Tendance haussière forte — Laissez courir vos positions gagnantes "
-                        "mais préparez votre plan de sortie. Définissez vos niveaux de prise "
-                        'de profits et remontez vos stop-loss. "Be fearful when others are greedy."'
+                        "Tendance haussière forte. Le risque de retournement tend à "
+                        f"augmenter à mesure que le mouvement s'étend ; résistance à surveiller : {resistance:.0f}."
                     )
-                return (
-                    "Marché haussier — Maintenez vos positions mais commencez à sécuriser "
-                    f"des gains partiels. Résistance à surveiller : {resistance:.0f}."
-                )
+                return "Marché haussier : la dynamique reste positive. " f"Résistance à surveiller : {resistance:.0f}."
 
-        # Fallback: trend-based recommendations
+        # Fallback: trend-based observation
         if trend == "bullish" and trend_strength > 50:
-            return "Tendance haussière forte — Maintenez vos positions, préparez la prise de profits"
+            return "Tendance haussière forte détectée."
         elif trend == "bullish":
-            return "Tendance légèrement haussière — Maintenir la position"
+            return "Tendance légèrement haussière détectée."
         elif trend == "bearish" and trend_strength > 50:
-            return "Tendance baissière forte — Opportunité d'accumulation via DCA/VCA"
+            return "Tendance baissière forte détectée ; prix décotés par rapport aux plus hauts récents."
         elif trend == "bearish":
-            return "Tendance légèrement baissière — Envisagez d'accumuler sur les supports"
-        return "Tendance neutre — Attendre un signal plus clair avant de prendre position"
+            return "Tendance légèrement baissière détectée."
+        return "Tendance neutre — pas de signal directionnel clair."
 
     @staticmethod
     def _ema20_fallback(
