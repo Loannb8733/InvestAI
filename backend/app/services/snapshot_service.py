@@ -628,39 +628,50 @@ class SnapshotService:
         if not symbols_to_fetch:
             return price_series
 
-        # 2. Check PostgreSQL first (persistent, complete after backfill)
+        # 2. Check PostgreSQL first (persistent, complete after backfill).
+        # One batched query (WHERE symbol IN ...) instead of one SELECT per symbol.
         symbols_need_redis: Dict[str, str] = {}
         if db is not None:
             cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
+            non_stable: Dict[str, str] = {}
             for symbol_upper, asset_type in symbols_to_fetch.items():
                 if symbol_upper in STABLECOINS:
                     price_series[symbol_upper] = {}
-                    continue
+                else:
+                    non_stable[symbol_upper] = asset_type
+
+            rows_by_symbol: Dict[str, Dict[str, float]] = {}
+            if non_stable:
                 try:
                     result = await db.execute(
-                        select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
+                        select(
+                            AssetPriceHistory.symbol,
+                            AssetPriceHistory.price_date,
+                            AssetPriceHistory.price_eur,
+                        )
                         .where(
-                            AssetPriceHistory.symbol == symbol_upper,
+                            AssetPriceHistory.symbol.in_(list(non_stable)),
                             AssetPriceHistory.price_date >= cutoff_date,
                         )
-                        .order_by(AssetPriceHistory.price_date)
+                        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
                     )
-                    rows = result.all()
-                    if rows and len(rows) >= 1:
-                        series: Dict[str, float] = {}
-                        for row in rows:
-                            series[row[0].strftime("%Y-%m-%d")] = float(row[1])
-                        price_series[symbol_upper] = series
-                        _cache_put(
-                            _price_cache,
-                            (symbol_upper, days),
-                            (time.time(), series),
-                            _MAX_PRICE_CACHE,
-                        )
-                        continue
+                    for sym, pdate, peur in result.all():
+                        rows_by_symbol.setdefault(sym, {})[pdate.strftime("%Y-%m-%d")] = float(peur)
                 except Exception as e:
-                    logger.warning("DB price lookup failed for %s: %s", symbol_upper, e)
-                symbols_need_redis[symbol_upper] = asset_type
+                    logger.warning("Batched DB price lookup failed: %s", e)
+
+            for symbol_upper, asset_type in non_stable.items():
+                series = rows_by_symbol.get(symbol_upper)
+                if series:
+                    price_series[symbol_upper] = series
+                    _cache_put(
+                        _price_cache,
+                        (symbol_upper, days),
+                        (time.time(), series),
+                        _MAX_PRICE_CACHE,
+                    )
+                else:
+                    symbols_need_redis[symbol_upper] = asset_type
         else:
             symbols_need_redis = {s: t for s, t in symbols_to_fetch.items() if s not in STABLECOINS}
             for s in symbols_to_fetch:
