@@ -15,6 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { simulationsApi, dashboardApi, analyticsApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import { formatCurrency as formatCurrencyBase } from '@/lib/utils'
 import {
   Loader2,
   TrendingUp,
@@ -113,13 +114,9 @@ export default function SimulationsPage() {
   const livePortfolioValue = dashboard?.total_value ?? 0
   const userCurrency = user?.preferredCurrency || 'EUR'
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: userCurrency,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
+  // Delegate to the shared formatter so amounts keep their cents and stay
+  // consistent with the rest of the app (the local version forced 0 decimals).
+  const formatCurrency = (value: number) => formatCurrencyBase(value, userCurrency)
 
   // Auto-suggest inflation based on user currency
   const suggestedInflation = INFLATION_BY_CURRENCY[userCurrency]?.rate ?? 2.0
