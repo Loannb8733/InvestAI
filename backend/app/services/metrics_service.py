@@ -128,6 +128,20 @@ def _conversion_dest_unit_cost(
     return cost_removed / matched_qty
 
 
+def _ci_price_in_portfolio_ccy(price, conversion_rate) -> Decimal:
+    """Recorded CONVERSION_IN price expressed in the portfolio currency.
+
+    ``price`` is stored in the leg's own trade currency (e.g. a USD-quoted swap);
+    ``conversion_rate`` is portfolio units per 1 unit of that currency (``None``
+    means the price is already in the portfolio currency). Every other leg applies
+    this same rate, so the conversion destination's cost basis must too — otherwise
+    a USD-quoted CONVERSION_IN is carried as if it were EUR.
+    """
+    p = Decimal(str(price or 0))
+    fx = Decimal(str(conversion_rate)) if conversion_rate else Decimal("1")
+    return p * fx
+
+
 def compute_cump_pru(
     all_txs: list,
     aid_to_symbol: Dict[str, str],
@@ -646,7 +660,7 @@ class MetricsService:
                             dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
                             dest_exch = (ci.exchange or "").strip()
                             matched_qty = Decimal(str(ci.quantity))
-                            matched_price = Decimal(str(ci.price or 0))
+                            matched_price = _ci_price_in_portfolio_ccy(ci.price, getattr(ci, "conversion_rate", None))
                             break
                 else:
                     # Kraken / generic: match trade_id suffix in notes
@@ -661,7 +675,9 @@ class MetricsService:
                                     dest_sym = candidate
                                     dest_exch = (ci.exchange or "").strip()
                                     matched_qty = Decimal(str(ci.quantity))
-                                    matched_price = Decimal(str(ci.price or 0))
+                                    matched_price = _ci_price_in_portfolio_ccy(
+                                        ci.price, getattr(ci, "conversion_rate", None)
+                                    )
                                 else:
                                     logger.warning(
                                         "Kraken conversion match rejected: " "src=%s == dest=%s (suffix=%s, tx_id=%s)",
