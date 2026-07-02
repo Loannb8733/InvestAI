@@ -1330,6 +1330,7 @@ class AnalyticsService:
         monthly_withdrawal: float = 0.0,
         initial_portfolio_value: float = 0.0,
         vol_regime: str = "normal",
+        seed: Optional[int] = None,
     ) -> "MonteCarloResult":
         """CPU-bound Monte Carlo with volatility shrinkage, withdrawals and fees.
 
@@ -1370,7 +1371,11 @@ class AnalyticsService:
         else:
             L_blended = L
 
-        seed = int(time.time()) ^ (hash(user_id) % (2**31))
+        # Reproducibility: an explicit ``seed`` forces deterministic draws (tests,
+        # or any caller that needs repeatable runs). Production leaves it None, so
+        # each run gets fresh randomness from the wall clock XOR the user id.
+        if seed is None:
+            seed = int(time.time()) ^ (hash(user_id) % (2**31))
         rng = np.random.default_rng(seed & 0x7FFFFFFF)
         Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
         correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)
