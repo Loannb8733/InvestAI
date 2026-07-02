@@ -83,15 +83,21 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
             <tbody>
               {correlation.symbols.map((sym1, i) => (
                 <tr key={sym1} className="border-b last:border-b-0">
-                  <td className="p-2 font-semibold text-xs bg-muted/50 sticky left-0 z-10">{sym1}</td>
+                  <th scope="row" className="p-2 font-semibold text-xs bg-muted/50 sticky left-0 z-10 text-left">{sym1}</th>
                   {correlation.symbols.map((sym2, j) => {
                     const value = correlation.matrix[i]?.[j] ?? 0
                     const isDiag = i === j
+                    const label = corrLabel(value, ct)
+                    // Full spoken meaning so the value is never conveyed by colour alone.
+                    const cellAria = isDiag
+                      ? `${sym1}, diagonale`
+                      : `${sym1} / ${sym2} : ${value.toFixed(2)}${label ? `, ${label}` : ''}`
                     return (
                       <TooltipProvider key={`${sym1}-${sym2}`}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <td
+                              aria-label={cellAria}
                               className={`p-0 text-center transition-opacity hover:opacity-80 ${isDiag ? 'bg-muted' : ''}`}
                               style={!isDiag ? { backgroundColor: corrColor(value, false) } : undefined}
                             >
@@ -119,17 +125,17 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
           </table>
         </div>
 
-        {/* Color scale legend */}
+        {/* Color scale legend — decorative; cell values carry the meaning */}
         <div className="flex items-center justify-center gap-2">
-          <span className="text-xs text-muted-foreground">-1</span>
-          <div className="flex h-3 w-48 rounded-full overflow-hidden">
+          <span className="text-xs text-muted-foreground">-1 (inverse)</span>
+          <div className="relative flex h-3 w-48 rounded-full overflow-hidden" aria-hidden="true">
             <div className="flex-1" style={{ background: 'oklch(var(--chart-5) / 0.85)' }} />
             <div className="flex-1" style={{ background: 'oklch(var(--chart-5) / 0.45)' }} />
             <div className="flex-1" style={{ background: 'oklch(var(--muted-foreground) / 0.2)' }} />
             <div className="flex-1" style={{ background: 'oklch(var(--loss) / 0.45)' }} />
             <div className="flex-1" style={{ background: 'oklch(var(--loss) / 0.85)' }} />
           </div>
-          <span className="text-xs text-muted-foreground">+1</span>
+          <span className="text-xs text-muted-foreground">+1 (concentration)</span>
         </div>
 
         {/* Notable pairs */}

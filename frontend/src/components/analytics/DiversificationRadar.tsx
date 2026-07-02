@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, CheckCircle2, Globe, Building2, TrendingUp } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Globe, Building2, TrendingUp, TrendingDown } from 'lucide-react'
 import { ResponsiveRadar } from '@nivo/radar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { ProjectAudit } from '@/types/crowdfunding'
@@ -8,7 +8,7 @@ import type { ProjectAudit } from '@/types/crowdfunding'
 const IMPACT_CONFIG = {
   ameliore: { label: 'Améliore la diversification', color: 'bg-gain', icon: CheckCircle2 },
   neutre: { label: 'Impact neutre', color: 'bg-warning', icon: AlertTriangle },
-  degrade: { label: 'Dégrade la diversification', color: 'bg-loss', icon: AlertTriangle },
+  degrade: { label: 'Dégrade la diversification', color: 'bg-loss', icon: TrendingDown },
 } as const
 
 interface DiversificationRadarProps {
@@ -108,7 +108,14 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
               <div>
                 <p className="text-sm font-medium mb-2">Score de corrélation</p>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="flex-1 h-3 bg-muted rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={correlationPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Score de corrélation : ${correlationPct}%`}
+                  >
                     <div
                       className={`h-full rounded-full transition-all ${
                         correlationPct > 60
@@ -141,7 +148,14 @@ export default function DiversificationRadar({ audit }: DiversificationRadarProp
                   <div key={item.axis} className="flex items-center gap-2">
                     <AxisIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-sm w-32">{item.axis}</span>
-                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="flex-1 h-2 bg-muted rounded-full overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={item.value}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`Concentration ${item.axis} : ${item.value}%`}
+                    >
                       <div
                         className={`h-full rounded-full ${
                           item.value > 60 ? 'bg-loss' : item.value > 30 ? 'bg-warning' : 'bg-gain'
