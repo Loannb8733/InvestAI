@@ -82,6 +82,26 @@ async def test_access_token_without_fingerprint_allowed_outside_production(clien
 
 
 @pytest.mark.asyncio
+async def test_access_token_revoked_after_logout(client: AsyncClient, regular_user: User):
+    """Logging out blocklists the access token's jti so it stops working at once."""
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "user@test.com", "password": "userpassword"},
+    )
+    token = login.json()["access_token"]
+
+    # Works before logout
+    ok = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert ok.status_code == 200
+
+    # Logout revokes it (reads the access_token cookie set at login)
+    await client.post("/api/v1/auth/logout")
+
+    revoked = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert revoked.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_login_invalid_email(client: AsyncClient):
     """Test login with non-existent email."""
     response = await client.post(
