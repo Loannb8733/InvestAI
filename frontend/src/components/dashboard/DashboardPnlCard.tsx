@@ -59,6 +59,8 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
             <span className="text-xs text-muted-foreground">Rendement :</span>
             <div className="inline-flex rounded-md border border-border text-xs">
               <button
+                type="button"
+                aria-pressed={returnMode === 'price'}
                 className={`px-2.5 py-1 rounded-l-md transition-colors ${
                   returnMode === 'price'
                     ? 'bg-primary text-primary-foreground'
@@ -69,6 +71,8 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
                 Price Return
               </button>
               <button
+                type="button"
+                aria-pressed={returnMode === 'total'}
                 className={`px-2.5 py-1 rounded-r-md transition-colors ${
                   returnMode === 'total'
                     ? 'bg-primary text-primary-foreground'

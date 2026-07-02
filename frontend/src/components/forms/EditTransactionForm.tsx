@@ -228,6 +228,8 @@ export default function EditTransactionForm({
                     <button
                       key={type.value}
                       type="button"
+                      aria-label={type.label}
+                      aria-pressed={isActive}
                       onClick={() => setTransactionType(type.value)}
                       className={cn(
                         'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-[11px] font-medium transition-all duration-150',
