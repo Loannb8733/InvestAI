@@ -319,8 +319,16 @@ async def login(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass  # Redis down — fail open
+        except Exception as exc:  # noqa: BLE001
+            # Fail CLOSED, mirroring the MFA anti-replay below: if the lockout
+            # store is unreachable we cannot tell whether this account is being
+            # brute-forced, so we refuse rather than silently drop the throttle.
+            # A brief 503 during a Redis outage beats an open brute-force window.
+            logger.warning("Login lockout store unavailable: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentification temporairement indisponible. Réessayez dans un instant.",
+            ) from exc
 
     # Always perform a bcrypt comparison so a missing account takes the same time
     # as a wrong password (prevents email enumeration by timing).
