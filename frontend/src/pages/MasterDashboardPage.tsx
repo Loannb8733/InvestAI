@@ -118,7 +118,12 @@ export default function MasterDashboardPage() {
   const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
 
   // Fetch crypto dashboard metrics
-  const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
+  const {
+    data: metrics,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    refetch: refetchMetrics,
+  } = useQuery<DashboardMetrics>({
     queryKey: [...queryKeys.dashboard.metrics(selectedPeriod), currency],
     queryFn: () => dashboardApi.getMetrics(selectedPeriod),
     placeholderData: keepPreviousData,
@@ -276,6 +281,26 @@ export default function MasterDashboardPage() {
           ))}
         </div>
       </div>
+    )
+  }
+
+  // ============== Error state ==============
+  // Never render the net-worth surface at €0 on a failed fetch — that reads as
+  // "your wealth is zero" and destroys trust. Show an explicit error + retry.
+  if (metricsError && !metrics) {
+    return (
+      <Card className="mx-auto mt-10 max-w-lg border-destructive/30">
+        <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+          <AlertTriangle className="h-10 w-10 text-destructive" />
+          <div>
+            <h2 className="text-lg font-semibold">Impossible de charger votre patrimoine</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Une erreur réseau est survenue. Vos données sont en sécurité — réessayez.
+            </p>
+          </div>
+          <Button onClick={() => refetchMetrics()}>Réessayer</Button>
+        </CardContent>
+      </Card>
     )
   }
 
