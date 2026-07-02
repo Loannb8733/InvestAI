@@ -31,6 +31,27 @@ async def test_login_invalid_password(client: AsyncClient, regular_user: User):
 
 
 @pytest.mark.asyncio
+async def test_login_fails_closed_when_lockout_store_down(client: AsyncClient, regular_user: User, monkeypatch):
+    """If the Redis lockout store is unreachable, login must 503 (fail-closed).
+
+    Otherwise a Redis outage silently drops the brute-force throttle, letting an
+    attacker hammer passwords with no lockout — even a valid password must not
+    succeed while the throttle can't be enforced.
+    """
+
+    async def _boom():
+        raise RuntimeError("redis down")
+
+    monkeypatch.setattr("app.core.redis_client._get_redis_txt", _boom)
+
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "user@test.com", "password": "userpassword"},
+    )
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
 async def test_login_invalid_email(client: AsyncClient):
     """Test login with non-existent email."""
     response = await client.post(
