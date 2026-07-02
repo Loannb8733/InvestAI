@@ -1650,22 +1650,25 @@ class MetricsService:
                 from app.models.asset_price_history import AssetPriceHistory
 
                 cutoff = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
+                sym_uppers = [s.upper() for s in remaining]
                 async with AsyncSessionLocal() as _db:
-                    for symbol in list(remaining):
-                        sym_upper = symbol.upper()
-                        result = await _db.execute(
-                            select(AssetPriceHistory.price_eur)
-                            .where(
-                                AssetPriceHistory.symbol == sym_upper,
-                                AssetPriceHistory.price_date >= cutoff,
-                            )
-                            .order_by(AssetPriceHistory.price_date)
+                    # One batched query (WHERE symbol IN ...) instead of one SELECT
+                    # per symbol; group the rows by symbol Python-side.
+                    result = await _db.execute(
+                        select(AssetPriceHistory.symbol, AssetPriceHistory.price_eur)
+                        .where(
+                            AssetPriceHistory.symbol.in_(sym_uppers),
+                            AssetPriceHistory.price_date >= cutoff,
                         )
-                        prices = [float(r[0]) for r in result.all()]
-                        if prices and len(prices) >= 2 and prices[0] != 0:
-                            change = (prices[-1] - prices[0]) / prices[0] * 100
-                            changes[sym_upper] = change
-                            remaining = [s for s in remaining if s.upper() != sym_upper]
+                        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
+                    )
+                    prices_by_sym: Dict[str, list] = {}
+                    for sym, px in result.all():
+                        prices_by_sym.setdefault(sym, []).append(float(px))
+                    for sym_upper, prices in prices_by_sym.items():
+                        if len(prices) >= 2 and prices[0] != 0:
+                            changes[sym_upper] = (prices[-1] - prices[0]) / prices[0] * 100
+                    remaining = [s for s in remaining if s.upper() not in changes]
             except Exception as e:
                 logger.warning("DB period change lookup failed: %s", e)
 
