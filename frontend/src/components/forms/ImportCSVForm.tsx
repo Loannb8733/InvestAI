@@ -256,9 +256,11 @@ export default function ImportCSVForm({
           onChange={handleFileSelect}
           className="hidden"
         />
-        <div
+        <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+          aria-label="Sélectionner un fichier CSV à importer"
+          className="w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
         >
           {selectedFile ? (
             <div className="flex items-center justify-center gap-2">
@@ -273,7 +275,7 @@ export default function ImportCSVForm({
               </p>
             </div>
           )}
-        </div>
+        </button>
       </div>
 
       {/* Import result */}
