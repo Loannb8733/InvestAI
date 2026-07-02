@@ -18,8 +18,18 @@ class TestGenerateRecommendation:
     def test_strong_bullish(self, svc):
         result = svc._generate_recommendation("bullish", 60, 100, 90, 110)
         assert "haussière forte" in result
-        # Product philosophy (commit 94e1ac4): strong bull -> take profits, not "renforcer".
-        assert "prise de profits" in result
+
+    def test_disclaimer_always_appended(self, svc):
+        # Trust & Safety: every recommendation must carry the non-advice disclaimer.
+        result = svc._generate_recommendation("bullish", 60, 100, 90, 110)
+        assert "ne constitue pas un conseil en" in result
+
+    def test_no_prescriptive_imperatives(self, svc):
+        # Recommendations must read as observations, not orders.
+        regime = {"dominant_regime": "bearish", "confidence": 0.9}
+        result = svc._generate_recommendation("bearish", 60, 100, 90, 110, regime_info=regime).lower()
+        for verb in ("accumulez", "prenez des profits", "renforcez", "placez des stop", "laissez courir"):
+            assert verb not in result, f"prescriptive verb leaked: {verb}"
 
     def test_weak_bullish(self, svc):
         result = svc._generate_recommendation("bullish", 30, 100, 90, 110)
