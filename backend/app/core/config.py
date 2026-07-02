@@ -187,6 +187,12 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+    # Number of trusted reverse proxies that append to X-Forwarded-For. The real
+    # client IP is read that many entries from the RIGHT of the chain, so a client
+    # cannot spoof its rate-limit key by pre-setting the header. Render's edge adds
+    # exactly one hop; raise this only if another trusted proxy (e.g. Cloudflare)
+    # sits in front.
+    TRUSTED_PROXY_HOPS: int = 1
 
     # Sentry
     SENTRY_DSN: str = ""

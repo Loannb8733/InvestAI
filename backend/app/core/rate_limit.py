@@ -8,14 +8,25 @@ from app.core.redis_client import redis_async_url, redis_ssl_kwargs
 
 
 def _get_real_client_ip(request: Request) -> str:
-    """Extract real client IP from X-Forwarded-For (behind Nginx/proxy)."""
+    """Extract the real client IP from X-Forwarded-For.
+
+    The client controls the *left* of the X-Forwarded-For chain: a request can
+    arrive with a forged ``X-Forwarded-For: 1.2.3.4`` and each trusted proxy then
+    *appends* the address it actually received the request from. So the real
+    client is ``TRUSTED_PROXY_HOPS`` entries from the RIGHT, not the leftmost
+    (spoofable) value. With Render's single edge proxy that is the last entry.
+    """
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        # First IP in the chain is the original client
-        return forwarded.split(",")[0].strip()
-    forwarded = request.headers.get("X-Real-IP")
-    if forwarded:
-        return forwarded.strip()
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            hops = max(settings.TRUSTED_PROXY_HOPS, 1)
+            # Clamp to the chain length so a short/absent chain can't IndexError.
+            idx = min(hops, len(parts))
+            return parts[-idx]
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
     return request.client.host if request.client else "127.0.0.1"
 
 
