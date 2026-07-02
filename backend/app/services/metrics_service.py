@@ -26,6 +26,12 @@ _dashboard_cache: Dict[Tuple[str, int], Tuple[float, Dict]] = {}
 _DASHBOARD_CACHE_TTL = 120  # 2 minutes
 _MAX_DASHBOARD_CACHE = 200  # max entries before eviction
 
+# Single-flight guard: the in-flight recompute future per cache key. When several
+# requests miss the cache at once (typically right after the TTL expires), only
+# the first recomputes; the rest await that same future instead of stampeding the
+# DB/CPU with N identical full-FIFO recomputes.
+_dashboard_inflight: Dict[Tuple, "asyncio.Future"] = {}
+
 
 def _cache_put_dashboard(key: Tuple, value: Tuple) -> None:
     """Insert into bounded dashboard cache, evicting oldest entries if full."""
@@ -1691,8 +1697,13 @@ class MetricsService:
         currency: str = "EUR",
         days: int = 30,
     ) -> Dict:
-        """Calculate dashboard metrics for a user's entire portfolio."""
-        # Check in-memory cache
+        """Cached, single-flight dashboard metrics for a user's entire portfolio.
+
+        The 2-minute in-memory cache is fronted by a per-key single-flight guard:
+        when several requests miss the cache at once (e.g. right after the TTL
+        expires), only the first recomputes the full FIFO / value series; the rest
+        await that same result instead of stampeding the DB and CPU.
+        """
         cache_key = (user_id, days, currency)
         now = time.time()
         if cache_key in _dashboard_cache:
@@ -1700,6 +1711,34 @@ class MetricsService:
             if now - ts < _DASHBOARD_CACHE_TTL:
                 return cached
 
+        # Single-flight: join an in-flight recompute for this key if one exists.
+        inflight = _dashboard_inflight.get(cache_key)
+        if inflight is not None:
+            return await inflight
+
+        fut: "asyncio.Future" = asyncio.get_event_loop().create_future()
+        _dashboard_inflight[cache_key] = fut
+        try:
+            result = await self._compute_user_dashboard_metrics(db, user_id, currency, days)
+            _cache_put_dashboard(cache_key, (time.time(), result))
+            if not fut.done():
+                fut.set_result(result)
+            return result
+        except BaseException as exc:
+            if not fut.done():
+                fut.set_exception(exc)
+            raise
+        finally:
+            _dashboard_inflight.pop(cache_key, None)
+
+    async def _compute_user_dashboard_metrics(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        currency: str = "EUR",
+        days: int = 30,
+    ) -> Dict:
+        """Full (uncached) dashboard computation. Fronted by get_user_dashboard_metrics."""
         # Get all user portfolios
         result = await db.execute(
             select(Portfolio).where(
@@ -1963,8 +2002,6 @@ class MetricsService:
             "forex_stale": any_forex_stale,
         }
 
-        # Cache the result (bounded)
-        _cache_put_dashboard(cache_key, (time.time(), result))
         return result
 
     async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:
