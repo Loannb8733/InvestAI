@@ -62,6 +62,20 @@ class ForecastResult:
     # [{feature_name: str, importance: float, direction: str}]
 
 
+def _ou_reversion_speed(phi: float) -> float:
+    """Ornstein-Uhlenbeck reversion speed (theta) from an AR(1) coefficient.
+
+    A ``phi`` at or above ~1 means a (near-)unit root: the series is trending, not
+    mean-reverting. We return 0 (no reversion — the OU forecast degenerates to a
+    random walk) instead of forcing phi to 0.999, which imposed reversion that
+    isn't there and biased the ensemble against the trend. Below the unit-root
+    band, phi is floored at 0.01 so theta stays finite and positive.
+    """
+    if phi >= 0.98:
+        return 0.0
+    return float(-np.log(max(phi, 0.01)))
+
+
 class PriceForecaster:
     """Ensemble price forecaster combining multiple models."""
 
@@ -946,8 +960,7 @@ class PriceForecaster:
             cov_xy = float(np.mean((x - x_mean) * (y - y_mean)))
             var_x = float(np.var(x))
             phi = cov_xy / max(var_x, 1e-15)
-            phi = np.clip(phi, 0.01, 0.999)  # Ensure mean-reverting
-            theta = -np.log(phi)
+            theta = _ou_reversion_speed(phi)
         else:
             theta = 0.05  # Default: slow reversion
 
