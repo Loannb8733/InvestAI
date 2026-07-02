@@ -207,7 +207,7 @@ class PriceForecaster:
             return result
 
         # ── 2. Compute weights via mini-backtest ─────────────────────
-        weights, ci_calibration = self._compute_weights(prices, dates, candidates)
+        weights, ci_calibration, model_mapes = self._compute_weights(prices, dates, candidates)
 
         # ── 3. Weighted combination ──────────────────────────────────
         n_days = days_ahead
@@ -263,9 +263,12 @@ class PriceForecaster:
         # ── 5. Build model_used string and details ───────────────────
         details = []
         parts = []
-        for (name, res), w in zip(candidates, weights):
+        for idx, ((name, res), w) in enumerate(zip(candidates, weights)):
             pct = round(w * 100)
-            mape = self._quick_mape(prices, dates, name, res)
+            # Real walk-forward MAPE from the weight backtest, not the directional
+            # _quick_mape proxy, so the reliability/skill score is grounded in
+            # out-of-sample error. Fallback keeps the proxy only if a MAPE is missing.
+            mape = model_mapes[idx] if idx < len(model_mapes) else self._quick_mape(prices, dates, name, res)
             details.append(
                 {
                     "name": name,
@@ -1279,18 +1282,20 @@ class PriceForecaster:
         prices: List[float],
         dates: List[datetime],
         candidates: List[Tuple[str, ForecastResult]],
-    ) -> Tuple[List[float], float]:
+    ) -> Tuple[List[float], float, List[float]]:
         """Compute weights via rolling walk-forward backtest across multiple windows.
 
         Returns:
-            (weights, ci_calibration): weights per model and CI calibration factor.
+            (weights, ci_calibration, per_model_mape): weights per model, the CI
+            calibration factor, and the real walk-forward MAPE per model (used by
+            models_detail so the reliability score reflects out-of-sample error).
         """
         n_cand = len(candidates)
         n = len(prices)
 
         if n < 28:
-            w = self._compute_weights_single(prices, dates, candidates, split=min(7, n // 2))
-            return w, 1.0
+            w, mapes = self._compute_weights_single(prices, dates, candidates, split=min(7, n // 2))
+            return w, 1.0, mapes
 
         # FIX1: Sliding windows every 14 days up to min(n/2, 180) instead of fixed 3
         window_size = 14
@@ -1303,8 +1308,8 @@ class PriceForecaster:
             offset += 14
 
         if not windows:
-            w = self._compute_weights_single(prices, dates, candidates, split=7)
-            return w, 1.0
+            w, mapes = self._compute_weights_single(prices, dates, candidates, split=7)
+            return w, 1.0, mapes
 
         # Per-window inverse-MAPE for recency-weighted aggregation
         per_window_inv = []
@@ -1379,7 +1384,12 @@ class PriceForecaster:
                 ci_calibration = target_coverage / coverage_rate
             ci_calibration = max(0.5, min(2.0, ci_calibration))
 
-        return weights, ci_calibration
+        # Real per-model MAPE surfaced for models_detail / reliability score: the
+        # recency-weighted harmonic mean of the walk-forward MAPE that drove the
+        # weights (accumulated_inv = weighted mean of 1/mape, window weights sum to
+        # 1). Falls back to 50 when a model never produced a usable score.
+        per_model_mape = [(1.0 / accumulated_inv[ci]) if accumulated_inv[ci] > 0 else 50.0 for ci in range(n_cand)]
+        return weights, ci_calibration, per_model_mape
 
     def _compute_weights_single(
         self,
@@ -1391,7 +1401,7 @@ class PriceForecaster:
         """Fallback single-window backtest for short histories."""
         n_cand = len(candidates)
         if len(prices) < 14 or split < 1:
-            return [1.0 / n_cand] * n_cand
+            return [1.0 / n_cand] * n_cand, [50.0] * n_cand
 
         split = min(split, len(prices) // 2)
         train_prices = prices[:-split]
@@ -1414,7 +1424,7 @@ class PriceForecaster:
 
         inv = [1.0 / m for m in mapes]
         total = sum(inv)
-        return [w / total for w in inv]
+        return [w / total for w in inv], mapes
 
     def _run_model_by_name(
         self,
