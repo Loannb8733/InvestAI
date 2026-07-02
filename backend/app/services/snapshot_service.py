@@ -1,5 +1,6 @@
 """Portfolio snapshot service for historical value tracking."""
 
+import asyncio
 import logging
 import math
 import time
@@ -37,6 +38,12 @@ _MAX_PRICE_CACHE = 500  # max entries before eviction
 _series_cache: Dict[Tuple[str, int], Tuple[float, List[Dict]]] = {}
 _SERIES_CACHE_TTL = 120  # 2 minutes — caches the entire computed series
 _MAX_SERIES_CACHE = 200  # max entries before eviction
+
+# Single-flight guard: the in-flight recompute future per (user_id, days). When
+# several requests miss the series cache at once (cold start / TTL expiry), only
+# the first replays the history + fetches prices; the rest await that same result
+# instead of stampeding the DB and price APIs.
+_series_inflight: Dict[Tuple, "asyncio.Future"] = {}
 
 
 def _cache_put(cache: dict, key, value, max_size: int) -> None:
@@ -759,14 +766,12 @@ class SnapshotService:
         days: int = 30,
         portfolio_id: Optional[str] = None,
     ) -> List[Dict]:
-        """
-        Build daily portfolio value series from transactions + real historical prices.
+        """Cached, single-flight daily portfolio value series.
 
-        This is the core method that replaces snapshot-based history.
-        It replays transactions to determine daily holdings, fetches real prices,
-        and computes portfolio value for each day.
+        The 2-minute series cache is fronted by a per-key single-flight guard so
+        concurrent cache misses share one recompute instead of each replaying the
+        full transaction history and re-fetching historical prices.
         """
-        # Check result-level cache first (avoids expensive DB + computation)
         cache_key = (user_id, days)
         now = time.time()
         if cache_key in _series_cache:
@@ -774,6 +779,33 @@ class SnapshotService:
             if now - ts < _SERIES_CACHE_TTL:
                 return cached_result
 
+        inflight = _series_inflight.get(cache_key)
+        if inflight is not None:
+            return await inflight
+
+        fut: "asyncio.Future" = asyncio.get_event_loop().create_future()
+        _series_inflight[cache_key] = fut
+        try:
+            result = await self._compute_portfolio_value_series(db, user_id, days, portfolio_id)
+            _cache_put(_series_cache, cache_key, (time.time(), result), _MAX_SERIES_CACHE)
+            if not fut.done():
+                fut.set_result(result)
+            return result
+        except BaseException as exc:
+            if not fut.done():
+                fut.set_exception(exc)
+            raise
+        finally:
+            _series_inflight.pop(cache_key, None)
+
+    async def _compute_portfolio_value_series(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        days: int = 30,
+        portfolio_id: Optional[str] = None,
+    ) -> List[Dict]:
+        """Full (uncached) value-series computation. Fronted by build_portfolio_value_series."""
         transactions = await self._get_user_transactions_with_assets(db, user_id, portfolio_id)
 
         if not transactions:
@@ -949,8 +981,6 @@ class SnapshotService:
                 }
             )
 
-        # Cache the result for subsequent calls (bounded)
-        _cache_put(_series_cache, cache_key, (time.time(), result), _MAX_SERIES_CACHE)
         return result
 
     def _estimate_interval_days(self, history: List[Dict]) -> float:
