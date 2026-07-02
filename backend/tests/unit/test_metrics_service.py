@@ -13,6 +13,7 @@ from app.services.metrics_service import (
     FIAT_SYMBOLS,
     STABLECOIN_SYMBOLS,
     MetricsService,
+    _ci_price_in_portfolio_ccy,
     _conversion_dest_unit_cost,
     compute_cump_pru,
     is_cash_like,
@@ -54,6 +55,22 @@ class TestConversionDestUnitCost:
         # No recorded dest price (0) -> legacy carry: cost_removed / matched_qty.
         u = _conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
         assert float(u) == pytest.approx(500000.0)
+
+
+class TestCiPriceInPortfolioCcy:
+    """The recorded CONVERSION_IN price must be converted to the portfolio
+    currency, like every other leg — a USD-quoted swap can't be carried as EUR."""
+
+    def test_eur_leg_unchanged(self):
+        # conversion_rate None => price already in portfolio ccy.
+        assert _ci_price_in_portfolio_ccy(Decimal("88000"), None) == Decimal("88000")
+
+    def test_usd_leg_converted(self):
+        # 88000 USD at 0.92 EUR/USD => 80960 EUR.
+        assert _ci_price_in_portfolio_ccy(Decimal("88000"), Decimal("0.92")) == Decimal("80960.00")
+
+    def test_none_price_is_zero(self):
+        assert _ci_price_in_portfolio_ccy(None, Decimal("0.92")) == Decimal("0")
 
 
 # ---------------------------------------------------------------------------
