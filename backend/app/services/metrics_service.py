@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.finance_constants import COLD_START_USD_EUR
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -464,7 +465,7 @@ class MetricsService:
         # guessed rate as a real quote.
         _HARDCODED_FALLBACK_RATES = {
             "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
-            "USD": {"EUR": 0.92, "CHF": 0.86, "GBP": 0.79},
+            "USD": {"EUR": float(COLD_START_USD_EUR), "CHF": 0.86, "GBP": 0.79},
         }
         forex_stale = False
         _fx_hist = FxHistoryService(db)

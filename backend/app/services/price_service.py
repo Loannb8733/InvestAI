@@ -12,6 +12,7 @@ import httpx
 from redis import Redis
 
 from app.core.config import settings
+from app.core.finance_constants import COLD_START_USD_EUR
 from app.core.symbol_map import COINGECKO_SYMBOL_MAP
 
 
@@ -236,8 +237,8 @@ class PriceService:
         if self._eur_usd_rate:
             logger.warning("USD/EUR live rate unavailable; reusing last-known rate %s", self._eur_usd_rate)
             return self._eur_usd_rate
-        logger.warning("USD/EUR rate unavailable and no prior value; using cold-start constant 0.92")
-        return Decimal("0.92")  # last-resort cold-start fallback only
+        logger.warning("USD/EUR rate unavailable and no prior value; using cold-start constant %s", COLD_START_USD_EUR)
+        return COLD_START_USD_EUR  # last-resort cold-start fallback only
 
     async def _stablecoin_price_eur(self, symbol: str) -> Decimal:
         """Get stablecoin price in EUR using live forex rate."""

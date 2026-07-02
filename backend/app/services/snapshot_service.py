@@ -851,14 +851,15 @@ class SnapshotService:
         fetch_days = min(max(days, days_since_first, 90), 1825)
         price_series = await self._fetch_all_price_series(all_symbols, fetch_days, db=db)
 
-        # Fetch live USD→EUR rate for stablecoin pricing (fallback to 0.92)
+        # Fetch live USD→EUR rate for stablecoin pricing (cold-start fallback).
         try:
+            from app.core.finance_constants import COLD_START_USD_EUR
             from app.services.price_service import PriceService
 
             _ps = PriceService()
-            stablecoin_eur_rate = float(await _ps.get_forex_rate("USD", "EUR") or 0.92)
+            stablecoin_eur_rate = float(await _ps.get_forex_rate("USD", "EUR") or COLD_START_USD_EUR)
         except Exception:
-            stablecoin_eur_rate = 0.92
+            stablecoin_eur_rate = float(COLD_START_USD_EUR)
 
         # Fallback: if most symbols have no price data (API down), use DB snapshots
         STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
