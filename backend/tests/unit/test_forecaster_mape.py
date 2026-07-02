@@ -13,7 +13,32 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.ml.forecaster import ForecastResult, PriceForecaster
+from app.ml.forecaster import ForecastResult, PriceForecaster, _ou_reversion_speed
+
+
+class TestOuReversionSpeed:
+    """Mean-reversion (OU) must not fake reversion on a trending / unit-root series.
+
+    A phi at/above ~1 means the series has a (near-)unit root — it is trending, not
+    mean-reverting. Forcing phi to 0.999 imposed reversion that isn't there and
+    biased the ensemble against the trend.
+    """
+
+    def test_unit_root_gives_no_reversion(self):
+        # phi >= 0.98 -> theta 0 -> the OU forecast stays flat (random walk).
+        assert _ou_reversion_speed(1.05) == 0.0
+        assert _ou_reversion_speed(1.0) == 0.0
+        assert _ou_reversion_speed(0.99) == 0.0
+        assert _ou_reversion_speed(0.98) == 0.0
+
+    def test_genuinely_reverting_series_keeps_speed(self):
+        # A clearly stationary phi still reverts.
+        assert _ou_reversion_speed(0.90) == pytest.approx(0.1053605, rel=1e-4)  # -ln(0.9)
+
+    def test_tiny_phi_is_floored(self):
+        # phi below the floor is clamped to 0.01 (finite, positive theta), not 0/neg.
+        assert _ou_reversion_speed(-0.5) == pytest.approx(4.60517, rel=1e-4)  # -ln(0.01)
+        assert _ou_reversion_speed(0.0) == pytest.approx(4.60517, rel=1e-4)
 
 
 def _fr(prices):
