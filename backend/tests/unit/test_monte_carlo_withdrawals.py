@@ -66,12 +66,34 @@ class TestMonteCarloWithdrawals:
             user_id="test",
             annual_withdrawal_rate=10.0,
             ter_percentage=0.0,
+            seed=42,  # deterministic: this equilibrium assertion is tolerance-tight
         )
         # With zero vol, all sims converge to the same value.
         # 10% return - 10% withdrawal ≈ 0% net (not exact due to compounding
         # interaction but should be within ±1%).
         assert abs(result.expected_return) < 1.5, f"Expected near-equilibrium, got {result.expected_return}%"
         assert result.prob_ruin == 0.0
+
+    def test_fixed_seed_is_deterministic(self):
+        """An explicit seed makes the Monte Carlo reproducible run-to-run.
+
+        Without an injectable seed the draws depend on time.time() ^ hash(user_id)
+        (randomized per process), making tolerance-based assertions flaky.
+        """
+        mu_vec, L, w = self._make_inputs(daily_mu=0.0003, daily_vol=0.01)
+        kwargs = dict(
+            num_simulations=200,
+            horizon_days=100,
+            n_assets=1,
+            user_id="test",
+            annual_withdrawal_rate=4.0,
+            ter_percentage=0.5,
+            seed=12345,
+        )
+        r1 = AnalyticsService._monte_carlo_compute(mu_vec, L, w, **kwargs)
+        r2 = AnalyticsService._monte_carlo_compute(mu_vec, L, w, **kwargs)
+        assert r1.expected_return == r2.expected_return
+        assert r1.prob_ruin == r2.prob_ruin
 
     def test_ter_erodes_value(self):
         """0% return + 2% TER over 90 days (no vol shrinkage) → measurable loss.
