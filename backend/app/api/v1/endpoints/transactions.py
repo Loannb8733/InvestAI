@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_debug_enabled
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.models.asset import Asset
@@ -30,6 +30,7 @@ router = APIRouter()
 
 @router.get("/debug/btc-metrics")
 async def debug_btc_metrics(
+    _: None = Depends(require_debug_enabled),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -40,18 +41,14 @@ async def debug_btc_metrics(
     from app.services.metrics_service import MetricsService
 
     # Find the user's BTC asset on Tangem
-    portfolio_result = await db.execute(
-        select(Portfolio).where(Portfolio.user_id == current_user.id)
-    )
+    portfolio_result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
     portfolio = portfolio_result.scalars().first()
     if not portfolio:
         return {"error": "no portfolio"}
 
     svc = MetricsService()
     # Call get_portfolio_metrics — the real path used by /dashboard
-    metrics = await svc.get_portfolio_metrics(
-        db=db, portfolio_id=str(portfolio.id), currency="EUR"
-    )
+    metrics = await svc.get_portfolio_metrics(db=db, portfolio_id=str(portfolio.id), currency="EUR")
     # Extract only BTC entries
     btc_assets = [a for a in metrics.get("assets", []) if a.get("symbol") == "BTC"]
     return {
@@ -65,6 +62,7 @@ async def debug_btc_metrics(
 
 @router.get("/debug/btc-fifo")
 async def debug_btc_fifo(
+    _: None = Depends(require_debug_enabled),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -95,7 +93,6 @@ async def debug_btc_fifo(
             {"uid": current_user.id},
         )
     ).all()
-    _ZERO = Decimal("0")
     fifo: dict = defaultdict(list)
     trace = []
 
@@ -136,7 +133,7 @@ async def debug_btc_fifo(
             extracted = consume(key, qty)
             tkey = (sym, f"__transit__{tid}")
             fifo[tkey] = extracted
-            cost = sum(l["qty"] * l["unit_cost"] for l in extracted)
+            cost = sum(ly["qty"] * ly["unit_cost"] for ly in extracted)
             step["action"] = f"OUT -> transit ({len(extracted)} layers)"
             step["cost_added"] = str(cost)
         elif tt == "TRANSFER_IN":
@@ -144,14 +141,14 @@ async def debug_btc_fifo(
             best_diff = None
             for tkey in list(fifo.keys()):
                 if tkey[0] == sym and tkey[1].startswith("__transit__"):
-                    tqty = sum(l["qty"] for l in fifo[tkey])
+                    tqty = sum(ly["qty"] for ly in fifo[tkey])
                     diff = abs(tqty - qty)
                     if best_diff is None or diff < best_diff:
                         best_diff = diff
                         matched = tkey
             if matched and fifo[matched]:
                 transit_layers = fifo.pop(matched)
-                tqty = sum(l["qty"] for l in transit_layers)
+                tqty = sum(ly["qty"] for ly in transit_layers)
                 if tqty > qty:
                     temp = (sym, f"__trim__{matched[1]}")
                     fifo[temp] = transit_layers
@@ -159,12 +156,12 @@ async def debug_btc_fifo(
                     fifo.pop(temp, None)
                     for layer in trimmed:
                         fifo[key].append(layer)
-                    cost = sum(l["qty"] * l["unit_cost"] for l in trimmed)
+                    cost = sum(ly["qty"] * ly["unit_cost"] for ly in trimmed)
                     step["action"] = f"IN matched-trim {matched[1][:18]}"
                 else:
                     for layer in transit_layers:
                         fifo[key].append(layer)
-                    cost = sum(l["qty"] * l["unit_cost"] for l in transit_layers)
+                    cost = sum(ly["qty"] * ly["unit_cost"] for ly in transit_layers)
                     step["action"] = f"IN matched {matched[1][:18]}"
                 step["cost_added"] = str(cost)
             else:
@@ -184,14 +181,14 @@ async def debug_btc_fifo(
         layers = fifo[key]
         if not layers:
             continue
-        qty = sum(l["qty"] for l in layers)
-        cost = sum(l["qty"] * l["unit_cost"] for l in layers)
+        qty = sum(ly["qty"] for ly in layers)
+        cost = sum(ly["qty"] * ly["unit_cost"] for ly in layers)
         final[f"{key[0]}|{key[1][:30]}"] = {
             "qty": str(qty),
             "cost": str(cost),
             "avg": str(cost / qty) if qty > 0 else None,
             "is_transit": key[1].startswith("__transit__"),
-            "layers": [{"qty": str(l["qty"]), "unit_cost": str(l["unit_cost"])} for l in layers],
+            "layers": [{"qty": str(ly["qty"]), "unit_cost": str(ly["unit_cost"])} for ly in layers],
         }
     return {"trace": trace, "final_fifo": final}
 
