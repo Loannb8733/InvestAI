@@ -232,15 +232,14 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
       <div className="hidden w-[76px] shrink-0 lg:block" aria-hidden />
 
       {/* Desktop rail — collapsed 76px, expands to 256px on hover (overlay) */}
-      <aside className="group fixed inset-y-0 left-0 z-30 hidden w-[76px] overflow-hidden border-r border-border/60 bg-card/80 backdrop-blur-xl transition-[width] duration-300 ease-in-out hover:w-64 hover:shadow-[8px_0_40px_-12px_oklch(var(--background)/0.9)] lg:block">
-        <div className="glow left-[-30%] top-[-10%] h-40 w-40 bg-[oklch(var(--primary))] opacity-30" aria-hidden />
+      <aside className="group fixed inset-y-0 left-0 z-30 hidden w-[76px] overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-in-out hover:w-64 lg:block">
         <div className="relative h-full">{renderBody(false)}</div>
       </aside>
 
       {/* Mobile: backdrop + drawer */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden',
+          'fixed inset-0 z-40 bg-black/60 transition-opacity lg:hidden',
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
         onClick={onClose}
