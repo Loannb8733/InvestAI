@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import compute_token_fingerprint, decode_token
 from app.models.user import User, UserRole
@@ -16,6 +17,16 @@ from app.models.user import User, UserRole
 logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
+
+
+def require_debug_enabled() -> None:
+    """Guard for debug-only endpoints.
+
+    Returns 404 in production so internal diagnostics (FIFO traces, raw metrics)
+    are never reachable on the public surface — they are development tools only.
+    """
+    if settings.is_production:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 
 
 security_optional = HTTPBearer(auto_error=False)
