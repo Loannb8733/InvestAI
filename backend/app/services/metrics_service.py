@@ -17,6 +17,18 @@ from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
+
+# Re-exported for backwards compatibility — these classification helpers now live
+# in asset_classification so callers need not import the whole metrics module.
+from app.services.asset_classification import (  # noqa: F401
+    FIAT_SYMBOLS,
+    STABLECOIN_SYMBOLS,
+    is_cash_like,
+    is_fiat,
+    is_liquidity,
+    is_safe_haven,
+    is_stablecoin,
+)
 from app.services.fifo import consume_fifo, extract_fifo_layers
 from app.services.price_service import price_service
 
@@ -66,53 +78,6 @@ def invalidate_dashboard_cache(user_id: str) -> None:
         loop.create_task(redis_client.invalidate_dashboard_cache(user_id))
     except RuntimeError:
         pass
-
-
-# Fiat currencies -> counted as cash
-FIAT_SYMBOLS = {"EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY"}
-
-# Stablecoins -> separate card, excluded from investment metrics
-STABLECOIN_SYMBOLS = {
-    "USDT",
-    "USDC",
-    "BUSD",
-    "DAI",
-    "TUSD",
-    "USDP",
-    "GUSD",
-    "FRAX",
-    "LUSD",
-    "USDG",
-    "PYUSD",
-    "FDUSD",
-    "EURC",
-    "EURT",
-}
-
-
-def is_fiat(symbol: str) -> bool:
-    return symbol.upper() in FIAT_SYMBOLS
-
-
-def is_stablecoin(symbol: str) -> bool:
-    return symbol.upper() in STABLECOIN_SYMBOLS
-
-
-def is_cash_like(symbol: str) -> bool:
-    return is_fiat(symbol) or is_stablecoin(symbol)
-
-
-# Canonical alias — use this across the codebase
-is_liquidity = is_cash_like
-
-
-# Gold / safe-haven asset detection
-_GOLD_SYMBOLS = {"PAXG", "XAUT", "GLD", "IAU", "SGOL", "GOLD"}
-
-
-def is_safe_haven(symbol: str) -> bool:
-    """Return True for gold-backed tokens and ETFs."""
-    return symbol.upper() in _GOLD_SYMBOLS
 
 
 def _conversion_dest_unit_cost(
