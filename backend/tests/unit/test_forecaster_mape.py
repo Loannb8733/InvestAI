@@ -13,7 +13,32 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.ml.forecaster import ForecastResult, PriceForecaster, _ou_reversion_speed
+from app.ml.forecaster import ForecastResult, PriceForecaster, _ensemble_total_variance_ci, _ou_reversion_speed
+
+
+class TestEnsembleTotalVarianceCi:
+    """Ensemble CI must combine the models' OWN (out-of-model) intervals via the
+    law of total variance, not an in-sample empirical quantile."""
+
+    def test_agreeing_models_use_within_variance_only(self):
+        # Both models: point 100, native half-width 1.96 (=> std 1). Between-model
+        # variance is 0, within is 1 => total std 1 => 95% CI = 100 +/- 1.96.
+        lo, hi = _ensemble_total_variance_ci([100.0, 100.0], [1.96, 1.96], [0.5, 0.5], 100.0)
+        assert lo == pytest.approx(98.04, abs=0.03)
+        assert hi == pytest.approx(101.96, abs=0.03)
+
+    def test_disagreeing_models_widen_via_between_variance(self):
+        # Points 100 and 110 around mid 105 inject between-model dispersion, so the
+        # ensemble interval is wider than any single model's native half-width.
+        lo, hi = _ensemble_total_variance_ci([100.0, 110.0], [1.96, 1.96], [0.5, 0.5], 105.0)
+        assert (hi - lo) / 2 > 1.96
+        assert lo < 105 < hi
+
+    def test_zero_native_width_uses_point_dispersion_only(self):
+        # No native intervals => CI driven purely by the spread of point forecasts.
+        lo, hi = _ensemble_total_variance_ci([100.0, 110.0], [0.0, 0.0], [0.5, 0.5], 105.0)
+        assert hi > lo
+        assert lo < 105 < hi
 
 
 class TestOuReversionSpeed:

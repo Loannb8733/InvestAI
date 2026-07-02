@@ -76,6 +76,35 @@ def _ou_reversion_speed(phi: float) -> float:
     return float(-np.log(max(phi, 0.01)))
 
 
+# 95% two-sided z-score; native model CIs (Prophet interval_width=0.95,
+# ARIMA alpha=0.05) are all built at this level, so half-width / _Z95 recovers
+# each model's forecast standard deviation.
+_Z95 = 1.959963984540054
+
+
+def _ensemble_total_variance_ci(
+    points: List[float],
+    half_widths: List[float],
+    weights: List[float],
+    ensemble_mid: float,
+) -> Tuple[float, float]:
+    """95% ensemble CI at one horizon via the law of total variance.
+
+    Combines each model's OWN (out-of-model) interval instead of an in-sample
+    empirical quantile: total variance = within-model (weighted mean of each
+    model's native variance) + between-model (weighted spread of the point
+    forecasts around the ensemble mean). ``weights`` are assumed normalised.
+    """
+    within = 0.0
+    between = 0.0
+    for p, half, w in zip(points, half_widths, weights):
+        std = half / _Z95 if half > 0 else 0.0
+        within += w * std * std
+        between += w * (p - ensemble_mid) * (p - ensemble_mid)
+    total_std = float(np.sqrt(max(within + between, 0.0)))
+    return ensemble_mid - _Z95 * total_std, ensemble_mid + _Z95 * total_std
+
+
 class PriceForecaster:
     """Ensemble price forecaster combining multiple models."""
 
@@ -232,15 +261,21 @@ class PriceForecaster:
             for i in range(min(n_days, len(res.prices))):
                 combined_prices[i] += res.prices[i] * w
 
-        # ── 3b. Calibrated CIs: empirical quantiles + EWMA scaling ──
-        ewma_vols = self._ewma_volatility_forecast(prices, n_days)
-        combined_low, combined_high = self._empirical_quantile_ci(
-            prices,
-            prices[-1],
-            n_days,
-            combined_prices,
-            ewma_vols,
-        )
+        # ── 3b. CIs: prefer the models' OWN (out-of-model) intervals, combined
+        # by the law of total variance; fall back to the in-sample empirical
+        # quantile only when no candidate exposes a usable native interval. ──
+        native_ci = self._combine_native_ci(candidates, weights, combined_prices, n_days)
+        if native_ci is not None:
+            combined_low, combined_high = native_ci
+        else:
+            ewma_vols = self._ewma_volatility_forecast(prices, n_days)
+            combined_low, combined_high = self._empirical_quantile_ci(
+                prices,
+                prices[-1],
+                n_days,
+                combined_prices,
+                ewma_vols,
+            )
 
         # Apply CI floor by asset type
         if market_context:
@@ -1038,6 +1073,48 @@ class PriceForecaster:
             result[d] = float(np.sqrt(ewma_var * d))
 
         return result
+
+    def _combine_native_ci(
+        self,
+        candidates: List[Tuple[str, "ForecastResult"]],
+        weights: List[float],
+        combined_prices: List[float],
+        n_days: int,
+    ) -> Optional[Tuple[List[float], List[float]]]:
+        """Combine the candidate models' native CIs into an ensemble interval.
+
+        Each base model (Prophet, ARIMA, ...) already exposes a proper 95%
+        out-of-model interval in ``confidence_low/high``. Rather than discard
+        them and recompute an in-sample empirical quantile over the whole
+        history, fold them together per horizon with the law of total variance
+        (see :func:`_ensemble_total_variance_ci`), re-normalising the weights
+        over whichever models expose an interval at that horizon.
+
+        Returns ``(low, high)`` or ``None`` when no candidate provides a usable
+        interval at some horizon, in which case the caller falls back to the
+        empirical estimate.
+        """
+        low: List[float] = [0.0] * n_days
+        high: List[float] = [0.0] * n_days
+        for i in range(n_days):
+            pts: List[float] = []
+            halves: List[float] = []
+            ws: List[float] = []
+            for (_name, res), w in zip(candidates, weights):
+                if i < len(res.prices) and i < len(res.confidence_low) and i < len(res.confidence_high):
+                    half = (res.confidence_high[i] - res.confidence_low[i]) / 2
+                    if half >= 0:
+                        pts.append(res.prices[i])
+                        halves.append(half)
+                        ws.append(w)
+            w_tot = sum(ws)
+            if not ws or w_tot <= 0:
+                return None  # incomplete native coverage — let the caller fall back
+            ws = [x / w_tot for x in ws]
+            lo, hi = _ensemble_total_variance_ci(pts, halves, ws, combined_prices[i])
+            low[i] = max(0.0, lo)
+            high[i] = hi
+        return low, high
 
     def _empirical_quantile_ci(
         self,
