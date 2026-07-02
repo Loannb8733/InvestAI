@@ -52,6 +52,36 @@ async def test_login_fails_closed_when_lockout_store_down(client: AsyncClient, r
 
 
 @pytest.mark.asyncio
+async def test_access_token_without_fingerprint_rejected_in_production(
+    client: AsyncClient, regular_user: User, monkeypatch
+):
+    """A production access token missing its `fp` claim is forged/tampered → 401.
+
+    Every token the API issues carries a fingerprint; without this guard an
+    fp-less token would skip binding validation entirely.
+    """
+    from app.core.config import settings
+    from app.core.security import create_access_token
+
+    token = create_access_token(subject=str(regular_user.id))  # no fingerprint
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "DEBUG", False)
+
+    resp = await client.get("/api/v1/portfolios", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_access_token_without_fingerprint_allowed_outside_production(client: AsyncClient, regular_user: User):
+    """Outside production the binding is not enforced (dev/test convenience)."""
+    from app.core.security import create_access_token
+
+    token = create_access_token(subject=str(regular_user.id))  # no fingerprint
+    resp = await client.get("/api/v1/portfolios", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_login_invalid_email(client: AsyncClient):
     """Test login with non-existent email."""
     response = await client.post(

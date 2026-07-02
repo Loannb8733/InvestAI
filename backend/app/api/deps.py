@@ -69,6 +69,16 @@ async def get_current_user(
 
     # Verify token fingerprint (user-agent binding)
     token_fp = payload.get("fp")
+    if not token_fp and settings.is_production:
+        # Every token this API issues carries a fingerprint (login / register /
+        # refresh all set it). A production access token without one is forged or
+        # tampered — reject it instead of silently skipping binding validation.
+        logger.warning("Access token missing fingerprint in production (sub=%s)", payload.get("sub"))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token binding required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     if token_fp:
         user_agent = request.headers.get("user-agent", "")
         current_fp = compute_token_fingerprint(user_agent)
