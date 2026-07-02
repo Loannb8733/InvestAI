@@ -753,8 +753,15 @@ class ReportService:
             exch = (tx.exchange or "").strip()
             key: FifoKey = (sym, exch)
             qty = Decimal(str(tx.quantity))
-            price = Decimal(str(tx.price or 0))
-            fee = Decimal(str(tx.fee or 0))
+            # The 2086 is filed in EUR: convert the trade price/fee from the
+            # transaction currency via the FX rate captured at execution
+            # (conversion_rate = EUR per 1 unit of tx currency; defaults to 1 for
+            # same-currency trades). Without this, USD/USDT-pair acquisition cost AND
+            # cession price are ~8-9% off and diverge from the dashboard's FIFO cost
+            # basis. (Parity with metrics_service.)
+            _tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+            price = Decimal(str(tx.price or 0)) * _tx_fx
+            fee = Decimal(str(tx.fee or 0)) * _tx_fx
             ttype = tx.transaction_type
             tx_dt = tx.executed_at
             if tx_dt.tzinfo is None:
@@ -885,7 +892,7 @@ class ReportService:
             elif ttype == TxType.CONVERSION_IN:
                 # B3: Qty/cost already handled by CONVERSION_OUT.
                 # Only apply fees to last layer if present.
-                fee_ci = Decimal(str(tx.fee or 0))
+                fee_ci = fee  # already converted to EUR above
                 if fee_ci > 0:
                     layers = fifo.get(key, [])
                     if layers:
@@ -986,8 +993,11 @@ class ReportService:
                     for held_sym, held_qty in holdings_replay.items():
                         if held_qty > _ZERO:
                             if held_sym == sym:
-                                # Use actual cession price per unit
-                                portfolio_value += held_qty * Decimal(str(tx.price or 0))
+                                # Use actual cession price per unit, converted to EUR
+                                # (portfolio currency) so it matches the historical
+                                # prices used for the other held symbols below.
+                                _sell_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
+                                portfolio_value += held_qty * Decimal(str(tx.price or 0)) * _sell_fx
                             else:
                                 hist_price = day_prices.get(held_sym.upper(), _ZERO)
                                 portfolio_value += held_qty * hist_price
