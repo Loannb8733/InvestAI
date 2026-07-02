@@ -66,12 +66,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-background">
-      {/* Left — immersive brand panel */}
-      <div className="relative hidden overflow-hidden border-r border-border/60 lg:flex">
-        <div className="absolute inset-0 mesh" />
-        <div className="glow left-[-10%] top-[-10%] h-[420px] w-[420px] bg-[oklch(var(--primary))]" />
-        <div className="glow bottom-[-15%] right-[-5%] h-[380px] w-[380px] bg-[oklch(var(--chart-3))]" />
-
+      {/* Left — brand panel */}
+      <div className="relative hidden overflow-hidden border-r border-border bg-card lg:flex">
         <div className="relative z-10 flex w-full flex-col justify-between p-14 animate-in fade-in duration-700 motion-reduce:animate-none">
           {/* Logo */}
           <div className="flex items-center gap-3">
@@ -99,7 +95,7 @@ export default function LoginPage() {
               {univers.map((u) => (
                 <span
                   key={u}
-                  className="rounded-full border border-border/70 bg-card/40 px-4 py-1.5 text-sm text-foreground/80 backdrop-blur-sm"
+                  className="rounded-full border border-border bg-muted px-4 py-1.5 text-sm text-foreground/80"
                 >
                   {u}
                 </span>
@@ -214,7 +210,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="group h-12 w-full rounded-xl bg-[linear-gradient(100deg,oklch(var(--primary)),oklch(var(--chart-3)))] text-base font-semibold text-primary-foreground shadow-[0_8px_30px_-8px_oklch(var(--primary)/0.7)] transition-all hover:shadow-[0_10px_40px_-6px_oklch(var(--primary)/0.85)]"
+              className="group h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
               disabled={isLoading}
             >
               {isLoading ? (

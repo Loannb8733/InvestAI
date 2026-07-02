@@ -129,40 +129,25 @@
     font-weight: 600;
   }
 
-  /* Texte en dégradé violet → cyan (titres vivants) */
+  /* Titre accentué — aplat de couleur (pas de dégradé) */
   .gradient-text {
-    background-image: linear-gradient(
-      100deg,
-      oklch(var(--primary)) 0%,
-      oklch(var(--chart-3)) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: oklch(var(--primary));
   }
 
-  /* Halo de couleur diffus (profondeur, « vivant ») */
+  /* Halo décoratif retiré — surfaces plates */
   .glow {
-    position: absolute;
-    border-radius: 9999px;
-    filter: blur(80px);
-    opacity: 0.5;
-    pointer-events: none;
+    display: none;
   }
 
-  /* Carte « verre » subtile sur fond sombre */
+  /* Carte plate (ex-« verre » : plus de flou ni de translucidité) */
   .glass {
-    background: oklch(var(--card) / 0.6);
-    backdrop-filter: blur(16px);
-    border: 1px solid oklch(var(--border) / 0.8);
+    background: oklch(var(--card));
+    border: 1px solid oklch(var(--border));
   }
 
-  /* Grain doux pour casser les aplats de dégradé */
+  /* Fond plat (ex-dégradés radiaux retirés) */
   .mesh {
-    background:
-      radial-gradient(60% 80% at 20% 10%, oklch(var(--primary) / 0.18), transparent 60%),
-      radial-gradient(50% 60% at 90% 30%, oklch(var(--chart-3) / 0.14), transparent 55%),
-      radial-gradient(70% 70% at 60% 100%, oklch(var(--gain) / 0.10), transparent 60%);
+    background: transparent;
   }
 
   /* Entrées staggered discrètes (récit) */
