@@ -547,6 +547,27 @@ async def logout(request: Request, response: Response) -> dict:
         except Exception:
             pass  # Best-effort revocation; cookie deletion still provides baseline protection
 
+    # Blocklist the access token's jti too, so a token already in an attacker's
+    # hands stops working immediately instead of lingering until it expires.
+    raw_access = request.cookies.get("access_token")
+    if not raw_access:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            raw_access = auth_header[7:]
+    if raw_access:
+        try:
+            payload = decode_token(raw_access)
+            if payload and payload.get("jti"):
+                from app.core.redis_client import _get_redis_txt
+
+                r = await _get_redis_txt()
+                exp = payload.get("exp", 0)
+                ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
+                ttl = min(ttl, 3600)  # access tokens are short-lived
+                await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
+        except Exception:
+            pass  # Best-effort; cookie deletion still provides baseline protection
+
     # Deletion attributes (samesite/secure/domain) must match those used when
     # the cookies were set, otherwise the browser ignores the clearing
     # Set-Cookie in a cross-site context and the cookie lingers.

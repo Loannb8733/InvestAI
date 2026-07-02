@@ -94,6 +94,25 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+    # Revocation: reject access tokens whose jti was blocklisted (e.g. on logout).
+    # Fail-open on Redis error — the token still expires within minutes.
+    jti = payload.get("jti")
+    if jti:
+        try:
+            from app.core.redis_client import _get_redis_txt
+
+            r = await _get_redis_txt()
+            if await r.exists(f"token_blocklist:{jti}"):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Redis down — fail open
+
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(

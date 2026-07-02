@@ -50,6 +50,7 @@ def create_access_token(
         "sub": str(subject),
         "exp": expire,
         "type": "access",
+        "jti": uuid.uuid4().hex,  # enables per-token revocation (logout / blocklist)
     }
     if fingerprint:
         to_encode["fp"] = fingerprint
