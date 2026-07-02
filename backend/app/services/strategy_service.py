@@ -64,8 +64,10 @@ class StrategyService:
         # 1. Get dashboard metrics for liquidity + total value
         try:
             dashboard = await metrics_service.get_user_dashboard_metrics(db, user_id)
-            available_liquidity = float(dashboard.get("available_liquidity", 0))
-            total_value = float(dashboard.get("total_value", 0))
+            # Round euro amounts to cents so float aggregation artifacts never leak
+            # into the advisory response (these are guidance figures, not ledger math).
+            available_liquidity = round(float(dashboard.get("available_liquidity", 0)), 2)
+            total_value = round(float(dashboard.get("total_value", 0)), 2)
         except Exception as e:
             logger.warning("Failed to get dashboard metrics: %s", e)
             available_liquidity = 0.0
@@ -90,14 +92,14 @@ class StrategyService:
                 if "ACHAT" in action or action == "DCA":
                     next_symbol = asset.get("symbol")
                     next_action = action
-                    next_amount = float(asset.get("impact_eur", 0))
+                    next_amount = round(float(asset.get("impact_eur", 0)), 2)
                     break
         except Exception as e:
             logger.warning("Failed to get strategy table: %s", e)
 
         # 4. Can we execute?
         can_execute = available_liquidity >= next_amount if next_amount > 0 else True
-        shortfall = max(0, next_amount - available_liquidity) if not can_execute else 0.0
+        shortfall = round(max(0, next_amount - available_liquidity), 2) if not can_execute else 0.0
         message = None
         if not can_execute and next_symbol:
             message = (

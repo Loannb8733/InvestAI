@@ -371,7 +371,7 @@ class AIStrategyService:
 
         actions = []
         for asset in top:
-            amount = abs(asset.get("impact_eur", 0))
+            amount = round(abs(asset.get("impact_eur", 0)), 2)
             if amount == 0 or amount > liquidity * 0.5:
                 # Fallback ou cap : proportionnel à la liquidité
                 amount = round(liquidity * pct, 2)
@@ -416,7 +416,7 @@ class AIStrategyService:
                 {
                     "action": asset.get("action", "PRENDRE PROFITS"),
                     "symbol": asset["symbol"],
-                    "amount": abs(asset.get("impact_eur", 0)),
+                    "amount": round(abs(asset.get("impact_eur", 0)), 2),
                     "currency": "EUR",
                     "reason": (
                         f"Alpha {asset.get('alpha_score', 0)}/100 — " f"{asset.get('description', 'Signal de vente')}"
@@ -467,7 +467,7 @@ class AIStrategyService:
 
         actions = []
         for asset in weakest:
-            amount = abs(asset.get("impact_eur", 0)) or round(asset.get("value", 0) * 0.2, 2)
+            amount = round(abs(asset.get("impact_eur", 0)), 2) or round(asset.get("value", 0) * 0.2, 2)
             actions.append(
                 {
                     "action": "ALLÉGER",
