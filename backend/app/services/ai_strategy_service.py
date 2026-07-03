@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import get_cached_contrarian_stats
 from app.models.strategy import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
+from app.services.asset_classification import STABLECOIN_SYMBOLS
 from app.services.contrarian_stats_service import format_reasoning
 
 logger = logging.getLogger(__name__)
@@ -622,8 +623,7 @@ class AIStrategyService:
             return None
 
         # Check if user already holds stablecoins
-        stablecoin_syms = {"USDC", "USDT", "DAI", "USDG", "BUSD", "TUSD"}
-        held_stables = [a for a in assets if a.get("symbol", "").upper() in stablecoin_syms]
+        held_stables = [a for a in assets if a.get("symbol", "").upper() in STABLECOIN_SYMBOLS]
         stable_value = sum(a.get("value", 0) for a in held_stables)
         stable_pct = (stable_value / total_value * 100) if total_value > 0 else 0
 

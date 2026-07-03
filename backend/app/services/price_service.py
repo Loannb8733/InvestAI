@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.finance_constants import COLD_START_USD_EUR
 from app.core.redis_client import _get_redis_txt
 from app.core.symbol_map import COINGECKO_SYMBOL_MAP
+from app.services.asset_classification import STABLECOIN_PEGS
 
 
 class PriceService:
@@ -188,23 +189,8 @@ class PriceService:
             logger.warning(f"Redis cache write error for {symbol}: {e}")
 
     # Stablecoins: peg currency (USD or EUR)
-    STABLECOINS: Dict[str, str] = {
-        "USDT": "USD",  # Tether
-        "USDC": "USD",  # USD Coin
-        "BUSD": "USD",  # Binance USD
-        "DAI": "USD",  # Dai
-        "TUSD": "USD",  # TrueUSD
-        "USDP": "USD",  # Pax Dollar
-        "GUSD": "USD",  # Gemini Dollar
-        "FRAX": "USD",  # Frax
-        "LUSD": "USD",  # Liquity USD
-        "USDD": "USD",  # USDD
-        "PYUSD": "USD",  # PayPal USD
-        "FDUSD": "USD",  # First Digital USD
-        "USDG": "USD",  # Global Dollar (Paxos)
-        "EURT": "EUR",  # Euro Tether
-        "EUROC": "EUR",  # Euro Coin
-    }
+    # Canonical peg map lives in asset_classification (single source of truth).
+    STABLECOINS = STABLECOIN_PEGS
 
     # Cached EUR/USD rate (refreshed via get_forex_rate)
     _eur_usd_rate: Optional[Decimal] = None

@@ -15,6 +15,8 @@ from scipy.stats import spearmanr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.finance_constants import RISK_FREE_RATE
+from app.core.finance_constants import annualization_days as _trading_days
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
@@ -25,11 +27,7 @@ from app.tasks.history_cache import get_cached_history
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Configurable risk-free rate (annualized, as decimal e.g. 0.03 = 3%)
-# In a production system this would be fetched from an API (ECB ESTER, OAT 10Y)
-# ---------------------------------------------------------------------------
-RISK_FREE_RATE = 0.035  # 3.5% — approximate EUR risk-free Jan 2026
+# RISK_FREE_RATE now lives in app.core.finance_constants (imported above).
 
 # Cache TTL for historical data (seconds) — shared across all endpoint calls
 _HISTORY_CACHE_TTL = 300  # 5 minutes
@@ -164,17 +162,6 @@ def _compute_returns(prices: List[float]) -> np.ndarray:
     if len(arr) < 2:
         return np.array([])
     return np.diff(np.log(arr))
-
-
-def _trading_days(asset_type) -> int:
-    """Return annualization factor: 252 for stocks/ETF, 365 for crypto/other."""
-    if isinstance(asset_type, str):
-        at = asset_type.lower()
-    else:
-        at = asset_type.value.lower() if hasattr(asset_type, "value") else str(asset_type).lower()
-    if at in ("stock", "etf"):
-        return 252
-    return 365
 
 
 def _annualized_volatility(returns: np.ndarray, asset_type=None) -> float:

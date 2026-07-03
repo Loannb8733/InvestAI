@@ -38,5 +38,9 @@ USER appuser
 
 EXPOSE 8000
 
-# Render injects $PORT at runtime
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Render injects $PORT at runtime.
+# Run DB migrations on boot (web service only — worker/beat override this CMD via
+# their startCommand in render.yaml, so migrations run exactly once per deploy).
+# Fail-open: if the migration errors (e.g. prod schema drift), log it and still
+# start the app rather than taking the whole service down on an auto-deploy.
+CMD alembic upgrade head || echo "ALEMBIC MIGRATION FAILED"; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

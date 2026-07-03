@@ -12,10 +12,12 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.finance_constants import CALENDAR_DAYS_PER_YEAR, RISK_FREE_RATE
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction, TransactionType
+from app.services.asset_classification import STABLECOIN_PEGS, STABLECOIN_SYMBOLS
 from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
@@ -608,8 +610,9 @@ class SnapshotService:
 
         price_series: Dict[str, Dict[str, float]] = {}
 
-        # Stablecoins: default price of ~1 EUR (close enough)
-        STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
+        # Stablecoins carry no price history; they're valued at their peg in the
+        # value series (USD-pegged -> live USD/EUR rate, EUR-pegged -> ~1 EUR).
+        STABLECOINS = STABLECOIN_SYMBOLS
 
         now = time.time()
         symbols_to_fetch: Dict[str, str] = {}
@@ -873,7 +876,7 @@ class SnapshotService:
             stablecoin_eur_rate = float(COLD_START_USD_EUR)
 
         # Fallback: if most symbols have no price data (API down), use DB snapshots
-        STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"}
+        STABLECOINS = STABLECOIN_SYMBOLS
         non_stable_symbols = {s for s in all_symbols if s not in STABLECOINS}
         symbols_with_prices = {s for s in non_stable_symbols if s in price_series and price_series[s]}
         if non_stable_symbols and len(symbols_with_prices) < len(non_stable_symbols) / 2:
@@ -960,9 +963,10 @@ class SnapshotService:
                 # LOCF: use last known price
                 elif symbol in last_known_prices:
                     price = last_known_prices[symbol]
-                # Stablecoin fallback (live forex rate)
+                # Stablecoin fallback: EUR-pegged coins are worth ~1 EUR, USD-pegged
+                # coins are worth the live USD->EUR rate.
                 elif symbol in STABLECOINS:
-                    price = stablecoin_eur_rate
+                    price = 1.0 if STABLECOIN_PEGS.get(symbol) == "EUR" else stablecoin_eur_rate
                     last_known_prices[symbol] = price
                 # Try to find nearest price in series
                 elif symbol in price_series:
@@ -1082,7 +1086,7 @@ class SnapshotService:
         # Annualized volatility: std(returns) * sqrt(periods_per_year)
         # periods_per_year = 365 / interval_days (adjusts for subsampled data)
         interval_days = self._estimate_interval_days(history)
-        periods_per_year = 365.0 / interval_days
+        periods_per_year = CALENDAR_DAYS_PER_YEAR / interval_days
 
         n = len(returns)
         mean_return = sum(returns) / n
@@ -1096,7 +1100,7 @@ class SnapshotService:
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        risk_free_rate: float = 0.035,
+        risk_free_rate: float = RISK_FREE_RATE,
         history: Optional[List[Dict]] = None,
         roi_annualized: Optional[float] = None,
     ) -> float:
@@ -1119,7 +1123,7 @@ class SnapshotService:
 
         # Volatility from TWR log returns (annualized)
         interval_days = self._estimate_interval_days(history)
-        periods_per_year = 365.0 / interval_days
+        periods_per_year = CALENDAR_DAYS_PER_YEAR / interval_days
 
         n = len(returns)
         mean_return = sum(returns) / n
@@ -1288,7 +1292,7 @@ class SnapshotService:
         portfolio_return: float,
         benchmark_return: float,
         beta: float,
-        risk_free_rate: float = 0.02,
+        risk_free_rate: float = RISK_FREE_RATE,
     ) -> float:
         """
         Calculate Alpha - excess return compared to benchmark.

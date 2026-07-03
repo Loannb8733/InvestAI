@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.finance_constants import COLD_START_USD_EUR, annualized_return_pct
+from app.core.finance_constants import COLD_START_USD_EUR, TRADING_DAYS_PER_YEAR, annualized_return_pct
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -339,7 +339,7 @@ class MetricsService:
                 continue
             mean_ret = sum(daily_returns) / len(daily_returns)
             variance = sum((r - mean_ret) ** 2 for r in daily_returns) / len(daily_returns)
-            volatilities[symbol] = math.sqrt(variance) * math.sqrt(252)
+            volatilities[symbol] = math.sqrt(variance) * math.sqrt(TRADING_DAYS_PER_YEAR)
 
         # Weighted risk contributions
         total_weighted = 0.0
