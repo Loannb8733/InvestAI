@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
-import httpx
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +28,8 @@ from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, _rsi
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
-from app.services.metrics_service import is_cash_like, is_safe_haven
+from app.services.asset_classification import is_cash_like, is_safe_haven
+from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_cycles import PredictionCyclesMixin
 from app.services.prediction_metrics import PredictionMetricsMixin
 from app.services.prediction_types import _HISTORY_DAYS  # noqa: F401 — re-exported
@@ -134,16 +134,7 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                     )
 
         # Fetch Fear & Greed Index
-        fear_greed = None
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                if resp.status_code == 200:
-                    fng_data = resp.json()
-                    if fng_data.get("data"):
-                        fear_greed = int(fng_data["data"][0].get("value", 50))
-        except Exception:
-            pass
+        fear_greed = await fetch_fear_greed_index()
 
         # Fetch BTC dominance
         btc_dominance = None
@@ -710,22 +701,14 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                     pass
 
         # Fetch real Fear & Greed Index from alternative.me
-        fear_greed = 50
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                resp.raise_for_status()
-                fng_data = resp.json()
-                if fng_data.get("data"):
-                    fear_greed = int(fng_data["data"][0].get("value", 50))
-        except Exception as e:
-            logger.warning("Failed to fetch Fear & Greed Index: %s", e)
+        fear_greed = await fetch_fear_greed_index()
+        if fear_greed is None:
             # Fallback: compute from portfolio data
             if asset_count > 0:
                 avg_change = total_change / asset_count
                 fear_greed = int(max(0, min(100, 50 + avg_change * 10)))
+            else:
+                fear_greed = 50
 
         if fear_greed >= 60:
             sentiment = "bullish"
@@ -1054,16 +1037,7 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
         btc_returns = np.diff(np.log(np.array(btc_prices, dtype=float))) if len(btc_prices) > 10 else np.array([])
 
         # ── Fetch Fear & Greed for regime detection ──
-        fear_greed: Optional[int] = None
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                if resp.status_code == 200:
-                    fng_data = resp.json()
-                    if fng_data.get("data"):
-                        fear_greed = int(fng_data["data"][0].get("value", 50))
-        except Exception:
-            pass
+        fear_greed: Optional[int] = await fetch_fear_greed_index()
 
         # ── Batch-fetch prices (same source as Dashboard for parity) ──
         crypto_symbols = [s for s, a in asset_map.items() if a.asset_type == AssetType.CRYPTO]

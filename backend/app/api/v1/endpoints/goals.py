@@ -211,7 +211,7 @@ async def create_goal(
     """Create a new financial goal."""
     import logging
 
-    from app.services.metrics_service import is_liquidity
+    from app.services.asset_classification import is_liquidity
 
     logger = logging.getLogger(__name__)
 
@@ -403,7 +403,7 @@ async def sync_goal_with_portfolio(
         raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
     # Calculate total portfolio value (or liquidity-only for SAVINGS goals)
-    from app.services.metrics_service import is_liquidity
+    from app.services.asset_classification import is_liquidity
 
     portfolios_result = await db.execute(
         select(Portfolio).where(

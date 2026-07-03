@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.finance_constants import annualized_return_pct
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
 from app.models.alert import Alert
@@ -387,7 +388,7 @@ async def _get_dashboard_impl(
     from sqlalchemy import case as sa_case
 
     from app.models.transaction import TransactionType
-    from app.services.metrics_service import is_stablecoin
+    from app.services.asset_classification import is_stablecoin
 
     staked_result = await db.execute(
         select(
@@ -537,8 +538,9 @@ async def _get_dashboard_impl(
             actual_days = max(days, 30)
         if actual_days >= 180:
             years = actual_days / 365.0
-            roi_annualized = (pow(total_return / cagr_base, 1 / years) - 1) * 100
-            roi_annualized = max(-95.0, min(roi_annualized, 1000.0))
+            roi_annualized = annualized_return_pct(
+                float(cagr_base), float(total_return), years, floor=-95.0, ceil=1000.0
+            )
         else:
             roi_annualized = None
     else:
@@ -1066,7 +1068,7 @@ async def get_portfolio_sparklines(
     from collections import defaultdict
 
     from app.models.asset_price_history import AssetPriceHistory
-    from app.services.metrics_service import is_cash_like
+    from app.services.asset_classification import is_cash_like
 
     # Verify ownership
     portfolio_result = await db.execute(

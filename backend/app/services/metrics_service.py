@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.finance_constants import COLD_START_USD_EUR
+from app.core.finance_constants import COLD_START_USD_EUR, annualized_return_pct
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -1323,11 +1323,11 @@ class MetricsService:
             annualized_return = None
             if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
                 years = holding_days / 365.25
-                ratio = metrics["current_value"] / metrics["total_invested"]
-                if ratio > 0 and years > 0:
-                    raw = (pow(ratio, 1 / years) - 1) * 100
-                    # O4: Clamp to avoid aberrations on short holding periods
-                    annualized_return = round(max(-99.0, min(raw, 999.0)), 2)
+                # O4: Clamp to avoid aberrations on short holding periods
+                annualized_return = round(
+                    annualized_return_pct(float(metrics["total_invested"]), float(metrics["current_value"]), years),
+                    2,
+                )
 
             # Dividend income for this asset
             asset_fkey = (asset.symbol.upper(), (asset.exchange or "").strip())
@@ -2328,10 +2328,7 @@ class MetricsService:
         years: float,
     ) -> float:
         """Calculate Compound Annual Growth Rate (clamped -99% to +999%)."""
-        if initial_value <= 0 or years <= 0:
-            return 0.0
-        raw = (pow(float(final_value / initial_value), 1 / years) - 1) * 100
-        return float(max(-99.0, min(raw, 999.0)))
+        return annualized_return_pct(float(initial_value), float(final_value), years)
 
 
 # Singleton instance

@@ -1195,7 +1195,7 @@ class AnalyticsService:
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
-        from app.services.metrics_service import is_cash_like
+        from app.services.asset_classification import is_cash_like
 
         # Get ALL user assets (including stablecoins/fiat for liquidity cushion)
         assets = await self._get_user_assets(

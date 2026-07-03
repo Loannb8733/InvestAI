@@ -28,8 +28,9 @@ from app.models.asset import Asset, AssetType
 from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
+from app.services.asset_classification import is_liquidity, is_safe_haven
 from app.services.fifo import consume_fifo, consume_fifo_with_dates, extract_fifo_layers
-from app.services.metrics_service import is_liquidity, is_safe_haven, metrics_service
+from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
 logger = logging.getLogger(__name__)

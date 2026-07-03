@@ -20,7 +20,8 @@ from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeResult, _rsi
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
-from app.services.metrics_service import is_cash_like, is_safe_haven
+from app.services.asset_classification import is_cash_like, is_safe_haven
+from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_types import _HISTORY_DAYS
 from app.services.price_service import PriceService
 
@@ -34,8 +35,6 @@ class PredictionCyclesMixin:
         user_id: str,
     ) -> Dict:
         """Analyse de cycle de marche globale avec regime par actif."""
-        import httpx as _httpx
-
         # ── 1. BTC as market reference ───────────────────────────────
         btc_prices = None
         for try_days in [_HISTORY_DAYS, 90]:
@@ -54,16 +53,7 @@ class PredictionCyclesMixin:
                 )
 
         # Fear & Greed
-        fear_greed = None
-        try:
-            async with _httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                if resp.status_code == 200:
-                    fng_data = resp.json()
-                    if fng_data.get("data"):
-                        fear_greed = int(fng_data["data"][0].get("value", 50))
-        except Exception:
-            pass
+        fear_greed = await fetch_fear_greed_index()
 
         btc_dominance = None
         try:

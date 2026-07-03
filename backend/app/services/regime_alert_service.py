@@ -15,6 +15,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.redis_client import _get_redis_txt
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig
 from app.models.user import User
+from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.telegram_service import telegram_service
 
 logger = logging.getLogger(__name__)
@@ -54,16 +55,7 @@ class RegimeAlertService:
                 return None
 
             # Fetch Fear & Greed for better accuracy
-            fear_greed: Optional[int] = None
-            try:
-                import httpx
-
-                async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                    if resp.status_code == 200:
-                        fear_greed = int(resp.json()["data"][0].get("value", 50))
-            except Exception:
-                pass
+            fear_greed: Optional[int] = await fetch_fear_greed_index(timeout=10.0)
 
             result = self.detector.detect(btc_prices, "BTC", fear_greed)
             return result.dominant_regime

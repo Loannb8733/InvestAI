@@ -16,7 +16,8 @@ from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeCon
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services.analytics_service import AnalyticsService
-from app.services.metrics_service import is_safe_haven
+from app.services.asset_classification import is_safe_haven
+from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_service import PredictionService
 from app.services.price_service import price_service
 from app.tasks.history_cache import get_cached_history
@@ -951,18 +952,8 @@ class SmartInsightsService:
         regime_days = max(days, 90)
         try:
             # Fetch Fear & Greed Index
-            fear_greed: Optional[int] = None
+            fear_greed: Optional[int] = await fetch_fear_greed_index(timeout=10.0)
             vix_value: Optional[float] = None
-            try:
-                import httpx
-
-                async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.get("https://api.alternative.me/fng/?limit=1")
-                    if resp.status_code == 200:
-                        fng_data = resp.json()
-                        fear_greed = int(fng_data["data"][0].get("value", 50))
-            except Exception as e:
-                logger.warning("Failed to fetch Fear & Greed: %s", e)
 
             # Fetch VIX (CBOE Volatility Index) for TradFi sentiment
             try:
