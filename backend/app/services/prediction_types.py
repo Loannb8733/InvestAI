@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
 
+# History window for ML predictions (days). Shared by prediction_service and its
+# extracted mixins so there is a single source of truth (and no import cycle).
+_HISTORY_DAYS = 365
+
 
 @dataclass
 class PricePrediction:
