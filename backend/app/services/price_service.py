@@ -9,10 +9,10 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 import httpx
-from redis import Redis
 
 from app.core.config import settings
 from app.core.finance_constants import COLD_START_USD_EUR
+from app.core.redis_client import _get_redis_txt
 from app.core.symbol_map import COINGECKO_SYMBOL_MAP
 
 
@@ -32,11 +32,6 @@ class PriceService:
     SYMBOL_MAP = COINGECKO_SYMBOL_MAP
 
     def __init__(self):
-        self.redis = Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            decode_responses=True,
-        )
         # CoinGecko API key (optional, for higher rate limits)
         self.coingecko_api_key = getattr(settings, "COINGECKO_API_KEY", None) or None
 
@@ -82,7 +77,8 @@ class PriceService:
         # Check Redis cache for discovered ID
         cache_key = f"coingecko_id:{symbol_upper}"
         try:
-            cached_id = self.redis.get(cache_key)
+            redis = await _get_redis_txt()
+            cached_id = await redis.get(cache_key)
             if cached_id:
                 self._dynamic_symbol_cache[symbol_upper] = cached_id
                 return cached_id
@@ -114,7 +110,8 @@ class PriceService:
                     if coin_id:
                         # Cache the discovered ID for 7 days
                         try:
-                            self.redis.setex(cache_key, 604800, coin_id)
+                            redis = await _get_redis_txt()
+                            await redis.setex(cache_key, 604800, coin_id)
                         except Exception:
                             pass
                         self._dynamic_symbol_cache[symbol_upper] = coin_id
@@ -135,11 +132,12 @@ class PriceService:
     # Maximum acceptable cache age before forcing a refresh (seconds)
     MAX_CACHE_AGE = 300  # 5 minutes
 
-    def _get_cached_price(self, asset_type: str, symbol: str) -> Optional[Dict]:
+    async def _get_cached_price(self, asset_type: str, symbol: str) -> Optional[Dict]:
         """Get price from Redis cache. Returns None if stale (> MAX_CACHE_AGE)."""
         try:
             key = self._get_cache_key(asset_type, symbol)
-            data = self.redis.hgetall(key)
+            redis = await _get_redis_txt()
+            data = await redis.hgetall(key)
             if data:
                 # Freshness guard: reject entries older than MAX_CACHE_AGE
                 last_updated_str = data.get("last_updated")
@@ -171,7 +169,7 @@ class PriceService:
             logger.warning(f"Redis cache read error for {symbol}: {e}")
         return None
 
-    def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
+    async def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
         """Cache price in Redis."""
         try:
             key = self._get_cache_key(asset_type, symbol)
@@ -183,8 +181,9 @@ class PriceService:
                 "market_cap": str(data.get("market_cap", 0)),
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
-            self.redis.hset(key, mapping=cache_data)
-            self.redis.expire(key, ttl)
+            redis = await _get_redis_txt()
+            await redis.hset(key, mapping=cache_data)
+            await redis.expire(key, ttl)
         except Exception as e:
             logger.warning(f"Redis cache write error for {symbol}: {e}")
 
@@ -254,7 +253,7 @@ class PriceService:
         is_stablecoin = symbol_upper in self.STABLECOINS
 
         # Check cache first
-        cached = self._get_cached_price("crypto", symbol)
+        cached = await self._get_cached_price("crypto", symbol)
         if cached:
             return cached
 
@@ -306,7 +305,7 @@ class PriceService:
                         "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                         "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                     }
-                    self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
+                    await self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
                     return result
 
         except Exception as e:
@@ -336,7 +335,7 @@ class PriceService:
                         "volume_24h": raw_data.get("VOLUME24HOUR", 0) or 0,
                         "market_cap": raw_data.get("MKTCAP", 0) or 0,
                     }
-                    self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
+                    await self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
                     return result
 
         except Exception as e:
@@ -355,7 +354,7 @@ class PriceService:
                 "volume_24h": 0,
                 "market_cap": 0,
             }
-            self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
+            await self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
             return result
 
         return None
@@ -363,7 +362,7 @@ class PriceService:
     async def get_stock_price(self, symbol: str) -> Optional[Dict]:
         """Fetch stock/ETF price from Yahoo Finance."""
         # Check cache first
-        cached = self._get_cached_price("stock", symbol)
+        cached = await self._get_cached_price("stock", symbol)
         if cached:
             return cached
 
@@ -397,7 +396,7 @@ class PriceService:
                 "market_cap": 0,
                 "quote_currency": quote_currency,
             }
-            self._cache_price("stock", symbol, result, self.CACHE_TTL_STOCK)
+            await self._cache_price("stock", symbol, result, self.CACHE_TTL_STOCK)
             return result
 
         except Exception as e:
@@ -456,7 +455,7 @@ class PriceService:
                         "volume_24h": coin_data.get("VOLUME24HOUR", 0) or 0,
                         "market_cap": coin_data.get("MKTCAP", 0) or 0,
                     }
-                    self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
+                    await self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
                     results[symbol.upper()] = result
 
         except Exception as e:
@@ -471,7 +470,7 @@ class PriceService:
         # Check cache first
         uncached_symbols = []
         for symbol in symbols:
-            cached = self._get_cached_price("crypto", symbol)
+            cached = await self._get_cached_price("crypto", symbol)
             if cached:
                 results[symbol.upper()] = cached
             else:
@@ -534,7 +533,7 @@ class PriceService:
                     "volume_24h": coin_data.get(f"{currency}_24h_vol", 0) or 0,
                     "market_cap": coin_data.get(f"{currency}_market_cap", 0) or 0,
                 }
-                self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
+                await self._cache_price("crypto", symbol, result, self.CACHE_TTL_CRYPTO)
                 results[symbol.upper()] = result
 
         except Exception as e:
@@ -570,7 +569,8 @@ class PriceService:
         """Get exchange rate between two currencies."""
         cache_key = f"forex:{from_currency}:{to_currency}"
         try:
-            cached = self.redis.get(cache_key)
+            redis = await _get_redis_txt()
+            cached = await redis.get(cache_key)
             if cached:
                 return Decimal(cached)
         except Exception as e:
@@ -584,7 +584,8 @@ class PriceService:
             rate = data.get("rates", {}).get(to_currency)
             if rate:
                 try:
-                    self.redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
+                    redis = await _get_redis_txt()
+                    await redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
                 except Exception as e:
                     logger.warning(f"Redis cache write error for forex: {e}")
                 return Decimal(str(rate))
@@ -615,7 +616,8 @@ class PriceService:
         # Check cache
         cache_key = f"price:historical:{coin_id}:{date_str}:{currency}"
         try:
-            cached = self.redis.get(cache_key)
+            redis = await _get_redis_txt()
+            cached = await redis.get(cache_key)
             if cached:
                 return Decimal(cached)
         except Exception as e:
@@ -640,7 +642,8 @@ class PriceService:
                 price_decimal = Decimal(str(price))
                 # Cache for 24 hours (historical prices don't change)
                 try:
-                    self.redis.setex(cache_key, 86400, str(price_decimal))
+                    redis = await _get_redis_txt()
+                    await redis.setex(cache_key, 86400, str(price_decimal))
                 except Exception as e:
                     logger.warning(f"Redis cache write error for historical price: {e}")
                 return price_decimal

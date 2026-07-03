@@ -287,7 +287,11 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
         # Regime detection — multi-timeframe (P15) + adjust CI and recommendation
         regime_info = None
         if prices and len(prices) >= 7:
-            mtf = self.regime_detector.detect_multi_timeframe(
+            # Offloaded to a worker thread — detect_multi_timeframe runs ~7
+            # technical indicators over two timeframes (CPU-bound) and would
+            # otherwise block the event loop during a prediction request.
+            mtf = await asyncio.to_thread(
+                self.regime_detector.detect_multi_timeframe,
                 prices,
                 symbol,
                 fear_greed,

@@ -1,5 +1,6 @@
 """Transaction endpoints."""
 
+import asyncio
 import csv
 import io
 import logging
@@ -1257,9 +1258,10 @@ async def import_transactions_csv(
             detail="Format CSV non reconnu. Veuillez spécifier la plateforme.",
         )
 
-    # Parse CSV
+    # Parse CSV (offloaded to a worker thread — parse_csv is a synchronous,
+    # CPU-bound loop that would otherwise block the event loop for large files)
     try:
-        parsed_transactions, parse_errors = parser.parse_csv(content_str)
+        parsed_transactions, parse_errors = await asyncio.to_thread(parser.parse_csv, content_str)
         logger.info(f"Parsed {len(parsed_transactions)} transactions, {len(parse_errors)} parse errors")
     except Exception as e:
         logger.error(f"Error parsing CSV: {e}")

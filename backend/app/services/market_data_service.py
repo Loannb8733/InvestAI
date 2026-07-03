@@ -15,9 +15,8 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 import httpx
-from redis import Redis
 
-from app.core.config import settings
+from app.core.redis_client import _get_redis_txt
 
 logger = logging.getLogger(__name__)
 
@@ -234,11 +233,6 @@ class MarketDataService:
     CACHE_TTL_CLOSED = 3600  # 1 hour when market is closed
 
     def __init__(self):
-        self.redis = Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            decode_responses=True,
-        )
         self.http_client = httpx.AsyncClient(
             timeout=5.0,
             headers={
@@ -258,11 +252,12 @@ class MarketDataService:
     def _cache_key(self, ticker: str) -> str:
         return f"mkt:stock:{ticker.upper()}"
 
-    def _get_cached(self, ticker: str) -> Optional[Dict]:
+    async def _get_cached(self, ticker: str) -> Optional[Dict]:
         """Get cached stock price data."""
         try:
             key = self._cache_key(ticker)
-            data = self.redis.hgetall(key)
+            redis = await _get_redis_txt()
+            data = await redis.hgetall(key)
             if not data or "price" not in data:
                 return None
 
@@ -290,7 +285,7 @@ class MarketDataService:
             logger.warning("Cache read error for %s: %s", ticker, e)
         return None
 
-    def _cache_set(self, ticker: str, data: Dict):
+    async def _cache_set(self, ticker: str, data: Dict):
         """Cache stock price data with market-aware TTL."""
         try:
             key = self._cache_key(ticker)
@@ -304,8 +299,9 @@ class MarketDataService:
                 "exchange": data.get("exchange", ""),
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
-            self.redis.hset(key, mapping=cache_data)
-            self.redis.expire(key, ttl)
+            redis = await _get_redis_txt()
+            await redis.hset(key, mapping=cache_data)
+            await redis.expire(key, ttl)
         except Exception as e:
             logger.warning("Cache write error for %s: %s", ticker, e)
 
@@ -316,7 +312,7 @@ class MarketDataService:
         volume, quote_currency, exchange.
         """
         # Check cache first
-        cached = self._get_cached(ticker)
+        cached = await self._get_cached(ticker)
         if cached:
             return cached
 
@@ -350,7 +346,7 @@ class MarketDataService:
                 "quote_currency": quote_currency,
                 "exchange": exchange_name,
             }
-            self._cache_set(ticker, result)
+            await self._cache_set(ticker, result)
             return result
 
         except Exception as e:
@@ -372,7 +368,7 @@ class MarketDataService:
         # Check cache first
         uncached = []
         for ticker in tickers:
-            cached = self._get_cached(ticker)
+            cached = await self._get_cached(ticker)
             if cached:
                 results[ticker.upper()] = cached
             else:

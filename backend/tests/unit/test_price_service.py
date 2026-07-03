@@ -19,24 +19,28 @@ from app.services.price_service import PriceService
 
 @pytest.fixture
 def mock_redis():
-    """Create a mock Redis client."""
+    """Create a mock async Redis client (matches core.redis_client._get_redis_txt)."""
     redis = MagicMock()
-    redis.hgetall.return_value = {}
-    redis.get.return_value = None
+    redis.hgetall = AsyncMock(return_value={})
+    redis.get = AsyncMock(return_value=None)
+    redis.setex = AsyncMock()
+    redis.hset = AsyncMock()
+    redis.expire = AsyncMock()
     return redis
 
 
 @pytest.fixture
 def price_service(mock_redis):
-    """Create a PriceService with mocked Redis and HTTP client."""
+    """Create a PriceService whose shared async Redis client is mocked."""
     with patch("app.services.price_service.settings") as mock_settings:
-        mock_settings.REDIS_HOST = "localhost"
-        mock_settings.REDIS_PORT = 6379
         mock_settings.COINGECKO_API_KEY = None
-        with patch("app.services.price_service.Redis", return_value=mock_redis):
-            svc = PriceService()
-            svc.redis = mock_redis
-            return svc
+        # _get_redis_txt is awaited at call time inside each method, so the patch
+        # must stay active for the whole test (yield inside the with-block).
+        with patch(
+            "app.services.price_service._get_redis_txt",
+            AsyncMock(return_value=mock_redis),
+        ):
+            yield PriceService()
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +96,8 @@ class TestCacheKey:
 class TestCacheBehavior:
     """Tests for cache hit and cache miss scenarios."""
 
-    def test_cache_hit_returns_cached_data(self, price_service, mock_redis):
+    @pytest.mark.asyncio
+    async def test_cache_hit_returns_cached_data(self, price_service, mock_redis):
         mock_redis.hgetall.return_value = {
             "price": "45000.50",
             "change_24h": "500.0",
@@ -102,24 +107,27 @@ class TestCacheBehavior:
             "last_updated": "2026-01-01T00:00:00",
         }
 
-        result = price_service._get_cached_price("crypto", "BTC")
+        result = await price_service._get_cached_price("crypto", "BTC")
 
         assert result is not None
         assert result["price"] == Decimal("45000.50")
         assert result["change_24h"] == 500.0
         assert result["change_percent_24h"] == 1.12
 
-    def test_cache_miss_returns_none(self, price_service, mock_redis):
+    @pytest.mark.asyncio
+    async def test_cache_miss_returns_none(self, price_service, mock_redis):
         mock_redis.hgetall.return_value = {}
-        result = price_service._get_cached_price("crypto", "BTC")
+        result = await price_service._get_cached_price("crypto", "BTC")
         assert result is None
 
-    def test_cache_redis_error_returns_none(self, price_service, mock_redis):
+    @pytest.mark.asyncio
+    async def test_cache_redis_error_returns_none(self, price_service, mock_redis):
         mock_redis.hgetall.side_effect = Exception("Redis connection error")
-        result = price_service._get_cached_price("crypto", "BTC")
+        result = await price_service._get_cached_price("crypto", "BTC")
         assert result is None
 
-    def test_cache_price_stores_in_redis(self, price_service, mock_redis):
+    @pytest.mark.asyncio
+    async def test_cache_price_stores_in_redis(self, price_service, mock_redis):
         data = {
             "price": Decimal("45000.50"),
             "change_24h": 500.0,
@@ -127,12 +135,13 @@ class TestCacheBehavior:
             "volume_24h": 1000000,
             "market_cap": 850000000000,
         }
-        price_service._cache_price("crypto", "BTC", data, 60)
+        await price_service._cache_price("crypto", "BTC", data, 60)
 
         mock_redis.hset.assert_called_once()
         mock_redis.expire.assert_called_once_with("price:crypto:BTC", 60)
 
-    def test_cache_price_redis_error_no_raise(self, price_service, mock_redis):
+    @pytest.mark.asyncio
+    async def test_cache_price_redis_error_no_raise(self, price_service, mock_redis):
         """Cache write failures should be silently ignored."""
         mock_redis.hset.side_effect = Exception("Redis write error")
         data = {
@@ -143,7 +152,7 @@ class TestCacheBehavior:
             "market_cap": 0,
         }
         # Should not raise
-        price_service._cache_price("crypto", "BTC", data, 60)
+        await price_service._cache_price("crypto", "BTC", data, 60)
 
 
 # ---------------------------------------------------------------------------
