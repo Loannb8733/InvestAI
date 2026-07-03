@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import math
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
@@ -31,57 +30,17 @@ from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeRes
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services.metrics_service import is_cash_like, is_safe_haven
+from app.services.prediction_types import (  # noqa: F401 — re-exported for compatibility
+    AnomalyDetection,
+    MarketSentiment,
+    PricePrediction,
+)
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
 # History window for ML predictions (days)
 _HISTORY_DAYS = 365
-
-
-@dataclass
-class PricePrediction:
-    """Price prediction for an asset."""
-
-    symbol: str
-    current_price: float
-    predictions: List[Dict]  # [{date, price, confidence_low, confidence_high}]
-    trend: str  # "bullish", "bearish", "neutral"
-    trend_strength: float  # 0-100
-    support_level: float
-    resistance_level: float
-    recommendation: str
-    model_used: str
-    models_detail: List[Dict] = None  # [{name, weight_pct, mape, trend}]
-    explanations: List[Dict] = None  # SHAP explanations from XGBoost
-    regime_info: Optional[Dict] = None  # {dominant_regime, confidence, probabilities}
-    display_thresholds: Optional[Dict] = None  # adaptive thresholds for frontend
-    _history_dates: List = None  # internal: cached for accuracy calc
-    _history_prices: List[float] = None  # internal: cached for accuracy calc
-
-
-@dataclass
-class AnomalyDetection:
-    """Anomaly detection result."""
-
-    symbol: str
-    is_anomaly: bool
-    anomaly_type: Optional[str]
-    severity: str
-    description: str
-    detected_at: datetime
-    price_change_percent: float
-
-
-@dataclass
-class MarketSentiment:
-    """Market sentiment analysis."""
-
-    overall_sentiment: str
-    sentiment_score: float
-    fear_greed_index: int
-    market_phase: str
-    signals: List[Dict]
 
 
 class PredictionService:
