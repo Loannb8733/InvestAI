@@ -29,7 +29,7 @@ from app.services.asset_classification import (  # noqa: F401
     is_safe_haven,
     is_stablecoin,
 )
-from app.services.fifo import consume_fifo, extract_fifo_layers
+from app.services import fifo_replay
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
@@ -557,17 +557,10 @@ class MetricsService:
                 .order_by(Transaction.executed_at, Transaction.id)
             )
             all_txs = all_tx_result.scalars().all()
-            # TRANSFER_OUT must be processed before TRANSFER_IN at the same timestamp
-            # so FIFO transit layers exist when the matching TRANSFER_IN is consumed.
-            _epoch = datetime.min.replace(tzinfo=timezone.utc)
-            all_txs = sorted(
-                all_txs,
-                key=lambda tx: (
-                    tx.executed_at or _epoch,
-                    0 if tx.transaction_type == TxType.TRANSFER_OUT else 1,
-                    str(tx.id),
-                ),
-            )
+            # Canonical deterministic replay ordering (TRANSFER_OUT before a
+            # same-timestamp TRANSFER_IN, str(id) tie-break) — shared with the
+            # tax replay via the unified engine.
+            all_txs = fifo_replay.sort_transactions(all_txs)
 
             # Fetch ALL portfolio assets (including qty=0) for FIFO symbol/exchange
             # lookups — zero-qty assets may have TRANSFER_OUT transactions whose
@@ -595,409 +588,45 @@ class MetricsService:
             # Compute CUMP PRU from transaction history (fee-inclusive, follows 3 rules)
             cump_pru_by_fkey: Dict[Tuple[str, str], Decimal] = compute_cump_pru(all_txs, aid_to_symbol, aid_to_exchange)
 
-            import re as _re
             from collections import defaultdict as _defaultdict
 
             _ZERO = Decimal("0")
-
-            # FIFO layers: keyed by (symbol, exchange)
-            # Each layer: {
-            #   "qty": Decimal,
-            #   "unit_cost": Decimal,        # cost in portfolio currency
-            #   "unit_cost_base": Decimal,    # cost in transaction currency
-            #   "currency": str,              # transaction currency (e.g. "USD")
-            #   "fx_rate": Decimal,           # FX rate at purchase (base→portfolio)
-            #   "is_paid": bool,
-            # }
-            # is_paid=True for BUY layers, False for free (airdrop/reward)
             FifoKey = Tuple[str, str]  # (symbol, exchange)
-            fifo: Dict[FifoKey, list] = _defaultdict(list)
 
-            # Dividend income tracking per (symbol, exchange)
-            dividend_income: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            # ---- Unified FIFO replay (app.services.fifo_replay) ----
+            # Display/P&L semantics: every ReplayConfig default IS the display
+            # behaviour (market-price reward basis, recorded-price conversion
+            # destinations, F-06 transfer-in recovery, unmatched conversions
+            # preserved, fee_currency-aware fees, network-fee trim, external_id
+            # conversion fallback); only stablecoin seeding is opt-in.
+            _replay_res = fifo_replay.replay(
+                all_txs,
+                aid_to_symbol,
+                fifo_replay.ReplayConfig(
+                    portfolio_currency=currency,
+                    seed_stablecoin_layers=True,
+                ),
+                aid_to_avg_price=aid_to_avg_price,
+                sym_avg_price=sym_avg_price,
+                usd_to_portfolio=usd_to_target,
+            )
+            fifo = _replay_res.fifo
+            dividend_income = _replay_res.dividend_income
+            _pending_fee_conversions.extend(_replay_res.pending_fee_conversions)
 
-            # Pre-build conversion matching indices
-            conv_ins = [tx for tx in all_txs if tx.transaction_type == TxType.CONVERSION_IN]
-
-            def _match_conversion_in(co_tx: Transaction, src_sym: str) -> Tuple[Optional[str], Optional[str], Decimal]:
-                """Find the matching CONVERSION_IN for a CONVERSION_OUT.
-
-                Returns (dest_symbol, dest_exchange, matched_qty).
-                """
-                notes = co_tx.notes or ""
-                exch = co_tx.exchange or ""
-                co_qty = Decimal(str(co_tx.quantity))
-
-                dest_sym: Optional[str] = None
-                dest_exch: Optional[str] = None
-                matched_qty = co_qty  # fallback
-                matched_price = _ZERO  # recorded dest price on the matched CONVERSION_IN
-
-                if "Crypto.com" in exch or "crypto.com" in exch.lower():
-                    for ci in conv_ins:
-                        if (ci.notes or "") == notes and (ci.exchange or "") == exch:
-                            dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
-                            dest_exch = (ci.exchange or "").strip()
-                            matched_qty = Decimal(str(ci.quantity))
-                            matched_price = _ci_price_in_portfolio_ccy(ci.price, getattr(ci, "conversion_rate", None))
-                            break
-                else:
-                    # Kraken / generic: match trade_id suffix in notes
-                    m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
-                    if m:
-                        suffix = m.group(1)
-                        for ci in conv_ins:
-                            if f"convert_buy_{suffix}" in (ci.notes or ""):
-                                candidate = aid_to_symbol.get(str(ci.asset_id), "")
-                                # M3: Verify dest symbol differs from source
-                                if candidate and candidate != src_sym:
-                                    dest_sym = candidate
-                                    dest_exch = (ci.exchange or "").strip()
-                                    matched_qty = Decimal(str(ci.quantity))
-                                    matched_price = _ci_price_in_portfolio_ccy(
-                                        ci.price, getattr(ci, "conversion_rate", None)
-                                    )
-                                else:
-                                    logger.warning(
-                                        "Kraken conversion match rejected: " "src=%s == dest=%s (suffix=%s, tx_id=%s)",
-                                        src_sym,
-                                        candidate,
-                                        suffix,
-                                        co_tx.id,
-                                    )
-                                break
-
-                    if not dest_sym:
-                        # Fallback: match via external_id for records synced before
-                        # the notes-format fix (those records have no trade_id in notes
-                        # but do carry external_id="convert_sell_{refid}").
-                        ext_id = getattr(co_tx, "external_id", None) or ""
-                        if ext_id.startswith("convert_sell_"):
-                            suffix = ext_id[len("convert_sell_") :]
-                            for ci in conv_ins:
-                                ci_ext = getattr(ci, "external_id", None) or ""
-                                if ci_ext == f"convert_buy_{suffix}":
-                                    candidate = aid_to_symbol.get(str(ci.asset_id), "")
-                                    if candidate and candidate != src_sym:
-                                        dest_sym = candidate
-                                        dest_exch = (ci.exchange or "").strip()
-                                        matched_qty = Decimal(str(ci.quantity))
-                                        matched_price = _ci_price_in_portfolio_ccy(
-                                            ci.price, getattr(ci, "conversion_rate", None)
-                                        )
-                                    else:
-                                        logger.warning(
-                                            "Kraken conversion match (ext_id fallback) rejected: "
-                                            "src=%s == dest=%s (suffix=%s, tx_id=%s)",
-                                            src_sym,
-                                            candidate,
-                                            suffix,
-                                            co_tx.id,
-                                        )
-                                    break
-
-                return dest_sym, dest_exch, matched_qty, matched_price
-
-            def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
-                """Remove qty from FIFO layers, return total cost removed."""
-                return consume_fifo(fifo.get(key, []), qty_to_remove)
-
-            def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
-                """Remove qty from FIFO layers, return list of extracted layers
-                (preserving original unit costs for transfer/conversion)."""
-                return extract_fifo_layers(fifo.get(key, []), qty_to_remove)
-
-            # ---- Single-pass chronological processing ----
-            for tx in all_txs:
-                sym = aid_to_symbol.get(str(tx.asset_id), "")
-                exch = (tx.exchange or "").strip()
-                key: FifoKey = (sym, exch)
-                qty = Decimal(str(tx.quantity))
-                ttype = tx.transaction_type
-
-                if ttype == TxType.BUY:
-                    # FX: cost basis is tracked in the PORTFOLIO currency. The trade
-                    # price is in the transaction currency, so convert it via the FX
-                    # rate captured at execution (conversion_rate = portfolio units per
-                    # 1 unit of tx currency; defaults to 1 for same-currency trades).
-                    tx_ccy = (tx.currency or "EUR").upper()
-                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                    unit_cost_base = Decimal(str(tx.price or 0))  # price in tx currency
-                    total_cost = qty * unit_cost_base * tx_fx  # -> portfolio currency
-                    # B1/M2: Include transaction fees in cost basis
-                    fee = Decimal(str(tx.fee or 0))
-                    if fee > 0:
-                        fee_ccy = (tx.fee_currency or tx.currency or "EUR").upper()
-                        portfolio_ccy = currency.upper()
-                        if fee_ccy == portfolio_ccy:
-                            total_cost += fee
-                        else:
-                            _pending_fee_conversions.append((key, fee, fee_ccy))
-                    layer_unit = total_cost / qty if qty > 0 else _ZERO
-
-                    fifo[key].append(
-                        {
-                            "qty": qty,
-                            "unit_cost": layer_unit,
-                            "unit_cost_base": unit_cost_base,
-                            "currency": tx_ccy,
-                            "fx_rate": tx_fx,
-                            "is_paid": True,
-                        }
-                    )
-
-                elif ttype == TxType.SELL:
-                    # O5: Warn if sell qty exceeds pool
-                    pool_qty = sum(ly["qty"] for ly in fifo.get(key, []))
-                    if qty > pool_qty:
+            # DEBUG: log orphan (unmatched) BTC transit layers so cost-basis
+            # loss through transfers stays visible in prod logs.
+            for _okey, _olayers in _replay_res.orphan_transit.items():
+                if _okey[0] == "BTC":
+                    _orphan_qty = sum(ly["qty"] for ly in _olayers)
+                    if _orphan_qty > 0:
                         logger.warning(
-                            "Oversell: SELL qty=%s > pool=%s for %s@%s (tx_id=%s)",
-                            qty,
-                            pool_qty,
-                            sym,
-                            exch,
-                            tx.id,
+                            "[FIFO_DEBUG] BTC orphan transit %s qty=%s cost=%s layers=%s",
+                            _okey[1][:40],
+                            _orphan_qty,
+                            sum(ly["qty"] * ly["unit_cost"] for ly in _olayers),
+                            len(_olayers),
                         )
-                    _consume_fifo(key, qty)
-
-                elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
-                    # Rewards/airdrops: use market price at receipt when available
-                    # (required for correct fiscal cost basis — staking rewards are
-                    # taxable income at their market value on the day received).
-                    # Falls back to zero-cost only when no price is recorded.
-                    tx_ccy = (tx.currency or "EUR").upper()
-                    reward_price = Decimal(str(tx.price or 0))  # price in tx currency
-                    tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                    # unit_cost must be in the PORTFOLIO currency (EUR): apply fx.
-                    fifo[key].append(
-                        {
-                            "qty": qty,
-                            "unit_cost": reward_price * tx_fx,
-                            "unit_cost_base": reward_price,
-                            "currency": tx_ccy,
-                            "fx_rate": tx_fx,
-                            "is_paid": reward_price > _ZERO,
-                        }
-                    )
-
-                elif ttype == TxType.TRANSFER_OUT:
-                    # Move oldest layers to a "transit" — the matching TRANSFER_IN
-                    # will pick them up. We use the transaction's exchange as source.
-                    extracted = _consume_fifo_layers(key, qty)
-                    # Store extracted layers temporarily keyed by (sym, "__transit__", tx.id)
-                    transit_key = (sym, f"__transit__{tx.id}")
-                    fifo[transit_key] = extracted
-
-                elif ttype == TxType.TRANSFER_IN:
-                    # Try to find matching TRANSFER_OUT layers in transit
-                    # Match by: same symbol, qty ~= transit qty, closest in time
-                    matched_transit = None
-                    best_match_diff = None
-                    for tkey, tlayers in list(fifo.items()):
-                        if tkey[0] == sym and tkey[1].startswith("__transit__"):
-                            transit_qty = sum(ly["qty"] for ly in tlayers)
-                            diff = abs(transit_qty - qty)
-                            if best_match_diff is None or diff < best_match_diff:
-                                best_match_diff = diff
-                                matched_transit = tkey
-                    if matched_transit and fifo[matched_transit]:
-                        transit_layers = fifo.pop(matched_transit)
-                        transit_total_qty = sum(ly["qty"] for ly in transit_layers)
-                        if transit_total_qty > qty:
-                            # Network fee: transit sent more than received — trim to received qty.
-                            # The excess (fee burned on-chain) is discarded from cost basis.
-                            temp_key = (sym, f"__trim__{matched_transit[1]}")
-                            fifo[temp_key] = transit_layers
-                            trimmed = _consume_fifo_layers(temp_key, qty)
-                            fifo.pop(temp_key, None)
-                            for layer in trimmed:
-                                fifo[key].append(layer)
-                        else:
-                            for layer in transit_layers:
-                                fifo[key].append(layer)
-                    else:
-                        # No matching transit — unmatched/external transfer in.
-                        # F-06: do NOT default to zero cost (that treats the whole
-                        # position as pure gain and inflates latent P&L). Recover a
-                        # cost basis in priority order:
-                        #   1. the row's own recorded price (converted to EUR),
-                        #   2. this asset's stored avg_buy_price,
-                        #   3. the symbol-wide avg_buy_price (same coin elsewhere).
-                        # Only when none is known do we fall back to zero cost.
-                        tx_ccy = (tx.currency or "EUR").upper()
-                        tx_price = Decimal(str(tx.price or 0))
-                        if tx_price > _ZERO:
-                            tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                            unit_cost = tx_price * tx_fx
-                            unit_base = tx_price
-                            cost_known = True
-                        else:
-                            # avg_buy_price is already in the portfolio currency (EUR).
-                            proxy = aid_to_avg_price.get(str(tx.asset_id), _ZERO)
-                            if proxy <= _ZERO:
-                                proxy = sym_avg_price.get(sym, _ZERO)
-                            tx_fx = Decimal("1")
-                            unit_cost = proxy
-                            unit_base = proxy
-                            cost_known = proxy > _ZERO
-                        if not cost_known:
-                            logger.warning(
-                                "Unmatched TRANSFER_IN with no recoverable cost basis: "
-                                "tx_id=%s %s@%s qty=%s — using zero cost",
-                                tx.id,
-                                sym,
-                                exch,
-                                qty,
-                            )
-                        fifo[key].append(
-                            {
-                                "qty": qty,
-                                "unit_cost": unit_cost,
-                                "unit_cost_base": unit_base,
-                                "currency": tx_ccy,
-                                "fx_rate": tx_fx,
-                                "is_paid": cost_known,
-                            }
-                        )
-
-                elif ttype == TxType.CONVERSION_OUT:
-                    src_sym = sym
-                    dest_sym, dest_exch, matched_ci_qty, matched_ci_price = _match_conversion_in(tx, src_sym)
-
-                    if dest_sym is None:
-                        # B2: Unmatched — preserve cost on source
-                        logger.error(
-                            "Unmatched CONVERSION_OUT: tx_id=%s src=%s qty=%s "
-                            "exchange=%s notes='%s' — cost preserved on source",
-                            tx.id,
-                            src_sym,
-                            qty,
-                            exch,
-                            tx.notes or "",
-                        )
-                        # Qty leaves but we DON'T consume cost layers
-                        # Just remove zero-cost equivalent from pool for qty tracking
-                    else:
-                        # O5: Warn if conversion qty exceeds pool
-                        pool_qty = sum(ly["qty"] for ly in fifo.get(key, []))
-
-                        # Stablecoin with no tracked history: seed synthetic EUR
-                        # layers so the cost basis propagates to the destination.
-                        # (e.g. USDC acquired off-platform then converted to PAXG)
-                        if pool_qty == _ZERO and is_stablecoin(src_sym):
-                            if src_sym.upper() in {"EURC", "EURT"}:
-                                eur_per_unit = Decimal("1")
-                                layer_ccy = "EUR"
-                                fx = Decimal("1")
-                            else:
-                                # USD-pegged stablecoin: 1 unit ≈ 1 USD → convert to EUR
-                                eur_per_unit = Decimal(str(usd_to_target))
-                                layer_ccy = "USD"
-                                fx = eur_per_unit
-                            fifo[key].append(
-                                {
-                                    "qty": qty,
-                                    "unit_cost": eur_per_unit,
-                                    "unit_cost_base": Decimal("1"),
-                                    "currency": layer_ccy,
-                                    "fx_rate": fx,
-                                    "is_paid": True,
-                                }
-                            )
-                            pool_qty = qty
-                            logger.info(
-                                "Seeded synthetic %s layer for stablecoin %s@%s " "qty=%s unit_cost=%s (tx_id=%s)",
-                                layer_ccy,
-                                src_sym,
-                                exch,
-                                qty,
-                                eur_per_unit,
-                                tx.id,
-                            )
-                        elif qty > pool_qty:
-                            logger.warning(
-                                "Over-conversion: CONVERSION_OUT qty=%s > pool=%s " "for %s@%s (tx_id=%s)",
-                                qty,
-                                pool_qty,
-                                src_sym,
-                                exch,
-                                tx.id,
-                            )
-                        # Consume FIFO layers from source
-                        cost_removed = _consume_fifo(key, qty)
-                        # Create single layer on destination with propagated cost
-                        tx_ccy = (tx.currency or "EUR").upper()
-                        tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                        if matched_ci_qty > 0 and cost_removed > 0:
-                            dest_key: FifoKey = (dest_sym, dest_exch or exch)
-                            # Destination cost basis = its market value at conversion
-                            # (recorded CONVERSION_IN price). Carrying the source cost
-                            # instead let mis-matched/chained conversions concentrate
-                            # cost into a shrinking qty and fabricate impossible unit
-                            # costs (FIN — runaway cost basis up to ~500k EUR/BTC).
-                            dest_unit = _conversion_dest_unit_cost(cost_removed, matched_ci_qty, matched_ci_price)
-                            fifo[dest_key].append(
-                                {
-                                    "qty": matched_ci_qty,
-                                    "unit_cost": dest_unit,
-                                    "unit_cost_base": dest_unit / tx_fx if tx_fx else dest_unit,
-                                    "currency": tx_ccy,
-                                    "fx_rate": tx_fx,
-                                    "is_paid": True,
-                                }
-                            )
-                        elif matched_ci_qty > 0:
-                            # Zero cost source (e.g. airdrop converted)
-                            dest_key = (dest_sym, dest_exch or exch)
-                            fifo[dest_key].append(
-                                {
-                                    "qty": matched_ci_qty,
-                                    "unit_cost": _ZERO,
-                                    "unit_cost_base": _ZERO,
-                                    "currency": tx_ccy,
-                                    "fx_rate": tx_fx,
-                                    "is_paid": False,
-                                }
-                            )
-
-                elif ttype == TxType.CONVERSION_IN:
-                    # B1/M2: Collect fees from CONVERSION_IN
-                    fee = Decimal(str(tx.fee or 0))
-                    if fee > 0:
-                        fee_ccy = (tx.fee_currency or tx.currency or "EUR").upper()
-                        portfolio_ccy = currency.upper()
-                        if fee_ccy == portfolio_ccy:
-                            # Add fee to the last layer of this key if it exists
-                            layers = fifo.get(key, [])
-                            if layers:
-                                last = layers[-1]
-                                old_total = last["qty"] * last["unit_cost"]
-                                last["unit_cost"] = (old_total + fee) / last["qty"] if last["qty"] > 0 else _ZERO
-                            else:
-                                # No layer yet — CONVERSION_OUT will create it later;
-                                # store fee keyed by (sym, exchange) for post-FIFO application
-                                _pending_fee_conversions.append((key, fee, fee_ccy))
-                        else:
-                            _pending_fee_conversions.append((key, fee, fee_ccy))
-                    # Qty already handled by CONVERSION_OUT creating the layer
-
-                elif ttype == TxType.DIVIDEND:
-                    # Dividend: cash income — does NOT create new shares.
-                    # Record income for Total Return calculation.
-                    # tx.price = dividend per share, tx.quantity = shares (or total amount)
-                    div_amount = qty * Decimal(str(tx.price or 0))
-                    if div_amount > 0:
-                        tx_ccy = (tx.currency or "EUR").upper()
-                        portfolio_ccy = currency.upper()
-                        if tx_ccy != portfolio_ccy and tx.conversion_rate:
-                            div_amount *= Decimal(str(tx.conversion_rate))
-                        elif tx_ccy != portfolio_ccy:
-                            # Will be resolved later with forex rates
-                            _pending_fee_conversions.append((f"__div__{sym}", div_amount, tx_ccy))
-                            div_amount = _ZERO
-                        dividend_income[key] += div_amount
-
-                # STAKING/UNSTAKING: no cost impact (same exchange, same symbol)
 
             # ---- Derive per-asset invested_map from FIFO layers ----
             # Each asset_id maps to (symbol, exchange) via aid_to_symbol/aid_to_exchange
@@ -1009,21 +638,9 @@ class MetricsService:
             cost_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
             paid_qty_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
             fifo_seen_keys: set = set()  # tracks all keys touched by FIFO (incl. zero-cost)
+            # (orphan transit pools are isolated in _replay_res.orphan_transit
+            # by the engine and logged right after the replay call above)
             for fkey, layers in fifo.items():
-                if fkey[1].startswith("__transit__"):
-                    # DEBUG: log orphan transit layers so we can spot cost basis loss
-                    if fkey[0] == "BTC":
-                        _orphan_cost = sum(ly["qty"] * ly["unit_cost"] for ly in layers)
-                        _orphan_qty = sum(ly["qty"] for ly in layers)
-                        if _orphan_qty > 0:
-                            logger.warning(
-                                "[FIFO_DEBUG] BTC orphan transit %s qty=%s cost=%s layers=%s",
-                                fkey[1][:40],
-                                _orphan_qty,
-                                _orphan_cost,
-                                len(layers),
-                            )
-                    continue  # skip unmatched transit layers
                 fifo_seen_keys.add(fkey)
                 for layer in layers:
                     cost_by_key[fkey] += layer["qty"] * layer["unit_cost"]
@@ -1084,8 +701,6 @@ class MetricsService:
             # Store the base-currency cost for decomposition.
             fx_base_cost_by_key: Dict[FifoKey, list] = _defaultdict(list)
             for fkey, layers in fifo.items():
-                if fkey[1].startswith("__transit__"):
-                    continue
                 for layer in layers:
                     if layer.get("is_paid") and layer.get("currency") and layer["currency"] != currency.upper():
                         fx_base_cost_by_key[fkey].append(

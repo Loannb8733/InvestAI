@@ -2,7 +2,6 @@
 
 import io
 import logging
-import re as _re
 from collections import defaultdict as _defaultdict
 from dataclasses import dataclass, field
 from datetime import date as _date
@@ -28,8 +27,9 @@ from app.models.asset import Asset, AssetType
 from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
+from app.services import fifo_replay
 from app.services.asset_classification import is_liquidity, is_safe_haven
-from app.services.fifo import consume_fifo, consume_fifo_with_dates, extract_fifo_layers
+from app.services.fifo import consume_fifo, extract_fifo_layers
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
@@ -669,272 +669,83 @@ class ReportService:
         )
         all_transactions = list(trans_result.scalars().all())
 
-        # Pre-collect CONVERSION_IN transactions for matching
-        conv_ins = [t for t in all_transactions if t.transaction_type == TransactionType.CONVERSION_IN]
-
-        # ── FIFO helpers (mirroring metrics_service) ──────────────────
-
-        # Layer format: {"qty": Decimal, "unit_cost": Decimal,
-        #                "is_paid": bool, "acquired_at": datetime}
-        fifo: Dict[FifoKey, list] = _defaultdict(list)
-
-        def _match_conversion_in(
-            co_tx: Transaction,
-            src_sym: str,
-        ) -> Tuple[Optional[str], Optional[str], Decimal]:
-            """Find matching CONVERSION_IN for a CONVERSION_OUT."""
-            notes = co_tx.notes or ""
-            exch = co_tx.exchange or ""
-            co_qty = Decimal(str(co_tx.quantity))
-            dest_sym: Optional[str] = None
-            dest_exch: Optional[str] = None
-            matched_qty = co_qty
-
-            if "crypto.com" in exch.lower():
-                for ci in conv_ins:
-                    if (ci.notes or "") == notes and (ci.exchange or "") == exch:
-                        dest_sym = aid_to_symbol.get(str(ci.asset_id), "")
-                        dest_exch = (ci.exchange or "").strip()
-                        matched_qty = Decimal(str(ci.quantity))
-                        break
-            else:
-                m = _re.search(r"trade_id:convert_sell_(\S+)", notes)
-                if m:
-                    suffix = m.group(1)
-                    for ci in conv_ins:
-                        if f"convert_buy_{suffix}" in (ci.notes or ""):
-                            candidate = aid_to_symbol.get(str(ci.asset_id), "")
-                            if candidate and candidate != src_sym:
-                                dest_sym = candidate
-                                dest_exch = (ci.exchange or "").strip()
-                                matched_qty = Decimal(str(ci.quantity))
-                            break
-            return dest_sym, dest_exch, matched_qty
-
-        def _consume_fifo(key: FifoKey, qty_to_remove: Decimal) -> Decimal:
-            """Remove qty from FIFO layers, return total cost removed."""
-            return consume_fifo(fifo.get(key, []), qty_to_remove)
-
-        def _consume_fifo_with_dates(
-            key: FifoKey,
-            qty_to_remove: Decimal,
-        ) -> Tuple[Decimal, Optional[datetime]]:
-            """Consume FIFO layers and return (cost_removed, oldest_acquired_at).
-
-            The oldest layer's acquired_at determines the holding period (M1).
-            """
-            return consume_fifo_with_dates(fifo.get(key, []), qty_to_remove)
-
-        def _consume_fifo_layers(key: FifoKey, qty_to_remove: Decimal) -> list:
-            """Extract layers preserving unit costs (for transfers)."""
-            return extract_fifo_layers(fifo.get(key, []), qty_to_remove)
-
-        # ── 3. Single-pass chronological processing ───────────────────
-        # holdings tracks total qty per symbol (for portfolio_value calc)
-        holdings: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-        # total_acquisition_cost: global PMP numerator (art. 150 VH bis)
-        # B2: EXCLUDES transfers. B3: CONVERSION_IN inherits from OUT.
+        # ── 3. Single-pass chronological FIFO replay (unified engine) ─────
+        # Layer bookkeeping is delegated to app.services.fifo_replay with the
+        # 2086 configuration: zero-basis rewards, carried conversion cost
+        # (sursis d'imposition), zero-basis unmatched transfers, tx-currency
+        # fees, and the historical behaviours frozen as-is (unmatched
+        # CONVERSION_OUT consumed + taxed, no network-fee trim, no external_id
+        # match fallback). The art. 150 VH bis ledger and TaxEvent2086
+        # construction stay in this module via the on_event callback.
         total_acquisition_cost = _ZERO
 
         year_start = datetime(year, 1, 1, tzinfo=_tz.utc)
         year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=_tz.utc)
         events: List[TaxEvent2086] = []
-
-        # Collect unique dates where we need portfolio values (B1)
         cession_dates: set = set()
 
         TxType = TransactionType
 
-        for tx in all_transactions:
-            asset = asset_map.get(tx.asset_id)
-            if not asset or not tx.executed_at:
-                continue
+        _tax_cfg = fifo_replay.ReplayConfig(
+            portfolio_currency="EUR",
+            reward_basis=fifo_replay.RewardBasis.ZERO,
+            conversion_dest_basis=fifo_replay.ConversionDestBasis.CARRY_COST,
+            unmatched_transfer_in=fifo_replay.UnmatchedTransferInPolicy.ZERO,
+            unmatched_conversion_out=fifo_replay.UnmatchedConversionOutPolicy.CONSUME,
+            fee_handling=fifo_replay.FeeHandling.TX_CURRENCY,
+            trim_transfer_network_fee=False,
+            seed_stablecoin_layers=False,
+            conversion_external_id_fallback=False,
+            skip_null_executed_at=True,
+        )
 
-            sym = asset.symbol.upper()
-            exch = (tx.exchange or "").strip()
-            key: FifoKey = (sym, exch)
-            qty = Decimal(str(tx.quantity))
-            # The 2086 is filed in EUR: convert the trade price/fee from the
-            # transaction currency via the FX rate captured at execution
-            # (conversion_rate = EUR per 1 unit of tx currency; defaults to 1 for
-            # same-currency trades). Without this, USD/USDT-pair acquisition cost AND
-            # cession price are ~8-9% off and diverge from the dashboard's FIFO cost
-            # basis. (Parity with metrics_service.)
-            _tx_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-            price = Decimal(str(tx.price or 0)) * _tx_fx
-            fee = Decimal(str(tx.fee or 0)) * _tx_fx
-            ttype = tx.transaction_type
-            tx_dt = tx.executed_at
-            if tx_dt.tzinfo is None:
-                tx_dt = tx_dt.replace(tzinfo=_tz.utc)
-
-            if ttype == TxType.BUY:
-                total_cost = qty * price + fee
-                layer_unit = total_cost / qty if qty > 0 else _ZERO
-                fifo[key].append(
-                    {
-                        "qty": qty,
-                        "unit_cost": layer_unit,
-                        "is_paid": True,
-                        "acquired_at": tx_dt,
-                    }
+        def _on_replay_event(ev: fifo_replay.ReplayEvent) -> None:
+            nonlocal total_acquisition_cost
+            if ev.kind == "BUY":
+                total_acquisition_cost += ev.total_cost
+                return
+            if ev.kind == "CONVERSION_IN_FEE":
+                total_acquisition_cost += ev.fee
+                return
+            if ev.kind not in ("SELL", "CONVERSION_OUT"):
+                return
+            total_acquisition_cost -= ev.cost_removed
+            if ev.kind == "CONVERSION_OUT":
+                # B3: a matched conversion's consumed cost re-enters the global
+                # acquisition ledger as the new asset's basis.
+                total_acquisition_cost += ev.dest_cost
+            tx_dt = ev.tx_dt
+            if year_start <= tx_dt <= year_end:
+                cession_dates.add(tx_dt.date())
+                cession_price = ev.quantity * ev.price - ev.fee
+                events.append(
+                    TaxEvent2086(
+                        date=ev.tx.executed_at,
+                        symbol=ev.symbol,
+                        # Historical parity: the 2086 stores the enum VALUE
+                        # (lowercase, e.g. "conversion_out"), not the engine kind.
+                        event_type=ev.tx.transaction_type.value,
+                        quantity=float(ev.quantity),
+                        unit_price=float(ev.price),
+                        cession_price=float(cession_price),
+                        portfolio_value=0.0,  # filled in pass 2
+                        total_acquisition_cost=float(total_acquisition_cost),
+                        acquisition_fraction=0.0,  # filled in pass 2
+                        gain_loss=0.0,  # filled in pass 2
+                        holding_period=(
+                            "long_terme"
+                            if ev.oldest_acquired_at and (tx_dt - ev.oldest_acquired_at).days >= 730
+                            else "court_terme"
+                        ),
+                        fees=float(ev.fee),
+                    )
                 )
-                holdings[sym] += qty
-                total_acquisition_cost += total_cost
 
-            elif ttype in (TxType.AIRDROP, TxType.STAKING_REWARD):
-                fifo[key].append(
-                    {
-                        "qty": qty,
-                        "unit_cost": _ZERO,
-                        "is_paid": False,
-                        "acquired_at": tx_dt,
-                    }
-                )
-                holdings[sym] += qty
-
-            elif ttype == TxType.TRANSFER_OUT:
-                # B2: Transfers do NOT modify total_acquisition_cost
-                extracted = _consume_fifo_layers(key, qty)
-                transit_key = (sym, f"__transit__{tx.id}")
-                fifo[transit_key] = extracted
-                holdings[sym] = max(_ZERO, holdings[sym] - qty)
-
-            elif ttype == TxType.TRANSFER_IN:
-                # B2: Match transit layers — no cost change
-                matched_transit = None
-                best_diff = None
-                for tkey in list(fifo.keys()):
-                    if tkey[0] == sym and tkey[1].startswith("__transit__"):
-                        transit_qty = sum(ly["qty"] for ly in fifo[tkey])
-                        diff = abs(transit_qty - qty)
-                        if best_diff is None or diff < best_diff:
-                            best_diff = diff
-                            matched_transit = tkey
-                if matched_transit and fifo[matched_transit]:
-                    for layer in fifo.pop(matched_transit):
-                        fifo[key].append(layer)
-                else:
-                    fifo[key].append(
-                        {
-                            "qty": qty,
-                            "unit_cost": _ZERO,
-                            "is_paid": False,
-                            "acquired_at": tx_dt,
-                        }
-                    )
-                holdings[sym] += qty
-
-            elif ttype == TxType.CONVERSION_OUT:
-                # B3: Consume FIFO from source, propagate cost to destination
-                src_sym = sym
-                dest_sym, dest_exch, matched_ci_qty = _match_conversion_in(tx, src_sym)
-
-                # This IS a taxable event — compute before modifying state
-                is_in_year = year_start <= tx_dt <= year_end
-                cession_price = qty * price - fee
-
-                if is_in_year:
-                    cession_dates.add(tx_dt.date())
-
-                cost_removed, oldest_date = _consume_fifo_with_dates(key, qty)
-                holdings[sym] = max(_ZERO, holdings[sym] - qty)
-
-                # Reduce total_acquisition_cost by the cost of consumed layers
-                total_acquisition_cost -= cost_removed
-
-                if dest_sym and matched_ci_qty > 0:
-                    dest_key: FifoKey = (dest_sym, dest_exch or exch)
-                    if cost_removed > 0:
-                        dest_unit = cost_removed / matched_ci_qty
-                        fifo[dest_key].append(
-                            {
-                                "qty": matched_ci_qty,
-                                "unit_cost": dest_unit,
-                                "is_paid": True,
-                                "acquired_at": tx_dt,
-                            }
-                        )
-                        # B3: The converted cost re-enters total_acquisition_cost
-                        # as the new asset's cost basis
-                        total_acquisition_cost += cost_removed
-                    else:
-                        fifo[dest_key].append(
-                            {
-                                "qty": matched_ci_qty,
-                                "unit_cost": _ZERO,
-                                "is_paid": False,
-                                "acquired_at": tx_dt,
-                            }
-                        )
-                    holdings[dest_sym] += matched_ci_qty
-
-                # Record event data for year cessions (computed below)
-                if is_in_year:
-                    events.append(
-                        TaxEvent2086(
-                            date=tx.executed_at,
-                            symbol=src_sym,
-                            event_type=ttype.value,
-                            quantity=float(qty),
-                            unit_price=float(price),
-                            cession_price=float(cession_price),
-                            portfolio_value=0.0,  # filled in pass 2
-                            total_acquisition_cost=float(total_acquisition_cost),
-                            acquisition_fraction=0.0,  # filled in pass 2
-                            gain_loss=0.0,  # filled in pass 2
-                            holding_period=(
-                                "long_terme" if oldest_date and (tx_dt - oldest_date).days >= 730 else "court_terme"
-                            ),
-                            fees=float(fee),
-                        )
-                    )
-
-            elif ttype == TxType.CONVERSION_IN:
-                # B3: Qty/cost already handled by CONVERSION_OUT.
-                # Only apply fees to last layer if present.
-                fee_ci = fee  # already converted to EUR above
-                if fee_ci > 0:
-                    layers = fifo.get(key, [])
-                    if layers:
-                        last = layers[-1]
-                        old_total = last["qty"] * last["unit_cost"]
-                        last["unit_cost"] = (old_total + fee_ci) / last["qty"] if last["qty"] > 0 else _ZERO
-                        total_acquisition_cost += fee_ci
-
-            elif ttype == TxType.SELL:
-                cession_price = qty * price - fee
-
-                is_in_year = year_start <= tx_dt <= year_end
-                if is_in_year:
-                    cession_dates.add(tx_dt.date())
-
-                # M1: Use FIFO layer date for holding period
-                cost_removed, oldest_date = _consume_fifo_with_dates(key, qty)
-                holdings[sym] = max(_ZERO, holdings[sym] - qty)
-
-                # Reduce total_acquisition_cost proportionally
-                total_acquisition_cost -= cost_removed
-
-                if is_in_year:
-                    events.append(
-                        TaxEvent2086(
-                            date=tx.executed_at,
-                            symbol=sym,
-                            event_type=ttype.value,
-                            quantity=float(qty),
-                            unit_price=float(price),
-                            cession_price=float(cession_price),
-                            portfolio_value=0.0,  # filled in pass 2
-                            total_acquisition_cost=float(total_acquisition_cost),
-                            acquisition_fraction=0.0,
-                            gain_loss=0.0,
-                            holding_period=(
-                                "long_terme" if oldest_date and (tx_dt - oldest_date).days >= 730 else "court_terme"
-                            ),
-                            fees=float(fee),
-                        )
-                    )
+        # Ordering note: the 2086 replay processes rows in bare SQL
+        # ORDER BY executed_at order (no deterministic tie-break), frozen as-is.
+        # Switching to fifo_replay.sort_transactions is a pending convergence
+        # decision — it changes same-timestamp outputs.
+        fifo_replay.replay(all_transactions, aid_to_symbol, _tax_cfg, on_event=_on_replay_event)
 
         # ── 4. Pass 2: Compute portfolio_value from historical prices (B1) ──
         # Collect ALL symbols that ever had holdings (we need to replay
