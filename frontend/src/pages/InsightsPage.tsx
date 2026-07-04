@@ -23,6 +23,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { insightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
+import SharedEmptyState from '@/components/ui/empty-state'
 import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveLine, type LineSeries } from '@nivo/line'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
@@ -1348,13 +1349,7 @@ function StrategyTableSkeleton() {
   )
 }
 
+// État vide : composant partagé du design system, icône financière conservée.
 function EmptyState({ message }: { message: string }) {
-  return (
-    <Card>
-      <CardContent className="py-12 text-center">
-        <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">{message}</p>
-      </CardContent>
-    </Card>
-  )
+  return <SharedEmptyState icon={DollarSign} title={message} />
 }

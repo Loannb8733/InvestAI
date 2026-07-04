@@ -1,11 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import {
   TrendingUp,
   TrendingDown,
@@ -14,8 +9,15 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Banknote,
-  Info,
 } from 'lucide-react'
+
+/**
+ * Rangée de métriques du dashboard — vitrine du design system.
+ *
+ * 5 StatCards (tilt 3D + ticker animé + badge de variation) sous un
+ * SpotlightGroup : le halo suit le pointeur d'une carte à l'autre.
+ * Le contrat de données et le mode privé sont ceux de l'ancienne version.
+ */
 
 interface DashboardMetricsRowProps {
   totalValue: number
@@ -32,7 +34,10 @@ interface DashboardMetricsRowProps {
   selectedPeriod: number
   availableLiquidity?: number
   privacyMode?: boolean
+  loading?: boolean
 }
+
+const fmtDelta = (n: number) => `${n >= 0 ? '+' : ''}${formatPercent(n)}`
 
 export default function DashboardMetricsRow({
   totalValue,
@@ -49,85 +54,81 @@ export default function DashboardMetricsRow({
   selectedPeriod,
   availableLiquidity,
   privacyMode,
+  loading = false,
 }: DashboardMetricsRowProps) {
-  const periodLabel = selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`
-  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
-  const pp = (val: number) => privacyMode ? '••••' : formatPercent(val)
+  const periodLabel =
+    selectedPeriod === 0 ? 'tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`
+  const pc = (val: number) => (privacyMode ? '••••••' : formatCurrency(val))
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Patrimoine Total</CardTitle>
-          <Wallet className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-serif font-medium">{pc(totalValue)}</div>
-          <p className="text-xs text-muted-foreground">
-            {assetsCount} actifs{availableLiquidity != null && availableLiquidity > 0 && ` · dont ${pc(availableLiquidity)} de liquidité`}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="cursor-help inline-flex items-center gap-1">
-                    Capital Net
-                    <Info className="h-3 w-3 text-muted-foreground" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Capital net = Total investi − Total vendu. Représente le capital réellement engagé, après déduction des ventes.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </CardTitle>
-          <Banknote className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-serif font-medium">{pc(netCapital)}</div>
-          <p className="text-xs text-muted-foreground">{pc(totalInvested)} investi au total</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <CardTitle className="text-sm font-medium cursor-help inline-flex items-center gap-1">Plus-value Nette <Info className="h-3 w-3 text-muted-foreground" /></CardTitle>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs"><p className="text-sm">Patrimoine Total − Capital Net. Mesure la variation de richesse globale (inclut ventes passées).</p></TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {isPositive ? <TrendingUp className="h-4 w-4 text-gain" /> : <TrendingDown className="h-4 w-4 text-loss" />}
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-serif font-medium ${isPositive ? 'text-gain' : 'text-loss'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pc(netGainLoss)}</div>
-          <p className={`text-xs ${isPositive ? 'text-gain' : 'text-loss'}`}>{isPositive ? '\u25B2' : '\u25BC'} {pp(netGainLossPercent)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Variation {periodLabel}</CardTitle>
-          {isDailyPositive ? <ArrowUpRight className="h-4 w-4 text-gain" /> : <ArrowDownRight className="h-4 w-4 text-loss" />}
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-serif font-medium ${isDailyPositive ? 'text-gain' : 'text-loss'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pc(dailyChange)}</div>
-          <p className={`text-xs ${isDailyPositive ? 'text-gain' : 'text-loss'}`}>{isDailyPositive ? '\u25B2' : '\u25BC'} {pp(dailyChangePercent)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Portefeuilles</CardTitle>
-          <PieChart className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-serif font-medium">{portfoliosCount}</div>
-          <p className="text-xs text-muted-foreground">portefeuille{portfoliosCount > 1 ? 's' : ''} actif{portfoliosCount > 1 ? 's' : ''}</p>
-        </CardContent>
-      </Card>
-    </div>
+    <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <StatCard
+        className="spot-card"
+        label="Patrimoine Total"
+        icon={Wallet}
+        value={totalValue}
+        format={formatCurrency}
+        privacy={privacyMode}
+        loading={loading}
+        hint={
+          <>
+            {assetsCount} actifs
+            {availableLiquidity != null && availableLiquidity > 0 && (
+              <> · dont {pc(availableLiquidity)} de liquidité</>
+            )}
+          </>
+        }
+      />
+      <StatCard
+        className="spot-card"
+        label="Capital Net"
+        tooltip="Capital net = Total investi − Total vendu. Représente le capital réellement engagé, après déduction des ventes."
+        icon={Banknote}
+        value={netCapital}
+        format={formatCurrency}
+        privacy={privacyMode}
+        loading={loading}
+        hint={<>{pc(totalInvested)} investi au total</>}
+      />
+      <StatCard
+        className="spot-card"
+        label="Plus-value Nette"
+        tooltip="Patrimoine Total − Capital Net. Mesure la variation de richesse globale (inclut ventes passées)."
+        icon={isPositive ? TrendingUp : TrendingDown}
+        value={netGainLoss}
+        format={formatCurrency}
+        delta={netGainLossPercent}
+        formatDelta={fmtDelta}
+        tone="auto"
+        privacy={privacyMode}
+        loading={loading}
+      />
+      <StatCard
+        className="spot-card"
+        label={`Variation ${periodLabel}`}
+        icon={isDailyPositive ? ArrowUpRight : ArrowDownRight}
+        value={dailyChange}
+        format={formatCurrency}
+        delta={dailyChangePercent}
+        deltaLabel={periodLabel}
+        formatDelta={fmtDelta}
+        tone="auto"
+        privacy={privacyMode}
+        loading={loading}
+      />
+      <StatCard
+        className="spot-card"
+        label="Portefeuilles"
+        icon={PieChart}
+        value={portfoliosCount}
+        format={(n) => Math.round(n).toString()}
+        loading={loading}
+        hint={
+          <>
+            portefeuille{portfoliosCount > 1 ? 's' : ''} actif{portfoliosCount > 1 ? 's' : ''}
+          </>
+        }
+      />
+    </SpotlightGroup>
   )
 }

@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { Loader2, ArrowRight, Sparkles } from 'lucide-react'
 
 const loginSchema = z.object({
@@ -68,6 +69,7 @@ export default function LoginPage() {
     <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-background">
       {/* Left — brand panel */}
       <div className="relative hidden overflow-hidden border-r border-border bg-card lg:flex">
+        <AuroraCanvas opacity={0.45} />
         <div className="relative z-10 flex w-full flex-col justify-between p-14 animate-in fade-in duration-700 motion-reduce:animate-none">
           {/* Logo */}
           <div className="flex items-center gap-3">
