@@ -1152,8 +1152,8 @@ class SmartInsightsService:
                     p = await price_service.get_current_price(a.symbol, a.asset_type.value)
                     gold_value += float(a.quantity) * float(p)
                     gold_symbol = a.symbol
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Safe-haven price fetch failed for %s: %s", a.symbol, exc)
 
         gold_exposure = gold_value / total_value if total_value > 0 else 0.0
         metrics_summary["gold_exposure"] = round(gold_exposure, 4)
@@ -1460,8 +1460,8 @@ class SmartInsightsService:
             net_capital = getattr(analytics, "net_capital", None) or getattr(analytics, "total_invested", 0)
             if net_capital and net_capital > 0:
                 breakeven_pct = round(((total_value / net_capital) - 1) * 100, 2)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Breakeven distance computation failed for dashboard summary: %s", exc)
 
         # Top alpha: try prediction service
         top_alpha = None
@@ -1473,8 +1473,8 @@ class SmartInsightsService:
                     "symbol": best_alpha.get("symbol", "?"),
                     "alpha_score": best_alpha.get("alpha_score", 0),
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Top-alpha lookup failed for dashboard summary: %s", exc)
 
         # Market regime
         regime_label = None

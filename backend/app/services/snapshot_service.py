@@ -748,8 +748,8 @@ class SnapshotService:
                     # Persist to PostgreSQL for future requests
                     try:
                         await _persist_prices_to_db(symbol_upper, dates, prices)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Failed to persist prices to DB for %s: %s", symbol_upper, exc)
                 else:
                     symbols_failed.append(symbol_upper)
 
@@ -766,8 +766,8 @@ class SnapshotService:
                 try:
                     asset_type = symbols_need_api.get(symbol_upper, "crypto")
                     cache_single_asset.delay(symbol_upper, asset_type)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to schedule deep backfill for %s: %s", symbol_upper, exc)
         finally:
             await fetcher.close()
 
@@ -1021,8 +1021,8 @@ class SnapshotService:
                 intervals = len(dates) - 1
                 if intervals > 0 and total_days > 0:
                     return total_days / intervals
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to estimate data-point interval, defaulting to 1 day: %s", exc)
 
         return 1.0
 

@@ -1,5 +1,6 @@
 """Asset endpoints."""
 
+import logging
 from typing import List
 from uuid import UUID
 
@@ -14,6 +15,8 @@ from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -116,8 +119,9 @@ async def create_asset(
         from app.tasks.history_cache import cache_single_asset
 
         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
-    except Exception:
-        pass  # Non-critical
+    except Exception as exc:
+        # Non-critical: history pre-cache is a best-effort background dispatch.
+        logger.debug("History pre-cache dispatch failed for %s: %s", asset.symbol, exc)
 
     return asset
 

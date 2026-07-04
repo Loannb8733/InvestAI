@@ -83,8 +83,8 @@ class PriceService:
             if cached_id:
                 self._dynamic_symbol_cache[symbol_upper] = cached_id
                 return cached_id
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Redis CoinGecko-id cache read failed for %s: %s", symbol_upper, exc)
 
         # Search CoinGecko API
         try:
@@ -113,8 +113,8 @@ class PriceService:
                         try:
                             redis = await _get_redis_txt()
                             await redis.setex(cache_key, 604800, coin_id)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.debug("Redis CoinGecko-id cache write failed for %s: %s", symbol_upper, exc)
                         self._dynamic_symbol_cache[symbol_upper] = coin_id
                         logger.debug(f"Discovered CoinGecko ID for {symbol_upper}: {coin_id}")
                         return coin_id

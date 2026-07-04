@@ -387,8 +387,8 @@ async def get_risk_metrics(
         # We'll expose the parametric endpoint separately for exact computation
         var_parametric_pct = round(var_hist_pct * 0.95, 2)  # parametric is typically slightly tighter
         var_parametric_eur = round(analytics.total_value * var_parametric_pct / 100, 2)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Parametric VaR estimation failed, using defaults: %s", exc)
 
     return {
         "volatility": {

@@ -140,8 +140,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
         btc_dominance = None
         try:
             btc_dominance = await self.data_fetcher.get_btc_dominance()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
         # ── Compute MarketContext once for the entire pipeline ──────
         ctx: Optional[MarketContext] = None
@@ -701,8 +701,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                             bullish_count += 1
                         elif change_pct < -sig_threshold:
                             bearish_count += 1
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Sentiment price fetch failed for %s: %s", sym, exc)
 
         # Fetch real Fear & Greed Index from alternative.me
         fear_greed = await fetch_fear_greed_index()
@@ -1062,8 +1062,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                 data = await self.price_service.get_stock_price(sym)
                 if data and data.get("price"):
                     price_map[sym.upper()] = float(data["price"])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Stock price fetch failed for %s (alpha scoring): %s", sym, exc)
 
         # ── Pre-fetch all 90d histories in parallel ──
         import asyncio as _aio
@@ -1086,8 +1086,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                         },
                     )
                     return (sym, a_prices_raw)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("90d history fetch failed for %s (alpha scoring): %s", sym, exc)
             return (sym, [])
 
         # Limit assets to reduce memory usage on free-tier hosting (512 MB)
@@ -1308,8 +1308,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                         if abs(ema_7d_pct) > 0.01:  # only if meaningful
                             predicted_7d_pct = Decimal(str(round(ema_7d_pct, 4)))
                             prediction_source = "ema20_slope"
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("EMA-20 slope fallback failed for %s: %s", symbol, exc)
 
                 scored_assets.append(
                     {
@@ -2196,8 +2196,8 @@ class PredictionService(PredictionCyclesMixin, PredictionMetricsMixin):
                 ]
                 if returns:
                     return float(np.std(returns))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Daily volatility computation failed for %s, using fallback: %s", symbol, exc)
         # Fallback only if data unavailable
         fallback = {
             AssetType.CRYPTO: 0.05,

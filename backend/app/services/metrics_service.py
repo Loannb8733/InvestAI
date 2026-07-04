@@ -17,6 +17,7 @@ from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
+from app.services import fifo_replay
 
 # Re-exported for backwards compatibility — these classification helpers now live
 # in asset_classification so callers need not import the whole metrics module.
@@ -29,7 +30,6 @@ from app.services.asset_classification import (  # noqa: F401
     is_safe_haven,
     is_stablecoin,
 )
-from app.services import fifo_replay
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
@@ -1038,8 +1038,8 @@ class MetricsService:
                 )
                 for sym, data in sc_prices.items():
                     stablecoin_live_prices[sym.upper()] = float(data["price"])
-            except Exception:
-                pass  # fallback to peg below
+            except Exception as exc:
+                logger.debug("Live stablecoin price fetch failed, falling back to peg: %s", exc)
 
         for asset in stablecoin_assets:
             sym_upper = asset.symbol.upper()
@@ -1097,8 +1097,8 @@ class MetricsService:
                 rate = await price_service.get_forex_rate(sym, target)
                 if rate:
                     _fiat_rates[sym] = float(rate)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Fiat forex rate fetch failed for %s->%s: %s", sym, target, exc)
         _fiat_rates[target] = 1.0  # target currency = 1:1
         for asset in fiat_assets:
             rate = _fiat_rates.get(asset.symbol.upper(), eur_to_target)
@@ -1299,8 +1299,8 @@ class MetricsService:
                         if prices and len(prices) >= 2 and prices[0] != 0:
                             change = (prices[-1] - prices[0]) / prices[0] * 100
                             changes[sym_upper] = change
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Live period-change fetch failed for %s: %s", symbol, exc)
             finally:
                 await fetcher.close()
 

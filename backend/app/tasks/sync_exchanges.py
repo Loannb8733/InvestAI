@@ -314,8 +314,8 @@ async def _get_or_create_asset(
         from app.tasks.history_cache import cache_single_asset
 
         cache_single_asset.delay(symbol, "crypto")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Best-effort history pre-cache dispatch failed for %s: %s", symbol, exc)
 
     return asset
 
@@ -1226,8 +1226,8 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         from app.tasks.history_cache import cache_single_asset
 
                         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Best-effort history pre-cache dispatch failed for %s: %s", asset.symbol, exc)
 
                     # Create initial transfer transaction with market price
                     if exchange_quantity > 0:

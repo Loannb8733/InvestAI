@@ -306,8 +306,8 @@ class GoalProjectionService:
 
             vol_regime = await smart_insights_service.get_current_vol_regime(db, user_id)
             regime_label = {"stress": "Bear", "normal": "Normal", "low": "Bull"}.get(vol_regime, "Normal")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Vol-regime lookup failed, defaulting to 'normal': %s", exc)
 
         # Lookup return/vol for this strategy × regime
         annual_return = _ANNUAL_RETURN.get((strategy_type, vol_regime), 0.08)

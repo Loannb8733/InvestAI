@@ -266,8 +266,8 @@ async def get_cached_hyperparams(symbol: str, model_name: str) -> Optional[dict]
         data = await r.get(f"hparams:{symbol}:{model_name}")
         if data:
             return json.loads(data)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Redis hyperparams cache miss for %s:%s: %s", symbol, model_name, exc)
     return None
 
 
@@ -333,8 +333,8 @@ async def get_cached_reliability(symbol: str, days: int) -> Optional[dict]:
         data = await r.get(f"reliability:{symbol}:{days}")
         if data:
             return json.loads(data)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Redis reliability cache miss for %s: %s", symbol, exc)
     return None
 
 

@@ -110,8 +110,9 @@ async def get_current_user(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass  # Redis down — fail open
+        except Exception as exc:  # noqa: BLE001
+            # Redis down — fail open (the token still expires within minutes)
+            logger.warning("Access-token blocklist check unavailable (failing open): %s", exc)
 
     user_id = payload.get("sub")
     if not user_id:

@@ -441,8 +441,8 @@ class AlertService:
                 data = await self.price_service.get_stock_price(asset.symbol)
                 if data:
                     return float(data.get("change_percent_24h", 0) or 0)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("24h change fetch failed for %s: %s", asset.symbol, exc)
         return None
 
     async def _get_asset_price(self, asset: Asset) -> float:

@@ -657,8 +657,8 @@ async def _get_dashboard_impl(
                 )
                 db.add(snap)
                 await db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Daily portfolio snapshot creation skipped for user %s: %s", user_id, exc)
 
     from app.core.timeframe import get_period_label_fr
 
@@ -899,8 +899,8 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
                 timeout=5.0,
             )
             price_map = {sym.upper(): d["price"] for sym, d in price_data.items()}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Alert price batch fetch failed: %s", exc)
 
     active_alerts = []
     for alert in alerts:
@@ -989,8 +989,8 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
                         price=all_data[symbol]["price"],
                     )
                 )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Index comparison fetch failed: %s", exc)
 
     return indices
 
@@ -1267,8 +1267,8 @@ async def get_benchmark_data(
                             )
                         )
                     result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Benchmark series fetch failed for %s: %s", symbol, exc)
     finally:
         await fetcher.close()
 

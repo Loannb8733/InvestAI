@@ -290,8 +290,8 @@ async def test_api_key(
                     if resp.status_code != 200:
                         body = resp.json()
                         error_detail = f"HTTP {resp.status_code}: {body.get('msg', resp.text[:200])}"
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Could not fetch detailed connection-test error for key %s: %s", api_key.id, exc)
 
             api_key.last_error = error_detail
             await db.commit()
@@ -940,8 +940,8 @@ async def import_trade_history(
             forex_rate = await price_service.get_forex_rate("USD", "EUR")
             if forex_rate:
                 usd_eur_rate = float(forex_rate)
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("USD→EUR spot fetch failed; using default fallback rate: %s", exc)
 
         try:
             async with AsyncSessionLocal() as _fx_seed_db:
@@ -1077,8 +1077,8 @@ async def import_trade_history(
                                 fee_token_price = float(fee_price_data[fee_currency.lower()].get("price", 0))
                             elif fee_currency.upper() in fee_price_data:
                                 fee_token_price = float(fee_price_data[fee_currency.upper()].get("price", 0))
-                        except Exception:
-                            pass
+                        except Exception as exc:  # noqa: BLE001
+                            logger.debug("Fee-token price lookup failed for %s: %s", fee_currency, exc)
                         if fee_token_price > 0:
                             fee_amount = fee_amount * fee_token_price
                         elif price_eur > 0:

@@ -121,8 +121,8 @@ class CryptoComService(BaseExchangeService):
                             total=balance,
                         )
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Crypto.com: failed to fetch balances: %s", exc)
 
         return balances
 
@@ -181,8 +181,8 @@ class CryptoComService(BaseExchangeService):
                             timestamp=datetime.fromtimestamp(trade["create_time"] / 1000, tz=timezone.utc),
                         )
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Crypto.com: failed to fetch trades for %s: %s", instrument, exc)
 
         return trades
 
@@ -289,8 +289,8 @@ class CryptoComService(BaseExchangeService):
                         tx_id=deposit.get("txid"),
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Crypto.com: failed to fetch deposit history: %s", exc)
 
         return deposits
 
@@ -338,8 +338,8 @@ class CryptoComService(BaseExchangeService):
                         address=withdrawal.get("address"),
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Crypto.com: failed to fetch withdrawal history: %s", exc)
 
         return withdrawals
 

@@ -95,8 +95,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                         import sentry_sdk
 
                         sentry_sdk.set_user({"id": payload.get("sub"), "ip_address": "{{auto}}"})
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Failed to set Sentry user context from token: %s", exc)
 
         try:
             # Process the request
@@ -612,8 +612,8 @@ async def _boot_advisory_lock(key: int, lock_engine=None):
         if lock_conn is not None:
             try:
                 await lock_conn.close()
-            except Exception:
-                pass
+            except Exception as close_exc:  # noqa: BLE001
+                logger.debug("Failed to close boot advisory-lock connection after acquire error: %s", close_exc)
         lock_conn = None
     try:
         yield
@@ -621,12 +621,12 @@ async def _boot_advisory_lock(key: int, lock_engine=None):
         if lock_conn is not None:
             try:
                 await lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
-            except Exception:
-                pass
+            except Exception as unlock_exc:  # noqa: BLE001
+                logger.debug("Failed to release boot advisory lock (auto-released on disconnect): %s", unlock_exc)
             try:
                 await lock_conn.close()
-            except Exception:
-                pass
+            except Exception as close_exc:  # noqa: BLE001
+                logger.debug("Failed to close boot advisory-lock connection: %s", close_exc)
 
 
 async def _run_startup_migrations():
@@ -911,8 +911,8 @@ async def dashboard_cache_invalidation_middleware(request: Request, call_next):
                 # Tangem qty fix was masked by a stale +630 EUR PnL display.
                 await invalidate_redis_dashboard(user_id)
                 invalidate_inmem_dashboard(user_id)
-    except Exception:  # never let cache bookkeeping break a successful request
-        pass
+    except Exception as exc:  # noqa: BLE001 — never let cache bookkeeping break a successful request
+        logger.debug("Dashboard cache invalidation after write failed: %s", exc)
     return response
 
 

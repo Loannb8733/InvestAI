@@ -58,8 +58,8 @@ class PredictionCyclesMixin:
         btc_dominance = None
         try:
             btc_dominance = await self.data_fetcher.get_btc_dominance()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
         # BTC regime (market reference)
         btc_regime = None
@@ -212,8 +212,8 @@ class PredictionCyclesMixin:
                                     _br = np.diff(np.log(np.array(_bp[-_min:], dtype=float)))
                                     _ar = np.diff(np.log(np.array(a_prices[-_min:], dtype=float)))
                                     btc_corr = round(float(np.corrcoef(_br, _ar)[0, 1]), 2)
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                logger.debug("BTC correlation computation failed for %s: %s", asset.symbol, exc)
 
                         # For BTC, reuse the market-reference regime to avoid
                         # inconsistency between "Régime BTC" card and per-asset table

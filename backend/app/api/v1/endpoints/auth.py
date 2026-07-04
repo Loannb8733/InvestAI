@@ -346,8 +346,8 @@ async def login(
                 fail_key = f"login_fail:{user.id}"
                 await r.incr(fail_key)
                 await r.expire(fail_key, 900)  # 15-minute window
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to record login failure counter for user %s: %s", user.id, exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe invalide",
@@ -394,8 +394,8 @@ async def login(
             try:
                 r = await _get_redis_txt()
                 await r.setex(f"totp_used:{user.id}:{login_data.mfa_code}", 90, "1")
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to mark TOTP code used (anti-replay) for user %s: %s", user.id, exc)
         elif user.mfa_backup_codes:
             # Try backup codes
             codes = json.loads(user.mfa_backup_codes)
@@ -424,8 +424,8 @@ async def login(
     try:
         r = await _get_redis_txt()
         await r.delete(f"login_fail:{user.id}")
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Failed to clear login failure counter for user %s: %s", user.id, exc)
 
     # Generate tokens with fingerprint binding
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
@@ -489,8 +489,9 @@ async def refresh_token(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass  # Redis down — fail open
+        except Exception as exc:  # noqa: BLE001
+            # Redis down — fail open (token still expires on its own)
+            logger.warning("Refresh-token blocklist check unavailable (failing open): %s", exc)
 
     user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == user_id))
@@ -544,8 +545,9 @@ async def logout(request: Request, response: Response) -> dict:
                 ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
                 ttl = min(ttl, 7 * 86400)
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
-        except Exception:
-            pass  # Best-effort revocation; cookie deletion still provides baseline protection
+        except Exception as exc:  # noqa: BLE001
+            # Best-effort revocation; cookie deletion still provides baseline protection
+            logger.warning("Failed to blocklist refresh token on logout: %s", exc)
 
     # Blocklist the access token's jti too, so a token already in an attacker's
     # hands stops working immediately instead of lingering until it expires.
@@ -565,8 +567,9 @@ async def logout(request: Request, response: Response) -> dict:
                 ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
                 ttl = min(ttl, 3600)  # access tokens are short-lived
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
-        except Exception:
-            pass  # Best-effort; cookie deletion still provides baseline protection
+        except Exception as exc:  # noqa: BLE001
+            # Best-effort; cookie deletion still provides baseline protection
+            logger.warning("Failed to blocklist access token on logout: %s", exc)
 
     # Deletion attributes (samesite/secure/domain) must match those used when
     # the cookies were set, otherwise the browser ignores the clearing
