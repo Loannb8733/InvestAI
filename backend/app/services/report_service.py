@@ -29,7 +29,6 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services import fifo_replay
 from app.services.asset_classification import is_liquidity, is_safe_haven
-from app.services.fifo import consume_fifo, extract_fifo_layers
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
@@ -280,6 +279,61 @@ _ZERO = Decimal("0")
 
 # FIFO layer key type
 FifoKey = Tuple[str, str]
+
+
+@dataclass(frozen=True)
+class _TaxMode:
+    """A tax-replay mode = a fifo_replay config + whether to canonically sort.
+
+    Two modes exist so the convergence of the 2086's accidental bugs can be
+    shadow-compared on real data (scripts/shadow_tax_2086.py) before it is
+    trusted. The *legitimate* tax semantics (zero-basis rewards, carried
+    conversion cost / sursis d'imposition, zero-basis unproven transfers,
+    tx-currency fees) are identical in both modes; only the four accidental
+    divergences differ.
+    """
+
+    config: "fifo_replay.ReplayConfig"
+    canonical_sort: bool
+
+
+# Legitimate tax semantics — shared by both modes.
+_TAX_BASE = dict(
+    portfolio_currency="EUR",
+    reward_basis=fifo_replay.RewardBasis.ZERO,
+    conversion_dest_basis=fifo_replay.ConversionDestBasis.CARRY_COST,
+    unmatched_transfer_in=fifo_replay.UnmatchedTransferInPolicy.ZERO,
+    fee_handling=fifo_replay.FeeHandling.TX_CURRENCY,
+    seed_stablecoin_layers=False,
+    skip_null_executed_at=True,
+)
+
+# Frozen historical behaviour — the four accidental 2086 bugs kept as-is:
+# nondeterministic SQL ordering, no external_id conversion match, no transfer
+# network-fee trim, and unmatched CONVERSION_OUT consumed + taxed.
+TAX_MODE_LEGACY = _TaxMode(
+    config=fifo_replay.ReplayConfig(
+        **_TAX_BASE,
+        unmatched_conversion_out=fifo_replay.UnmatchedConversionOutPolicy.CONSUME,
+        trim_transfer_network_fee=False,
+        conversion_external_id_fallback=False,
+    ),
+    canonical_sort=False,
+)
+
+# Converged — the four accidental bugs fixed: deterministic ordering
+# (TRANSFER_OUT before same-timestamp TRANSFER_IN), external_id conversion
+# match fallback, network-fee trim, and unmatched CONVERSION_OUT preserved
+# (a crypto-to-crypto swap is in sursis, not a taxable disposal).
+TAX_MODE = _TaxMode(
+    config=fifo_replay.ReplayConfig(
+        **_TAX_BASE,
+        unmatched_conversion_out=fifo_replay.UnmatchedConversionOutPolicy.PRESERVE,
+        trim_transfer_network_fee=True,
+        conversion_external_id_fallback=True,
+    ),
+    canonical_sort=True,
+)
 
 
 def _now_paris() -> datetime:
@@ -613,6 +667,8 @@ class ReportService:
         db: AsyncSession,
         user_id: str,
         year: int,
+        *,
+        mode: _TaxMode = TAX_MODE,
     ) -> TaxSummary2086:
         """Compute capital gains per French 2086 formula (art. 150 VH bis CGI).
 
@@ -686,18 +742,12 @@ class ReportService:
 
         TxType = TransactionType
 
-        _tax_cfg = fifo_replay.ReplayConfig(
-            portfolio_currency="EUR",
-            reward_basis=fifo_replay.RewardBasis.ZERO,
-            conversion_dest_basis=fifo_replay.ConversionDestBasis.CARRY_COST,
-            unmatched_transfer_in=fifo_replay.UnmatchedTransferInPolicy.ZERO,
-            unmatched_conversion_out=fifo_replay.UnmatchedConversionOutPolicy.CONSUME,
-            fee_handling=fifo_replay.FeeHandling.TX_CURRENCY,
-            trim_transfer_network_fee=False,
-            seed_stablecoin_layers=False,
-            conversion_external_id_fallback=False,
-            skip_null_executed_at=True,
-        )
+        _tax_cfg = mode.config
+        # Ordering: the converged mode uses the canonical deterministic order
+        # (TRANSFER_OUT before same-timestamp TRANSFER_IN, str(id) tie-break);
+        # the legacy mode keeps the bare SQL executed_at order. BOTH passes
+        # below must iterate the same order so pass-2 event matching aligns.
+        replay_txs = fifo_replay.sort_transactions(all_transactions) if mode.canonical_sort else all_transactions
 
         def _on_replay_event(ev: fifo_replay.ReplayEvent) -> None:
             nonlocal total_acquisition_cost
@@ -741,11 +791,7 @@ class ReportService:
                     )
                 )
 
-        # Ordering note: the 2086 replay processes rows in bare SQL
-        # ORDER BY executed_at order (no deterministic tie-break), frozen as-is.
-        # Switching to fifo_replay.sort_transactions is a pending convergence
-        # decision — it changes same-timestamp outputs.
-        fifo_replay.replay(all_transactions, aid_to_symbol, _tax_cfg, on_event=_on_replay_event)
+        fifo_replay.replay(replay_txs, aid_to_symbol, _tax_cfg, on_event=_on_replay_event)
 
         # ── 4. Pass 2: Compute portfolio_value from historical prices (B1) ──
         # Collect ALL symbols that ever had holdings (we need to replay
@@ -766,7 +812,7 @@ class ReportService:
         holdings_replay: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
         event_idx = 0
 
-        for tx in all_transactions:
+        for tx in replay_txs:  # same order as pass 1 so event matching aligns
             asset = asset_map.get(tx.asset_id)
             if not asset or not tx.executed_at:
                 continue
@@ -2185,53 +2231,16 @@ class ReportService:
         )
         all_txs = list(trans_result.scalars().all())
 
-        # Build FIFO state (simplified — same logic as compute_tax_2086)
-        fifo: Dict[FifoKey, list] = _defaultdict(list)
-        TxType = TransactionType
-
-        for tx in all_txs:
-            sym = aid_to_symbol.get(str(tx.asset_id), "")
-            if not sym:
-                continue
-            exch = (tx.exchange or "").strip()
-            key: FifoKey = (sym, exch)
-            qty = Decimal(str(tx.quantity))
-            price = Decimal(str(tx.price or 0))
-            fee = Decimal(str(tx.fee or 0))
-
-            if tx.transaction_type == TxType.BUY:
-                total_cost = qty * price + fee
-                unit = total_cost / qty if qty > 0 else _ZERO
-                fifo[key].append({"qty": qty, "unit_cost": unit})
-            elif tx.transaction_type == TxType.SELL:
-                self._consume_fifo_simple(fifo, key, qty)
-            elif tx.transaction_type in (TxType.AIRDROP, TxType.STAKING_REWARD):
-                fifo[key].append({"qty": qty, "unit_cost": _ZERO})
-            elif tx.transaction_type == TxType.TRANSFER_OUT:
-                layers = self._extract_fifo_simple(fifo, key, qty)
-                fifo[(sym, f"__transit__{tx.id}")] = layers
-            elif tx.transaction_type == TxType.TRANSFER_IN:
-                matched = None
-                best = None
-                for tkey in list(fifo.keys()):
-                    if tkey[0] == sym and tkey[1].startswith("__transit__"):
-                        tqty = sum(ly["qty"] for ly in fifo[tkey])
-                        diff = abs(tqty - qty)
-                        if best is None or diff < best:
-                            best = diff
-                            matched = tkey
-                if matched and fifo[matched]:
-                    for layer in fifo.pop(matched):
-                        fifo[key].append(layer)
-                else:
-                    fifo[key].append({"qty": qty, "unit_cost": _ZERO})
-            elif tx.transaction_type == TxType.CONVERSION_OUT:
-                self._consume_fifo_simple(fifo, key, qty)
-            elif tx.transaction_type == TxType.CONVERSION_IN:
-                # Simplified: use price as cost (approximation for tax estimate)
-                total_cost = qty * price
-                unit = total_cost / qty if qty > 0 else _ZERO
-                fifo[key].append({"qty": qty, "unit_cost": unit})
+        # Build FIFO layers via the unified engine, using the converged tax
+        # config (FX-correct prices, conversion matching, deterministic order).
+        # This replaces the old inline replay that ignored conversion_rate and
+        # used raw transaction-currency prices as the cost basis — so the
+        # estimated gain/tax now match the 2086's cost basis for FX trades.
+        fifo = fifo_replay.replay(
+            fifo_replay.sort_transactions(all_txs),
+            aid_to_symbol,
+            TAX_MODE.config,
+        ).fifo
 
         # Now estimate gains for each sell order
         for order in orders:
@@ -2279,24 +2288,6 @@ class ReportService:
 
             order.estimated_gain = round(float(estimated_gain), 2)
             order.estimated_tax = round(max(0.0, float(estimated_gain)) * 0.30, 2)
-
-    @staticmethod
-    def _consume_fifo_simple(
-        fifo: Dict[FifoKey, list],
-        key: FifoKey,
-        qty: Decimal,
-    ) -> Decimal:
-        """Simple FIFO consume (no dates). Returns cost removed."""
-        return consume_fifo(fifo.get(key, []), qty)
-
-    @staticmethod
-    def _extract_fifo_simple(
-        fifo: Dict[FifoKey, list],
-        key: FifoKey,
-        qty: Decimal,
-    ) -> list:
-        """Extract FIFO layers preserving unit costs."""
-        return extract_fifo_layers(fifo.get(key, []), qty)
 
     # ── Rebalancing PDF ───────────────────────────────────────────────
 

@@ -47,6 +47,7 @@ import pytest
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
+from app.services import report_service
 from app.services.metrics_service import MetricsService
 from app.services.report_service import RebalanceOrder, ReportService
 
@@ -336,17 +337,35 @@ async def test_unmatched_conversion_out_diverges(db_session, regular_user):
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
 
-    # DIVERGENCE #2 (tax side): tax consumes the layers (acquisition cost
-    # drops to 0) AND emits a taxable cession for the full 25000.
+    # CONVERGED (2026-07-04, UnmatchedConversionOutPolicy.PRESERVE): the
+    # unmatched CONVERSION_OUT no longer DESTROYS the source cost basis. It is
+    # now preserved (20000, matching metrics), so a later sale of the source
+    # keeps its basis instead of being taxed on the full proceeds. Pre-
+    # convergence this was 0.0 (DIVERGENCE #2, the accidental consume+destroy).
+    #
+    # The conversion still emits a cession event — whether a crypto->crypto
+    # swap is a taxable disposal at all under art. 150 VH bis (sursis) is a
+    # separate domain question left deliberately unchanged by this refactor.
     assert summary.nb_cessions == 1
     ev = summary.events[0]
     assert ev.event_type == "conversion_out"
     assert ev.cession_price == pytest.approx(25000.0, abs=1e-6)
-    assert ev.total_acquisition_cost == pytest.approx(0.0, abs=1e-9)
+    assert ev.total_acquisition_cost == pytest.approx(20000.0, abs=1e-6)  # was 0.0 pre-convergence
     assert ev.portfolio_value == pytest.approx(0.0, abs=1e-9)  # nothing held after
     assert ev.acquisition_fraction == pytest.approx(0.0, abs=1e-9)
+    # gain still 25000 here only because portfolio_value is 0 (acq_fraction=0);
+    # the preserved basis matters on the NEXT disposal, not this one.
     assert ev.gain_loss == pytest.approx(25000.0, abs=1e-6)
-    assert ev.holding_period == "long_terme"
+    # court_terme (was long_terme): PRESERVE consumes no FIFO layer, so the
+    # event carries no acquisition date and falls to the court_terme default.
+    assert ev.holding_period == "court_terme"
+
+    # Cross-check the payoff of the convergence: the LEGACY mode still destroys
+    # the basis (acquisition 0), proving the fix is what changed the number.
+    legacy = await ReportService().compute_tax_2086(
+        db_session, str(regular_user.id), 2026, mode=report_service.TAX_MODE_LEGACY
+    )
+    assert legacy.events[0].total_acquisition_cost == pytest.approx(0.0, abs=1e-9)
 
 
 # ── Scenario 4 — FX conversion & fee-currency semantics ─────────────
@@ -646,12 +665,13 @@ async def test_estimate_rebalancing_tax_two_assets(db_session, regular_user):
 
 
 @pytest.mark.asyncio
-async def test_estimate_rebalancing_tax_ignores_conversion_rate(db_session, regular_user):
+async def test_estimate_rebalancing_tax_applies_conversion_rate(db_session, regular_user):
     """BUY 1 BTC @ 100 USD with conversion_rate 0.92.
 
-    The rebalancing replay reads tx.price RAW (100), ignoring the FX rate,
-    so the estimated gain at a 150 EUR current price is 50 — while the
-    metrics FIFO basis for the same buy would be 92 EUR (gain 58).
+    CONVERGED (2026-07-04): the rebalancing estimate now runs through the
+    unified engine, so the FX rate is applied — basis 92 EUR, gain at a 150 EUR
+    current price = 58 (matching the metrics FIFO basis). Pre-migration it read
+    tx.price RAW (100) and reported gain 50 (DIVERGENCE #8, now closed).
     """
     portfolio = await _make_portfolio(db_session, regular_user)
     btc = await _make_asset(db_session, portfolio, symbol="BTC", qty=1, current_price=150)
@@ -670,12 +690,11 @@ async def test_estimate_rebalancing_tax_ignores_conversion_rate(db_session, regu
 
     await ReportService()._estimate_rebalancing_tax(db_session, str(regular_user.id), [order], class_assets, "EUR")
 
-    # DIVERGENCE #8: rebalancing estimate ignores conversion_rate — basis
-    # is the raw 100 (tx currency), not the 92 EUR the metrics FIFO books.
-    assert order.estimated_gain == pytest.approx(50.0, abs=1e-6)
-    assert order.estimated_tax == pytest.approx(15.0, abs=1e-6)
+    # CONVERGED: FX applied — basis 92 EUR, gain = 150 - 92 = 58 (was 50).
+    assert order.estimated_gain == pytest.approx(58.0, abs=1e-6)
+    assert order.estimated_tax == pytest.approx(17.4, abs=1e-6)  # 58 * 0.30
 
-    # Cross-check the metrics side of the same trade for the record.
+    # Rebalancing estimate and metrics now agree on the 92 EUR cost basis.
     result = await _metrics(db_session, portfolio, {"BTC": 150.0}, forex={("USD", "EUR"): 0.92})
-    assert result["total_invested"] == pytest.approx(92.0, abs=1e-6)  # DIVERGENCE #8 (metrics side)
+    assert result["total_invested"] == pytest.approx(92.0, abs=1e-6)
     assert result["total_gain_loss"] == pytest.approx(58.0, abs=1e-6)
