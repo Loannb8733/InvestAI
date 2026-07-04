@@ -932,10 +932,11 @@ async def import_trade_history(
         # current spot rate is kept ONLY as a last-resort fallback when no historical rate
         # is available.
         from app.core.database import AsyncSessionLocal
+        from app.core.finance_constants import COLD_START_USD_EUR
         from app.services.fx_history_service import FxHistoryService
         from app.services.price_service import price_service
 
-        usd_eur_rate = 0.92
+        usd_eur_rate = float(COLD_START_USD_EUR)
         try:
             forex_rate = await price_service.get_forex_rate("USD", "EUR")
             if forex_rate:
