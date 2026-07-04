@@ -1301,8 +1301,22 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             return {"success": False, "error": "sync_failed"}
 
 
+async def _list_active_api_key_ids() -> list:
+    """Return the ids of all active API keys (one short-lived session)."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(APIKey.id).where(APIKey.is_active == True))
+        return [str(row[0]) for row in result.all()]
+
+
 async def _sync_all_exchanges_async() -> dict:
-    """Sync all active exchange accounts (async implementation)."""
+    """Sync all active exchange accounts sequentially, inline.
+
+    Used by the HTTP cron endpoint (endpoints/cron.py): the free tier runs
+    without a Celery worker, so the work must happen in-process and return real
+    per-key success/failure counts to the external scheduler. Keys are processed
+    sequentially on purpose — two exchanges of the same user upsert the same
+    "Crypto" portfolio, so concurrent syncs could race on get-or-create.
+    """
     async with AsyncSessionLocal() as db:
         # Get all active API keys
         result = await db.execute(select(APIKey).where(APIKey.is_active == True))
@@ -1333,8 +1347,19 @@ async def _sync_all_exchanges_async() -> dict:
 
 @celery_app.task(name="app.tasks.sync_exchanges.sync_all_exchanges")
 def sync_all_exchanges():
-    """Sync all user exchange accounts."""
-    return asyncio.run(_sync_all_exchanges_async())
+    """Fan out one sync_single_exchange task per active API key.
+
+    Dispatcher only: each key gets its own task with per-key retry/backoff and
+    its own time limit, so one slow or failing exchange can no longer consume
+    the single shared 300s task_time_limit and starve the remaining keys (the
+    previous behaviour, which looped all keys inline in this task). Only runs
+    where a Celery worker exists (beat scheduled it); the HTTP cron path keeps
+    the inline sequential implementation above.
+    """
+    api_key_ids = asyncio.run(_list_active_api_key_ids())
+    for api_key_id in api_key_ids:
+        sync_single_exchange.delay(api_key_id)
+    return {"dispatched": len(api_key_ids)}
 
 
 @celery_app.task(
@@ -1349,37 +1374,6 @@ def sync_single_exchange(api_key_id: str):
     return asyncio.run(_sync_single_exchange(api_key_id))
 
 
-@celery_app.task(
-    name="app.tasks.sync_exchanges.sync_binance",
-    autoretry_for=(Exception,),
-    max_retries=3,
-    default_retry_delay=120,
-    retry_backoff=True,
-)
-def sync_binance(user_id: str, api_key_id: str):
-    """Sync Binance account for a user."""
-    return asyncio.run(_sync_single_exchange(api_key_id))
-
-
-@celery_app.task(
-    name="app.tasks.sync_exchanges.sync_kraken",
-    autoretry_for=(Exception,),
-    max_retries=3,
-    default_retry_delay=120,
-    retry_backoff=True,
-)
-def sync_kraken(user_id: str, api_key_id: str):
-    """Sync Kraken account for a user."""
-    return asyncio.run(_sync_single_exchange(api_key_id))
-
-
-@celery_app.task(
-    name="app.tasks.sync_exchanges.sync_crypto_com",
-    autoretry_for=(Exception,),
-    max_retries=3,
-    default_retry_delay=120,
-    retry_backoff=True,
-)
-def sync_crypto_com(user_id: str, api_key_id: str):
-    """Sync Crypto.com account for a user."""
-    return asyncio.run(_sync_single_exchange(api_key_id))
+# NOTE: the per-exchange task wrappers (sync_binance / sync_kraken /
+# sync_crypto_com) were removed — they had zero callers, ignored their user_id
+# argument, and merely duplicated sync_single_exchange.
