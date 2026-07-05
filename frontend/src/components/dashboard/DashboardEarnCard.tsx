@@ -21,7 +21,7 @@ export default function DashboardEarnCard({ earnSummary, privacyMode }: { earnSu
   const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
 
   return (
-    <Card className="border-accent/20">
+    <Card elevation="raised" className="border-accent/20">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Lock className="h-4 w-4 text-accent" />

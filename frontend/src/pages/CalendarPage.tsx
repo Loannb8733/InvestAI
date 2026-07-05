@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
 import {
   Dialog,
   DialogContent,
@@ -82,6 +85,9 @@ interface CalendarSummary {
   events_this_month: number
   projected_income_this_month: number
 }
+
+const fmtCount = (n: number) => Math.round(n).toString()
+const fmtEur = (n: number) => `${n.toLocaleString('fr-FR')} EUR`
 
 const eventTypeIcons: Record<string, React.ReactNode> = {
   dividend: <TrendingUp className="h-4 w-4" />,
@@ -269,55 +275,37 @@ export default function CalendarPage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Événements à venir
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.upcoming_events}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Ce mois-ci
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.events_this_month}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Revenus attendus
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium text-gain">
-                {summary.total_expected_income.toLocaleString('fr-FR')} EUR
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Complétés
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.completed_events}</div>
-            </CardContent>
-          </Card>
-        </div>
+        <SpotlightGroup className="grid gap-4 md:grid-cols-4">
+          <StatCard
+            className="spot-card"
+            label="Événements à venir"
+            value={summary.upcoming_events}
+            format={fmtCount}
+          />
+          <StatCard
+            className="spot-card"
+            label="Ce mois-ci"
+            value={summary.events_this_month}
+            format={fmtCount}
+          />
+          <StatCard
+            className="spot-card"
+            label="Revenus attendus"
+            value={summary.total_expected_income}
+            format={fmtEur}
+          />
+          <StatCard
+            className="spot-card"
+            label="Complétés"
+            value={summary.completed_events}
+            format={fmtCount}
+          />
+        </SpotlightGroup>
       )}
 
       {/* Revenue Banner */}
       {summary && summary.projected_income_this_month > 0 && (
-        <Card className="border-gain/30 bg-gain/5">
+        <Card elevation="raised" className="border-gain/30 bg-gain/5">
           <CardContent className="py-3 flex items-center justify-between">
             <span className="text-sm font-medium text-gain flex items-center gap-2">
               <Landmark className="h-4 w-4" />
@@ -332,7 +320,7 @@ export default function CalendarPage() {
 
       {/* Market Events Timeline */}
       {marketEvents && marketEvents.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-accent" />
@@ -381,7 +369,7 @@ export default function CalendarPage() {
 
       {/* Upcoming Events */}
       {upcomingEvents && upcomingEvents.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -466,6 +454,7 @@ export default function CalendarPage() {
             return (
               <Card
                 key={event.id}
+                elevation="raised"
                 className={`${event.is_completed ? 'opacity-60' : ''} ${overdue ? 'border-loss' : ''}`}
               >
                 <CardContent className="py-4">
@@ -560,21 +549,17 @@ export default function CalendarPage() {
           })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Aucun événement</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Ajoutez des événements pour suivre vos dividendes, loyers et échéances.
-              </p>
-              <Button onClick={() => setShowAddEvent(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer un événement
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={CalendarIcon}
+          title="Aucun événement"
+          description="Ajoutez des événements pour suivre vos dividendes, loyers et échéances."
+          action={
+            <Button onClick={() => setShowAddEvent(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Créer un événement
+            </Button>
+          }
+        />
       )}
 
       {/* Add/Edit Event Dialog */}

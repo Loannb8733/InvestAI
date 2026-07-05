@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { ToastAction } from '@/components/ui/toast'
+import EmptyState from '@/components/ui/empty-state'
 import { apiKeysApi, transactionsApi } from '@/services/api'
 import ColdWalletsManager from '@/components/exchanges/ColdWalletsManager'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
@@ -57,6 +58,7 @@ import {
   Copy,
   ChevronRight,
   Info,
+  Link2,
 } from 'lucide-react'
 
 interface Exchange {
@@ -503,7 +505,7 @@ export default function ExchangesPage() {
               .findIndex(k => k.id === apiKey.id) + 1
 
             return (
-              <Card key={apiKey.id} className="relative overflow-hidden">
+              <Card key={apiKey.id} elevation="raised" className="relative overflow-hidden">
                 {/* Status indicator bar */}
                 <div className={`absolute top-0 left-0 right-0 h-1 ${apiKey.is_active ? 'bg-gain' : 'bg-loss'}`} />
 
@@ -647,28 +649,21 @@ export default function ExchangesPage() {
           })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center gap-4">
-                <ExchangeLogo exchange="binance" size={48} />
-                <ExchangeLogo exchange="kraken" size={48} />
-              </div>
-              <h2 className="text-xl font-semibold">Aucun exchange connecté</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Connectez vos exchanges pour importer automatiquement vos positions crypto.
-              </p>
-              <Button onClick={() => setShowAddKey(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Connecter un exchange
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Link2}
+          title="Aucun exchange connecté"
+          description="Connectez vos exchanges pour importer automatiquement vos positions crypto."
+          action={
+            <Button onClick={() => setShowAddKey(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Connecter un exchange
+            </Button>
+          }
+        />
       )}
 
       {/* Cold Wallets section */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Shield className="h-5 w-5 text-accent" />
@@ -728,7 +723,7 @@ export default function ExchangesPage() {
       <ColdWalletsManager />
 
       {/* Actions explanation */}
-      <Card className="bg-muted/30">
+      <Card elevation="raised" className="bg-muted/30">
         <CardHeader>
           <CardTitle className="text-lg">Comment ça marche ?</CardTitle>
         </CardHeader>
@@ -783,7 +778,7 @@ export default function ExchangesPage() {
       </Card>
 
       {/* Supported exchanges info */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Exchanges supportés</CardTitle>
           <CardDescription>

@@ -102,6 +102,8 @@ describe('AdminPage', () => {
 
     // Total: 3, Active: 2, MFA: 1
     await screen.findByText('admin@test.com')
-    expect(screen.getByText('3')).toBeInTheDocument() // total
+    // NumberTicker (StatCard) renders the value twice: an aria-hidden animated
+    // span and a visually-hidden aria-live copy — assert on the live one.
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0) // total
   })
 })

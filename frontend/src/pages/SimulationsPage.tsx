@@ -288,7 +288,7 @@ export default function SimulationsPage() {
         {/* FIRE Calculator */}
         <TabsContent value="fire" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Flame className="h-5 w-5 text-warning" />
@@ -462,7 +462,7 @@ export default function SimulationsPage() {
             </Card>
 
             {fireResult && (
-              <Card>
+              <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats FIRE</CardTitle>
                 </CardHeader>
@@ -521,7 +521,7 @@ export default function SimulationsPage() {
 
           {/* FIRE Chart */}
           {fireResult && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle>Projection FIRE</CardTitle>
                 <CardDescription>
@@ -624,7 +624,7 @@ export default function SimulationsPage() {
         {/* Portfolio Projection */}
         <TabsContent value="projection" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <LineChart className="h-5 w-5 text-accent" />
@@ -741,7 +741,7 @@ export default function SimulationsPage() {
             </Card>
 
             {projectionResult && (
-              <Card>
+              <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats de la projection</CardTitle>
                 </CardHeader>
@@ -775,7 +775,7 @@ export default function SimulationsPage() {
           </div>
 
           {projectionResult && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle>Évolution du portefeuille</CardTitle>
               </CardHeader>
@@ -898,7 +898,7 @@ export default function SimulationsPage() {
         {/* Monte Carlo */}
         <TabsContent value="montecarlo" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-accent" />
@@ -980,7 +980,7 @@ export default function SimulationsPage() {
             </Card>
 
             {mcResult && (
-              <Card>
+              <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats Monte Carlo</CardTitle>
                   <CardDescription>
@@ -1034,7 +1034,7 @@ export default function SimulationsPage() {
 
           {/* Monte Carlo Fan Chart */}
           {mcResult && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle>Fuseau de probabilité Monte Carlo</CardTitle>
                 <CardDescription>Distribution des rendements : P5 (pessimiste) à P95 (optimiste)</CardDescription>
@@ -1138,7 +1138,7 @@ export default function SimulationsPage() {
         {/* DCA Simulator */}
         <TabsContent value="dca" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-accent" />
@@ -1234,7 +1234,7 @@ export default function SimulationsPage() {
             </Card>
 
             {dcaResult && (
-              <Card>
+              <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats DCA</CardTitle>
                 </CardHeader>
@@ -1288,7 +1288,7 @@ export default function SimulationsPage() {
           </div>
 
           {dcaLumpSumData && dcaLumpSumData.length > 0 && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle>DCA vs Lump Sum</CardTitle>
                 <CardDescription>

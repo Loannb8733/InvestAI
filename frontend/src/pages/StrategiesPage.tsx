@@ -4,6 +4,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { strategiesApi } from '@/services/api'
 import { toast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import EmptyState from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -123,7 +124,7 @@ function StrategyCard({
   const perfLabel = PERF_LABELS[perfLevel]
 
   return (
-    <Card className={strategy.status === 'PROPOSED' ? 'border-accent/30 bg-accent/5' : ''}>
+    <Card elevation="raised" className={strategy.status === 'PROPOSED' ? 'border-accent/30 bg-accent/5' : ''}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -523,14 +524,11 @@ export default function StrategiesPage() {
 
       {/* Empty state */}
       {!isLoading && strategies.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Brain className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucune stratégie</h3>
-            <p className="text-muted-foreground mb-4 max-w-md">
-              Cliquez sur "Analyser mon portefeuille" pour que l'IA propose des stratégies
-              adaptées à votre situation, ou créez les vôtres.
-            </p>
+        <EmptyState
+          icon={Brain}
+          title="Aucune stratégie"
+          description={'Cliquez sur "Analyser mon portefeuille" pour que l\'IA propose des stratégies adaptées à votre situation, ou créez les vôtres.'}
+          action={
             <Button onClick={() => suggestMutation.mutate()} disabled={suggestMutation.isPending}>
               {suggestMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -539,8 +537,8 @@ export default function StrategiesPage() {
               )}
               Analyser mon portefeuille
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       {/* Archived */}

@@ -4,7 +4,9 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonStatCard } from '@/components/ui/skeleton'
+import EmptyState from '@/components/ui/empty-state'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import {
   Select,
   SelectContent,
@@ -272,13 +274,7 @@ export default function SmartInsightsPage() {
           {/* Score + metrics skeleton */}
           <div className="grid gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="pt-6 space-y-3">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-10 w-20" />
-                  <Skeleton className="h-3 w-16" />
-                </CardContent>
-              </Card>
+              <SkeletonStatCard key={i} />
             ))}
           </div>
           {/* Regime card skeleton */}
@@ -310,22 +306,23 @@ export default function SmartInsightsPage() {
           </Card>
         </div>
       ) : isError ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertTriangle className="h-12 w-12 mx-auto text-loss mb-3" />
-            <p className="text-muted-foreground">Erreur lors du chargement des données</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+        <EmptyState
+          variant="error"
+          icon={AlertTriangle}
+          title="Erreur lors du chargement des données"
+          action={
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Réessayer
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : data ? (
         <>
           {/* Score global + Metriques */}
-          <div className="grid gap-4 lg:grid-cols-4">
+          <SpotlightGroup className="grid gap-4 lg:grid-cols-4">
             {/* Score */}
-            <Card className={`border-2 ${getScoreBg(data.overall_score)} ${pageAccent}`}>
+            <Card elevation="raised" className={`spot-card border-2 ${getScoreBg(data.overall_score)} ${pageAccent}`}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -341,7 +338,7 @@ export default function SmartInsightsPage() {
             </Card>
 
             {/* Sharpe */}
-            <Card>
+            <Card elevation="raised" className="spot-card">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -368,7 +365,7 @@ export default function SmartInsightsPage() {
             </Card>
 
             {/* VaR */}
-            <Card>
+            <Card elevation="raised" className="spot-card">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -398,7 +395,7 @@ export default function SmartInsightsPage() {
             </Card>
 
             {/* Diversification */}
-            <Card>
+            <Card elevation="raised" className="spot-card">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -425,7 +422,7 @@ export default function SmartInsightsPage() {
             </Card>
 
             {/* Max Drawdown */}
-            <Card>
+            <Card elevation="raised" className="spot-card">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -452,7 +449,7 @@ export default function SmartInsightsPage() {
             </Card>
             {/* Gold / Safe Haven */}
             {(data.metrics_summary.gold_exposure ?? 0) > 0 && (
-              <Card className="border-warning/20">
+              <Card elevation="raised" className="spot-card border-warning/20">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -484,7 +481,7 @@ export default function SmartInsightsPage() {
             )}
             {/* Correlation Analysis */}
             {data.metrics_summary.avg_top5_correlation != null && (
-              <Card className={`${(data.metrics_summary.avg_top5_correlation ?? 0) > 0.7 ? 'border-loss/20' : 'border-border'}`}>
+              <Card elevation="raised" className={`spot-card ${(data.metrics_summary.avg_top5_correlation ?? 0) > 0.7 ? 'border-loss/20' : 'border-border'}`}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -516,11 +513,11 @@ export default function SmartInsightsPage() {
                 </CardContent>
               </Card>
             )}
-          </div>
+          </SpotlightGroup>
 
           {/* Risk Clusters */}
           {data.metrics_summary.risk_clusters && data.metrics_summary.risk_clusters.length > 0 && (
-            <Card className="border-loss/20">
+            <Card elevation="raised" className="border-loss/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <GitBranch className="h-5 w-5 text-loss" />
@@ -566,7 +563,7 @@ export default function SmartInsightsPage() {
             const totalValue = data.metrics_summary.total_value || 1
             const flashPct = (totalFlashImpact / totalValue) * 100
             return (
-              <Card className="border-warning/20">
+              <Card elevation="raised" className="border-warning/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Flame className="h-5 w-5 text-warning" />
@@ -618,7 +615,7 @@ export default function SmartInsightsPage() {
 
           {/* Insights */}
           {data.insights.length > 0 && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Zap className="h-5 w-5 text-warning" />
@@ -692,7 +689,7 @@ export default function SmartInsightsPage() {
 
           {/* Rebalancing suggestions */}
           {data.rebalancing_orders.length > 0 && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5 text-accent" />
@@ -754,7 +751,7 @@ export default function SmartInsightsPage() {
 
           {/* Anomalies with impact */}
           {data.anomaly_impacts.length > 0 && (
-            <Card className="border-warning/20">
+            <Card elevation="raised" className="border-warning/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-warning" />
@@ -805,15 +802,11 @@ export default function SmartInsightsPage() {
 
           {/* Empty states */}
           {data.insights.length === 0 && data.rebalancing_orders.length === 0 && data.anomaly_impacts.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <CheckCircle2 className="h-16 w-16 mx-auto text-gain mb-4" />
-                <h3 className="text-xl font-semibold">Votre portefeuille est en bonne santé !</h3>
-                <p className="text-muted-foreground mt-2">
-                  Aucune recommandation ou anomalie détectée pour le moment.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={CheckCircle2}
+              title="Votre portefeuille est en bonne santé !"
+              description="Aucune recommandation ou anomalie détectée pour le moment."
+            />
           )}
 
           {/* Footer */}
@@ -822,12 +815,7 @@ export default function SmartInsightsPage() {
           </p>
         </>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Impossible de charger les données</p>
-          </CardContent>
-        </Card>
+        <EmptyState icon={AlertTriangle} title="Impossible de charger les données" />
       )}
     </div>
   )
@@ -899,7 +887,7 @@ function MarketRegimeCard({ regime }: { regime: MarketRegime }) {
   const dominant = REGIME_CONFIG[market.dominant_regime] || REGIME_CONFIG.bullish
 
   return (
-    <Card className={`border-2 ${dominant.bg}`}>
+    <Card elevation="raised" className={`border-2 ${dominant.bg}`}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-primary" />

@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
-import { Loader2, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingPerformanceItem } from '@/types/crowdfunding'
@@ -18,8 +21,10 @@ export default function CrowdfundingPerformancePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="grid gap-4 md:grid-cols-3">
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+        <SkeletonStatCard />
       </div>
     )
   }
@@ -63,38 +68,28 @@ export default function CrowdfundingPerformancePage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Intérêts Projetés (Total)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-gain" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium text-gain">
-              {formatCurrency(totalProjectedInterest)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              sur {formatCurrency(totalInvested)} investis
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Reçu</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{formatCurrency(totalReceived)}</div>
-            <p className="text-xs text-muted-foreground">
-              {totalProjectedInterest > 0
-                ? `${((totalReceived / totalProjectedInterest) * 100).toFixed(0)}% des intérêts projetés`
-                : '—'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
+      <SpotlightGroup className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          className="spot-card"
+          label="Intérêts Projetés (Total)"
+          icon={TrendingUp}
+          value={totalProjectedInterest}
+          format={formatCurrency}
+          hint={<>sur {formatCurrency(totalInvested)} investis</>}
+        />
+        <StatCard
+          className="spot-card"
+          label="Total Reçu"
+          icon={CheckCircle2}
+          value={totalReceived}
+          format={formatCurrency}
+          hint={
+            totalProjectedInterest > 0
+              ? `${((totalReceived / totalProjectedInterest) * 100).toFixed(0)}% des intérêts projetés`
+              : '—'
+          }
+        />
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Projets On Track</CardTitle>
             {onTrackCount === activeCount ? (
@@ -114,11 +109,11 @@ export default function CrowdfundingPerformancePage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       {/* Chart: Projected vs Received */}
       {chartData.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Projeté vs Reçu par Projet</CardTitle>
           </CardHeader>
@@ -179,7 +174,7 @@ export default function CrowdfundingPerformancePage() {
       )}
 
       {/* Detail table */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Détail par Projet</CardTitle>
         </CardHeader>

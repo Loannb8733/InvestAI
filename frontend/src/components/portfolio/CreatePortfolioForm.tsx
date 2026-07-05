@@ -1,5 +1,5 @@
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import EmptyState from '@/components/ui/empty-state'
 import { Plus, Wallet } from 'lucide-react'
 import AddPortfolioForm from '@/components/forms/AddPortfolioForm'
 
@@ -17,21 +17,17 @@ export default function CreatePortfolioForm({
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-serif font-medium">Portefeuille</h1>
       </div>
-      <Card>
-        <CardContent className="py-12">
-          <div className="text-center space-y-4">
-            <Wallet className="h-16 w-16 mx-auto text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Aucun portefeuille</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Créez votre premier portefeuille pour commencer à suivre vos investissements.
-            </p>
-            <Button onClick={() => onShowAddPortfolioChange(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Créer un portefeuille
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={Wallet}
+        title="Aucun portefeuille"
+        description="Créez votre premier portefeuille pour commencer à suivre vos investissements."
+        action={
+          <Button onClick={() => onShowAddPortfolioChange(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Créer un portefeuille
+          </Button>
+        }
+      />
       <AddPortfolioForm open={showAddPortfolio} onOpenChange={onShowAddPortfolioChange} />
     </div>
   )

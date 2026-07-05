@@ -40,6 +40,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
 import { formatCurrency } from '@/lib/utils'
 import { queryKeys } from '@/lib/queryKeys'
 import { alertsApi, assetsApi, profileApi, notificationsApi } from '@/services/api'
@@ -97,6 +100,8 @@ interface Asset {
   name: string
   asset_type: string
 }
+
+const fmtCount = (n: number) => Math.round(n).toString()
 
 export default function AlertsPage() {
   const queryClient = useQueryClient()
@@ -451,63 +456,44 @@ export default function AlertsPage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total alertes</CardTitle>
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.total_alerts}</div>
-              <p className="text-xs text-muted-foreground">
-                Alertes configurées
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Actives</CardTitle>
-              <CheckCircle className="h-4 w-4 text-gain" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium text-gain">{summary.active_alerts}</div>
-              <p className="text-xs text-muted-foreground">
-                Alertes en surveillance
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Aujourd'hui</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium text-warning">{summary.triggered_today}</div>
-              <p className="text-xs text-muted-foreground">
-                Déclenchées aujourd'hui
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total déclenché</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.total_triggers}</div>
-              <p className="text-xs text-muted-foreground">
-                Nombre total de déclenchements
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            className="spot-card"
+            label="Total alertes"
+            icon={Bell}
+            value={summary.total_alerts}
+            format={fmtCount}
+            hint="Alertes configurées"
+          />
+          <StatCard
+            className="spot-card"
+            label="Actives"
+            icon={CheckCircle}
+            value={summary.active_alerts}
+            format={fmtCount}
+            hint="Alertes en surveillance"
+          />
+          <StatCard
+            className="spot-card"
+            label="Aujourd'hui"
+            icon={Clock}
+            value={summary.triggered_today}
+            format={fmtCount}
+            hint="Déclenchées aujourd'hui"
+          />
+          <StatCard
+            className="spot-card"
+            label="Total déclenché"
+            icon={AlertTriangle}
+            value={summary.total_triggers}
+            format={fmtCount}
+            hint="Nombre total de déclenchements"
+          />
+        </SpotlightGroup>
       )}
 
       {/* Alerts List */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Mes alertes</CardTitle>
           <CardDescription>
@@ -596,24 +582,24 @@ export default function AlertsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-12">
-              <Bell className="h-16 w-16 mx-auto text-muted-foreground" strokeWidth={1.5} />
-              <h2 className="text-xl font-serif font-medium mt-4 mb-2">Reste informé sans surveiller</h2>
-              <p className="text-muted-foreground mb-2 max-w-md mx-auto">
-                Crée une première alerte et laisse InvestAI te prévenir dès qu'un actif
-                franchit le seuil qui compte pour toi.
-              </p>
-              <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer une alerte
-              </Button>
-            </div>
+            <EmptyState
+              icon={Bell}
+              title="Reste informé sans surveiller"
+              description="Crée une première alerte et laisse InvestAI te prévenir dès qu'un actif franchit le seuil qui compte pour toi."
+              action={
+                <Button onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Créer une alerte
+                </Button>
+              }
+              className="border-0"
+            />
           )}
         </CardContent>
       </Card>
 
       {/* Telegram Configuration */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -680,7 +666,7 @@ export default function AlertsPage() {
       </Card>
 
       {/* Notification Settings Info */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Types d'alertes disponibles</CardTitle>
           <CardDescription>

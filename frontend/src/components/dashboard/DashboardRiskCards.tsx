@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import {
   Tooltip,
   TooltipContent,
@@ -67,8 +68,8 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
   const st = thresholds?.sharpe ?? DEFAULT_DISPLAY_THRESHOLDS.sharpe
   if (!riskMetrics) return null
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+    <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Card elevation="raised" className="spot-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -80,7 +81,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card elevation="raised" className="spot-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -92,7 +93,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card elevation="raised" className="spot-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -104,7 +105,7 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card elevation="raised" className="spot-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -116,6 +117,6 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           </div>
         </CardContent>
       </Card>
-    </div>
+    </SpotlightGroup>
   )
 }

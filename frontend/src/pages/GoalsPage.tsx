@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Slider } from '@/components/ui/slider'
+import EmptyState from '@/components/ui/empty-state'
 import { formatCurrency } from '@/lib/utils'
 import { goalsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
@@ -591,20 +592,17 @@ export default function GoalsPage() {
 
       {/* Empty state */}
       {goals.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Target className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
-            <h2 className="text-xl font-serif font-medium mb-2">Ton parcours commence ici</h2>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Fixe un premier objectif — une maison, une retraite, un coussin de sécurité —
-              et suis chaque pas qui t'en rapproche.
-            </p>
+        <EmptyState
+          icon={Target}
+          title="Ton parcours commence ici"
+          description="Fixe un premier objectif — une maison, une retraite, un coussin de sécurité — et suis chaque pas qui t'en rapproche."
+          action={
             <Button onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Créer mon premier objectif
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <>
           {/* Active Goals — Progress Cards */}
@@ -613,7 +611,7 @@ export default function GoalsPage() {
               {activeGoals.map((goal) => {
                 const isExpanded = expandedGoal === goal.id
                 return (
-                  <Card key={goal.id} className="overflow-hidden">
+                  <Card key={goal.id} elevation="raised" className="overflow-hidden">
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center justify-between text-base">
                         <span className="flex items-center gap-2">
@@ -722,7 +720,7 @@ export default function GoalsPage() {
               </h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {reachedGoals.map((goal) => (
-                  <Card key={goal.id} className="opacity-75">
+                  <Card key={goal.id} elevation="raised" className="opacity-75">
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-3">
                         <div className="h-3 w-3 rounded-full bg-gain" />

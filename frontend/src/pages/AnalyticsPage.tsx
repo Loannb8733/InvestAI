@@ -29,7 +29,6 @@ import {
   Shield,
   Target,
   Activity,
-  Loader2,
   PieChart as PieChartIcon,
   BarChart3,
   Info,
@@ -41,6 +40,9 @@ import {
   Shuffle,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
+import { SkeletonStatCard } from '@/components/ui/skeleton'
 import PortfolioEvolutionChart from '@/components/analytics/PortfolioEvolutionChart'
 import MonteCarloCard from '@/components/analytics/MonteCarloCard'
 import StressTestCard from '@/components/analytics/StressTestCard'
@@ -437,8 +439,18 @@ export default function AnalyticsPage() {
 
   if (loadingAnalytics || loadingDiversification) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <h1 className="text-3xl font-serif font-medium">Analyses</h1>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -447,17 +459,12 @@ export default function AnalyticsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-serif font-medium">Analyses</h1>
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <Activity className="h-16 w-16 mx-auto text-loss" />
-              <h2 className="text-xl font-semibold">Erreur de chargement</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Impossible de charger les analyses. Veuillez réessayer.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          variant="error"
+          icon={Activity}
+          title="Erreur de chargement"
+          description="Impossible de charger les analyses. Veuillez réessayer."
+        />
       </div>
     )
   }
@@ -466,17 +473,11 @@ export default function AnalyticsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-serif font-medium">Analyses</h1>
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Aucune donnée à analyser</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Ajoutez des actifs à vos portefeuilles pour voir les analyses détaillées.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={BarChart3}
+          title="Aucune donnée à analyser"
+          description="Ajoutez des actifs à vos portefeuilles pour voir les analyses détaillées."
+        />
       </div>
     )
   }
@@ -591,8 +592,8 @@ export default function AnalyticsPage() {
       )}
 
       {/* Key Metrics — Row 1: Core risk */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <SpotlightGroup className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="volatility">
               <CardTitle className="text-sm font-medium">Volatilité</CardTitle>
@@ -607,7 +608,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="sharpe">
               <CardTitle className="text-sm font-medium">Sharpe</CardTitle>
@@ -629,7 +630,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="relative ring-1 ring-accent/20">
+        <Card elevation="raised" className="spot-card relative ring-1 ring-accent/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
               <MetricWithTooltip metricKey="sortino">
@@ -656,7 +657,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="diversification">
               <CardTitle className="text-sm font-medium">Diversification</CardTitle>
@@ -670,11 +671,11 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground">{diversification?.rating}</p>
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       {/* Key Metrics — Row 2: More risk + XIRR */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <SpotlightGroup className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="var">
               <CardTitle className="text-sm font-medium">VaR 95%</CardTitle>
@@ -691,7 +692,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="cvar">
               <CardTitle className="text-sm font-medium">CVaR (ES)</CardTitle>
@@ -706,7 +707,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="maxdd">
               <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
@@ -728,7 +729,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <MetricWithTooltip metricKey="xirr">
               <CardTitle className="text-sm font-medium">XIRR</CardTitle>
@@ -751,12 +752,12 @@ export default function AnalyticsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Allocation by Type */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Répartition par classe d'actifs</CardTitle>
           </CardHeader>
@@ -804,7 +805,7 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Risk Radar */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Profil de risque
@@ -867,7 +868,7 @@ export default function AnalyticsPage() {
 
         {/* MPT Optimization */}
         {optimization && (
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shuffle className="h-5 w-5 text-accent" />
@@ -953,7 +954,7 @@ export default function AnalyticsPage() {
 
         {/* Beta vs Benchmark */}
         {betaData && betaData.assets.length > 0 && (
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-accent" />
@@ -1036,7 +1037,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* Performance Chart */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Performance par actif</CardTitle>
           <CardDescription>Gains/pertes en pourcentage (top 10)</CardDescription>
@@ -1076,7 +1077,7 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Allocation by Asset */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Top 10 positions</CardTitle>
           <CardDescription>Répartition par actif</CardDescription>
@@ -1118,7 +1119,7 @@ export default function AnalyticsPage() {
 
       {/* Recommendations */}
       {diversification && diversification.recommendations.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-warning" />
@@ -1147,7 +1148,7 @@ export default function AnalyticsPage() {
       {/* Top / Worst performers */}
       {performance && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-gain">
                 <TrendingUp className="h-5 w-5" />
@@ -1170,7 +1171,7 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-loss">
                 <TrendingDown className="h-5 w-5" />

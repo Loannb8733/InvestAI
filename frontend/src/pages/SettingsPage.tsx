@@ -154,7 +154,7 @@ export default function SettingsPage() {
 
       <div className="grid gap-6">
         {/* Profile */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -219,7 +219,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Security */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
@@ -289,7 +289,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Appearance */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <div className="flex items-center gap-2">
               {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
@@ -328,7 +328,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* API Keys */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Key className="h-5 w-5" />

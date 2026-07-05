@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
@@ -47,7 +48,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
 
   if (isLoading && !data && !availableLiquidity) {
     return (
-      <Card>
+      <Card elevation="raised">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Zap className="h-4 w-4 text-warning" />
@@ -55,7 +56,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-20 animate-pulse bg-muted rounded" />
+          <Skeleton className="h-20" />
         </CardContent>
       </Card>
     )
@@ -68,7 +69,7 @@ export default function DashboardMunitionsCard({ availableLiquidity, totalValue,
   const invested_pct = data?.invested_pct ?? (100 - liquidity_pct)
 
   return (
-    <Card>
+    <Card elevation="raised">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center justify-between">
           <span className="flex items-center gap-2">

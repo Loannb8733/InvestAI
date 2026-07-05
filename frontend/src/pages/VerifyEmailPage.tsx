@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import AuroraCanvas from '@/components/ui/aurora-canvas'
 import {
   TrendingUp,
   Loader2,
@@ -61,8 +62,9 @@ export default function VerifyEmailPage() {
   }, [searchParams, setTokens, fetchUser, toast])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-8">
-      <div className="w-full max-w-md text-center space-y-6">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-8">
+      <AuroraCanvas className="opacity-40" />
+      <div className="relative z-10 w-full max-w-md text-center space-y-6">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">

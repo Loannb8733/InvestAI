@@ -10,6 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import EmptyState from '@/components/ui/empty-state'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import { Skeleton, SkeletonStatCard } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
@@ -34,7 +37,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
-  Loader2,
   Plus,
   Bell,
   Calendar,
@@ -315,7 +317,7 @@ function CustomizePanel({
 }) {
   const allIds = [...visibleWidgets, ...hiddenWidgets]
   return (
-    <Card className="absolute right-0 top-12 z-50 w-72 shadow-lg">
+    <Card elevation="floating" className="absolute right-0 top-12 z-50 w-72">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Personnaliser le dashboard</CardTitle>
         <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0" aria-label="Fermer le panneau de personnalisation">
@@ -420,21 +422,29 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <p className="text-destructive">Erreur lors du chargement des données</p>
-        <Button onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Réessayer
-        </Button>
-      </div>
+      <EmptyState
+        variant="error"
+        title="Erreur lors du chargement des données"
+        action={
+          <Button onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Réessayer
+          </Button>
+        }
+      />
     )
   }
 
@@ -458,21 +468,16 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-serif font-medium">Tableau de bord</h1>
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <Wallet className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Bienvenue sur InvestAI !</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Commencez par créer un portefeuille et ajouter vos premiers actifs
-                pour voir apparaître vos métriques et analyses.
-              </p>
-              <Button onClick={() => navigate('/portfolio')}>
-                Créer mon premier portefeuille
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Wallet}
+          title="Bienvenue sur InvestAI !"
+          description="Commencez par créer un portefeuille et ajouter vos premiers actifs pour voir apparaître vos métriques et analyses."
+          action={
+            <Button onClick={() => navigate('/portfolio')}>
+              Créer mon premier portefeuille
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -619,7 +624,7 @@ export default function DashboardPage() {
               case 'crowdfunding':
                 if (!cfDashboard || cfDashboard.active_count === 0 && cfDashboard.completed_count === 0) return null
                 return (
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/crowdfunding')}>
+                  <Card elevation="interactive" className="hover:bg-muted/50 transition-colors" onClick={() => navigate('/crowdfunding')}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         <Landmark className="h-4 w-4 text-accent" />
@@ -664,8 +669,8 @@ export default function DashboardPage() {
                 )
               case 'roi-concentration':
                 return (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
+                  <SpotlightGroup className="grid gap-4 md:grid-cols-3">
+                    <Card elevation="raised" className="spot-card">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <div>
@@ -676,7 +681,7 @@ export default function DashboardPage() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised" className="spot-card">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <div>
@@ -688,7 +693,7 @@ export default function DashboardPage() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised" className="spot-card">
                       <CardContent className="pt-6">
                         <div>
                           <MetricTooltip content="Simulation de l'impact d'une correction de marché sur votre portefeuille."><p className="text-sm text-muted-foreground mb-2">Stress Tests</p></MetricTooltip>
@@ -703,11 +708,11 @@ export default function DashboardPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  </div>
+                  </SpotlightGroup>
                 )
               case 'indices':
                 return metrics.index_comparison.length > 0 ? (
-                  <Card>
+                  <Card elevation="raised">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Comparaison avec les indices ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})</CardTitle>
                     </CardHeader>
@@ -743,7 +748,7 @@ export default function DashboardPage() {
                 return (
                   <div className="space-y-4">
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           Évolution du patrimoine ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})
@@ -756,7 +761,7 @@ export default function DashboardPage() {
                         </Button>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Répartition par actif <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/analytics')}>Voir plus<ChevronRight className="h-4 w-4 ml-1" /></Button>
@@ -796,7 +801,7 @@ export default function DashboardPage() {
               case 'currency-exposure':
                 if (!metrics.currency_exposure || metrics.currency_exposure.length === 0) return null
                 return (
-                  <Card>
+                  <Card elevation="raised">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         Exposition Devises
@@ -810,22 +815,22 @@ export default function DashboardPage() {
               case 'allocation-transactions-alerts':
                 return (
                   <div className="grid gap-4 lg:grid-cols-3">
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader><CardTitle>Répartition par classe</CardTitle></CardHeader>
                       <CardContent><AllocationChart data={metrics.allocation} /></CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader><CardTitle>Crypto par catégorie</CardTitle></CardHeader>
                       <CardContent><CryptoClassChart assets={metrics.asset_allocation} /></CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Répartition par plateforme</CardTitle>
                         <SecurityBadge />
                       </CardHeader>
                       <CardContent><PlatformPieChart onPlatformClick={(p) => { if (p) navigate(`/transactions?platform=${encodeURIComponent(p)}`) }} /></CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Transactions récentes <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/transactions')}>Voir tout<ChevronRight className="h-4 w-4 ml-1" /></Button>
@@ -854,7 +859,7 @@ export default function DashboardPage() {
                         ) : (<p className="text-muted-foreground text-center py-8">Aucune transaction</p>)}
                       </CardContent>
                     </Card>
-                    <Card className="lg:col-span-1">
+                    <Card elevation="raised" className="lg:col-span-1">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2"><Bell className="h-4 w-4" />Alertes & Événements</CardTitle>
                       </CardHeader>
@@ -909,7 +914,7 @@ export default function DashboardPage() {
               case 'performers':
                 return (
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader>
                         <CardTitle className="text-gain flex items-center gap-2"><TrendingUp className="h-5 w-5" />Meilleures performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>
@@ -932,7 +937,7 @@ export default function DashboardPage() {
                         ) : (<p className="text-muted-foreground text-center py-4">Aucun actif en gain</p>)}
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card elevation="raised">
                       <CardHeader>
                         <CardTitle className="text-loss flex items-center gap-2"><TrendingDown className="h-5 w-5" />Moins bonnes performances <span className="text-xs font-normal text-muted-foreground">({periodLabel})</span></CardTitle>
                       </CardHeader>

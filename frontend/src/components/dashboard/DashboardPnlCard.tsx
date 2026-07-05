@@ -48,7 +48,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
   const netAfterTax = pnlBreakdown.net_pnl - estimatedTax
 
   return (
-    <Card>
+    <Card elevation="raised">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2"><Scale className="h-4 w-4" />Répartition des Plus/Moins-values <span className="text-xs font-normal text-muted-foreground">({periodLabel ?? 'Depuis le début'})</span></CardTitle>
         <CardDescription>Distinction entre gains réalisés et latents (fiscalité)</CardDescription>

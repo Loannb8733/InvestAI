@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import EmptyState from '@/components/ui/empty-state'
 import {
   Select,
   SelectContent,
@@ -155,7 +156,7 @@ export default function PredictionsPage() {
 
       {/* Sentiment + Portfolio Summary */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card elevation="raised">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -195,7 +196,7 @@ export default function PredictionsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -274,16 +275,11 @@ export default function PredictionsPage() {
               formatPrice={formatPrice}
             />
           ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
-                <h2 className="text-xl font-serif font-medium mb-2">Pas encore de projection</h2>
-                <p className="text-muted-foreground max-w-md">
-                  Ajoute des actifs à ton portefeuille pour que l'analyse statistique
-                  puisse dessiner les scénarios à venir.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={BarChart3}
+              title="Pas encore de projection"
+              description="Ajoute des actifs à ton portefeuille pour que l'analyse statistique puisse dessiner les scénarios à venir."
+            />
           )}
         </TabsContent>
 

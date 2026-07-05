@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
 import {
   Dialog,
   DialogContent,
@@ -64,6 +67,8 @@ interface NoteSummary {
   notes_this_month: number
   unique_tags: string[]
 }
+
+const fmtCount = (n: number) => Math.round(n).toString()
 
 export default function NotesPage() {
   const { toast } = useToast()
@@ -196,42 +201,30 @@ export default function NotesPage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.total_notes}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Ce mois-ci
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.notes_this_month}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Tags utilisés
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-serif font-medium">{summary.unique_tags.length}</div>
-            </CardContent>
-          </Card>
-        </div>
+        <SpotlightGroup className="grid gap-4 md:grid-cols-3">
+          <StatCard
+            className="spot-card"
+            label="Total notes"
+            value={summary.total_notes}
+            format={fmtCount}
+          />
+          <StatCard
+            className="spot-card"
+            label="Ce mois-ci"
+            value={summary.notes_this_month}
+            format={fmtCount}
+          />
+          <StatCard
+            className="spot-card"
+            label="Tags utilisés"
+            value={summary.unique_tags.length}
+            format={fmtCount}
+          />
+        </SpotlightGroup>
       )}
 
       {/* Search and Filter */}
-      <Card>
+      <Card elevation="raised">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -273,7 +266,7 @@ export default function NotesPage() {
         <>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {notes.map((note) => (
-            <Card key={note.id} className="hover:shadow-md transition-shadow">
+            <Card key={note.id} elevation="raised">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-lg line-clamp-1">{note.title}</CardTitle>
@@ -359,21 +352,17 @@ export default function NotesPage() {
         )}
         </>
       ) : (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Aucune note</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Commencez à documenter vos décisions d'investissement.
-              </p>
-              <Button onClick={() => setShowAddNote(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer une note
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={FileText}
+          title="Aucune note"
+          description="Commencez à documenter vos décisions d'investissement."
+          action={
+            <Button onClick={() => setShowAddNote(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Créer une note
+            </Button>
+          }
+        />
       )}
 
       {/* Add/Edit Note Dialog */}

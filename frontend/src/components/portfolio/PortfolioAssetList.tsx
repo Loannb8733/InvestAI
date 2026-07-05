@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import EmptyState from '@/components/ui/empty-state'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { ALL_PLATFORMS, isColdWallet } from '@/lib/platforms'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -281,6 +282,7 @@ export default function PortfolioAssetList({
 
           return (
             <Card
+              elevation="interactive"
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={onOpenCashBalance}
             >
@@ -310,7 +312,7 @@ export default function PortfolioAssetList({
         })()}
 
         {/* Stablecoins card */}
-        <Card>
+        <Card elevation="raised">
           <CardContent className="py-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
@@ -344,6 +346,7 @@ export default function PortfolioAssetList({
             return (
               <Card
                 key={platform}
+                elevation="interactive"
                 className={`cursor-pointer transition-all ${
                   isActive
                     ? 'ring-2 ring-primary border-primary'
@@ -671,9 +674,7 @@ export default function PortfolioAssetList({
           </table>
         </div>
       ) : (
-        <div className="text-center py-8 text-muted-foreground">
-          Aucun actif dans ce portefeuille
-        </div>
+        <EmptyState title="Aucun actif dans ce portefeuille" />
       )}
       <div className="mt-4">
         <Button

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { TrendingUp, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -34,8 +35,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-4">
+      <AuroraCanvas className="opacity-40" />
+      <Card elevation="raised" className="relative z-10 w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <TrendingUp className="h-10 w-10 text-primary" />

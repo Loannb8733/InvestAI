@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +48,8 @@ interface User {
   mfa_enabled: boolean
   created_at: string
 }
+
+const fmtCount = (n: number) => Math.round(n).toString()
 
 export default function AdminPage() {
   const { toast } = useToast()
@@ -137,40 +141,32 @@ export default function AdminPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilisateurs totaux</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{usersList.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilisateurs actifs</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-gain" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{activeCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">MFA activé</CardTitle>
-            <Shield className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{mfaCount}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <SpotlightGroup className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          className="spot-card"
+          label="Utilisateurs totaux"
+          icon={Users}
+          value={usersList.length}
+          format={fmtCount}
+        />
+        <StatCard
+          className="spot-card"
+          label="Utilisateurs actifs"
+          icon={ShieldCheck}
+          value={activeCount}
+          format={fmtCount}
+        />
+        <StatCard
+          className="spot-card"
+          label="MFA activé"
+          icon={Shield}
+          value={mfaCount}
+          format={fmtCount}
+        />
+      </SpotlightGroup>
 
       {/* Users Table */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Utilisateurs</CardTitle>
         </CardHeader>

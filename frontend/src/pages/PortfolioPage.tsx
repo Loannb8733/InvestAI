@@ -41,6 +41,10 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
+import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { isColdWallet } from '@/lib/platforms'
 import PortfolioAssetList from '@/components/portfolio/PortfolioAssetList'
 import CreatePortfolioForm from '@/components/portfolio/CreatePortfolioForm'
@@ -274,7 +278,7 @@ export default function PortfolioPage() {
 
       {/* Selected portfolio */}
       {currentPortfolio && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -343,8 +347,10 @@ export default function PortfolioPage() {
               {/* History Tab */}
               <TabsContent value="history">
                 {loadingHistory ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <SkeletonStatCard />
+                    <SkeletonStatCard />
+                    <SkeletonStatCard />
                   </div>
                 ) : portfolioHistory ? (
                   <div className={`space-y-6 ${isHistoryStale ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -355,47 +361,29 @@ export default function PortfolioPage() {
                       </div>
                     )}
                     {/* Summary cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
-                              <PiggyBank className="h-5 w-5 text-accent" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Total investi (historique)</p>
-                              <p className="text-xl font-bold">{formatCurrency(portfolioHistory.total_invested_all_time)}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-gain/20 flex items-center justify-center">
-                              <TrendingUp className="h-5 w-5 text-gain" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Total vendu</p>
-                              <p className="text-xl font-bold">{formatCurrency(portfolioHistory.total_sold)}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-warning/20 flex items-center justify-center">
-                              <History className="h-5 w-5 text-warning" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Frais totaux</p>
-                              <p className="text-xl font-bold">{formatCurrency(portfolioHistory.total_fees)}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <SpotlightGroup className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <StatCard
+                        className="spot-card"
+                        label="Total investi (historique)"
+                        icon={PiggyBank}
+                        value={portfolioHistory.total_invested_all_time}
+                        format={formatCurrency}
+                      />
+                      <StatCard
+                        className="spot-card"
+                        label="Total vendu"
+                        icon={TrendingUp}
+                        value={portfolioHistory.total_sold}
+                        format={formatCurrency}
+                      />
+                      <StatCard
+                        className="spot-card"
+                        label="Frais totaux"
+                        icon={History}
+                        value={portfolioHistory.total_fees}
+                        format={formatCurrency}
+                      />
+                    </SpotlightGroup>
 
                     {/* Sold assets table */}
                     {portfolioHistory.sold_assets.length > 0 ? (
@@ -430,6 +418,7 @@ export default function PortfolioPage() {
                                   return (
                                     <Card
                                       key={platform}
+                                      elevation="interactive"
                                       className={`cursor-pointer transition-all ${
                                         isActive
                                           ? 'ring-2 ring-primary border-primary'
@@ -587,15 +576,11 @@ export default function PortfolioPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        Aucun actif vendu
-                      </div>
+                      <EmptyState title="Aucun actif vendu" />
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Aucune donnée historique
-                  </div>
+                  <EmptyState title="Aucune donnée historique" />
                 )}
               </TabsContent>
             </Tabs>

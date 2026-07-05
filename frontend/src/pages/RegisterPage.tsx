@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
+import AuroraCanvas from '@/components/ui/aurora-canvas'
 import {
   TrendingUp,
   Loader2,
@@ -132,8 +133,9 @@ export default function RegisterPage() {
   // Show success screen after registration
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-8">
-        <div className="w-full max-w-md text-center space-y-6">
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-8">
+        <AuroraCanvas className="opacity-40" />
+        <div className="relative z-10 w-full max-w-md text-center space-y-6">
           <div className="mx-auto h-20 w-20 rounded-full bg-gain dark:bg-gain/30 flex items-center justify-center">
             <Mail className="h-10 w-10 text-gain dark:text-gain" />
           </div>
@@ -357,6 +359,7 @@ export default function RegisterPage() {
 
       {/* Right side - Branding & Benefits */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden border-l border-border">
+        <AuroraCanvas className="opacity-40" />
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground">
           {/* Logo */}

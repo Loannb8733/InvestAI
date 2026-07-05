@@ -34,6 +34,7 @@ import { crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import { Textarea } from '@/components/ui/textarea'
+import EmptyState from '@/components/ui/empty-state'
 import {
   Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText,
   Download, X, Banknote, ShieldCheck, ChevronRight,
@@ -626,12 +627,7 @@ export default function CrowdfundingProjectsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Aucun projet trouvé</p>
-          </CardContent>
-        </Card>
+        <EmptyState icon={FolderOpen} title="Aucun projet trouvé" />
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -646,6 +642,7 @@ export default function CrowdfundingProjectsPage() {
               return (
                 <Card
                   key={p.id}
+                  elevation="interactive"
                   className={`transition-all duration-200 cursor-pointer ${
                     isSelected
                       ? 'ring-2 ring-primary/50 bg-primary/[0.02]'

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
@@ -85,7 +86,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
       </div>
 
       {/* KPI Grid */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <SpotlightGroup className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         {[
           { label: 'TRI', value: audit.tri != null ? `${audit.tri}%` : '—', icon: TrendingUp },
           { label: 'Durée', value: audit.duration_min && audit.duration_max ? `${audit.duration_min}-${audit.duration_max} mois` : audit.duration_max ? `${audit.duration_max} mois` : '—', icon: Clock },
@@ -94,7 +95,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
           { label: 'LTV', value: audit.ltv != null ? `${audit.ltv}%` : '—', icon: Building2 },
           { label: 'LTC', value: audit.ltc != null ? `${audit.ltc}%` : '—', icon: Building2 },
         ].map((kpi) => (
-          <Card key={kpi.label}>
+          <Card key={kpi.label} elevation="raised" className="spot-card">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                 <kpi.icon className="h-3 w-3" />
@@ -104,11 +105,11 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </SpotlightGroup>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Radar Chart */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Score de Robustesse
@@ -141,7 +142,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
         </Card>
 
         {/* Verdict + Allocation */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Verdict & Allocation</CardTitle>
           </CardHeader>
@@ -214,7 +215,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
 
       {/* Investment Simulation */}
       {audit.investment_simulation && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
@@ -328,7 +329,7 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
 
       {/* Guarantees Table */}
       {audit.guarantees.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
@@ -432,7 +433,7 @@ export default function CrowdfundingAuditLabPage() {
 
       {/* Upload Zone */}
       {!currentAudit && (
-        <Card>
+        <Card elevation="raised">
           <CardContent className="pt-6">
             <div
               {...getRootProps()}
@@ -532,7 +533,7 @@ export default function CrowdfundingAuditLabPage() {
 
       {/* History */}
       {audits && audits.length > 0 && !currentAudit && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader
             className="cursor-pointer"
             onClick={() => setShowHistory(!showHistory)}

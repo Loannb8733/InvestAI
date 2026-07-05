@@ -15,6 +15,9 @@ import AllocationChart from '@/components/charts/AllocationChart'
 // Lightweight Charts (canvas, ~45 Ko). Lazy-load : pas SSR-safe, hors chunk principal.
 const PortfolioAreaChart = lazy(() => import('@/components/charts/PortfolioAreaChart'))
 import AnimatedNumber from '@/components/ui/animated-number'
+import EmptyState from '@/components/ui/empty-state'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TrendingUp,
@@ -277,7 +280,7 @@ export default function MasterDashboardPage() {
         <div className="h-48 bg-card rounded-2xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-card rounded-xl" />
+            <SkeletonStatCard key={i} />
           ))}
         </div>
       </div>
@@ -289,18 +292,13 @@ export default function MasterDashboardPage() {
   // "your wealth is zero" and destroys trust. Show an explicit error + retry.
   if (metricsError && !metrics) {
     return (
-      <Card className="mx-auto mt-10 max-w-lg border-destructive/30">
-        <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-          <AlertTriangle className="h-10 w-10 text-destructive" />
-          <div>
-            <h2 className="text-lg font-semibold">Impossible de charger votre patrimoine</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Une erreur réseau est survenue. Vos données sont en sécurité — réessayez.
-            </p>
-          </div>
-          <Button onClick={() => refetchMetrics()}>Réessayer</Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        variant="error"
+        className="mx-auto mt-10 max-w-lg"
+        title="Impossible de charger votre patrimoine"
+        description="Une erreur réseau est survenue. Vos données sont en sécurité — réessayez."
+        action={<Button onClick={() => refetchMetrics()}>Réessayer</Button>}
+      />
     )
   }
 
@@ -342,7 +340,7 @@ export default function MasterDashboardPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', duration: 0.6, bounce: 0.1 }}
-        className="relative overflow-hidden rounded-lg border border-border bg-card p-6 md:p-8"
+        className="relative overflow-hidden rounded-lg border border-border bg-card p-6 md:p-8 elev-2"
       >
         <div className="relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
           <div className="min-w-0">
@@ -400,6 +398,7 @@ export default function MasterDashboardPage() {
       </motion.div>
 
       {/* KPI Row */}
+      <SpotlightGroup>
       <motion.div
         className="grid gap-3 grid-cols-2 lg:grid-cols-4"
         variants={staggerContainer}
@@ -408,7 +407,7 @@ export default function MasterDashboardPage() {
       >
         {/* Total Investi */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
+          <div className="spot-card elev-1 rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <Wallet className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Total investi</span>
@@ -423,7 +422,7 @@ export default function MasterDashboardPage() {
 
         {/* P&L Net */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
+          <div className="spot-card elev-1 rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               {pnl >= 0 ? (
                 <TrendingUp className="h-3.5 w-3.5 text-gain" />
@@ -444,7 +443,7 @@ export default function MasterDashboardPage() {
 
         {/* Rendement annualisé */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
+          <div className="spot-card elev-1 rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <BarChart3 className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Rendement annualisé</span>
@@ -461,7 +460,7 @@ export default function MasterDashboardPage() {
 
         {/* Liquidités */}
         <motion.div variants={kpiVariants}>
-          <div className="rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
+          <div className="spot-card elev-1 rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <Banknote className="h-3.5 w-3.5" />
               <span className="uppercase tracking-wide">Liquidités</span>
@@ -474,6 +473,7 @@ export default function MasterDashboardPage() {
           </div>
         </motion.div>
       </motion.div>
+      </SpotlightGroup>
 
       {/* Charts Row */}
       <motion.div
@@ -484,7 +484,7 @@ export default function MasterDashboardPage() {
       >
         {/* Allocation Pie */}
         <motion.div variants={kpiVariants}>
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle>Allocation Globale</CardTitle>
             </CardHeader>
@@ -496,7 +496,7 @@ export default function MasterDashboardPage() {
 
         {/* Performance Line */}
         <motion.div variants={kpiVariants}>
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle>Performance du Capital</CardTitle>
             </CardHeader>
@@ -533,7 +533,7 @@ export default function MasterDashboardPage() {
       >
         {/* Points d'Attention */}
         <motion.div variants={kpiVariants}>
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
@@ -581,7 +581,7 @@ export default function MasterDashboardPage() {
 
         {/* Quick Actions */}
         <motion.div variants={kpiVariants}>
-          <Card>
+          <Card elevation="raised">
             <CardHeader>
               <CardTitle>Raccourcis</CardTitle>
             </CardHeader>

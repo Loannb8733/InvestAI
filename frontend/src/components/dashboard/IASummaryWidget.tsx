@@ -20,6 +20,7 @@ import {
 import { smartInsightsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { Button } from '@/components/ui/button'
+import EmptyState from '@/components/ui/empty-state'
 
 // ── Health gauge (circular SVG) ──
 
@@ -172,7 +173,7 @@ export default function IASummaryWidget() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card elevation="raised">
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
@@ -181,13 +182,7 @@ export default function IASummaryWidget() {
   }
 
   if (error || !data) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          Analyse IA indisponible
-        </CardContent>
-      </Card>
-    )
+    return <EmptyState variant="error" title="Analyse IA indisponible" />
   }
 
   const severityVariant = (s: string): 'danger' | 'warning' | 'success' => {
@@ -212,7 +207,7 @@ export default function IASummaryWidget() {
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card elevation="raised" className="overflow-hidden">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Brain className="h-4 w-4 text-accent" />

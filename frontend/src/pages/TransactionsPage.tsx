@@ -75,6 +75,9 @@ import {
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { isColdWallet } from '@/lib/platforms'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
 import AddTransactionForm from '@/components/forms/AddTransactionForm'
 import ImportCSVForm from '@/components/forms/ImportCSVForm'
 import EditTransactionForm from '@/components/forms/EditTransactionForm'
@@ -703,69 +706,40 @@ export default function TransactionsPage() {
 
       {/* Statistics Cards */}
       {transactions && transactions.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-gain/10">
-                  <TrendingUp className="h-4 w-4 text-gain" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total achats{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-gain">{formatCurrency(stats.totalBought)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-loss/10">
-                  <TrendingDown className="h-4 w-4 text-loss" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total ventes{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-loss">{formatCurrency(stats.totalSold)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-warning/10">
-                  <Receipt className="h-4 w-4 text-warning" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total frais{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className="text-lg font-semibold text-warning">{formatCurrency(stats.totalFees)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${stats.netFlow >= 0 ? 'bg-accent/10' : 'bg-accent/10'}`}>
-                  <Coins className={`h-4 w-4 ${stats.netFlow >= 0 ? 'text-accent' : 'text-accent'}`} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Flux net{hasActiveFilters ? ' (filtrés)' : ''}</p>
-                  <p className={`text-lg font-semibold ${stats.netFlow >= 0 ? 'text-accent' : 'text-accent'}`}>
-                    {formatCurrency(stats.netFlow)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <SpotlightGroup className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard
+            className="spot-card"
+            label={`Total achats${hasActiveFilters ? ' (filtrés)' : ''}`}
+            icon={TrendingUp}
+            value={stats.totalBought}
+            format={formatCurrency}
+          />
+          <StatCard
+            className="spot-card"
+            label={`Total ventes${hasActiveFilters ? ' (filtrés)' : ''}`}
+            icon={TrendingDown}
+            value={stats.totalSold}
+            format={formatCurrency}
+          />
+          <StatCard
+            className="spot-card"
+            label={`Total frais${hasActiveFilters ? ' (filtrés)' : ''}`}
+            icon={Receipt}
+            value={stats.totalFees}
+            format={formatCurrency}
+          />
+          <StatCard
+            className="spot-card"
+            label={`Flux net${hasActiveFilters ? ' (filtrés)' : ''}`}
+            icon={Coins}
+            value={stats.netFlow}
+            format={formatCurrency}
+          />
+        </SpotlightGroup>
       )}
 
       {/* Main Content Card */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4">
             {/* Title and Search Row */}
@@ -1178,35 +1152,36 @@ export default function TransactionsPage() {
               )}
             </>
           ) : (
-            <div className="text-center py-12">
-              <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
-              <h2 className="text-xl font-semibold mt-4">
-                {hasActiveFilters ? 'Aucun résultat' : 'Aucune transaction'}
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                {hasActiveFilters
+            <EmptyState
+              variant={hasActiveFilters ? 'search' : 'empty'}
+              icon={FileText}
+              title={hasActiveFilters ? 'Aucun résultat' : 'Aucune transaction'}
+              description={
+                hasActiveFilters
                   ? 'Essayez de modifier vos filtres pour trouver des transactions.'
-                  : 'Ajoutez votre première transaction ou importez un fichier CSV.'}
-              </p>
-              {hasActiveFilters ? (
-                <Button className="mt-4" variant="outline" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-2" />
-                  Effacer les filtres
-                </Button>
-              ) : (
-                <Button className="mt-4" onClick={() => setIsAddOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une transaction
-                </Button>
-              )}
-            </div>
+                  : 'Ajoutez votre première transaction ou importez un fichier CSV.'
+              }
+              action={
+                hasActiveFilters ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-2" />
+                    Effacer les filtres
+                  </Button>
+                ) : (
+                  <Button onClick={() => setIsAddOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter une transaction
+                  </Button>
+                )
+              }
+            />
           )}
         </CardContent>
       </Card>
 
       {/* Danger Zone */}
       {transactions && transactions.length > 0 && (
-        <Card className="border-destructive/50">
+        <Card elevation="raised" className="border-destructive/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-destructive flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4" />

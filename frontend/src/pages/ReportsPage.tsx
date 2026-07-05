@@ -247,7 +247,7 @@ export default function ReportsPage() {
   }
 
   const renderReportCard = (report: ReportCard) => (
-    <Card key={report.id} className="flex flex-col">
+    <Card key={report.id} elevation="raised" className="flex flex-col">
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className={`p-3 rounded-lg ${report.bgColor}`}>
@@ -333,7 +333,7 @@ export default function ReportsPage() {
             {generalCards.map(renderReportCard)}
           </div>
 
-          <Card className="bg-muted/50">
+          <Card elevation="raised" className="bg-muted/50">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
                 <FileDown className="h-8 w-8 text-muted-foreground" />
@@ -356,7 +356,7 @@ export default function ReportsPage() {
             {renderReportCard(stocksTaxCard)}
           </div>
 
-          <Card className="bg-muted/50">
+          <Card elevation="raised" className="bg-muted/50">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
                 <Receipt className="h-8 w-8 text-muted-foreground" />

@@ -24,6 +24,8 @@ import { formatCurrency } from '@/lib/utils'
 import { insightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import SharedEmptyState from '@/components/ui/empty-state'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
 import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveLine, type LineSeries } from '@nivo/line'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
@@ -142,15 +144,11 @@ function TopAlpha() {
   if (isLoading) return <Loader />
   if (!data || !data.found) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold">Aucun actif risqué détecté</h3>
-          <p className="text-muted-foreground mt-1">
-            L'analyse Alpha nécessite des positions en cryptomonnaies, actions ou ETF. Les stablecoins et le cash sont exclus.
-          </p>
-        </CardContent>
-      </Card>
+      <SharedEmptyState
+        icon={Zap}
+        title="Aucun actif risqué détecté"
+        description="L'analyse Alpha nécessite des positions en cryptomonnaies, actions ou ETF. Les stablecoins et le cash sont exclus."
+      />
     )
   }
 
@@ -164,7 +162,7 @@ function TopAlpha() {
   return (
     <div className="space-y-4">
       {/* Main Alpha Card */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -245,7 +243,7 @@ function TopAlpha() {
 
       {/* Scoreboard — other assets */}
       {allScores.length > 1 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle className="text-base">Classement Alpha</CardTitle>
             <CardDescription>Tous vos actifs classés par score de surperformance</CardDescription>
@@ -386,7 +384,7 @@ function StrategyTable() {
 
   return (
     <>
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -723,8 +721,8 @@ function FeeAnalysis() {
   return (
     <div className="space-y-4">
       {/* Summary cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <Card>
+      <SpotlightGroup className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total des frais</CardTitle>
           </CardHeader>
@@ -733,16 +731,14 @@ function FeeAnalysis() {
             <p className="text-xs text-muted-foreground">{data.nb_transactions_with_fees} transactions</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Moyenne mensuelle</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{formatCurrency(data.avg_monthly_fee)}</div>
-            <p className="text-xs text-muted-foreground">par mois</p>
-          </CardContent>
-        </Card>
-        <Card>
+        <StatCard
+          className="spot-card"
+          label="Moyenne mensuelle"
+          value={data.avg_monthly_fee}
+          format={formatCurrency}
+          hint="par mois"
+        />
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Top exchange</CardTitle>
           </CardHeader>
@@ -757,11 +753,11 @@ function FeeAnalysis() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Frais par mois</CardTitle>
           </CardHeader>
@@ -794,7 +790,7 @@ function FeeAnalysis() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Frais par exchange</CardTitle>
           </CardHeader>
@@ -836,15 +832,11 @@ function TaxLossHarvesting() {
 
   if (!data || data.nb_candidates === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <TrendingUp className="h-12 w-12 mx-auto text-gain mb-3" />
-          <h3 className="text-lg font-semibold">Aucune opportunité</h3>
-          <p className="text-muted-foreground text-sm mt-1">
-            Toutes vos positions sont en plus-value. Pas de tax-loss harvesting possible.
-          </p>
-        </CardContent>
-      </Card>
+      <SharedEmptyState
+        icon={TrendingUp}
+        title="Aucune opportunité"
+        description="Toutes vos positions sont en plus-value. Pas de tax-loss harvesting possible."
+      />
     )
   }
 
@@ -860,8 +852,8 @@ function TaxLossHarvesting() {
         </p>
       </div>
       {/* Summary */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <Card>
+      <SpotlightGroup className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Moins-values totales</CardTitle>
           </CardHeader>
@@ -870,7 +862,7 @@ function TaxLossHarvesting() {
             <p className="text-xs text-muted-foreground">{data.nb_candidates} positions</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Economie d'impôt estimée</CardTitle>
           </CardHeader>
@@ -879,7 +871,7 @@ function TaxLossHarvesting() {
             <p className="text-xs text-muted-foreground">Flat tax 30%</p>
           </CardContent>
         </Card>
-        <Card className="border-warning/20 bg-warning/5">
+        <Card elevation="raised" className="spot-card border-warning/20 bg-warning/5">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-1">
               <Lightbulb className="h-4 w-4 text-warning" />
@@ -890,10 +882,10 @@ function TaxLossHarvesting() {
             <p className="text-xs text-muted-foreground">{data.note}</p>
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       {/* Opportunities table */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle>Opportunités de harvesting</CardTitle>
           <CardDescription>Positions en moins-value pouvant réduire votre impôt</CardDescription>
@@ -965,8 +957,8 @@ function PassiveIncome() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <Card>
+      <SpotlightGroup className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total revenus passifs</CardTitle>
           </CardHeader>
@@ -975,16 +967,14 @@ function PassiveIncome() {
             <p className="text-xs text-muted-foreground">{data.nb_events} versements</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Moyenne mensuelle</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{formatCurrency(data.avg_monthly)}</div>
-            <p className="text-xs text-muted-foreground">par mois</p>
-          </CardContent>
-        </Card>
-        <Card>
+        <StatCard
+          className="spot-card"
+          label="Moyenne mensuelle"
+          value={data.avg_monthly}
+          format={formatCurrency}
+          hint="par mois"
+        />
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Projection annuelle</CardTitle>
           </CardHeader>
@@ -993,10 +983,10 @@ function PassiveIncome() {
             <p className="text-xs text-muted-foreground">basé sur les 3 derniers mois</p>
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Revenus par mois</CardTitle>
           </CardHeader>
@@ -1029,7 +1019,7 @@ function PassiveIncome() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Par type</CardTitle>
           </CardHeader>
@@ -1115,7 +1105,7 @@ function DcaBacktest() {
   return (
     <div className="space-y-4">
       {/* Config form */}
-      <Card>
+      <Card elevation="raised">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -1163,17 +1153,15 @@ function DcaBacktest() {
       {/* Results */}
       {data && !data.error && (
         <>
-          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total investi</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{formatCurrency(data.total_invested)}</div>
-                <p className="text-xs text-muted-foreground">{data.nb_months} mois</p>
-              </CardContent>
-            </Card>
-            <Card>
+          <SpotlightGroup className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            <StatCard
+              className="spot-card"
+              label="Total investi"
+              value={data.total_invested}
+              format={formatCurrency}
+              hint={<>{data.nb_months} mois</>}
+            />
+            <Card elevation="raised" className="spot-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Valeur actuelle</CardTitle>
               </CardHeader>
@@ -1183,7 +1171,7 @@ function DcaBacktest() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card elevation="raised" className="spot-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Plus-value</CardTitle>
               </CardHeader>
@@ -1194,19 +1182,17 @@ function DcaBacktest() {
                 <p className="text-xs text-muted-foreground">{data.gain_loss_pct >= 0 ? '+' : ''}{Number(data.gain_loss_pct).toFixed(2)}%</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Prix moyen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{formatCurrency(data.avg_buy_price)}</div>
-                <p className="text-xs text-muted-foreground">vs {formatCurrency(data.current_price)} actuel</p>
-              </CardContent>
-            </Card>
-          </div>
+            <StatCard
+              className="spot-card"
+              label="Prix moyen"
+              value={data.avg_buy_price}
+              format={formatCurrency}
+              hint={<>vs {formatCurrency(data.current_price)} actuel</>}
+            />
+          </SpotlightGroup>
 
           {chartData.length > 0 && (
-            <Card>
+            <Card elevation="raised">
               <CardHeader>
                 <CardTitle>Evolution : investissement vs valeur</CardTitle>
               </CardHeader>
@@ -1290,12 +1276,7 @@ function DcaBacktest() {
       )}
 
       {data?.error && (
-        <Card className="border-loss/20">
-          <CardContent className="py-6 text-center">
-            <AlertTriangle className="h-8 w-8 mx-auto text-loss mb-2" />
-            <p className="text-sm text-loss">{data.error}</p>
-          </CardContent>
-        </Card>
+        <SharedEmptyState variant="error" icon={AlertTriangle} title={data.error} />
       )}
     </div>
   )

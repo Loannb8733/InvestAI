@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import StatCard from '@/components/ui/stat-card'
+import SpotlightGroup from '@/components/ui/spotlight-group'
+import EmptyState from '@/components/ui/empty-state'
+import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi } from '@/services/api'
@@ -10,7 +14,6 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  Loader2,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react'
@@ -39,8 +42,11 @@ export default function CrowdfundingDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+        <SkeletonStatCard />
       </div>
     )
   }
@@ -56,22 +62,19 @@ export default function CrowdfundingDashboardPage() {
             Gérez vos investissements en crowdfunding immobilier et PME
           </p>
         </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Landmark className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Aucun projet</h2>
-            <p className="text-muted-foreground mb-6 text-center max-w-md">
-              Commencez par ajouter vos investissements en crowdfunding pour suivre
-              leur performance et les intégrer à votre patrimoine global.
-            </p>
+        <EmptyState
+          icon={Landmark}
+          title="Aucun projet"
+          description="Commencez par ajouter vos investissements en crowdfunding pour suivre leur performance et les intégrer à votre patrimoine global."
+          action={
             <Button asChild>
               <Link to="/crowdfunding/projects">
                 Ajouter un projet
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Link>
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
     )
   }
@@ -109,49 +112,36 @@ export default function CrowdfundingDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Investi</CardTitle>
-            <Landmark className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{formatCurrency(d.total_invested)}</div>
-            <p className="text-xs text-muted-foreground">
+      <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          className="spot-card"
+          label="Total Investi"
+          icon={Landmark}
+          value={d.total_invested}
+          format={formatCurrency}
+          hint={
+            <>
               sur {d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count} projet(s)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Rendement Projeté / an</CardTitle>
-            <TrendingUp className="h-4 w-4 text-gain" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium text-gain">
-              {formatCurrency(d.projected_annual_interest)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Taux moyen pondéré : {d.weighted_average_rate.toFixed(1)}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Reçu</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-serif font-medium">{formatCurrency(d.total_received)}</div>
-            <p className="text-xs text-muted-foreground">
-              intérêts + remboursements
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
+            </>
+          }
+        />
+        <StatCard
+          className="spot-card"
+          label="Rendement Projeté / an"
+          icon={TrendingUp}
+          value={d.projected_annual_interest}
+          format={formatCurrency}
+          hint={<>Taux moyen pondéré : {d.weighted_average_rate.toFixed(1)}%</>}
+        />
+        <StatCard
+          className="spot-card"
+          label="Total Reçu"
+          icon={CheckCircle2}
+          value={d.total_received}
+          format={formatCurrency}
+          hint="intérêts + remboursements"
+        />
+        <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Prochaine Échéance</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -175,11 +165,11 @@ export default function CrowdfundingDashboardPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </SpotlightGroup>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Platform Breakdown */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Répartition par Plateforme</CardTitle>
           </CardHeader>
@@ -232,7 +222,7 @@ export default function CrowdfundingDashboardPage() {
         </Card>
 
         {/* Status Overview */}
-        <Card>
+        <Card elevation="raised">
           <CardHeader>
             <CardTitle>Statut des Projets</CardTitle>
           </CardHeader>
@@ -259,7 +249,7 @@ export default function CrowdfundingDashboardPage() {
 
       {/* Recent Projects */}
       {d.projects.length > 0 && (
-        <Card>
+        <Card elevation="raised">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Projets Récents</CardTitle>
             <Button variant="ghost" size="sm" asChild>
