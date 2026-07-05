@@ -43,7 +43,17 @@ export default defineConfig({
       : {
           ...(process.env.VITE_HMR_PROTOCOL === 'wss'
             ? { clientPort: 443, protocol: 'wss' as const }
-            : { host: 'localhost', clientPort: Number(process.env.VITE_HMR_PORT) || 3001 }),
+            : {
+                host: 'localhost',
+                // Pas de clientPort en dur : sans valeur explicite, Vite
+                // utilise le port réellement écouté (y compris après un
+                // auto-incrément 3000→3001→…). Un fallback codé en dur
+                // provoquait une boucle websocket-mort → full reload quand
+                // le port par défaut était occupé (ex: container Docker).
+                ...(process.env.VITE_HMR_PORT
+                  ? { clientPort: Number(process.env.VITE_HMR_PORT) }
+                  : {}),
+              }),
         },
     proxy: {
       '/api': {

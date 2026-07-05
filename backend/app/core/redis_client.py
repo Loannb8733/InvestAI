@@ -13,15 +13,17 @@ from app.core.config import settings
 
 
 def redis_async_url() -> str:
-    """Return REDIS_URL cleaned for redis.asyncio.from_url().
+    """Return REDIS_URL cleaned for redis.from_url() (sync ou asyncio).
 
-    Strips the ssl_cert_reqs query param (string 'CERT_NONE' causes parse
-    errors in redis-py 5). We pass ssl_cert_reqs as a kwarg instead.
-    The raw settings.REDIS_URL is kept for Celery/kombu compatibility.
+    Strips the ssl_cert_reqs query param (kombu's CERT_* spellings cause
+    parse errors in redis-py 5). We pass ssl_cert_reqs as a kwarg instead
+    (see redis_ssl_kwargs). The raw settings.REDIS_URL is kept for
+    Celery/kombu, which reads the param from the URL.
     """
     url = settings.REDIS_URL
-    for sep in ("?ssl_cert_reqs=CERT_NONE", "&ssl_cert_reqs=CERT_NONE"):
-        url = url.replace(sep, "")
+    for value in ("CERT_REQUIRED", "CERT_OPTIONAL", "CERT_NONE", "required", "optional", "none"):
+        for sep in (f"?ssl_cert_reqs={value}", f"&ssl_cert_reqs={value}"):
+            url = url.replace(sep, "")
     if url.endswith("?"):
         url = url[:-1]
     return url
@@ -30,11 +32,12 @@ def redis_async_url() -> str:
 def redis_ssl_kwargs() -> Dict[str, Any]:
     """Return extra kwargs needed for TLS connections (Upstash).
 
-    Uses ssl_cert_reqs="none" (lowercase string) which redis-py 5.x
-    accepts alongside the rediss:// URL scheme.
+    ssl_cert_reqs="required" : redis-py valide le certificat du broker
+    (Upstash sert un certificat public de confiance — ne jamais désactiver
+    la validation : CERT_NONE exposait au MITM).
     """
     if settings.REDIS_URL.startswith("rediss://"):
-        return {"ssl_cert_reqs": "none"}
+        return {"ssl_cert_reqs": "required"}
     return {}
 
 

@@ -33,8 +33,9 @@ def _get_real_client_ip(request: Request) -> str:
 def _limiter_storage_uri() -> str:
     """Return a cleaned Redis URL for the synchronous limits storage.
 
-    Reuses the same cleaning logic as the async client to strip
-    ssl_cert_reqs=CERT_NONE which redis-py 5.x rejects as a string.
+    Reuses the same cleaning logic as the async client: the kombu-spelled
+    ssl_cert_reqs query param is stripped and re-passed as a kwarg via
+    redis_ssl_kwargs(), with certificate validation enabled.
     """
     return redis_async_url()
 

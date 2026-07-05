@@ -136,14 +136,17 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         """Build Redis URL. Uses REDIS_URL env var if set.
 
-        For Upstash (rediss://), appends ssl_cert_reqs=CERT_NONE when missing
-        to avoid Celery/kombu SSL warnings.
+        For Upstash (rediss://), appends ssl_cert_reqs=CERT_REQUIRED when
+        missing so Celery/kombu VALIDATE the broker's TLS certificate (Upstash
+        serves a publicly-trusted cert ; CERT_NONE laissait la connexion
+        vulnérable au MITM). Échappatoire : un ssl_cert_reqs explicite dans
+        l'URL d'environnement est respecté tel quel.
         """
         external = os.environ.get("REDIS_URL", "")
         if external:
             if external.startswith("rediss://") and "ssl_cert_reqs" not in external:
                 sep = "&" if "?" in external else "?"
-                external = f"{external}{sep}ssl_cert_reqs=CERT_NONE"
+                external = f"{external}{sep}ssl_cert_reqs=CERT_REQUIRED"
             return external
         if self.REDIS_PASSWORD:
             return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
