@@ -977,8 +977,11 @@ async def _sync_detailed_transactions(
                 asset.quantity = max(0.0, float(asset.quantity) - qty)
 
                 # Create the matching TRANSFER_IN on the cold wallet (cost basis).
+                # amount_is_net: the exchange API's withdrawal amount is already
+                # the net received on-chain (fee charged on top) — see
+                # transfer_service docstring.
                 try:
-                    await create_mirror_transfer_in(db, transaction, asset, destination)
+                    await create_mirror_transfer_in(db, transaction, asset, destination, amount_is_net=True)
                 except Exception as mirror_err:  # noqa: BLE001 - mirror is best-effort
                     logger.warning("Mirror transfer_in failed for %s: %s", base_asset, mirror_err)
 

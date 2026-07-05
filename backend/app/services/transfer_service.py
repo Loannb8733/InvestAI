@@ -18,11 +18,34 @@ logger = logging.getLogger(__name__)
 COLD_WALLET_DESTINATION = "Tangem"
 
 
+def mirror_received_qty(
+    qty: Decimal,
+    fee: Decimal,
+    fee_currency: str,
+    symbol: str,
+    *,
+    amount_is_net: bool,
+) -> Decimal:
+    """Net quantity that actually lands on the destination wallet.
+
+    Manual entries record the GROSS sent amount → net = qty − fee (when the
+    network fee is paid in the transferred asset). Exchange withdrawal APIs
+    (Binance/Kraken) report ``amount`` already NET of the network fee — the fee
+    is charged on top of it — so deducting again double-counts the fee
+    (amount_is_net=True → net = qty).
+    """
+    if not amount_is_net and fee > 0 and (not fee_currency or fee_currency == symbol):
+        return qty - fee
+    return qty
+
+
 async def create_mirror_transfer_in(
     db: AsyncSession,
     source_transaction: Transaction,
     source_asset: Asset,
     destination_exchange: str,
+    *,
+    amount_is_net: bool = False,
 ) -> Transaction:
     """Create a mirror transfer_in on the destination platform.
 
@@ -34,6 +57,13 @@ async def create_mirror_transfer_in(
         source_transaction: The transfer_out transaction.
         source_asset: The asset on the source exchange.
         destination_exchange: Name of the destination platform (e.g. "Tangem").
+        amount_is_net: True when the source quantity is ALREADY the net amount
+            received on-chain. Exchange withdrawal APIs (Binance/Kraken) report
+            ``amount`` net of the network fee — the fee is charged on top — so
+            the mirror must NOT subtract the fee again (double-deduction bug
+            that desynced cold-wallet balances vs Tangem). Manual entries keep
+            the historical gross semantics (False: user records the gross sent
+            amount, mirror = qty − fee).
 
     Returns:
         The created mirror transfer_in transaction.
@@ -74,11 +104,7 @@ async def create_mirror_transfer_in(
     fee_currency = (source_transaction.fee_currency or "").upper()
     symbol = source_asset.symbol.upper()
 
-    # Network fees are paid in the transferred asset
-    if fee > 0 and (not fee_currency or fee_currency == symbol):
-        mirror_qty = qty - fee
-    else:
-        mirror_qty = qty
+    mirror_qty = mirror_received_qty(qty, fee, fee_currency, symbol, amount_is_net=amount_is_net)
 
     if mirror_qty <= 0:
         logger.warning(

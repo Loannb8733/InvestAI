@@ -1349,13 +1349,21 @@ async def import_trade_history(
                         Transaction.asset_id.in_(withdrawal_asset_ids),
                         Transaction.transaction_type == TransactionType.TRANSFER_OUT,
                         Transaction.related_transaction_id.is_(None),
+                        # Mirror ONLY real on-chain withdrawals. Balance-sync
+                        # adjustments ("Ajustement balance ...", ext Kraken_sync_*)
+                        # and manual phantom zeroings (manual_phantom_out_*) are
+                        # bookkeeping rows with NO on-chain movement — mirroring
+                        # them fabricated coins on the cold wallet.
+                        Transaction.external_id.like("withdrawal_%"),
                     )
                 )
                 for w_tx in withdrawal_txs_result.scalars().all():
                     w_asset_result = await db.execute(select(Asset).where(Asset.id == w_tx.asset_id))
                     w_asset = w_asset_result.scalar_one_or_none()
                     if w_asset:
-                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination)
+                        # amount_is_net: exchange APIs report the net received
+                        # amount (network fee charged on top) — do not deduct.
+                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination, amount_is_net=True)
                 await db.flush()
 
         # Create assets for API balances that have no transactions (e.g. airdrops, dust)
