@@ -4,7 +4,7 @@ import enum
 import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, Enum, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
 from app.models import Base
@@ -31,6 +31,10 @@ class User(Base):
     preferred_currency = Column(String(10), default="EUR", nullable=False)
     telegram_chat_id = Column(String(100), nullable=True)
     telegram_enabled = Column(Boolean, default=False, nullable=False)
+    # Allocation cible par classe crypto (ex: {"L1": 0.5, "Stable": 0.2, ...},
+    # fractions sommant à 1.0). Clé de voûte du pilotage : widget d'écart sur
+    # le dashboard + rapport de rebalancing. NULL = pas encore définie.
+    target_allocations = Column(JSONB, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verification_token = Column(String(255), nullable=True)
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)

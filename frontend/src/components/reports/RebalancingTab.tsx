@@ -1,10 +1,12 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { queryKeys } from '@/lib/queryKeys'
 import { reportsApi } from '@/services/api'
 import { formatCurrency } from '@/lib/utils'
 import { CRYPTO_CLASS_LABELS, CRYPTO_CLASS_COLORS } from '@/lib/constants'
@@ -65,10 +67,30 @@ const DEFAULT_TARGETS: Record<string, number> = {
 export default function RebalancingTab() {
   const { toast } = useToast()
   const { theme, color } = useNivoTheme()
+  const queryClient = useQueryClient()
   const [targets, setTargets] = useState<Record<string, number>>(DEFAULT_TARGETS)
   const [data, setData] = useState<RebalancingData | null>(null)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const userTouched = useRef(false)
+
+  // Cible persistée : les sliders repartent de TA cible enregistrée, plus des
+  // valeurs par défaut réinitialisées à chaque visite.
+  const { data: savedTargets } = useQuery({
+    queryKey: queryKeys.reports.rebalancingTargets,
+    queryFn: reportsApi.getRebalancingTargets,
+    staleTime: 5 * 60_000,
+    meta: { suppressGlobalError: true },
+  })
+  useEffect(() => {
+    if (!userTouched.current && savedTargets?.targets) {
+      const pct: Record<string, number> = { ...DEFAULT_TARGETS }
+      for (const k of Object.keys(pct)) pct[k] = 0
+      for (const [k, v] of Object.entries(savedTargets.targets)) pct[k] = Math.round(v * 100)
+      setTargets(pct)
+    }
+  }, [savedTargets])
 
   const totalPct = useMemo(
     () => Object.values(targets).reduce((s, v) => s + v, 0),
@@ -78,8 +100,29 @@ export default function RebalancingTab() {
   const isValid = Math.abs(totalPct - 100) <= 1
 
   const updateTarget = useCallback((key: string, value: number) => {
+    userTouched.current = true
     setTargets((prev) => ({ ...prev, [key]: Math.max(0, Math.min(100, value)) }))
   }, [])
+
+  const handleSaveTargets = async () => {
+    if (!isValid) return
+    setSaving(true)
+    try {
+      const allocations: Record<string, number> = {}
+      for (const [k, v] of Object.entries(targets)) {
+        if (v > 0) allocations[k] = v / 100
+      }
+      await reportsApi.saveRebalancingTargets(allocations)
+      // Le widget d'écart du dashboard doit refléter la nouvelle cible.
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.rebalancingTargets })
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.rebalancingDrift })
+      toast({ title: 'Allocation cible enregistrée', description: 'Le dashboard suit désormais vos écarts vs cette cible.' })
+    } catch {
+      toast({ title: "Impossible d'enregistrer la cible", variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleCompute = async () => {
     if (!isValid) return
@@ -191,14 +234,29 @@ export default function RebalancingTab() {
                 </span>
               )}
             </div>
-            <Button onClick={handleCompute} disabled={!isValid || loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ArrowRightLeft className="h-4 w-4 mr-2" />
-              )}
-              Calculer
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleSaveTargets}
+                disabled={!isValid || saving}
+                title="Enregistre cette allocation comme cible : le dashboard suivra vos écarts"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Scale className="h-4 w-4 mr-2" />
+                )}
+                Définir comme cible
+              </Button>
+              <Button onClick={handleCompute} disabled={!isValid || loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                )}
+                Calculer
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

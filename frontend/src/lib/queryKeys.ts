@@ -156,6 +156,8 @@ export const queryKeys = {
     all: ['reports'] as const,
     availableYears: ['reports', 'availableYears'] as const,
     taxSummary: (year: number) => ['reports', 'taxSummary', year] as const,
+    rebalancingTargets: ['reports', 'rebalancingTargets'] as const,
+    rebalancingDrift: ['reports', 'rebalancingDrift'] as const,
   },
 
   strategies: {

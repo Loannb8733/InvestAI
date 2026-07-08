@@ -63,6 +63,7 @@ import { useDashboardLayout, WIDGET_LABELS, type WidgetId } from '@/hooks/useDas
 import DashboardMetricsRow from '@/components/dashboard/DashboardMetricsRow'
 import DashboardPnlCard from '@/components/dashboard/DashboardPnlCard'
 import DashboardRiskCards from '@/components/dashboard/DashboardRiskCards'
+import AllocationDriftCard from '@/components/dashboard/AllocationDriftCard'
 import DashboardBenchmarkChart from '@/components/dashboard/DashboardBenchmarkChart'
 import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCard'
 import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
@@ -669,6 +670,8 @@ export default function DashboardPage() {
                 return (
                   <DashboardRiskCards riskMetrics={risk_metrics} periodLabel={periodLabel} privacyMode={privacyMode} />
                 )
+              case 'allocation-drift':
+                return <AllocationDriftCard />
               case 'roi-concentration':
                 return (
                   <SpotlightGroup className="grid gap-4 md:grid-cols-3">

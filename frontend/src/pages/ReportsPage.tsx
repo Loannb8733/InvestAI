@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,8 +48,13 @@ interface ReportCard {
   actions: ReportAction[]
 }
 
+const VALID_TABS = new Set(['exports', 'fiscal', 'strategy'])
+
 export default function ReportsPage() {
   const { toast } = useToast()
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : 'exports'
   const [selectedYearCrypto, setSelectedYearCrypto] = useState<string>(
     new Date().getFullYear().toString()
   )
@@ -315,7 +321,9 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="exports" className="space-y-6">
+      {/* ?tab=strategy permet au widget d'écart du dashboard de pointer
+          directement sur le rééquilibrage */}
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="exports" className="gap-2">
             <FileDown className="h-4 w-4" />

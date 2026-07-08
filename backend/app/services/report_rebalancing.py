@@ -85,6 +85,7 @@ class RebalancingReportMixin:
         user_id: str,
         target_allocations: Dict[str, float],
         currency: str = "EUR",
+        estimate_tax: bool = True,
     ) -> RebalancingReport:
         """Compute rebalancing orders to reach target allocation per crypto class.
 
@@ -175,7 +176,8 @@ class RebalancingReportMixin:
 
         # 5. Estimate tax impact for sell orders via FIFO
         # We need the FIFO layers to estimate unrealized gains on the assets to sell
-        if any(o.action == "sell" for o in orders):
+        # (skippable — le widget de drift du dashboard n'a pas besoin du replay FIFO)
+        if estimate_tax and any(o.action == "sell" for o in orders):
             await self._estimate_rebalancing_tax(
                 db,
                 user_id,

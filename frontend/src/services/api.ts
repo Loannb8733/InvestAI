@@ -895,6 +895,23 @@ export const alertsApi = {
 }
 
 // Reports API
+export interface RebalancingDriftCategory {
+  category: string
+  label: string
+  current_value: number
+  current_pct: number
+  target_pct: number
+  drift_pct: number
+  drift_eur: number
+}
+
+export interface RebalancingDrift {
+  targets: Record<string, number> | null
+  categories: RebalancingDriftCategory[]
+  max_drift_pct: number
+  total_crypto_value: number
+}
+
 export interface TaxSummary {
   year: number
   nb_cessions: number
@@ -992,6 +1009,25 @@ export const reportsApi = {
     const response = await api.post('/reports/rebalancing', {
       target_allocations: targetAllocations,
     })
+    return response.data
+  },
+
+  /** Allocation cible persistée (null si jamais définie). */
+  getRebalancingTargets: async (): Promise<{ targets: Record<string, number> | null }> => {
+    const response = await api.get('/reports/rebalancing/targets')
+    return response.data
+  },
+
+  saveRebalancingTargets: async (targetAllocations: Record<string, number>) => {
+    const response = await api.put('/reports/rebalancing/targets', {
+      target_allocations: targetAllocations,
+    })
+    return response.data
+  },
+
+  /** Écart actuel vs cible — version légère (sans estimation fiscale). */
+  getRebalancingDrift: async (): Promise<RebalancingDrift> => {
+    const response = await api.get('/reports/rebalancing/drift')
     return response.data
   },
 

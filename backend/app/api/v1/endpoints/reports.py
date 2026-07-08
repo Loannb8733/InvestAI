@@ -332,6 +332,70 @@ async def get_rebalancing_report(
     }
 
 
+# ── Allocation cible persistée (clé de voûte du pilotage) ────────────────
+
+
+@router.get("/rebalancing/targets")
+@limiter.limit("30/minute")
+async def get_rebalancing_targets(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Allocation cible enregistrée de l'utilisateur (null si jamais définie)."""
+    return {"targets": current_user.target_allocations}
+
+
+@router.put("/rebalancing/targets")
+@limiter.limit("10/minute")
+async def save_rebalancing_targets(
+    request: Request,
+    body: RebalancingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persiste l'allocation cible (même validation que le rapport : somme = 1.0).
+
+    Avant, les cibles vivaient en dur dans le front et se réinitialisaient à
+    chaque visite — aucun pilotage d'écart possible.
+    """
+    current_user.target_allocations = body.target_allocations
+    await db.commit()
+    return {"targets": current_user.target_allocations}
+
+
+@router.get("/rebalancing/drift")
+@limiter.limit("30/minute")
+async def get_rebalancing_drift(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Écart actuel vs allocation cible — version légère pour le dashboard.
+
+    Réutilise le moteur de rebalancing SANS l'estimation fiscale (pas de
+    replay FIFO) ; s'appuie sur le cache du dashboard, donc quasi gratuit.
+    """
+    targets = current_user.target_allocations
+    if not targets:
+        return {"targets": None, "categories": [], "max_drift_pct": 0.0, "total_crypto_value": 0.0}
+
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    report = await report_service.get_rebalancing_report(
+        db,
+        str(current_user.id),
+        targets,
+        currency=currency,
+        estimate_tax=False,
+    )
+    max_drift = max((abs(c["drift_pct"]) for c in report.categories), default=0.0)
+    return {
+        "targets": targets,
+        "categories": report.categories,
+        "max_drift_pct": round(max_drift, 2),
+        "total_crypto_value": report.total_value,
+    }
+
+
 @router.post("/rebalancing/pdf")
 @limiter.limit("10/minute")
 async def get_rebalancing_report_pdf(
