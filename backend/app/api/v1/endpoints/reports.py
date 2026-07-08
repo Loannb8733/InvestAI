@@ -86,6 +86,38 @@ async def get_performance_report_excel(
     )
 
 
+@router.get("/tax/{year}/summary")
+@limiter.limit("20/minute")
+async def get_tax_summary(
+    request: Request,
+    year: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Synthèse fiscale 2086 de l'année, en JSON (pour l'affichage in-app).
+
+    C'est la VRAIE base imposable française (méthode d'acquisition globale,
+    cessions crypto→fiat uniquement) — contrairement à un « réalisé all-time
+    × 30 % » qui surestime (conversions crypto↔crypto incluses, toutes années
+    cumulées). Les events détaillés sont exclus du payload (voir le PDF).
+    """
+    if year < 2015 or year > datetime.now().year:
+        year = datetime.now().year
+
+    tax = await report_service.compute_tax_2086(db, str(current_user.id), year)
+    return {
+        "year": tax.year,
+        "nb_cessions": tax.nb_cessions,
+        "total_cessions": round(tax.total_cessions, 2),
+        "total_plus_values": round(tax.total_plus_values, 2),
+        "total_moins_values": round(tax.total_moins_values, 2),
+        "net_plus_value": round(tax.net_plus_value, 2),
+        "flat_tax_30": round(tax.flat_tax_30, 2),
+        "ir_12_8": round(tax.ir_12_8, 2),
+        "ps_17_2": round(tax.ps_17_2, 2),
+    }
+
+
 @router.get("/tax/{year}/pdf")
 @limiter.limit("10/minute")
 async def get_tax_report_pdf(

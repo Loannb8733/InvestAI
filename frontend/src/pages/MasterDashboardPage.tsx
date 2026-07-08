@@ -150,11 +150,18 @@ export default function MasterDashboardPage() {
 
   // ============== Computed values ==============
 
+  // Valeur crowdfunding = capital restant dû (les remboursements de capital
+  // sortent de la poche ; le principal en défaut est provisionné donc exclu).
+  // L'ancien calcul valorisait au coût d'origine — faux dès le 1er remboursement.
+  const cfValue = useMemo(
+    () => cfDashboard?.capital_outstanding ?? cfDashboard?.total_invested ?? 0,
+    [cfDashboard]
+  )
+
   const netWorth = useMemo(() => {
     const cryptoValue = metrics?.total_value ?? 0
-    const cfValue = cfDashboard?.total_invested ?? 0
     return cryptoValue + cfValue
-  }, [metrics, cfDashboard])
+  }, [metrics, cfValue])
 
   const totalInvested = useMemo(() => {
     return (metrics?.total_invested ?? 0) + (cfDashboard?.total_invested ?? 0)
@@ -186,30 +193,34 @@ export default function MasterDashboardPage() {
     const verb = change.amount >= 0 ? 'progressé' : 'reculé'
     const amount = formatCurrency(Math.abs(change.amount))
     const pct = `${Math.abs(change.percent).toFixed(2)} %`
-    return `${when}, ton patrimoine a ${verb} de ${amount} (${pct}).`
-  }, [metrics, change, selectedPeriod])
+    // Honnêteté du récit : la variation ne couvre que la poche marchés — le
+    // crowdfunding n'a pas de valorisation quotidienne.
+    const scope = cfValue > 0 ? 'ta poche marchés a' : 'ton patrimoine a'
+    return `${when}, ${scope} ${verb} de ${amount} (${pct}).`
+  }, [metrics, change, selectedPeriod, cfValue])
 
   const pnl = useMemo(() => {
     const cryptoPnl = metrics?.advanced_metrics?.pnl_breakdown?.net_pnl ?? 0
-    const cfInterest = (cfDashboard?.total_received ?? 0) - (cfDashboard?.total_invested ?? 0)
-    return cryptoPnl + cfInterest
+    // P&L crowdfunding = intérêts réellement encaissés − principal en défaut
+    // (provision). Le capital vivant n'est JAMAIS une perte, ni le capital
+    // remboursé un gain — l'ancien calcul (reçu − investi) comptait chaque
+    // projet en cours comme une perte du principal.
+    const cfInterest = cfDashboard?.total_interest_received ?? 0
+    const cfDefaultLoss = cfDashboard?.defaulted_outstanding ?? 0
+    return cryptoPnl + cfInterest - cfDefaultLoss
   }, [metrics, cfDashboard])
 
-  // Blend CAGR: weighted by capital
-  const blendedReturn = useMemo(() => {
-    const cryptoCAGR = metrics?.advanced_metrics?.roi_annualized ?? 0
-    const cryptoWeight = metrics?.total_value ?? 0
-    const cfWeight = cfDashboard?.total_invested ?? 0
-    const cfReturn = cfDashboard?.weighted_average_rate ?? 0
-    const totalWeight = cryptoWeight + cfWeight
-    if (totalWeight === 0) return 0
-    return (cryptoCAGR * cryptoWeight + cfReturn * cfWeight) / totalWeight
-  }, [metrics, cfDashboard])
+  // Rendements par poche — SANS blend. L'ancien calcul mélangeait un CAGR
+  // crypto réalisé (backward, base valeur) avec un taux contractuel nominal
+  // crowdfunding (forward, base investie) : ni TWR ni MWR, incomparable.
+  // On affiche les deux séparément, chacun avec sa nature.
+  const cryptoCagr = metrics?.advanced_metrics?.roi_annualized ?? null
+  const cfContractualRate = cfDashboard?.weighted_average_rate ?? null
 
-  // Merge allocation: crypto allocation + crowdfunding segment
+  // Merge allocation: crypto allocation + crowdfunding segment (au CRD, pas au coût)
   const mergedAllocation = useMemo(() => {
     const cryptoAlloc = metrics?.allocation ?? []
-    const cfTotal = cfDashboard?.total_invested ?? 0
+    const cfTotal = cfValue
     if (cfTotal <= 0) return cryptoAlloc
 
     const totalAll = cryptoAlloc.reduce((s, a) => s + a.value, 0) + cfTotal
@@ -223,7 +234,7 @@ export default function MasterDashboardPage() {
       percentage: totalAll > 0 ? (cfTotal / totalAll) * 100 : 0,
     })
     return result
-  }, [metrics, cfDashboard])
+  }, [metrics, cfValue])
 
   // Points d'attention (max 3)
   const attentionItems = useMemo(() => {
@@ -441,20 +452,39 @@ export default function MasterDashboardPage() {
           </div>
         </motion.div>
 
-        {/* Rendement annualisé */}
+        {/* Rendements par poche — deux natures de chiffres, jamais blendés :
+            CAGR crypto = réalisé (backward) ; taux crowdfunding = contractuel
+            nominal (forward). Les mélanger produisait un chiffre sans sens. */}
         <motion.div variants={kpiVariants}>
           <div className="spot-card elev-1 rounded-lg border border-border bg-card p-4 hover:bg-muted/40 transition-colors cursor-default">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
               <BarChart3 className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-wide">Rendement annualisé</span>
+              <span className="uppercase tracking-wide">Rendements par poche</span>
             </div>
-            <AnimatedNumber
-              value={blendedReturn}
-              formatter={formatPercent}
-              className={`text-xl font-semibold tabular tracking-tight ${
-                blendedReturn >= 0 ? 'text-gain' : 'text-loss'
-              }`}
-            />
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Crypto (réalisé)</span>
+              {cryptoCagr !== null ? (
+                <AnimatedNumber
+                  value={cryptoCagr}
+                  formatter={formatPercent}
+                  className={`text-sm font-semibold tabular ${cryptoCagr >= 0 ? 'text-gain' : 'text-loss'}`}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground" title="CAGR indisponible (moins de 180 jours d'historique)">—</span>
+              )}
+            </div>
+            {cfValue > 0 && (
+              <div className="flex items-baseline justify-between gap-2 mt-1">
+                <span className="text-xs text-muted-foreground">Crowdfunding (contractuel)</span>
+                {cfContractualRate !== null ? (
+                  <span className="text-sm font-semibold tabular text-foreground">
+                    {formatPercent(cfContractualRate)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            )}
           </div>
         </motion.div>
 

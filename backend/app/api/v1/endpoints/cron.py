@@ -43,6 +43,33 @@ async def cron_sync_exchanges() -> dict:
     return {"task": "sync-exchanges", "result": result}
 
 
+@router.post("/sync-goals", dependencies=[Depends(verify_cron_token)])
+async def cron_sync_goals() -> dict:
+    """Synchronise quotidiennement les jauges d'objectifs de tous les
+    utilisateurs sur la valeur réelle de leur portefeuille — sans quoi elles
+    ne bougent que quand l'utilisateur clique « Sync »."""
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.goal import Goal, GoalStatus
+    from app.services.goal_projection_service import sync_goals_for_user
+
+    logger.info("Cron: sync-goals started")
+    synced_total = 0
+    users_done = 0
+    async with AsyncSessionLocal() as db:
+        user_ids = (
+            (await db.execute(select(Goal.user_id).where(Goal.status == GoalStatus.ACTIVE).distinct())).scalars().all()
+        )
+        for uid in user_ids:
+            try:
+                synced_total += await sync_goals_for_user(db, uid)
+                users_done += 1
+            except Exception as exc:  # noqa: BLE001 — un user en échec ne bloque pas les autres
+                logger.warning("sync-goals failed for user %s: %s", uid, exc)
+    return {"task": "sync-goals", "result": {"users": users_done, "goals_synced": synced_total}}
+
+
 @router.post("/daily-snapshot", dependencies=[Depends(verify_cron_token)])
 async def cron_daily_snapshot() -> dict:
     """Persist the daily portfolio snapshot for every user."""

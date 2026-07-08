@@ -691,7 +691,11 @@ async def _get_dashboard_impl(
     )
     asset_ccy_map = {str(row[0]): (row[1] or "EUR").upper() for row in asset_ccy_result.fetchall()}
 
-    # Re-compute with accurate per-asset currencies
+    # Re-compute with accurate per-asset currencies.
+    # « crypto = USD » était trompeur pour le risque de change : l'or tokenisé
+    # (PAXG…) est une exposition OR, les stablecoins EUR une exposition EUR.
+    from app.services.asset_classification import STABLECOIN_PEGS, is_safe_haven
+
     ccy_totals = {}
     for a in metrics.get("assets", []):
         a_val = a.get("current_value", 0.0)
@@ -699,8 +703,12 @@ async def _get_dashboard_impl(
             continue
         a_id = a.get("id", "")
         a_type = a.get("asset_type", "")
+        a_sym = (a.get("symbol") or "").upper()
         if a_type == "crypto":
-            a_ccy = "USD"
+            if is_safe_haven(a_sym):
+                a_ccy = "OR"
+            else:
+                a_ccy = STABLECOIN_PEGS.get(a_sym, "USD")
         else:
             a_ccy = asset_ccy_map.get(a_id, "EUR")
         ccy_totals[a_ccy] = ccy_totals.get(a_ccy, 0.0) + a_val

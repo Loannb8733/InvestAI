@@ -16,7 +16,7 @@ from app.core.rate_limit import limiter
 from app.models.asset import Asset, AssetType
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
-from app.models.crowdfunding_repayment import CrowdfundingRepayment
+from app.models.crowdfunding_repayment import CrowdfundingRepayment, PaymentType
 from app.models.portfolio import Portfolio
 from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
@@ -332,6 +332,40 @@ async def get_dashboard(
     total_invested = sum(float(p.invested_amount) for p in projects)
     total_received = sum(float(p.total_received) for p in projects)
 
+    # ── Décomposition capital / intérêts (rigueur comptable) ─────────────
+    # Un remboursement de capital n'est PAS un gain (retour de principal) ;
+    # seul l'intérêt est du P&L. Le capital restant dû (CRD) est la vraie
+    # valeur de la poche crowdfunding — pas le montant investi au coût.
+    # Répartition : split explicite (interest_amount/capital_amount) quand il
+    # existe ; sinon par payment_type ; un BOTH sans split est compté en
+    # capital (conservateur : aucun gain fictif).
+    total_interest_received = 0.0
+    capital_repaid_by_project: dict = {}
+    for pid, reps in reps_map.items():
+        cap = 0.0
+        for r in reps:
+            interest = float(r.interest_amount or 0)
+            capital = float(r.capital_amount or 0)
+            if interest == 0 and capital == 0:
+                amount = float(r.amount or 0)
+                if r.payment_type == PaymentType.INTEREST:
+                    interest = amount
+                else:  # CAPITAL, ou BOTH sans split → conservateur
+                    capital = amount
+            total_interest_received += interest
+            cap += capital
+        capital_repaid_by_project[pid] = cap
+
+    total_capital_repaid = sum(capital_repaid_by_project.values())
+    capital_outstanding = 0.0  # CRD des projets non défaillants
+    defaulted_outstanding = 0.0  # principal exposé sur projets en défaut (provision)
+    for p in projects:
+        crd = max(0.0, float(p.invested_amount) - capital_repaid_by_project.get(p.id, 0.0))
+        if p.status == ProjectStatus.DEFAULTED:
+            defaulted_outstanding += crd
+        else:
+            capital_outstanding += crd
+
     active = [p for p in projects if p.status == ProjectStatus.ACTIVE]
     projected_annual = sum(float(p.invested_amount) * float(p.annual_rate) / 100 for p in active)
 
@@ -359,6 +393,10 @@ async def get_dashboard(
     return CrowdfundingDashboardResponse(
         total_invested=round(total_invested, 2),
         total_received=round(total_received, 2),
+        total_interest_received=round(total_interest_received, 2),
+        total_capital_repaid=round(total_capital_repaid, 2),
+        capital_outstanding=round(capital_outstanding, 2),
+        defaulted_outstanding=round(defaulted_outstanding, 2),
         projected_annual_interest=round(projected_annual, 2),
         weighted_average_rate=round(weighted_rate, 3),
         active_count=status_counts[ProjectStatus.ACTIVE],

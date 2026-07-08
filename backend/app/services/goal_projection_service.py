@@ -422,5 +422,70 @@ class GoalProjectionService:
         )
 
 
+async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> int:
+    """Met à jour ``current_amount`` des objectifs d'un utilisateur depuis la
+    valeur réelle du portefeuille (SAVINGS = liquidités uniquement).
+
+    Extrait de l'endpoint POST /goals/{id}/sync pour être partagé avec le cron
+    quotidien — une jauge d'objectif qui date de trois semaines est un
+    instrument de pilotage mort. Retourne le nombre d'objectifs synchronisés.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.models.asset import Asset
+    from app.models.goal import Goal, GoalStatus, GoalType
+    from app.models.portfolio import Portfolio
+    from app.services.asset_classification import is_liquidity
+    from app.services.price_service import price_service
+
+    conditions = [Goal.user_id == user_id, Goal.status == GoalStatus.ACTIVE]
+    if only_goal_id is not None:
+        conditions = [Goal.user_id == user_id, Goal.id == only_goal_id]
+    goals = (await db.execute(select(Goal).where(*conditions))).scalars().all()
+    if not goals:
+        return 0
+
+    portfolios = (await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))).scalars().all()
+    portfolio_ids = [p.id for p in portfolios]
+    assets = (
+        (await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))).scalars().all()
+        if portfolio_ids
+        else []
+    )
+
+    # Deux valorisations partagées par tous les objectifs de l'utilisateur :
+    # totale (WEALTH/…) et liquidités seules (SAVINGS). Prix dédupliqués.
+    price_cache: dict = {}
+    total_value = Decimal("0")
+    liquid_value = Decimal("0")
+    for asset in assets:
+        if float(asset.quantity) <= 0:
+            continue
+        pkey = (asset.symbol, asset.asset_type.value)
+        if pkey not in price_cache:
+            price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
+        value = asset.quantity * Decimal(str(price_cache[pkey]))
+        total_value += value
+        if is_liquidity(asset.symbol):
+            liquid_value += value
+    cash_total = Decimal("0")
+    for portfolio in portfolios:
+        for _ccy, amount in (portfolio.cash_balances or {}).items():
+            cash_total += Decimal(str(amount))
+
+    synced = 0
+    for goal in goals:
+        is_savings = goal.goal_type == GoalType.SAVINGS
+        goal.current_amount = (liquid_value + cash_total) if is_savings else total_value
+        if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
+            goal.status = GoalStatus.REACHED
+        synced += 1
+
+    await db.commit()
+    return synced
+
+
 # Singleton
 goal_projection_service = GoalProjectionService()

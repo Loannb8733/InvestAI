@@ -1,6 +1,7 @@
 """Calendar endpoints for financial events and reminders."""
 
 import calendar
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -13,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.calendar_event import CalendarEvent, EventType
+
+logger = logging.getLogger(__name__)
 from app.models.user import User
 
 router = APIRouter()
@@ -152,26 +155,39 @@ async def get_calendar_summary(
     )
     events_this_month = month_result.scalar() or 0
 
-    income_result = await db.execute(
-        select(func.coalesce(func.sum(CalendarEvent.amount), 0)).where(
-            base,
-            CalendarEvent.event_type.in_(income_types),
-            CalendarEvent.is_completed.is_(False),
-            CalendarEvent.event_date >= now,
+    # Sommes PAR DEVISE puis conversion en EUR — l'ancien SUM brut additionnait
+    # des montants EUR/USD/GBP entre eux et affichait le tout « en EUR ».
+    async def _income_eur(*extra_conds) -> float:
+        result = await db.execute(
+            select(CalendarEvent.currency, func.coalesce(func.sum(CalendarEvent.amount), 0))
+            .where(
+                base,
+                CalendarEvent.event_type.in_(income_types),
+                CalendarEvent.is_completed.is_(False),
+                *extra_conds,
+            )
+            .group_by(CalendarEvent.currency)
         )
-    )
-    total_income = float(income_result.scalar() or 0)
+        total = 0.0
+        for ccy, amount in result.all():
+            amount = float(amount or 0)
+            ccy = (ccy or "EUR").upper()
+            if ccy != "EUR" and amount:
+                try:
+                    from app.services.price_service import price_service
 
-    income_month_result = await db.execute(
-        select(func.coalesce(func.sum(CalendarEvent.amount), 0)).where(
-            base,
-            CalendarEvent.event_type.in_(income_types),
-            CalendarEvent.is_completed.is_(False),
-            CalendarEvent.event_date >= month_start,
-            CalendarEvent.event_date < month_end,
-        )
+                    rate = await price_service.get_forex_rate(ccy, "EUR")
+                    amount = amount * float(rate) if rate else amount
+                except Exception as exc:  # noqa: BLE001 — best-effort, montant brut sinon
+                    logger.debug("Conversion %s->EUR indisponible pour le résumé calendrier: %s", ccy, exc)
+            total += amount
+        return total
+
+    total_income = await _income_eur(CalendarEvent.event_date >= now)
+    income_this_month = await _income_eur(
+        CalendarEvent.event_date >= month_start,
+        CalendarEvent.event_date < month_end,
     )
-    income_this_month = float(income_month_result.scalar() or 0)
 
     return CalendarSummaryResponse(
         total_events=total_events,

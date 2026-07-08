@@ -212,10 +212,13 @@ export default function ReportsPage() {
     ],
   }
 
+  // Backend = stub 501 : afficher l'état honnêtement plutôt que de laisser
+  // l'utilisateur découvrir l'échec au clic de téléchargement.
   const stocksTaxCard: ReportCard = {
     id: 'tax-stocks',
-    title: 'Valeurs Mobilières (Flat Tax)',
-    description: 'Plus-values sur actions, ETF et obligations. Prélèvement forfaitaire unique (PFU) 30% ou barème progressif.',
+    title: 'Valeurs Mobilières (Flat Tax) — Bientôt disponible',
+    description:
+      'Plus-values sur actions, ETF et obligations (PFU 30 % ou barème progressif). Fonctionnalité en cours de développement — les exports ne sont pas encore actifs.',
     icon: BarChart3,
     color: 'text-accent',
     bgColor: 'bg-accent/10',

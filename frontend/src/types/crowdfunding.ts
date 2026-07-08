@@ -108,6 +108,14 @@ export interface CrowdfundingUpdateData {
 export interface CrowdfundingDashboard {
   total_invested: number
   total_received: number
+  /** Intérêts réellement encaissés (seul vrai P&L — le capital remboursé n'est pas un gain). */
+  total_interest_received: number
+  /** Capital déjà remboursé (retour de principal, pas un gain). */
+  total_capital_repaid: number
+  /** Capital restant dû des projets sains — la valeur réelle de la poche. */
+  capital_outstanding: number
+  /** Principal exposé sur projets en défaut (provisionné en perte). */
+  defaulted_outstanding: number
   projected_annual_interest: number
   weighted_average_rate: number
   active_count: number

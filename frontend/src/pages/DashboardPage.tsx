@@ -467,7 +467,7 @@ export default function DashboardPage() {
   if (!metrics || metrics.assets_count === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-serif font-medium">Tableau de bord</h1>
+        <h1 className="text-3xl font-serif font-medium">Poche crypto</h1>
         <EmptyState
           icon={Wallet}
           title="Bienvenue sur InvestAI !"
@@ -503,7 +503,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Tableau de bord</h1>
+          {/* « Poche crypto », pas « patrimoine » : le crowdfunding vit sur la vue
+              Patrimoine global — deux « patrimoines totaux » différents portaient à confusion. */}
+          <h1 className="text-3xl font-serif font-medium">Poche crypto</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-muted-foreground">
               Dernière mise à jour : {new Date(metrics.last_updated).toLocaleString('fr-FR')}
@@ -714,7 +716,7 @@ export default function DashboardPage() {
                 return metrics.index_comparison.length > 0 ? (
                   <Card elevation="raised">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Comparaison avec les indices ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})</CardTitle>
+                      <CardTitle className="text-sm font-medium">Variation des prix BTC/ETH/SOL ({selectedPeriod === 0 ? 'Tout' : selectedPeriod === 1 ? '24h' : selectedPeriod === 365 ? '1an' : `${selectedPeriod}j`})</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex gap-6 flex-wrap">

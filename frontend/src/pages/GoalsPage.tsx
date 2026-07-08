@@ -136,9 +136,10 @@ function resolveColor(input: string, colorFn: (name: string) => string): string 
 // ── Projection Chart Component with DCA Slider ──────────────────
 
 function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
-  const [dcaAmount, setDcaAmount] = useState(43)
-  const [debouncedDca, setDebouncedDca] = useState(43)
+  const [dcaAmount, setDcaAmount] = useState(0)
+  const [debouncedDca, setDebouncedDca] = useState(0)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const userTouched = useRef(false)
 
   const { data, isLoading, isFetching } = useQuery<GoalProjection>({
     queryKey: ['goals', 'projection', goalId, debouncedDca],
@@ -147,7 +148,18 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
     placeholderData: (prev) => prev,
   })
 
+  // Défaut du slider = mensualité requise calculée par le backend
+  // (rmc_with_returns) — plus de « 43 € » magique déconnecté de l'objectif.
+  useEffect(() => {
+    if (!userTouched.current && data && data.rmc_with_returns > 0 && dcaAmount === 0) {
+      const suggested = Math.max(1, Math.round(data.rmc_with_returns))
+      setDcaAmount(suggested)
+      setDebouncedDca(suggested)
+    }
+  }, [data, dcaAmount])
+
   const handleSliderChange = useCallback((value: number[]) => {
+    userTouched.current = true
     setDcaAmount(value[0])
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => setDebouncedDca(value[0]), 300)
@@ -422,7 +434,10 @@ export default function GoalsPage() {
   const [deadlineDate, setDeadlineDate] = useState('')
   const [priority, setPriority] = useState('medium')
   const [strategyType, setStrategyType] = useState('moderate')
-  const [color, setColor] = useState('oklch(var(--chart-2))')
+  // Hex uniquement : le backend valide max_length=7 — l'ancien défaut
+  // `oklch(var(--chart-2))` (21 caractères) faisait échouer la création en 422
+  // si l'utilisateur ne touchait pas au color-picker.
+  const [color, setColor] = useState('#34d399')
 
   const { data: goals = [], isLoading } = useQuery<Goal[]>({
     queryKey: queryKeys.goals.list,

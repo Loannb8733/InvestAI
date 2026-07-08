@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { PnLBreakdown } from '@/types'
+import { reportsApi, type TaxSummary } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Tooltip,
@@ -42,10 +45,32 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
   const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
   const hasDividends = totalDividendIncome > 0
 
-  // Tax calculation based on selected mode
-  const taxRate = taxMode === 'pfu' ? 0.3 : 0  // Progressive = 0% estimate (user must consult advisor)
-  const estimatedTax = pnlBreakdown.realized_pnl > 0 ? pnlBreakdown.realized_pnl * taxRate : 0
+  // Vraie base imposable : synthèse 2086 de l'année fiscale EN COURS
+  // (cessions crypto→fiat uniquement, méthode d'acquisition globale) — pas
+  // le « réalisé all-time × 30 % » qui cumulait toutes les années et incluait
+  // les conversions crypto↔crypto.
+  const fiscalYear = new Date().getFullYear()
+  const { data: taxSummary } = useQuery<TaxSummary>({
+    queryKey: queryKeys.reports.taxSummary(fiscalYear),
+    queryFn: () => reportsApi.getTaxSummary(fiscalYear),
+    staleTime: 10 * 60_000, // calcul lourd côté back — 10 min de fraîcheur suffisent
+    meta: { suppressGlobalError: true }, // best-effort : fallback silencieux
+  })
+
+  // PFU = flat tax 30 % sur la PV nette 2086 ; barème = PS 17,2 % toujours
+  // dus, l'IR dépendant de la TMI (affiché comme plancher, jamais 0 fictif).
+  const taxableBase = taxSummary ? Math.max(0, taxSummary.net_plus_value) : null
+  const estimatedTax =
+    taxSummary != null
+      ? taxMode === 'pfu'
+        ? Math.max(0, taxSummary.flat_tax_30)
+        : Math.max(0, taxSummary.ps_17_2)
+      : // Fallback (synthèse indisponible) : ancien calcul conservateur all-time
+        pnlBreakdown.realized_pnl > 0
+        ? pnlBreakdown.realized_pnl * (taxMode === 'pfu' ? 0.3 : 0.172)
+        : 0
   const netAfterTax = pnlBreakdown.net_pnl - estimatedTax
+  const hasTaxSection = pnlBreakdown.realized_pnl > 0 || (taxSummary?.nb_cessions ?? 0) > 0
 
   return (
     <Card elevation="raised">
@@ -121,7 +146,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
             </div>
           </div>
         )}
-        {pnlBreakdown.realized_pnl > 0 && (
+        {hasTaxSection && (
           <div className="mt-4 pt-3 border-t border-border/50">
             {/* Tax mode toggle */}
             <div className="flex items-center gap-2 mb-3">
@@ -154,18 +179,23 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
               <div>
                 <MetricTooltip content={
                   taxMode === 'pfu'
-                    ? "Prélèvement Forfaitaire Unique (flat tax 30%) : IR 12.8% + Prélèvements Sociaux 17.2%. Appliqué uniquement sur les plus-values réalisées."
-                    : "Barème progressif : le taux dépend de votre tranche marginale d'imposition. Consultez votre conseiller fiscal."
+                    ? `Prélèvement Forfaitaire Unique (flat tax 30 %) : IR 12,8 % + PS 17,2 %. ${taxSummary ? `Base 2086 ${fiscalYear} : PV nette de ${formatCurrency(taxSummary.net_plus_value)} sur ${taxSummary.nb_cessions} cession(s) crypto→fiat.` : 'Base : réalisé cumulé (synthèse annuelle indisponible).'}`
+                    : "Barème progressif : les prélèvements sociaux (17,2 %) restent dus dans tous les cas ; l'impôt sur le revenu s'ajoute selon votre tranche marginale d'imposition."
                 }>
                   <p className="text-xs text-muted-foreground">
-                    {taxMode === 'pfu' ? 'PFU estimé (30%)' : 'Impôt estimé (barème)'}
+                    {taxMode === 'pfu'
+                      ? taxSummary ? `PFU ${fiscalYear} (base 2086)` : 'PFU estimé (30 %)'
+                      : `PS 17,2 %${taxSummary ? ` ${fiscalYear}` : ''} (plancher barème)`}
                   </p>
                 </MetricTooltip>
                 <p className="text-lg font-bold text-warning">
                   {estimatedTax > 0 ? `-${pc(estimatedTax)}` : pc(0)}
                 </p>
                 {taxMode === 'progressive' && (
-                  <p className="text-[10px] text-muted-foreground">Dépend de votre TMI</p>
+                  <p className="text-[10px] text-muted-foreground">+ IR selon votre TMI</p>
+                )}
+                {taxSummary && taxableBase === 0 && (
+                  <p className="text-[10px] text-muted-foreground">Aucune PV nette imposable en {fiscalYear}</p>
                 )}
               </div>
               <div>
@@ -178,7 +208,10 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
             <div className="mt-3 flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
               <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
               <p className="text-[11px] text-warning dark:text-warning leading-tight">
-                Estimation maximale conservative{taxMode === 'pfu' ? ' basée sur le PFU 30%' : ''}. Calculée sur le P&L brut réalisé sans déduction des moins-values, abattements ou report déficitaire — le montant réel sera inférieur. Ne constitue pas un conseil fiscal. Consultez votre conseiller fiscal.
+                {taxSummary
+                  ? `Base : formulaire 2086 ${fiscalYear} (cessions crypto→fiat, méthode d'acquisition globale, moins-values de l'année déduites). Hors report des moins-values antérieures et cas particuliers.`
+                  : "Estimation conservative sur le P&L réalisé cumulé (toutes années) — le montant réel sera inférieur."}{' '}
+                Ne constitue pas un conseil fiscal.
               </p>
             </div>
           </div>

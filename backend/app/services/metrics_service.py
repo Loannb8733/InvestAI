@@ -1422,13 +1422,22 @@ class MetricsService:
 
         aggregated = list(symbol_agg.values())
 
-        # Top and worst performers (by price change over selected period)
+        # Top et worst performers — triés par CONTRIBUTION EN EUROS au P&L de la
+        # période, pas par %. Un actif à +80 % qui pèse 0,5 % du portefeuille
+        # ne doit pas passer devant BTC à +12 % qui a fait 90 % du gain.
+        # € de variation ≈ valeur_actuelle − valeur_début = V × pct / (100 + pct).
+        def _period_eur_change(a: dict) -> float:
+            pct = a["period_change_percent"]
+            if pct <= -100:  # garde-fou division par ~0
+                return -a["current_value"]
+            return a["current_value"] * pct / (100 + pct)
+
         top_performers = [a for a in aggregated if a["period_change_percent"] > 0]
-        top_performers.sort(key=lambda x: x["period_change_percent"], reverse=True)
+        top_performers.sort(key=_period_eur_change, reverse=True)
         top_performers = top_performers[:5]
 
         worst_performers = [a for a in aggregated if a["period_change_percent"] < 0]
-        worst_performers.sort(key=lambda x: x["period_change_percent"])
+        worst_performers.sort(key=_period_eur_change)
         worst_performers = worst_performers[:5]
 
         # Period change (portfolio-level) — weighted average of asset period changes

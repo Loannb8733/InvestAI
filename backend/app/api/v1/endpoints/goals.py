@@ -387,10 +387,12 @@ async def sync_goal_with_portfolio(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Sync goal's current_amount with actual portfolio value."""
-    from app.models.asset import Asset
-    from app.models.portfolio import Portfolio
-    from app.services.price_service import PriceService
+    """Sync goal's current_amount with actual portfolio value.
+
+    La valorisation vit dans ``goal_projection_service.sync_goals_for_user``
+    (partagée avec le cron quotidien /cron/sync-goals).
+    """
+    from app.services.goal_projection_service import sync_goals_for_user
 
     result = await db.execute(
         select(Goal).where(
@@ -402,45 +404,7 @@ async def sync_goal_with_portfolio(
     if not goal:
         raise HTTPException(status_code=404, detail="Objectif non trouvé")
 
-    # Calculate total portfolio value (or liquidity-only for SAVINGS goals)
-    from app.services.asset_classification import is_liquidity
-
-    portfolios_result = await db.execute(
-        select(Portfolio).where(
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    portfolios = portfolios_result.scalars().all()
-
-    total_value = Decimal("0")
-    price_service = PriceService()
-    is_savings = goal.goal_type == GoalType.SAVINGS
-    # Batch: one asset query for all portfolios (was one per portfolio), and
-    # dedupe price lookups per symbol (same get_price → identical values).
-    portfolio_ids = [p.id for p in portfolios]
-    assets_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
-    assets = assets_result.scalars().all()
-    price_cache: dict = {}
-    for asset in assets:
-        if float(asset.quantity) > 0:
-            # SAVINGS goals only count liquidity (cash/stables/gold)
-            if is_savings and not is_liquidity(asset.symbol):
-                continue
-            pkey = (asset.symbol, asset.asset_type.value)
-            if pkey not in price_cache:
-                price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
-            total_value += asset.quantity * Decimal(str(price_cache[pkey]))
-    # Include portfolio cash_balances for SAVINGS goals
-    if is_savings:
-        for portfolio in portfolios:
-            for _ccy, amount in (portfolio.cash_balances or {}).items():
-                total_value += Decimal(str(amount))
-
-    goal.current_amount = total_value
-    if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
-        goal.status = GoalStatus.REACHED
-
-    await db.commit()
+    await sync_goals_for_user(db, current_user.id, only_goal_id=goal.id)
     await db.refresh(goal)
     return _build_response(goal)
 

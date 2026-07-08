@@ -895,9 +895,27 @@ export const alertsApi = {
 }
 
 // Reports API
+export interface TaxSummary {
+  year: number
+  nb_cessions: number
+  total_cessions: number
+  total_plus_values: number
+  total_moins_values: number
+  net_plus_value: number
+  flat_tax_30: number
+  ir_12_8: number
+  ps_17_2: number
+}
+
 export const reportsApi = {
   getAvailableYears: async () => {
     const response = await api.get('/reports/available-years')
+    return response.data
+  },
+
+  /** Synthèse fiscale 2086 de l'année (vraie base imposable FR, JSON). */
+  getTaxSummary: async (year: number): Promise<TaxSummary> => {
+    const response = await api.get(`/reports/tax/${year}/summary`)
     return response.data
   },
 
