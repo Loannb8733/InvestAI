@@ -11,6 +11,7 @@ on:
   schedule:
     - cron: "0 * * * *" # hourly — exchange sync
     - cron: "0 0 * * *" # 00:00 UTC — daily portfolio snapshot
+    - cron: "10 0 * * *" # 00:10 UTC — sync des jauges d'objectifs (après le snapshot)
     - cron: "15 2 * * *" # 02:15 UTC — contrarian (Fear & Greed) stats refresh
     - cron: "0 */12 * * *" # every 12h — market-regime mutation check
   workflow_dispatch:
@@ -20,7 +21,7 @@ on:
         required: true
         default: sync-exchanges
         type: choice
-        options: [sync-exchanges, daily-snapshot, contrarian-refresh, regime-check]
+        options: [sync-exchanges, daily-snapshot, sync-goals, contrarian-refresh, regime-check]
 
 env:
   BASE_URL: https://investai-api.onrender.com/api/v1/cron
@@ -38,6 +39,7 @@ jobs:
             case "${{ github.event.schedule }}" in
               "0 * * * *")    echo "tasks=sync-exchanges"     >> "$GITHUB_OUTPUT" ;;
               "0 0 * * *")    echo "tasks=daily-snapshot"     >> "$GITHUB_OUTPUT" ;;
+              "10 0 * * *")   echo "tasks=sync-goals"         >> "$GITHUB_OUTPUT" ;;
               "15 2 * * *")   echo "tasks=contrarian-refresh" >> "$GITHUB_OUTPUT" ;;
               "0 */12 * * *") echo "tasks=regime-check"       >> "$GITHUB_OUTPUT" ;;
               *)              echo "tasks="                   >> "$GITHUB_OUTPUT" ;;
