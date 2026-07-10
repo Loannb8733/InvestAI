@@ -87,7 +87,10 @@ def _enrich(
     months = int(project.duration_months)
     tax_multiplier = 1 - float(project.tax_rate or 0) / 100
 
-    projected_total = invested * rate * months / 12 * tax_multiplier
+    # Brut de fiscalité (base homogène face à interest_earned, lui aussi brut)
+    projected_gross = invested * rate * months / 12
+    # Net de flat tax
+    projected_total = projected_gross * tax_multiplier
     interest_earned = _interest_earned(project, repayments)
 
     progress = 0.0
@@ -127,6 +130,7 @@ def _enrich(
         created_at=project.created_at,
         updated_at=project.updated_at,
         projected_total_interest=round(projected_total, 2),
+        projected_interest_gross=round(projected_gross, 2),
         interest_earned=round(interest_earned, 2),
         progress_percent=round(progress, 1),
         documents=docs,
@@ -377,10 +381,22 @@ async def get_dashboard(
     if rate_invested > 0:
         weighted_rate = sum(float(p.invested_amount) * float(p.annual_rate) for p in rate_projects) / rate_invested
 
-    # Platform breakdown
+    # Platform breakdown (montants investis, au coût historique)
     platform_map: dict[str, float] = {}
     for p in projects:
         platform_map[p.platform] = platform_map.get(p.platform, 0) + float(p.invested_amount)
+
+    # Exposition par plateforme au CRD (capital restant dû) — projets en
+    # défaut EXCLUS. Contrairement au montant investi, un projet remboursé
+    # à 80 % ne pèse plus que 20 % de son principal.
+    platform_outstanding: dict[str, float] = {}
+    for p in projects:
+        if p.status == ProjectStatus.DEFAULTED:
+            continue
+        crd = max(0.0, float(p.invested_amount) - capital_repaid_by_project.get(p.id, 0.0))
+        if crd > 0:
+            platform_outstanding[p.platform] = platform_outstanding.get(p.platform, 0.0) + crd
+    platform_outstanding = {k: round(v, 2) for k, v in platform_outstanding.items()}
 
     # Next maturity
     maturities = [p.estimated_end_date for p in active if p.estimated_end_date and p.estimated_end_date >= date.today()]
@@ -406,6 +422,7 @@ async def get_dashboard(
         funding_count=status_counts[ProjectStatus.FUNDING],
         next_maturity=next_mat,
         platform_breakdown=platform_map,
+        platform_breakdown_outstanding=platform_outstanding,
         projects=enriched,
     )
 
@@ -427,7 +444,8 @@ async def get_performance(
         months = int(p.duration_months)
         received = float(p.total_received)
         tax_multiplier = 1 - float(p.tax_rate or 0) / 100
-        projected_total = invested * rate * months / 12 * tax_multiplier
+        projected_gross = invested * rate * months / 12  # brut de fiscalité
+        projected_total = projected_gross * tax_multiplier  # net de flat tax
 
         elapsed_months = 0.0
         on_track = True
@@ -448,6 +466,7 @@ async def get_performance(
                 "duration_months": months,
                 "repayment_type": p.repayment_type.value,
                 "projected_total_interest": round(projected_total, 2),
+                "projected_interest_gross": round(projected_gross, 2),
                 "total_received": received,
                 "interest_earned": round(_interest_earned(p, repayments_by_project.get(p.id)), 2),
                 "elapsed_months": round(elapsed_months, 1),

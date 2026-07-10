@@ -9,6 +9,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/utils'
 import { usePredictionData } from '@/hooks/usePredictionData'
 import { FearGreedGauge } from '@/components/predictions/PredictionMetricCard'
@@ -19,6 +25,7 @@ import PredictionSimulationTab from '@/components/predictions/PredictionSimulati
 import {
   AlertTriangle,
   Brain,
+  Gauge,
   Loader2,
   ArrowUp,
   ArrowDown,
@@ -46,6 +53,7 @@ export default function PredictionsPage() {
     loadingPredictions, loadingSentiment, loadingCycle, loadingBacktest,
     selectedPrediction, chartData, showSupportResistance,
     unifiedAlerts, totalAlerts, highAlerts,
+    modelAccuracy,
     formatPrice,
   } = usePredictionData()
 
@@ -138,9 +146,43 @@ export default function PredictionsPage() {
           <p className="text-muted-foreground">Projections statistiques et sentiment de marché</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={daysAhead <= 7 ? 'default' : daysAhead <= 14 ? 'secondary' : 'outline'} className="text-xs">
-            Confiance : {daysAhead <= 7 ? 'Haute' : daysAhead <= 14 ? 'Modérée' : 'Indicative'}
-          </Badge>
+          {/* Badge de confiance basé sur le track-record réel du modèle
+              (direction correcte en backtest), pas sur l'horizon choisi. */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex cursor-help">
+                  <Badge
+                    variant={modelAccuracy.level === 'high' ? 'default' : modelAccuracy.level === 'medium' ? 'secondary' : 'outline'}
+                    className="text-xs"
+                  >
+                    Confiance : {modelAccuracy.level === 'high' ? 'Haute' : modelAccuracy.level === 'medium' ? 'Modérée' : 'Indicative'}
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                {modelAccuracy.hitRate != null ? (
+                  <>
+                    <p className="text-xs font-medium">Précision historique du modèle</p>
+                    <p className="text-xs mt-1">
+                      Direction correcte : {modelAccuracy.hitRate.toFixed(0)} %
+                      {modelAccuracy.mape != null && <> · MAPE : {modelAccuracy.mape.toFixed(1)} %</>}
+                      {modelAccuracy.source === 'predictions' && <> (moyenne par actif)</>}
+                    </p>
+                    {modelAccuracy.level === 'low' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Précision historique insuffisante (moins de 50 % de directions correctes).
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs">
+                    Précision historique insuffisante — pas encore assez de prédictions vérifiées pour évaluer le modèle.
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Select value={daysAhead.toString()} onValueChange={(v) => setDaysAhead(parseInt(v))}>
             <SelectTrigger className="w-44">
               <SelectValue />
@@ -257,7 +299,18 @@ export default function PredictionsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="predictions">
+        <TabsContent value="predictions" className="space-y-4">
+          {(modelAccuracy.mape != null || modelAccuracy.backtestHitRate != null) && (
+            <div className="rounded-lg border bg-muted/40 p-3 flex items-center gap-2 text-sm">
+              <Gauge className="h-4 w-4 text-primary shrink-0" />
+              <span>
+                Précision du modèle (backtest {daysAhead}j) :
+                {modelAccuracy.mape != null && <> MAPE {modelAccuracy.mape.toFixed(1)} %</>}
+                {modelAccuracy.mape != null && modelAccuracy.backtestHitRate != null && ' · '}
+                {modelAccuracy.backtestHitRate != null && <>direction correcte {modelAccuracy.backtestHitRate.toFixed(0)} %</>}
+              </span>
+            </div>
+          )}
           {predictions && predictions.length > 0 ? (
             <PredictionListView
               predictions={predictions}

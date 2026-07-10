@@ -42,20 +42,22 @@ export default function CrowdfundingPerformancePage() {
     )
   }
 
-  // Aggregated metrics
+  // Aggregated metrics — brut/brut : intérêts encaissés (P&L) face aux
+  // intérêts projetés bruts de fiscalité. Le total reçu (capital + intérêts)
+  // n'est jamais comparé à des intérêts.
   const totalInvested = projects.reduce((s, p) => s + p.invested_amount, 0)
-  const totalProjectedInterest = projects.reduce((s, p) => s + p.projected_total_interest, 0)
-  const totalReceived = projects.reduce((s, p) => s + p.total_received, 0)
+  const totalProjectedGross = projects.reduce((s, p) => s + (p.projected_interest_gross ?? 0), 0)
+  const totalInterestEarned = projects.reduce((s, p) => s + (p.interest_earned ?? 0), 0)
   const onTrackCount = projects.filter((p) => p.on_track && p.status === 'active').length
   const activeCount = projects.filter((p) => p.status === 'active').length
 
-  // Chart data
+  // Chart data — intérêts perçus vs projetés, tous deux BRUTS
   const chartData = projects
     .filter((p) => p.status !== 'completed')
     .map((p) => ({
       name: (p.project_name || p.platform).substring(0, 20),
-      'Intérêts projetés': p.projected_total_interest,
-      'Reçu': p.total_received,
+      'Intérêts projetés (bruts)': p.projected_interest_gross ?? 0,
+      'Intérêts perçus': p.interest_earned ?? 0,
     }))
 
   return (
@@ -71,21 +73,22 @@ export default function CrowdfundingPerformancePage() {
       <SpotlightGroup className="grid gap-4 md:grid-cols-3">
         <StatCard
           className="spot-card"
-          label="Intérêts Projetés (Total)"
+          label="Intérêts Projetés (bruts)"
           icon={TrendingUp}
-          value={totalProjectedInterest}
+          value={totalProjectedGross}
           format={formatCurrency}
-          hint={<>sur {formatCurrency(totalInvested)} investis</>}
+          hint={<>bruts de fiscalité · sur {formatCurrency(totalInvested)} investis</>}
         />
         <StatCard
           className="spot-card"
-          label="Total Reçu"
+          label="Intérêts encaissés"
+          tooltip="Seuls les intérêts sont du P&L — le capital remboursé (retour de principal) n'est pas compté ici."
           icon={CheckCircle2}
-          value={totalReceived}
+          value={totalInterestEarned}
           format={formatCurrency}
           hint={
-            totalProjectedInterest > 0
-              ? `${((totalReceived / totalProjectedInterest) * 100).toFixed(0)}% des intérêts projetés`
+            totalProjectedGross > 0
+              ? `${((totalInterestEarned / totalProjectedGross) * 100).toFixed(0)}% des intérêts projetés (bruts)`
               : '—'
           }
         />
@@ -115,13 +118,14 @@ export default function CrowdfundingPerformancePage() {
       {chartData.length > 0 && (
         <Card elevation="raised">
           <CardHeader>
-            <CardTitle>Projeté vs Reçu par Projet</CardTitle>
+            <CardTitle>Intérêts Projetés vs Perçus par Projet</CardTitle>
+            <p className="text-xs text-muted-foreground">montants bruts de fiscalité</p>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveBar
                 data={chartData}
-                keys={['Intérêts projetés', 'Reçu']}
+                keys={['Intérêts projetés (bruts)', 'Intérêts perçus']}
                 indexBy="name"
                 groupMode="grouped"
                 theme={theme}
@@ -129,7 +133,7 @@ export default function CrowdfundingPerformancePage() {
                 padding={0.25}
                 innerPadding={4}
                 colors={({ id }) =>
-                  id === 'Intérêts projetés' ? color('--primary', 0.3) : color('--chart-3')
+                  id === 'Intérêts projetés (bruts)' ? color('--primary', 0.3) : color('--chart-3')
                 }
                 borderRadius={4}
                 enableLabel={false}
@@ -187,8 +191,8 @@ export default function CrowdfundingPerformancePage() {
                   <th scope="col" className="pb-2 font-medium">Plateforme</th>
                   <th scope="col" className="pb-2 font-medium text-right">Investi</th>
                   <th scope="col" className="pb-2 font-medium text-right">Taux</th>
-                  <th scope="col" className="pb-2 font-medium text-right">Projeté</th>
-                  <th scope="col" className="pb-2 font-medium text-right">Reçu</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Projeté (brut)</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Intérêts perçus (bruts)</th>
                   <th scope="col" className="pb-2 font-medium text-center">Progression</th>
                   <th scope="col" className="pb-2 font-medium text-center">Statut</th>
                 </tr>
@@ -203,9 +207,9 @@ export default function CrowdfundingPerformancePage() {
                     <td className="py-3 text-right">{formatCurrency(p.invested_amount)}</td>
                     <td className="py-3 text-right">{p.annual_rate}%</td>
                     <td className="py-3 text-right text-gain">
-                      {formatCurrency(p.projected_total_interest)}
+                      {formatCurrency(p.projected_interest_gross ?? 0)}
                     </td>
-                    <td className="py-3 text-right">{formatCurrency(p.total_received)}</td>
+                    <td className="py-3 text-right">{formatCurrency(p.interest_earned ?? 0)}</td>
                     <td className="py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">

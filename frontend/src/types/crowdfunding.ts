@@ -1,6 +1,24 @@
 export type RepaymentType = 'in_fine' | 'amortizable'
 export type ProjectStatus = 'funding' | 'active' | 'completed' | 'delayed' | 'defaulted'
 
+/** Labels FR partagés (badges de statut) — source unique pour toutes les pages crowdfunding. */
+export const STATUS_LABELS: Record<ProjectStatus, string> = {
+  funding: 'En cours de levée',
+  active: 'Actif',
+  completed: 'Terminé',
+  delayed: 'En retard',
+  defaulted: 'Défaut',
+}
+
+/** Classes de couleur partagées pour les badges de statut. */
+export const STATUS_COLORS: Record<ProjectStatus, string> = {
+  funding: 'bg-warning/10 text-warning',
+  active: 'bg-gain/10 text-gain',
+  completed: 'bg-accent/10 text-accent',
+  delayed: 'bg-warning/10 text-warning',
+  defaulted: 'bg-loss/10 text-loss',
+}
+
 export interface ProjectDocument {
   id: string
   project_id: string
@@ -61,7 +79,11 @@ export interface CrowdfundingProject {
   total_received: number
   created_at: string
   updated_at: string
+  /** Intérêts projetés NETS de flat tax. */
   projected_total_interest: number | null
+  /** Intérêts projetés BRUTS de fiscalité (invested × rate × months/12) — base homogène face à interest_earned (brut). */
+  projected_interest_gross: number | null
+  /** Intérêts réellement encaissés à date (bruts, avant prélèvements). */
   interest_earned: number | null
   progress_percent: number | null
   documents: ProjectDocument[]
@@ -124,7 +146,10 @@ export interface CrowdfundingDashboard {
   defaulted_count: number
   funding_count: number
   next_maturity: string | null
+  /** Montants investis par plateforme (coût historique). */
   platform_breakdown: Record<string, number>
+  /** Exposition par plateforme au capital restant dû (projets en défaut exclus). Optionnel pour compat backend. */
+  platform_breakdown_outstanding?: Record<string, number>
   projects: CrowdfundingProject[]
 }
 
@@ -210,8 +235,13 @@ export interface CrowdfundingPerformanceItem {
   annual_rate: number
   duration_months: number
   repayment_type: RepaymentType
+  /** Intérêts projetés NETS de flat tax. */
   projected_total_interest: number
+  /** Intérêts projetés BRUTS de fiscalité — à comparer à interest_earned (brut). */
+  projected_interest_gross: number
+  /** Total reçu (brut, capital + intérêts) — ne pas comparer aux intérêts projetés. */
   total_received: number
+  /** Intérêts réellement encaissés (bruts). */
   interest_earned: number
   elapsed_months: number
   progress_percent: number

@@ -50,10 +50,12 @@ export function usePredictionData() {
     queryFn: predictionsApi.getMarketCycle,
   })
 
+  // Toujours chargé (pas seulement en mode "réalité") : alimente le badge de
+  // confiance et l'encart « Précision du modèle » avec le track-record réel.
   const { data: backtestData, isLoading: loadingBacktest } = useQuery<BacktestData>({
     queryKey: queryKeys.predictions.backtest(daysAhead),
     queryFn: () => predictionsApi.getBacktest(daysAhead),
-    enabled: showReality,
+    staleTime: 5 * 60 * 1000,
   })
 
   // ── Derived state ──────────────────────────────────────────────────
@@ -70,6 +72,29 @@ export function usePredictionData() {
   }, [daysAhead])
 
   const effectiveWhatIfSymbol = whatIfSymbol || (predictions && predictions.length > 0 ? predictions[0].symbol : '')
+
+  // ── Précision réelle du modèle (track-record) ──────────────────────
+  // Priorité au backtest global (direction + MAPE) ; sinon repli sur la
+  // moyenne des hit rates par actif fournis avec les prédictions.
+  const modelAccuracy = useMemo(() => {
+    const mape = backtestData?.overall_mape ?? null
+    const backtestHitRate = backtestData?.overall_direction_accuracy ?? null
+
+    let hitRate: number | null = backtestHitRate
+    let source: 'backtest' | 'predictions' | null = backtestHitRate != null ? 'backtest' : null
+    if (hitRate == null && predictions && predictions.length > 0) {
+      const sampled = predictions.filter(p => (p.hit_rate_n_samples ?? 0) > 0 && p.hit_rate != null)
+      if (sampled.length > 0) {
+        hitRate = sampled.reduce((sum, p) => sum + p.hit_rate, 0) / sampled.length
+        source = 'predictions'
+      }
+    }
+
+    const level: 'high' | 'medium' | 'low' =
+      hitRate == null ? 'low' : hitRate >= 60 ? 'high' : hitRate >= 50 ? 'medium' : 'low'
+
+    return { hitRate, mape, backtestHitRate, level, source }
+  }, [backtestData, predictions])
 
   // ── Unified alerts ─────────────────────────────────────────────────
 
@@ -272,6 +297,7 @@ export function usePredictionData() {
     unifiedAlerts,
     totalAlerts,
     highAlerts,
+    modelAccuracy,
 
     // Utilities
     formatPrice,

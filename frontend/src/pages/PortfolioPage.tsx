@@ -33,6 +33,7 @@ import {
   Download,
   History,
   TrendingUp,
+  TrendingDown,
   PiggyBank,
   AlertTriangle,
   Shield,
@@ -95,6 +96,15 @@ export default function PortfolioPage() {
   const [deletePortfolio, setDeletePortfolio] = useState<Portfolio | null>(null)
   const [historyPlatformFilter, setHistoryPlatformFilter] = useState<string | null>(null)
   const [historyExpandedSymbols, setHistoryExpandedSymbols] = useState<Set<string>>(new Set())
+
+  // Période de détention : « {1ère tx} → {dernière tx} » en format court fr-FR
+  const formatHoldingPeriod = (first?: string, last?: string) => {
+    if (!first || !last) return '—'
+    const firstDate = new Date(first)
+    const lastDate = new Date(last)
+    if (Number.isNaN(firstDate.getTime()) || Number.isNaN(lastDate.getTime())) return '—'
+    return `${firstDate.toLocaleDateString('fr-FR')} → ${lastDate.toLocaleDateString('fr-FR')}`
+  }
 
   const toggleHistoryExpanded = (symbol: string) => {
     setHistoryExpandedSymbols(prev => {
@@ -347,7 +357,8 @@ export default function PortfolioPage() {
               {/* History Tab */}
               <TabsContent value="history">
                 {loadingHistory ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <SkeletonStatCard />
                     <SkeletonStatCard />
                     <SkeletonStatCard />
                     <SkeletonStatCard />
@@ -361,7 +372,7 @@ export default function PortfolioPage() {
                       </div>
                     )}
                     {/* Summary cards */}
-                    <SpotlightGroup className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <SpotlightGroup className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <StatCard
                         className="spot-card"
                         label="Total investi (historique)"
@@ -381,6 +392,13 @@ export default function PortfolioPage() {
                         label="Frais totaux"
                         icon={History}
                         value={portfolioHistory.total_fees}
+                        format={formatCurrency}
+                      />
+                      <StatCard
+                        className={`spot-card ${portfolioHistory.realized_gains >= 0 ? '[&_.font-serif]:text-gain' : '[&_.font-serif]:text-loss'}`}
+                        label="Gains réalisés"
+                        icon={portfolioHistory.realized_gains >= 0 ? TrendingUp : TrendingDown}
+                        value={portfolioHistory.realized_gains}
                         format={formatCurrency}
                       />
                     </SpotlightGroup>
@@ -463,6 +481,7 @@ export default function PortfolioPage() {
                                 <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Qté vendue</th>
                                 <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Total vendu</th>
                                 <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">+/- Réalisé</th>
+                                <th scope="col" className="text-center py-2 text-sm font-medium text-muted-foreground">Détention</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -470,7 +489,7 @@ export default function PortfolioPage() {
                                 const filtered = portfolioHistory.sold_assets
                                   .filter((asset) => !historyPlatformFilter || (asset.exchange || 'Non assigné') === historyPlatformFilter)
                                 // Group by symbol
-                                const groups = new Map<string, { symbol: string; name: string | undefined; asset_type: string; assets: typeof filtered; totalBought: number; totalBoughtValue: number; totalSold: number; totalSoldValue: number; realizedGain: number }>()
+                                const groups = new Map<string, { symbol: string; name: string | undefined; asset_type: string; assets: typeof filtered; totalBought: number; totalBoughtValue: number; totalSold: number; totalSoldValue: number; realizedGain: number; firstTx?: string; lastTx?: string }>()
                                 for (const asset of filtered) {
                                   const existing = groups.get(asset.symbol)
                                   if (existing) {
@@ -480,6 +499,12 @@ export default function PortfolioPage() {
                                     existing.totalSold += asset.total_sold
                                     existing.totalSoldValue += asset.total_sold_value
                                     existing.realizedGain += asset.realized_gain
+                                    if (asset.first_transaction && (!existing.firstTx || new Date(asset.first_transaction) < new Date(existing.firstTx))) {
+                                      existing.firstTx = asset.first_transaction
+                                    }
+                                    if (asset.last_transaction && (!existing.lastTx || new Date(asset.last_transaction) > new Date(existing.lastTx))) {
+                                      existing.lastTx = asset.last_transaction
+                                    }
                                   } else {
                                     groups.set(asset.symbol, {
                                       symbol: asset.symbol,
@@ -491,6 +516,8 @@ export default function PortfolioPage() {
                                       totalSold: asset.total_sold,
                                       totalSoldValue: asset.total_sold_value,
                                       realizedGain: asset.realized_gain,
+                                      firstTx: asset.first_transaction,
+                                      lastTx: asset.last_transaction,
                                     })
                                   }
                                 }
@@ -521,6 +548,9 @@ export default function PortfolioPage() {
                                           <td className={`text-center py-3 ${asset.realized_gain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                             {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
                                           </td>
+                                          <td className="text-center py-3 text-xs text-muted-foreground whitespace-nowrap">
+                                            {formatHoldingPeriod(asset.first_transaction, asset.last_transaction)}
+                                          </td>
                                         </tr>
                                       )
                                     }
@@ -549,6 +579,9 @@ export default function PortfolioPage() {
                                           <td className={`text-center py-3 font-medium ${group.realizedGain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                             {group.realizedGain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(group.realizedGain)}
                                           </td>
+                                          <td className="text-center py-3 text-xs text-muted-foreground whitespace-nowrap">
+                                            {formatHoldingPeriod(group.firstTx, group.lastTx)}
+                                          </td>
                                         </tr>
                                         {isExpanded && group.assets.map((asset) => (
                                           <tr key={asset.id} className="border-b last:border-0 bg-muted/20">
@@ -564,6 +597,9 @@ export default function PortfolioPage() {
                                             <td className="text-center py-2 text-sm">{formatCurrency(asset.total_sold_value)}</td>
                                             <td className={`text-center py-2 text-sm ${asset.realized_gain >= 0 ? 'text-gain' : 'text-loss'}`}>
                                               {asset.realized_gain >= 0 ? '\u25B2' : '\u25BC'} {formatCurrency(asset.realized_gain)}
+                                            </td>
+                                            <td className="text-center py-2 text-xs text-muted-foreground whitespace-nowrap">
+                                              {formatHoldingPeriod(asset.first_transaction, asset.last_transaction)}
                                             </td>
                                           </tr>
                                         ))}

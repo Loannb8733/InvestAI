@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,6 +69,15 @@ interface DCAResult {
   average_cost: number
   total_units: number
   return_percent: number
+  // Distribution multi-chemins (500 trajectoires simulées côté backend)
+  dca_p10: number
+  dca_p50: number
+  dca_p90: number
+  lumpsum_p10: number
+  lumpsum_p50: number
+  lumpsum_p90: number
+  prob_dca_beats_ls: number
+  n_paths: number
   projections: Array<{
     period: number
     price: number
@@ -76,6 +86,9 @@ interface DCAResult {
     total_units: number
     total_invested: number
     current_value: number
+    current_value_p10: number
+    current_value_p90: number
+    lump_sum_value: number
   }>
 }
 
@@ -240,16 +253,11 @@ export default function SimulationsPage() {
       ]
     : []
 
-  // DCA lump sum comparison data
-  const dcaLumpSumData = dcaResult?.projections.map((p) => {
-    // Lump sum: invest total_amount at period 0, grows with expected return
-    const monthlyReturn = (dcaParams.expected_return / 100) / 12
-    const lumpSumValue = dcaParams.total_amount * Math.pow(1 + monthlyReturn, p.period)
-    return {
-      ...p,
-      lump_sum_value: Math.round(lumpSumValue * 100) / 100,
-    }
-  })
+  // Comparaison DCA vs Lump Sum : les deux stratégies sont désormais simulées
+  // côté backend SUR LES MÊMES trajectoires stochastiques (médiane + p10-p90).
+  // Le calcul lump-sum déterministe local (composé certain) a été supprimé :
+  // il comparait un chemin aléatoire à une courbe sans risque.
+  const dcaChartData = dcaResult?.projections
 
   return (
     <div className="space-y-6">
@@ -1145,7 +1153,8 @@ export default function SimulationsPage() {
                   Simulateur DCA
                 </CardTitle>
                 <CardDescription>
-                  Dollar Cost Averaging - Comparez investissement programmé vs lump sum.
+                  Dollar Cost Averaging - Comparez investissement programmé vs lump sum
+                  sur 500 trajectoires de marché simulées (résultats en médiane et fourchette p10-p90).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1228,8 +1237,20 @@ export default function SimulationsPage() {
                   ) : (
                     <Calculator className="mr-2 h-4 w-4" />
                   )}
-                  Simuler
+                  Simuler (500 trajectoires)
                 </Button>
+
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
+                  <span>
+                    Cette simulation est hypothétique (rendement et volatilité supposés).
+                    Pour un test sur données historiques réelles :{' '}
+                    <Link to="/intelligence" className="text-accent underline underline-offset-2">
+                      Backtest DCA (Analyses IA &rsaquo; Signaux Alpha)
+                    </Link>
+                    .
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
@@ -1237,6 +1258,10 @@ export default function SimulationsPage() {
               <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats DCA</CardTitle>
+                  <CardDescription>
+                    Simulation sur {dcaResult.n_paths} trajectoires — médianes et fourchettes p10-p90.
+                    Aucun chiffre n'est garanti.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -1245,18 +1270,24 @@ export default function SimulationsPage() {
                       <p className="text-2xl font-serif font-medium">{formatCurrency(dcaResult.total_invested)}</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gain/10">
-                      <p className="text-sm text-muted-foreground">Valeur finale DCA</p>
-                      <p className="text-2xl font-serif font-medium">{formatCurrency(dcaResult.final_value)}</p>
+                      <p className="text-sm text-muted-foreground">Médiane DCA (valeur finale)</p>
+                      <p className="text-2xl font-serif font-medium">{formatCurrency(dcaResult.dca_p50)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        p10-p90 : {formatCurrency(dcaResult.dca_p10)} – {formatCurrency(dcaResult.dca_p90)}
+                      </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 rounded-lg bg-accent/10">
-                      <p className="text-sm text-muted-foreground">Prix moyen</p>
-                      <p className="text-xl font-bold">{formatCurrency(dcaResult.average_cost)}</p>
+                      <p className="text-sm text-muted-foreground">Médiane Lump Sum</p>
+                      <p className="text-xl font-bold">{formatCurrency(dcaResult.lumpsum_p50)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        p10-p90 : {formatCurrency(dcaResult.lumpsum_p10)} – {formatCurrency(dcaResult.lumpsum_p90)}
+                      </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-warning/10">
-                      <p className="text-sm text-muted-foreground">Rendement DCA</p>
+                      <p className="text-sm text-muted-foreground">Rendement DCA (médiane)</p>
                       <p
                         className={`text-xl font-bold ${dcaResult.return_percent >= 0 ? 'text-gain' : 'text-loss'}`}
                       >
@@ -1266,33 +1297,38 @@ export default function SimulationsPage() {
                     </div>
                   </div>
 
-                  {/* Lump sum comparison */}
-                  {dcaLumpSumData && dcaLumpSumData.length > 0 && (
-                    <div className="p-4 rounded-lg bg-muted space-y-2">
-                      <p className="text-sm font-medium">Comparaison Lump Sum</p>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Lump Sum finale</span>
-                        <span className="font-medium">
-                          {formatCurrency(dcaLumpSumData[dcaLumpSumData.length - 1]?.lump_sum_value ?? 0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">DCA finale</span>
-                        <span className="font-medium">{formatCurrency(dcaResult.final_value)}</span>
-                      </div>
+                  {/* DCA vs Lump Sum : probabilité sur les mêmes trajectoires */}
+                  <div className="p-4 rounded-lg bg-muted space-y-2">
+                    <p className="text-sm font-medium">Médiane DCA vs Médiane Lump Sum</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Dans {dcaResult.prob_dca_beats_ls.toFixed(0)} % des scénarios simulés
+                      </span>
+                      <span className="font-medium">le DCA fait mieux que le Lump Sum</span>
                     </div>
-                  )}
+                    <div className="h-2 bg-background rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent transition-all"
+                        style={{ width: `${Math.min(Math.max(dcaResult.prob_dca_beats_ls, 0), 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Les deux stratégies sont évaluées sur les mêmes {dcaResult.n_paths} trajectoires de
+                      rendements — la comparaison est donc à risque identique.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {dcaLumpSumData && dcaLumpSumData.length > 0 && (
+          {dcaChartData && dcaChartData.length > 0 && (
             <Card elevation="raised">
               <CardHeader>
                 <CardTitle>DCA vs Lump Sum</CardTitle>
                 <CardDescription>
-                  Comparaison entre investissement programmé et investissement direct
+                  Trajectoires médianes sur {dcaResult?.n_paths ?? 500} scénarios simulés —
+                  bande p10-p90 pour le DCA
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1300,11 +1336,24 @@ export default function SimulationsPage() {
                   const cDca = color('--chart-2')
                   const cLump = color('--chart-1')
                   const cInvested = color('--muted-foreground')
-                  const dcaData = dcaLumpSumData
-                  // Solid DCA value as the real Nivo line; the two dashed references via a custom layer.
+                  const dcaData = dcaChartData
+                  // Solid median DCA value as the real Nivo line; the p10-p90 band and
+                  // the two dashed references (median Lump Sum, invested capital) via custom layers.
                   const series: LineSeries[] = [
                     { id: 'current_value', data: dcaData.map((d) => ({ x: String(d.period), y: d.current_value })) },
                   ]
+                  const BandLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
+                    const sx = xScale as (v: string) => number
+                    const sy = yScale as (v: number) => number
+                    // Polygon: p90 forward, then p10 backward
+                    const upper = dcaData.map(
+                      (d, i) => `${i === 0 ? 'M' : 'L'}${sx(String(d.period))},${sy(d.current_value_p90)}`
+                    )
+                    const lower = [...dcaData]
+                      .reverse()
+                      .map((d) => `L${sx(String(d.period))},${sy(d.current_value_p10)}`)
+                    return <path d={`${upper.join(' ')} ${lower.join(' ')} Z`} fill={cDca} opacity={0.15} stroke="none" />
+                  }
                   const DashedLinesLayer = ({ xScale, yScale }: CommonCustomLayerProps<LineSeries>) => {
                     const sx = xScale as (v: string) => number
                     const sy = yScale as (v: number) => number
@@ -1334,15 +1383,16 @@ export default function SimulationsPage() {
                         enableGridX={false}
                         axisBottom={{ tickSize: 0, tickPadding: 8 }}
                         axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
-                        layers={['grid', 'axes', DashedLinesLayer, 'lines', 'slices']}
+                        layers={['grid', 'axes', BandLayer, DashedLinesLayer, 'lines', 'slices']}
                         enableSlices="x"
                         sliceTooltip={({ slice }) => {
                           const period = slice.points[0]?.data.x as string
                           const point = dcaData.find((d) => String(d.period) === period)
                           if (!point) return null
                           const rows = [
-                            { label: 'DCA (valeur)', value: point.current_value, color: cDca },
-                            { label: 'Lump Sum', value: point.lump_sum_value, color: cLump },
+                            { label: 'DCA (médiane)', value: point.current_value, color: cDca },
+                            { label: 'DCA p10-p90', value: null, color: cDca },
+                            { label: 'Lump Sum (médiane)', value: point.lump_sum_value, color: cLump },
                             { label: 'Capital investi', value: point.total_invested, color: cInvested },
                           ]
                           return (
@@ -1354,7 +1404,11 @@ export default function SimulationsPage() {
                                     <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
                                     <span className="text-xs text-muted-foreground">{r.label}</span>
                                   </span>
-                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(r.value)}</span>
+                                  <span className="font-mono text-sm tabular-nums">
+                                    {r.value !== null
+                                      ? formatCurrency(r.value)
+                                      : `${formatCurrency(point.current_value_p10)} – ${formatCurrency(point.current_value_p90)}`}
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -1365,14 +1419,14 @@ export default function SimulationsPage() {
                             anchor: 'top-right',
                             direction: 'row',
                             translateY: -12,
-                            itemWidth: 110,
+                            itemWidth: 130,
                             itemHeight: 18,
                             symbolSize: 10,
                             symbolShape: 'circle',
                             itemTextColor: color('--muted-foreground'),
                             data: [
-                              { id: 'current_value', label: 'DCA (valeur)', color: cDca },
-                              { id: 'lump_sum_value', label: 'Lump Sum', color: cLump },
+                              { id: 'current_value', label: 'DCA (médiane)', color: cDca },
+                              { id: 'lump_sum_value', label: 'Lump Sum (médiane)', color: cLump },
                               { id: 'total_invested', label: 'Capital investi', color: cInvested },
                             ],
                           },

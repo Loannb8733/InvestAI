@@ -89,12 +89,19 @@ import type { TransactionWithAssetInfo, PortfolioSummary } from '@/types'
 type Transaction = TransactionWithAssetInfo
 type Portfolio = PortfolioSummary
 
-interface TransactionStats {
-  totalBought: number
-  totalSold: number
-  totalFees: number
-  countByType: Record<string, number>
+interface CurrencyTotals {
+  bought: number
+  sold: number
+  fees: number
   netFlow: number
+}
+
+interface TransactionStats {
+  /** Totaux par devise (EUR, USD, ...) — jamais additionnés entre devises. */
+  byCurrency: Record<string, CurrencyTotals>
+  countByType: Record<string, number>
+  /** Mouvements hors achats/ventes (transferts, rewards, airdrops, conversions). */
+  excludedCount: number
 }
 
 // ============== Constants ==============
@@ -392,29 +399,77 @@ export default function TransactionsPage() {
   }, [filteredTransactions, sortField, sortDirection])
 
   const stats = useMemo<TransactionStats>(() => {
-    let totalBought = 0
-    let totalSold = 0
-    let totalFees = 0
+    const byCurrency: Record<string, CurrencyTotals> = {}
     const countByType: Record<string, number> = {}
+    // Mouvements qui gonflaient à tort achats/ventes : exclus des flux, comptés séparément.
+    const excludedTypes = [
+      'transfer_in',
+      'transfer_out',
+      'staking_reward',
+      'airdrop',
+      'conversion_in',
+      'conversion_out',
+    ]
+    let excludedCount = 0
 
     filteredTransactions.forEach((tx) => {
-      const total = (tx.quantity || 0) * (tx.price || 0)
       countByType[tx.transaction_type] = (countByType[tx.transaction_type] || 0) + 1
-      const fee = Number(tx.fee) || 0
-      totalFees += isNaN(fee) ? 0 : fee
-      if (
-        ['buy', 'transfer_in', 'staking_reward', 'airdrop', 'conversion_in'].includes(
-          tx.transaction_type
-        )
-      ) {
-        totalBought += total
-      } else if (['sell', 'transfer_out', 'conversion_out'].includes(tx.transaction_type)) {
-        totalSold += total
+      const currency = tx.currency || 'EUR'
+      const entry = (byCurrency[currency] ??= { bought: 0, sold: 0, fees: 0, netFlow: 0 })
+      const total = (Number(tx.quantity) || 0) * (Number(tx.price) || 0)
+      // Les frais sont réels sur tous les types de mouvements.
+      entry.fees += Number(tx.fee) || 0
+      if (tx.transaction_type === 'buy') {
+        entry.bought += total
+      } else if (tx.transaction_type === 'sell') {
+        entry.sold += total
+      } else if (excludedTypes.includes(tx.transaction_type)) {
+        excludedCount++
       }
     })
 
-    return { totalBought, totalSold, totalFees, countByType, netFlow: totalBought - totalSold }
+    Object.values(byCurrency).forEach((entry) => {
+      entry.netFlow = entry.bought - entry.sold
+    })
+
+    return { byCurrency, countByType, excludedCount }
   }, [filteredTransactions])
+
+  const eurTotals: CurrencyTotals = stats.byCurrency['EUR'] ?? {
+    bought: 0,
+    sold: 0,
+    fees: 0,
+    netFlow: 0,
+  }
+
+  const otherCurrencies = useMemo(
+    () => Object.keys(stats.byCurrency).filter((c) => c !== 'EUR').sort(),
+    [stats.byCurrency]
+  )
+
+  /** Lignes secondaires « + 1 234,56 $US » pour les devises non-EUR (jamais converties). */
+  const otherCurrencyLines = useCallback(
+    (field: keyof CurrencyTotals): React.ReactNode[] =>
+      otherCurrencies
+        .filter((c) => stats.byCurrency[c][field] !== 0)
+        .map((c) => {
+          const amount = stats.byCurrency[c][field]
+          return (
+            <span key={`${field}-${c}`} className="block">
+              {amount >= 0 ? '+ ' : ''}
+              {formatCurrency(amount, c)}
+            </span>
+          )
+        }),
+    [otherCurrencies, stats.byCurrency]
+  )
+
+  const excludedHint =
+    stats.excludedCount > 0
+      ? stats.excludedCount > 1
+        ? `${stats.excludedCount} transferts/rewards exclus`
+        : '1 transfert/reward exclu'
+      : null
 
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE))
 
@@ -587,8 +642,17 @@ export default function TransactionsPage() {
 
   // ============== Render Helpers ==============
 
-  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+  const SortableHeader = ({
+    field,
+    children,
+    title,
+  }: {
+    field: SortField
+    children: React.ReactNode
+    title?: string
+  }) => (
     <th scope="col"
+      title={title}
       className="text-center py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
       onClick={() => handleSort(field)}
     >
@@ -710,30 +774,58 @@ export default function TransactionsPage() {
           <StatCard
             className="spot-card"
             label={`Total achats${hasActiveFilters ? ' (filtrés)' : ''}`}
+            tooltip="Achats (BUY) uniquement — transferts, conversions et récompenses exclus."
             icon={TrendingUp}
-            value={stats.totalBought}
+            value={eurTotals.bought}
             format={formatCurrency}
+            hint={
+              otherCurrencyLines('bought').length > 0 || excludedHint ? (
+                <>
+                  {otherCurrencyLines('bought')}
+                  {excludedHint && <span className="block">{excludedHint}</span>}
+                </>
+              ) : undefined
+            }
           />
           <StatCard
             className="spot-card"
             label={`Total ventes${hasActiveFilters ? ' (filtrés)' : ''}`}
+            tooltip="Ventes (SELL) uniquement — transferts, conversions et récompenses exclus."
             icon={TrendingDown}
-            value={stats.totalSold}
+            value={eurTotals.sold}
             format={formatCurrency}
+            hint={
+              otherCurrencyLines('sold').length > 0 || excludedHint ? (
+                <>
+                  {otherCurrencyLines('sold')}
+                  {excludedHint && <span className="block">{excludedHint}</span>}
+                </>
+              ) : undefined
+            }
           />
           <StatCard
             className="spot-card"
             label={`Total frais${hasActiveFilters ? ' (filtrés)' : ''}`}
+            tooltip="Frais de tous les types de mouvements, cumulés par devise."
             icon={Receipt}
-            value={stats.totalFees}
+            value={eurTotals.fees}
             format={formatCurrency}
+            hint={
+              otherCurrencyLines('fees').length > 0 ? <>{otherCurrencyLines('fees')}</> : undefined
+            }
           />
           <StatCard
             className="spot-card"
-            label={`Flux net${hasActiveFilters ? ' (filtrés)' : ''}`}
+            label={`Flux net investi${hasActiveFilters ? ' (filtrés)' : ''}`}
             icon={Coins}
-            value={stats.netFlow}
+            value={eurTotals.netFlow}
             format={formatCurrency}
+            hint={
+              <>
+                <span className="block">hors transferts internes, conversions et récompenses</span>
+                {otherCurrencyLines('netFlow')}
+              </>
+            }
           />
         </SpotlightGroup>
       )}
@@ -969,7 +1061,7 @@ export default function TransactionsPage() {
                       <th scope="col" className="text-center py-3 text-sm font-medium text-muted-foreground">Plateforme</th>
                       <SortableHeader field="quantity">Quantité</SortableHeader>
                       <SortableHeader field="price">Prix</SortableHeader>
-                      <SortableHeader field="total">Total</SortableHeader>
+                      <SortableHeader field="total" title="Hors frais">Total</SortableHeader>
                       <SortableHeader field="fee">Frais</SortableHeader>
                       <th scope="col" className="text-center py-3 text-sm font-medium text-muted-foreground w-20">Actions</th>
                     </tr>

@@ -562,8 +562,21 @@ export default function PortfolioAssetList({
                       <td className="text-center py-3 text-muted-foreground">
                         {(() => {
                           const totalQty = group.assets.reduce((s, a) => s + a.quantity, 0)
+                          if (totalQty <= 0) return '-'
+                          // Même méthodologie que les lignes simples : breakeven backend (frais inclus, FIFO),
+                          // pondéré par quantité — si toutes les positions l'exposent.
+                          if (group.assets.every(a => a.breakeven_price != null)) {
+                            const weightedBreakeven =
+                              group.assets.reduce((s, a) => s + a.breakeven_price! * a.quantity, 0) / totalQty
+                            return (
+                              <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}`}>
+                                {formatCurrency(weightedBreakeven)}
+                              </span>
+                            )
+                          }
+                          // Fallback : recalcul front (invested + frais) / quantité.
                           const totalCost = group.assets.reduce((s, a) => s + a.total_invested + (a.total_fees || 0), 0)
-                          return totalQty > 0 ? formatCurrency(totalCost / totalQty) : '-'
+                          return formatCurrency(totalCost / totalQty)
                         })()}
                       </td>
                       <td className="text-center py-3">
@@ -578,11 +591,30 @@ export default function PortfolioAssetList({
                             {formatPercent(group.totalGainLossPercent)}
                           </p>
                           {(() => {
-                            const first = group.assets.find(a => a.annualized_return != null && a.holding_days != null && a.holding_days >= 7)
-                            if (!first) return null
+                            // CAGR de groupe : moyenne pondérée par le capital investi,
+                            // uniquement si les positions couvertes représentent >= 90 % du capital.
+                            const withCagr = group.assets.filter(
+                              a => a.annualized_return != null && a.holding_days != null && a.holding_days >= 7
+                            )
+                            if (withCagr.length === 0) return null
+                            const coveredInvested = withCagr.reduce((s, a) => s + a.total_invested, 0)
+                            const coverage = group.totalInvested > 0 ? coveredInvested / group.totalInvested : 0
+                            if (coveredInvested <= 0 || coverage < 0.9) {
+                              return (
+                                <p
+                                  className="text-[10px] text-muted-foreground mt-0.5"
+                                  title="CAGR indisponible pour toutes les plateformes"
+                                >
+                                  CAGR: —
+                                </p>
+                              )
+                            }
+                            const weightedCagr =
+                              withCagr.reduce((s, a) => s + a.annualized_return! * a.total_invested, 0) /
+                              coveredInvested
                             return (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">
-                                CAGR: {first.annualized_return! >= 0 ? '+' : ''}{first.annualized_return!.toFixed(1)}%/an
+                              <p className="text-[10px] text-muted-foreground mt-0.5" title="Pondéré par le capital investi">
+                                CAGR: {weightedCagr >= 0 ? '+' : ''}{weightedCagr.toFixed(1)}%/an
                               </p>
                             )
                           })()}

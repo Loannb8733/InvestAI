@@ -16,12 +16,15 @@ import {
   CheckCircle2,
   ArrowRight,
   RefreshCw,
+  Wallet,
+  Banknote,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ResponsivePie } from '@nivo/pie'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingDashboard } from '@/types/crowdfunding'
+import { STATUS_COLORS, STATUS_LABELS } from '@/types/crowdfunding'
 
 const COLOR_TOKENS = ['--chart-5', '--chart-3', '--chart-1', '--chart-4', '--chart-2', '--chart-2']
 
@@ -79,12 +82,19 @@ export default function CrowdfundingDashboardPage() {
     )
   }
 
-  const platformData = Object.entries(d.platform_breakdown).map(([name, value], i) => ({
+  // Camembert : exposition au CRD (capital restant dû) si le backend l'expose,
+  // sinon fallback sur les montants investis (coût historique).
+  const usingOutstanding = d.platform_breakdown_outstanding !== undefined
+  const breakdown = d.platform_breakdown_outstanding ?? d.platform_breakdown
+  const platformData = Object.entries(breakdown).map(([name, value], i) => ({
     id: name,
     label: name,
     value,
     color: color(COLOR_TOKENS[i % COLOR_TOKENS.length]),
   }))
+
+  const totalProjects =
+    d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count
 
   return (
     <div className="space-y-6">
@@ -111,7 +121,7 @@ export default function CrowdfundingDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — décomposition comptable : intérêts = P&L, capital remboursé = retour de principal */}
       <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           className="spot-card"
@@ -119,11 +129,33 @@ export default function CrowdfundingDashboardPage() {
           icon={Landmark}
           value={d.total_invested}
           format={formatCurrency}
-          hint={
-            <>
-              sur {d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count} projet(s)
-            </>
-          }
+          hint={<>sur {totalProjects} projet(s)</>}
+        />
+        <StatCard
+          className="spot-card"
+          label="Intérêts encaissés"
+          tooltip="Seul vrai gain (P&L) : le capital remboursé n'est pas un gain, c'est un retour de principal."
+          icon={TrendingUp}
+          value={d.total_interest_received}
+          format={formatCurrency}
+          hint="bruts de prélèvements"
+        />
+        <StatCard
+          className="spot-card"
+          label="Capital remboursé"
+          icon={Banknote}
+          value={d.total_capital_repaid}
+          format={formatCurrency}
+          hint="retour de principal — pas un gain"
+        />
+        <StatCard
+          className="spot-card"
+          label="Capital restant dû"
+          tooltip="La valeur réelle de la poche crowdfunding : principal encore investi, hors projets en défaut."
+          icon={Wallet}
+          value={d.capital_outstanding}
+          format={formatCurrency}
+          hint="hors projets en défaut"
         />
         <StatCard
           className="spot-card"
@@ -131,7 +163,7 @@ export default function CrowdfundingDashboardPage() {
           icon={TrendingUp}
           value={d.projected_annual_interest}
           format={formatCurrency}
-          hint={<>Taux moyen pondéré : {d.weighted_average_rate.toFixed(1)}%</>}
+          hint={<>brut de fiscalité · taux moyen pondéré : {d.weighted_average_rate.toFixed(1)}%</>}
         />
         <StatCard
           className="spot-card"
@@ -139,8 +171,24 @@ export default function CrowdfundingDashboardPage() {
           icon={CheckCircle2}
           value={d.total_received}
           format={formatCurrency}
-          hint="intérêts + remboursements"
+          hint="brut, capital + intérêts"
         />
+        {d.defaulted_outstanding > 0 && (
+          <Card elevation="raised" className="spot-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Exposé en défaut</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-loss" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-serif font-medium text-loss">
+                {formatCurrency(d.defaulted_outstanding)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                principal restant dû sur {d.defaulted_count} projet(s) en défaut
+              </p>
+            </CardContent>
+          </Card>
+        )}
         <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Prochaine Échéance</CardTitle>
@@ -172,6 +220,11 @@ export default function CrowdfundingDashboardPage() {
         <Card elevation="raised">
           <CardHeader>
             <CardTitle>Répartition par Plateforme</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {usingOutstanding
+                ? 'exposition au capital restant dû (projets en défaut exclus)'
+                : 'montants investis (coût historique)'}
+            </p>
           </CardHeader>
           <CardContent>
             {platformData.length > 0 ? (
@@ -228,6 +281,7 @@ export default function CrowdfundingDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {[
+              { label: 'En levée', count: d.funding_count, color: 'bg-warning', icon: Clock },
               { label: 'Actifs', count: d.active_count, color: 'bg-gain', icon: TrendingUp },
               { label: 'Terminés', count: d.completed_count, color: 'bg-accent', icon: CheckCircle2 },
               { label: 'En retard', count: d.delayed_count, color: 'bg-warning', icon: AlertTriangle },
@@ -273,17 +327,8 @@ export default function CrowdfundingDashboardPage() {
                   </div>
                   <div className="text-right ml-4">
                     <p className="text-sm font-medium">{formatCurrency(p.invested_amount)}</p>
-                    <Badge
-                      variant={
-                        p.status === 'active'
-                          ? 'default'
-                          : p.status === 'completed'
-                            ? 'secondary'
-                            : 'destructive'
-                      }
-                      className="text-xs"
-                    >
-                      {p.status}
+                    <Badge className={`text-xs ${STATUS_COLORS[p.status]}`}>
+                      {STATUS_LABELS[p.status]}
                     </Badge>
                   </div>
                 </div>

@@ -37,7 +37,7 @@ import { apiKeysApi, transactionsApi } from '@/services/api'
 import ColdWalletsManager from '@/components/exchanges/ColdWalletsManager'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import { COLD_WALLETS } from '@/lib/platforms'
 import {
   Plus,
@@ -59,6 +59,8 @@ import {
   ChevronRight,
   Info,
   Link2,
+  Pencil,
+  Power,
 } from 'lucide-react'
 
 interface Exchange {
@@ -160,13 +162,23 @@ export default function ExchangesPage() {
   const [refreshingFxId, setRefreshingFxId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<APIKey | null>(null)
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [renameTarget, setRenameTarget] = useState<APIKey | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  // Un polling par tâche (import, recalcul FX...) : lancer une 2e opération
+  // ne doit jamais écraser le suivi de la 1re.
+  const pollTimersRef = useRef<
+    Map<string, { interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> }>
+  >(new Map())
 
   useEffect(() => {
+    const timers = pollTimersRef.current
     return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
+      timers.forEach(({ interval, timeout }) => {
+        clearInterval(interval)
+        clearTimeout(timeout)
+      })
+      timers.clear()
     }
   }, [])
   const [guideExchange, setGuideExchange] = useState<string | null>(null)
@@ -212,6 +224,37 @@ export default function ExchangesPage() {
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la clé API.' })
+    },
+  })
+
+  // Update API key mutation (rename label / toggle active)
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { label?: string; is_active?: boolean } }) =>
+      apiKeysApi.update(id, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
+      setRenameTarget(null)
+      if (variables.data.is_active !== undefined) {
+        toast({
+          title: variables.data.is_active ? 'Connexion activée' : 'Connexion désactivée',
+          description: variables.data.is_active
+            ? 'La clé API sera de nouveau utilisée pour les synchronisations.'
+            : 'La clé API ne sera plus utilisée pour les synchronisations.',
+        })
+      } else {
+        toast({ title: 'Label mis à jour', description: 'La connexion a été renommée avec succès.' })
+      }
+    },
+    onError: (error: unknown) => {
+      const axiosError = error as import('axios').AxiosError<{ detail?: string }>
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: axiosError.response?.data?.detail || 'Impossible de mettre à jour la clé API.',
+      })
+    },
+    onSettled: () => {
+      setTogglingId(null)
     },
   })
 
@@ -325,15 +368,21 @@ export default function ExchangesPage() {
     },
   ) => {
     const clear = opts?.onClear ?? (() => setImportingId(null))
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
+    const stopPolling = () => {
+      const timers = pollTimersRef.current.get(taskId)
+      if (timers) {
+        clearInterval(timers.interval)
+        clearTimeout(timers.timeout)
+        pollTimersRef.current.delete(taskId)
+      }
+    }
 
     const interval = setInterval(async () => {
       try {
         const status = await apiKeysApi.getImportStatus(taskId)
 
         if (status.status === 'completed') {
-          clearInterval(interval)
+          stopPolling()
           clear()
 
           queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
@@ -400,7 +449,7 @@ export default function ExchangesPage() {
               /* non-blocking: silently skip if endpoint is unavailable */
             })
         } else if (status.status === 'failed') {
-          clearInterval(interval)
+          stopPolling()
           clear()
 
           toast({
@@ -411,7 +460,7 @@ export default function ExchangesPage() {
         }
         // else: still pending/progress — continue polling
       } catch {
-        clearInterval(interval)
+        stopPolling()
         clear()
 
         toast({
@@ -422,14 +471,13 @@ export default function ExchangesPage() {
       }
     }, 5000) // Poll every 5 seconds
 
-    pollIntervalRef.current = interval
-
     // Safety: stop polling after 10 minutes
-    pollTimeoutRef.current = setTimeout(() => {
-      clearInterval(interval)
-      pollIntervalRef.current = null
+    const timeout = setTimeout(() => {
+      stopPolling()
       clear()
     }, 600000)
+
+    pollTimersRef.current.set(taskId, { interval, timeout })
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -465,6 +513,25 @@ export default function ExchangesPage() {
     if (amount < 1) return amount.toFixed(6)
     if (amount < 1000) return amount.toFixed(4)
     return amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+  }
+
+  // Freshness of the last sync: relative label + color (gain <24h, warning 1-3j, loss >3j)
+  const getSyncFreshness = (dateString: string): { label: string; className: string } | null => {
+    const ts = new Date(dateString).getTime()
+    if (Number.isNaN(ts)) return null
+    const diffMs = Date.now() - ts
+    if (diffMs < 0) return null
+    const hours = Math.floor(diffMs / 3_600_000)
+    const days = Math.floor(hours / 24)
+    const label =
+      hours < 1 ? 'il y a moins d\'1 h' : hours < 24 ? `il y a ${hours} h` : `il y a ${days} j`
+    const className =
+      hours < 24
+        ? 'text-gain border-gain/30 bg-gain/10'
+        : days <= 3
+          ? 'text-warning border-warning/30 bg-warning/10'
+          : 'text-loss border-loss/30 bg-loss/10'
+    return { label, className }
   }
 
   // Count connected exchanges by type
@@ -531,9 +598,41 @@ export default function ExchangesPage() {
                         )}
                       </div>
                     </div>
-                    <Badge variant={apiKey.is_active ? 'default' : 'destructive'} className="shrink-0">
-                      {apiKey.is_active ? 'Actif' : 'Inactif'}
-                    </Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground"
+                        title="Renommer cette connexion"
+                        onClick={() => {
+                          setRenameTarget(apiKey)
+                          setRenameValue(apiKey.label || '')
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <button
+                        type="button"
+                        title={apiKey.is_active
+                          ? 'Cliquer pour désactiver cette connexion'
+                          : 'Cliquer pour réactiver cette connexion'}
+                        onClick={() => {
+                          setTogglingId(apiKey.id)
+                          updateMutation.mutate({ id: apiKey.id, data: { is_active: !apiKey.is_active } })
+                        }}
+                        disabled={togglingId === apiKey.id}
+                        className="disabled:opacity-50"
+                      >
+                        <Badge variant={apiKey.is_active ? 'default' : 'destructive'} className="cursor-pointer gap-1">
+                          {togglingId === apiKey.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Power className="h-3 w-3" />
+                          )}
+                          {apiKey.is_active ? 'Actif' : 'Inactif'}
+                        </Badge>
+                      </button>
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -545,10 +644,21 @@ export default function ExchangesPage() {
                       <span>Créé le {formatDate(apiKey.created_at)}</span>
                     </div>
                     {apiKey.last_sync_at && (
-                      <div className="flex items-center gap-1 text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                        <RefreshCw className="h-3 w-3" />
-                        <span>Sync {formatDate(apiKey.last_sync_at)}</span>
-                      </div>
+                      <>
+                        <div className="flex items-center gap-1 text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                          <RefreshCw className="h-3 w-3" />
+                          <span>Sync {formatDateTime(apiKey.last_sync_at)}</span>
+                        </div>
+                        {(() => {
+                          const freshness = getSyncFreshness(apiKey.last_sync_at)
+                          if (!freshness) return null
+                          return (
+                            <Badge variant="outline" className={`text-xs font-medium ${freshness.className}`}>
+                              {freshness.label}
+                            </Badge>
+                          )
+                        })()}
+                      </>
                     )}
                   </div>
 
@@ -2264,6 +2374,53 @@ export default function ExchangesPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename API Key Dialog */}
+      <Dialog open={!!renameTarget} onOpenChange={(open) => !open && setRenameTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renommer la connexion</DialogTitle>
+            <DialogDescription>
+              {renameTarget && (
+                <>
+                  Modifiez le label de votre connexion{' '}
+                  <strong>{getExchangeName(renameTarget.exchange)}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!renameTarget) return
+              updateMutation.mutate({ id: renameTarget.id, data: { label: renameValue.trim() } })
+            }}
+          >
+            <div className="space-y-2 py-4">
+              <Label htmlFor="rename-label">Label</Label>
+              <Input
+                id="rename-label"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="Ex: Compte principal, DCA, Trading..."
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Utile si vous avez plusieurs comptes sur le même exchange.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRenameTarget(null)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

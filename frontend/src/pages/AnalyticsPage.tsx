@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { PortfolioSummary as Portfolio } from '@/types'
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,7 +37,10 @@ import {
   Zap,
   Percent,
   ArrowDownRight,
+  ArrowUpRight,
   Shuffle,
+  ListChecks,
+  Loader2,
 } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import SpotlightGroup from '@/components/ui/spotlight-group'
@@ -195,6 +198,25 @@ interface OptimizeData {
   sharpe_ratio: number
 }
 
+interface RebalanceOrder {
+  symbol: string
+  name: string
+  asset_type: string
+  current_weight: number
+  target_weight: number
+  diff_weight: number
+  current_value: number
+  target_value: number
+  diff_value: number
+  action: string
+}
+
+interface RebalanceResponse {
+  orders: RebalanceOrder[]
+}
+
+type OptimizeObjective = 'max_sharpe' | 'min_volatility'
+
 // Metric explanation tooltips
 const metricExplanations: Record<string, { title: string; description: string }> = {
   volatility: {
@@ -259,6 +281,10 @@ const MetricWithTooltip = ({ metricKey, children }: { metricKey: string; childre
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState('30d')
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all')
+  // Horizon de projection Monte Carlo — indépendant de la période d'analyse (lookback)
+  const [mcHorizon, setMcHorizon] = useState('90')
+  // Objectif d'optimisation Markowitz
+  const [optimizeObjective, setOptimizeObjective] = useState<OptimizeObjective>('max_sharpe')
   const { theme, color } = useNivoTheme()
 
   const { data: portfolios } = useQuery<Portfolio[]>({
@@ -305,12 +331,13 @@ export default function AnalyticsPage() {
     placeholderData: keepPreviousData,
   })
 
-  const monteCarloHorizon = Math.max(7, periodDays || 90)
+  const monteCarloHorizon = Number(mcHorizon)
   const { data: monteCarlo } = useQuery<MonteCarloData>({
     queryKey: queryKeys.analytics.monteCarlo(portfolioParam, monteCarloHorizon),
     queryFn: () => analyticsApi.getMonteCarlo(monteCarloHorizon, portfolioParam),
-    enabled: !!analytics && analytics.asset_count > 0 && periodDays !== 1,
+    enabled: !!analytics && analytics.asset_count > 0,
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
   })
 
   const { data: xirrData } = useQuery<{ xirr: number | null }>({
@@ -322,10 +349,16 @@ export default function AnalyticsPage() {
 
   const optimizeDays = Math.max(30, periodDays || 90)
   const { data: optimization } = useQuery<OptimizeData>({
-    queryKey: queryKeys.analytics.optimize(portfolioParam, optimizeDays),
-    queryFn: () => analyticsApi.getOptimize('max_sharpe', optimizeDays),
+    queryKey: [...queryKeys.analytics.optimize(portfolioParam, optimizeDays), optimizeObjective],
+    queryFn: () => analyticsApi.getOptimize(optimizeObjective, optimizeDays),
     enabled: !!analytics && analytics.asset_count >= 2,
     ...analyticsQueryOpts,
+    placeholderData: keepPreviousData,
+  })
+
+  // Ordres de rééquilibrage vers l'allocation optimale (Markowitz)
+  const rebalanceMutation = useMutation<RebalanceResponse, Error, Record<string, number>>({
+    mutationFn: (targetWeights) => analyticsApi.postRebalance(targetWeights),
   })
 
   const { data: stressTest } = useQuery<StressTestData>({
@@ -863,20 +896,62 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Monte Carlo */}
         {monteCarlo && monteCarlo.simulations > 0 && (
-          <MonteCarloCard monteCarlo={monteCarlo} />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-muted-foreground">Horizon de projection</span>
+              <Select value={mcHorizon} onValueChange={setMcHorizon}>
+                <SelectTrigger className="h-8 w-28" aria-label="Horizon de projection Monte Carlo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 jours</SelectItem>
+                  <SelectItem value="90">90 jours</SelectItem>
+                  <SelectItem value="180">180 jours</SelectItem>
+                  <SelectItem value="365">365 jours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <MonteCarloCard monteCarlo={monteCarlo} />
+            </div>
+          </div>
         )}
 
         {/* MPT Optimization */}
         {optimization && (
           <Card elevation="raised">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shuffle className="h-5 w-5 text-accent" />
-                Allocation optimale (Markowitz)
-              </CardTitle>
-              <CardDescription>
-                Portefeuille maximisant le Sharpe ratio
-              </CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <CardTitle className="flex items-center gap-2">
+                    <Shuffle className="h-5 w-5 text-accent" />
+                    Allocation optimale (Markowitz)
+                  </CardTitle>
+                  <CardDescription>
+                    {optimizeObjective === 'max_sharpe'
+                      ? 'Portefeuille maximisant le Sharpe ratio'
+                      : 'Portefeuille minimisant la volatilité'}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">Objectif</span>
+                  <Select
+                    value={optimizeObjective}
+                    onValueChange={(v) => {
+                      setOptimizeObjective(v as OptimizeObjective)
+                      rebalanceMutation.reset()
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-36" aria-label="Objectif d'optimisation">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="max_sharpe">Sharpe max</SelectItem>
+                      <SelectItem value="min_volatility">Volatilité min</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -931,6 +1006,88 @@ export default function AnalyticsPage() {
                     <div className="text-lg font-bold text-accent">{optimization.sharpe_ratio.toFixed(2)}</div>
                     <div className="text-xs text-muted-foreground">Sharpe optimal</div>
                   </div>
+                </div>
+
+                {/* Rebalancing orders */}
+                <div className="pt-3 border-t space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={rebalanceMutation.isPending}
+                    onClick={() => rebalanceMutation.mutate(optimization.weights)}
+                  >
+                    {rebalanceMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ListChecks className="h-4 w-4 mr-2" />
+                    )}
+                    Générer les ordres de rééquilibrage
+                  </Button>
+
+                  {rebalanceMutation.isError && (
+                    <p className="text-xs text-loss text-center">
+                      Impossible de générer les ordres de rééquilibrage. Veuillez réessayer.
+                    </p>
+                  )}
+
+                  {rebalanceMutation.isSuccess && (() => {
+                    const actionableOrders = (rebalanceMutation.data?.orders ?? []).filter(
+                      (o) => o.action === 'buy' || o.action === 'sell'
+                    )
+                    if (actionableOrders.length === 0) {
+                      return (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          Aucun ordre nécessaire — votre allocation est déjà proche de la cible.
+                        </p>
+                      )
+                    }
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b">
+                                <th scope="col" className="text-left p-2 font-medium">Actif</th>
+                                <th scope="col" className="text-center p-2 font-medium">Action</th>
+                                <th scope="col" className="text-right p-2 font-medium">Montant</th>
+                                <th scope="col" className="text-right p-2 font-medium">Poids actuel → cible</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {actionableOrders.map((order) => (
+                                <tr key={order.symbol} className="border-b last:border-b-0">
+                                  <td className="p-2">
+                                    <div className="font-medium">{order.symbol}</div>
+                                    <div className="text-xs text-muted-foreground">{order.name}</div>
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${order.action === 'buy' ? 'text-gain' : 'text-loss'}`}>
+                                      {order.action === 'buy' ? (
+                                        <ArrowUpRight className="h-3 w-3" />
+                                      ) : (
+                                        <ArrowDownRight className="h-3 w-3" />
+                                      )}
+                                      {order.action === 'buy' ? 'Acheter' : 'Vendre'}
+                                    </span>
+                                  </td>
+                                  <td className={`p-2 text-right font-mono ${order.action === 'buy' ? 'text-gain' : 'text-loss'}`}>
+                                    {order.action === 'buy' ? '+' : '−'}{formatCurrency(Math.abs(order.diff_value))}
+                                  </td>
+                                  <td className="p-2 text-right font-mono text-xs">
+                                    {order.current_weight.toFixed(1)}% → {order.target_weight.toFixed(1)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Ordres suggérés (optimisation Markowitz) — ne constitue pas un conseil en investissement.
+                        </p>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
             </CardContent>

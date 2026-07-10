@@ -134,6 +134,9 @@ class CrowdfundingProjectResponse(BaseModel):
 
     # Computed
     projected_total_interest: Optional[float] = None
+    # Intérêts projetés BRUTS de fiscalité (invested × rate × months/12) —
+    # permet des ratios homogènes brut/brut face à interest_earned (brut).
+    projected_interest_gross: Optional[float] = None
     interest_earned: Optional[float] = None
     progress_percent: Optional[float] = None
     documents: list[ProjectDocumentResponse] = []
@@ -163,6 +166,9 @@ class CrowdfundingDashboardResponse(BaseModel):
     funding_count: int
     next_maturity: Optional[date] = None
     platform_breakdown: dict[str, float]
+    # Exposition par plateforme au capital restant dû (projets en défaut
+    # exclus) — un projet remboursé à 80 % ne pèse plus que 20 %.
+    platform_breakdown_outstanding: dict[str, float] = Field(default_factory=dict)
     projects: list[CrowdfundingProjectResponse]
 
 

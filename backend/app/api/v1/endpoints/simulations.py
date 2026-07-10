@@ -124,7 +124,15 @@ class DCAParameters(BaseModel):
 
 
 class DCAResult(BaseModel):
-    """DCA simulation result."""
+    """DCA simulation result (distribution multi-chemins).
+
+    Correction audit : les champs historiques (``final_value``, ``average_cost``,
+    ``total_units``, ``return_percent``, ``projections``) sont désormais alimentés
+    par la MÉDIANE (p50) d'une simulation Monte Carlo à ``n_paths`` trajectoires —
+    plus jamais par un tirage aléatoire unique. Les nouveaux champs exposent la
+    distribution complète (p10/p50/p90 par stratégie) et la probabilité que le
+    DCA batte le Lump Sum, calculée sur les MÊMES chemins de rendements.
+    """
 
     total_invested: float
     final_value: float
@@ -133,6 +141,15 @@ class DCAResult(BaseModel):
     return_percent: float
     projections: List[Dict[str, Any]]
     currency: str
+    # Distribution multi-chemins (nouveaux champs)
+    dca_p10: float
+    dca_p50: float
+    dca_p90: float
+    lumpsum_p10: float
+    lumpsum_p50: float
+    lumpsum_p90: float
+    prob_dca_beats_ls: float  # % des chemins (0-100) où la valeur finale DCA > Lump Sum
+    n_paths: int
 
 
 class WhatIfParameters(BaseModel):
@@ -374,68 +391,120 @@ async def simulate_dca(
     params: DCAParameters,
     current_user: User = Depends(get_current_user),
 ) -> DCAResult:
-    """Simulate Dollar Cost Averaging strategy."""
-    import random
+    """Simulate Dollar Cost Averaging vs Lump Sum on N stochastic paths.
+
+    Correction (audit financier) : l'ancienne implémentation tirait UN SEUL
+    chemin aléatoire (``random.gauss`` par période, sans seed) présenté comme
+    « le » résultat, tandis que le Lump Sum était recalculé côté front en
+    composé déterministe — la conclusion DCA vs Lump Sum changeait donc à
+    chaque clic. On simule désormais ``N_PATHS = 500`` trajectoires de
+    rendements vectorisées (numpy, ``np.random.default_rng`` sans seed fixe
+    car on renvoie une DISTRIBUTION, pas un chiffre unique) et on évalue les
+    DEUX stratégies sur les MÊMES chemins :
+
+    - DCA : ``amount_per_investment`` investi au prix de chaque période ;
+    - Lump Sum : la totalité investie au prix initial (période 0).
+
+    La réponse expose p10/p50/p90 de la valeur finale par stratégie et la
+    probabilité (fraction des chemins, en %) que le DCA batte le Lump Sum.
+    Compatibilité : les champs historiques sont alimentés par la médiane
+    (p50), et ``projections`` contient la trajectoire médiane par période
+    avec sa bande p10-p90 (``current_value_p10`` / ``current_value_p90``)
+    ainsi que la valeur Lump Sum médiane (``lump_sum_value``).
+
+    Le drift et la volatilité annualisés sont convertis à la période réelle
+    d'investissement (hebdo/mensuel/trimestriel) — l'ancien code appliquait
+    un pas mensuel quelle que soit la fréquence.
+    """
+    import numpy as np
 
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
 
-    # Determine investment frequency
+    # Determine investment frequency and per-period scaling
     if params.frequency == "weekly":
         num_investments = params.duration_months * 4
-        amount_per_investment = params.total_amount / num_investments
+        periods_per_year = 48  # 4 semaines/mois x 12 mois (cohérent avec num_investments)
     elif params.frequency == "quarterly":
-        num_investments = params.duration_months // 3
-        amount_per_investment = params.total_amount / max(num_investments, 1)
+        num_investments = max(params.duration_months // 3, 1)
+        periods_per_year = 4
     else:  # monthly
         num_investments = params.duration_months
-        amount_per_investment = params.total_amount / num_investments
+        periods_per_year = 12
+    amount_per_investment = params.total_amount / num_investments
+    total_invested = amount_per_investment * num_investments
 
-    # Simulate price movements — Decimal precision for financial sums
-    projections = []
-    total_units = Decimal("0")
-    total_invested = Decimal("0")
-    price = Decimal("100")  # Starting price
-    monthly_return = params.expected_return / 100 / 12
-    monthly_volatility = params.expected_volatility / 100 / (12**0.5)
-    amt_per = Decimal(str(amount_per_investment))
+    n_paths = 500
+    # No fixed seed — we return a distribution, not a single stochastic draw
+    rng = np.random.default_rng()
+    period_return = params.expected_return / 100 / periods_per_year
+    period_vol = params.expected_volatility / 100 / (periods_per_year**0.5)
 
-    # No fixed seed — each simulation produces genuine stochastic results
+    # Same return paths for BOTH strategies — shape (n_paths, num_investments)
+    returns = rng.normal(period_return, period_vol, size=(n_paths, num_investments))
+    growth = np.clip(1.0 + returns, 0.01, None)  # prevent negative prices
+    start_price = 100.0
+    prices = start_price * np.cumprod(growth, axis=1)
 
-    for i in range(num_investments):
-        # Simulate price change (float OK for stochastic sampling)
-        price_change = random.gauss(monthly_return, monthly_volatility)
-        price = price * Decimal(str(1 + price_change))
-        price = max(price, Decimal("1"))  # Prevent negative prices
+    # DCA: buy amount_per_investment at each period's price
+    units_per_period = amount_per_investment / prices
+    cum_units = np.cumsum(units_per_period, axis=1)
+    dca_values = cum_units * prices  # portfolio value at each period, per path
+    dca_final = dca_values[:, -1]
 
-        # Make investment
-        units_bought = amt_per / price
-        total_units += units_bought
-        total_invested += amt_per
+    # Lump Sum: everything invested at the initial price, on the SAME paths
+    ls_units = total_invested / start_price
+    ls_values = ls_units * prices
+    ls_final = ls_values[:, -1]
 
-        projections.append(
-            {
-                "period": i + 1,
-                "price": float(round(price, 2)),
-                "amount_invested": float(round(amt_per, 2)),
-                "units_bought": float(round(units_bought, 4)),
-                "total_units": float(round(total_units, 4)),
-                "total_invested": float(round(total_invested, 2)),
-                "current_value": float(round(total_units * price, 2)),
-            }
-        )
+    dca_p10, dca_p50, dca_p90 = (float(v) for v in np.percentile(dca_final, [10, 50, 90]))
+    ls_p10, ls_p50, ls_p90 = (float(v) for v in np.percentile(ls_final, [10, 50, 90]))
+    prob_dca_beats_ls = float(np.mean(dca_final > ls_final) * 100)
 
-    final_value = total_units * price
-    average_cost = total_invested / total_units if total_units > 0 else Decimal("0")
-    return_percent = ((final_value - total_invested) / total_invested * 100) if total_invested > 0 else Decimal("0")
+    # Median trajectory per period (p50 across paths) + p10-p90 band
+    price_p50 = np.percentile(prices, 50, axis=0)
+    units_p50 = np.percentile(units_per_period, 50, axis=0)
+    cum_units_p50 = np.percentile(cum_units, 50, axis=0)
+    dca_val_p10 = np.percentile(dca_values, 10, axis=0)
+    dca_val_p50 = np.percentile(dca_values, 50, axis=0)
+    dca_val_p90 = np.percentile(dca_values, 90, axis=0)
+    ls_val_p50 = np.percentile(ls_values, 50, axis=0)
+
+    projections: List[Dict[str, Any]] = [
+        {
+            "period": i + 1,
+            "price": round(float(price_p50[i]), 2),
+            "amount_invested": round(amount_per_investment, 2),
+            "units_bought": round(float(units_p50[i]), 4),
+            "total_units": round(float(cum_units_p50[i]), 4),
+            "total_invested": round(amount_per_investment * (i + 1), 2),
+            "current_value": round(float(dca_val_p50[i]), 2),
+            "current_value_p10": round(float(dca_val_p10[i]), 2),
+            "current_value_p90": round(float(dca_val_p90[i]), 2),
+            "lump_sum_value": round(float(ls_val_p50[i]), 2),
+        }
+        for i in range(num_investments)
+    ]
+
+    median_total_units = float(np.percentile(cum_units[:, -1], 50))
+    average_cost = total_invested / median_total_units if median_total_units > 0 else 0.0
+    return_percent = ((dca_p50 - total_invested) / total_invested * 100) if total_invested > 0 else 0.0
 
     return DCAResult(
-        total_invested=float(round(total_invested, 2)),
-        final_value=float(round(final_value, 2)),
-        average_cost=float(round(average_cost, 2)),
-        total_units=float(round(total_units, 4)),
-        return_percent=float(round(return_percent, 2)),
+        total_invested=round(total_invested, 2),
+        final_value=round(dca_p50, 2),
+        average_cost=round(average_cost, 2),
+        total_units=round(median_total_units, 4),
+        return_percent=round(return_percent, 2),
         projections=projections,
         currency=currency,
+        dca_p10=round(dca_p10, 2),
+        dca_p50=round(dca_p50, 2),
+        dca_p90=round(dca_p90, 2),
+        lumpsum_p10=round(ls_p10, 2),
+        lumpsum_p50=round(ls_p50, 2),
+        lumpsum_p90=round(ls_p90, 2),
+        prob_dca_beats_ls=round(prob_dca_beats_ls, 1),
+        n_paths=n_paths,
     )
 
 

@@ -41,24 +41,9 @@ import {
   AlertTriangle, CheckCircle2, Clock,
 } from 'lucide-react'
 import type { CrowdfundingProject, ProjectStatus, RepaymentType, PaymentType, InterestFrequency } from '@/types/crowdfunding'
+import { STATUS_COLORS, STATUS_LABELS } from '@/types/crowdfunding'
 import StressTestSlider from '@/components/crowdfunding/StressTestSlider'
 import PaymentTimeline from '@/components/crowdfunding/PaymentTimeline'
-
-const STATUS_COLORS: Record<ProjectStatus, string> = {
-  funding: 'bg-warning/10 text-warning',
-  active: 'bg-gain/10 text-gain',
-  completed: 'bg-accent/10 text-accent',
-  delayed: 'bg-warning/10 text-warning',
-  defaulted: 'bg-loss/10 text-loss',
-}
-
-const STATUS_LABELS: Record<ProjectStatus, string> = {
-  funding: 'En cours de levée',
-  active: 'Actif',
-  completed: 'Terminé',
-  delayed: 'En retard',
-  defaulted: 'Défaut',
-}
 
 const INTEREST_FREQUENCY_LABELS: Record<InterestFrequency, string> = {
   at_maturity: 'À maturité',
@@ -157,6 +142,7 @@ export default function CrowdfundingProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingRepayment, setDeletingRepayment] = useState<{ projectId: string; repaymentId: string } | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [files, setFiles] = useState<File[]>([])
   const [uploadingDocs, setUploadingDocs] = useState(false)
@@ -252,9 +238,13 @@ export default function CrowdfundingProjectsPage() {
       crowdfundingApi.deleteRepayment(projectId, repaymentId),
     onSuccess: () => {
       invalidate()
+      setDeletingRepayment(null)
       toast({ title: 'Versement supprimé' })
     },
-    onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
+    onError: () => {
+      setDeletingRepayment(null)
+      toast({ title: 'Erreur lors de la suppression', variant: 'destructive' })
+    },
   })
 
   const handleRepaymentSubmit = () => {
@@ -706,7 +696,7 @@ export default function CrowdfundingProjectsPage() {
 
                     {p.projected_total_interest !== null && (
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Intérêts projetés : </span>
+                        <span className="text-muted-foreground">Intérêts projetés (nets de fiscalité) : </span>
                         <span className="font-medium text-gain">
                           {formatCurrency(p.projected_total_interest)}
                         </span>
@@ -746,14 +736,29 @@ export default function CrowdfundingProjectsPage() {
                       </div>
                     )}
 
-                    {/* Repayments summary */}
+                    {/* Repayments summary — intérêts encaissés vs projetés, en BRUT/BRUT
+                        (le total reçu mélange capital + intérêts : affiché à part, étiqueté) */}
                     <div className="border-t pt-3 space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Reçu</span>
+                        <span className="text-muted-foreground">Intérêts (bruts)</span>
                         <span>
-                          <span className="font-medium text-gain">{formatCurrency(p.total_received)}</span>
-                          <span className="text-muted-foreground"> / {formatCurrency(p.projected_total_interest ?? 0)}</span>
+                          <span className="font-medium text-gain">{formatCurrency(p.interest_earned ?? 0)}</span>
+                          <span className="text-muted-foreground"> / {formatCurrency(p.projected_interest_gross ?? 0)}</span>
                         </span>
+                      </div>
+                      {(p.projected_interest_gross ?? 0) > 0 && (
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gain rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, ((p.interest_earned ?? 0) / (p.projected_interest_gross ?? 1)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Total reçu (brut, capital + intérêts)</span>
+                        <span className="font-medium">{formatCurrency(p.total_received)}</span>
                       </div>
                       {p.repayments && p.repayments.length > 0 && (
                         <div className="space-y-1">
@@ -765,7 +770,8 @@ export default function CrowdfundingProjectsPage() {
                               <span className="flex items-center gap-1">
                                 <span className="font-medium text-gain">+{formatCurrency(r.amount)}</span>
                                 <button
-                                  onClick={() => deleteRepaymentMutation.mutate({ projectId: p.id, repaymentId: r.id })}
+                                  aria-label="Supprimer ce versement"
+                                  onClick={() => setDeletingRepayment({ projectId: p.id, repaymentId: r.id })}
                                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
                                 >
                                   <X className="h-3 w-3" />
@@ -903,6 +909,28 @@ export default function CrowdfundingProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete repayment confirmation */}
+      <AlertDialog open={!!deletingRepayment} onOpenChange={(open) => !open && setDeletingRepayment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce versement ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le versement sera retiré de l'historique et le total reçu du projet sera
+              recalculé. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingRepayment && deleteRepaymentMutation.mutate(deletingRepayment)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Repayment dialog — Tokimo-style breakdown */}
       <Dialog
         open={repaymentDialogOpen}
@@ -922,7 +950,10 @@ export default function CrowdfundingProjectsPage() {
             const interest = parseFloat(repaymentForm.interest_amount) || 0
             const capital = parseFloat(repaymentForm.capital_amount) || 0
             const tax = parseFloat(repaymentForm.tax_amount) || 0
-            const netAmount = interest + capital - tax
+            // Le ledger stocke le BRUT (intérêts + capital) ; les taxes sont
+            // enregistrées à part (tax_amount). Le net n'est qu'informatif.
+            const grossAmount = interest + capital
+            const netAmount = grossAmount - tax
             const project = projects?.find((p) => p.id === repaymentProjectId)
             const totalCapitalPaid = (project?.repayments ?? [])
               .reduce((s, r) => s + (r.capital_amount ?? 0), 0)
@@ -977,14 +1008,22 @@ export default function CrowdfundingProjectsPage() {
                   />
                 </div>
 
-                {/* Computed summary */}
+                {/* Computed summary — le brut est ce qui est enregistré au ledger */}
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Montant versé</span>
-                    <span className={`font-semibold tabular-nums ${netAmount > 0 ? 'text-gain' : 'text-muted-foreground'}`}>
-                      {formatCurrency(netAmount > 0 ? netAmount : 0)}
+                    <span className="text-muted-foreground">Montant enregistré (brut)</span>
+                    <span className={`font-semibold tabular-nums ${grossAmount > 0 ? 'text-gain' : 'text-muted-foreground'}`}>
+                      {formatCurrency(grossAmount > 0 ? grossAmount : 0)}
                     </span>
                   </div>
+                  {tax > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">net après prélèvements</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatCurrency(netAmount > 0 ? netAmount : 0)}
+                      </span>
+                    </div>
+                  )}
                   {capital > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Capital restant dû</span>
@@ -1007,7 +1046,7 @@ export default function CrowdfundingProjectsPage() {
 
                 <Button
                   onClick={handleRepaymentSubmit}
-                  disabled={!repaymentForm.payment_date || netAmount <= 0 || createRepaymentMutation.isPending}
+                  disabled={!repaymentForm.payment_date || grossAmount <= 0 || createRepaymentMutation.isPending}
                 >
                   {createRepaymentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Enregistrer
