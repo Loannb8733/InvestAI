@@ -19,6 +19,11 @@ class AlertCondition(str, enum.Enum):
     DAILY_CHANGE_DOWN = "daily_change_down"
     TARGET_BREAK_EVEN = "target_break_even"
     VOLATILITY_SPIKE = "volatility_spike"
+    # Conditions au niveau PORTEFEUILLE (asset_id NULL) — protègent un
+    # patrimoine concentré, ce que les seuils par actif ne font pas.
+    PORTFOLIO_DRAWDOWN = "portfolio_drawdown"  # drawdown courant vs ATH ≥ seuil %
+    CONCENTRATION_HHI = "concentration_hhi"  # indice HHI ≥ seuil
+    ALLOCATION_DRIFT = "allocation_drift"  # écart max vs cible ≥ seuil pts
 
 
 class Alert(Base):

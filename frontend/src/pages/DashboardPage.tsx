@@ -190,6 +190,8 @@ interface DashboardMetrics {
   daily_change_percent: number
   period_change?: number
   period_change_percent?: number
+  /** TWR de la période — performance nette des flux, comparable à un indice. */
+  period_twr_percent?: number | null
   portfolios_count: number
   assets_count: number
   allocation: Array<{ type: string; value: number; percentage: number }>
@@ -610,6 +612,7 @@ export default function DashboardPage() {
                     isPositive={isPositive}
                     dailyChange={variationChange}
                     dailyChangePercent={variationPercent}
+                    periodTwrPercent={selectedPeriod === 1 ? undefined : metrics.period_twr_percent ?? undefined}
                     isDailyPositive={isDailyPositive}
                     portfoliosCount={metrics.portfolios_count}
                     selectedPeriod={selectedPeriod}

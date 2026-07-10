@@ -301,6 +301,14 @@ class AlertService:
         alert: Alert,
     ) -> Optional[AlertTrigger]:
         """Check if a single alert should trigger."""
+        # Conditions au niveau portefeuille : pas d'asset_id, on branche avant.
+        if alert.condition in (
+            AlertCondition.PORTFOLIO_DRAWDOWN,
+            AlertCondition.CONCENTRATION_HHI,
+            AlertCondition.ALLOCATION_DRIFT,
+        ):
+            return await self._check_portfolio_alert(db, alert)
+
         # Get asset
         result = await db.execute(select(Asset).where(Asset.id == alert.asset_id))
         asset = result.scalar_one_or_none()
@@ -427,6 +435,96 @@ class AlertService:
                 message=message,
             )
 
+        return None
+
+    async def _check_portfolio_alert(self, db: AsyncSession, alert: Alert) -> Optional[AlertTrigger]:
+        """Évalue une condition au niveau portefeuille (drawdown / HHI / drift).
+
+        Ces conditions protègent un patrimoine concentré — exactement le risque
+        qu'un investisseur crypto veut surveiller — là où les seuils par actif
+        ne voient rien. Tout le calcul réutilise des données déjà servies
+        (cache dashboard, moteur de rebalancing).
+        """
+        from app.services.metrics_service import metrics_service
+
+        user_id = str(alert.user_id)
+        threshold = float(alert.threshold)
+        should_trigger = False
+        current_value = 0.0
+        message = ""
+
+        if alert.condition == AlertCondition.PORTFOLIO_DRAWDOWN:
+            # Drawdown COURANT = repli depuis le plus-haut historique de la
+            # série (pas le max drawdown passé) : « où en suis-je vs mon pic ».
+            from app.services.snapshot_service import snapshot_service
+
+            history = await snapshot_service.build_portfolio_value_series(db, user_id, days=365)
+            values = [float(h.get("value") or 0) for h in history if (h.get("value") or 0) > 0]
+            if len(values) >= 2:
+                peak = max(values)
+                current = values[-1]
+                dd = (peak - current) / peak * 100 if peak > 0 else 0.0
+                current_value = round(dd, 2)
+                if dd >= threshold:
+                    should_trigger = True
+                    message = (
+                        f"\U0001f4c9 Repli de {dd:.1f}% depuis le plus-haut du portefeuille "
+                        f"(seuil d'alerte : {threshold:.0f}%). Pic : {peak:,.0f}€, "
+                        f"actuel : {current:,.0f}€."
+                    )
+
+        elif alert.condition == AlertCondition.CONCENTRATION_HHI:
+            # HHI sur les poids par actif (0 = dispersé, 1 = tout sur un actif).
+            metrics = await metrics_service.get_user_dashboard_metrics(db, user_id)
+            assets = metrics.get("aggregated_assets", [])
+            total = sum(float(a.get("current_value") or 0) for a in assets)
+            if total > 0:
+                hhi = sum((float(a.get("current_value") or 0) / total) ** 2 for a in assets)
+                current_value = round(hhi, 4)
+                if hhi >= threshold:
+                    top = max(assets, key=lambda a: float(a.get("current_value") or 0), default=None)
+                    top_txt = f" Position dominante : {top.get('symbol')}." if top else ""
+                    should_trigger = True
+                    message = (
+                        f"⚠️ Concentration élevée du portefeuille (HHI {hhi:.2f}, "
+                        f"seuil {threshold:.2f}).{top_txt} Envisage de diversifier."
+                    )
+
+        elif alert.condition == AlertCondition.ALLOCATION_DRIFT:
+            # Écart max vs allocation cible persistée (en points de %).
+            from app.models.user import User
+            from app.services.report_service import report_service
+
+            user_obj = (await db.execute(select(User).where(User.id == alert.user_id))).scalar_one_or_none()
+            targets = getattr(user_obj, "target_allocations", None) if user_obj else None
+            if targets:
+                currency = getattr(user_obj, "preferred_currency", "EUR") or "EUR"
+                report = await report_service.get_rebalancing_report(
+                    db, user_id, targets, currency=currency, estimate_tax=False
+                )
+                if report.categories:
+                    worst = max(report.categories, key=lambda c: abs(c["drift_pct"]))
+                    drift = abs(worst["drift_pct"])
+                    current_value = round(drift, 2)
+                    if drift >= threshold:
+                        should_trigger = True
+                        message = (
+                            f"\U0001f3af Allocation dérivée : {worst['label']} à "
+                            f"{worst['current_pct']:.0f}% (cible {worst['target_pct']:.0f}%, "
+                            f"écart {drift:.0f} pts ≥ {threshold:.0f}). Un rééquilibrage est conseillé."
+                        )
+
+        if should_trigger:
+            return AlertTrigger(
+                alert_id=alert.id,
+                alert_name=alert.name,
+                symbol="Portefeuille",
+                condition=alert.condition.value,
+                threshold=threshold,
+                current_value=current_value,
+                triggered_at=datetime.now(timezone.utc),
+                message=message,
+            )
         return None
 
     async def _get_daily_change(self, asset: Asset) -> Optional[float]:

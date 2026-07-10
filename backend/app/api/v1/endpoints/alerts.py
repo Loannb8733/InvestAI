@@ -21,10 +21,18 @@ from app.services.alert_service import alert_service
 router = APIRouter()
 
 
+# Conditions au niveau portefeuille : pas d'actif rattaché (asset_id NULL).
+PORTFOLIO_CONDITIONS = {
+    AlertCondition.PORTFOLIO_DRAWDOWN,
+    AlertCondition.CONCENTRATION_HHI,
+    AlertCondition.ALLOCATION_DRIFT,
+}
+
+
 class AlertCreate(BaseModel):
     """Schema for creating an alert."""
 
-    asset_id: UUID
+    asset_id: Optional[UUID] = None
     name: str = Field(..., min_length=1, max_length=100)
     condition: AlertCondition
     threshold: float = Field(default=0, ge=0)
@@ -34,13 +42,19 @@ class AlertCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_threshold(self):
-        """Threshold must be > 0 except for auto-computed conditions."""
+        """Threshold must be > 0 except for auto-computed conditions ;
+        asset_id requis sauf pour les conditions au niveau portefeuille."""
         auto_conditions = {
             AlertCondition.TARGET_BREAK_EVEN,
             AlertCondition.VOLATILITY_SPIKE,
         }
         if self.condition not in auto_conditions and self.threshold <= 0:
             raise ValueError("Le seuil doit être supérieur à 0 pour cette condition")
+        if self.condition in PORTFOLIO_CONDITIONS:
+            if self.asset_id is not None:
+                raise ValueError("Une alerte de portefeuille ne cible pas un actif")
+        elif self.asset_id is None:
+            raise ValueError("Un actif est requis pour cette condition")
         return self
 
 
@@ -101,6 +115,10 @@ class AlertConditionInfo(BaseModel):
     value: str
     label: str
     description: str
+    # True = condition au niveau portefeuille (pas de sélecteur d'actif).
+    is_portfolio: bool = False
+    # Unité/placeholder du seuil pour l'UI (ex "%", "0-1", "pts").
+    threshold_unit: Optional[str] = None
 
 
 @router.get("/conditions", response_model=List[AlertConditionInfo])
@@ -146,6 +164,27 @@ async def list_alert_conditions() -> List[AlertConditionInfo]:
             "value": "volatility_spike",
             "label": "Pic de volatilité",
             "description": "Alerte quand la contribution au risque augmente fortement en 24h",
+        },
+        {
+            "value": "portfolio_drawdown",
+            "label": "Repli du portefeuille (drawdown)",
+            "description": "Alerte quand le portefeuille recule de X% depuis son plus-haut historique",
+            "is_portfolio": True,
+            "threshold_unit": "%",
+        },
+        {
+            "value": "concentration_hhi",
+            "label": "Concentration excessive (HHI)",
+            "description": "Alerte quand l'indice de concentration HHI dépasse un seuil (0 = dispersé, 1 = un seul actif)",
+            "is_portfolio": True,
+            "threshold_unit": "0-1",
+        },
+        {
+            "value": "allocation_drift",
+            "label": "Dérive d'allocation",
+            "description": "Alerte quand l'écart max vs votre allocation cible dépasse X points",
+            "is_portfolio": True,
+            "threshold_unit": "pts",
         },
     ]
     return [AlertConditionInfo(**c) for c in conditions]
@@ -218,28 +257,29 @@ async def create_alert(
     db: AsyncSession = Depends(get_db),
 ) -> AlertResponse:
     """Create a new alert."""
-    # Verify asset belongs to user
-    result = await db.execute(
-        select(Portfolio).where(
-            Portfolio.user_id == current_user.id,
+    # Les alertes de portefeuille ne ciblent aucun actif — pas de vérif d'actif.
+    if alert_in.condition not in PORTFOLIO_CONDITIONS:
+        result = await db.execute(
+            select(Portfolio).where(
+                Portfolio.user_id == current_user.id,
+            )
         )
-    )
-    portfolios = result.scalars().all()
-    portfolio_ids = [p.id for p in portfolios]
+        portfolios = result.scalars().all()
+        portfolio_ids = [p.id for p in portfolios]
 
-    result = await db.execute(
-        select(Asset).where(
-            Asset.id == alert_in.asset_id,
-            Asset.portfolio_id.in_(portfolio_ids),
+        result = await db.execute(
+            select(Asset).where(
+                Asset.id == alert_in.asset_id,
+                Asset.portfolio_id.in_(portfolio_ids),
+            )
         )
-    )
-    asset = result.scalar_one_or_none()
+        asset = result.scalar_one_or_none()
 
-    if not asset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Actif non trouvé",
-        )
+        if not asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Actif non trouvé",
+            )
 
     alert = Alert(
         user_id=current_user.id,

@@ -85,6 +85,8 @@ interface AlertCondition {
   value: string
   label: string
   description: string
+  is_portfolio?: boolean
+  threshold_unit?: string | null
 }
 
 interface AlertSummary {
@@ -247,7 +249,8 @@ export default function AlertsPage() {
 
   const handleCreate = () => {
     const auto = isAutoCondition(formData.condition)
-    if (!formData.asset_id || !formData.name || !formData.condition) {
+    const isPortfolio = isPortfolioCondition(formData.condition)
+    if (!formData.name || !formData.condition || (!isPortfolio && !formData.asset_id)) {
       toast({ title: 'Veuillez remplir tous les champs obligatoires', variant: 'destructive' })
       return
     }
@@ -257,7 +260,8 @@ export default function AlertsPage() {
     }
 
     createMutation.mutate({
-      asset_id: formData.asset_id,
+      // Les alertes de portefeuille ne ciblent aucun actif.
+      asset_id: isPortfolio ? null : formData.asset_id,
       name: formData.name,
       condition: formData.condition,
       threshold: auto ? 0 : parseFloat(formData.threshold),
@@ -294,6 +298,12 @@ export default function AlertsPage() {
 
   const isAutoCondition = (condition: string) =>
     condition === 'target_break_even' || condition === 'volatility_spike'
+
+  const isPortfolioCondition = (condition: string) =>
+    conditions?.find((c) => c.value === condition)?.is_portfolio ?? false
+
+  const thresholdUnit = (condition: string) =>
+    conditions?.find((c) => c.value === condition)?.threshold_unit ?? null
 
   if (loadingAlerts) {
     return (
@@ -350,6 +360,34 @@ export default function AlertsPage() {
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="condition">Condition</Label>
+                  <Select
+                    value={formData.condition}
+                    onValueChange={(value) =>
+                      // En basculant sur une condition de portefeuille, on
+                      // vide l'actif éventuellement sélectionné.
+                      setFormData({
+                        ...formData,
+                        condition: value,
+                        asset_id: isPortfolioCondition(value) ? '' : formData.asset_id,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conditions?.map((condition) => (
+                        <SelectItem key={condition.value} value={condition.value}>
+                          {condition.label}
+                          {condition.is_portfolio ? ' · portefeuille' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!isPortfolioCondition(formData.condition) && (
+                <div className="grid gap-2">
                   <Label htmlFor="asset">Actif</Label>
                   <Select
                     value={formData.asset_id}
@@ -367,24 +405,7 @@ export default function AlertsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="condition">Condition</Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value) => setFormData({ ...formData, condition: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {conditions?.map((condition) => (
-                        <SelectItem key={condition.value} value={condition.value}>
-                          {condition.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
                 {!isAutoCondition(formData.condition) && (
                 <div className="grid gap-2">
                   <Label htmlFor="threshold">Seuil</Label>
@@ -393,24 +414,38 @@ export default function AlertsPage() {
                       id="threshold"
                       type="number"
                       step="0.01"
-                      placeholder="Ex: 50000"
+                      placeholder={
+                        formData.condition === 'concentration_hhi'
+                          ? 'Ex : 0.30'
+                          : formData.condition === 'portfolio_drawdown'
+                            ? 'Ex : 15'
+                            : formData.condition === 'allocation_drift'
+                              ? 'Ex : 10'
+                              : 'Ex: 50000'
+                      }
                       value={formData.threshold}
                       onChange={(e) => setFormData({ ...formData, threshold: e.target.value })}
                       className="flex-1"
                     />
-                    <Select
-                      value={formData.currency}
-                      onValueChange={(value) => setFormData({ ...formData, currency: value })}
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="%">%</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {isPortfolioCondition(formData.condition) ? (
+                      <div className="flex w-24 items-center justify-center rounded-md border bg-muted/40 text-sm text-muted-foreground">
+                        {thresholdUnit(formData.condition)}
+                      </div>
+                    ) : (
+                      <Select
+                        value={formData.currency}
+                        onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="%">%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
                 )}

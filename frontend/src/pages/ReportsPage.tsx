@@ -28,6 +28,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import RebalancingTab from '@/components/reports/RebalancingTab'
+import TaxSummaryPanel from '@/components/reports/TaxSummaryPanel'
 
 interface ReportAction {
   label: string
@@ -362,6 +363,9 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="fiscal" className="space-y-6">
+          {/* Fiscalité en continu : la synthèse à l'écran, pas seulement le PDF */}
+          <TaxSummaryPanel />
+
           <div className="grid gap-6 md:grid-cols-2">
             {renderReportCard(cryptoTaxCard)}
             {renderReportCard(stocksTaxCard)}

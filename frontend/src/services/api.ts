@@ -856,7 +856,7 @@ export const alertsApi = {
   },
 
   create: async (data: {
-    asset_id: string
+    asset_id: string | null // null pour les alertes de portefeuille
     name: string
     condition: string
     threshold: number

@@ -31,6 +31,30 @@ from app.services.snapshot_service import snapshot_service
 router = APIRouter()
 
 
+def _compute_period_twr(points: list) -> Optional[float]:
+    """TWR de la période depuis la série (value, net_capital) chronologique.
+
+    r_i = (V_i − F_i) / V_{i−1} avec F_i = flux externe net de la sous-période
+    (variation de net_capital : dépôts − retraits). Produit des r_i − 1.
+    Retourne None si la série est trop courte pour être significative.
+    """
+    if not points or len(points) < 2:
+        return None
+    twr = 1.0
+    prev = None
+    for p in points:
+        value = float(p.get("value") or 0)
+        net_cap = float(p.get("net_capital") or 0)
+        if prev is not None and prev[0] > 0:
+            flow = net_cap - prev[1]
+            ratio = (value - flow) / prev[0]
+            # Garde-fou : une sous-période aberrante (données trouées) ne doit
+            # pas produire un TWR négatif impossible ou explosif.
+            twr *= min(max(ratio, 0.0), 10.0)
+        prev = (value, net_cap)
+    return round((twr - 1.0) * 100, 2)
+
+
 def _ensure_json_safe(obj):
     """Recursively convert Decimal/non-finite floats so the response is JSON-safe."""
     import math as _math
@@ -229,6 +253,8 @@ class EnhancedDashboardResponse(BaseModel):
     daily_change_percent: float
     period_change: float = 0.0
     period_change_percent: float = 0.0
+    # TWR de la période (performance nette des flux, comparable à un indice).
+    period_twr_percent: Optional[float] = None
     portfolios_count: int
     assets_count: int
 
@@ -371,6 +397,12 @@ async def _get_dashboard_impl(
     is_data_estimated = coverage_ratio < 0.3 and days > 7
     for point in historical_data:
         point["is_estimated"] = is_data_estimated
+
+    # TWR (Time-Weighted Return) de la période : rendements des sous-périodes
+    # chaînés, chacun corrigé du flux externe (Δ net_capital) — c'est LA mesure
+    # de performance comparable à un benchmark, contrairement au proxy
+    # « moyenne pondérée des variations de prix » qui ignore les dépôts/retraits.
+    period_twr_percent = _compute_period_twr(historical_data)
 
     # Period change calculation:
     # - "Tout" (days=0): true P&L vs total_invested (unified root: Patrimoine - Investi)
@@ -735,6 +767,7 @@ async def _get_dashboard_impl(
         daily_change_percent=metrics["daily_change_percent"],
         period_change=metrics.get("period_change", 0.0),
         period_change_percent=metrics.get("period_change_percent", 0.0),
+        period_twr_percent=period_twr_percent,
         portfolios_count=metrics["portfolios_count"],
         assets_count=metrics["assets_count"],
         allocation=metrics["allocation"],

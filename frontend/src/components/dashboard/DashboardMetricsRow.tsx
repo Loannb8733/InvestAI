@@ -29,6 +29,9 @@ interface DashboardMetricsRowProps {
   isPositive: boolean
   dailyChange: number
   dailyChangePercent: number
+  /** TWR de la période (net des flux). Prioritaire sur dailyChangePercent
+      pour le badge : c'est la vraie performance, pas un proxy de prix. */
+  periodTwrPercent?: number
   isDailyPositive: boolean
   portfoliosCount: number
   selectedPeriod: number
@@ -49,6 +52,7 @@ export default function DashboardMetricsRow({
   isPositive,
   dailyChange,
   dailyChangePercent,
+  periodTwrPercent,
   isDailyPositive,
   portfoliosCount,
   selectedPeriod,
@@ -106,11 +110,16 @@ export default function DashboardMetricsRow({
       <StatCard
         className="spot-card"
         label={`Variation ${periodLabel}`}
+        tooltip={
+          periodTwrPercent != null
+            ? 'Le pourcentage est le TWR (Time-Weighted Return) : performance nette des dépôts/retraits, comparable à un indice.'
+            : undefined
+        }
         icon={isDailyPositive ? ArrowUpRight : ArrowDownRight}
         value={dailyChange}
         format={formatCurrency}
-        delta={dailyChangePercent}
-        deltaLabel={periodLabel}
+        delta={periodTwrPercent ?? dailyChangePercent}
+        deltaLabel={periodTwrPercent != null ? `TWR ${periodLabel}` : periodLabel}
         formatDelta={fmtDelta}
         tone="auto"
         privacy={privacyMode}
