@@ -20,8 +20,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/utils'
-import { insightsApi, predictionsApi, reportsApi, type TaxSummary } from '@/services/api'
+import { dashboardApi, insightsApi, predictionsApi, reportsApi, type TaxSummary } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import SharedEmptyState from '@/components/ui/empty-state'
 import StatCard from '@/components/ui/stat-card'
@@ -38,6 +44,7 @@ import {
   AlertTriangle,
   DollarSign,
   Calendar,
+  Info,
   Lightbulb,
   Play,
   Zap,
@@ -682,6 +689,15 @@ function StrategyTable() {
                 {!signal.validated && signal.reason && (
                   <p className="text-xs text-muted-foreground mt-1">{signal.reason}</p>
                 )}
+                {/* Critères explicites : un rejet sans explication du seuil
+                    (score > 85 exigé côté backend) était incompréhensible. */}
+                {!signal.validated && !signal.reason && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {signal.score <= 85 && `Score ${signal.score}/100 ≤ 85 (seuil de validation). `}
+                    {signal.impact_pct <= 0 && 'Impact prédit non positif. '}
+                    {signal.weight_overflow && 'Poids post-achat au-delà de la limite de concentration.'}
+                  </p>
+                )}
               </div>
             </div>
           ) : null}
@@ -701,12 +717,32 @@ function FeeAnalysis() {
     queryFn: insightsApi.getFees,
     staleTime: 5 * 60 * 1000,
   })
+  // Valeur du portefeuille pour mettre les frais en perspective (fee drag).
+  const { data: metrics } = useQuery<{ total_value: number }>({
+    queryKey: queryKeys.dashboard.metrics(30),
+    queryFn: () => dashboardApi.getMetrics(30),
+    staleTime: 5 * 60 * 1000,
+    meta: { suppressGlobalError: true },
+  })
 
   if (isLoading) return <Loader />
 
   if (!data || data.total_fees === 0) {
     return <EmptyState message="Aucun frais enregistré" />
   }
+
+  // Fee drag : les frais en % du portefeuille + leur coût composé.
+  // Hypothèse de rendement r = 5 %/an (affichée) ; coût 10 ans =
+  // V × ((1+r)^10 − (1+r−f)^10) — l'écart de capitalisation dû aux frais.
+  const portfolioValue = metrics?.total_value ?? 0
+  const annualFees = (data.avg_monthly_fee ?? 0) * 12
+  const feeRate = portfolioValue > 0 ? annualFees / portfolioValue : null
+  const GROWTH = 0.05
+  const compounded10y =
+    feeRate !== null && feeRate < GROWTH
+      ? portfolioValue * (Math.pow(1 + GROWTH, 10) - Math.pow(1 + GROWTH - feeRate, 10))
+      : null
+  const costPerTenthPercent = portfolioValue * (Math.pow(1.05, 10) - Math.pow(1.049, 10))
 
   const monthlyData = Object.entries((data.by_month ?? {}) as Record<string, number>).map(([month, value]) => ({
     month,
@@ -754,6 +790,48 @@ function FeeAnalysis() {
           </CardContent>
         </Card>
       </SpotlightGroup>
+
+      {/* Fee drag : mise en perspective — c'est le coût composé qui parle,
+          pas le montant mensuel. */}
+      {feeRate !== null && (
+        <Card elevation="raised">
+          <CardContent className="pt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div>
+              <span className="text-xs text-muted-foreground">Frais annualisés</span>
+              <p className={`text-lg font-semibold tabular ${feeRate > 0.005 ? 'text-warning' : 'text-foreground'}`}>
+                {(feeRate * 100).toFixed(2)} % <span className="text-xs font-normal text-muted-foreground">du portefeuille</span>
+              </p>
+            </div>
+            {compounded10y !== null && (
+              <div>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground cursor-help inline-flex items-center gap-1">
+                        Coût composé sur 10 ans
+                        <Info className="h-3 w-3" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        Écart de capitalisation dû aux frais, à taille de portefeuille constante et
+                        hypothèse de rendement 5 %/an : V × ((1+5 %)¹⁰ − (1+5 %−frais)¹⁰).
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <p className="text-lg font-semibold tabular text-loss">≈ {formatCurrency(compounded10y)}</p>
+              </div>
+            )}
+            {portfolioValue > 0 && (
+              <p className="text-xs text-muted-foreground basis-full">
+                Chaque 0,1 % de frais annuels coûte ≈ {formatCurrency(costPerTenthPercent)} sur 10 ans à
+                taille de portefeuille constante.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">

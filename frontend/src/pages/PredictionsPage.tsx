@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import EmptyState from '@/components/ui/empty-state'
@@ -16,7 +17,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/utils'
-import { usePredictionData } from '@/hooks/usePredictionData'
+import { usePredictionData, type AccuracyReport } from '@/hooks/usePredictionData'
 import { FearGreedGauge } from '@/components/predictions/PredictionMetricCard'
 import PredictionListView from '@/components/predictions/PredictionListView'
 import PredictionCyclesTab from '@/components/predictions/PredictionCyclesTab'
@@ -25,6 +26,7 @@ import PredictionSimulationTab from '@/components/predictions/PredictionSimulati
 import {
   AlertTriangle,
   Brain,
+  ChevronDown,
   Gauge,
   Loader2,
   ArrowUp,
@@ -54,6 +56,7 @@ export default function PredictionsPage() {
     selectedPrediction, chartData, showSupportResistance,
     unifiedAlerts, totalAlerts, highAlerts,
     modelAccuracy,
+    accuracyReport,
     formatPrice,
   } = usePredictionData()
 
@@ -312,21 +315,24 @@ export default function PredictionsPage() {
             </div>
           )}
           {predictions && predictions.length > 0 ? (
-            <PredictionListView
-              predictions={predictions}
-              selectedAsset={selectedAsset}
-              setSelectedAsset={setSelectedAsset}
-              selectedPrediction={selectedPrediction}
-              chartData={chartData}
-              showSupportResistance={showSupportResistance}
-              showReality={showReality}
-              setShowReality={setShowReality}
-              loadingBacktest={loadingBacktest}
-              backtestData={backtestData}
-              daysAhead={daysAhead}
-              dt={dt}
-              formatPrice={formatPrice}
-            />
+            <>
+              <PredictionListView
+                predictions={predictions}
+                selectedAsset={selectedAsset}
+                setSelectedAsset={setSelectedAsset}
+                selectedPrediction={selectedPrediction}
+                chartData={chartData}
+                showSupportResistance={showSupportResistance}
+                showReality={showReality}
+                setShowReality={setShowReality}
+                loadingBacktest={loadingBacktest}
+                backtestData={backtestData}
+                daysAhead={daysAhead}
+                dt={dt}
+                formatPrice={formatPrice}
+              />
+              <ModelAccuracySection report={accuracyReport} loading={loadingBacktest} />
+            </>
           ) : (
             <EmptyState
               icon={BarChart3}
@@ -358,5 +364,151 @@ export default function PredictionsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+// ── Précision du modèle (rapport d'accuracy) ─────────────────────────
+// Section honnête : montre le track-record réel du modèle, actif par actif,
+// sans jamais promettre de « précision garantie ».
+
+const MIN_SAMPLES = 10
+
+function directionColor(hitRate: number | null): string {
+  if (hitRate == null) return 'text-muted-foreground'
+  if (hitRate >= 60) return 'text-gain'
+  if (hitRate >= 50) return 'text-warning'
+  return 'text-loss'
+}
+
+function honestSummary(direction: number | null, nVerified: number): string {
+  if (direction == null || nVerified === 0) {
+    return "Pas encore assez de prédictions vérifiées pour évaluer la fiabilité directionnelle du modèle sur ce portefeuille."
+  }
+  if (direction < 55) {
+    return "Les prédictions directionnelles de ce portefeuille sont proches du hasard — à utiliser comme contexte, pas comme signal."
+  }
+  if (direction >= 60) {
+    return `Le modèle a correctement anticipé la direction dans ${direction.toFixed(0)} % des cas sur l'historique vérifié — un résultat encourageant, à interpréter avec mesure : l'historique passé ne préjuge pas des performances futures.`
+  }
+  return `Avec ${direction.toFixed(0)} % de directions correctes, le modèle fait légèrement mieux que le hasard — prudence dans l'interprétation.`
+}
+
+function ModelAccuracySection({ report, loading }: { report: AccuracyReport; loading: boolean }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Card elevation="raised">
+      <CardContent className="pt-4 pb-4">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between gap-2 text-left"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          <span className="flex items-center gap-2 font-semibold">
+            <Gauge className="h-5 w-5 text-primary" />
+            Précision du modèle
+            <span className="text-xs font-normal text-muted-foreground">
+              — historique vérifié, pas une garantie
+            </span>
+          </span>
+          <span className="flex items-center gap-2">
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+          </span>
+        </button>
+
+        {open && (
+          <div className="mt-4 space-y-4">
+            {/* Agrégats backtest */}
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <span>
+                  MAPE global :{' '}
+                  <span className="font-medium">
+                    {report.overallMape != null ? `${report.overallMape.toFixed(1)} %` : '—'}
+                  </span>
+                </span>
+                <span>
+                  Direction correcte :{' '}
+                  <span className={`font-medium ${directionColor(report.overallDirection)}`}>
+                    {report.overallDirection != null ? `${report.overallDirection.toFixed(0)} %` : '—'}
+                  </span>
+                </span>
+                <span>
+                  Prédictions vérifiées :{' '}
+                  <span className="font-medium">{report.nVerified}</span>
+                </span>
+                <span>
+                  Période : <span className="font-medium">prédictions à {report.horizonDays} j vérifiées à échéance</span>
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {honestSummary(report.overallDirection, report.nVerified)}
+              </p>
+            </div>
+
+            {/* Tableau par actif */}
+            {report.rows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th scope="col" className="text-left py-2 px-2 text-xs font-medium">Actif</th>
+                      <th scope="col" className="text-right py-2 px-2 text-xs font-medium">Direction correcte</th>
+                      <th scope="col" className="text-right py-2 px-2 text-xs font-medium">MAPE</th>
+                      <th scope="col" className="text-right py-2 px-2 text-xs font-medium">Skill score</th>
+                      <th scope="col" className="text-right py-2 px-2 text-xs font-medium">Échantillons</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.rows.map(row => {
+                      const insufficient = row.nSamples < MIN_SAMPLES
+                      return (
+                        <tr
+                          key={row.symbol}
+                          className={`border-b last:border-0 ${insufficient ? 'opacity-50' : ''}`}
+                        >
+                          <td className="py-2 px-2">
+                            <span className="font-medium">{row.symbol}</span>
+                            {insufficient && (
+                              <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 text-muted-foreground">
+                                échantillon insuffisant
+                              </Badge>
+                            )}
+                          </td>
+                          <td className={`py-2 px-2 text-right tabular-nums font-medium ${insufficient ? 'text-muted-foreground' : directionColor(row.hitRate)}`}>
+                            {row.hitRate != null ? `${row.hitRate.toFixed(0)} %` : '—'}
+                          </td>
+                          <td className="py-2 px-2 text-right tabular-nums">
+                            {row.mape != null ? `${row.mape.toFixed(1)} %` : '—'}
+                          </td>
+                          <td className="py-2 px-2 text-right tabular-nums">
+                            {row.skillScore != null ? row.skillScore.toFixed(0) : '—'}
+                          </td>
+                          <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                            {row.nSamples}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aucune métrique par actif disponible.</p>
+            )}
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Direction correcte : % de prédictions dont le sens (hausse/baisse) s'est vérifié.
+              MAPE : erreur moyenne absolue en % entre prix prédit et prix réel.
+              Skill score : performance relative à une prévision naïve (50 = équivalent, 100 = parfait).
+              Les lignes avec moins de {MIN_SAMPLES} échantillons sont grisées : trop peu de données pour conclure.
+              Ces chiffres décrivent le passé — ils ne préjugent en rien des performances futures.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

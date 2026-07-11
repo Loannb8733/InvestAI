@@ -836,6 +836,17 @@ export const predictionsApi = {
     const response = await api.patch(`/predictions/planned-orders/${id}`, { status })
     return response.data
   },
+
+  createPlannedOrder: async (data: {
+    symbol: string
+    side: 'buy' | 'sell'
+    amount_eur: number
+    notes?: string
+    source?: 'frontend' | 'telegram'
+  }) => {
+    const response = await api.post('/predictions/planned-orders', data)
+    return response.data
+  },
 }
 
 // Alerts API
@@ -1558,6 +1569,11 @@ export const strategiesApi = {
 
   updateAction: async (actionId: string, data: { status?: string; amount?: number }) => {
     const response = await api.patch(`/strategies/actions/${actionId}`, data)
+    return response.data
+  },
+
+  getPerformance: async (id: string) => {
+    const response = await api.get(`/strategies/${id}/performance`)
     return response.data
   },
 }

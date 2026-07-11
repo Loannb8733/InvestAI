@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { smartInsightsApi } from '@/services/api'
+import { smartInsightsApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
+import { useToast } from '@/hooks/use-toast'
 import {
   Activity,
   AlertTriangle,
@@ -156,7 +157,25 @@ function formatMetric(name: string | undefined, value: number): string {
 
 export default function SmartInsightsPage() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [days, setDays] = useState(30)
+  const [plannedSymbols, setPlannedSymbols] = useState<Set<string>>(new Set())
+
+  // Pont rebalancing MPT → ordres planifiés : les suggestions cessent d'être
+  // un tableau inerte, elles rejoignent le circuit de décision (Signaux Alpha).
+  const planOrderMutation = useMutation({
+    mutationFn: (order: { symbol: string; side: 'buy' | 'sell'; amount_eur: number }) =>
+      predictionsApi.createPlannedOrder({
+        ...order,
+        notes: 'Rééquilibrage MPT (Smart Insights)',
+        source: 'frontend',
+      }),
+    onSuccess: (_data, order) => {
+      setPlannedSymbols((prev) => new Set(prev).add(order.symbol))
+      toast({ title: 'Ordre planifié', description: `${order.symbol} — visible dans Signaux Alpha.` })
+    },
+    onError: () => toast({ title: "Impossible de planifier l'ordre", variant: 'destructive' }),
+  })
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<PortfolioHealth>({
     queryKey: queryKeys.smartInsights.health(days),
@@ -710,6 +729,9 @@ export default function SmartInsightsPage() {
                         <th scope="col" className="text-right p-2">Poids cible</th>
                         <th scope="col" className="text-right p-2">Montant</th>
                         <th scope="col" className="text-left p-2">Raison</th>
+                        <th scope="col" className="text-right p-2">
+                          <span className="sr-only">Planifier</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -740,6 +762,29 @@ export default function SmartInsightsPage() {
                             </span>
                           </td>
                           <td className="p-2 text-xs text-muted-foreground max-w-[200px]">{order.reason}</td>
+                          <td className="p-2 text-right">
+                            {(order.action === 'buy' || order.action === 'sell') && (
+                              plannedSymbols.has(order.symbol) ? (
+                                <span className="text-xs text-gain">Planifié ✓</span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                  disabled={planOrderMutation.isPending}
+                                  onClick={() =>
+                                    planOrderMutation.mutate({
+                                      symbol: order.symbol,
+                                      side: order.action as 'buy' | 'sell',
+                                      amount_eur: Math.abs(order.amount_eur ?? 0),
+                                    })
+                                  }
+                                >
+                                  Planifier
+                                </Button>
+                              )
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

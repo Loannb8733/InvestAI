@@ -1,7 +1,7 @@
 """Crowdfunding project endpoints — CRUD + dashboard + performance."""
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -33,6 +33,7 @@ from app.schemas.crowdfunding import (
     RepaymentResponse,
     StressTestResponse,
 )
+from app.services.analytics_math import _xirr as _solve_xirr
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 from app.services.reconciliation_service import reconciliation_service
 from app.services.stress_test_service import ALLOWED_DELAY_MONTHS, stress_test_service
@@ -41,6 +42,85 @@ router = APIRouter()
 
 
 # ──────────────────────── helpers ────────────────────────
+
+# En deçà de cette durée entre le premier et le dernier flux, annualiser un
+# rendement n'a pas de sens (un +1 % sur 10 jours "annualisé" explose) — on
+# préfère ne rien afficher.
+_XIRR_MIN_SPAN_DAYS = 30
+
+
+def compute_xirr(flows: list[tuple[date, float]]) -> Optional[float]:
+    """XIRR (taux annualisé) qui annule la NPV de flux réels datés.
+
+    Convention de signe : négatif = sortie de cash (investissement),
+    positif = entrée (remboursement, coupon, valeur terminale).
+
+    Délègue la résolution numérique au solveur partagé
+    :func:`app.services.analytics_math._xirr` (bissection Brent sur
+    [-0.99, 10.0] puis fallback Newton-Raphson, jour-count 365.25) — même
+    moteur que /analytics/xirr et le stress test, pour des chiffres cohérents
+    partout dans l'app.
+
+    Retourne le taux en décimal (0.10 = 10 %), ou ``None`` si :
+      * les flux ne contiennent pas à la fois une sortie ET une entrée
+        (ex. défaut total sans aucun remboursement — pas de taux définissable) ;
+      * moins de ``_XIRR_MIN_SPAN_DAYS`` jours séparent le premier et le
+        dernier flux (annualisation non significative) ;
+      * le solveur ne converge pas (ex. racine sous -99 %).
+    """
+    if len(flows) < 2:
+        return None
+    has_outflow = any(amount < 0 for _, amount in flows)
+    has_inflow = any(amount > 0 for _, amount in flows)
+    if not (has_outflow and has_inflow):
+        return None
+    dates = [d for d, _ in flows]
+    if (max(dates) - min(dates)).days < _XIRR_MIN_SPAN_DAYS:
+        return None
+    return _solve_xirr([(datetime(d.year, d.month, d.day), amount) for d, amount in flows])
+
+
+def _realized_xirr(
+    project: CrowdfundingProject,
+    repayments: Optional[list[CrowdfundingRepayment]] = None,
+) -> Optional[float]:
+    """XIRR réalisé d'un projet (décimal), à partir des flux réellement datés.
+
+    Flux construits :
+      * ``-invested_amount`` à ``start_date`` ;
+      * ``+amount`` à chaque ``payment_date`` de remboursement enregistré ;
+      * ``+CRD`` aujourd'hui en valeur terminale, où CRD = max(0, investi −
+        capital remboursé) — le capital vivant n'est pas perdu, il vaut son pair.
+
+    Projets DEFAULTED : valeur terminale 0 (principal provisionné en perte) —
+    le XIRR reflète alors la perte réelle. Répartition capital/intérêts : split
+    explicite quand il existe, sinon ``payment_type`` (un BOTH sans split est
+    compté en capital, conservateur — même règle que le dashboard).
+    """
+    if not project.start_date:
+        return None
+    invested = float(project.invested_amount or 0)
+    if invested <= 0:
+        return None
+
+    flows: list[tuple[date, float]] = [(project.start_date, -invested)]
+    capital_repaid = 0.0
+    for r in repayments or []:
+        amount = float(r.amount or 0)
+        if amount > 0:
+            flows.append((r.payment_date, amount))
+        interest = float(r.interest_amount or 0)
+        capital = float(r.capital_amount or 0)
+        if interest == 0 and capital == 0 and r.payment_type != PaymentType.INTEREST:
+            capital = amount  # CAPITAL, ou BOTH sans split → conservateur
+        capital_repaid += capital
+
+    if project.status != ProjectStatus.DEFAULTED:
+        crd = max(0.0, invested - capital_repaid)
+        if crd > 0:
+            flows.append((date.today(), crd))
+
+    return compute_xirr(flows)
 
 
 def _compute_schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
@@ -455,6 +535,11 @@ async def get_performance(
                 expected = invested * rate * min(elapsed_months, months) / 12
                 on_track = received >= expected * 0.9
 
+        # XIRR réalisé (en %) et écart face au taux contractuel (points de %)
+        xirr = _realized_xirr(p, repayments_by_project.get(p.id))
+        realized_xirr = round(xirr * 100, 2) if xirr is not None else None
+        xirr_gap = round(realized_xirr - float(p.annual_rate), 2) if realized_xirr is not None else None
+
         performance.append(
             {
                 "id": str(p.id),
@@ -469,6 +554,8 @@ async def get_performance(
                 "projected_interest_gross": round(projected_gross, 2),
                 "total_received": received,
                 "interest_earned": round(_interest_earned(p, repayments_by_project.get(p.id)), 2),
+                "realized_xirr": realized_xirr,
+                "xirr_gap": xirr_gap,
                 "elapsed_months": round(elapsed_months, 1),
                 "progress_percent": round(min(100, elapsed_months / max(1, months) * 100), 1),
                 "on_track": on_track,

@@ -4,13 +4,50 @@ import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
-import { TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, AlertTriangle, CheckCircle2, Percent } from 'lucide-react'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingPerformanceItem } from '@/types/crowdfunding'
+
+/** Format FR d'un pourcentage : « 8,42 % ». */
+const formatPercent = (n: number) => `${n.toFixed(2).replace('.', ',')} %`
+
+/** Format FR d'un écart en points de % : « +1,3 pt » / « −2,8 pts ». */
+const formatGapPts = (gap: number) => {
+  const abs = Math.abs(gap)
+  const sign = gap >= 0 ? '+' : '−'
+  const unit = abs >= 2 ? 'pts' : 'pt'
+  return `${sign}${abs.toFixed(1).replace('.', ',')} ${unit}`
+}
+
+/** Couleur de l'écart XIRR vs contractuel : gain ≥ 0, warning [−2 ; 0[, loss < −2 pts. */
+const gapColorClass = (gap: number) =>
+  gap >= 0 ? 'text-gain' : gap >= -2 ? 'text-warning' : 'text-loss'
+
+/** Tiret « — » avec info-bulle pour un XIRR non calculable. */
+function XirrUnavailable() {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help text-muted-foreground">—</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">
+          Calculable après 30 jours et premiers flux
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 export default function CrowdfundingPerformancePage() {
   const { theme, color } = useNivoTheme()
@@ -21,7 +58,8 @@ export default function CrowdfundingPerformancePage() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <SkeletonStatCard />
         <SkeletonStatCard />
         <SkeletonStatCard />
         <SkeletonStatCard />
@@ -51,6 +89,20 @@ export default function CrowdfundingPerformancePage() {
   const onTrackCount = projects.filter((p) => p.on_track && p.status === 'active').length
   const activeCount = projects.filter((p) => p.status === 'active').length
 
+  // XIRR moyen pondéré par le montant investi (projets avec XIRR calculable
+  // uniquement), face au taux contractuel moyen pondéré sur le même périmètre.
+  const xirrProjects = projects.filter((p) => p.realized_xirr !== null)
+  const xirrWeight = xirrProjects.reduce((s, p) => s + p.invested_amount, 0)
+  const weightedXirr =
+    xirrWeight > 0
+      ? xirrProjects.reduce((s, p) => s + p.invested_amount * (p.realized_xirr ?? 0), 0) /
+        xirrWeight
+      : null
+  const weightedContractualRate =
+    totalInvested > 0
+      ? projects.reduce((s, p) => s + p.invested_amount * p.annual_rate, 0) / totalInvested
+      : null
+
   // Chart data — intérêts perçus vs projetés, tous deux BRUTS
   const chartData = projects
     .filter((p) => p.status !== 'completed')
@@ -70,7 +122,20 @@ export default function CrowdfundingPerformancePage() {
       </div>
 
       {/* Summary cards */}
-      <SpotlightGroup className="grid gap-4 md:grid-cols-3">
+      <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          className="spot-card"
+          label="XIRR moyen pondéré"
+          tooltip="Rendement annualisé des flux réellement encaissés, CRD en valeur terminale ; les retards le dégradent. Pondéré par les montants investis (projets avec XIRR calculable)."
+          icon={Percent}
+          value={weightedXirr}
+          format={formatPercent}
+          hint={
+            weightedContractualRate !== null ? (
+              <>vs taux contractuel moyen {formatPercent(weightedContractualRate)}</>
+            ) : undefined
+          }
+        />
         <StatCard
           className="spot-card"
           label="Intérêts Projetés (bruts)"
@@ -191,6 +256,8 @@ export default function CrowdfundingPerformancePage() {
                   <th scope="col" className="pb-2 font-medium">Plateforme</th>
                   <th scope="col" className="pb-2 font-medium text-right">Investi</th>
                   <th scope="col" className="pb-2 font-medium text-right">Taux</th>
+                  <th scope="col" className="pb-2 font-medium text-right">XIRR réalisé</th>
+                  <th scope="col" className="pb-2 font-medium text-right">Écart vs contractuel</th>
                   <th scope="col" className="pb-2 font-medium text-right">Projeté (brut)</th>
                   <th scope="col" className="pb-2 font-medium text-right">Intérêts perçus (bruts)</th>
                   <th scope="col" className="pb-2 font-medium text-center">Progression</th>
@@ -206,6 +273,22 @@ export default function CrowdfundingPerformancePage() {
                     <td className="py-3 text-muted-foreground">{p.platform}</td>
                     <td className="py-3 text-right">{formatCurrency(p.invested_amount)}</td>
                     <td className="py-3 text-right">{p.annual_rate}%</td>
+                    <td className="py-3 text-right tabular-nums">
+                      {p.realized_xirr !== null ? (
+                        formatPercent(p.realized_xirr)
+                      ) : (
+                        <XirrUnavailable />
+                      )}
+                    </td>
+                    <td className="py-3 text-right tabular-nums">
+                      {p.xirr_gap !== null ? (
+                        <span className={gapColorClass(p.xirr_gap)}>
+                          {formatGapPts(p.xirr_gap)}
+                        </span>
+                      ) : (
+                        <XirrUnavailable />
+                      )}
+                    </td>
                     <td className="py-3 text-right text-gain">
                       {formatCurrency(p.projected_interest_gross ?? 0)}
                     </td>

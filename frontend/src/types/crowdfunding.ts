@@ -243,6 +243,15 @@ export interface CrowdfundingPerformanceItem {
   total_received: number
   /** Intérêts réellement encaissés (bruts). */
   interest_earned: number
+  /**
+   * XIRR réalisé (% annualisé) — taux qui annule la NPV des flux réels datés :
+   * −investi @ start_date, +remboursements @ dates réelles, +CRD aujourd'hui en
+   * valeur terminale (0 si défaut : principal provisionné). Null si le projet a
+   * moins de 30 jours ou si les flux ne permettent pas de calcul.
+   */
+  realized_xirr: number | null
+  /** Écart realized_xirr − annual_rate, en points de % (les retards le creusent). */
+  xirr_gap: number | null
   elapsed_months: number
   progress_percent: number
   on_track: boolean

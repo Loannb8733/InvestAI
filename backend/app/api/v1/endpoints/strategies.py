@@ -241,6 +241,49 @@ async def reject_strategy(
     return await _enrich(db, strategy)
 
 
+@router.get("/{strategy_id}/performance", response_model=dict)
+@limiter.limit("30/minute")
+async def get_strategy_performance(
+    request: Request,
+    strategy_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Measure what the EXECUTED actions of this strategy actually returned.
+
+    Per executed action: price at execution day (from persisted daily closes),
+    current price, and pnl/impact in EUR. Buys are a true unrealized P&L;
+    sells are an "impact" (avoided gain/loss). Aggregates include the total
+    impact, the follow rate (executed vs skipped) and a "do nothing" baseline.
+    Actions whose execution price cannot be resolved are excluded and counted
+    as non-evaluable.
+    """
+    result = await db.execute(
+        select(Strategy).where(
+            Strategy.id == strategy_id,
+            Strategy.user_id == current_user.id,
+        )
+    )
+    strategy = result.scalar_one_or_none()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Stratégie non trouvée")
+
+    actions_result = await db.execute(
+        select(StrategyAction).where(StrategyAction.strategy_id == strategy.id).order_by(StrategyAction.created_at)
+    )
+    actions = actions_result.scalars().all()
+
+    from app.services.strategy_service import strategy_service
+
+    performance = await strategy_service.get_strategy_performance(db, actions)
+    return {
+        "strategy_id": str(strategy.id),
+        "strategy_name": strategy.name,
+        "strategy_status": strategy.status.value if strategy.status else "ACTIVE",
+        **performance,
+    }
+
+
 @router.patch("/actions/{action_id}", response_model=dict)
 @limiter.limit("20/minute")
 async def update_action_status(

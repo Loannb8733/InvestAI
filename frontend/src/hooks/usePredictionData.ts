@@ -17,6 +17,40 @@ import type {
   UnifiedAlert,
 } from '@/types/predictions'
 
+// ── Rapport d'accuracy (section « Précision du modèle ») ────────────
+
+export interface AssetAccuracyRow {
+  symbol: string
+  /** % de directions correctes (0-100). */
+  hitRate: number | null
+  /** MAPE moyen (%) issu du backtest, si dispo pour cet actif. */
+  mape: number | null
+  /** Skill score vs baseline naïve (0-100). */
+  skillScore: number | null
+  /** Nombre d'échantillons ayant servi au hit rate. */
+  nSamples: number
+  significant: boolean
+}
+
+export interface AccuracyReport {
+  rows: AssetAccuracyRow[]
+  overallMape: number | null
+  overallDirection: number | null
+  /** Nombre total de prédictions vérifiées en backtest (tous actifs). */
+  nVerified: number
+  horizonDays: number
+}
+
+// Forme RÉELLE de la réponse /predictions/backtest côté backend
+// (get_portfolio_backtest) : le type BacktestData (per_asset + points) est
+// obsolète, on lit donc le champ `assets` de façon défensive.
+interface BacktestAssetAccuracy {
+  symbol: string
+  samples: number
+  avg_mape: number | null
+  direction_accuracy: number | null
+}
+
 export function usePredictionData() {
   const [daysAhead, setDaysAhead] = useState(7)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
@@ -95,6 +129,34 @@ export function usePredictionData() {
 
     return { hitRate, mape, backtestHitRate, level, source }
   }, [backtestData, predictions])
+
+  // ── Rapport d'accuracy par actif (Précision du modèle) ─────────────
+  const accuracyReport = useMemo((): AccuracyReport => {
+    const backtestAssets =
+      (backtestData as unknown as { assets?: BacktestAssetAccuracy[] } | undefined)?.assets ?? []
+    const mapeBySymbol = new Map(
+      backtestAssets.map(a => [a.symbol.toUpperCase(), a.avg_mape] as const)
+    )
+
+    const rows: AssetAccuracyRow[] = (predictions ?? [])
+      .map(p => ({
+        symbol: p.symbol,
+        hitRate: p.hit_rate ?? null,
+        mape: mapeBySymbol.get(p.symbol.toUpperCase()) ?? null,
+        skillScore: p.skill_score ?? null,
+        nSamples: p.hit_rate_n_samples ?? 0,
+        significant: p.hit_rate_significant ?? false,
+      }))
+      .sort((a, b) => b.nSamples - a.nSamples)
+
+    return {
+      rows,
+      overallMape: backtestData?.overall_mape ?? null,
+      overallDirection: backtestData?.overall_direction_accuracy ?? null,
+      nVerified: backtestAssets.reduce((sum, a) => sum + (a.samples ?? 0), 0),
+      horizonDays: daysAhead,
+    }
+  }, [predictions, backtestData, daysAhead])
 
   // ── Unified alerts ─────────────────────────────────────────────────
 
@@ -298,6 +360,7 @@ export function usePredictionData() {
     totalAlerts,
     highAlerts,
     modelAccuracy,
+    accuracyReport,
 
     // Utilities
     formatPrice,

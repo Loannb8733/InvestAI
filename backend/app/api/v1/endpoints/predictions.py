@@ -3,12 +3,13 @@
 import logging
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.ml import adaptive_thresholds as at
 from app.models.asset import AssetType
 from app.models.user import User
@@ -1018,6 +1019,56 @@ async def list_planned_orders(
         }
         for o in orders
     ]
+
+
+class PlannedOrderCreate(BaseModel):
+    """Body for creating a planned order from the frontend (e.g. MPT rebalancing)."""
+
+    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]{1,20}$")
+    side: str = Field(pattern="^(buy|sell)$")
+    amount_eur: float = Field(gt=0, le=10_000_000)
+    notes: Optional[str] = Field(None, max_length=1000)
+    source: str = Field("frontend", pattern="^(frontend|telegram)$")
+
+
+@router.post("/planned-orders", response_model=dict, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
+async def create_planned_order(
+    request: Request,
+    data: PlannedOrderCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a pending planned order for the current user.
+
+    Bridges rebalancing suggestions (Smart Insights / MPT) to the planned
+    orders queue consumed on the Signaux Alpha page.
+    """
+    from app.models.planned_order import PlannedOrder, PlannedOrderStatus
+
+    order = PlannedOrder(
+        user_id=current_user.id,
+        symbol=data.symbol.upper(),
+        action="ACHAT" if data.side == "buy" else "VENDRE",
+        order_eur=round(data.amount_eur, 2),
+        source=data.source,
+        status=PlannedOrderStatus.PENDING,
+        notes=data.notes,
+    )
+    db.add(order)
+    await db.commit()
+    await db.refresh(order)
+
+    return {
+        "id": str(order.id),
+        "symbol": order.symbol,
+        "action": order.action,
+        "order_eur": float(order.order_eur),
+        "source": order.source,
+        "status": order.status.value,
+        "notes": order.notes,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+    }
 
 
 @router.patch("/planned-orders/{order_id}", response_model=dict)
