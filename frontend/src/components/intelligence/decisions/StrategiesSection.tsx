@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import StrategyPerformancePanel from './StrategyPerformancePanel'
 import {
   Brain,
   Plus,
@@ -118,6 +119,7 @@ function StrategyCard({
   const Icon = getStrategyIcon(strategy.params)
   const statusBadge = STATUS_BADGE[strategy.status] || STATUS_BADGE.ACTIVE
   const pendingActions = strategy.actions.filter((a) => a.status === 'PENDING')
+  const hasExecuted = strategy.actions.some((a) => a.status === 'EXECUTED')
   const riskLevel = (strategy.params?.risk_level as number) || 0
   const perfLevel = (strategy.params?.performance_potential as number) || 0
   const riskInfo = RISK_LABELS[riskLevel]
@@ -321,6 +323,9 @@ function StrategyCard({
               )
             })}
           </div>
+
+          {/* Performance mesurée : dès qu'au moins une action a été exécutée */}
+          {hasExecuted && <StrategyPerformancePanel strategyId={strategy.id} />}
         </CardContent>
       )}
     </Card>
@@ -348,7 +353,12 @@ const ACTION_TYPES = [
   'SWAP',
 ] as const
 
-export default function StrategiesPage() {
+/**
+ * Cycle de vie complet des stratégies IA : proposer (analyse IA), accepter/
+ * rejeter, exécuter/sauter les actions, éditer les montants, munitions —
+ * et mesurer ce que chaque stratégie a donné (P&L).
+ */
+export default function StrategiesSection() {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [formName, setFormName] = useState('')
@@ -451,11 +461,14 @@ export default function StrategiesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Section header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-medium">Stratégies</h1>
-          <p className="text-muted-foreground">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Brain className="h-5 w-5 text-primary" />
+            Stratégies IA
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Laissez l'IA analyser votre portefeuille ou créez vos propres stratégies.
           </p>
         </div>
@@ -485,11 +498,11 @@ export default function StrategiesPage() {
       {/* AI Proposals */}
       {proposed.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+          <h3 className="text-base font-semibold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-accent" />
             Propositions IA
             <Badge variant="secondary">{proposed.length}</Badge>
-          </h2>
+          </h3>
           {proposed.map((s) => (
             <StrategyCard
               key={s.id}
@@ -507,7 +520,7 @@ export default function StrategiesPage() {
       {/* Active strategies */}
       {active.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Stratégies actives</h2>
+          <h3 className="text-base font-semibold">Stratégies actives</h3>
           {active.map((s) => (
             <StrategyCard
               key={s.id}
@@ -544,7 +557,7 @@ export default function StrategiesPage() {
       {/* Archived */}
       {archived.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-muted-foreground">Historique</h2>
+          <h3 className="text-base font-semibold text-muted-foreground">Historique</h3>
           {archived.map((s) => (
             <StrategyCard
               key={s.id}
@@ -568,9 +581,9 @@ export default function StrategiesPage() {
           <div className="space-y-5 py-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="strategy-name">Nom de la stratégie</Label>
+              <Label htmlFor="decisions-strategy-name">Nom de la stratégie</Label>
               <Input
-                id="strategy-name"
+                id="decisions-strategy-name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="Ex: DCA Bitcoin hebdomadaire"
@@ -579,9 +592,9 @@ export default function StrategiesPage() {
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="strategy-desc">Description / Règles</Label>
+              <Label htmlFor="decisions-strategy-desc">Description / Règles</Label>
               <Textarea
-                id="strategy-desc"
+                id="decisions-strategy-desc"
                 value={formDesc}
                 onChange={(e) => setFormDesc(e.target.value)}
                 placeholder="Décrivez votre stratégie, vos règles d'entrée/sortie, conditions de marché..."

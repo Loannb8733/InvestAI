@@ -633,7 +633,7 @@ export default function MasterDashboardPage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-3 h-12 border-border/50 hover:border-border"
-                  onClick={() => navigate('/intelligence?tab=predictions')}
+                  onClick={() => navigate('/intelligence?tab=market')}
                 >
                   <Crosshair className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                   <div className="text-left">

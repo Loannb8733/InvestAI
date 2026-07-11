@@ -26,9 +26,11 @@ import {
   ArrowRightLeft,
   Bitcoin,
   BarChart3,
+  Lightbulb,
 } from 'lucide-react'
 import RebalancingTab from '@/components/reports/RebalancingTab'
 import TaxSummaryPanel from '@/components/reports/TaxSummaryPanel'
+import OptimizationsTab from '@/components/reports/OptimizationsTab'
 
 interface ReportAction {
   label: string
@@ -49,7 +51,7 @@ interface ReportCard {
   actions: ReportAction[]
 }
 
-const VALID_TABS = new Set(['exports', 'fiscal', 'strategy'])
+const VALID_TABS = new Set(['exports', 'fiscal', 'strategy', 'optimisations'])
 
 export default function ReportsPage() {
   const { toast } = useToast()
@@ -338,6 +340,10 @@ export default function ReportsPage() {
             <ArrowRightLeft className="h-4 w-4" />
             Stratégie
           </TabsTrigger>
+          <TabsTrigger value="optimisations" className="gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Optimisations
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="exports" className="space-y-6">
@@ -391,6 +397,10 @@ export default function ReportsPage() {
 
         <TabsContent value="strategy">
           <RebalancingTab />
+        </TabsContent>
+
+        <TabsContent value="optimisations">
+          <OptimizationsTab />
         </TabsContent>
       </Tabs>
     </div>
