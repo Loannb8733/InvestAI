@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { notesApi } from '@/services/api'
+import { notesApi, assetsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import {
   Select,
@@ -68,6 +68,15 @@ interface NoteSummary {
   unique_tags: string[]
 }
 
+interface AssetOption {
+  id: string
+  symbol: string
+  name: string | null
+}
+
+/** Valeur sentinelle : les SelectItem de shadcn/ui n'acceptent pas la chaîne vide. */
+const NO_ASSET = 'none'
+
 const fmtCount = (n: number) => Math.round(n).toString()
 
 export default function NotesPage() {
@@ -97,6 +106,13 @@ export default function NotesPage() {
   const { data: summary } = useQuery<NoteSummary>({
     queryKey: queryKeys.notes.summary,
     queryFn: notesApi.getSummary,
+  })
+
+  // Fetch assets for the "Actif lié" selector
+  const { data: assets } = useQuery<AssetOption[]>({
+    queryKey: queryKeys.assets.list(),
+    queryFn: () => assetsApi.list(),
+    staleTime: 60_000,
   })
 
   // Create note mutation
@@ -142,6 +158,19 @@ export default function NotesPage() {
   })
 
   const [sentiment, setSentiment] = useState<string>('')
+  const [linkedAssetId, setLinkedAssetId] = useState<string>(NO_ASSET)
+
+  const openAddDialog = () => {
+    setSentiment('')
+    setLinkedAssetId(NO_ASSET)
+    setShowAddNote(true)
+  }
+
+  const openEditDialog = (note: Note) => {
+    setSentiment(note.sentiment || '')
+    setLinkedAssetId(note.asset_id || NO_ASSET)
+    setEditingNote(note)
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -152,6 +181,7 @@ export default function NotesPage() {
       content: formData.get('content') as string || undefined,
       tags: formData.get('tags') as string || undefined,
       sentiment: sentiment || undefined,
+      asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : undefined,
     }
 
     if (editingNote) {
@@ -193,7 +223,7 @@ export default function NotesPage() {
             Prenez des notes sur vos investissements et stratégies.
           </p>
         </div>
-        <Button onClick={() => setShowAddNote(true)}>
+        <Button onClick={openAddDialog}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle note
         </Button>
@@ -274,7 +304,7 @@ export default function NotesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => { setEditingNote(note); setSentiment(note.sentiment || '') }}
+                      onClick={() => openEditDialog(note)}
                       aria-label="Modifier la note"
                     >
                       <Edit className="h-4 w-4" />
@@ -357,7 +387,7 @@ export default function NotesPage() {
           title="Aucune note"
           description="Commencez à documenter vos décisions d'investissement."
           action={
-            <Button onClick={() => setShowAddNote(true)}>
+            <Button onClick={openAddDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Créer une note
             </Button>
@@ -433,6 +463,24 @@ export default function NotesPage() {
                           <s.icon className="h-4 w-4" />
                           {s.label}
                         </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Actif lié (optionnel)</Label>
+                <Select value={linkedAssetId} onValueChange={setLinkedAssetId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucun actif" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_ASSET}>Aucun actif</SelectItem>
+                    {assets?.map((asset) => (
+                      <SelectItem key={asset.id} value={asset.id}>
+                        {asset.symbol}
+                        {asset.name ? ` — ${asset.name}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

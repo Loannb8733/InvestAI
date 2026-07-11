@@ -262,6 +262,9 @@ export default function TransactionsPage() {
   // Selection states
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
+  // Export states
+  const [isExportingAll, setIsExportingAll] = useState(false)
+
   // ============== Queries ==============
 
   const { data: portfolios } = useQuery<Portfolio[]>({
@@ -546,14 +549,34 @@ export default function TransactionsPage() {
 
   // ============== Handlers ==============
 
-  const handleExportAll = () => {
-    if (!transactions || transactions.length === 0) {
-      toast({ title: 'Aucune transaction à exporter', variant: 'destructive' })
-      return
+  /** Export SERVEUR : toutes les transactions, pas seulement les pages chargées côté client. */
+  const handleExportAll = async () => {
+    if (isExportingAll) return
+    setIsExportingAll(true)
+    try {
+      const blob = await transactionsApi.exportCSV(
+        selectedPortfolio !== 'all' ? selectedPortfolio : undefined
+      )
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `transactions_all_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({
+        title: 'Export complet téléchargé',
+        description:
+          selectedPortfolio !== 'all'
+            ? 'Toutes les transactions du portefeuille ont été exportées.'
+            : 'Toutes les transactions ont été exportées.',
+      })
+    } catch {
+      toast({ title: "Erreur lors de l'export", variant: 'destructive' })
+    } finally {
+      setIsExportingAll(false)
     }
-    const csv = generateCSV(transactions)
-    downloadCSV(csv, `transactions_all_${new Date().toISOString().split('T')[0]}.csv`)
-    toast({ title: `${transactions.length} transactions exportées` })
   }
 
   const handleExportFiltered = () => {
@@ -703,9 +726,13 @@ export default function TransactionsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportAll}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Tout exporter ({transactions?.length || 0})
+              <DropdownMenuItem onClick={handleExportAll} disabled={isExportingAll}>
+                {isExportingAll ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                )}
+                Tout exporter (serveur)
               </DropdownMenuItem>
               {hasActiveFilters && (
                 <DropdownMenuItem onClick={handleExportFiltered}>
@@ -1040,6 +1067,24 @@ export default function TransactionsPage() {
         </CardHeader>
 
         <CardContent>
+          {/* Avertissement : les filtres ne portent que sur les pages déjà chargées */}
+          {hasActiveFilters && hasMoreTransactions && (
+            <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded-md border border-warning/30 bg-warning/10 text-sm text-warning">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Filtres appliqués sur les {transactions.length} transactions chargées — les
+                suivantes n'ont pas été parcourues.{' '}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:opacity-80 font-medium"
+                  onClick={() => setTxSkip((s) => s + TX_PAGE_SIZE)}
+                >
+                  Charger plus
+                </button>{' '}
+                pour une vue exhaustive.
+              </span>
+            </div>
+          )}
           {paginatedTransactions.length > 0 ? (
             <>
               <div className="overflow-x-auto">

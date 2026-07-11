@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { calendarApi, predictionsApi } from '@/services/api'
+import api, { calendarApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import {
   Plus,
@@ -86,8 +86,33 @@ interface CalendarSummary {
   projected_income_this_month: number
 }
 
+interface PassiveIncomeMonth {
+  month: string
+  amount: number
+}
+
+interface PassiveIncome {
+  total_12m: number
+  monthly: PassiveIncomeMonth[]
+  sources: {
+    events: number
+    crowdfunding: number
+  }
+}
+
+interface SeedTaxEventsResult {
+  created: number
+  skipped: number
+  message: string
+}
+
 const fmtCount = (n: number) => Math.round(n).toString()
 const fmtEur = (n: number) => `${n.toLocaleString('fr-FR')} EUR`
+
+const formatMonthLabel = (month: string) => {
+  const [year, monthIndex] = month.split('-').map(Number)
+  return new Date(year, monthIndex - 1, 1).toLocaleDateString('fr-FR', { month: 'short' })
+}
 
 const eventTypeIcons: Record<string, React.ReactNode> = {
   dividend: <TrendingUp className="h-4 w-4" />,
@@ -146,6 +171,12 @@ export default function CalendarPage() {
     queryFn: calendarApi.getSummary,
   })
 
+  // Fetch passive income projection (12 months)
+  const { data: passiveIncome } = useQuery<PassiveIncome>({
+    queryKey: [...queryKeys.calendar.all, 'passive-income'],
+    queryFn: calendarApi.getPassiveIncome,
+  })
+
   // Fetch market events
   const { data: marketEvents } = useQuery<MarketEvent[]>({
     queryKey: queryKeys.calendar.marketEvents,
@@ -189,6 +220,26 @@ export default function CalendarPage() {
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de compléter l\'événement.' })
+    },
+  })
+
+  // Seed French tax deadlines mutation
+  const seedTaxMutation = useMutation({
+    mutationFn: async (): Promise<SeedTaxEventsResult> => {
+      const response = await api.post('/calendar/seed-tax-events')
+      return response.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+      toast({
+        title: data.created > 0
+          ? `${data.created} échéance${data.created > 1 ? 's' : ''} fiscale${data.created > 1 ? 's' : ''} ajoutée${data.created > 1 ? 's' : ''}`
+          : 'Aucune échéance à ajouter',
+        description: 'Dates indicatives — vérifiez sur impots.gouv.fr.',
+      })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'ajouter les échéances fiscales.' })
     },
   })
 
@@ -267,10 +318,24 @@ export default function CalendarPage() {
             Gérez vos échéances et événements financiers.
           </p>
         </div>
-        <Button onClick={() => setShowAddEvent(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvel événement
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => seedTaxMutation.mutate()}
+            disabled={seedTaxMutation.isPending}
+          >
+            {seedTaxMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Landmark className="h-4 w-4 mr-2" />
+            )}
+            Ajouter les échéances fiscales FR
+          </Button>
+          <Button onClick={() => setShowAddEvent(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouvel événement
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -314,6 +379,63 @@ export default function CalendarPage() {
             <span className="text-lg font-bold text-gain">
               +{summary.projected_income_this_month.toLocaleString('fr-FR')} EUR
             </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Passive Income 12 months */}
+      {passiveIncome && (
+        <Card elevation="raised">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-gain" />
+              Revenus passifs — 12 prochains mois
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {passiveIncome.total_12m > 0 ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span className="text-2xl font-bold text-gain">
+                    +{passiveIncome.total_12m.toLocaleString('fr-FR')} EUR
+                  </span>
+                  <span className="text-sm text-muted-foreground">attendus sur 12 mois</span>
+                </div>
+                {(() => {
+                  const maxAmount = Math.max(...passiveIncome.monthly.map((m) => m.amount), 1)
+                  return (
+                    <div
+                      className="flex items-end gap-1"
+                      role="img"
+                      aria-label="Revenus passifs mensuels sur les 12 prochains mois"
+                    >
+                      {passiveIncome.monthly.map((m) => (
+                        <div key={m.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                          <div className="w-full h-24 flex items-end justify-center">
+                            <div
+                              className="w-full max-w-[28px] rounded-t bg-gain/70"
+                              style={{ height: `${m.amount > 0 ? Math.max((m.amount / maxAmount) * 100, 4) : 0}%` }}
+                              title={`${formatMonthLabel(m.month)} : ${m.amount.toLocaleString('fr-FR')} EUR`}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {formatMonthLabel(m.month)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+                <p className="text-xs text-muted-foreground mt-3">
+                  {`Dont ${passiveIncome.sources.events.toLocaleString('fr-FR')} EUR d'événements (dividendes, loyers, intérêts) et ${passiveIncome.sources.crowdfunding.toLocaleString('fr-FR')} EUR de coupons crowdfunding.`}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Aucun revenu passif prévu sur les 12 prochains mois. Ajoutez des événements de type
+                dividende, loyer ou intérêt, ou synchronisez vos projets crowdfunding.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

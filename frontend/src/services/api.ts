@@ -1151,6 +1151,11 @@ export const calendarApi = {
     return response.data
   },
 
+  getPassiveIncome: async () => {
+    const response = await api.get('/calendar/passive-income')
+    return response.data
+  },
+
   getUpcoming: async (days: number = 30) => {
     const response = await api.get('/calendar/upcoming', { params: { days } })
     return response.data
