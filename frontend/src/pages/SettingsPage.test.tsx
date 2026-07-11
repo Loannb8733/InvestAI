@@ -41,7 +41,11 @@ vi.mock('@/services/api', () => ({
   profileApi: {
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
+    // Profil investisseur (TMI / risque / DCA) — carte ajoutée à SettingsPage
+    getInvestorProfile: vi.fn().mockResolvedValue({ tmi_rate: null, risk_profile: null, monthly_dca_eur: null }),
+    updateInvestorProfile: vi.fn(),
   },
+  investorProfileQueryKey: ['auth', 'investor-profile'],
 }))
 
 function renderWithProviders() {

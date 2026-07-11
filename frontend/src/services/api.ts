@@ -1325,6 +1325,26 @@ export const notificationsApi = {
 }
 
 // Profile API (user self-service)
+
+/** Profil investisseur (paramètres financiers). `null` = non renseigné. */
+export type RiskProfile = 'conservative' | 'moderate' | 'aggressive'
+
+export interface InvestorProfile {
+  /** Tranche marginale d'imposition : 0, 0.11, 0.3, 0.41 ou 0.45 */
+  tmi_rate: number | null
+  risk_profile: RiskProfile | null
+  monthly_dca_eur: number | null
+}
+
+/** Clé de query partagée : SettingsPage écrit, DashboardPnlCard lit. */
+export const investorProfileQueryKey = ['auth', 'investor-profile'] as const
+
+const toInvestorProfile = (data: Record<string, unknown>): InvestorProfile => ({
+  tmi_rate: (data.tmi_rate as number | null | undefined) ?? null,
+  risk_profile: (data.risk_profile as RiskProfile | null | undefined) ?? null,
+  monthly_dca_eur: (data.monthly_dca_eur as number | null | undefined) ?? null,
+})
+
 export const profileApi = {
   updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string; telegram_chat_id?: string; telegram_enabled?: boolean }) => {
     const response = await api.patch('/auth/me', data)
@@ -1337,6 +1357,18 @@ export const profileApi = {
       new_password: newPassword,
     })
     return response.data
+  },
+
+  // Profil investisseur — porté par /auth/me (colonnes users.tmi_rate,
+  // risk_profile, monthly_dca_eur). Envoyer null efface la valeur.
+  getInvestorProfile: async (): Promise<InvestorProfile> => {
+    const response = await api.get('/auth/me')
+    return toInvestorProfile(response.data)
+  },
+
+  updateInvestorProfile: async (payload: Partial<InvestorProfile>): Promise<InvestorProfile> => {
+    const response = await api.patch('/auth/me', payload)
+    return toInvestorProfile(response.data)
   },
 }
 
@@ -1450,6 +1482,14 @@ export const crowdfundingApi = {
 
   getPerformance: async () => {
     const response = await api.get('/crowdfunding/performance')
+    return response.data
+  },
+
+  /** Rapport fiscal annuel : intérêts bruts / retenues à la source par plateforme, à réconcilier avec les IFU (formulaire 2561). */
+  getTaxReport: async (year?: number) => {
+    const response = await api.get('/crowdfunding/tax-report', {
+      params: year !== undefined ? { year } : undefined,
+    })
     return response.data
   },
 

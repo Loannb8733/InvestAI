@@ -172,6 +172,41 @@ export interface CashflowMonth {
   projects: CashflowProjectAmount[]
 }
 
+/**
+ * Agrégat fiscal annuel d'une plateforme — les intérêts de crowdfunding
+ * obligataire sont des revenus de capitaux mobiliers : PFU 30 % (12,8 % IR
+ * + 17,2 % PS) prélevé à la source par la plateforme et déclaré case 2TR/2BH
+ * via l'IFU (formulaire 2561). Sert à réconcilier ces IFU.
+ */
+export interface TaxReportPlatform {
+  platform: string
+  /** Intérêts bruts encaissés dans l'année (avant prélèvements). */
+  gross_interest: number
+  /** Retenue à la source saisie sur les versements (somme des tax_amount). */
+  tax_withheld: number
+  /** Net perçu = brut − retenues. */
+  net_interest: number
+  /** PFU théorique : brut × 30 %. */
+  theoretical_pfu: number
+  /**
+   * True si la retenue diverge de plus de 1 € du PFU théorique — dispense
+   * d'acompte, ou versements saisis sans le split fiscal renseigné.
+   */
+  withholding_gap: boolean
+  nb_payments: number
+}
+
+/** Rapport fiscal annuel agrégé par plateforme + totaux. */
+export interface CrowdfundingTaxReport {
+  year: number
+  platforms: TaxReportPlatform[]
+  total_gross_interest: number
+  total_tax_withheld: number
+  total_net_interest: number
+  total_theoretical_pfu: number
+  nb_payments: number
+}
+
 export interface GuaranteeInfo {
   type: string
   rank: string | null

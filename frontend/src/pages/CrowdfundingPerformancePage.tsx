@@ -1,5 +1,13 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
@@ -16,7 +24,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { TrendingUp, AlertTriangle, CheckCircle2, Percent } from 'lucide-react'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
-import type { CrowdfundingPerformanceItem } from '@/types/crowdfunding'
+import type { CrowdfundingPerformanceItem, CrowdfundingTaxReport } from '@/types/crowdfunding'
 
 /** Format FR d'un pourcentage : « 8,42 % ». */
 const formatPercent = (n: number) => `${n.toFixed(2).replace('.', ',')} %`
@@ -32,6 +40,10 @@ const formatGapPts = (gap: number) => {
 /** Couleur de l'écart XIRR vs contractuel : gain ≥ 0, warning [−2 ; 0[, loss < −2 pts. */
 const gapColorClass = (gap: number) =>
   gap >= 0 ? 'text-gain' : gap >= -2 ? 'text-warning' : 'text-loss'
+
+/** 5 dernières années (année en cours incluse) pour le sélecteur fiscal. */
+const CURRENT_YEAR = new Date().getFullYear()
+const TAX_YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
 
 /** Tiret « — » avec info-bulle pour un XIRR non calculable. */
 function XirrUnavailable() {
@@ -54,6 +66,12 @@ export default function CrowdfundingPerformancePage() {
   const { data, isLoading } = useQuery<{ projects: CrowdfundingPerformanceItem[] }>({
     queryKey: queryKeys.crowdfunding.performance,
     queryFn: crowdfundingApi.getPerformance,
+  })
+
+  const [taxYear, setTaxYear] = useState(CURRENT_YEAR)
+  const { data: taxReport, isLoading: isTaxLoading } = useQuery<CrowdfundingTaxReport>({
+    queryKey: [...queryKeys.crowdfunding.all, 'tax-report', taxYear],
+    queryFn: () => crowdfundingApi.getTaxReport(taxYear),
   })
 
   if (isLoading) {
@@ -322,6 +340,122 @@ export default function CrowdfundingPerformancePage() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Rapport fiscal annuel — réconciliation des IFU */}
+      <Card elevation="raised">
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>Fiscalité {taxYear}</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Intérêts = revenus de capitaux mobiliers · PFU 30 % (12,8 % IR + 17,2 % PS)
+              prélevé à la source par les plateformes
+            </p>
+          </div>
+          <Select value={String(taxYear)} onValueChange={(v) => setTaxYear(Number(v))}>
+            <SelectTrigger className="w-28 shrink-0" aria-label="Année fiscale">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TAX_YEARS.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {isTaxLoading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Chargement…</p>
+          ) : !taxReport || taxReport.platforms.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Aucun versement enregistré en {taxYear}.
+            </p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th scope="col" className="pb-2 font-medium">Plateforme</th>
+                      <th scope="col" className="pb-2 font-medium text-right">Versements</th>
+                      <th scope="col" className="pb-2 font-medium text-right">Intérêts bruts</th>
+                      <th scope="col" className="pb-2 font-medium text-right">Retenue à la source</th>
+                      <th scope="col" className="pb-2 font-medium text-right">Net perçu</th>
+                      <th scope="col" className="pb-2 font-medium text-right">PFU théorique (30 %)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {taxReport.platforms.map((p) => (
+                      <tr key={p.platform} className="border-b border-border/50">
+                        <td className="py-3">
+                          <span className="flex items-center gap-2">
+                            {p.platform}
+                            {p.withholding_gap && (
+                              <TooltipProvider delayDuration={100}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertTriangle className="h-4 w-4 cursor-help text-warning" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs text-xs">
+                                    La retenue saisie s'écarte de plus de 1 € du PFU théorique
+                                    (30 % des intérêts bruts). Causes possibles : dispense
+                                    d'acompte de 12,8 % (revenu fiscal de référence sous les
+                                    seuils), ou versements saisis sans le détail
+                                    intérêts / retenue renseigné.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-muted-foreground">
+                          {p.nb_payments}
+                        </td>
+                        <td className="py-3 text-right tabular-nums">
+                          {formatCurrency(p.gross_interest)}
+                        </td>
+                        <td
+                          className={`py-3 text-right tabular-nums ${p.withholding_gap ? 'text-warning' : ''}`}
+                        >
+                          {formatCurrency(p.tax_withheld)}
+                        </td>
+                        <td className="py-3 text-right tabular-nums">
+                          {formatCurrency(p.net_interest)}
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-muted-foreground">
+                          {formatCurrency(p.theoretical_pfu)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-medium">
+                      <td className="py-3">TOTAL</td>
+                      <td className="py-3 text-right tabular-nums">{taxReport.nb_payments}</td>
+                      <td className="py-3 text-right tabular-nums">
+                        {formatCurrency(taxReport.total_gross_interest)}
+                      </td>
+                      <td className="py-3 text-right tabular-nums">
+                        {formatCurrency(taxReport.total_tax_withheld)}
+                      </td>
+                      <td className="py-3 text-right tabular-nums">
+                        {formatCurrency(taxReport.total_net_interest)}
+                      </td>
+                      <td className="py-3 text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(taxReport.total_theoretical_pfu)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground">
+                À réconcilier avec l'IFU (formulaire 2561) fourni par chaque plateforme —
+                case 2TR. Les intérêts déjà prélevés à la source n'entraînent pas de double
+                imposition.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

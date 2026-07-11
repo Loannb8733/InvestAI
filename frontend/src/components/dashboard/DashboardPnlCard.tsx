@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import type { PnLBreakdown } from '@/types'
-import { reportsApi, type TaxSummary } from '@/services/api'
+import { profileApi, investorProfileQueryKey, reportsApi, type TaxSummary } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -57,17 +58,32 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
     meta: { suppressGlobalError: true }, // best-effort : fallback silencieux
   })
 
+  // TMI du profil investisseur (Réglages) : si renseignée, le mode barème
+  // affiche PS 17,2 % + IR à la TMI au lieu du seul plancher PS.
+  const { data: investorProfile } = useQuery({
+    queryKey: investorProfileQueryKey,
+    queryFn: profileApi.getInvestorProfile,
+    staleTime: 10 * 60_000, // le profil change rarement
+    meta: { suppressGlobalError: true }, // best-effort : fallback silencieux
+  })
+  const tmiRate = investorProfile?.tmi_rate ?? null
+  const tmiPct = tmiRate != null ? Math.round(tmiRate * 100) : null
+
   // PFU = flat tax 30 % sur la PV nette 2086 ; barème = PS 17,2 % toujours
-  // dus, l'IR dépendant de la TMI (affiché comme plancher, jamais 0 fictif).
+  // dus + IR à la TMI si connue (sinon plancher PS seul, jamais 0 fictif).
   const taxableBase = taxSummary ? Math.max(0, taxSummary.net_plus_value) : null
+  const progressiveBase = taxableBase ?? Math.max(0, pnlBreakdown.realized_pnl)
+  const progressiveRate = 0.172 + (tmiRate ?? 0)
   const estimatedTax =
     taxSummary != null
       ? taxMode === 'pfu'
         ? Math.max(0, taxSummary.flat_tax_30)
-        : Math.max(0, taxSummary.ps_17_2)
+        : tmiRate != null
+          ? progressiveBase * progressiveRate
+          : Math.max(0, taxSummary.ps_17_2)
       : // Fallback (synthèse indisponible) : ancien calcul conservateur all-time
         pnlBreakdown.realized_pnl > 0
-        ? pnlBreakdown.realized_pnl * (taxMode === 'pfu' ? 0.3 : 0.172)
+        ? pnlBreakdown.realized_pnl * (taxMode === 'pfu' ? 0.3 : progressiveRate)
         : 0
   const netAfterTax = pnlBreakdown.net_pnl - estimatedTax
   const hasTaxSection = pnlBreakdown.realized_pnl > 0 || (taxSummary?.nb_cessions ?? 0) > 0
@@ -180,19 +196,28 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
                 <MetricTooltip content={
                   taxMode === 'pfu'
                     ? `Prélèvement Forfaitaire Unique (flat tax 30 %) : IR 12,8 % + PS 17,2 %. ${taxSummary ? `Base 2086 ${fiscalYear} : PV nette de ${formatCurrency(taxSummary.net_plus_value)} sur ${taxSummary.nb_cessions} cession(s) crypto→fiat.` : 'Base : réalisé cumulé (synthèse annuelle indisponible).'}`
-                    : "Barème progressif : les prélèvements sociaux (17,2 %) restent dus dans tous les cas ; l'impôt sur le revenu s'ajoute selon votre tranche marginale d'imposition."
+                    : tmiRate != null
+                      ? `Barème progressif avec votre TMI : PS 17,2 % (${formatCurrency(progressiveBase * 0.172)}) + IR ${tmiPct} % (${formatCurrency(progressiveBase * tmiRate)}) sur une base imposable de ${formatCurrency(progressiveBase)}. TMI configurable dans les Réglages.`
+                      : "Barème progressif : les prélèvements sociaux (17,2 %) restent dus dans tous les cas ; l'impôt sur le revenu s'ajoute selon votre tranche marginale d'imposition."
                 }>
                   <p className="text-xs text-muted-foreground">
                     {taxMode === 'pfu'
                       ? taxSummary ? `PFU ${fiscalYear} (base 2086)` : 'PFU estimé (30 %)'
-                      : `PS 17,2 %${taxSummary ? ` ${fiscalYear}` : ''} (plancher barème)`}
+                      : tmiRate != null
+                        ? `Barème : PS 17,2 % + IR ${tmiPct} %${taxSummary ? ` (${fiscalYear})` : ''}`
+                        : `PS 17,2 %${taxSummary ? ` ${fiscalYear}` : ''} (plancher barème)`}
                   </p>
                 </MetricTooltip>
                 <p className="text-lg font-bold text-warning">
                   {estimatedTax > 0 ? `-${pc(estimatedTax)}` : pc(0)}
                 </p>
-                {taxMode === 'progressive' && (
-                  <p className="text-[10px] text-muted-foreground">+ IR selon votre TMI</p>
+                {taxMode === 'progressive' && tmiRate == null && (
+                  <p className="text-[10px] text-muted-foreground">
+                    + IR selon votre TMI —{' '}
+                    <Link to="/settings" className="underline hover:text-foreground">
+                      Configurer votre TMI dans les Réglages
+                    </Link>
+                  </p>
                 )}
                 {taxSummary && taxableBase === 0 && (
                   <p className="text-[10px] text-muted-foreground">Aucune PV nette imposable en {fiscalYear}</p>

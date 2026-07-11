@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/authStore'
 import { useTheme } from '@/components/theme-provider'
-import { authApi, profileApi } from '@/services/api'
+import { authApi, profileApi, investorProfileQueryKey, type RiskProfile } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
-import { Shield, User, Moon, Sun, Key, Loader2, Globe } from 'lucide-react'
+import { Shield, User, Moon, Sun, Key, Loader2, Globe, TrendingUp } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,22 @@ const CURRENCIES = [
   { value: 'GBP', label: 'GBP (£)', symbol: '£' },
 ]
 
+// Tranches marginales d'imposition (barème IR français). Les values doivent
+// correspondre à String(tmi_rate) renvoyé par l'API (0.3 et non 0.30).
+const TMI_OPTIONS = [
+  { value: '0', label: '0 %' },
+  { value: '0.11', label: '11 %' },
+  { value: '0.3', label: '30 %' },
+  { value: '0.41', label: '41 %' },
+  { value: '0.45', label: '45 %' },
+]
+
+const RISK_OPTIONS: { value: RiskProfile; label: string }[] = [
+  { value: 'conservative', label: 'Prudent' },
+  { value: 'moderate', label: 'Modéré' },
+  { value: 'aggressive', label: 'Agressif' },
+]
+
 export default function SettingsPage() {
   const user = useAuthStore((state) => state.user)
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser)
@@ -49,6 +65,26 @@ export default function SettingsPage() {
       setPreferredCurrency(user.preferredCurrency || 'EUR')
     }
   }, [user])
+
+  // Investor profile form state — hydraté depuis l'API
+  const queryClient = useQueryClient()
+  const [tmiRate, setTmiRate] = useState('')
+  const [riskProfile, setRiskProfile] = useState('')
+  const [monthlyDca, setMonthlyDca] = useState('')
+
+  const { data: investorProfile } = useQuery({
+    queryKey: investorProfileQueryKey,
+    queryFn: profileApi.getInvestorProfile,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (investorProfile) {
+      setTmiRate(investorProfile.tmi_rate != null ? String(investorProfile.tmi_rate) : '')
+      setRiskProfile(investorProfile.risk_profile ?? '')
+      setMonthlyDca(investorProfile.monthly_dca_eur != null ? String(investorProfile.monthly_dca_eur) : '')
+    }
+  }, [investorProfile])
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -72,6 +108,34 @@ export default function SettingsPage() {
       toast({ title: 'Erreur', description: 'Impossible de mettre à jour le profil.', variant: 'destructive' })
     },
   })
+
+  // Investor profile mutation
+  const investorMutation = useMutation({
+    mutationFn: () =>
+      profileApi.updateInvestorProfile({
+        tmi_rate: tmiRate === '' ? null : Number(tmiRate),
+        risk_profile: riskProfile === '' ? null : (riskProfile as RiskProfile),
+        monthly_dca_eur: monthlyDca === '' ? null : Number(monthlyDca),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: investorProfileQueryKey })
+      toast({ title: 'Profil investisseur mis à jour', description: 'Vos paramètres financiers ont été enregistrés.' })
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: "Impossible d'enregistrer le profil investisseur.", variant: 'destructive' })
+    },
+  })
+
+  const handleInvestorSave = () => {
+    if (monthlyDca !== '') {
+      const dca = Number(monthlyDca)
+      if (!Number.isFinite(dca) || dca < 0) {
+        toast({ title: 'Montant invalide', description: 'Le DCA mensuel doit être un montant positif ou nul.', variant: 'destructive' })
+        return
+      }
+    }
+    investorMutation.mutate()
+  }
 
   // Password mutation
   const passwordMutation = useMutation({
@@ -214,6 +278,75 @@ export default function SettingsPage() {
             >
               {profileMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Enregistrer les modifications
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Investor profile */}
+        <Card elevation="raised">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              <CardTitle>Profil investisseur</CardTitle>
+            </div>
+            <CardDescription>
+              Vos paramètres financiers — utilisés par le dashboard, les suggestions et les simulateurs
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="tmiRate">Tranche marginale d'imposition (TMI)</Label>
+                <Select value={tmiRate} onValueChange={setTmiRate}>
+                  <SelectTrigger id="tmiRate">
+                    <SelectValue placeholder="Non renseignée" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TMI_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Utilisée par l'estimation d'impôt au barème progressif (dashboard)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="riskProfile">Profil de risque</Label>
+                <Select value={riskProfile} onValueChange={setRiskProfile}>
+                  <SelectTrigger id="riskProfile">
+                    <SelectValue placeholder="Non renseigné" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RISK_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Utilisé par les suggestions de déploiement de capital
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="monthlyDca">DCA mensuel (€)</Label>
+                <Input
+                  id="monthlyDca"
+                  type="number"
+                  min={0}
+                  step={50}
+                  inputMode="decimal"
+                  placeholder="ex : 500"
+                  value={monthlyDca}
+                  onChange={(e) => setMonthlyDca(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Pré-remplit les simulateurs de projection
+                </p>
+              </div>
+            </div>
+            <Button onClick={handleInvestorSave} disabled={investorMutation.isPending}>
+              {investorMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Enregistrer le profil investisseur
             </Button>
           </CardContent>
         </Card>

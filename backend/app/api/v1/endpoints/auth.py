@@ -5,8 +5,9 @@ import json
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from io import BytesIO
-from typing import Optional
+from typing import Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,10 @@ class UserProfileResponse(BaseModel):
     mfa_enabled: bool
     telegram_chat_id: Optional[str] = None
     telegram_enabled: bool = False
+    # Profil investisseur (paramètres financiers) — NULL = non renseigné
+    tmi_rate: Optional[float] = None
+    risk_profile: Optional[str] = None
+    monthly_dca_eur: Optional[float] = None
     created_at: str
 
 
@@ -176,6 +181,10 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+# Tranches marginales d'imposition françaises (barème IR)
+_TMI_ALLOWED = (0.0, 0.11, 0.30, 0.41, 0.45)
+
+
 class UserProfileUpdate(BaseModel):
     """Request to update user profile."""
 
@@ -184,6 +193,20 @@ class UserProfileUpdate(BaseModel):
     preferred_currency: Optional[str] = Field(None, pattern=r"^(EUR|USD|CHF|GBP)$")
     telegram_chat_id: Optional[str] = Field(None, max_length=100, pattern=r"^-?\d+$")
     telegram_enabled: Optional[bool] = None
+    # Profil investisseur — envoyer null pour effacer une valeur
+    tmi_rate: Optional[float] = None
+    risk_profile: Optional[Literal["conservative", "moderate", "aggressive"]] = None
+    monthly_dca_eur: Optional[float] = Field(None, ge=0, le=99_999_999.99)
+
+    @field_validator("tmi_rate")
+    @classmethod
+    def check_tmi_rate(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        # Comparaison avec tolérance : 0.30 peut arriver en 0.30000000000000004
+        if not any(abs(v - allowed) < 1e-9 for allowed in _TMI_ALLOWED):
+            raise ValueError("TMI invalide : valeurs autorisées 0, 0.11, 0.30, 0.41, 0.45")
+        return v
 
 
 @router.post("/verify-email", response_model=Token)
@@ -750,6 +773,9 @@ async def get_current_user_info(
         "mfa_enabled": current_user.mfa_enabled,
         "telegram_chat_id": current_user.telegram_chat_id,
         "telegram_enabled": getattr(current_user, "telegram_enabled", False),
+        "tmi_rate": float(current_user.tmi_rate) if current_user.tmi_rate is not None else None,
+        "risk_profile": current_user.risk_profile,
+        "monthly_dca_eur": float(current_user.monthly_dca_eur) if current_user.monthly_dca_eur is not None else None,
         "created_at": current_user.created_at.isoformat(),
     }
 
@@ -760,15 +786,27 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update current user profile (first_name, last_name, preferred_currency)."""
+    """Update current user profile (identity, currency, investor profile)."""
     update_data = data.model_dump(exclude_unset=True)
-    # Defense-in-depth: only allow the three profile fields. Blocks any future
-    # field added to UserProfileUpdate (or accidentally to User) from being
-    # writable via this self-service endpoint — role, is_active, email,
+    # Defense-in-depth: only allow explicit self-service fields. Blocks any
+    # future field added to UserProfileUpdate (or accidentally to User) from
+    # being writable via this endpoint — role, is_active, email,
     # password_hash, mfa_* must never be reachable here.
-    _PATCHABLE = {"first_name", "last_name", "preferred_currency"}
+    _PATCHABLE = {
+        "first_name",
+        "last_name",
+        "preferred_currency",
+        "tmi_rate",
+        "risk_profile",
+        "monthly_dca_eur",
+    }
+    # Colonnes Numeric : passer par Decimal(str(...)) pour éviter les
+    # artefacts binaires des floats (0.30000000000000004).
+    _DECIMAL_FIELDS = {"tmi_rate", "monthly_dca_eur"}
     for field, value in update_data.items():
         if field in _PATCHABLE:
+            if field in _DECIMAL_FIELDS and value is not None:
+                value = Decimal(str(round(value, 3 if field == "tmi_rate" else 2)))
             setattr(current_user, field, value)
 
     await db.commit()
@@ -784,6 +822,9 @@ async def update_profile(
         "mfa_enabled": current_user.mfa_enabled,
         "telegram_chat_id": current_user.telegram_chat_id,
         "telegram_enabled": getattr(current_user, "telegram_enabled", False),
+        "tmi_rate": float(current_user.tmi_rate) if current_user.tmi_rate is not None else None,
+        "risk_profile": current_user.risk_profile,
+        "monthly_dca_eur": float(current_user.monthly_dca_eur) if current_user.monthly_dca_eur is not None else None,
         "created_at": current_user.created_at.isoformat(),
     }
 

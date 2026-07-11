@@ -197,6 +197,49 @@ class CashflowMonthResponse(BaseModel):
     projects: list[CashflowProjectAmount] = Field(default_factory=list)
 
 
+# ---------- Rapport fiscal annuel (réconciliation IFU) ----------
+
+
+class TaxReportPlatform(BaseModel):
+    """Agrégat fiscal annuel d'une plateforme.
+
+    Les intérêts de crowdfunding immobilier (obligations) sont des revenus de
+    capitaux mobiliers soumis au PFU 30 % (12,8 % IR + 17,2 % PS), prélevé À LA
+    SOURCE par la plateforme (le ``tax_amount`` saisi sur chaque versement) et
+    déclaré case 2TR/2BH via l'IFU (formulaire 2561) qu'elle envoie. Ce rapport
+    sert à réconcilier ces IFU avec les versements saisis dans l'app.
+
+    ``withholding_gap`` : True quand la retenue saisie diverge de plus de 1 €
+    du PFU théorique (``gross_interest × 0.30``) — soit une dispense d'acompte
+    (12,8 % IR non prélevé sur demande, revenu fiscal de référence sous les
+    seuils), soit des versements enregistrés sans le split fiscal renseigné.
+    """
+
+    platform: str
+    # Intérêts bruts encaissés dans l'année (avant prélèvements)
+    gross_interest: float
+    # Retenue à la source saisie sur les versements (somme des tax_amount)
+    tax_withheld: float
+    # Net perçu = brut − retenues
+    net_interest: float
+    # PFU théorique : gross_interest × 30 %
+    theoretical_pfu: float
+    withholding_gap: bool
+    nb_payments: int
+
+
+class CrowdfundingTaxReportResponse(BaseModel):
+    """Rapport fiscal annuel agrégé par plateforme + totaux."""
+
+    year: int
+    platforms: list[TaxReportPlatform]
+    total_gross_interest: float
+    total_tax_withheld: float
+    total_net_interest: float
+    total_theoretical_pfu: float
+    nb_payments: int
+
+
 # ---------- Audit Lab schemas ----------
 
 

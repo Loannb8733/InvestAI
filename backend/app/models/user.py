@@ -3,7 +3,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
@@ -35,6 +35,16 @@ class User(Base):
     # fractions sommant à 1.0). Clé de voûte du pilotage : widget d'écart sur
     # le dashboard + rapport de rebalancing. NULL = pas encore définie.
     target_allocations = Column(JSONB, nullable=True)
+    # --- Profil investisseur (paramètres financiers de pilotage) ---------
+    # Tranche marginale d'imposition (0, 0.11, 0.30, 0.41, 0.45). Consommée
+    # par l'estimation d'impôt au barème progressif (dashboard, rapports).
+    # NULL = non renseignée → l'UI affiche le plancher PS 17,2 % seul.
+    tmi_rate = Column(Numeric(4, 3), nullable=True)
+    # Profil de risque : "conservative" / "moderate" / "aggressive".
+    # Consommé par les suggestions de déploiement de capital.
+    risk_profile = Column(String(20), nullable=True)
+    # Montant investi en DCA chaque mois (EUR). Pré-remplit les simulateurs.
+    monthly_dca_eur = Column(Numeric(10, 2), nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verification_token = Column(String(255), nullable=True)
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)

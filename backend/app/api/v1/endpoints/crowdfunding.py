@@ -28,12 +28,14 @@ from app.schemas.crowdfunding import (
     CrowdfundingProjectCreate,
     CrowdfundingProjectResponse,
     CrowdfundingProjectUpdate,
+    CrowdfundingTaxReportResponse,
     PaymentScheduleEntryResponse,
     ProjectAuditResponse,
     ProjectDocumentResponse,
     RepaymentCreate,
     RepaymentResponse,
     StressTestResponse,
+    TaxReportPlatform,
 )
 from app.services.analytics_math import _xirr as _solve_xirr
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
@@ -636,6 +638,79 @@ async def get_cashflow_schedule(
         )
         for key, b in sorted(buckets.items())
     ]
+
+
+@router.get("/tax-report", response_model=CrowdfundingTaxReportResponse)
+@limiter.limit("30/minute")
+async def get_tax_report(
+    request: Request,
+    year: Optional[int] = Query(None, ge=2000, le=2100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rapport fiscal annuel : réconciliation des IFU (formulaire 2561).
+
+    Agrège, par plateforme, les versements de l'année (``payment_date``) :
+    intérêts bruts, retenues à la source (``tax_amount``) et net perçu. Les
+    intérêts de crowdfunding obligataire sont des revenus de capitaux
+    mobiliers : PFU 30 % (12,8 % IR + 17,2 % PS) prélevé à la source par la
+    plateforme, déclaré case 2TR/2BH via l'IFU qu'elle envoie — ce rapport
+    permet de vérifier ces IFU ligne à ligne.
+
+    Répartition intérêts/capital : split explicite quand il existe, sinon
+    fallback par ``payment_type`` (même règle que le dashboard : un versement
+    INTEREST sans split est tout intérêt ; CAPITAL ou BOTH sans split est
+    compté en capital, conservateur — zéro intérêt fictif).
+    """
+    report_year = year if year is not None else date.today().year
+    projects = await _get_user_projects(db, current_user.id)
+    platform_by_project = {p.id: p.platform for p in projects}
+    reps_map = await _get_repayments_for_projects(db, [p.id for p in projects])
+
+    buckets: dict[str, dict[str, float]] = {}
+    for pid, reps in reps_map.items():
+        platform = platform_by_project.get(pid, "Inconnue")
+        for r in reps:
+            if r.payment_date.year != report_year:
+                continue
+            interest = float(r.interest_amount or 0)
+            capital = float(r.capital_amount or 0)
+            if interest == 0 and capital == 0 and r.payment_type == PaymentType.INTEREST:
+                interest = float(r.amount or 0)
+            bucket = buckets.setdefault(platform, {"gross": 0.0, "tax": 0.0, "count": 0.0})
+            bucket["gross"] += interest
+            bucket["tax"] += float(r.tax_amount or 0)
+            bucket["count"] += 1
+
+    platforms = []
+    for name in sorted(buckets, key=str.casefold):
+        bucket = buckets[name]
+        gross = bucket["gross"]
+        tax = bucket["tax"]
+        pfu = gross * 0.30
+        platforms.append(
+            TaxReportPlatform(
+                platform=name,
+                gross_interest=round(gross, 2),
+                tax_withheld=round(tax, 2),
+                net_interest=round(gross - tax, 2),
+                theoretical_pfu=round(pfu, 2),
+                # > 1 € d'écart vs PFU théorique : dispense d'acompte, ou
+                # versements saisis sans le split fiscal renseigné
+                withholding_gap=abs(tax - pfu) > 1.0,
+                nb_payments=int(bucket["count"]),
+            )
+        )
+
+    return CrowdfundingTaxReportResponse(
+        year=report_year,
+        platforms=platforms,
+        total_gross_interest=round(sum(p.gross_interest for p in platforms), 2),
+        total_tax_withheld=round(sum(p.tax_withheld for p in platforms), 2),
+        total_net_interest=round(sum(p.net_interest for p in platforms), 2),
+        total_theoretical_pfu=round(sum(p.theoretical_pfu for p in platforms), 2),
+        nb_payments=sum(p.nb_payments for p in platforms),
+    )
 
 
 @router.post("/sync-calendar")

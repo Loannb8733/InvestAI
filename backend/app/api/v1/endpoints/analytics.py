@@ -373,19 +373,16 @@ async def get_risk_metrics(
     elif analytics.portfolio_volatility > 25:
         risk_level = "medium"
 
-    # Compute parametric VaR from portfolio returns (reuse internal data)
-
-    # We need portfolio returns — rebuild them quickly
+    # VaR paramétrique RÉELLE (gaussienne) : z95 × σ_journalière, avec
+    # σ_journalière dérivée de la volatilité annualisée du portefeuille
+    # (crypto : 365 jours de cotation). L'ancien code faisait
+    # « VaR_hist × 0.95 » — un facteur arbitraire sans fondement statistique.
     var_parametric_pct = 0.0
     var_parametric_eur = 0.0
     try:
-        # Quick estimation: use parametric formula from historical VaR data
-        # VaR_hist is already in analytics.var_95 (in EUR)
-        # For parametric, approximate from the ratio
-        var_hist_pct = (analytics.var_95 / analytics.total_value * 100) if analytics.total_value > 0 else 0
-        # Parametric VaR ~ historical VaR * 1.0 (they're usually close for normal-ish distributions)
-        # We'll expose the parametric endpoint separately for exact computation
-        var_parametric_pct = round(var_hist_pct * 0.95, 2)  # parametric is typically slightly tighter
+        z_95 = 1.645  # quantile 95 % de la loi normale
+        daily_sigma_pct = (analytics.portfolio_volatility or 0) / (365**0.5)
+        var_parametric_pct = round(z_95 * daily_sigma_pct, 2)
         var_parametric_eur = round(analytics.total_value * var_parametric_pct / 100, 2)
     except Exception as exc:
         logger.debug("Parametric VaR estimation failed, using defaults: %s", exc)
