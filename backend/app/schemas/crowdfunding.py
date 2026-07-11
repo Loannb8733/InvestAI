@@ -172,6 +172,31 @@ class CrowdfundingDashboardResponse(BaseModel):
     projects: list[CrowdfundingProjectResponse]
 
 
+# ---------- Cashflow schedule (échéancier consolidé) ----------
+
+
+class CashflowProjectAmount(BaseModel):
+    """Contribution d'un projet au cash-flow d'un mois (montant BRUT de fiscalité)."""
+
+    name: str
+    amount: float
+
+
+class CashflowMonthResponse(BaseModel):
+    """Cash-flows attendus sur un mois, agrégés sur tous les projets non-défaut.
+
+    Somme des échéances contractuelles NON complétées (capital + intérêts).
+    Les montants sont BRUTS de fiscalité — les échéanciers sont contractuels,
+    avant prélèvements.
+    """
+
+    month: str  # "YYYY-MM"
+    expected_capital: float = 0.0
+    expected_interest: float = 0.0
+    total: float = 0.0
+    projects: list[CashflowProjectAmount] = Field(default_factory=list)
+
+
 # ---------- Audit Lab schemas ----------
 
 

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import {
@@ -18,6 +18,7 @@ import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { ALL_PLATFORMS, isColdWallet } from '@/lib/platforms'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sparkline } from '@/components/ui/sparkline'
+import AssetDetailSheet from '@/components/portfolio/AssetDetailSheet'
 import type { AssetMetrics, PortfolioMetrics } from '@/types'
 
 interface GroupedAsset {
@@ -65,12 +66,34 @@ export default function PortfolioAssetList({
   const [platformPopover, setPlatformPopover] = useState<string | null>(null)
   const [platformFilter, setPlatformFilter] = useState<string | null>(null)
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
+  // Vue détail : le groupe reste monté pendant l'animation de fermeture.
+  const [detailGroup, setDetailGroup] = useState<GroupedAsset | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // Reset filters when portfolio changes
   useEffect(() => {
     setPlatformFilter(null)
     setExpandedSymbols(new Set())
+    setDetailOpen(false)
   }, [portfolioId])
+
+  const openDetail = (group: GroupedAsset) => {
+    setDetailGroup(group)
+    setDetailOpen(true)
+  }
+
+  const detailRowProps = (group: GroupedAsset) => ({
+    role: 'button' as const,
+    tabIndex: 0,
+    'aria-label': `Voir le détail de ${group.symbol}`,
+    onClick: () => openDetail(group),
+    onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        openDetail(group)
+      }
+    },
+  })
 
   const toggleExpanded = (symbol: string) => {
     setExpandedSymbols(prev => {
@@ -457,8 +480,12 @@ export default function PortfolioAssetList({
                 const isSingle = !group.isMultiPlatform
 
                 return isSingle ? (
-                  // Single platform — render as before
-                  <tr key={group.assets[0].id} className="border-b last:border-0">
+                  // Single platform — ligne cliquable vers la vue détail
+                  <tr
+                    key={group.assets[0].id}
+                    className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                    {...detailRowProps(group)}
+                  >
                     <td className="py-3 text-center">
                       <div className="flex justify-center">
                         <AssetIconCompact
@@ -469,7 +496,10 @@ export default function PortfolioAssetList({
                         />
                       </div>
                     </td>
-                    <td className="text-center py-3">{renderPlatformBadge(group.assets[0])}</td>
+                    {/* stopPropagation : le popover plateforme ne doit pas ouvrir le détail */}
+                    <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
+                      {renderPlatformBadge(group.assets[0])}
+                    </td>
                     <td className="text-center py-3">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
                     <td className="text-center py-3 text-muted-foreground">
                       {group.assets[0].breakeven_price != null ? (
@@ -521,7 +551,7 @@ export default function PortfolioAssetList({
                         </div>
                       ) : <span className="text-xs text-muted-foreground">-</span>}
                     </td>
-                    <td className="text-center py-3">
+                    <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-center gap-1">
                         <Button variant="ghost" size="icon" onClick={() => onAddTransaction(group.assets[0].id, group.symbol)} title="Ajouter une transaction">
                           <ArrowRightLeft className="h-4 w-4" />
@@ -536,8 +566,8 @@ export default function PortfolioAssetList({
                   // Multi-platform — grouped row + expandable sub-rows
                   <Fragment key={group.symbol}>
                     <tr
-                      className="border-b cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleExpanded(group.symbol)}
+                      className="border-b cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                      {...detailRowProps(group)}
                     >
                       <td className="py-3 text-center">
                         <div className="flex justify-center items-center gap-1">
@@ -550,13 +580,23 @@ export default function PortfolioAssetList({
                         </div>
                       </td>
                       <td className="text-center py-3">
-                        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Masquer' : 'Afficher'} les positions par plateforme de ${group.symbol}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExpanded(group.symbol)
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
                           {isExpanded
                             ? <ChevronDown className="h-3.5 w-3.5" />
                             : <ChevronRight className="h-3.5 w-3.5" />
                           }
                           <span>{group.assets.length} plateformes</span>
-                        </div>
+                        </button>
                       </td>
                       <td className="text-center py-3 font-medium">{group.totalQuantity.toFixed(group.totalQuantity < 1 ? 8 : 2)}</td>
                       <td className="text-center py-3 text-muted-foreground">
@@ -718,6 +758,14 @@ export default function PortfolioAssetList({
           Ajouter un actif
         </Button>
       </div>
+
+      <AssetDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        group={detailGroup}
+        portfolioTotalValue={portfolioMetrics?.total_value}
+        sparkline={detailGroup ? sparklines?.[detailGroup.symbol] : undefined}
+      />
     </>
   )
 }

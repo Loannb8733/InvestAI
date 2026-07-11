@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,8 +13,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Badge, type BadgeProps } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { simulationsApi, dashboardApi, analyticsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency as formatCurrencyBase } from '@/lib/utils'
 import {
@@ -30,6 +59,10 @@ import {
   Clock,
   BarChart3,
   Info,
+  Save,
+  Trash2,
+  Bookmark,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
@@ -112,6 +145,139 @@ const INFLATION_BY_CURRENCY: Record<string, { rate: number; label: string }> = {
   AUD: { rate: 2.5, label: '2.5% (Australie)' },
 }
 
+// ============ Scénarios sauvegardés ============
+
+type ScenarioKind = 'fire' | 'projection' | 'montecarlo' | 'dca'
+
+interface SavedScenario {
+  id: string
+  name: string
+  description: string | null
+  simulation_type: string
+  parameters: {
+    kind?: string
+    inputs?: Record<string, unknown>
+    results?: Record<string, unknown>
+  }
+  results: Record<string, unknown> | null
+  created_at: string
+}
+
+// L'enum backend SimulationType n'a pas de valeur « montecarlo » : les scénarios
+// Monte Carlo sont persistés en simulation_type "projection" et discriminés côté
+// front via parameters.kind (le champ parameters est un Dict[str, Any] libre).
+const BACKEND_TYPE_BY_KIND: Record<ScenarioKind, string> = {
+  fire: 'fire',
+  projection: 'projection',
+  montecarlo: 'projection',
+  dca: 'dca',
+}
+
+const SCENARIO_KIND_META: Record<ScenarioKind, { label: string; badge: BadgeProps['variant'] }> = {
+  fire: { label: 'FIRE', badge: 'warning' },
+  projection: { label: 'Projection', badge: 'accent' },
+  montecarlo: { label: 'Monte Carlo', badge: 'secondary' },
+  dca: { label: 'DCA', badge: 'gain' },
+}
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  weekly: 'Hebdomadaire',
+  monthly: 'Mensuel',
+  quarterly: 'Trimestriel',
+}
+
+type FieldFormat = 'currency' | 'percent' | 'number' | 'years' | 'months' | 'days' | 'bool' | 'frequency'
+
+interface ScenarioField {
+  key: string
+  label: string
+  format: FieldFormat
+}
+
+const SCENARIO_FIELDS: Record<ScenarioKind, { params: ScenarioField[]; results: ScenarioField[] }> = {
+  fire: {
+    params: [
+      { key: 'current_portfolio_value', label: 'Valeur du portefeuille', format: 'currency' },
+      { key: 'monthly_contribution', label: 'Contribution mensuelle', format: 'currency' },
+      { key: 'monthly_expenses', label: 'Dépenses mensuelles (retraite)', format: 'currency' },
+      { key: 'expected_annual_return', label: 'Rendement annuel', format: 'percent' },
+      { key: 'expense_ratio', label: 'Frais annuels / TER', format: 'percent' },
+      { key: 'inflation_rate', label: 'Inflation', format: 'percent' },
+      { key: 'withdrawal_rate', label: 'Taux de retrait', format: 'percent' },
+      { key: 'target_years', label: 'Horizon', format: 'years' },
+    ],
+    results: [
+      { key: 'fire_number', label: 'Nombre FIRE', format: 'currency' },
+      { key: 'years_to_fire', label: 'Années restantes', format: 'years' },
+      { key: 'monthly_passive_income', label: 'Revenu passif mensuel', format: 'currency' },
+      { key: 'current_progress_percent', label: 'Progression', format: 'percent' },
+      { key: 'is_fire_achieved', label: 'FIRE atteint', format: 'bool' },
+    ],
+  },
+  projection: {
+    params: [
+      { key: 'years', label: 'Horizon', format: 'years' },
+      { key: 'expected_return', label: 'Rendement annuel', format: 'percent' },
+      { key: 'expense_ratio', label: 'Frais annuels / TER', format: 'percent' },
+      { key: 'monthly_contribution', label: 'Contribution mensuelle', format: 'currency' },
+      { key: 'inflation_rate', label: 'Inflation', format: 'percent' },
+    ],
+    results: [
+      { key: 'final_value', label: 'Valeur finale', format: 'currency' },
+      { key: 'real_final_value', label: 'Valeur réelle (inflation)', format: 'currency' },
+      { key: 'total_contributions', label: 'Contributions totales', format: 'currency' },
+      { key: 'total_returns', label: 'Gains totaux', format: 'currency' },
+    ],
+  },
+  montecarlo: {
+    params: [
+      { key: 'horizon', label: 'Horizon', format: 'days' },
+      { key: 'annual_withdrawal_rate', label: 'Taux de retrait annuel', format: 'percent' },
+      { key: 'ter_percentage', label: 'TER / Frais annuels', format: 'percent' },
+      { key: 'monthly_withdrawal', label: 'Retrait mensuel', format: 'currency' },
+    ],
+    results: [
+      { key: 'expected_return', label: 'Rendement attendu', format: 'percent' },
+      { key: 'prob_positive', label: 'Prob. gain', format: 'percent' },
+      { key: 'prob_loss_10', label: 'Prob. perte >10 %', format: 'percent' },
+      { key: 'prob_ruin', label: 'Prob. ruine', format: 'percent' },
+      { key: 'p5', label: 'P5 (pessimiste)', format: 'percent' },
+      { key: 'p50', label: 'P50 (médian)', format: 'percent' },
+      { key: 'p95', label: 'P95 (optimiste)', format: 'percent' },
+    ],
+  },
+  dca: {
+    params: [
+      { key: 'total_amount', label: 'Montant total', format: 'currency' },
+      { key: 'frequency', label: 'Fréquence', format: 'frequency' },
+      { key: 'duration_months', label: 'Durée', format: 'months' },
+      { key: 'expected_volatility', label: 'Volatilité attendue', format: 'percent' },
+      { key: 'expected_return', label: 'Rendement attendu', format: 'percent' },
+    ],
+    results: [
+      { key: 'total_invested', label: 'Total investi', format: 'currency' },
+      { key: 'dca_p50', label: 'Médiane DCA', format: 'currency' },
+      { key: 'dca_p10', label: 'DCA p10', format: 'currency' },
+      { key: 'dca_p90', label: 'DCA p90', format: 'currency' },
+      { key: 'lumpsum_p50', label: 'Médiane Lump Sum', format: 'currency' },
+      { key: 'return_percent', label: 'Rendement DCA (médiane)', format: 'percent' },
+      { key: 'prob_dca_beats_ls', label: 'Prob. DCA > Lump Sum', format: 'percent' },
+    ],
+  },
+}
+
+function scenarioKindOf(sim: SavedScenario): ScenarioKind {
+  const k = sim.parameters?.kind
+  if (k === 'fire' || k === 'projection' || k === 'montecarlo' || k === 'dca') return k
+  if (sim.simulation_type === 'fire' || sim.simulation_type === 'projection' || sim.simulation_type === 'dca') {
+    return sim.simulation_type
+  }
+  return 'projection'
+}
+
+const formatScenarioDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
 export default function SimulationsPage() {
   const { toast } = useToast()
   const { user } = useAuthStore()
@@ -162,8 +328,12 @@ export default function SimulationsPage() {
     horizon: 365,
     annual_withdrawal_rate: 0,
     ter_percentage: 0.25,
+    monthly_withdrawal: 0,
   })
   const [mcResult, setMcResult] = useState<MonteCarloData | null>(null)
+  // Snapshot des paramètres réellement utilisés pour le dernier calcul MC
+  // (les inputs peuvent changer après coup sans relancer la simulation).
+  const [mcApplied, setMcApplied] = useState<typeof mcParams | null>(null)
 
   // DCA state
   const [dcaParams, setDcaParams] = useState({
@@ -214,15 +384,17 @@ export default function SimulationsPage() {
 
   // Monte Carlo mutation
   const mcMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (params: typeof mcParams) =>
       analyticsApi.getMonteCarlo(
-        mcParams.horizon,
+        params.horizon,
         undefined,
-        mcParams.annual_withdrawal_rate || undefined,
-        mcParams.ter_percentage || undefined,
+        params.annual_withdrawal_rate || undefined,
+        params.ter_percentage || undefined,
+        params.monthly_withdrawal || undefined,
       ),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       setMcResult(data)
+      setMcApplied(variables)
       toast({ title: 'Simulation Monte Carlo calculée' })
     },
     onError: () => {
@@ -241,6 +413,168 @@ export default function SimulationsPage() {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de simuler le DCA.' })
     },
   })
+
+  // ============ Scénarios enregistrés ============
+
+  const queryClient = useQueryClient()
+  const [saveKind, setSaveKind] = useState<ScenarioKind | null>(null)
+  const [scenarioName, setScenarioName] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<SavedScenario | null>(null)
+
+  const { data: savedScenariosData, isLoading: scenariosLoading } = useQuery<SavedScenario[]>({
+    queryKey: queryKeys.simulations.list,
+    queryFn: () => simulationsApi.list(),
+  })
+  const savedScenarios = useMemo(() => savedScenariosData ?? [], [savedScenariosData])
+
+  const saveMutation = useMutation({
+    mutationFn: simulationsApi.save,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.simulations.all })
+      setSaveKind(null)
+      setScenarioName('')
+      toast({ title: 'Scénario enregistré' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'enregistrer le scénario." })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: simulationsApi.delete,
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.simulations.all })
+      setSelectedIds((prev) => prev.filter((s) => s !== id))
+      setDeleteTarget(null)
+      toast({ title: 'Scénario supprimé' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le scénario.' })
+    },
+  })
+
+  // Construit le payload de sauvegarde : paramètres + résultats clés (scalaires
+  // uniquement, pas les séries de projection) embarqués dans `parameters`.
+  const buildScenarioPayload = (kind: ScenarioKind, name: string) => {
+    let inputs: Record<string, unknown> | null = null
+    let results: Record<string, unknown> | null = null
+
+    if (kind === 'fire' && fireResult) {
+      inputs = { ...fireParams }
+      results = {
+        fire_number: fireResult.fire_number,
+        years_to_fire: fireResult.years_to_fire,
+        monthly_passive_income: fireResult.monthly_passive_income,
+        current_progress_percent: fireResult.current_progress_percent,
+        is_fire_achieved: fireResult.is_fire_achieved,
+      }
+    } else if (kind === 'projection' && projectionResult) {
+      inputs = { ...projectionParams }
+      results = {
+        final_value: projectionResult.final_value,
+        real_final_value: projectionResult.real_final_value,
+        total_contributions: projectionResult.total_contributions,
+        total_returns: projectionResult.total_returns,
+      }
+    } else if (kind === 'montecarlo' && mcResult) {
+      inputs = { ...(mcApplied ?? mcParams) }
+      results = {
+        expected_return: mcResult.expected_return,
+        prob_positive: mcResult.prob_positive,
+        prob_loss_10: mcResult.prob_loss_10,
+        prob_ruin: mcResult.prob_ruin,
+        p5: mcResult.percentiles.p5,
+        p50: mcResult.percentiles.p50,
+        p95: mcResult.percentiles.p95,
+        simulations: mcResult.simulations,
+        horizon_days: mcResult.horizon_days,
+      }
+    } else if (kind === 'dca' && dcaResult) {
+      inputs = { ...dcaParams }
+      results = {
+        total_invested: dcaResult.total_invested,
+        dca_p10: dcaResult.dca_p10,
+        dca_p50: dcaResult.dca_p50,
+        dca_p90: dcaResult.dca_p90,
+        lumpsum_p10: dcaResult.lumpsum_p10,
+        lumpsum_p50: dcaResult.lumpsum_p50,
+        lumpsum_p90: dcaResult.lumpsum_p90,
+        return_percent: dcaResult.return_percent,
+        prob_dca_beats_ls: dcaResult.prob_dca_beats_ls,
+        n_paths: dcaResult.n_paths,
+      }
+    }
+
+    if (!inputs || !results) return null
+    return {
+      name,
+      simulation_type: BACKEND_TYPE_BY_KIND[kind],
+      parameters: { kind, inputs, results },
+    }
+  }
+
+  const handleSaveScenario = () => {
+    if (!saveKind) return
+    const name = scenarioName.trim()
+    if (!name) return
+    const payload = buildScenarioPayload(saveKind, name)
+    if (!payload) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: "Lancez d'abord un calcul avant de sauvegarder.",
+      })
+      return
+    }
+    saveMutation.mutate(payload)
+  }
+
+  const toggleScenarioSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((s) => s !== id)
+      if (prev.length >= 2) return prev
+      return [...prev, id]
+    })
+  }
+
+  const firstSelectedKind = useMemo(() => {
+    if (selectedIds.length === 0) return null
+    const first = savedScenarios.find((s) => s.id === selectedIds[0])
+    return first ? scenarioKindOf(first) : null
+  }, [selectedIds, savedScenarios])
+
+  const comparison = useMemo(() => {
+    if (selectedIds.length !== 2) return null
+    const a = savedScenarios.find((s) => s.id === selectedIds[0])
+    const b = savedScenarios.find((s) => s.id === selectedIds[1])
+    if (!a || !b) return null
+    const kind = scenarioKindOf(a)
+    if (kind !== scenarioKindOf(b)) return null
+    return { a, b, kind }
+  }, [selectedIds, savedScenarios])
+
+  const formatFieldValue = (value: unknown, format: FieldFormat): string => {
+    if (value === null || value === undefined || value === '') return '—'
+    switch (format) {
+      case 'currency':
+        return formatCurrency(Number(value))
+      case 'percent':
+        return `${Number(value).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} %`
+      case 'years':
+        return `${value} an${Number(value) > 1 ? 's' : ''}`
+      case 'months':
+        return `${value} mois`
+      case 'days':
+        return `${value} jours`
+      case 'bool':
+        return value ? 'Oui' : 'Non'
+      case 'frequency':
+        return FREQUENCY_LABELS[String(value)] ?? String(value)
+      default:
+        return Number(value).toLocaleString('fr-FR')
+    }
+  }
 
   // Build Monte Carlo fan data for chart
   const mcChartData = mcResult
@@ -465,6 +799,16 @@ export default function SimulationsPage() {
                     <Calculator className="mr-2 h-4 w-4" />
                   )}
                   Calculer
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setSaveKind('fire')}
+                  disabled={!fireResult}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Sauvegarder ce scénario
                 </Button>
               </CardContent>
             </Card>
@@ -745,6 +1089,16 @@ export default function SimulationsPage() {
                   )}
                   Projeter
                 </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setSaveKind('projection')}
+                  disabled={!projectionResult}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Sauvegarder ce scénario
+                </Button>
               </CardContent>
             </Card>
 
@@ -964,6 +1318,24 @@ export default function SimulationsPage() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="mc-monthly-withdrawal">Retrait mensuel (€/mois)</Label>
+                  <Input
+                    id="mc-monthly-withdrawal"
+                    type="number"
+                    step="50"
+                    min="0"
+                    value={mcParams.monthly_withdrawal}
+                    onChange={(e) =>
+                      setMcParams({ ...mcParams, monthly_withdrawal: parseFloat(e.target.value) || 0 })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Montant fixe retiré chaque mois. 0 = aucun retrait fixe. S'il est renseigné, il
+                    remplace le taux de retrait annuel.
+                  </p>
+                </div>
+
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 text-sm text-muted-foreground">
                   <Info className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
                   <span>
@@ -974,7 +1346,7 @@ export default function SimulationsPage() {
 
                 <Button
                   className="w-full"
-                  onClick={() => mcMutation.mutate()}
+                  onClick={() => mcMutation.mutate(mcParams)}
                   disabled={mcMutation.isPending}
                 >
                   {mcMutation.isPending ? (
@@ -983,6 +1355,16 @@ export default function SimulationsPage() {
                     <BarChart3 className="mr-2 h-4 w-4" />
                   )}
                   Simuler (5 000 chemins)
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setSaveKind('montecarlo')}
+                  disabled={!mcResult}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Sauvegarder ce scénario
                 </Button>
               </CardContent>
             </Card>
@@ -993,6 +1375,9 @@ export default function SimulationsPage() {
                   <CardTitle>Résultats Monte Carlo</CardTitle>
                   <CardDescription>
                     {mcResult.simulations.toLocaleString()} simulations sur {mcResult.horizon_days} jours
+                    {mcApplied && mcApplied.monthly_withdrawal > 0 && (
+                      <> — avec retraits de {formatCurrency(mcApplied.monthly_withdrawal)}/mois</>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1240,6 +1625,16 @@ export default function SimulationsPage() {
                   Simuler (500 trajectoires)
                 </Button>
 
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setSaveKind('dca')}
+                  disabled={!dcaResult}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Sauvegarder ce scénario
+                </Button>
+
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 text-xs text-muted-foreground">
                   <Info className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
                   <span>
@@ -1442,6 +1837,226 @@ export default function SimulationsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ============ Scénarios enregistrés ============ */}
+      <Card elevation="raised">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bookmark className="h-5 w-5 text-accent" />
+            Scénarios enregistrés
+          </CardTitle>
+          <CardDescription>
+            Sauvegardez vos calculs pour les retrouver plus tard, puis sélectionnez 2 scénarios du
+            même type pour les comparer côte à côte.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scenariosLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Chargement des scénarios…
+            </div>
+          ) : savedScenarios.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Aucun scénario enregistré pour le moment. Lancez un calcul puis cliquez sur
+              «&nbsp;Sauvegarder ce scénario&nbsp;».
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {savedScenarios.map((sim) => {
+                const kind = scenarioKindOf(sim)
+                const meta = SCENARIO_KIND_META[kind]
+                const isSelected = selectedIds.includes(sim.id)
+                const selectionDisabled =
+                  !isSelected &&
+                  (selectedIds.length >= 2 ||
+                    (firstSelectedKind !== null && firstSelectedKind !== kind))
+                return (
+                  <div
+                    key={sim.id}
+                    className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                      isSelected ? 'border-accent/40 bg-accent/5' : 'border-border'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      disabled={selectionDisabled}
+                      onCheckedChange={() => toggleScenarioSelection(sim.id)}
+                      aria-label={`Comparer « ${sim.name} »`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{sim.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Enregistré le {formatScenarioDate(sim.created_at)}
+                      </p>
+                    </div>
+                    <Badge variant={meta.badge}>{meta.label}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteTarget(sim)}
+                      aria-label={`Supprimer « ${sim.name} »`}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )
+              })}
+              {selectedIds.length === 1 && (
+                <p className="pt-1 text-xs text-muted-foreground">
+                  Sélectionnez un second scénario{' '}
+                  {firstSelectedKind ? `de type ${SCENARIO_KIND_META[firstSelectedKind].label} ` : ''}
+                  pour lancer la comparaison.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Comparaison côte à côte */}
+      {comparison && (
+        <Card elevation="raised">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-accent" />
+              Comparaison de scénarios
+              <Badge variant={SCENARIO_KIND_META[comparison.kind].badge}>
+                {SCENARIO_KIND_META[comparison.kind].label}
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Paramètres et résultats clés côte à côte — les valeurs qui diffèrent sont surlignées.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-64" />
+                  <TableHead>{comparison.a.name}</TableHead>
+                  <TableHead>{comparison.b.name}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(['params', 'results'] as const).map((section) => (
+                  <Fragment key={section}>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={3} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {section === 'params' ? 'Paramètres' : 'Résultats'}
+                      </TableCell>
+                    </TableRow>
+                    {SCENARIO_FIELDS[comparison.kind][section].map((field) => {
+                      const source = section === 'params' ? 'inputs' : 'results'
+                      const va = comparison.a.parameters?.[source]?.[field.key]
+                      const vb = comparison.b.parameters?.[source]?.[field.key]
+                      if (va === undefined && vb === undefined) return null
+                      const differs = JSON.stringify(va ?? null) !== JSON.stringify(vb ?? null)
+                      const cellClass = differs ? 'bg-warning/10 font-medium' : ''
+                      return (
+                        <TableRow key={field.key}>
+                          <TableCell className="text-muted-foreground">{field.label}</TableCell>
+                          <TableCell className={`font-mono tabular-nums ${cellClass}`}>
+                            {formatFieldValue(va, field.format)}
+                          </TableCell>
+                          <TableCell className={`font-mono tabular-nums ${cellClass}`}>
+                            {formatFieldValue(vb, field.format)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Dialog de sauvegarde */}
+      <Dialog
+        open={saveKind !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSaveKind(null)
+            setScenarioName('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sauvegarder ce scénario</DialogTitle>
+            <DialogDescription>
+              Le scénario {saveKind ? SCENARIO_KIND_META[saveKind].label : ''} sera enregistré avec
+              ses paramètres et ses résultats clés.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="scenario-name">Nom du scénario</Label>
+            <Input
+              id="scenario-name"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+              placeholder="Ex. : Retraite à 45 ans"
+              autoFocus
+              maxLength={200}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveScenario()
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSaveKind(null)
+                setScenarioName('')
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSaveScenario}
+              disabled={!scenarioName.trim() || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation de suppression */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce scénario ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «&nbsp;{deleteTarget?.name}&nbsp;» sera définitivement supprimé. Cette action est
+              irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

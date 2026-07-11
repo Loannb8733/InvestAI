@@ -153,6 +153,25 @@ export interface CrowdfundingDashboard {
   projects: CrowdfundingProject[]
 }
 
+/** Contribution d'un projet au cash-flow d'un mois (montant BRUT de fiscalité). */
+export interface CashflowProjectAmount {
+  name: string
+  amount: number
+}
+
+/**
+ * Cash-flows attendus sur un mois — échéances contractuelles NON encaissées,
+ * agrégées sur tous les projets non-défaut. Montants BRUTS de fiscalité.
+ */
+export interface CashflowMonth {
+  /** Mois au format "YYYY-MM". */
+  month: string
+  expected_capital: number
+  expected_interest: number
+  total: number
+  projects: CashflowProjectAmount[]
+}
+
 export interface GuaranteeInfo {
   type: string
   rank: string | null

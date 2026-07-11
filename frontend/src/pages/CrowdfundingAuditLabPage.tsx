@@ -28,10 +28,18 @@ import {
   Percent,
   Wallet,
   Calendar,
+  Link2,
 } from 'lucide-react'
 import { ResponsiveRadar } from '@nivo/radar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
-import type { ProjectAudit } from '@/types/crowdfunding'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { CrowdfundingDashboard, ProjectAudit } from '@/types/crowdfunding'
 import DiversificationRadar from '@/components/analytics/DiversificationRadar'
 
 const VERDICT_CONFIG = {
@@ -379,19 +387,38 @@ export default function CrowdfundingAuditLabPage() {
   const [files, setFiles] = useState<File[]>([])
   const [currentAudit, setCurrentAudit] = useState<ProjectAudit | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  // Projet auquel rattacher l'analyse ('' = aucun)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
 
   const { data: audits } = useQuery<ProjectAudit[]>({
     queryKey: queryKeys.crowdfunding.audits,
     queryFn: crowdfundingApi.listAudits,
   })
 
+  // Projets de l'utilisateur (pour le rattachement optionnel de l'audit)
+  const { data: dashboard } = useQuery<CrowdfundingDashboard>({
+    queryKey: queryKeys.crowdfunding.dashboard,
+    queryFn: crowdfundingApi.getDashboard,
+  })
+  const projects = dashboard?.projects ?? []
+
   const analyzeMutation = useMutation({
-    mutationFn: (selectedFiles: File[]) => crowdfundingApi.analyzeDocuments(selectedFiles),
+    mutationFn: (selectedFiles: File[]) =>
+      crowdfundingApi.analyzeDocuments(selectedFiles, selectedProjectId || undefined),
     onSuccess: (data) => {
       setCurrentAudit(data)
       setFiles([])
+      setSelectedProjectId('')
     },
   })
+
+  // Nom du projet rattaché à l'audit affiché (si rattachement)
+  const linkedProjectName = currentAudit?.project_id
+    ? (() => {
+        const p = projects.find((proj) => proj.id === currentAudit.project_id)
+        return p ? p.project_name || p.platform : null
+      })()
+    : null
 
   const analyzeErrorMessage = analyzeMutation.isError
     ? (() => {
@@ -485,6 +512,34 @@ export default function CrowdfundingAuditLabPage() {
                   </div>
                 ))}
 
+                {projects.length > 0 && (
+                  <div className="mt-4 space-y-1.5">
+                    <p className="text-sm font-medium flex items-center gap-1.5">
+                      <Link2 className="h-4 w-4 text-muted-foreground" />
+                      Rattacher à un projet (optionnel)
+                    </p>
+                    <Select
+                      value={selectedProjectId || 'none'}
+                      onValueChange={(v) => setSelectedProjectId(v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aucun projet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun projet</SelectItem>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.project_name || p.platform}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      L'audit sera associé au projet sélectionné dans votre portefeuille.
+                    </p>
+                  </div>
+                )}
+
                 <Button
                   className="w-full mt-4"
                   size="lg"
@@ -521,7 +576,15 @@ export default function CrowdfundingAuditLabPage() {
       {/* Results */}
       {currentAudit && (
         <>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2">
+            {linkedProjectName ? (
+              <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1">
+                <Link2 className="h-3.5 w-3.5" />
+                Rattaché à {linkedProjectName}
+              </Badge>
+            ) : (
+              <span />
+            )}
             <Button variant="outline" onClick={() => setCurrentAudit(null)}>
               Nouvelle analyse
             </Button>

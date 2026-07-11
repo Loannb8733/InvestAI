@@ -20,6 +20,7 @@ export const queryKeys = {
     list: (portfolioId?: string) =>
       [...queryKeys.transactions.all, 'list', ...(portfolioId ? [portfolioId] : [])] as const,
     detail: (id: string) => [...queryKeys.transactions.all, 'detail', id] as const,
+    byAsset: (assetId: string) => [...queryKeys.transactions.all, 'byAsset', assetId] as const,
     csvPlatforms: ['transactions', 'csvPlatforms'] as const,
   },
 
@@ -163,6 +164,11 @@ export const queryKeys = {
   strategies: {
     all: ['strategies'] as const,
     list: ['strategies', 'list'] as const,
+  },
+
+  simulations: {
+    all: ['simulations'] as const,
+    list: ['simulations', 'list'] as const,
   },
 
   crowdfunding: {

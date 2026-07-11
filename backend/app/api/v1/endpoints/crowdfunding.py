@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
@@ -22,6 +22,8 @@ from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
 from app.models.user import User
 from app.schemas.crowdfunding import (
+    CashflowMonthResponse,
+    CashflowProjectAmount,
     CrowdfundingDashboardResponse,
     CrowdfundingProjectCreate,
     CrowdfundingProjectResponse,
@@ -516,6 +518,7 @@ async def get_performance(
 ):
     projects = await _get_user_projects(db, current_user.id)
     repayments_by_project = await _get_repayments_for_projects(db, [p.id for p in projects])
+    schedules_by_project = await _get_schedules_for_projects(db, [p.id for p in projects])
 
     performance = []
     for p in projects:
@@ -528,10 +531,24 @@ async def get_performance(
         projected_total = projected_gross * tax_multiplier  # net de flat tax
 
         elapsed_months = 0.0
-        on_track = True
         if p.start_date:
             elapsed_months = (date.today() - p.start_date).days / 30.44
-            if p.repayment_type.value == "amortizable" and elapsed_months > 0:
+
+        # ── on_track unifié via l'échéancier contractuel ──────────────────
+        # Un projet est « on track » si AUCUNE échéance de son schedule n'est
+        # en retard de plus de 5 jours sans être complétée — même définition
+        # « overdue » que _compute_schedule_status. Contrairement à l'ancienne
+        # heuristique (prorata du reçu, amortizable uniquement), elle couvre
+        # aussi les in fine : un coupon impayé depuis 9 mois n'est plus « OK ».
+        schedule = schedules_by_project.get(p.id, [])
+        if schedule:
+            on_track = all(_compute_schedule_status(e) != "overdue" for e in schedule)
+        else:
+            # Fallback historique quand le projet n'a pas d'échéancier :
+            # reçu ≥ 90 % du prorata contractuel (significatif seulement
+            # pour les amortizables — un in fine sans schedule reste « OK »).
+            on_track = True
+            if p.start_date and p.repayment_type.value == "amortizable" and elapsed_months > 0:
                 expected = invested * rate * min(elapsed_months, months) / 12
                 on_track = received >= expected * 0.9
 
@@ -567,6 +584,60 @@ async def get_performance(
     return {"projects": performance}
 
 
+@router.get("/cashflow-schedule", response_model=list[CashflowMonthResponse])
+@limiter.limit("30/minute")
+async def get_cashflow_schedule(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Échéancier consolidé de cash-flows : « combien je reçois en septembre ».
+
+    Agrège les échéances contractuelles NON complétées de tous les projets
+    non-défaut de l'utilisateur, par mois (YYYY-MM), sur les 24 prochains mois
+    (mois courant inclus). Montants BRUTS de fiscalité — les schedules sont
+    contractuels, avant prélèvements. Les mois sans échéance sont omis.
+    """
+    projects = await _get_user_projects(db, current_user.id)
+    eligible = [p for p in projects if p.status != ProjectStatus.DEFAULTED]
+    name_by_project = {p.id: (p.project_name or p.platform) for p in eligible}
+    sched_map = await _get_schedules_for_projects(db, [p.id for p in eligible])
+
+    today = date.today()
+    window_start = today.replace(day=1)
+    # Borne exclusive : premier jour du mois M+24
+    end_index = today.year * 12 + (today.month - 1) + 24
+    window_end = date(end_index // 12, end_index % 12 + 1, 1)
+
+    buckets: dict[str, dict] = {}
+    for pid, entries in sched_map.items():
+        for e in entries:
+            if e.is_completed or not (window_start <= e.due_date < window_end):
+                continue
+            key = f"{e.due_date.year:04d}-{e.due_date.month:02d}"
+            bucket = buckets.setdefault(key, {"capital": 0.0, "interest": 0.0, "projects": {}})
+            capital = float(e.expected_capital or 0)
+            interest = float(e.expected_interest or 0)
+            bucket["capital"] += capital
+            bucket["interest"] += interest
+            name = name_by_project.get(pid, "Projet")
+            bucket["projects"][name] = bucket["projects"].get(name, 0.0) + capital + interest
+
+    return [
+        CashflowMonthResponse(
+            month=key,
+            expected_capital=round(b["capital"], 2),
+            expected_interest=round(b["interest"], 2),
+            total=round(b["capital"] + b["interest"], 2),
+            projects=[
+                CashflowProjectAmount(name=n, amount=round(a, 2))
+                for n, a in sorted(b["projects"].items(), key=lambda kv: -kv[1])
+            ],
+        )
+        for key, b in sorted(buckets.items())
+    ]
+
+
 @router.post("/sync-calendar")
 @limiter.limit("5/minute")
 async def sync_calendar_events(
@@ -598,11 +669,23 @@ async def analyze_documents(
     request: Request,
     files: list[UploadFile] = File(...),
     project_id: Optional[uuid.UUID] = Query(None),
+    project_id_form: Optional[uuid.UUID] = Form(None, alias="project_id"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload PDFs and get an AI-powered risk analysis."""
+    """Upload PDFs and get an AI-powered risk analysis.
+
+    ``project_id`` (optionnel) rattache l'audit à un projet existant. Le
+    wrapper frontend ``crowdfundingApi.analyzeDocuments`` l'envoie en champ
+    multipart (FormData) — accepté ici via ``Form`` ; le query param reste
+    supporté pour compatibilité. L'appartenance du projet à l'utilisateur est
+    vérifiée avant persistance.
+    """
     from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
+
+    effective_project_id = project_id_form or project_id
+    if effective_project_id is not None:
+        await _get_project_for_user(db, effective_project_id, current_user.id)
 
     if len(files) > _MAX_FILES:
         raise HTTPException(400, f"Maximum {_MAX_FILES} fichiers autorisés")
@@ -642,7 +725,7 @@ async def analyze_documents(
             db=db,
             file_contents=file_contents,
             user_id=current_user.id,
-            project_id=project_id,
+            project_id=effective_project_id,
             munitions=munitions,
             total_capital=total_capital,
         )

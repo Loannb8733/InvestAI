@@ -22,11 +22,18 @@ import {
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ResponsivePie } from '@nivo/pie'
+import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
-import type { CrowdfundingDashboard } from '@/types/crowdfunding'
+import type { CashflowMonth, CrowdfundingDashboard } from '@/types/crowdfunding'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types/crowdfunding'
 
 const COLOR_TOKENS = ['--chart-5', '--chart-3', '--chart-1', '--chart-4', '--chart-2', '--chart-2']
+
+/** Libellé FR court d'un mois "YYYY-MM" : « sept. 26 ». */
+const formatMonthLabel = (month: string) => {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
+}
 
 export default function CrowdfundingDashboardPage() {
   const queryClient = useQueryClient()
@@ -34,6 +41,11 @@ export default function CrowdfundingDashboardPage() {
   const { data, isLoading } = useQuery<CrowdfundingDashboard>({
     queryKey: queryKeys.crowdfunding.dashboard,
     queryFn: crowdfundingApi.getDashboard,
+  })
+
+  const { data: cashflows } = useQuery<CashflowMonth[]>({
+    queryKey: [...queryKeys.crowdfunding.all, 'cashflow-schedule'],
+    queryFn: crowdfundingApi.getCashflowSchedule,
   })
 
   const syncCalendar = useMutation({
@@ -95,6 +107,25 @@ export default function CrowdfundingDashboardPage() {
 
   const totalProjects =
     d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count
+
+  // Échéancier consolidé — 12 premiers mois (montants BRUTS de fiscalité)
+  const upcomingCashflows = (cashflows ?? []).slice(0, 12)
+  const cashflowChartData = upcomingCashflows.map((m) => ({
+    month: m.month,
+    Capital: m.expected_capital,
+    'Intérêts (bruts)': m.expected_interest,
+  }))
+  const cashflowByMonth = new Map(upcomingCashflows.map((m) => [m.month, m]))
+
+  // « Prochains 3 mois » : mois courant + 2 suivants (calendaires)
+  const now = new Date()
+  const next3MonthKeys = [0, 1, 2].map((i) => {
+    const dt = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+  })
+  const next3MonthsTotal = (cashflows ?? [])
+    .filter((m) => next3MonthKeys.includes(m.month))
+    .reduce((s, m) => s + m.total, 0)
 
   return (
     <div className="space-y-6">
@@ -300,6 +331,102 @@ export default function CrowdfundingDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cash-flows à venir — échéances contractuelles non encaissées, agrégées par mois */}
+      <Card elevation="raised">
+        <CardHeader>
+          <CardTitle>Cash-flows à venir</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            échéances contractuelles non encaissées, montants bruts de fiscalité — 12 prochains mois
+          </p>
+        </CardHeader>
+        <CardContent>
+          {cashflowChartData.length > 0 ? (
+            <>
+              <div className="h-[280px]">
+                <ResponsiveBar
+                  data={cashflowChartData}
+                  keys={['Capital', 'Intérêts (bruts)']}
+                  indexBy="month"
+                  groupMode="stacked"
+                  theme={theme}
+                  margin={{ top: 28, right: 16, bottom: 40, left: 56 }}
+                  padding={0.25}
+                  colors={({ id }) =>
+                    id === 'Capital' ? color('--chart-1') : color('--chart-3')
+                  }
+                  borderRadius={3}
+                  enableLabel={false}
+                  enableGridY
+                  axisBottom={{ tickSize: 0, tickPadding: 8, format: formatMonthLabel }}
+                  axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}€` }}
+                  valueScale={{ type: 'linear' }}
+                  tooltip={({ indexValue }) => {
+                    const m = cashflowByMonth.get(String(indexValue))
+                    if (!m) return <></>
+                    return (
+                      <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                        <p className="text-xs font-medium">{formatMonthLabel(m.month)}</p>
+                        <p className="mt-0.5 font-mono text-sm tabular-nums">
+                          {formatCurrency(m.total)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          capital {formatCurrency(m.expected_capital)} · intérêts bruts{' '}
+                          {formatCurrency(m.expected_interest)}
+                        </p>
+                        {m.projects.length > 0 && (
+                          <div className="mt-1 space-y-0.5 border-t border-border pt-1">
+                            {m.projects.map((p) => (
+                              <div
+                                key={p.name}
+                                className="flex items-center justify-between gap-4 text-xs"
+                              >
+                                <span className="max-w-[160px] truncate text-muted-foreground">
+                                  {p.name}
+                                </span>
+                                <span className="font-mono tabular-nums">
+                                  {formatCurrency(p.amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }}
+                  legends={[
+                    {
+                      anchor: 'top-right',
+                      direction: 'row',
+                      translateY: -22,
+                      itemWidth: 90,
+                      itemHeight: 18,
+                      symbolSize: 10,
+                      symbolShape: 'circle',
+                      itemTextColor: color('--muted-foreground'),
+                      dataFrom: 'keys',
+                    },
+                  ]}
+                  animate
+                  motionConfig="gentle"
+                />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Prochains 3 mois :{' '}
+                <span className="font-medium text-foreground">
+                  {formatCurrency(next3MonthsTotal)}
+                </span>{' '}
+                <span className="text-xs">(bruts de fiscalité)</span>
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              Aucune échéance à venir — l'échéancier se génère automatiquement à la création
+              ou à la mise à jour d'un projet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Projects */}
       {d.projects.length > 0 && (
