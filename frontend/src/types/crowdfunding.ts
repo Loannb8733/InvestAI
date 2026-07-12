@@ -130,8 +130,10 @@ export interface CrowdfundingUpdateData {
 export interface CrowdfundingDashboard {
   total_invested: number
   total_received: number
-  /** Intérêts réellement encaissés (seul vrai P&L — le capital remboursé n'est pas un gain). */
+  /** Intérêts BRUTS (base imposable) — Σ des parts d'intérêts avant prélèvements. */
   total_interest_received: number
+  /** Intérêts NETS réellement crédités (net des prélèvements à la source). « Ce que tu as ». */
+  total_interest_net?: number
   /** Capital déjà remboursé (retour de principal, pas un gain). */
   total_capital_repaid: number
   /** Capital restant dû des projets sains — la valeur réelle de la poche. */

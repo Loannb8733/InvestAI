@@ -153,7 +153,10 @@ class CrowdfundingDashboardResponse(BaseModel):
     # Décomposition comptable : les intérêts sont du P&L, le capital remboursé
     # est un retour de principal ; le CRD (capital restant dû) est la valeur
     # de la poche ; le principal des projets en défaut est provisionné à part.
-    total_interest_received: float = 0.0
+    total_interest_received: float = 0.0  # intérêts BRUTS (base imposable)
+    # Intérêts NETS réellement crédités (net des prélèvements à la source quand
+    # ils sont saisis ; = brut sinon). C'est « ce que tu as » en cash.
+    total_interest_net: float = 0.0
     total_capital_repaid: float = 0.0
     capital_outstanding: float = 0.0
     defaulted_outstanding: float = 0.0

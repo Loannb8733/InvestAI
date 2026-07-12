@@ -165,12 +165,12 @@ export default function CrowdfundingDashboardPage() {
         />
         <StatCard
           className="spot-card"
-          label="Intérêts encaissés"
-          tooltip="Seul vrai gain (P&L) : le capital remboursé n'est pas un gain, c'est un retour de principal."
+          label="Intérêts nets encaissés"
+          tooltip={`Ce que tu as réellement touché, net des prélèvements à la source (IR + CSG). Base imposable brute : ${formatCurrency(d.total_interest_received)} (déclarée au 2086). Le capital remboursé n'est pas un gain.`}
           icon={TrendingUp}
-          value={d.total_interest_received}
+          value={d.total_interest_net ?? d.total_interest_received}
           format={formatCurrency}
-          hint="bruts de prélèvements"
+          hint={<>brut : {formatCurrency(d.total_interest_received)} · net de prélèvements</>}
         />
         <StatCard
           className="spot-card"

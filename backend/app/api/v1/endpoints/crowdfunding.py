@@ -431,7 +431,8 @@ async def get_dashboard(
     # Répartition : split explicite (interest_amount/capital_amount) quand il
     # existe ; sinon par payment_type ; un BOTH sans split est compté en
     # capital (conservateur : aucun gain fictif).
-    total_interest_received = 0.0
+    total_interest_received = 0.0  # intérêts BRUTS (base imposable) = Σ interest_amount
+    total_interest_net = 0.0  # intérêts NETS réellement crédités = Σ (amount − capital)
     total_referral = 0.0  # bonus de parrainage / plateforme (hors intérêts, hors capital)
     capital_repaid_by_project: dict = {}
     for pid, reps in reps_map.items():
@@ -440,15 +441,18 @@ async def get_dashboard(
             if r.payment_type == PaymentType.REFERRAL:
                 total_referral += float(r.amount or 0)
                 continue
+            amount = float(r.amount or 0)
             interest = float(r.interest_amount or 0)
             capital = float(r.capital_amount or 0)
             if interest == 0 and capital == 0:
-                amount = float(r.amount or 0)
                 if r.payment_type == PaymentType.INTEREST:
                     interest = amount
                 else:  # CAPITAL, ou BOTH sans split → conservateur
                     capital = amount
             total_interest_received += interest
+            # Net crédité = montant reçu − part capital (= net d'impôt quand la
+            # plateforme prélève à la source ; = brut si aucun prélèvement saisi).
+            total_interest_net += max(0.0, amount - capital)
             cap += capital
         capital_repaid_by_project[pid] = cap
 
@@ -502,6 +506,7 @@ async def get_dashboard(
         total_invested=round(total_invested, 2),
         total_received=round(total_received, 2),
         total_interest_received=round(total_interest_received, 2),
+        total_interest_net=round(total_interest_net, 2),
         total_capital_repaid=round(total_capital_repaid, 2),
         total_referral=round(total_referral, 2),
         capital_outstanding=round(capital_outstanding, 2),
