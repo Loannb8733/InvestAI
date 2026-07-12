@@ -406,7 +406,31 @@ export interface BalanceGapCreditResult {
 }
 
 export const transactionsApi = {
-  list: async (params?: { asset_id?: string; portfolio_id?: string; skip?: number; limit?: number }) => {
+  /**
+   * Liste les transactions avec filtres SERVEUR (exhaustifs sur tout l'historique).
+   * Avec `include_total: true`, la réponse devient `{ items, total }` où `total`
+   * est le nombre total filtré (compat : sans ce paramètre, liste nue comme avant).
+   */
+  list: async (params?: {
+    asset_id?: string
+    portfolio_id?: string
+    skip?: number
+    limit?: number
+    /** Valeur de l'enum backend (ex. 'buy') ou alias 'conversions'. */
+    transaction_type?: string
+    /** Plateforme (insensible à la casse) — 'Manuel' cible les transactions sans plateforme. */
+    exchange?: string
+    /** Symbole d'actif exact (insensible à la casse). */
+    asset_symbol?: string
+    /** Date de début (YYYY-MM-DD, incluse). */
+    date_from?: string
+    /** Date de fin (YYYY-MM-DD, incluse). */
+    date_to?: string
+    /** Recherche partielle sur le symbole et les notes. */
+    search?: string
+    /** Si vrai, bascule la réponse en { items, total }. */
+    include_total?: boolean
+  }) => {
     const response = await api.get('/transactions', { params })
     return response.data
   },

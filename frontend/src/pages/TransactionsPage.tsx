@@ -104,6 +104,12 @@ interface TransactionStats {
   excludedCount: number
 }
 
+/** Réponse serveur avec include_total=true : page filtrée + total filtré. */
+interface TransactionsListPage {
+  items: Transaction[]
+  total: number
+}
+
 // ============== Constants ==============
 
 const typeLabels: Record<string, string> = {
@@ -273,14 +279,47 @@ export default function TransactionsPage() {
     staleTime: 60_000,
   })
 
-  const { data: transactionsPage, isLoading } = useQuery<Transaction[]>({
-    queryKey: [...queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined), txSkip],
+  // Recherche débouncée (300 ms) : évite une requête serveur à chaque frappe
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  /** Date de début (YYYY-MM-DD, locale) dérivée du filtre de période, envoyée au serveur. */
+  const dateFrom = useMemo(() => {
+    const start = getDateRangeStart(dateRange)
+    if (!start) return undefined
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
+  }, [dateRange])
+
+  /** Filtres appliqués côté SERVEUR — exhaustifs sur tout l'historique, pas seulement les pages chargées. */
+  const serverFilters = useMemo(
+    () => ({
+      portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
+      transaction_type: selectedType !== 'all' ? selectedType : undefined,
+      exchange: selectedPlatform !== 'all' ? selectedPlatform : undefined,
+      asset_symbol: selectedAsset !== 'all' ? selectedAsset : undefined,
+      date_from: dateFrom,
+      search: debouncedSearch || undefined,
+    }),
+    [selectedPortfolio, selectedType, selectedPlatform, selectedAsset, dateFrom, debouncedSearch]
+  )
+
+  const { data: transactionsPage, isLoading } = useQuery<TransactionsListPage>({
+    queryKey: [
+      ...queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined),
+      serverFilters,
+      txSkip,
+    ],
     queryFn: () =>
       transactionsApi.list({
-        portfolio_id: selectedPortfolio !== 'all' ? selectedPortfolio : undefined,
+        ...serverFilters,
         skip: txSkip,
         limit: TX_PAGE_SIZE,
-      }),
+        include_total: true,
+      }) as Promise<TransactionsListPage>,
     placeholderData: keepPreviousData,
   })
 
@@ -288,18 +327,20 @@ export default function TransactionsPage() {
   useEffect(() => {
     if (transactionsPage) {
       if (txSkip === 0) {
-        setAccumulatedTx(transactionsPage)
+        setAccumulatedTx(transactionsPage.items)
       } else {
         setAccumulatedTx((prev) => {
           const existingIds = new Set(prev.map((t) => t.id))
-          return [...prev, ...transactionsPage.filter((t) => !existingIds.has(t.id))]
+          return [...prev, ...transactionsPage.items.filter((t) => !existingIds.has(t.id))]
         })
       }
     }
   }, [transactionsPage, txSkip])
 
   const transactions = accumulatedTx
-  const hasMoreTransactions = (transactionsPage?.length ?? 0) === TX_PAGE_SIZE
+  /** Total SERVEUR des transactions correspondant aux filtres (tout l'historique). */
+  const totalCount = transactionsPage?.total ?? transactions.length
+  const hasMoreTransactions = transactions.length < totalCount
 
   // ============== Derived Data ==============
 
@@ -316,8 +357,13 @@ export default function TransactionsPage() {
         }
       }
     })
-    return Array.from(assets.values()).sort((a, b) => b.count - a.count)
-  }, [transactions])
+    const list = Array.from(assets.values()).sort((a, b) => b.count - a.count)
+    // Garde l'actif sélectionné dans la liste même s'il n'apparaît pas dans les lignes chargées
+    if (selectedAsset !== 'all' && !assets.has(selectedAsset)) {
+      list.push({ symbol: selectedAsset, name: null, count: 0 })
+    }
+    return list
+  }, [transactions, selectedAsset])
 
   const uniquePlatforms = useMemo(() => {
     if (!transactions) return []
@@ -326,44 +372,19 @@ export default function TransactionsPage() {
       const platform = tx.exchange || 'Manuel'
       platforms.set(platform, (platforms.get(platform) || 0) + 1)
     })
-    return Array.from(platforms.entries())
+    const list = Array.from(platforms.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-  }, [transactions])
+    // Garde la plateforme sélectionnée dans la liste même si absente des lignes chargées
+    if (selectedPlatform !== 'all' && !platforms.has(selectedPlatform)) {
+      list.push({ name: selectedPlatform, count: 0 })
+    }
+    return list
+  }, [transactions, selectedPlatform])
 
-  const filteredTransactions = useMemo(() => {
-    if (!transactions) return []
-    const dateStart = getDateRangeStart(dateRange)
-
-    return transactions.filter((tx) => {
-      if (selectedAsset !== 'all' && tx.asset_symbol !== selectedAsset) return false
-      const txPlatform = tx.exchange || 'Manuel'
-      if (selectedPlatform !== 'all' && txPlatform !== selectedPlatform) return false
-      if (selectedType !== 'all') {
-        if (selectedType === 'conversions') {
-          if (!conversionTypes.includes(tx.transaction_type)) return false
-        } else if (tx.transaction_type !== selectedType) {
-          return false
-        }
-      }
-      if (dateStart) {
-        const txDate = new Date(tx.executed_at || tx.created_at)
-        if (txDate < dateStart) return false
-      }
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const matchesSymbol = tx.asset_symbol?.toLowerCase().includes(query)
-        const matchesName = tx.asset_name?.toLowerCase().includes(query)
-        const matchesNotes = tx.notes?.toLowerCase().includes(query)
-        const matchesPlatform = (tx.exchange || 'manuel').toLowerCase().includes(query)
-        const matchesType = typeLabels[tx.transaction_type]?.toLowerCase().includes(query)
-        if (!matchesSymbol && !matchesName && !matchesNotes && !matchesPlatform && !matchesType) {
-          return false
-        }
-      }
-      return true
-    })
-  }, [transactions, selectedAsset, selectedPlatform, selectedType, dateRange, searchQuery])
+  // Les filtres (type, plateforme, dates, recherche, actif, portefeuille) sont désormais
+  // appliqués côté SERVEUR : les transactions chargées sont déjà filtrées et exhaustives.
+  const filteredTransactions = transactions
 
   const sortedTransactions = useMemo(() => {
     const sorted = [...filteredTransactions]
@@ -474,6 +495,11 @@ export default function TransactionsPage() {
         : '1 transfert/reward exclu'
       : null
 
+  /** Les StatCards sont calculées sur les lignes filtrées CHARGÉES : si le total
+   * serveur dépasse le chargé, on le signale. */
+  const partialLoadHint =
+    totalCount > transactions.length ? `sur les ${transactions.length} chargées` : null
+
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE))
 
   // Reset to last valid page if current page exceeds total after deletion
@@ -489,8 +515,9 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
+    setTxSkip(0)
     setSelectedIds(new Set())
-  }, [selectedPortfolio, selectedAsset, selectedPlatform, selectedType, dateRange, searchQuery])
+  }, [selectedPortfolio, selectedAsset, selectedPlatform, selectedType, dateRange, debouncedSearch])
 
   // ============== Mutations ==============
 
@@ -806,10 +833,11 @@ export default function TransactionsPage() {
             value={eurTotals.bought}
             format={formatCurrency}
             hint={
-              otherCurrencyLines('bought').length > 0 || excludedHint ? (
+              otherCurrencyLines('bought').length > 0 || excludedHint || partialLoadHint ? (
                 <>
                   {otherCurrencyLines('bought')}
                   {excludedHint && <span className="block">{excludedHint}</span>}
+                  {partialLoadHint && <span className="block">{partialLoadHint}</span>}
                 </>
               ) : undefined
             }
@@ -822,10 +850,11 @@ export default function TransactionsPage() {
             value={eurTotals.sold}
             format={formatCurrency}
             hint={
-              otherCurrencyLines('sold').length > 0 || excludedHint ? (
+              otherCurrencyLines('sold').length > 0 || excludedHint || partialLoadHint ? (
                 <>
                   {otherCurrencyLines('sold')}
                   {excludedHint && <span className="block">{excludedHint}</span>}
+                  {partialLoadHint && <span className="block">{partialLoadHint}</span>}
                 </>
               ) : undefined
             }
@@ -838,7 +867,12 @@ export default function TransactionsPage() {
             value={eurTotals.fees}
             format={formatCurrency}
             hint={
-              otherCurrencyLines('fees').length > 0 ? <>{otherCurrencyLines('fees')}</> : undefined
+              otherCurrencyLines('fees').length > 0 || partialLoadHint ? (
+                <>
+                  {otherCurrencyLines('fees')}
+                  {partialLoadHint && <span className="block">{partialLoadHint}</span>}
+                </>
+              ) : undefined
             }
           />
           <StatCard
@@ -851,6 +885,7 @@ export default function TransactionsPage() {
               <>
                 <span className="block">hors transferts internes, conversions et récompenses</span>
                 {otherCurrencyLines('netFlow')}
+                {partialLoadHint && <span className="block">{partialLoadHint}</span>}
               </>
             }
           />
@@ -890,7 +925,7 @@ export default function TransactionsPage() {
             {/* Compact Filters Row */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Portfolio Filter */}
-              <Select value={selectedPortfolio} onValueChange={(v) => { setSelectedPortfolio(v); setTxSkip(0) }}>
+              <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
                 <SelectTrigger className="w-40 h-9">
                   <SelectValue placeholder="Portefeuille" />
                 </SelectTrigger>

@@ -17,8 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
-import { notesApi, assetsApi } from '@/services/api'
+// Exception documentée : l'instance axios par défaut est importée directement
+// car api.ts est maintenu par ailleurs (pas de notesApi.getScorecard à ce jour).
+// Même pattern que CalendarPage pour /calendar/seed-tax-events.
+import api, { notesApi, assetsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
 import {
   Select,
@@ -39,6 +43,13 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Target,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  X,
+  Hourglass,
+  AlertCircle,
 } from 'lucide-react'
 
 const SENTIMENT_OPTIONS = [
@@ -74,10 +85,66 @@ interface AssetOption {
   name: string | null
 }
 
+type ScorecardVerdict = 'correct' | 'incorrect' | 'pending'
+
+interface ScorecardEntry {
+  note_id: string
+  title: string
+  symbol: string
+  sentiment: string
+  note_date: string
+  perf_30d: number | null
+  perf_90d: number | null
+  verdict_30d: ScorecardVerdict
+  verdict_90d: ScorecardVerdict
+}
+
+interface ScorecardSentimentStats {
+  n: number
+  hit_rate: number | null
+}
+
+interface ScorecardSummary {
+  total_scored: number
+  unscorable: number
+  hit_rate_30d: number | null
+  hit_rate_90d: number | null
+  by_sentiment: Record<string, ScorecardSentimentStats>
+}
+
+interface ScorecardResponse {
+  entries: ScorecardEntry[]
+  summary: ScorecardSummary
+}
+
 /** Valeur sentinelle : les SelectItem de shadcn/ui n'acceptent pas la chaîne vide. */
 const NO_ASSET = 'none'
 
 const fmtCount = (n: number) => Math.round(n).toString()
+
+const fmtHitRate = (v: number | null) => (v === null ? '—' : `${v.toFixed(0)} %`)
+
+const fmtPerf = (v: number | null) => {
+  if (v === null) return '—'
+  return `${v > 0 ? '+' : ''}${v.toFixed(1)} %`
+}
+
+const perfClass = (v: number | null) => {
+  if (v === null) return 'text-muted-foreground'
+  if (v > 0) return 'text-gain'
+  if (v < 0) return 'text-loss'
+  return 'text-muted-foreground'
+}
+
+const VerdictIcon = ({ verdict }: { verdict: ScorecardVerdict }) => {
+  if (verdict === 'correct') {
+    return <Check className="h-4 w-4 text-gain" aria-label="Correct" />
+  }
+  if (verdict === 'incorrect') {
+    return <X className="h-4 w-4 text-loss" aria-label="Incorrect" />
+  }
+  return <Hourglass className="h-4 w-4 text-muted-foreground" aria-label="En attente" />
+}
 
 export default function NotesPage() {
   const { toast } = useToast()
@@ -112,6 +179,24 @@ export default function NotesPage() {
   const { data: assets } = useQuery<AssetOption[]>({
     queryKey: queryKeys.assets.list(),
     queryFn: () => assetsApi.list(),
+    staleTime: 60_000,
+  })
+
+  // Scorecard : chargée paresseusement au dépliage de la carte
+  const [scorecardOpen, setScorecardOpen] = useState(false)
+  const {
+    data: scorecard,
+    isLoading: scorecardLoading,
+    isError: scorecardError,
+  } = useQuery<ScorecardResponse>({
+    queryKey: [...queryKeys.notes.all, 'scorecard'],
+    // Appel direct via l'instance axios (voir commentaire d'import) plutôt
+    // que via un wrapper notesApi, api.ts étant hors périmètre ici.
+    queryFn: async (): Promise<ScorecardResponse> => {
+      const response = await api.get('/notes/scorecard')
+      return response.data
+    },
+    enabled: scorecardOpen,
     staleTime: 60_000,
   })
 
@@ -252,6 +337,127 @@ export default function NotesPage() {
           />
         </SpotlightGroup>
       )}
+
+      {/* Scorecard : sentiment enregistré vs performance réalisée ensuite —
+          la raison d'être d'un journal d'investissement. Chargée au dépliage. */}
+      <Card elevation="raised">
+        <CardHeader className="pb-2">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-left"
+            onClick={() => setScorecardOpen((o) => !o)}
+            aria-expanded={scorecardOpen}
+          >
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4" aria-hidden />
+              Scorecard de vos analyses
+            </CardTitle>
+            {scorecardOpen ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
+            )}
+          </button>
+        </CardHeader>
+        {scorecardOpen && (
+          <CardContent className="space-y-4">
+            {scorecardLoading ? (
+              <div className="space-y-2" aria-hidden>
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : scorecardError ? (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-loss" aria-hidden />
+                Impossible de calculer la scorecard pour le moment.
+              </p>
+            ) : !scorecard || scorecard.summary.total_scored === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Liez des notes à des actifs avec un sentiment (Bullish/Bearish/Neutre) pour mesurer
+                la qualité de vos analyses dans le temps.
+                {scorecard && scorecard.summary.unscorable > 0 && (
+                  <> {scorecard.summary.unscorable} note(s) liée(s) sans historique de prix exploitable.</>
+                )}
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Taux de réussite à 30 j</span>
+                    <p className="text-2xl font-serif font-medium tabular">
+                      {fmtHitRate(scorecard.summary.hit_rate_30d)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">à 90 j</span>
+                    <p className="text-2xl font-serif font-medium tabular">
+                      {fmtHitRate(scorecard.summary.hit_rate_90d)}
+                    </p>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    {Object.entries(scorecard.summary.by_sentiment).map(([s, st]) => (
+                      <span key={s} className="tabular">
+                        {s === 'bullish' ? 'Bullish' : s === 'bearish' ? 'Bearish' : 'Neutre'} :{' '}
+                        {fmtHitRate(st.hit_rate)} ({st.n})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {scorecard.summary.hit_rate_90d !== null && scorecard.summary.hit_rate_90d < 50 && (
+                  <p className="text-xs text-warning">
+                    Vos intuitions font moins bien que pile ou face sur 90 jours — le journal sert
+                    exactement à voir ça.
+                  </p>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th scope="col" className="text-left p-2">Note</th>
+                        <th scope="col" className="text-left p-2">Actif</th>
+                        <th scope="col" className="text-left p-2">Sentiment</th>
+                        <th scope="col" className="text-right p-2">Perf 30 j</th>
+                        <th scope="col" className="text-center p-2">30 j</th>
+                        <th scope="col" className="text-right p-2">Perf 90 j</th>
+                        <th scope="col" className="text-center p-2">90 j</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scorecard.entries.map((e) => (
+                        <tr key={e.note_id} className="border-b last:border-b-0">
+                          <td className="p-2 max-w-[220px]">
+                            <span className="block truncate font-medium">{e.title}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(e.note_date).toLocaleDateString('fr-FR')}
+                            </span>
+                          </td>
+                          <td className="p-2 font-mono text-xs">{e.symbol}</td>
+                          <td className="p-2">
+                            <Badge variant="outline" className="text-xs">
+                              {e.sentiment === 'bullish' ? 'Bullish' : e.sentiment === 'bearish' ? 'Bearish' : 'Neutre'}
+                            </Badge>
+                          </td>
+                          <td className={`p-2 text-right tabular ${perfClass(e.perf_30d)}`}>{fmtPerf(e.perf_30d)}</td>
+                          <td className="p-2 text-center"><VerdictIcon verdict={e.verdict_30d} /></td>
+                          <td className={`p-2 text-right tabular ${perfClass(e.perf_90d)}`}>{fmtPerf(e.perf_90d)}</td>
+                          <td className="p-2 text-center"><VerdictIcon verdict={e.verdict_90d} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Verdict : Bullish correct si perf &gt; +2 %, Bearish correct si perf &lt; −2 %,
+                  Neutre correct si |perf| ≤ 5 %.
+                  {scorecard.summary.unscorable > 0 && (
+                    <> {scorecard.summary.unscorable} note(s) non évaluable(s) (historique de prix manquant).</>
+                  )}
+                </p>
+              </>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Search and Filter */}
       <Card elevation="raised">

@@ -53,6 +53,7 @@ import {
   Download,
   Coins,
   Calendar,
+  Clock,
   Wallet,
   Shield,
   ChevronRight,
@@ -592,7 +593,17 @@ export default function ExchangesPage() {
 
       {/* Connected exchanges */}
       {apiKeys && apiKeys.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <>
+          {/* Auto-sync info: a server-side cron already syncs every active key
+              hourly — the manual Sync button is only a way to force a refresh. */}
+          <div className="flex items-start gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              Synchronisation automatique : toutes les heures (serveur). La sync manuelle reste
+              disponible pour forcer une mise à jour immédiate.
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {apiKeys.map((apiKey) => {
             const sameExchangeCount = getExchangeCount(apiKey.exchange)
             const sameExchangeIndex = apiKeys
@@ -626,40 +637,49 @@ export default function ExchangesPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground"
-                        title="Renommer cette connexion"
-                        onClick={() => {
-                          setRenameTarget(apiKey)
-                          setRenameValue(apiKey.label || '')
-                        }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <button
-                        type="button"
-                        title={apiKey.is_active
-                          ? 'Cliquer pour désactiver cette connexion'
-                          : 'Cliquer pour réactiver cette connexion'}
-                        onClick={() => {
-                          setTogglingId(apiKey.id)
-                          updateMutation.mutate({ id: apiKey.id, data: { is_active: !apiKey.is_active } })
-                        }}
-                        disabled={togglingId === apiKey.id}
-                        className="disabled:opacity-50"
-                      >
-                        <Badge variant={apiKey.is_active ? 'default' : 'destructive'} className="cursor-pointer gap-1">
-                          {togglingId === apiKey.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Power className="h-3 w-3" />
-                          )}
-                          {apiKey.is_active ? 'Actif' : 'Inactif'}
-                        </Badge>
-                      </button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground"
+                          title="Renommer cette connexion"
+                          onClick={() => {
+                            setRenameTarget(apiKey)
+                            setRenameValue(apiKey.label || '')
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <button
+                          type="button"
+                          title={apiKey.is_active
+                            ? 'Cliquer pour désactiver cette connexion'
+                            : 'Cliquer pour réactiver cette connexion'}
+                          onClick={() => {
+                            setTogglingId(apiKey.id)
+                            updateMutation.mutate({ id: apiKey.id, data: { is_active: !apiKey.is_active } })
+                          }}
+                          disabled={togglingId === apiKey.id}
+                          className="disabled:opacity-50"
+                        >
+                          <Badge variant={apiKey.is_active ? 'default' : 'destructive'} className="cursor-pointer gap-1">
+                            {togglingId === apiKey.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Power className="h-3 w-3" />
+                            )}
+                            {apiKey.is_active ? 'Actif' : 'Inactif'}
+                          </Badge>
+                        </button>
+                      </div>
+                      {/* Inactive keys are skipped by the hourly server-side auto-sync
+                          (sync_exchanges filters on is_active). */}
+                      {!apiKey.is_active && (
+                        <span className="text-[10px] text-muted-foreground">
+                          exclue de la sync auto
+                        </span>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -690,11 +710,19 @@ export default function ExchangesPage() {
                     )}
                   </div>
 
-                  {/* Error message */}
+                  {/* Last sync error (from manual sync, import or hourly auto-sync) */}
                   {apiKey.last_error && (
-                    <div className="flex items-start gap-2 text-sm text-loss bg-loss/10 p-2 rounded-md">
+                    <div
+                      className="flex items-start gap-2 text-sm text-loss bg-loss/10 p-2 rounded-md"
+                      title={apiKey.last_error}
+                    >
                       <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span className="line-clamp-2">{apiKey.last_error}</span>
+                      <span className="line-clamp-2">
+                        Dernière sync en échec :{' '}
+                        {apiKey.last_error.length > 120
+                          ? `${apiKey.last_error.slice(0, 120)}…`
+                          : apiKey.last_error}
+                      </span>
                     </div>
                   )}
 
@@ -785,7 +813,8 @@ export default function ExchangesPage() {
               </Card>
             )
           })}
-        </div>
+          </div>
+        </>
       ) : (
         <EmptyState
           icon={Link2}

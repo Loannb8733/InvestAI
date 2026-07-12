@@ -4,15 +4,16 @@ import asyncio
 import csv
 import io
 import logging
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_debug_enabled
@@ -242,22 +243,64 @@ class CSVRowError(BaseModel):
     message: str
 
 
-@router.get("", response_model=List[TransactionWithAsset])
+class TransactionListPage(BaseModel):
+    """Paginated transaction list with the total matching the applied filters."""
+
+    items: List[TransactionWithAsset]
+    total: int
+
+
+@router.get("", response_model=None)
 async def list_transactions(
     asset_id: Optional[UUID] = None,
     portfolio_id: Optional[UUID] = None,
+    transaction_type: Optional[str] = Query(
+        None,
+        max_length=30,
+        description="Filtre par type de transaction (valeur de l'enum, ex. 'buy') ou alias 'conversions'",
+    ),
+    exchange: Optional[str] = Query(
+        None,
+        max_length=50,
+        description="Filtre par plateforme (insensible à la casse). 'Manuel' cible les transactions sans plateforme.",
+    ),
+    asset_symbol: Optional[str] = Query(
+        None,
+        max_length=30,
+        description="Filtre par symbole d'actif exact (insensible à la casse)",
+    ),
+    date_from: Optional[date] = Query(None, description="Transactions exécutées à partir de cette date (incluse)"),
+    date_to: Optional[date] = Query(None, description="Transactions exécutées jusqu'à cette date (incluse)"),
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Recherche partielle (ILIKE) sur le symbole de l'actif et les notes",
+    ),
+    include_total: bool = Query(
+        False,
+        description="Si vrai, renvoie {items, total} au lieu d'une liste nue (compat: défaut inchangé)",
+    ),
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[TransactionWithAsset]:
-    """List transactions for the current user with asset details."""
+) -> Union[List[TransactionWithAsset], TransactionListPage]:
+    """List transactions for the current user with asset details.
+
+    All filters are applied in SQL so they cover the full history, not only
+    the loaded page. With ``include_total=true`` the response becomes
+    ``{items, total}`` where ``total`` is the filtered count.
+    """
+
+    def _empty() -> Union[List[TransactionWithAsset], TransactionListPage]:
+        return TransactionListPage(items=[], total=0) if include_total else []
+
     # Get user's portfolio IDs
     portfolio_result = await db.execute(select(Portfolio.id).where(Portfolio.user_id == current_user.id))
     portfolio_ids = [p for p in portfolio_result.scalars().all()]
 
     if not portfolio_ids:
-        return []
+        return _empty()
 
     # Get user's assets (full objects for later mapping)
     asset_query = select(Asset).where(Asset.portfolio_id.in_(portfolio_ids))
@@ -276,7 +319,7 @@ async def list_transactions(
     asset_ids = list(asset_map.keys())
 
     if not asset_ids:
-        return []
+        return _empty()
 
     # Build transaction query
     query = select(Transaction).where(
@@ -290,6 +333,64 @@ async def list_transactions(
                 detail="Actif non trouvé",
             )
         query = query.where(Transaction.asset_id == asset_id)
+
+    # --- Server-side filters (exhaustive: applied in SQL, not on the loaded page) ---
+
+    if transaction_type:
+        type_value = transaction_type.strip().lower()
+        if type_value == "conversions":
+            tx_types = [TransactionType.CONVERSION_IN, TransactionType.CONVERSION_OUT]
+        else:
+            try:
+                tx_types = [TransactionType(type_value)]
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Type de transaction invalide",
+                )
+        query = query.where(Transaction.transaction_type.in_(tx_types))
+
+    if date_from:
+        query = query.where(Transaction.executed_at >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
+    if date_to:
+        query = query.where(Transaction.executed_at <= datetime.combine(date_to, time.max, tzinfo=timezone.utc))
+
+    # Join Asset only when a filter needs it (keeps the base query index-friendly)
+    search_term = search.strip() if search else ""
+    symbol_term = asset_symbol.strip() if asset_symbol else ""
+    if search_term or symbol_term or exchange is not None:
+        query = query.join(Asset, Transaction.asset_id == Asset.id)
+
+    if exchange is not None:
+        # Effective platform = transaction exchange, fallback on asset exchange
+        # (mirrors the enrichment below: trans.exchange or asset.exchange)
+        effective_exchange = func.coalesce(
+            func.nullif(func.trim(Transaction.exchange), ""),
+            func.nullif(func.trim(Asset.exchange), ""),
+        )
+        ex = exchange.strip()
+        if ex == "" or ex.lower() == "manuel":
+            query = query.where(effective_exchange.is_(None))
+        else:
+            query = query.where(func.lower(effective_exchange) == ex.lower())
+
+    if symbol_term:
+        query = query.where(func.upper(Asset.symbol) == symbol_term.upper())
+
+    if search_term:
+        escaped = search_term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        query = query.where(
+            or_(
+                Asset.symbol.ilike(pattern, escape="\\"),
+                Transaction.notes.ilike(pattern, escape="\\"),
+            )
+        )
+
+    total = 0
+    if include_total:
+        count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+        total = int(count_result.scalar() or 0)
 
     result = await db.execute(query.order_by(Transaction.executed_at.desc()).offset(skip).limit(limit))
     transactions = result.scalars().all()
@@ -318,6 +419,8 @@ async def list_transactions(
             )
         )
 
+    if include_total:
+        return TransactionListPage(items=enriched_transactions, total=total)
     return enriched_transactions
 
 
