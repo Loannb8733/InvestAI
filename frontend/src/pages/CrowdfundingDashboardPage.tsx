@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Wallet,
   Banknote,
+  Gift,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -204,6 +205,17 @@ export default function CrowdfundingDashboardPage() {
           format={formatCurrency}
           hint="brut, capital + intérêts"
         />
+        {(d.total_referral ?? 0) > 0 && (
+          <StatCard
+            className="spot-card"
+            label="Parrainage & bonus"
+            tooltip="Bonus de parrainage / plateforme encaissés — comptés à part : ni intérêts du projet, ni capital, exclus du XIRR et du rapport fiscal des intérêts."
+            icon={Gift}
+            value={d.total_referral ?? 0}
+            format={formatCurrency}
+            hint="hors intérêts et capital"
+          />
+        )}
         {d.defaulted_outstanding > 0 && (
           <Card elevation="raised" className="spot-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">

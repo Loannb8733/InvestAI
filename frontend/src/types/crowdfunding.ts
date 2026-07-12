@@ -138,6 +138,8 @@ export interface CrowdfundingDashboard {
   capital_outstanding: number
   /** Principal exposé sur projets en défaut (provisionné en perte). */
   defaulted_outstanding: number
+  /** Bonus de parrainage / plateforme encaissés (hors intérêts et capital). Optionnel pour compat backend. */
+  total_referral?: number
   projected_annual_interest: number
   weighted_average_rate: number
   active_count: number

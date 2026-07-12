@@ -14,6 +14,10 @@ class PaymentType(str, enum.Enum):
     INTEREST = "interest"
     CAPITAL = "capital"
     BOTH = "both"
+    # Bonus de parrainage / plateforme : versé en cash mais N'EST PAS un
+    # intérêt du projet (ni du capital) — exclu du P&L d'intérêts et du XIRR,
+    # comptabilisé dans une poche « parrainage » à part (cf. Tokimo).
+    REFERRAL = "referral"
 
 
 class CrowdfundingRepayment(Base):

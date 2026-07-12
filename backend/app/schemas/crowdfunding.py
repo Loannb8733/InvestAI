@@ -157,6 +157,8 @@ class CrowdfundingDashboardResponse(BaseModel):
     total_capital_repaid: float = 0.0
     capital_outstanding: float = 0.0
     defaulted_outstanding: float = 0.0
+    # Bonus de parrainage / plateforme encaissés (hors intérêts et hors capital).
+    total_referral: float = 0.0
     projected_annual_interest: float
     weighted_average_rate: float
     active_count: int

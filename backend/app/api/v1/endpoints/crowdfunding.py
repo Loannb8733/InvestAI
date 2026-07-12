@@ -110,6 +110,10 @@ def _realized_xirr(
     flows: list[tuple[date, float]] = [(project.start_date, -invested)]
     capital_repaid = 0.0
     for r in repayments or []:
+        # Le parrainage est un bonus plateforme, pas un flux du projet :
+        # exclu du XIRR (ne doit pas gonfler la performance du projet).
+        if r.payment_type == PaymentType.REFERRAL:
+            continue
         amount = float(r.amount or 0)
         if amount > 0:
             flows.append((r.payment_date, amount))
@@ -428,10 +432,14 @@ async def get_dashboard(
     # existe ; sinon par payment_type ; un BOTH sans split est compté en
     # capital (conservateur : aucun gain fictif).
     total_interest_received = 0.0
+    total_referral = 0.0  # bonus de parrainage / plateforme (hors intérêts, hors capital)
     capital_repaid_by_project: dict = {}
     for pid, reps in reps_map.items():
         cap = 0.0
         for r in reps:
+            if r.payment_type == PaymentType.REFERRAL:
+                total_referral += float(r.amount or 0)
+                continue
             interest = float(r.interest_amount or 0)
             capital = float(r.capital_amount or 0)
             if interest == 0 and capital == 0:
@@ -495,6 +503,7 @@ async def get_dashboard(
         total_received=round(total_received, 2),
         total_interest_received=round(total_interest_received, 2),
         total_capital_repaid=round(total_capital_repaid, 2),
+        total_referral=round(total_referral, 2),
         capital_outstanding=round(capital_outstanding, 2),
         defaulted_outstanding=round(defaulted_outstanding, 2),
         projected_annual_interest=round(projected_annual, 2),
@@ -673,6 +682,8 @@ async def get_tax_report(
         for r in reps:
             if r.payment_date.year != report_year:
                 continue
+            if r.payment_type == PaymentType.REFERRAL:
+                continue  # bonus de parrainage — pas un revenu de capitaux du projet
             interest = float(r.interest_amount or 0)
             capital = float(r.capital_amount or 0)
             if interest == 0 and capital == 0 and r.payment_type == PaymentType.INTEREST:
