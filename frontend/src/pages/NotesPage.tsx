@@ -261,18 +261,25 @@ export default function NotesPage() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
 
-    const data = {
+    const base = {
       title: formData.get('title') as string,
       content: formData.get('content') as string || undefined,
       tags: formData.get('tags') as string || undefined,
       sentiment: sentiment || undefined,
-      asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : undefined,
     }
 
     if (editingNote) {
-      updateMutation.mutate({ id: editingNote.id, data })
+      // Édition : « Aucun actif » = DÉLIER explicitement (null) — le backend
+      // distingue null (délier) d'absent (inchangé).
+      updateMutation.mutate({
+        id: editingNote.id,
+        data: { ...base, asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : null },
+      })
     } else {
-      createMutation.mutate(data)
+      createMutation.mutate({
+        ...base,
+        asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : undefined,
+      })
     }
   }
 

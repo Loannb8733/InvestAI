@@ -583,6 +583,10 @@ async def update_note(
         note.attachments = note_in.attachments
     if note_in.sentiment is not None:
         note.sentiment = note_in.sentiment
+    # PATCH sémantique : « asset_id présent avec null » = délier l'actif ;
+    # « asset_id absent » = inchangé (model_fields_set fait la distinction).
+    if "asset_id" in note_in.model_fields_set and note_in.asset_id is None:
+        note.asset_id = None
     if note_in.asset_id is not None:
         # Verify asset belongs to user
         result = await db.execute(

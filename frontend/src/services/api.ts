@@ -1152,7 +1152,8 @@ export const notesApi = {
     title?: string
     content?: string
     tags?: string
-    asset_id?: string
+    /** string = lier à cet actif ; null = DÉLIER ; absent = inchangé. */
+    asset_id?: string | null
   }) => {
     const response = await api.patch(`/notes/${id}`, data)
     return response.data
