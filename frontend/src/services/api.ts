@@ -1261,6 +1261,25 @@ export const simulationsApi = {
     return response.data
   },
 
+  // FIRE probabiliste (Monte Carlo) — taux en DÉCIMAL (0.04 = 4 %).
+  // Les champs omis sont pré-remplis côté backend (portefeuille live,
+  // profil investisseur) et la source est échouée dans assumptions.defaults_from.
+  fireProbabilistic: async (data: {
+    current_value?: number
+    monthly_contribution?: number
+    annual_expenses: number
+    withdrawal_rate?: number
+    annual_return_mean?: number
+    annual_volatility?: number
+    inflation?: number
+    index_contributions?: boolean
+    years_horizon?: number
+    n_paths?: number
+  }) => {
+    const response = await api.post('/simulations/fire-probabilistic', data)
+    return response.data
+  },
+
   projectPortfolio: async (data: {
     years?: number
     expected_return?: number

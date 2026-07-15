@@ -67,19 +67,37 @@ import {
 import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 
-interface FIREResult {
-  fire_number: number
-  years_to_fire: number | null
-  monthly_passive_income: number
-  projected_values: Array<{
-    year: number
-    portfolio_value: number
-    fire_number: number
-    is_fire: boolean
-    progress_percent: number
-  }>
-  is_fire_achieved: boolean
-  current_progress_percent: number
+// FIRE probabiliste : hypothèses réellement appliquées, échouées par le backend
+// (taux en décimal : 0.04 = 4 %). defaults_from trace la provenance des défauts.
+interface FIREAssumptions {
+  current_value: number
+  monthly_contribution: number
+  annual_expenses: number
+  withdrawal_rate: number
+  annual_return_mean: number
+  annual_volatility: number
+  inflation: number
+  index_contributions: boolean
+  years_horizon: number
+  n_paths: number
+  defaults_from: Record<string, string> | null
+}
+
+interface FIREProbResult {
+  prob_by_year: Array<{ year: number; prob: number }>
+  prob_at_horizon: number
+  fire_year_p10: number | null
+  fire_year_p50: number | null
+  fire_year_p90: number | null
+  final_value_p10: number
+  final_value_p50: number
+  final_value_p90: number
+  fire_number_today: number
+  survival_prob_30y: number
+  median_path: Array<{ year: number; portfolio_value: number; fire_number: number }>
+  n_paths: number
+  currency: string
+  assumptions: FIREAssumptions
 }
 
 interface ProjectionResult {
@@ -186,7 +204,16 @@ const FREQUENCY_LABELS: Record<string, string> = {
   quarterly: 'Trimestriel',
 }
 
-type FieldFormat = 'currency' | 'percent' | 'number' | 'years' | 'months' | 'days' | 'bool' | 'frequency'
+type FieldFormat =
+  | 'currency'
+  | 'percent'
+  | 'number'
+  | 'years'
+  | 'months'
+  | 'days'
+  | 'bool'
+  | 'frequency'
+  | 'raw'
 
 interface ScenarioField {
   key: string
@@ -197,21 +224,31 @@ interface ScenarioField {
 const SCENARIO_FIELDS: Record<ScenarioKind, { params: ScenarioField[]; results: ScenarioField[] }> = {
   fire: {
     params: [
-      { key: 'current_portfolio_value', label: 'Valeur du portefeuille', format: 'currency' },
-      { key: 'monthly_contribution', label: 'Contribution mensuelle', format: 'currency' },
-      { key: 'monthly_expenses', label: 'Dépenses mensuelles (retraite)', format: 'currency' },
+      { key: 'current_value', label: 'Valeur de départ', format: 'currency' },
+      { key: 'monthly_contribution', label: 'Épargne mensuelle', format: 'currency' },
+      { key: 'annual_expenses', label: 'Dépenses annuelles (retraite)', format: 'currency' },
       { key: 'expected_annual_return', label: 'Rendement annuel', format: 'percent' },
-      { key: 'expense_ratio', label: 'Frais annuels / TER', format: 'percent' },
+      { key: 'annual_volatility', label: 'Volatilité annuelle', format: 'percent' },
       { key: 'inflation_rate', label: 'Inflation', format: 'percent' },
       { key: 'withdrawal_rate', label: 'Taux de retrait', format: 'percent' },
-      { key: 'target_years', label: 'Horizon', format: 'years' },
+      { key: 'index_contributions', label: 'Épargne indexée sur l’inflation', format: 'bool' },
+      { key: 'years_horizon', label: 'Horizon', format: 'years' },
+      { key: 'n_paths', label: 'Trajectoires simulées', format: 'number' },
+      // Anciens scénarios (projection déterministe) — affichés si présents
+      { key: 'current_portfolio_value', label: 'Valeur du portefeuille (ancien)', format: 'currency' },
+      { key: 'monthly_expenses', label: 'Dépenses mensuelles (ancien)', format: 'currency' },
     ],
     results: [
-      { key: 'fire_number', label: 'Nombre FIRE', format: 'currency' },
-      { key: 'years_to_fire', label: 'Années restantes', format: 'years' },
-      { key: 'monthly_passive_income', label: 'Revenu passif mensuel', format: 'currency' },
-      { key: 'current_progress_percent', label: 'Progression', format: 'percent' },
-      { key: 'is_fire_achieved', label: 'FIRE atteint', format: 'bool' },
+      { key: 'prob_at_horizon', label: 'Prob. FIRE à l’horizon', format: 'percent' },
+      { key: 'fire_year_p50', label: 'Année FIRE médiane', format: 'raw' },
+      { key: 'fire_year_p10', label: 'Année FIRE optimiste (p10)', format: 'raw' },
+      { key: 'fire_year_p90', label: 'Année FIRE prudente (p90)', format: 'raw' },
+      { key: 'fire_number_today', label: 'Nombre FIRE (aujourd’hui)', format: 'currency' },
+      { key: 'survival_prob_30y', label: 'Survie post-FIRE (30 ans)', format: 'percent' },
+      { key: 'final_value_p50', label: 'Valeur finale médiane', format: 'currency' },
+      // Anciens scénarios (projection déterministe) — affichés si présents
+      { key: 'fire_number', label: 'Nombre FIRE (ancien)', format: 'currency' },
+      { key: 'years_to_fire', label: 'Années restantes (ancien)', format: 'years' },
     ],
   },
   projection: {
@@ -300,18 +337,20 @@ export default function SimulationsPage() {
   // Auto-suggest inflation based on user currency
   const suggestedInflation = INFLATION_BY_CURRENCY[userCurrency]?.rate ?? 2.0
 
-  // FIRE Calculator state
+  // FIRE probabiliste — taux affichés en % (convertis en décimal à l'envoi).
+  // null = laisser le backend pré-remplir depuis le profil investisseur.
   const [fireParams, setFireParams] = useState({
     current_portfolio_value: 0,
-    monthly_contribution: 1000,
+    monthly_contribution: null as number | null,
     monthly_expenses: 3000,
-    expected_annual_return: 7,
-    expense_ratio: 0.25,
+    expected_annual_return: null as number | null,
+    annual_volatility: null as number | null,
     inflation_rate: suggestedInflation,
     withdrawal_rate: 4,
-    target_years: 30,
+    index_contributions: true,
+    years_horizon: 30,
   })
-  const [fireResult, setFireResult] = useState<FIREResult | null>(null)
+  const [fireResult, setFireResult] = useState<FIREProbResult | null>(null)
 
   // Projection state
   const [projectionParams, setProjectionParams] = useState({
@@ -358,17 +397,49 @@ export default function SimulationsPage() {
     }
   }, [livePortfolioValue])
 
-  // FIRE mutation
+  // FIRE probabiliste : les champs null sont OMIS pour laisser le backend
+  // appliquer les défauts du profil investisseur (echo dans defaults_from).
   const fireMutation = useMutation({
-    mutationFn: simulationsApi.calculateFIRE,
+    mutationFn: (p: typeof fireParams): Promise<FIREProbResult> =>
+      simulationsApi.fireProbabilistic({
+        current_value: p.current_portfolio_value > 0 ? p.current_portfolio_value : undefined,
+        monthly_contribution: p.monthly_contribution ?? undefined,
+        annual_expenses: p.monthly_expenses * 12,
+        withdrawal_rate: p.withdrawal_rate / 100,
+        annual_return_mean:
+          p.expected_annual_return !== null ? p.expected_annual_return / 100 : undefined,
+        annual_volatility: p.annual_volatility !== null ? p.annual_volatility / 100 : undefined,
+        inflation: p.inflation_rate / 100,
+        index_contributions: p.index_contributions,
+        years_horizon: p.years_horizon,
+      }),
     onSuccess: (data) => {
       setFireResult(data)
-      toast({ title: 'Calcul FIRE effectué' })
+      // Reflète dans les inputs les hypothèses réellement appliquées
+      // (dont celles pré-remplies depuis le profil investisseur).
+      const a = data.assumptions
+      setFireParams((prev) => ({
+        ...prev,
+        current_portfolio_value: a.current_value,
+        monthly_contribution: a.monthly_contribution,
+        expected_annual_return: Math.round(a.annual_return_mean * 10000) / 100,
+        annual_volatility: Math.round(a.annual_volatility * 10000) / 100,
+      }))
+      toast({ title: 'Simulation FIRE calculée' })
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de calculer le FIRE.' })
     },
   })
+
+  // Champs pré-remplis depuis le profil investisseur (badge dans l'UI)
+  const fireProfileDefaults = useMemo(() => {
+    const from = fireResult?.assumptions.defaults_from
+    if (!from) return []
+    return Object.entries(from)
+      .filter(([, source]) => source.includes('profil investisseur'))
+      .map(([field]) => field)
+  }, [fireResult])
 
   // Projection mutation
   const projectionMutation = useMutation({
@@ -461,13 +532,29 @@ export default function SimulationsPage() {
     let results: Record<string, unknown> | null = null
 
     if (kind === 'fire' && fireResult) {
-      inputs = { ...fireParams }
+      // Les hypothèses réellement appliquées (assumptions) font foi — pas les
+      // inputs UI, qui peuvent avoir changé depuis le calcul. Taux stockés en %.
+      const a = fireResult.assumptions
+      inputs = {
+        current_value: a.current_value,
+        monthly_contribution: a.monthly_contribution,
+        annual_expenses: a.annual_expenses,
+        expected_annual_return: Math.round(a.annual_return_mean * 10000) / 100,
+        annual_volatility: Math.round(a.annual_volatility * 10000) / 100,
+        inflation_rate: Math.round(a.inflation * 10000) / 100,
+        withdrawal_rate: Math.round(a.withdrawal_rate * 10000) / 100,
+        index_contributions: a.index_contributions,
+        years_horizon: a.years_horizon,
+        n_paths: a.n_paths,
+      }
       results = {
-        fire_number: fireResult.fire_number,
-        years_to_fire: fireResult.years_to_fire,
-        monthly_passive_income: fireResult.monthly_passive_income,
-        current_progress_percent: fireResult.current_progress_percent,
-        is_fire_achieved: fireResult.is_fire_achieved,
+        prob_at_horizon: Math.round(fireResult.prob_at_horizon * 1000) / 10,
+        fire_year_p10: fireResult.fire_year_p10,
+        fire_year_p50: fireResult.fire_year_p50,
+        fire_year_p90: fireResult.fire_year_p90,
+        fire_number_today: fireResult.fire_number_today,
+        survival_prob_30y: Math.round(fireResult.survival_prob_30y * 1000) / 10,
+        final_value_p50: fireResult.final_value_p50,
       }
     } else if (kind === 'projection' && projectionResult) {
       inputs = { ...projectionParams }
@@ -571,6 +658,8 @@ export default function SimulationsPage() {
         return value ? 'Oui' : 'Non'
       case 'frequency':
         return FREQUENCY_LABELS[String(value)] ?? String(value)
+      case 'raw':
+        return String(value)
       default:
         return Number(value).toLocaleString('fr-FR')
     }
@@ -598,7 +687,7 @@ export default function SimulationsPage() {
       <div>
         <h1 className="text-3xl font-serif font-medium">Simulations</h1>
         <p className="text-muted-foreground">
-          Calculateur FIRE, projections Monte Carlo et simulations DCA.
+          Calculateur FIRE probabiliste, projections Monte Carlo et simulations DCA.
           {livePortfolioValue > 0 && (
             <span className="ml-2 text-foreground font-medium">
               Portefeuille actuel : {formatCurrency(livePortfolioValue)}
@@ -634,10 +723,14 @@ export default function SimulationsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Flame className="h-5 w-5 text-warning" />
-                  Calculateur FIRE
+                  Calculateur FIRE probabiliste
+                  {fireProfileDefaults.length > 0 && (
+                    <Badge variant="accent">Pré-rempli depuis votre profil investisseur</Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
-                  Financial Independence, Retire Early - Calculez votre objectif d'indépendance financière.
+                  Financial Independence, Retire Early — au lieu d'un chiffre unique, une simulation
+                  Monte Carlo estime vos chances d'atteindre l'indépendance financière année par année.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -676,15 +769,24 @@ export default function SimulationsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fire-monthly-contribution">Contribution mensuelle</Label>
+                    <Label htmlFor="fire-monthly-contribution">Épargne mensuelle</Label>
                     <Input
                       id="fire-monthly-contribution"
                       type="number"
-                      value={fireParams.monthly_contribution}
+                      min={0}
+                      placeholder="auto : profil investisseur"
+                      value={fireParams.monthly_contribution ?? ''}
                       onChange={(e) =>
-                        setFireParams({ ...fireParams, monthly_contribution: parseFloat(e.target.value) || 0 })
+                        setFireParams({
+                          ...fireParams,
+                          monthly_contribution:
+                            e.target.value === '' ? null : parseFloat(e.target.value) || 0,
+                        })
                       }
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Vide = DCA mensuel de votre profil investisseur
+                    </p>
                   </div>
                 </div>
 
@@ -707,24 +809,39 @@ export default function SimulationsPage() {
                       id="fire-expected-return"
                       type="number"
                       step="0.1"
-                      value={fireParams.expected_annual_return}
+                      min={-5}
+                      max={20}
+                      placeholder="auto : profil investisseur"
+                      value={fireParams.expected_annual_return ?? ''}
                       onChange={(e) =>
-                        setFireParams({ ...fireParams, expected_annual_return: parseFloat(e.target.value) || 0 })
+                        setFireParams({
+                          ...fireParams,
+                          expected_annual_return:
+                            e.target.value === '' ? null : parseFloat(e.target.value) || 0,
+                        })
                       }
                     />
+                    <p className="text-xs text-muted-foreground">Vide = selon votre profil de risque</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fire-expense-ratio">Frais annuels / TER (%)</Label>
+                    <Label htmlFor="fire-volatility">Volatilité annuelle (%)</Label>
                     <Input
-                      id="fire-expense-ratio"
+                      id="fire-volatility"
                       type="number"
-                      step="0.05"
-                      value={fireParams.expense_ratio}
+                      step="0.5"
+                      min={1}
+                      max={80}
+                      placeholder="auto : profil investisseur"
+                      value={fireParams.annual_volatility ?? ''}
                       onChange={(e) =>
-                        setFireParams({ ...fireParams, expense_ratio: parseFloat(e.target.value) || 0 })
+                        setFireParams({
+                          ...fireParams,
+                          annual_volatility:
+                            e.target.value === '' ? null : parseFloat(e.target.value) || 0,
+                        })
                       }
                     />
-                    <p className="text-xs text-muted-foreground">Déduit du rendement brut</p>
+                    <p className="text-xs text-muted-foreground">Écart-type des rendements annuels</p>
                   </div>
                 </div>
 
@@ -768,37 +885,65 @@ export default function SimulationsPage() {
                       id="fire-withdrawal-rate"
                       type="number"
                       step="0.1"
+                      min={2}
+                      max={8}
                       value={fireParams.withdrawal_rate}
                       onChange={(e) =>
                         setFireParams({ ...fireParams, withdrawal_rate: parseFloat(e.target.value) || 0 })
                       }
                     />
+                    <p className="text-xs text-muted-foreground">Entre 2 % et 8 % (règle des 4 %)</p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="fire-target-years">Horizon (années)</Label>
-                  <Input
-                    id="fire-target-years"
-                    type="number"
-                    value={fireParams.target_years}
-                    onChange={(e) =>
-                      setFireParams({ ...fireParams, target_years: parseInt(e.target.value) || 0 })
-                    }
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fire-years-horizon">Horizon (années)</Label>
+                    <Input
+                      id="fire-years-horizon"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={fireParams.years_horizon}
+                      onChange={(e) =>
+                        setFireParams({ ...fireParams, years_horizon: parseInt(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fire-index-contributions" className="block">
+                      Indexation de l'épargne
+                    </Label>
+                    <label
+                      htmlFor="fire-index-contributions"
+                      className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input px-3 text-sm"
+                    >
+                      <Checkbox
+                        id="fire-index-contributions"
+                        checked={fireParams.index_contributions}
+                        onCheckedChange={(checked) =>
+                          setFireParams({ ...fireParams, index_contributions: checked === true })
+                        }
+                      />
+                      Indexer mon épargne sur l'inflation
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      L'objectif FIRE, lui, est toujours indexé
+                    </p>
+                  </div>
                 </div>
 
                 <Button
                   className="w-full"
                   onClick={() => fireMutation.mutate(fireParams)}
-                  disabled={fireMutation.isPending}
+                  disabled={fireMutation.isPending || fireParams.monthly_expenses <= 0}
                 >
                   {fireMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Calculator className="mr-2 h-4 w-4" />
                   )}
-                  Calculer
+                  Simuler (1 000 trajectoires)
                 </Button>
 
                 <Button
@@ -817,75 +962,194 @@ export default function SimulationsPage() {
               <Card elevation="raised">
                 <CardHeader>
                   <CardTitle>Résultats FIRE</CardTitle>
+                  <CardDescription>
+                    Simulation sur {fireResult.n_paths.toLocaleString('fr-FR')} trajectoires — le passé
+                    ne préjuge pas des performances futures.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Headline probabiliste */}
+                  <div className="text-center p-5 rounded-lg bg-warning/10">
+                    <Flame className="h-8 w-8 mx-auto text-warning mb-2" />
+                    <p className="text-3xl font-serif font-medium">
+                      {(fireResult.prob_at_horizon * 100).toFixed(0)} % de chances d'être FIRE
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      d'ici {fireResult.prob_by_year[fireResult.prob_by_year.length - 1]?.year}
+                    </p>
+                  </div>
+
+                  <div className="text-center p-4 rounded-lg bg-accent/10">
+                    <Clock className="h-6 w-6 mx-auto text-accent mb-1" />
+                    <p className="text-sm text-muted-foreground">Année FIRE médiane</p>
+                    <p className="text-2xl font-serif font-medium">
+                      {fireResult.fire_year_p50 ?? 'au-delà de l’horizon'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      optimiste {fireResult.fire_year_p10 ?? '—'} · prudent{' '}
+                      {fireResult.fire_year_p90 ?? 'au-delà de l’horizon'}
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-warning/10">
-                      <Target className="h-8 w-8 mx-auto text-warning mb-2" />
-                      <p className="text-sm text-muted-foreground">Nombre FIRE</p>
-                      <p className="text-2xl font-serif font-medium">{formatCurrency(fireResult.fire_number)}</p>
-                    </div>
                     <div className="text-center p-4 rounded-lg bg-accent/10">
-                      <Clock className="h-8 w-8 mx-auto text-accent mb-2" />
-                      <p className="text-sm text-muted-foreground">Années restantes</p>
-                      <p className="text-2xl font-serif font-medium">
-                        {fireResult.years_to_fire !== null ? `${fireResult.years_to_fire} ans` : 'N/A'}
+                      <Target className="h-6 w-6 mx-auto text-accent mb-1" />
+                      <p className="text-sm text-muted-foreground">Nombre FIRE (aujourd'hui)</p>
+                      <p className="text-xl font-serif font-medium">
+                        {formatCurrency(fireResult.fire_number_today)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">indexé sur l'inflation ensuite</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-gain/10">
+                      <DollarSign className="h-6 w-6 mx-auto text-gain mb-1" />
+                      <p className="text-sm text-muted-foreground">Valeur finale médiane</p>
+                      <p className="text-xl font-serif font-medium">
+                        {formatCurrency(fireResult.final_value_p50)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        p10-p90 : {formatCurrency(fireResult.final_value_p10)} –{' '}
+                        {formatCurrency(fireResult.final_value_p90)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-gain/10">
-                      <DollarSign className="h-8 w-8 mx-auto text-gain mb-2" />
-                      <p className="text-sm text-muted-foreground">Revenu passif mensuel</p>
-                      <p className="text-2xl font-serif font-medium">{formatCurrency(fireResult.monthly_passive_income)}</p>
+                  {/* Survie post-FIRE (test Trinity) */}
+                  <div
+                    className={`p-4 rounded-lg ${fireResult.survival_prob_30y < 0.8 ? 'bg-loss/10' : 'bg-gain/10'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        <Percent className="h-4 w-4" />
+                        Survie post-FIRE : {(fireResult.survival_prob_30y * 100).toFixed(1)} % sur 30
+                        ans de retraits
+                      </p>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-accent/10">
-                      <Percent className="h-8 w-8 mx-auto text-accent mb-2" />
-                      <p className="text-sm text-muted-foreground">Progression</p>
-                      <p className="text-2xl font-serif font-medium">{fireResult.current_progress_percent.toFixed(1)}%</p>
-                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Simulation séparée façon Trinity study : départ au nombre FIRE, retraits de vos
+                      dépenses indexées sur l'inflation pendant 30 ans, sans aucune épargne. C'est le
+                      pourcentage de trajectoires où le capital n'est jamais épuisé.
+                    </p>
                   </div>
 
-                  {fireResult.is_fire_achieved && (
+                  {fireResult.prob_by_year[0]?.prob === 1 && (
                     <div className="flex items-center gap-2 p-4 rounded-lg bg-gain/20 text-gain">
                       <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Félicitations ! Vous avez atteint le FIRE !</span>
+                      <span className="font-medium">
+                        Félicitations ! Votre portefeuille atteint déjà le nombre FIRE.
+                      </span>
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progression vers le FIRE</span>
-                      <span>{Math.min(fireResult.current_progress_percent, 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="h-3 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gain transition-all"
-                        style={{ width: `${Math.min(fireResult.current_progress_percent, 100)}%` }}
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const progress = Math.min(
+                      (fireResult.assumptions.current_value / fireResult.fire_number_today) * 100,
+                      100,
+                    )
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Progression vers le nombre FIRE</span>
+                          <span>{progress.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-3 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gain transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* FIRE Chart */}
+          {/* Courbe de probabilité cumulée */}
           {fireResult && (
             <Card elevation="raised">
               <CardHeader>
-                <CardTitle>Projection FIRE</CardTitle>
+                <CardTitle>Probabilité d'être FIRE, année par année</CardTitle>
                 <CardDescription>
-                  Croissance du capital vs objectif FIRE sur {fireParams.target_years} ans
-                  (TER {fireParams.expense_ratio}% déduit, inflation {fireParams.inflation_rate}%)
+                  Probabilité CUMULÉE d'avoir atteint le nombre FIRE (une fois atteint, l'état est
+                  acquis) — {fireResult.n_paths.toLocaleString('fr-FR')} trajectoires simulées.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const cProb = color('--chart-1')
+                  const probData = fireResult.prob_by_year
+                  const series: LineSeries[] = [
+                    {
+                      id: 'prob',
+                      data: probData.map((d) => ({ x: String(d.year), y: d.prob * 100 })),
+                    },
+                  ]
+                  return (
+                    <div className="h-72">
+                      <ResponsiveLine
+                        data={series}
+                        theme={theme}
+                        margin={{ top: 12, right: 16, bottom: 28, left: 44 }}
+                        xScale={{ type: 'point' }}
+                        yScale={{ type: 'linear', min: 0, max: 100 }}
+                        curve="monotoneX"
+                        colors={[cProb]}
+                        lineWidth={2}
+                        enablePoints={false}
+                        enableGridX={false}
+                        enableArea
+                        areaOpacity={0.25}
+                        axisBottom={{
+                          tickSize: 0,
+                          tickPadding: 8,
+                          tickValues: probData
+                            .filter((_, i) => i % Math.max(Math.ceil(probData.length / 10), 1) === 0)
+                            .map((d) => String(d.year)),
+                        }}
+                        axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${v}%` }}
+                        enableSlices="x"
+                        sliceTooltip={({ slice }) => {
+                          const year = slice.points[0]?.data.x as string
+                          const point = probData.find((d) => String(d.year) === year)
+                          if (!point) return null
+                          return (
+                            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                              <p className="mb-1 text-xs text-muted-foreground">En {year}</p>
+                              <span className="font-mono text-sm tabular-nums">
+                                {(point.prob * 100).toFixed(1)} %
+                              </span>
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                de chances d'avoir atteint le FIRE
+                              </span>
+                            </div>
+                          )
+                        }}
+                        animate
+                        motionConfig="gentle"
+                      />
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Trajectoire médiane vs objectif FIRE */}
+          {fireResult && (
+            <Card elevation="raised">
+              <CardHeader>
+                <CardTitle>Trajectoire médiane vs objectif FIRE</CardTitle>
+                <CardDescription>
+                  Valeur médiane du portefeuille (50 % des trajectoires font mieux, 50 % moins bien)
+                  face au nombre FIRE indexé sur l'inflation.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {(() => {
                   const cPortfolio = color('--chart-1')
                   const cFire = color('--chart-4')
-                  const fireData = fireResult.projected_values
+                  const fireData = fireResult.median_path
                   const series: LineSeries[] = [
                     {
                       id: 'portfolio_value',
@@ -902,69 +1166,130 @@ export default function SimulationsPage() {
                     return <path d={path} fill="none" stroke={cFire} strokeWidth={2} strokeDasharray="5 5" />
                   }
                   return (
-                    <>
-                      <div className="h-80">
-                        <ResponsiveLine
-                          data={series}
-                          theme={theme}
-                          margin={{ top: 12, right: 16, bottom: 28, left: 56 }}
-                          xScale={{ type: 'point' }}
-                          yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
-                          curve="monotoneX"
-                          colors={[cPortfolio]}
-                          lineWidth={2}
-                          enablePoints={false}
-                          enableGridX={false}
-                          enableArea
-                          areaOpacity={0.3}
-                          axisBottom={{ tickSize: 0, tickPadding: 8 }}
-                          axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
-                          layers={['grid', 'axes', 'areas', FireLineLayer, 'lines', 'slices']}
-                          enableSlices="x"
-                          sliceTooltip={({ slice }) => {
-                            const year = slice.points[0]?.data.x as string
-                            const point = fireData.find((d) => String(d.year) === year)
-                            if (!point) return null
-                            return (
-                              <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
-                                <p className="mb-1.5 text-xs text-muted-foreground">Année {year}</p>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="flex items-center gap-2">
-                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cPortfolio }} />
-                                    <span className="text-xs text-muted-foreground">Portefeuille</span>
-                                  </span>
-                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(point.portfolio_value)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="flex items-center gap-2">
-                                    <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cFire }} />
-                                    <span className="text-xs text-muted-foreground">Objectif FIRE</span>
-                                  </span>
-                                  <span className="font-mono text-sm tabular-nums">{formatCurrency(point.fire_number)}</span>
-                                </div>
+                    <div className="h-80">
+                      <ResponsiveLine
+                        data={series}
+                        theme={theme}
+                        margin={{ top: 12, right: 16, bottom: 28, left: 56 }}
+                        xScale={{ type: 'point' }}
+                        yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
+                        curve="monotoneX"
+                        colors={[cPortfolio]}
+                        lineWidth={2}
+                        enablePoints={false}
+                        enableGridX={false}
+                        enableArea
+                        areaOpacity={0.3}
+                        axisBottom={{
+                          tickSize: 0,
+                          tickPadding: 8,
+                          tickValues: fireData
+                            .filter((_, i) => i % Math.max(Math.ceil(fireData.length / 10), 1) === 0)
+                            .map((d) => String(d.year)),
+                        }}
+                        axisLeft={{ tickSize: 0, tickPadding: 6, format: (v) => `${((v as number) / 1000).toFixed(0)}k` }}
+                        layers={['grid', 'axes', 'areas', FireLineLayer, 'lines', 'slices']}
+                        enableSlices="x"
+                        sliceTooltip={({ slice }) => {
+                          const year = slice.points[0]?.data.x as string
+                          const point = fireData.find((d) => String(d.year) === year)
+                          if (!point) return null
+                          return (
+                            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+                              <p className="mb-1.5 text-xs text-muted-foreground">Année {year}</p>
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="flex items-center gap-2">
+                                  <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cPortfolio }} />
+                                  <span className="text-xs text-muted-foreground">Portefeuille (médiane)</span>
+                                </span>
+                                <span className="font-mono text-sm tabular-nums">{formatCurrency(point.portfolio_value)}</span>
                               </div>
-                            )
-                          }}
-                          legends={[
-                            {
-                              anchor: 'top-right',
-                              direction: 'row',
-                              translateY: -12,
-                              itemWidth: 110,
-                              itemHeight: 18,
-                              symbolSize: 10,
-                              symbolShape: 'circle',
-                              itemTextColor: color('--muted-foreground'),
-                              data: [
-                                { id: 'portfolio_value', label: 'Portefeuille', color: cPortfolio },
-                                { id: 'fire_number', label: 'Objectif FIRE', color: cFire },
-                              ],
-                            },
-                          ]}
-                          animate
-                          motionConfig="gentle"
-                        />
-                      </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="flex items-center gap-2">
+                                  <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: cFire }} />
+                                  <span className="text-xs text-muted-foreground">Objectif FIRE</span>
+                                </span>
+                                <span className="font-mono text-sm tabular-nums">{formatCurrency(point.fire_number)}</span>
+                              </div>
+                            </div>
+                          )
+                        }}
+                        legends={[
+                          {
+                            anchor: 'top-right',
+                            direction: 'row',
+                            translateY: -12,
+                            itemWidth: 140,
+                            itemHeight: 18,
+                            symbolSize: 10,
+                            symbolShape: 'circle',
+                            itemTextColor: color('--muted-foreground'),
+                            data: [
+                              { id: 'portfolio_value', label: 'Portefeuille (médiane)', color: cPortfolio },
+                              { id: 'fire_number', label: 'Objectif FIRE', color: cFire },
+                            ],
+                          },
+                        ]}
+                        animate
+                        motionConfig="gentle"
+                      />
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Hypothèses appliquées (exigence d'audit : hypothèses visibles) */}
+          {fireResult && (
+            <Card elevation="raised">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Info className="h-5 w-5 text-accent" />
+                  Hypothèses de la simulation
+                </CardTitle>
+                <CardDescription>
+                  Toutes les hypothèses réellement appliquées par le moteur — modifiez les champs
+                  ci-dessus pour tester votre propre scénario.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const a = fireResult.assumptions
+                  const from = a.defaults_from ?? {}
+                  const rows: Array<{ key: string; label: string; value: string }> = [
+                    { key: 'current_value', label: 'Valeur de départ', value: formatCurrency(a.current_value) },
+                    { key: 'monthly_contribution', label: 'Épargne mensuelle', value: formatCurrency(a.monthly_contribution) },
+                    { key: 'annual_expenses', label: 'Dépenses annuelles (retraite)', value: formatCurrency(a.annual_expenses) },
+                    { key: 'withdrawal_rate', label: 'Taux de retrait', value: `${(a.withdrawal_rate * 100).toFixed(1)} %` },
+                    { key: 'annual_return_mean', label: 'Rendement annuel moyen', value: `${(a.annual_return_mean * 100).toFixed(1)} %` },
+                    { key: 'annual_volatility', label: 'Volatilité annuelle', value: `${(a.annual_volatility * 100).toFixed(1)} %` },
+                    { key: 'inflation', label: 'Inflation', value: `${(a.inflation * 100).toFixed(1)} %` },
+                    { key: 'index_contributions', label: 'Épargne indexée sur l’inflation', value: a.index_contributions ? 'Oui' : 'Non' },
+                    { key: 'years_horizon', label: 'Horizon', value: `${a.years_horizon} ans` },
+                    { key: 'n_paths', label: 'Trajectoires simulées', value: a.n_paths.toLocaleString('fr-FR') },
+                  ]
+                  return (
+                    <>
+                      <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                        {rows.map((row) => (
+                          <div key={row.key} className="flex items-baseline justify-between gap-4 border-b border-border/50 py-1.5">
+                            <dt className="text-sm text-muted-foreground">
+                              {row.label}
+                              {from[row.key] && (
+                                <span className="ml-1.5 text-xs text-accent">({from[row.key]})</span>
+                              )}
+                            </dt>
+                            <dd className="font-mono text-sm tabular-nums">{row.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        Rendements mensuels log-normaux indépendants (moyenne et volatilité
+                        constantes). Simulation sur {fireResult.n_paths.toLocaleString('fr-FR')}{' '}
+                        trajectoires : ce sont des probabilités sous hypothèses, pas des promesses —
+                        le passé ne préjuge pas des performances futures.
+                      </p>
                     </>
                   )
                 })()}

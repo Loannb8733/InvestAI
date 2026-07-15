@@ -1,11 +1,13 @@
 """Simulations endpoints for what-if scenarios, projections, and FIRE calculator."""
 
 import logging
+import math
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -49,6 +51,166 @@ async def _get_portfolio_live_data(db: AsyncSession, user_id: str, currency: str
     }
 
 
+# ============ Moteur FIRE probabiliste (fonction pure, numpy vectorisé) ============
+
+# Hypothèses (rendement moyen, volatilité) par profil de risque investisseur.
+# Utilisées quand le body omet annual_return_mean / annual_volatility et que
+# l'utilisateur a renseigné users.risk_profile.
+RISK_PROFILE_ASSUMPTIONS: Dict[str, tuple] = {
+    "conservative": (0.05, 0.10),
+    "moderate": (0.07, 0.15),
+    "aggressive": (0.10, 0.25),
+}
+
+
+def simulate_fire_probabilistic(
+    *,
+    current_value: float,
+    monthly_contribution: float,
+    annual_expenses: float,
+    withdrawal_rate: float,
+    annual_return_mean: float,
+    annual_volatility: float,
+    inflation: float,
+    index_contributions: bool,
+    years_horizon: int,
+    n_paths: int,
+    seed: Optional[int] = None,
+    start_year: Optional[int] = None,
+) -> Dict[str, Any]:
+    r"""Simulation Monte Carlo de l'atteinte du FIRE + survie post-FIRE.
+
+    Modèle mathématique
+    -------------------
+    Pas MENSUEL, rendements log-normaux i.i.d. par (chemin, mois) :
+
+        sigma_m = annual_volatility / sqrt(12)
+        mu_m    = ln(1 + annual_return_mean) / 12 - sigma_m^2 / 2
+        growth[p, t] = exp(X),  X ~ N(mu_m, sigma_m)
+
+    La correction de drift ``-sigma_m^2/2`` garantit que l'espérance du
+    facteur de croissance mensuel vaut exactement ``(1 + mean)^(1/12)``
+    (propriété de la log-normale : E[exp(X)] = exp(mu + sigma^2/2)).
+
+    Accumulation :
+
+        V[t+1] = V[t] * growth[t] + c_t
+        c_t = monthly_contribution * (1 + inflation)^(t/12)   si index_contributions
+            = monthly_contribution                            sinon
+
+    Nombre FIRE en euros COURANTS (le pouvoir d'achat cible est constant
+    en termes réels) :
+
+        fire_number_t = (annual_expenses / withdrawal_rate) * (1 + inflation)^(t/12)
+
+    FIRE atteint (par chemin) = premier mois où V >= fire_number_t. L'état
+    est ABSORBANT : une fois le nombre FIRE atteint, le chemin reste compté
+    « FIRE » pour la probabilité cumulée, même si le marché rebaisse ensuite.
+    On mesure « avoir atteint le nombre au moins une fois » (convention
+    cFIREsim) — la robustesse APRÈS l'atteinte est mesurée séparément par la
+    simulation de survie ci-dessous, pas en re-testant le seuil.
+
+    Survie post-FIRE (test « Trinity study ») — simulation SÉPARÉE :
+        départ à fire_number_today, AUCUNE contribution, retraits mensuels
+        de ``annual_expenses / 12`` indexés sur l'inflation, 30 ans, mêmes
+        hypothèses (mu_m, sigma_m). ``survival_prob_30y`` = fraction des
+        chemins dont la valeur ne passe JAMAIS <= 0 (la ruine est absorbante).
+        Avec retrait 4 %, rendement 7 % et volatilité 15 %, on retrouve
+        l'ordre de grandeur Trinity (~85-95 %).
+
+    Args:
+        seed: uniquement pour les tests (reproductibilité) — None en prod.
+        start_year: année calendaire de départ (défaut : année courante).
+
+    Returns:
+        Dict prêt pour ``FIREProbabilisticResult`` (types Python natifs) :
+        prob_by_year, prob_at_horizon, fire_year_p10/p50/p90, final_value_p10/
+        p50/p90, fire_number_today, survival_prob_30y, median_path, n_paths.
+    """
+    if start_year is None:
+        start_year = datetime.now().year
+
+    rng = np.random.default_rng(seed)
+    n_months = years_horizon * 12
+    sigma_m = annual_volatility / math.sqrt(12.0)
+    mu_m = math.log1p(annual_return_mean) / 12.0 - sigma_m**2 / 2.0
+    infl_m = (1.0 + inflation) ** (1.0 / 12.0)
+    fire_number_today = annual_expenses / withdrawal_rate
+
+    # ---- Phase 1 : accumulation --------------------------------------------
+    growth = np.exp(rng.normal(mu_m, sigma_m, size=(n_paths, n_months)))
+    values = np.full(n_paths, float(current_value))
+    # fire_month[p] = premier mois (0-indexé sur t=0..n_months) où le chemin
+    # p atteint le nombre FIRE ; -1 = jamais atteint sur l'horizon.
+    fire_month = np.full(n_paths, 0 if current_value >= fire_number_today else -1, dtype=np.int64)
+
+    median_by_year: List[float] = [float(current_value)]
+    fire_number_by_year: List[float] = [fire_number_today]
+
+    for t in range(n_months):
+        contribution = monthly_contribution * (infl_m**t) if index_contributions else monthly_contribution
+        values = values * growth[:, t] + contribution
+        fire_number_t = fire_number_today * (infl_m ** (t + 1))
+        newly_fire = (fire_month < 0) & (values >= fire_number_t)
+        fire_month[newly_fire] = t + 1
+        if (t + 1) % 12 == 0:
+            median_by_year.append(float(np.median(values)))
+            fire_number_by_year.append(fire_number_t)
+
+    reached = fire_month >= 0
+    prob_by_year: List[Dict[str, Any]] = []
+    for k in range(years_horizon + 1):
+        prob = float(np.mean(reached & (fire_month <= 12 * k)))
+        prob_by_year.append({"year": start_year + k, "prob": round(prob, 4)})
+
+    def _year_at_quantile(q: float) -> Optional[int]:
+        """Première année calendaire où la proba cumulée atteint q (None sinon)."""
+        for entry in prob_by_year:
+            if entry["prob"] >= q:
+                return int(entry["year"])
+        return None
+
+    prob_at_horizon = float(np.mean(reached))
+    final_p10, final_p50, final_p90 = (float(v) for v in np.percentile(values, [10, 50, 90]))
+
+    # ---- Phase 2 : survie post-FIRE (simulation séparée) -------------------
+    survival_months = 30 * 12
+    growth_retirement = np.exp(rng.normal(mu_m, sigma_m, size=(n_paths, survival_months)))
+    retirement_values = np.full(n_paths, fire_number_today)
+    ruined = np.zeros(n_paths, dtype=bool)
+    monthly_expenses = annual_expenses / 12.0
+    for t in range(survival_months):
+        withdrawal = monthly_expenses * (infl_m**t)
+        retirement_values = retirement_values * growth_retirement[:, t] - withdrawal
+        ruined |= retirement_values <= 0.0
+        retirement_values = np.maximum(retirement_values, 0.0)  # la ruine est absorbante
+    survival_prob_30y = float(1.0 - np.mean(ruined))
+
+    median_path = [
+        {
+            "year": start_year + i,
+            "portfolio_value": round(median_by_year[i], 2),
+            "fire_number": round(fire_number_by_year[i], 2),
+        }
+        for i in range(len(median_by_year))
+    ]
+
+    return {
+        "prob_by_year": prob_by_year,
+        "prob_at_horizon": round(prob_at_horizon, 4),
+        "fire_year_p10": _year_at_quantile(0.10),
+        "fire_year_p50": _year_at_quantile(0.50),
+        "fire_year_p90": _year_at_quantile(0.90),
+        "final_value_p10": round(final_p10, 2),
+        "final_value_p50": round(final_p50, 2),
+        "final_value_p90": round(final_p90, 2),
+        "fire_number_today": round(fire_number_today, 2),
+        "survival_prob_30y": round(survival_prob_30y, 4),
+        "median_path": median_path,
+        "n_paths": n_paths,
+    }
+
+
 # ============ Schemas ============
 
 
@@ -83,6 +245,64 @@ class FIREResult(BaseModel):
     is_fire_achieved: bool
     current_progress_percent: float
     currency: str
+
+
+class FIREProbabilisticParameters(BaseModel):
+    """Paramètres de la simulation FIRE probabiliste (taux en DÉCIMAL : 0.04 = 4 %)."""
+
+    current_value: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Valeur de départ. Si omise, valeur live du portefeuille (metrics_service).",
+    )
+    monthly_contribution: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Épargne mensuelle. Si omise, users.monthly_dca_eur (profil investisseur), sinon 0.",
+    )
+    annual_expenses: float = Field(
+        ..., gt=0, description="Dépenses annuelles cibles à la retraite (euros d'aujourd'hui)."
+    )
+    withdrawal_rate: float = Field(default=0.04, ge=0.02, le=0.08)
+    annual_return_mean: Optional[float] = Field(
+        None,
+        ge=-0.05,
+        le=0.20,
+        description="Rendement annuel moyen. Si omis, dérivé de users.risk_profile, sinon 0.07.",
+    )
+    annual_volatility: Optional[float] = Field(
+        None,
+        ge=0.01,
+        le=0.80,
+        description="Volatilité annuelle. Si omise, dérivée de users.risk_profile, sinon 0.15.",
+    )
+    inflation: float = Field(default=0.02, ge=0.0, le=0.10)
+    index_contributions: bool = Field(
+        default=True,
+        description="Indexer l'épargne mensuelle sur l'inflation (le nombre FIRE l'est toujours).",
+    )
+    years_horizon: int = Field(default=30, gt=0, le=50)
+    n_paths: int = Field(default=1000, ge=100, le=2000)
+    seed: Optional[int] = Field(None, description="Reproductibilité — tests uniquement.")
+
+
+class FIREProbabilisticResult(BaseModel):
+    """Résultat de la simulation FIRE probabiliste."""
+
+    prob_by_year: List[Dict[str, Any]]  # [{year, prob}] proba CUMULÉE d'avoir atteint FIRE
+    prob_at_horizon: float
+    fire_year_p10: Optional[int]  # année optimiste (10 % des chemins FIRE) — null si jamais atteint
+    fire_year_p50: Optional[int]  # année médiane
+    fire_year_p90: Optional[int]  # année prudente (90 % des chemins FIRE)
+    final_value_p10: float
+    final_value_p50: float
+    final_value_p90: float
+    fire_number_today: float
+    survival_prob_30y: float  # % de chemins survivant à 30 ans de retraits post-FIRE
+    median_path: List[Dict[str, Any]]  # [{year, portfolio_value, fire_number}] trajectoire médiane
+    n_paths: int
+    currency: str
+    assumptions: Dict[str, Any]  # écho complet des hypothèses appliquées (+ defaults_from)
 
 
 class ProjectionParameters(BaseModel):
@@ -324,6 +544,94 @@ async def calculate_fire(
     )
 
 
+@router.post("/fire-probabilistic", response_model=FIREProbabilisticResult)
+async def calculate_fire_probabilistic(
+    params: FIREProbabilisticParameters,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> FIREProbabilisticResult:
+    """FIRE probabiliste : « X % de chances d'être FIRE en année Y » (Monte Carlo).
+
+    Remplace la projection déterministe unique (un chiffre trompeur) par la
+    probabilité cumulée d'atteindre le nombre FIRE sur N trajectoires
+    log-normales mensuelles, plus un test de survie post-FIRE de 30 ans
+    (cohérence Trinity study). Les paramètres omis sont pré-remplis depuis
+    le portefeuille live et le profil investisseur (users.risk_profile /
+    users.monthly_dca_eur) — la source de chaque défaut est échouée dans
+    ``assumptions.defaults_from`` (hypothèses VISIBLES, exigence d'audit).
+    """
+    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
+    defaults_from: Dict[str, str] = {}
+
+    # 1) Valeur de départ : live si non fournie (même source que /fire et /projection)
+    current_value = params.current_value
+    if current_value is None:
+        live = await _get_portfolio_live_data(db, str(current_user.id), currency)
+        current_value = max(float(live["total_value"]), 0.0)
+        defaults_from["current_value"] = "portefeuille live"
+
+    # 2) Pré-remplissage intelligent depuis le profil investisseur
+    risk_profile = (getattr(current_user, "risk_profile", None) or "").lower()
+    profile_assumptions = RISK_PROFILE_ASSUMPTIONS.get(risk_profile)
+
+    monthly_contribution = params.monthly_contribution
+    if monthly_contribution is None:
+        monthly_dca = getattr(current_user, "monthly_dca_eur", None)
+        if monthly_dca is not None:
+            monthly_contribution = float(monthly_dca)
+            defaults_from["monthly_contribution"] = "profil investisseur (DCA mensuel)"
+        else:
+            monthly_contribution = 0.0
+
+    annual_return_mean = params.annual_return_mean
+    if annual_return_mean is None:
+        if profile_assumptions is not None:
+            annual_return_mean = profile_assumptions[0]
+            defaults_from["annual_return_mean"] = f"profil investisseur ({risk_profile})"
+        else:
+            annual_return_mean = 0.07
+
+    annual_volatility = params.annual_volatility
+    if annual_volatility is None:
+        if profile_assumptions is not None:
+            annual_volatility = profile_assumptions[1]
+            defaults_from["annual_volatility"] = f"profil investisseur ({risk_profile})"
+        else:
+            annual_volatility = 0.15
+
+    simulation = simulate_fire_probabilistic(
+        current_value=current_value,
+        monthly_contribution=monthly_contribution,
+        annual_expenses=params.annual_expenses,
+        withdrawal_rate=params.withdrawal_rate,
+        annual_return_mean=annual_return_mean,
+        annual_volatility=annual_volatility,
+        inflation=params.inflation,
+        index_contributions=params.index_contributions,
+        years_horizon=params.years_horizon,
+        n_paths=params.n_paths,
+        seed=params.seed,
+    )
+
+    # Écho COMPLET des hypothèses réellement appliquées (exigence d'audit :
+    # hypothèses visibles), avec la provenance des valeurs par défaut.
+    assumptions: Dict[str, Any] = {
+        "current_value": round(current_value, 2),
+        "monthly_contribution": round(monthly_contribution, 2),
+        "annual_expenses": round(params.annual_expenses, 2),
+        "withdrawal_rate": params.withdrawal_rate,
+        "annual_return_mean": annual_return_mean,
+        "annual_volatility": annual_volatility,
+        "inflation": params.inflation,
+        "index_contributions": params.index_contributions,
+        "years_horizon": params.years_horizon,
+        "n_paths": params.n_paths,
+        "defaults_from": defaults_from or None,
+    }
+
+    return FIREProbabilisticResult(**simulation, currency=currency, assumptions=assumptions)
+
+
 @router.post("/projection", response_model=ProjectionResult)
 async def project_portfolio(
     params: ProjectionParameters,
@@ -416,8 +724,6 @@ async def simulate_dca(
     d'investissement (hebdo/mensuel/trimestriel) — l'ancien code appliquait
     un pas mensuel quelle que soit la fréquence.
     """
-    import numpy as np
-
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
 
     # Determine investment frequency and per-period scaling
