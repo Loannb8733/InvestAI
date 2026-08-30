@@ -3,71 +3,13 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import {
-  LayoutDashboard,
-  Wallet,
-  FileText,
   Settings,
   Users,
-  Calendar,
-  Target,
-  Brain,
-  FolderOpen,
-  ShieldCheck,
   X,
-  Bell,
-  BookOpen,
-  Lightbulb,
-  Compass,
   Sparkles,
-  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-interface NavItem {
-  icon: LucideIcon
-  label: string
-  path: string
-}
-
-interface NavGroup {
-  label: string
-  items: NavItem[]
-}
-
-const navGroups: NavGroup[] = [
-  {
-    label: 'Vue globale',
-    items: [
-      { icon: LayoutDashboard, label: 'Tableau de bord', path: '/' },
-      { icon: Calendar, label: 'Calendrier', path: '/calendar' },
-    ],
-  },
-  {
-    label: 'Crypto',
-    items: [
-      { icon: Compass, label: "Vue d'ensemble", path: '/crypto' },
-      { icon: Wallet, label: 'Portefeuille', path: '/portfolio' },
-      { icon: Brain, label: 'Analyses IA', path: '/intelligence' },
-    ],
-  },
-  {
-    label: 'Crowdfunding',
-    items: [
-      { icon: FolderOpen, label: 'Mes Projets', path: '/crowdfunding' },
-      { icon: ShieldCheck, label: 'Audit Lab', path: '/crowdfunding/audit-lab' },
-    ],
-  },
-  {
-    label: 'Outils',
-    items: [
-      { icon: Target, label: 'Objectifs', path: '/strategy' },
-      { icon: FileText, label: 'Rapports', path: '/reports' },
-      { icon: Bell, label: 'Alertes', path: '/alerts' },
-      { icon: BookOpen, label: 'Notes', path: '/notes' },
-      { icon: Lightbulb, label: 'Stratégies', path: '/strategies' },
-    ],
-  },
-]
+import { navGroups, type NavItem } from './navigation'
 
 interface NavRailProps {
   isOpen?: boolean
