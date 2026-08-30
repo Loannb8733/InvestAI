@@ -331,6 +331,10 @@ def _create_missing_transfer_mirrors():
                 sync_engine.dispose()
                 return
 
+            # Quantité réellement miroitée par actif destination : c'est ce dont on
+            # incrémentera la destination, sans jamais relire tout son historique.
+            mirrored_qty_by_asset: dict[str, float] = {}
+
             # Clear broken references
             for r in rows:
                 conn.execute(
@@ -457,39 +461,23 @@ def _create_missing_transfer_mirrors():
                     text("UPDATE transactions SET related_transaction_id = :mid WHERE id = :tid"),
                     {"mid": mirror_id, "tid": r.id},
                 )
+                mirrored_qty_by_asset[dest_asset_id] = mirrored_qty_by_asset.get(dest_asset_id, 0.0) + float(mirror_qty)
 
-            # Recalculate quantities for all destination assets
-            for key, aid in asset_cache.items():
-                net = conn.execute(
-                    text(
-                        "SELECT COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN"
-                        " ('buy','conversion_in','transfer_in','airdrop','staking_reward','dividend','interest')"
-                        " THEN quantity ELSE 0 END), 0)"
-                        " - COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')"
-                        " THEN quantity ELSE 0 END), 0) AS net_qty"
-                        " FROM transactions WHERE asset_id = :aid"
-                    ),
-                    {"aid": aid},
-                ).fetchone()
-                qty = max(0, float(net.net_qty)) if net else 0
-
-                buy = conn.execute(
-                    text(
-                        "SELECT COALESCE(SUM(quantity), 0) AS tq, COALESCE(SUM(quantity * price), 0) AS tc"
-                        " FROM transactions WHERE asset_id = :aid"
-                        " AND transaction_type::text IN ('BUY','CONVERSION_IN')"
-                    ),
-                    {"aid": aid},
-                ).fetchone()
-                avg = float(buy.tc) / float(buy.tq) if buy and float(buy.tq) > 0 else 0
-
+            # On INCREMENTE la destination du montant réellement miroité, au lieu de
+            # recalculer son solde depuis tout son historique.
+            #
+            # Le recalcul supposait l'historique exhaustif. Il ne l'est jamais pour un
+            # cold wallet : rien ne peut remonter ses sorties (pas d'API). Recalculer
+            # y remplaçait donc un solde juste par la somme des seules entrées connues.
+            # Même logique que create_mirror_transfer_in() dans transfer_service.py.
+            for aid, added in mirrored_qty_by_asset.items():
+                if added <= 0:
+                    continue
                 conn.execute(
-                    text("UPDATE assets SET quantity = :qty, avg_buy_price = :avg WHERE id = :aid"),
-                    {"qty": qty, "avg": avg, "aid": aid},
+                    text("UPDATE assets SET quantity = COALESCE(quantity, 0) + :add WHERE id = :aid"),
+                    {"add": added, "aid": aid},
                 )
-                logger.info("Recalculated dest asset %s: qty=%s, avg=%s", aid, qty, avg)
+                logger.info("Dest asset %s: +%s (miroirs créés)", aid, added)
 
             logger.info("Transfer mirror fix complete")
         sync_engine.dispose()
@@ -1000,31 +988,14 @@ async def admin_fix_mirrors(
 
             log.append(f"Found {len(rows)} unmirrored transfer_out")
 
-            # Always recalculate ALL Tangem assets (fix for previous runs with wrong case)
-            tangem_assets = conn.execute(
-                text("SELECT id, symbol FROM assets WHERE exchange = :exc"),
-                {"exc": DEFAULT_DESTINATION},
-            ).fetchall()
-            for ta in tangem_assets:
-                net = conn.execute(
-                    text(
-                        "SELECT COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN"
-                        " ('BUY','CONVERSION_IN','TRANSFER_IN','AIRDROP','STAKING_REWARD','DIVIDEND','INTEREST')"
-                        " THEN quantity ELSE 0 END), 0)"
-                        " - COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')"
-                        " THEN quantity ELSE 0 END), 0) AS net_qty"
-                        " FROM transactions WHERE asset_id = :aid"
-                    ),
-                    {"aid": ta.id},
-                ).fetchone()
-                final_qty = max(0, float(net.net_qty)) if net else 0
-                conn.execute(
-                    text("UPDATE assets SET quantity = :qty WHERE id = :aid"),
-                    {"qty": final_qty, "aid": ta.id},
-                )
-                log.append(f"Recalc Tangem {ta.symbol} qty={final_qty}")
+            # Quantité réellement miroitée par actif destination (cf. incrément plus bas).
+            mirrored_qty_by_asset: dict[str, float] = {}
+
+            # (Retiré) Le rattrapage « recalculer TOUS les actifs Tangem » écrasait
+            # chaque solde par la somme de son historique. Pour un cold wallet, cet
+            # historique ne contient que les entrées — les sorties ne sont pas
+            # récupérables — donc ce rattrapage transformait un solde correct en
+            # total d'entrées. Il ne reste que l'incrément des miroirs créés.
 
             if not rows:
                 sync_engine.dispose()
@@ -1142,29 +1113,18 @@ async def admin_fix_mirrors(
                     {"mid": mirror_id, "tid": r.id},
                 )
                 mirrors_created += 1
+                mirrored_qty_by_asset[dest_asset_id] = mirrored_qty_by_asset.get(dest_asset_id, 0.0) + float(mirror_qty)
                 log.append(f"Mirror {r.symbol} {mirror_qty} -> {DEFAULT_DESTINATION}")
 
-            # Recalculate destination asset quantities
-            for key, aid in asset_cache.items():
-                net = conn.execute(
-                    text(
-                        "SELECT COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN"
-                        " ('BUY','CONVERSION_IN','TRANSFER_IN','AIRDROP','STAKING_REWARD','DIVIDEND','INTEREST')"
-                        " THEN quantity ELSE 0 END), 0)"
-                        " - COALESCE(SUM(CASE"
-                        " WHEN transaction_type::text IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')"
-                        " THEN quantity ELSE 0 END), 0) AS net_qty"
-                        " FROM transactions WHERE asset_id = :aid"
-                    ),
-                    {"aid": aid},
-                ).fetchone()
-                final_qty = max(0, float(net.net_qty)) if net else 0
+            # Incrément, jamais recalcul global : cf. _create_missing_transfer_mirrors.
+            for aid, added in mirrored_qty_by_asset.items():
+                if added <= 0:
+                    continue
                 conn.execute(
-                    text("UPDATE assets SET quantity = :qty WHERE id = :aid"),
-                    {"qty": final_qty, "aid": aid},
+                    text("UPDATE assets SET quantity = COALESCE(quantity, 0) + :add WHERE id = :aid"),
+                    {"add": added, "aid": aid},
                 )
-                log.append(f"Asset {key[1]}/{key[2]} qty={final_qty}")
+                log.append(f"Asset {aid} +{added}")
 
         sync_engine.dispose()
         return {"status": "ok", "mirrors_created": mirrors_created, "log": log}
