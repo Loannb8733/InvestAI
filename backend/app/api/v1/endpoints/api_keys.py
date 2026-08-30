@@ -41,6 +41,28 @@ from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, 
 from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
 from app.services.metrics_service import invalidate_dashboard_cache
 
+
+def earn_positions_to_close(net_rows, still_staked, epsilon: float = 0.0001):
+    """Marqueurs Earn à éteindre : en base avec un solde, absents de l'exchange.
+
+    ``net_rows`` : lignes ``(asset_id, symbol, net)`` où ``net`` = STAKING - UNSTAKING.
+    ``still_staked`` : symboles encore en position d'après l'API.
+
+    Fonction pure (ni DB ni HTTP) : c'est la décision qu'on veut pouvoir tester,
+    la boucle appelante ne fait qu'écrire les lignes qu'elle renvoie.
+    """
+    open_syms = {str(sym).upper() for sym in still_staked}
+    to_close = []
+    for asset_id, symbol, net in net_rows:
+        net_qty = float(net or 0)
+        if net_qty <= epsilon:
+            continue  # déjà soldé, ou poussière
+        if str(symbol).upper() in open_syms:
+            continue  # toujours en Earn : on n'y touche pas
+        to_close.append((asset_id, symbol, net_qty))
+    return to_close
+
+
 router = APIRouter()
 
 
@@ -1310,7 +1332,9 @@ async def import_trade_history(
                 if abs(float(existing_staking_tx.quantity) - staked_qty) > 0.0001:
                     old_qty = float(existing_staking_tx.quantity)
                     existing_staking_tx.quantity = staked_qty
-                    existing_staking_tx.executed_at = datetime.now(timezone.utc)
+                    # `executed_at` reste la date d'entrée en position : l'écraser à
+                    # chaque sync faisait croire que le staking venait de commencer,
+                    # ce qui fausse l'APR annualisé calculé dans le dashboard.
                     existing_staking_tx.notes = f"Auto: {staked_qty:.8f} {base_sym} in Earn/Staking"
                     staking_created += 1
                     logger.info(f"{base_sym}: updated STAKING tx {old_qty:.8f} → {staked_qty:.8f}")
@@ -1329,6 +1353,55 @@ async def import_trade_history(
             db.add(staking_tx)
             staking_created += 1
             logger.info(f"{base_sym}: created STAKING transaction ({staked_qty:.8f} in Earn)")
+
+        # Solde les positions Earn refermées depuis la dernière sync.
+        #
+        # La boucle ci-dessus n'itère que sur les positions *encore ouvertes* : un
+        # actif retiré de l'Earn en sort, plus rien ne le met à jour, et son marqueur
+        # STAKING restait figé pour toujours sur sa dernière valeur. Le dashboard
+        # continuait alors d'afficher — et de valoriser — une position inexistante.
+        #
+        # On rapproche donc les marqueurs en base de la liste courante, et on éteint
+        # les orphelins par un UNSTAKING (le type existe déjà et le dashboard le
+        # soustrait), plutôt qu'en retouchant le STAKING : la position reste lisible
+        # dans l'historique.
+        still_staked = {sym for sym, qty in earn_staked.items() if qty > 0}
+        net_staked = await db.execute(
+            select(
+                Asset.id,
+                Asset.symbol,
+                func.sum(
+                    case(
+                        (Transaction.transaction_type == TransactionType.STAKING, Transaction.quantity),
+                        (Transaction.transaction_type == TransactionType.UNSTAKING, -Transaction.quantity),
+                        else_=0,
+                    )
+                ).label("net"),
+            )
+            .join(Transaction, Transaction.asset_id == Asset.id)
+            .where(
+                Asset.portfolio_id == portfolio.id,
+                Asset.exchange == service.exchange_name,
+                Transaction.transaction_type.in_([TransactionType.STAKING, TransactionType.UNSTAKING]),
+            )
+            .group_by(Asset.id, Asset.symbol)
+        )
+        for asset_id, symbol, net_qty in earn_positions_to_close(net_staked.all(), still_staked):
+            db.add(
+                Transaction(
+                    asset_id=asset_id,
+                    transaction_type=TransactionType.UNSTAKING,
+                    quantity=net_qty,
+                    price=0,
+                    fee=0,
+                    currency="EUR",
+                    executed_at=datetime.now(timezone.utc),
+                    exchange=service.exchange_name,
+                    notes=f"Auto: sortie d'Earn/Staking ({net_qty:.8f} {symbol})",
+                )
+            )
+            staking_created += 1
+            logger.info("%s: position Earn refermée, UNSTAKING de %.8f", symbol, net_qty)
 
         if staking_created:
             await db.flush()
