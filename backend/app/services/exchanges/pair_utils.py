@@ -108,3 +108,37 @@ def quote_fx_currency(quote: Optional[str]) -> Optional[str]:
 def is_crypto_quote(quote: Optional[str]) -> bool:
     """True if the quote is a crypto asset (BTC/ETH/BNB), not a fiat anchor."""
     return bool(quote) and quote.strip().upper() in CRYPTO_QUOTES
+
+
+def fee_currency_quote_anchor(fee_currency: Optional[str], asset_symbol: Optional[str]) -> Optional[str]:
+    """Infer a trade's fiat anchor from the fee currency of an already-stored row.
+
+    Used by the historical backfill, where the pair symbol is *not* available: the
+    ``transactions`` table keeps only the base asset (via ``asset_id``), never the quote.
+    The fee currency is the one surviving clue, and how much it is worth depends on the
+    exchange:
+
+    - Kraken books ``fee_currency`` = the pair's quote currency by construction, so the
+      answer is exact.
+    - Binance books ``commissionAsset``, which is the *received* asset on a buy, BNB when
+      fee discount is on, and the quote on a sell.
+
+    Rather than branch per exchange, we rely on one discriminant that holds for both: a
+    fee charged in the row's own asset tells us nothing about the quote, and a fee
+    charged in some *other* fiat/USD-stable can only be the quote. Everything else
+    (BNB, crypto, unknown) yields ``None``.
+
+    This also neutralises the one false positive worth worrying about — buying a
+    USD-stablecoin against EUR (e.g. ``USDCEUR``, fee in USDC) would otherwise be
+    mislabelled USD; here ``fee_currency == asset_symbol`` filters it out.
+
+    Returns the fiat anchor (``"USD"``, ``"GBP"``, …) or ``None`` when the fee currency
+    cannot prove the quote. Never guesses: ``None`` means "leave the row alone".
+    """
+    if not fee_currency:
+        return None
+    fc = fee_currency.strip().upper()
+    if asset_symbol and fc == asset_symbol.strip().upper():
+        # Fee taken on the base asset (Binance buy) -> says nothing about the quote.
+        return None
+    return quote_fx_currency(fc)
