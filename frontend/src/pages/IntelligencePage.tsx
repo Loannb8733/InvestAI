@@ -1,10 +1,11 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ShieldHalf, Radar, Crosshair, Bell, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import RegimeHeader from '@/components/intelligence/RegimeHeader'
 import { lazyWithRetry } from '@/lib/lazyWithRetry'
+import { LEGACY_TAB_MAP, TABS } from './intelligenceTabs'
 
 /**
  * Hub Intelligence — architecture « 3 piliers » (refonte 2026-07).
@@ -39,23 +40,6 @@ function TabLoader() {
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
   )
-}
-
-const TABS = [
-  { value: 'risk', label: 'Risque & Performance', icon: ShieldHalf },
-  { value: 'market', label: 'Marché & Signaux', icon: Radar },
-  { value: 'decisions', label: 'Décisions', icon: Crosshair },
-  { value: 'alerts', label: 'Alertes', icon: Bell },
-] as const
-
-/** Anciens ?tab= (liens externes, favoris) → nouveaux piliers. */
-const LEGACY_TAB_MAP: Record<string, string> = {
-  alpha: 'market',
-  smart: 'risk',
-  analytics: 'risk',
-  predictions: 'market',
-  strategies: 'decisions',
-  alerts: 'alerts',
 }
 
 export default function IntelligencePage() {
