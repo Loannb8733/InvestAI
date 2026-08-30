@@ -7,14 +7,19 @@ Before FIN-01, the exchange sync hard-coded ``currency="EUR"`` and left
 or overstates the EUR cost basis by the FX delta (~8-9% for USD-quoted history). The
 sync is now fixed going forward; this script repairs the rows already in the database.
 
-Scope (deliberately conservative)
----------------------------------
-We only touch rows where the original quote currency is *recoverable with certainty*:
-fiat orders and auto-invest (DCA) rows, whose ``fee_currency`` holds the real fiat
-currency the user paid in. Normal order-book trades are NOT touched here — their
-``fee_currency`` is typically the received asset or BNB, not the quote, so inferring
-their currency would be a guess. They keep ``currency='EUR'`` until a separate,
-explicitly-chosen strategy handles them.
+Scope (conservative, but wider than fiat-only)
+---------------------------------------------
+We touch a row only when its original quote currency is *recoverable with certainty*
+from what the database still holds. The pair symbol is gone (``transactions`` keeps the
+base asset only), so ``fee_currency`` is the sole clue, and its worth is exchange-
+dependent: Kraken stores the quote there by construction, Binance stores the received
+asset, BNB, or the quote depending on the side and fee settings.
+
+:func:`fee_currency_quote_anchor` encodes the one discriminant valid for both — a fee
+charged in the row's own asset proves nothing, a fee charged in another fiat/USD-stable
+can only be the quote — so order-book trades are now covered wherever that holds, and
+skipped (never guessed) everywhere else. Rows whose fee was paid in BNB remain
+unrecoverable by design; they are reported, not silently dropped.
 
 Safety
 ------
@@ -43,15 +48,19 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import or_, select  # noqa: E402
 
 from app.core.database import AsyncSessionLocal  # noqa: E402
-from app.models.transaction import Transaction  # noqa: E402
-from app.services.exchanges.pair_utils import quote_fx_currency  # noqa: E402
+from app.models.asset import Asset  # noqa: E402
+from app.models.transaction import Transaction, TransactionType  # noqa: E402
+from app.services.exchanges.pair_utils import fee_currency_quote_anchor  # noqa: E402
 from app.services.fx_history_service import FxHistoryService  # noqa: E402
 
-# Only these synced row kinds retain the real fiat currency in fee_currency.
-_RECOVERABLE_NOTES = ("Fiat Order", "Auto-Invest DCA")
+# Synced row kinds whose fee_currency is the fiat the user actually paid in.
+# "Instant Buy" was missing here even though the live sync already resolves its FX.
+_RECOVERABLE_NOTES = ("Fiat Order", "Auto-Invest DCA", "Instant Buy")
+# Order-book trades carry no notes; they are reached by type instead.
+_ORDER_BOOK_TYPES = (TransactionType.BUY, TransactionType.SELL)
 # Frankfurter (ECB) history is plentiful from 1999; 2017 covers all real crypto history.
 _EARLIEST = date(2017, 1, 1)
 
@@ -60,23 +69,34 @@ async def backfill(commit: bool) -> None:
     async with AsyncSessionLocal() as db:
         fx = FxHistoryService(db)
 
-        # Candidate rows: synced fiat/auto-invest, not yet FX-resolved.
+        # Candidate rows: any synced, not-yet-FX-resolved row whose kind can carry a
+        # recoverable quote — fiat/instant/DCA purchases, plus order-book trades.
+        # Joined to Asset because the discriminant compares fee_currency to the row's
+        # own asset symbol. `exchange != ""` keeps manual/CSV rows out: those never went
+        # through the sync, so their fee_currency follows no known convention.
         result = await db.execute(
-            select(Transaction).where(
+            select(Transaction, Asset.symbol)
+            .join(Asset, Asset.id == Transaction.asset_id)
+            .where(
                 Transaction.conversion_rate.is_(None),
                 Transaction.currency == "EUR",
-                Transaction.notes.in_(_RECOVERABLE_NOTES),
                 Transaction.fee_currency.isnot(None),
                 Transaction.executed_at.isnot(None),
+                Transaction.exchange.isnot(None),
+                Transaction.exchange != "",
+                or_(
+                    Transaction.notes.in_(_RECOVERABLE_NOTES),
+                    Transaction.transaction_type.in_(_ORDER_BOOK_TYPES),
+                ),
             )
         )
-        rows = list(result.scalars().all())
-        print(f"Found {len(rows)} candidate fiat/auto-invest rows with NULL conversion_rate.")
+        rows = list(result.all())
+        print(f"Found {len(rows)} synced candidate rows with NULL conversion_rate.")
 
         # Determine which non-EUR anchors we actually need, then seed each once.
         anchors_needed: set[str] = set()
-        for tx in rows:
-            anchor = quote_fx_currency(tx.fee_currency)
+        for tx, asset_symbol in rows:
+            anchor = fee_currency_quote_anchor(tx.fee_currency, asset_symbol)
             if anchor and anchor != "EUR":
                 anchors_needed.add(anchor)
         for anchor in sorted(anchors_needed):
@@ -88,10 +108,16 @@ async def backfill(commit: bool) -> None:
 
         updated = Counter()
         skipped_eur = 0
+        skipped_unprovable = Counter()
         skipped_no_rate = Counter()
-        for tx in rows:
-            anchor = quote_fx_currency(tx.fee_currency)
-            if anchor is None or anchor == "EUR":
+        for tx, asset_symbol in rows:
+            anchor = fee_currency_quote_anchor(tx.fee_currency, asset_symbol)
+            if anchor is None:
+                # Fee paid in the asset itself, in BNB, or in an unknown symbol: the
+                # quote cannot be proven, so the row is left exactly as it is.
+                skipped_unprovable[(tx.fee_currency or "?").upper()] += 1
+                continue
+            if anchor == "EUR":
                 skipped_eur += 1
                 continue
             rate = await fx.get_rate(tx.executed_at.date(), anchor, "EUR")
@@ -106,7 +132,13 @@ async def backfill(commit: bool) -> None:
         print(f"Would update: {sum(updated.values())} rows")
         for anchor, n in sorted(updated.items()):
             print(f"    {anchor}->EUR : {n}")
-        print(f"Left as EUR (quote already EUR/unknown): {skipped_eur}")
+        print(f"Left as EUR (quote already EUR): {skipped_eur}")
+        if skipped_unprovable:
+            # Reported, never silently dropped: this is the residual FIN-01 exposure.
+            total = sum(skipped_unprovable.values())
+            print(f"Left as EUR (quote not provable from fee currency): {total}")
+            for fc, n in sorted(skipped_unprovable.items(), key=lambda kv: -kv[1]):
+                print(f"    fee in {fc} : {n}")
         if skipped_no_rate:
             print("Skipped (no historical rate found):")
             for anchor, n in sorted(skipped_no_rate.items()):
