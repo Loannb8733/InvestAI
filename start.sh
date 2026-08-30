@@ -16,4 +16,10 @@ else
   echo "  (le backend basculera sur Gemini/Groq si configure)"
 fi
 
-docker compose "${@:-up -d}"
+# "${@:-up -d}" s'expanserait en UN seul mot ("up -d"), que docker compose
+# rejette : on positionne le defaut dans les parametres avant de le passer.
+if [ "$#" -eq 0 ]; then
+  set -- up -d
+fi
+
+docker compose "$@"
