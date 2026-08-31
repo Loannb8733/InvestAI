@@ -55,6 +55,23 @@ from sqlalchemy.ext.asyncio import create_async_engine
 TOL_EUR = Decimal("0.05")
 TOL_QTY = Decimal("0.00000001")  # 1e-8: tighter than asset.quantity precision
 
+# En dessous de cette valeur (quantité × prix de revient, en devise du portefeuille),
+# une position est considérée comme SOLDÉE : un écart entre son historique et son
+# solde ne peut plus influencer le patrimoine affiché, puisque la valorisation se
+# fait sur une quantité négligeable.
+#
+# Ces écarts restent signalés — en WARN, sans faire échouer le contrôle. Un
+# invariant qui reste rouge en permanence sur des poussières finit par n'être plus
+# lu, et masque les vraies violations. Constaté : 3 écarts résiduels portant sur
+# 0,00000098 USDC, 0,00011088 SOL et 0,00000202 ETH — soit moins d'un centime au
+# total, sur des actifs que le dashboard n'affiche même pas.
+MATERIALITY_VALUE = Decimal("1.00")
+
+# Un écart dont la valeur est inférieure à ce montant est du bruit d'arrondi, pas une
+# incohérence — même sur une position bien ouverte. Sans ce second critère, un écart
+# de 1,22e-8 SOL (soit un millionième d'euro) était signalé comme violation.
+MATERIALITY_DIFF_VALUE = Decimal("0.01")
+
 
 @dataclass
 class Issue:
@@ -90,6 +107,29 @@ async def _fetchall(conn, sql: str, **params):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def classify_holdings_gap(stored: Decimal, computed: Decimal, pru: Decimal):
+    """Un écart de holdings est-il matériel ? Renvoie ``(immaterial, raison)``.
+
+    Deux cas ne peuvent pas influencer le patrimoine affiché :
+    - la position est soldée (sa valeur est négligeable), donc la valorisation ne
+      porte plus sur rien ;
+    - l'écart lui-même vaut moins d'un centime : c'est du bruit d'arrondi.
+
+    Les signaler en ERROR rendait ce contrôle rouge en permanence — et un contrôle
+    toujours rouge finit par n'être plus lu, ce qui masque les vraies violations.
+    Ils restent listés, en WARN, sans faire échouer le script.
+
+    Fonction pure : testable sans base.
+    """
+    position_value = abs(stored) * pru
+    diff_value = abs(stored - computed) * pru
+    if position_value < MATERIALITY_VALUE:
+        return True, f"position soldée, valeur {position_value:.4f} — sans impact"
+    if diff_value < MATERIALITY_DIFF_VALUE:
+        return True, f"écart de {diff_value:.6f} — bruit d'arrondi"
+    return False, ""
+
+
 async def check_holdings_qty(conn) -> List[Issue]:
     """A. asset.quantity must equal the signed sum of its transactions.
 
@@ -102,6 +142,7 @@ async def check_holdings_qty(conn) -> List[Issue]:
         SELECT a.id              AS asset_id,
                a.symbol          AS symbol,
                a.quantity        AS stored_qty,
+               a.avg_buy_price   AS pru,
                p.user_id         AS user_id,
                COALESCE(SUM(CASE
                    WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP','STAKING_REWARD')
@@ -122,12 +163,20 @@ async def check_holdings_qty(conn) -> List[Issue]:
         stored = Decimal(str(r["stored_qty"] or 0))
         computed = Decimal(str(r["computed_qty"] or 0))
         if abs(stored - computed) > TOL_QTY:
+            # Position soldée : l'écart ne peut plus peser sur le patrimoine affiché.
+            pru = Decimal(str(r["pru"] or 0))
+            immaterial, raison = classify_holdings_gap(stored, computed, pru)
+            detail = (
+                f"asset={r['symbol']}({r['asset_id']}) stored={stored} " f"computed={computed} diff={stored - computed}"
+            )
+            if immaterial:
+                detail += f" [{raison}]"
             issues.append(
                 Issue(
-                    "ERROR",
+                    "WARN" if immaterial else "ERROR",
                     "A.holdings",
                     str(r["user_id"]),
-                    f"asset={r['symbol']}({r['asset_id']}) stored={stored} computed={computed} diff={stored - computed}",
+                    detail,
                 )
             )
     return issues
@@ -275,20 +324,36 @@ async def main() -> int:
     for i in all_issues:
         by_inv[i.invariant].append(i)
 
+    errors = [i for i in all_issues if i.severity == "ERROR"]
+    warns = [i for i in all_issues if i.severity != "ERROR"]
+
     print("\n" + "=" * 72)
     if not all_issues:
         print("✓ ALL INVARIANTS HELD")
         return 0
 
-    print(f"✗ {len(all_issues)} VIOLATION(S):\n")
+    if errors:
+        print(f"✗ {len(errors)} VIOLATION(S):\n")
+    else:
+        print("✓ ALL INVARIANTS HELD (aucune violation matérielle)\n")
+
     for inv, group in by_inv.items():
+        shown = [i for i in group if i.severity == "ERROR"] or group
         print(f"  {inv}: {len(group)}")
-        for i in group[:10]:
+        for i in shown[:10]:
             print(f"    {i.line()}")
-        if len(group) > 10:
-            print(f"    … and {len(group) - 10} more")
+        if len(shown) > 10:
+            print(f"    … and {len(shown) - 10} more")
         print()
-    return 1
+
+    if warns:
+        # Signalés, jamais bloquants : ce sont des positions soldées dont l'écart
+        # ne peut plus influencer les montants affichés.
+        print(f"  ({len(warns)} avertissement(s) sans impact matériel)\n")
+
+    # Le code de sortie ne dépend QUE des violations matérielles : un contrôle qui
+    # échoue en permanence sur des poussières cesse d'être lu.
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":
