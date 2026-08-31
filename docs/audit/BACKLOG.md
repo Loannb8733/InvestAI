@@ -5,6 +5,49 @@
 
 ---
 
+## ⚠️ Mise à jour du 2026-08-31 — lire avant de reprendre ce backlog
+
+Une session de travail sur les données **réelles de production** a invalidé plusieurs
+hypothèses de l'audit. Ce qui suit prime sur le reste du document.
+
+### Ce qui était faux dans l'audit
+
+| Affirmation de l'audit | Réalité mesurée |
+|---|---|
+| FIN-01 « non entamé », P0 🔴 | **Déjà implémenté à ~80 %** avant la session : `pair_utils`, `_resolve_trade_fx`, `_heal_transaction_fx`, `fx_history_service`, script de backfill et 5 fichiers de tests existaient. |
+| « coût de base faux de ~8-9 % pour la majorité des traders crypto » | **0 ligne concernée en production.** Les 164 achats/ventes du compte sont réellement en EUR. Le correctif reste juste, mais ne justifiait pas la priorité P0 *pour cet usage*. |
+| FIN-01 localisé dans `tasks/sync_exchanges.py` | Périmètre incomplet : `services/csv_parsers.py:639` force aussi `currency="EUR"` sans lire de colonne devise. |
+| Les 11 violations de l'invariant A | Ni un bug de calcul ni un historique « incomplet » : **5 étaient des écritures fantômes** créées par le mirroring (voir NEW-02). |
+
+**Leçon de méthode** : chaque ticket de ce backlog a été écrit en lisant du code, pas en
+mesurant des données. Avant d'investir sur FIN-02, FIN-03 ou FIN-04, **mesurer d'abord
+l'exposition réelle** — le diagnostic prend dix minutes et peut annuler des jours de travail.
+
+### Livré le 2026-08-31
+
+| Ticket | État | Détail |
+|---|---|---|
+| **UX-01** | ✅ | La redirection `/strategies` existait déjà ; l'apport est le garde-fou croisant chaque entrée de menu avec les `<Route>` d'`App.tsx`. Vérifié à l'écran : 12 entrées, 0 404. |
+| **FIN-01** | ✅ | Backfill élargi aux trades order-book et aux « Instant Buy » (oubliés). Sur la base de dev : 0 → 15 lignes corrigées. En prod : 0 ligne concernée. |
+| **FIN-TEST** | 🟡 partiel | 31 tests numériques déterministes ajoutés (discriminant FX, Earn, mirroring, cookie). Les tests de parité/XIRR restent à durcir. |
+
+### Findings découverts en session (absents de l'audit)
+
+| ID | Sév. | Problème → Correctif | État |
+|---|---|---|---|
+| **NEW-01** | 🔴 | `start.sh` ne démarrait rien : `"${@:-up -d}"` s'expanse en UN mot, rejeté par `docker compose`. | ✅ corrigé |
+| **NEW-02** | 🔴 | Le mirroring traitait tout `TRANSFER_OUT` comme un retrait vers le cold wallet. Une opération de **nettoyage** (`Phantom holding zeroed`) a ainsi créé 5 entrées fantômes sur Tangem (109 529 PEPE, 25,21 USDT, 2,52 USDG, 0,0086 DOGE) pour des actifs jamais détenus là-bas. 57 ajustements internes restaient sélectionnables. → Exclusion des libellés d'ajustement, en paramètre lié. | ✅ corrigé + données nettoyées |
+| **NEW-03** | 🔴 | Le mirroring **recalculait** `asset.quantity` depuis l'historique, en le supposant exhaustif — impossible pour un cold wallet. → Incrément du montant miroité. Le rattrapage « Always recalculate ALL Tangem assets » a été supprimé : il aurait réintroduit les fantômes à chaque appel. | ✅ corrigé |
+| **NEW-04** | 🟠 | Une position Earn refermée laissait son marqueur `STAKING` figé indéfiniment : **404,14 € affichés** dans le patrimoine pour une position inexistante. Le type `UNSTAKING` existait sans être jamais généré. | ✅ corrigé (s'applique à la prochaine sync) |
+| **NEW-05** | 🟠 | La CI échouait sur **tous** les runs depuis ≥ 11/07 : `COOKIE_SECURE` n'était abaissé qu'en `development`, or la CI tourne en `testing` — le cookie n'était pas renvoyé, la révocation de jeton intestable. | ✅ corrigé, CI verte |
+| **NEW-06** | 🟠 | Historique **négatif** sur 3 actifs (USDC Binance −26,55), mathématiquement impossible : entrées antérieures à la fenêtre de sync jamais importées. → `scripts/reconcile_missing_entries.py`. | ✅ corrigé, 7 entrées créées |
+| **NEW-07** | 🟡 | **Divergences de schéma dev/prod** : `prediction_logs.price_at_creation` absent en dev ; la FK `related_transaction_id` a `ON DELETE SET NULL` en dev mais pas en prod. Ce qui est validé en dev ne garantit donc pas le comportement en prod. | ❌ à traiter |
+| **NEW-08** | 🟡 | `recalc_avg_price.py` et `recalculate_quantities.py` recalculent `avg_buy_price` **sans lire `conversion_rate`** : les lancer défait FIN-01. | ❌ à traiter (ne pas exécuter) |
+
+**Invariant A (`check_holdings_qty`) : 11 → 0 violation.** Vérifié en production.
+
+---
+
 ## Note préalable sur l'objectif « 10/10 partout »
 
 Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif :
@@ -29,7 +72,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Vague | Contenu | Pourquoi |
 |-------|---------|----------|
-| **1 — Exactitude** | EPIC A (FIN-01→04) + FIN-TEST + UX-01 | Le risque dominant : des montants faux de ~8-9 % pour la majorité des traders crypto. Plus le 404 du menu (1 ligne). Rien d'autre ne doit passer devant. |
+| **1 — Exactitude** | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ → **FIN-02, FIN-03, FIN-04 restants** | ⚠️ Révisé le 2026-08-31. FIN-01 et UX-01 sont livrés ; l'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée sur les données réelles (0 ligne concernée en prod). **Mesurer l'exposition avant d'engager FIN-02/03/04.** |
 | **2 — Robustesse & vérité produit** | EPIC C (async, ORM, erreurs) + EPIC B (onboarding, promesses, titrage) + EPIC E P1 (sécurité élevée) | Stabilise le backend (bugs prod non-déterministes) et arrête de promettre des features absentes. |
 | **3 — Cohérence UX & sécurité moyenne** | EPIC D + EPIC E P2 + EPIC G (a11y) | États d'erreur, taxonomie, durcissements. |
 | **4 — Dette & polish** | EPIC F (god-files) + EPIC H (P3) | Refactors à dérouler en continu, sans bloquer la valeur. |
@@ -44,11 +87,11 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
-| **FIN-01** Devise réelle des trades exchange | 🔴 | F-01 | `tasks/sync_exchanges.py` (~257,282,338,394,452,521,585,639,809,861), `services/exchanges/*` | Toutes les `Transaction` de la sync sont `currency="EUR"` en dur alors que le `price` vient de paires USD/USDT. → Détecter la quote currency de chaque paire ; stocker `currency` réelle + `conversion_rate` = taux EUR/USD à la **date d'exécution** (le moteur FIFO sait exploiter `fx_rate`). Script de migration pour re-traiter l'historique. | Un achat `BTCUSDT` produit un coût de base en EUR exact (±0,1 %) ; `avg_buy_price` homogène ; test FIN-TEST #1 vert ; script de backfill idempotent validé sur données synthétiques. | L |
+| ✅ **FIN-01** Devise réelle des trades exchange *(livré 2026-08-31)* | ~~🔴~~ | F-01 | `tasks/sync_exchanges.py` (~257,282,338,394,452,521,585,639,809,861), `services/exchanges/*` | Toutes les `Transaction` de la sync sont `currency="EUR"` en dur alors que le `price` vient de paires USD/USDT. → Détecter la quote currency de chaque paire ; stocker `currency` réelle + `conversion_rate` = taux EUR/USD à la **date d'exécution** (le moteur FIFO sait exploiter `fx_rate`). Script de migration pour re-traiter l'historique. | Un achat `BTCUSDT` produit un coût de base en EUR exact (±0,1 %) ; `avg_buy_price` homogène ; test FIN-TEST #1 vert ; script de backfill idempotent validé sur données synthétiques. | L |
 | **FIN-02** Refonte XIRR (devise + flux) | 🔴 | F-02, F-03, F-04 | `services/analytics_service.py:1564-1644` | (a) ignore `tx.currency` (suppose tout USD) ; (b) compte `TRANSFER_IN/OUT` comme cash-flows fantômes ; (c) ignore `DIVIDEND`/`INTEREST`. → Lire `tx.currency` ligne à ligne (même pipeline que `metrics_service`) ; exclure les transferts internes ; ajouter dividendes+intérêts comme flux entrants. | XIRR de référence correct sur cash-flows connus (FIN-TEST #2) ; transferts internes appariés n'affectent pas le XIRR (#3) ; div/intérêts comptés (#4) ; parité P&L/rendement dashboard↔XIRR < 0,5 %. | M |
 | **FIN-03** Coût de base des transferts non appariés | 🟠→P0 | F-06 | `services/metrics_service.py:155-161,720-758`, `transfer_service.py:114-148` | Un `TRANSFER_IN` sans transit apparié crée une couche à **coût zéro** → P&L latent massivement surévalué. Règle divergente entre CUMP et FIFO. → À défaut d'appariement, utiliser `source_asset.avg_buy_price` ; unifier la règle entre les deux moteurs. | Un transfer_in non apparié n'apparaît jamais à coût zéro ; CUMP et FIFO donnent le même P&L (test dédié) ; couverture du cas « sync partielle ». | M |
 | **FIN-04** Service de taux de change robuste | 🟠 | F-05, A02 | `services/price_service.py:218-238`, `services/metrics_service.py:388-391,402,1325,1524` | Taux de repli figés en dur (`0.92`/`1.09`) + `except: pass` qui avalent les échecs forex → valorisation silencieusement fausse. → Un seul service de taux : dernière valeur connue **persistée** (pas une constante), TTL court, flag `forex_stale` propagé jusqu'à l'UI ; remplacer les 3 swallow par log + flag `partial`. | Aucun taux en dur dans le code ; `forex_stale` exposé dans la réponse API et affiché ; les échecs forex sont loggés (plus de `pass`) ; test FIN-TEST #7. | M |
-| **FIN-TEST** Tests numériques de référence | 🔴 | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
+| 🟡 **FIN-TEST** Tests numériques de référence *(partiel : 31 tests ajoutés ; parité/XIRR à durcir)* | 🟡 | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
 
 ---
 
@@ -56,7 +99,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Prio | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
-| **UX-01** Menu « Stratégies » → 404 | P0 | 🔴 | F-01(UX) | `components/layout/NavRail.tsx:67`, `App.tsx` | `/strategies` n'a ni route ni redirect → 404. → Ajouter `<Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace/>}/>` (ou pointer le menu directement). | Clic « Stratégies » n'atteint jamais la 404 ; test e2e de navigation menu. | XS |
+| ✅ **UX-01** Menu « Stratégies » → 404 *(livré 2026-08-31)* | ~~P0~~ | ~~🔴~~ | F-01(UX) | `components/layout/NavRail.tsx:67`, `App.tsx` | `/strategies` n'a ni route ni redirect → 404. → Ajouter `<Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace/>}/>` (ou pointer le menu directement). | Clic « Stratégies » n'atteint jamais la 404 ; test e2e de navigation menu. | XS |
 | **UX-02** Triple titrage des onglets | P1 | 🔴 | F-02(UX) | `IntelligencePage`, `PortfolioUnifiedPage`, `StrategyPage`, pages internes | Breadcrumb + label d'onglet + `<h1>` répètent le même mot. → Prop `embedded` sur les pages internes qui masque leur `<h1>` quand montées dans un conteneur. | Aucune page d'onglet n'affiche un titre dupliqué ; le titre unique vit dans le conteneur. | S |
 | **UX-03** Promesses d'actifs inexistants + onboarding mal monté | P1 | 🔴/🟠 | F-03, F-04(UX) | `components/OnboardingWizard.tsx:35-48,93-96`, `pages/ReportsPage.tsx:354-369`, `DashboardPage.tsx:492` | Onboarding/Rapports vendent actions/ETF/immobilier/SCPI (absents) ; le wizard n'est monté que sur `/crypto`, jamais sur `/`. → Aligner sur crypto+crowdfunding ; remonter le wizard au `Layout` (ou `/`). | Plus aucune mention d'actif non géré ; un nouveau compte voit l'onboarding dès `/`. | S |
 
@@ -149,13 +192,14 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Prio | Problème → Action | Critères d'acceptation | Effort |
 |--------|------|-------------------|------------------------|--------|
 | **VERIF-01** Audit design **rendu** (pas le code) | P1 | Le 8,5/10 design est non vérifié (lu dans le CSS, pas regardé). → Rendre l'app en local (build + Claude_Preview), capturer chaque écran clé en dark **et** light, à 375/768/1024/1440 px, et juger visuellement : hiérarchie, hardiesse réelle, cohérence, identité vs template. | Captures de tous les écrans clés ; verdict design **fondé sur le rendu** ; findings visuels ajoutés au backlog. | M |
-| **VERIF-02** Quantifier l'impact FIN-01/02 | P1 | Mesurer l'erreur réelle de coût de base / P&L sur un échantillon **anonymisé/synthétique** (jamais la DB prod). | Rapport chiffré de l'écart avant/après FIN-01/02. | S |
+| ✅ **VERIF-02** Quantifier l'impact FIN-01/02 *(fait 2026-08-31)* | ~~P1~~ | **Mesuré sur les données réelles.** Dev : 282,86 € de base comptés en EUR à tort → 246,52 € corrigés, soit −36,34 € (−12,85 %), avec des taux historiques distincts (0,95557 en 03/2025 · 0,87025 en 11/2025 · 0,85734 en 01/2026). Prod : **0 ligne concernée** — les 164 achats/ventes sont réellement en EUR. → *L'estimation « 8-9 % pour la majorité des traders » ne se vérifie pas sur ce compte.* | Rapport chiffré produit, avant/après, sur données réelles plutôt que synthétiques. | S |
 
 ---
 
 ## « Definition of Done » par domaine (cible réaliste, pas un chiffre rond)
 
 - **Calculs financiers** : EPIC A + FIN-TEST livrés ; parité dashboard↔XIRR↔rapports < 0,5 % ; tous montants en `Decimal` sur les chemins affichés ; aucun taux en dur ; `forex_stale` visible. → *score défendable seulement une fois les tests de référence verts.*
+  - **2026-08-31** : FIN-01 livré ; invariant `check_holdings_qty` à **0 violation** (était 11) ; 1117 tests backend verts et **CI verte pour la première fois depuis ≥ 11/07**. Restent FIN-02/03/04 — à cadrer sur mesure d'exposition, pas sur l'estimation de l'audit.
 - **Architecture & code** : ARC-01→04 livrés ; aucun fichier > ~800 LOC sur les god-files traités ; relations ORM sur les modèles centraux ; 0 `except: pass` sur du calcul financier.
 - **Fonctionnalités & UX** : EPIC B + UX-04 livrés ; 0 lien mort ; états d'erreur sur toutes les pages critiques ; promesses produit alignées sur le périmètre réel ; **VERIF-01 effectué**.
 - **Sécurité** : 0 finding 🟠 ouvert (SEC-01/02) ; durcissements SEC-04 ; **+ processus continu** : veille CVE (npm/pip audit en CI), rotation de clés, alerte Redis. La sécurité n'est jamais « finie ».
