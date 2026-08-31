@@ -183,6 +183,33 @@ def _reconcile_balance_diff(our_quantity: float, exchange_quantity: float) -> st
     return "transfer"
 
 
+def contradicts_recent_trade(diff: float, recent_quantities, tolerance: float = 1e-8) -> bool:
+    """L'ajustement annulerait-il un mouvement déjà enregistré pour cet actif ?
+
+    La réconciliation de solde compare notre quantité à celle de l'exchange et écrit
+    un TRANSFER_IN/OUT pour l'écart. Mais si un trade vient d'être importé sans que
+    le solde local en tienne encore compte, l'écart observé n'est pas un mouvement
+    externe : c'est ce trade même. L'ajustement l'annule alors purement et simplement.
+
+    Constaté en production le 2026-08-04 : quatre achats sur Kraken (BTC, ETH, PAXG,
+    SOL) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT
+    égale et de sens opposé. L'historique perdait les achats, le solde les gardait —
+    et l'écart se lisait ensuite comme un historique incomplet.
+
+    Fonction pure (ni DB ni HTTP) : c'est la décision qu'on veut pouvoir tester.
+    """
+    if diff == 0:
+        return False
+    for qty in recent_quantities:
+        q = float(qty or 0)
+        if q <= 0:
+            continue
+        # Même magnitude, sens opposé : l'ajustement défait ce mouvement.
+        if abs(abs(diff) - q) <= max(tolerance, q * 1e-6):
+            return True
+    return False
+
+
 async def _heal_transaction_fx(
     db: AsyncSession,
     external_ids: List[str],
@@ -1170,6 +1197,34 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         asset.quantity = exchange_quantity
                     elif decision == "transfer":
                         diff = exchange_quantity - our_quantity
+
+                        # Garde-fou FIN-03 : si l'écart correspond exactement à un
+                        # mouvement déjà enregistré aujourd'hui pour cet actif, ce
+                        # n'est pas un transfert externe — c'est ce mouvement que le
+                        # solde local n'a pas encore intégré. Écrire l'ajustement
+                        # l'annulerait (constaté en prod le 2026-08-04 sur 4 achats).
+                        recent = (
+                            (
+                                await db.execute(
+                                    select(Transaction.quantity).where(
+                                        Transaction.asset_id == asset.id,
+                                        Transaction.executed_at >= datetime.now(timezone.utc) - timedelta(days=2),
+                                    )
+                                )
+                            )
+                            .scalars()
+                            .all()
+                        )
+                        if contradicts_recent_trade(diff, recent):
+                            logger.warning(
+                                "%s: ajustement de %.8f ignoré — il annulerait un mouvement "
+                                "déjà enregistré (FIN-03)",
+                                symbol,
+                                diff,
+                            )
+                            asset.quantity = exchange_quantity
+                            continue
+
                         trans_type = TransactionType.TRANSFER_IN if diff > 0 else TransactionType.TRANSFER_OUT
 
                         logger.info(
@@ -1190,6 +1245,14 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
+                            # Sans executed_at, le moteur FIFO trie cette ligne à
+                            # l'epoch (1970) : elle est alors rejouée AVANT tout achat,
+                            # sur un stock vide, et ne retire donc aucun coût — alors
+                            # que la somme signée, elle, la décompte. Les deux moteurs
+                            # divergent, et l'écart se lit comme un « historique
+                            # incomplet ». On date l'ajustement au moment où il est
+                            # constaté. (FIN-03)
+                            executed_at=datetime.now(timezone.utc),
                             external_id=f"{service.exchange_name}_sync_{symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
@@ -1242,6 +1305,8 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                             price=current_price,
                             fee=0,
                             currency="EUR",
+                            # Daté : cf. FIN-03 sur l'ajustement de balance.
+                            executed_at=datetime.now(timezone.utc),
                             external_id=f"{service.exchange_name}_init_{symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
@@ -1276,6 +1341,8 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         price=float(asset.avg_buy_price or 0),
                         fee=0,
                         currency="EUR",
+                        # Daté : cf. FIN-03 sur l'ajustement de balance.
+                        executed_at=datetime.now(timezone.utc),
                         external_id=f"{service.exchange_name}_zero_{symbol}_{sync_ts}",
                         notes=f"Solde zéro sur {service.exchange_name} (vendu/converti)",
                     )
