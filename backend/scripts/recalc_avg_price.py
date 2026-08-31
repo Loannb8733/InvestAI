@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.models.asset import Asset, AssetType
 from app.models.transaction import Transaction, TransactionType
+from scripts._danger_guard import require_consent  # noqa: E402
 
 BUY_TYPES = [
     TransactionType.BUY,
@@ -62,4 +63,13 @@ async def main():
 
 
 if __name__ == "__main__":
+    require_consent(
+        "recalc_avg_price.py",
+        "Ce script réécrit avg_buy_price à partir des seuls quantity × price des achats,\n"
+        "  SANS lire conversion_rate. Sur un trade libellé en USD, il rétablit donc le prix\n"
+        "  brut en devise étrangère comme s'il s'agissait d'euros : c'est exactement l'erreur\n"
+        "  de coût de base que FIN-01 corrige. Le lancer défait FIN-01 sur tout le portefeuille.",
+        "vérifier d'abord si un écart existe réellement — voir scripts/check_invariants.py\n"
+        "  et le rapport docs/audit/BACKLOG.md (NEW-08).",
+    )
     asyncio.run(main())
