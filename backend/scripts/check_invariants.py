@@ -182,6 +182,44 @@ async def check_holdings_qty(conn) -> List[Issue]:
     return issues
 
 
+async def check_fee_currency_sanity(conn) -> List[Issue]:
+    """G. Des frais libellés dans l'actif ne peuvent pas dépasser la quantité achetée.
+
+    Une transaction Bitstack portait ``fee = 0,29`` avec ``fee_currency = 'BTC'`` sur
+    un achat de 0,0001234 BTC — 2 350 fois la quantité. C'étaient 0,29 EUR, saisis
+    avec la devise de l'actif.
+
+    Tant que la conversion des frais crypto échouait, l'erreur restait invisible : le
+    code retombait sur un taux de 1,0, donc la bonne valeur par accident. Une fois la
+    conversion branchée, ces frais auraient valu ~19 700 EUR.
+    """
+    rows = await _fetchall(
+        conn,
+        """
+        SELECT a.symbol, a.id AS asset_id, t.id AS tx_id, t.quantity, t.fee,
+               t.fee_currency, p.user_id
+        FROM transactions t
+        JOIN assets a ON a.id = t.asset_id
+        JOIN portfolios p ON p.id = a.portfolio_id
+        WHERE t.fee > 0
+          AND t.fee_currency IS NOT NULL
+          AND upper(t.fee_currency) = upper(a.symbol)
+          AND t.fee > t.quantity
+        """,
+    )
+    return [
+        Issue(
+            "ERROR",
+            "G.fee_ccy",
+            str(r["user_id"]),
+            f"asset={r['symbol']} tx={r['tx_id']} fee={r['fee']} {r['fee_currency']} "
+            f"> quantity={r['quantity']} — fee_currency est probablement faux "
+            f"(devise de l'actif au lieu de la devise payée)",
+        )
+        for r in rows
+    ]
+
+
 async def check_negative_qty(conn) -> List[Issue]:
     """D. asset.quantity must never be negative."""
     rows = await _fetchall(
@@ -302,6 +340,7 @@ async def main() -> int:
             check_index_present,
             check_uniq_transaction_hash,
             check_negative_qty,
+            check_fee_currency_sanity,
             check_holdings_qty,
             check_fx_consistency,
             check_snapshot_uniqueness,
