@@ -20,8 +20,27 @@ hypothèses de l'audit. Ce qui suit prime sur le reste du document.
 | Les 11 violations de l'invariant A | Ni un bug de calcul ni un historique « incomplet » : **5 étaient des écritures fantômes** créées par le mirroring (voir NEW-02). |
 
 **Leçon de méthode** : chaque ticket de ce backlog a été écrit en lisant du code, pas en
-mesurant des données. Avant d'investir sur FIN-02, FIN-03 ou FIN-04, **mesurer d'abord
-l'exposition réelle** — le diagnostic prend dix minutes et peut annuler des jours de travail.
+mesurant des données. Avant d'investir sur FIN-02 ou FIN-04, **mesurer d'abord l'exposition
+réelle** — le diagnostic prend dix minutes et peut annuler des jours de travail.
+
+Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se ressemblent :
+
+1. **Réparer un symptôme sans chercher sa cause.** L'écart entre solde et historique a été
+   « comblé » par 7 écritures de réconciliation (NEW-06). La cause réelle était en amont
+   (NEW-09) ; le correctif a empilé une troisième couche sur un double comptage et coûté
+   **214 € de plus-value affichée**. Toujours remonter à la cause avant d'écrire en base.
+2. **Corriger un indicateur sans regarder le chiffre affiché.** L'invariant est passé au
+   vert pendant que le P&L se dégradait. Un contrôle technique n'est pas une fin : mesurer
+   AVANT/APRÈS sur ce que l'utilisateur voit réellement.
+3. **Conclure sans mesurer.** Un correctif a été déclaré défaillant (clé API révoquée,
+   angle mort de conception) alors que la sync était simplement asynchrone et n'avait pas
+   encore abouti. Attendre et mesurer, plutôt que raisonner.
+
+Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
+vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
+Tout test de non-régression doit être validé par un canari : casser volontairement le code
+et vérifier que le test échoue. C'est exactement le reproche que ce backlog fait aux tests
+parity/XIRR (FIN-TEST).
 
 ### Livré le 2026-08-31
 
@@ -38,13 +57,23 @@ l'exposition réelle** — le diagnostic prend dix minutes et peut annuler des j
 | **NEW-01** | 🔴 | `start.sh` ne démarrait rien : `"${@:-up -d}"` s'expanse en UN mot, rejeté par `docker compose`. | ✅ corrigé |
 | **NEW-02** | 🔴 | Le mirroring traitait tout `TRANSFER_OUT` comme un retrait vers le cold wallet. Une opération de **nettoyage** (`Phantom holding zeroed`) a ainsi créé 5 entrées fantômes sur Tangem (109 529 PEPE, 25,21 USDT, 2,52 USDG, 0,0086 DOGE) pour des actifs jamais détenus là-bas. 57 ajustements internes restaient sélectionnables. → Exclusion des libellés d'ajustement, en paramètre lié. | ✅ corrigé + données nettoyées |
 | **NEW-03** | 🔴 | Le mirroring **recalculait** `asset.quantity` depuis l'historique, en le supposant exhaustif — impossible pour un cold wallet. → Incrément du montant miroité. Le rattrapage « Always recalculate ALL Tangem assets » a été supprimé : il aurait réintroduit les fantômes à chaque appel. | ✅ corrigé |
-| **NEW-04** | 🟠 | Une position Earn refermée laissait son marqueur `STAKING` figé indéfiniment : **404,14 € affichés** dans le patrimoine pour une position inexistante. Le type `UNSTAKING` existait sans être jamais généré. | ✅ corrigé (s'applique à la prochaine sync) |
+| **NEW-04** | 🟠 | Une position Earn refermée laissait son marqueur `STAKING` figé indéfiniment : **404,14 € affichés** dans le patrimoine pour une position inexistante. Le type `UNSTAKING` existait sans être jamais généré. | ✅ corrigé **et validé en prod** : une sync Binance a écrit l'`UNSTAKING` automatiquement (libellé « Auto: sortie d'Earn/Staking »), les 404 € ont disparu |
 | **NEW-05** | 🟠 | La CI échouait sur **tous** les runs depuis ≥ 11/07 : `COOKIE_SECURE` n'était abaissé qu'en `development`, or la CI tourne en `testing` — le cookie n'était pas renvoyé, la révocation de jeton intestable. | ✅ corrigé, CI verte |
-| **NEW-06** | 🟠 | Historique **négatif** sur 3 actifs (USDC Binance −26,55), mathématiquement impossible : entrées antérieures à la fenêtre de sync jamais importées. → `scripts/reconcile_missing_entries.py`. | ✅ corrigé, 7 entrées créées |
+| **NEW-06** | 🟠 | Historique **négatif** sur 3 actifs (USDC Binance −26,55). Diagnostic initial FAUX : on a cru à des entrées manquantes hors fenêtre de sync et écrit 7 `TRANSFER_IN` de réconciliation. **Elles ont dégradé le P&L affiché de 214 €** (+252 € → +38 €) car le FIFO comptait déjà ces actifs. La vraie cause était NEW-09. | ↩️ **annulé** — les 7 lignes ont été supprimées ; `scripts/reconcile_missing_entries.py` **ne doit pas être relancé** en l'état |
 | **NEW-07** | 🟡 | **Divergences de schéma dev/prod** : `prediction_logs.price_at_creation` absent en dev ; la FK `related_transaction_id` a `ON DELETE SET NULL` en dev mais pas en prod. Ce qui est validé en dev ne garantit donc pas le comportement en prod. | ❌ à traiter |
 | **NEW-08** | 🟡 | `recalc_avg_price.py` et `recalculate_quantities.py` recalculent `avg_buy_price` **sans lire `conversion_rate`** : les lancer défait FIN-01. | ❌ à traiter (ne pas exécuter) |
 
-**Invariant A (`check_holdings_qty`) : 11 → 0 violation.** Vérifié en production.
+| **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
+| **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
+| **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
+
+**Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
+
+**P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
+
+### Ce que FIN-03 était réellement
+
+Le ticket décrivait « TRANSFER_IN non apparié → couche à coût zéro ; règle divergente CUMP vs FIFO ». Le moteur FIFO s'est révélé **correct** : ses couches transitent bien d'un wallet à l'autre. La divergence venait d'en amont — des écritures d'ajustement sans date (NEW-10) et des ajustements annulant des trades (NEW-09). Corriger le FIFO aurait été corriger le mauvais composant.
 
 ---
 
@@ -72,7 +101,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Vague | Contenu | Pourquoi |
 |-------|---------|----------|
-| **1 — Exactitude** | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ → **FIN-02, FIN-03, FIN-04 restants** | ⚠️ Révisé le 2026-08-31. FIN-01 et UX-01 sont livrés ; l'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée sur les données réelles (0 ligne concernée en prod). **Mesurer l'exposition avant d'engager FIN-02/03/04.** |
+| **1 — Exactitude** | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ → **FIN-02 et FIN-04 restants** | ⚠️ Révisé le 2026-08-31. FIN-01, UX-01 et FIN-03 sont livrés ; l'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée sur les données réelles (0 ligne concernée en prod). **Mesurer l'exposition avant d'engager FIN-02/03/04.** |
 | **2 — Robustesse & vérité produit** | EPIC C (async, ORM, erreurs) + EPIC B (onboarding, promesses, titrage) + EPIC E P1 (sécurité élevée) | Stabilise le backend (bugs prod non-déterministes) et arrête de promettre des features absentes. |
 | **3 — Cohérence UX & sécurité moyenne** | EPIC D + EPIC E P2 + EPIC G (a11y) | États d'erreur, taxonomie, durcissements. |
 | **4 — Dette & polish** | EPIC F (god-files) + EPIC H (P3) | Refactors à dérouler en continu, sans bloquer la valeur. |
@@ -89,7 +118,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **FIN-01** Devise réelle des trades exchange *(livré 2026-08-31)* | ~~🔴~~ | F-01 | `tasks/sync_exchanges.py` (~257,282,338,394,452,521,585,639,809,861), `services/exchanges/*` | Toutes les `Transaction` de la sync sont `currency="EUR"` en dur alors que le `price` vient de paires USD/USDT. → Détecter la quote currency de chaque paire ; stocker `currency` réelle + `conversion_rate` = taux EUR/USD à la **date d'exécution** (le moteur FIFO sait exploiter `fx_rate`). Script de migration pour re-traiter l'historique. | Un achat `BTCUSDT` produit un coût de base en EUR exact (±0,1 %) ; `avg_buy_price` homogène ; test FIN-TEST #1 vert ; script de backfill idempotent validé sur données synthétiques. | L |
 | **FIN-02** Refonte XIRR (devise + flux) | 🔴 | F-02, F-03, F-04 | `services/analytics_service.py:1564-1644` | (a) ignore `tx.currency` (suppose tout USD) ; (b) compte `TRANSFER_IN/OUT` comme cash-flows fantômes ; (c) ignore `DIVIDEND`/`INTEREST`. → Lire `tx.currency` ligne à ligne (même pipeline que `metrics_service`) ; exclure les transferts internes ; ajouter dividendes+intérêts comme flux entrants. | XIRR de référence correct sur cash-flows connus (FIN-TEST #2) ; transferts internes appariés n'affectent pas le XIRR (#3) ; div/intérêts comptés (#4) ; parité P&L/rendement dashboard↔XIRR < 0,5 %. | M |
-| **FIN-03** Coût de base des transferts non appariés | 🟠→P0 | F-06 | `services/metrics_service.py:155-161,720-758`, `transfer_service.py:114-148` | Un `TRANSFER_IN` sans transit apparié crée une couche à **coût zéro** → P&L latent massivement surévalué. Règle divergente entre CUMP et FIFO. → À défaut d'appariement, utiliser `source_asset.avg_buy_price` ; unifier la règle entre les deux moteurs. | Un transfer_in non apparié n'apparaît jamais à coût zéro ; CUMP et FIFO donnent le même P&L (test dédié) ; couverture du cas « sync partielle ». | M |
+| ✅ **FIN-03** Coût de base des transferts non appariés *(traité 2026-08-31 — voir NEW-09/NEW-10 : la cause n'était pas le FIFO)* | ~~🟠→P0~~ | F-06 | `services/metrics_service.py:155-161,720-758`, `transfer_service.py:114-148` | Un `TRANSFER_IN` sans transit apparié crée une couche à **coût zéro** → P&L latent massivement surévalué. Règle divergente entre CUMP et FIFO. → À défaut d'appariement, utiliser `source_asset.avg_buy_price` ; unifier la règle entre les deux moteurs. | Un transfer_in non apparié n'apparaît jamais à coût zéro ; CUMP et FIFO donnent le même P&L (test dédié) ; couverture du cas « sync partielle ». | M |
 | **FIN-04** Service de taux de change robuste | 🟠 | F-05, A02 | `services/price_service.py:218-238`, `services/metrics_service.py:388-391,402,1325,1524` | Taux de repli figés en dur (`0.92`/`1.09`) + `except: pass` qui avalent les échecs forex → valorisation silencieusement fausse. → Un seul service de taux : dernière valeur connue **persistée** (pas une constante), TTL court, flag `forex_stale` propagé jusqu'à l'UI ; remplacer les 3 swallow par log + flag `partial`. | Aucun taux en dur dans le code ; `forex_stale` exposé dans la réponse API et affiché ; les échecs forex sont loggés (plus de `pass`) ; test FIN-TEST #7. | M |
 | 🟡 **FIN-TEST** Tests numériques de référence *(partiel : 31 tests ajoutés ; parité/XIRR à durcir)* | 🟡 | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
 
@@ -199,7 +228,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 ## « Definition of Done » par domaine (cible réaliste, pas un chiffre rond)
 
 - **Calculs financiers** : EPIC A + FIN-TEST livrés ; parité dashboard↔XIRR↔rapports < 0,5 % ; tous montants en `Decimal` sur les chemins affichés ; aucun taux en dur ; `forex_stale` visible. → *score défendable seulement une fois les tests de référence verts.*
-  - **2026-08-31** : FIN-01 livré ; invariant `check_holdings_qty` à **0 violation** (était 11) ; 1117 tests backend verts et **CI verte pour la première fois depuis ≥ 11/07**. Restent FIN-02/03/04 — à cadrer sur mesure d'exposition, pas sur l'estimation de l'audit.
+  - **2026-08-31** : FIN-01 et FIN-03 livrés ; invariant `check_holdings_qty` à **0 violation matérielle** (était 11), code retour 0 ; P&L Crypto rétabli à +252 € ; **1146 tests** backend verts et **CI verte pour la première fois depuis ≥ 11/07**. Restent FIN-02 et FIN-04 — à cadrer sur mesure d'exposition, pas sur l'estimation de l'audit. FIN-03 livré (NEW-09/NEW-10). Restent FIN-02 et FIN-04 — à cadrer sur mesure d'exposition, pas sur l'estimation de l'audit.
 - **Architecture & code** : ARC-01→04 livrés ; aucun fichier > ~800 LOC sur les god-files traités ; relations ORM sur les modèles centraux ; 0 `except: pass` sur du calcul financier.
 - **Fonctionnalités & UX** : EPIC B + UX-04 livrés ; 0 lien mort ; états d'erreur sur toutes les pages critiques ; promesses produit alignées sur le périmètre réel ; **VERIF-01 effectué**.
 - **Sécurité** : 0 finding 🟠 ouvert (SEC-01/02) ; durcissements SEC-04 ; **+ processus continu** : veille CVE (npm/pip audit en CI), rotation de clés, alerte Redis. La sécurité n'est jamais « finie ».
