@@ -329,6 +329,21 @@ class MetricsService:
                 logger.warning("FX history fallback failed for %s->%s: %s", from_ccy, to_ccy, e)
             return None
 
+        async def _crypto_unit_price(symbol: str, to_ccy: str) -> Optional[float]:
+            """Prix d'une unité de crypto dans la devise cible, ou None si inconnue.
+
+            Sert à convertir des frais réglés en crypto. Renvoie None sans bruit quand
+            le symbole n'est pas une crypto connue : l'appelant reprend alors son
+            cheminement normal.
+            """
+            try:
+                data = await price_service.get_price(symbol, "crypto", to_ccy.lower())
+                if data and data.get("price"):
+                    return float(data["price"])
+            except Exception as exc:  # noqa: BLE001 - jamais bloquant
+                logger.debug("Prix crypto indisponible pour %s->%s: %s", symbol, to_ccy, exc)
+            return None
+
         async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
             """Resolve an FX rate as (rate, stale).
 
@@ -351,6 +366,16 @@ class MetricsService:
             last_known = await _fx_last_known(from_ccy, to_ccy)
             if last_known is not None:
                 return last_known, True
+            # `from_ccy` peut ne pas être une devise : les frais d'exchange sont
+            # souvent réglés en crypto (BTC, ETH, BNB…). Le convertisseur forex ne
+            # connaît que le fiat et renvoie None, ce qui faisait retomber sur la
+            # constante de dernier recours — soit 1,0, donc 0,0001 BTC compté 0,0001 €
+            # — tout en levant `forex_stale` en permanence. L'application sait
+            # pourtant valoriser une crypto : on le lui demande.
+            crypto_rate = await _crypto_unit_price(from_ccy, to_ccy)
+            if crypto_rate is not None:
+                # Prix de marché temps réel : ce n'est pas une valeur périmée.
+                return crypto_rate, False
             fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
             logger.warning(
                 "No live/cached/persisted FX for %s->%s; using last-resort constant %s",
