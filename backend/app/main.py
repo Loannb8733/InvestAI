@@ -145,6 +145,31 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
 
 
+# Libellés de TRANSFER_OUT qui ne sont PAS des retraits vers un wallet : ce sont des
+# écritures internes de réconciliation (mise à zéro d'un solde fantôme, balayage de
+# poussière, ajustement manuel). Les miroiter fabrique une position sur le cold wallet
+# pour des actifs qui n'y ont jamais mis les pieds — constaté en production le
+# 2026-06-07 : une opération de NETTOYAGE a créé 5 entrées fantômes sur Tangem
+# (109 529 PEPE, 25,21 USDT, 2,52 USDG, 0,0086 DOGE), l'utilisateur n'ayant jamais
+# détenu ces actifs là-bas.
+INTERNAL_ADJUSTMENT_NOTE_PREFIXES = (
+    "Ajustement balance",
+    "Phantom holding zeroed",
+    "Solde zéro sur",
+    "Dust sweep",
+    "Manual adjustment",
+    "Réconciliation :",
+    # Cale posée à la main pour annuler un miroir fantôme déjà écrit : la miroiter
+    # recréerait précisément ce qu'elle vient d'annuler.
+    "Cale ",
+)
+
+
+# Valeur du paramètre lié `:internal_note_patterns` des requêtes de mirroring : un
+# motif de préfixe par libellé. Les libellés ne sont jamais concaténés dans le SQL.
+INTERNAL_NOTE_PATTERNS = [f"{prefix}%" for prefix in INTERNAL_ADJUSTMENT_NOTE_PREFIXES]
+
+
 def _fix_multiplatform_assets():
     """One-shot: move transactions whose exchange differs from their asset to a per-exchange asset."""
     try:
@@ -323,7 +348,11 @@ def _create_missing_transfer_mirrors():
                     " LEFT JOIN transactions m ON t.related_transaction_id = m.id"
                     " WHERE t.transaction_type::text = 'TRANSFER_OUT'"
                     " AND (t.related_transaction_id IS NULL OR m.id IS NULL)"
-                )
+                    # Écarte les écritures d'ajustement interne (cf. INTERNAL_NOTE_PATTERNS) :
+                    # les libellés voyagent en paramètre lié, la requête reste littérale.
+                    " AND NOT (COALESCE(t.notes, '') LIKE ANY(:internal_note_patterns))"
+                ),
+                {"internal_note_patterns": INTERNAL_NOTE_PATTERNS},
             ).fetchall()
 
             if not rows:
@@ -983,7 +1012,11 @@ async def admin_fix_mirrors(
                     " LEFT JOIN transactions m ON t.related_transaction_id = m.id"
                     " WHERE t.transaction_type::text = 'TRANSFER_OUT'"
                     " AND (t.related_transaction_id IS NULL OR m.id IS NULL)"
-                )
+                    # Écarte les écritures d'ajustement interne (cf. INTERNAL_NOTE_PATTERNS) :
+                    # les libellés voyagent en paramètre lié, la requête reste littérale.
+                    " AND NOT (COALESCE(t.notes, '') LIKE ANY(:internal_note_patterns))"
+                ),
+                {"internal_note_patterns": INTERNAL_NOTE_PATTERNS},
             ).fetchall()
 
             log.append(f"Found {len(rows)} unmirrored transfer_out")
