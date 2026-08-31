@@ -6,6 +6,15 @@ from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
+# Environnements servis en clair (http://) : un cookie `secure` n'y est jamais
+# renvoyé par le client, donc toute la mécanique qui en dépend est intestable.
+# C'est ce qui faisait échouer test_access_token_revoked_after_logout en CI :
+# le logout ne recevait pas le cookie, ne révoquait donc rien, et le jeton restait
+# valide. Le code de révocation, lui, était correct.
+# (Constante au niveau module : un attribut de classe préfixé « _ » deviendrait un
+# ModelPrivateAttr Pydantic, non itérable.)
+INSECURE_COOKIE_ENVS = frozenset({"development", "testing"})
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -39,9 +48,13 @@ class Settings(BaseSettings):
     @field_validator("COOKIE_SECURE", mode="before")
     @classmethod
     def auto_cookie_secure(cls, v, info):
-        """Force COOKIE_SECURE=False only when APP_ENV=development."""
+        """COOKIE_SECURE=False sur les environnements servis sans TLS.
+
+        Tout le reste — `production` inclus, et tout APP_ENV inconnu — reste à True :
+        le défaut est sûr, seuls des environnements nommés explicitement l'abaissent.
+        """
         app_env = info.data.get("APP_ENV", "development")
-        if app_env == "development":
+        if app_env in INSECURE_COOKIE_ENVS:
             return False
         return True
 
