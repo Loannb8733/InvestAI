@@ -110,9 +110,35 @@ que lus. **Contrairement à l'EPIC A, ceux-ci sont réels.**
 | Ticket | Annoncé par l'audit | Mesuré | Verdict |
 |---|---|---|---|
 | **ARC-01** | 7 fichiers `new_event_loop` | **9 fichiers**, 8 helpers `run_async` dupliqués | ✅ réel, **aggravé** (dont un ajouté le 2026-09-01 par `fx_rates.py`, en suivant la convention en place) |
-| **ARC-02** | 0 `relationship()` | 0 `relationship()`, **0 eager loading** | ✅ réel, exact |
+| **ARC-02** | 0 `relationship()` → « N+1 » | 0 `relationship()`, mais **le N+1 n'existe pas** : 50 actifs → 8 requêtes, 6 actifs → 1 ; 3 requêtes pour 2 portefeuilles + 56 actifs + 840 transactions | ❌ **infondé** — voir ci-dessous |
 | **ARC-03** | `transactions.py` 70 req · `dashboard.py` 37 · `api_keys.py` 59 | 70 · 22 · 56, pour 1 671 / 1 383 / 1 876 lignes | ✅ réel (dashboard amélioré depuis) |
 | **UX-03** | actions/ETF/immobilier « absents » | types présents au modèle, `get_stock_price` existe, mais **0 actif** de ces types et aucune page dédiée | ⚠️ réel mais **à reformuler** : ce n'est pas l'absence de support, c'est l'absence de parcours |
+
+#### ARC-02 : pourquoi le ticket se contredit
+
+Le N+1 est un symptôme du **lazy loading** des relations ORM : on charge N objets,
+puis on touche un attribut de relation sur chacun, ce qui déclenche N requêtes
+supplémentaires. Il faut donc des `relationship()` pour en souffrir.
+
+Or il n'y en a aucun, et `Asset` n'expose aucun attribut de relation : le lazy
+loading est **structurellement impossible**. Les « jointures FK manuelles » que le
+ticket reproche sont exactement ce qui l'empêche.
+
+Mesuré : le nombre de requêtes est **constant**, indépendant du volume.
+
+| Portefeuille | Actifs | Requêtes |
+|---|---:|---:|
+| Crypto | 50 | 8 |
+| Crowdfunding | 6 | 1 |
+
+Appliquer le correctif proposé (`relationship(..., lazy="selectin")` sur les cinq
+modèles centraux) **introduirait** le risque : chaque chargement d'actif tirerait ses
+transactions, y compris là où le code n'en a pas besoin. On remplacerait un accès
+groupé explicite par un chargement implicite plus coûteux.
+
+Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écrites à
+la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
+priorité 🟠 ni le risque du correctif proposé.
 
 À mesurer avant engagement : EPIC D (5), E (6), F (7), H (14).
 
