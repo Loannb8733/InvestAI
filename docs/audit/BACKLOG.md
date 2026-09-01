@@ -110,7 +110,7 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 | **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
 | **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
 | **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
-| **NEW-13** | 🔴 | **`/predictions/market-cycle` répond en 92 s** (1er appel), 1,4 s (cache chaud), **61 s** au 3e : le cache ne tient pas. Boucle séquentielle sur les 56 actifs avec appel d'API externe à cache froid ; la limite CoinGecko (50 req/min) rend le dépassement mécanique. Le bandeau de régime reste en squelette pendant tout ce temps. | ❌ **à traiter** (mesuré, non corrigé) |
+| **NEW-13** | 🔴 | **`/predictions/market-cycle` répondait en 65 s à 92 s**, le bandeau de régime restant en squelette pendant tout ce temps. **Ma première explication était fausse** : ni le nombre d'actifs (7, pas 56), ni l'absence de parallélisme (`asyncio.gather` était déjà en place). La cause : `Semaphore(5)` laissait 5 coroutines entrer ensemble dans la section critique, lire le même horodatage et repartir à la même milliseconde — le délai de 1,2 s retardait une rafale sans jamais l'espacer. D'où les 429, puis 10 s + 20 s + 30 s de backoff par symbole, pour finir sans donnée. | ✅ **corrigé** — `Lock`, backoff plafonné, budget de temps |
 | **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
@@ -157,6 +157,38 @@ sur `/intelligence` comme sur `/crypto` (6 squelettes encore affichés après 6 
 
 **Non corrigé** — le correctif (mise en cache qui tient, parallélisation bornée, respect
 du rate limit) est un chantier à part entière, à mesurer avant d'engager.
+
+#### NEW-13 — corrigé le 2026-09-01
+
+**Un verrou mal dimensionné, pas un problème de volume.** `asyncio.Semaphore(5)` autorisait
+cinq entrées simultanées dans la section censée espacer les appels : les cinq coroutines
+lisaient le même `_last_coingecko_call`, dormaient la même durée, repartaient ensemble. Le
+délai de 1,2 s retardait la rafale au lieu de la sérialiser.
+
+Un `asyncio.Lock` suffit à rétablir l'espacement — et donc à supprimer les 429 :
+
+| Mesure (cache vide) | Avant | Après |
+|---|---:|---:|
+| Quota disponible | 65 s | **8,5 s** |
+| Quota épuisé (pire cas) | 65 s | **13,5 s** |
+| Bandeau de régime à l'écran | 92 s | **5,6 s** |
+
+Les résultats sont identiques à l'existant (régime `top` à 0.98, même nombre d'actifs) :
+c'est bien de la latence supprimée, pas de l'analyse sacrifiée.
+
+**Deux gardes complètent**, parce qu'un quota journalier peut tomber quoi qu'on fasse :
+le backoff 429 est plafonné à 10 s et respecte `Retry-After` (il valait 10 s + 20 s + 30 s),
+et les appels externes du cycle de marché ont un budget de 12 s au-delà duquel l'analyse
+est rendue partielle plutôt que l'écran figé.
+
+**Une piste essayée puis retirée** : un disjoncteur global sur 429. Mesuré à 0,7 s — mais
+sans aucune donnée. Rapide parce que vide n'est pas un progrès ; la comparaison avec le
+code d'origine (`git stash`) l'a montré, et c'est elle qui a évité de livrer une fausse
+victoire.
+
+**Reste ouvert** : ces appels externes vivent toujours dans le chemin d'une requête HTTP.
+Les déporter vers une tâche périodique (comme `refresh_fx_rates`) rendrait l'endpoint
+instantané et insensible au quota. Non fait — c'est un chantier distinct.
 
 #### Ce qui a été confirmé à l'écran
 
@@ -398,9 +430,9 @@ document reproche à l'audit — une conclusion étendue au-delà de ce qui a é
 D et F ; 19 ne l'ont jamais été. Voir le tableau « État au 2026-09-01 » en tête de
 document.
 
-1. **NEW-13 — la lenteur de `/predictions/market-cycle`** (92 s au premier appel). C'est
-   ce qui dégrade le plus l'usage réel, et rien dans l'audit ne le mentionnait. Mesurer
-   d'abord pourquoi le cache ne tient pas entre deux appels.
+1. ~~NEW-13~~ — ✅ **corrigé le 2026-09-01** (65 s → 8,5 s ; 92 s → 5,6 s à l'écran).
+   **Reste souhaitable** : déporter ces appels externes hors du chemin HTTP, vers une
+   tâche périodique, pour rendre l'endpoint insensible au quota.
 2. ~~UX-05 et ARC-11~~ — ✅ **faits le 2026-09-01**.
 3. ~~VERIF-01~~ — ✅ **fait le 2026-09-01** sur 7 écrans. **À poursuivre** sur les 25
    restants : le taux de trouvailles a été de 3 défauts réels et 1 lenteur majeure pour
