@@ -64,6 +64,7 @@ import {
   Scale,
 } from 'lucide-react'
 import ExchangeLogo from '@/components/exchanges/exchange-logo'
+import QueryErrorState from '@/components/ui/query-error-state'
 import type { APIKey, Exchange, TestResult } from '@/types/exchanges'
 
 
@@ -106,13 +107,25 @@ export default function ExchangesPage() {
   const [gapCheck, setGapCheck] = useState<{ gaps: BalanceGap[]; checkedAt: Date } | null>(null)
 
   // Fetch supported exchanges
-  const { data: exchanges } = useQuery<Exchange[]>({
+  const {
+    data: exchanges,
+    isError: exchangesFailed,
+    refetch: refetchExchanges,
+    isFetching: refetchingExchanges,
+  } = useQuery<Exchange[]>({
     queryKey: queryKeys.exchanges.list,
     queryFn: apiKeysApi.listExchanges,
   })
 
   // Fetch user's API keys
-  const { data: apiKeys, isLoading } = useQuery<APIKey[]>({
+  const {
+    data: apiKeys,
+    isLoading,
+    isError: apiKeysFailed,
+    error: apiKeysError,
+    refetch: refetchApiKeys,
+    isFetching: refetchingApiKeys,
+  } = useQuery<APIKey[]>({
     queryKey: queryKeys.apiKeys.list,
     queryFn: apiKeysApi.list,
   })
@@ -494,6 +507,20 @@ export default function ExchangesPage() {
     )
   }
 
+  // Les clés sont le contenu de la page : sans elles il ne reste rien à afficher.
+  // `isLoading` retombe à false en cas d'échec, la page se rendait donc vide sans
+  // rien expliquer ni offrir de réessayer (UX-04).
+  if (apiKeysFailed) {
+    return (
+      <QueryErrorState
+        error={apiKeysError}
+        onRetry={refetchApiKeys}
+        busy={refetchingApiKeys}
+        title="Impossible de charger vos clés API"
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -871,6 +898,18 @@ export default function ExchangesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Erreur cantonnée à cette carte : les clés déjà enregistrées restent
+              consultables et synchronisables même si la liste des plateformes
+              disponibles n'a pas pu être chargée (UX-04). */}
+          {exchangesFailed ? (
+            <QueryErrorState
+              error={undefined}
+              onRetry={refetchExchanges}
+              busy={refetchingExchanges}
+              title="Liste des plateformes indisponible"
+              description="Vos clés déjà enregistrées restent utilisables. Réessayez pour pouvoir en ajouter une nouvelle."
+            />
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {exchanges?.map((exchange) => {
               const connectedCount = getExchangeCount(exchange.id)
@@ -904,6 +943,7 @@ export default function ExchangesPage() {
               )
             })}
           </div>
+          )}
         </CardContent>
       </Card>
 

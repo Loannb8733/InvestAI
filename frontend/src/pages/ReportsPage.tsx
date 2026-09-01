@@ -66,7 +66,12 @@ export default function ReportsPage() {
   )
   const [loadingReport, setLoadingReport] = useState<string | null>(null)
 
-  const { data: yearsData } = useQuery({
+  const {
+    data: yearsData,
+    isError: yearsFailed,
+    refetch: refetchYears,
+    isFetching: refetchingYears,
+  } = useQuery({
     queryKey: queryKeys.reports.availableYears,
     queryFn: reportsApi.getAvailableYears,
     staleTime: 10 * 60_000,
@@ -291,6 +296,25 @@ export default function ReportsPage() {
                 ))}
               </SelectContent>
             </Select>
+            {/* Signalement volontairement discret, et non un état d'erreur de page :
+                cette requête ne sert qu'à peupler la liste des années, et le repli
+                sur l'année courante laisse tous les rapports générables. Masquer la
+                page entière pour cela serait une régression, pas un correctif
+                (UX-04). */}
+            {yearsFailed && (
+              <p className="text-xs text-muted-foreground mt-2" role="status">
+                Seule l'année courante est proposée : la liste des années n'a pas pu être
+                chargée.{' '}
+                <button
+                  type="button"
+                  onClick={() => refetchYears()}
+                  disabled={refetchingYears}
+                  className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                >
+                  {refetchingYears ? 'Nouvelle tentative…' : 'Réessayer'}
+                </button>
+              </p>
+            )}
           </div>
         )}
         <div className="flex gap-2">
