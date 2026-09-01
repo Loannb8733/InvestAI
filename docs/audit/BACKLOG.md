@@ -169,7 +169,59 @@ priorité 🟠 ni le risque du correctif proposé.
 |---|---|---|
 | SEC-01 | vérif conditionnée à l'existence du secret : sans secret, webhook ouvert | ✅ **réel**, corrigé |
 | SEC-02 | `{type(e).__name__}: {e}` renvoyé par `GET /import-status/{task_id}` | ✅ **réel**, corrigé |
-| SEC-03 à SEC-06 | P2/P3 | à mesurer |
+| SEC-03 | `/register` renvoie « Un compte avec cet email existe déjà » | ✅ **réel**, impact faible |
+| SEC-04 | 2 sous-points sur 3 déjà corrigés ; l'endpoint admin est pire que décrit | ⚠️ **1/3 réel** |
+| SEC-05 | fail-open déjà décidé et loggué ; IDOR non exploitable ; docstring trompeuse | 🟢 **partiel** |
+| SEC-06 | `python-jose` **3.4.0** — les CVE citées visent ≤ 3.3.0 | ❌ **périmé** |
+
+##### SEC-03 à SEC-06 — le détail (mesuré 2026-09-01)
+
+**SEC-03** est réel. L'argument décisif n'est pas théorique mais l'incohérence interne :
+les deux routes voisines portent des docstrings explicites — « Always returns success to
+avoid email enumeration » (forgot-password), « Always return success to prevent email
+enumeration » (resend). Seul `register` a été oublié. Exposition réelle : route publique,
+limitée à 3/min, mais **1 seul utilisateur en base** — l'oracle ne révèle que l'adresse du
+propriétaire. Correctif XS, à faire pour la cohérence plus que pour le risque.
+
+**SEC-04** — les deux durcissements que le ticket réclame sont déjà en place :
+
+| Sous-point | Verdict |
+|---|---|
+| `X-Forwarded-For` spoofable | ❌ **déjà corrigé** — `rate_limit.py:20-27` lit la chaîne **depuis la droite** via `TRUSTED_PROXY_HOPS=1`, avec le commentaire qui explique pourquoi le leftmost est falsifiable |
+| Redis TLS `CERT_NONE` | ❌ **déjà corrigé** — `CERT_REQUIRED` forcé (`config.py:160`), `ssl_cert_reqs="required"` (`redis_client.py:40`) |
+| Endpoint admin verbeux | ✅ **réel, et pire que décrit** |
+
+`admin_fix_mirrors` (`main.py:940`) fait **232 lignes** et dépasse de loin le « dump debug » :
+il exécute un `ALTER TABLE` **en runtime depuis une requête HTTP**, renvoie au client la
+liste de toutes les transactions de transfert (id, symbole, exchange, type) via son tableau
+`log`, et **c'est le code qui a produit les 5 entrées fantômes Tangem** (NEW-02/NEW-03).
+Atténuations : `get_current_admin_user` + 2/min. Le vrai sujet n'est pas la fuite
+d'information, c'est qu'un endpoint HTTP migre le schéma et réécrive des soldes.
+
+→ **Recommandation : supprimer l'endpoint**, ne pas le réduire. Son rôle est celui d'une
+migration Alembic, il n'a plus de raison d'être appelé, et il reste le chemin par lequel
+les fantômes sont entrés.
+
+**SEC-05** — trois sous-points sur quatre ne tiennent plus, ou pas comme écrit :
+
+- *Fingerprint* : réel, mais c'est un problème de **documentation**, pas de code. La
+  docstring affirme « preventing stolen tokens from being used in a different browser »
+  alors qu'un User-Agent se recopie en une ligne. Le ticket demandait précisément d'en
+  documenter la limite — non fait.
+- *Ownership sur `import-status`* : réel mais **non exploitable**. `_import_tasks` ne
+  stocke aucun `user_id`, mais le `task_id` est un `uuid4().hex` (non énumérable) et le
+  message d'erreur est générique depuis SEC-02.
+- *Fail-open* : ❌ **plus « silencieux »**. La décision est prise, commentée (« the token
+  still expires within minutes ») et logguée en WARNING aux deux endroits (`deps.py:115`,
+  `auth.py:517`). Ne manque que l'alerte Redis.
+
+**SEC-06** est périmé. `python-jose` est épinglé en **3.4.0** — la version qui corrige les
+deux CVE invoquées (elles visent ≤ 3.3.0) — et `requirements.txt:14` le documente déjà en
+commentaire. À l'usage, `jwt.decode(..., algorithms=[settings.ALGORITHM])` est imposé aux
+deux points de vérification, ce qui neutralise la confusion d'algorithme indépendamment de
+la version. Reste `bcrypt==4.0.1`, ancien. **Point utile découvert au passage** : `passlib`
+n'est pas installé, bcrypt est appelé directement — l'obstacle habituel à la montée de
+version (incompatibilité passlib / bcrypt ≥ 4.1) n'existe pas ici. Rounds à 12, conforme.
 
 **EPIC F (god-files)** — trois confirmés, un largement fait :
 
@@ -196,21 +248,41 @@ priorité 🟠 ni le risque du correctif proposé.
 | UX-08 | 48 fichiers à spinner contre 19 à skeleton | ✅ réel |
 | UX-05 | « Objectifs » → `/strategy` et « Stratégies » → `/strategies` cohabitent toujours | ✅ réel |
 
-**Ce que la mesure de bout en bout donne** : sur 20 tickets vérifiés, **8 sont
-infondés ou déjà faits** (5 FIN de l'EPIC A, ARC-02, FIN-05, ARC-12) et **12 sont
-réels**. L'audit se trompe systématiquement là où le code a bougé depuis juin, et
-voit juste sur ce qui n'a jamais été touché — sécurité, god-files, états d'erreur.
+**Ce que la mesure de bout en bout donne** : sur **24 tickets vérifiés**, **11 sont
+infondés, périmés ou déjà faits** (5 FIN de l'EPIC A, ARC-02, FIN-05, ARC-12, SEC-06, et
+2 des 3 sous-points de SEC-04) et **13 sont réels** — dont plusieurs à une sévérité bien
+inférieure à celle annoncée.
+
+L'audit se trompe systématiquement là où le code a bougé depuis juin, et voit juste sur ce
+qui n'a jamais été touché — god-files, états d'erreur. **La lecture « la sécurité est le
+domaine où l'audit voit juste » ne tient plus** après mesure de l'EPIC E : sur 6 tickets
+SEC, 2 étaient réels (SEC-01/02, corrigés), 1 l'est faiblement (SEC-03), 1 à un tiers
+(SEC-04), 1 partiellement (SEC-05) et 1 est périmé (SEC-06).
+
+Deux constats se répètent d'un EPIC à l'autre :
+- **les chiffres de l'audit sont faux quand ils sont vérifiables** — 3 733 vs 2 416 lignes,
+  2 185 vs 1 368, 43 vs 13 fichiers, et un dénominateur de 36 pages pour UX-04 quand
+  **17** seulement émettent une requête ;
+- **la sévérité annoncée ne survit pas à la mesure d'exposition** — un oracle
+  d'énumération sur une base d'un seul utilisateur, un IDOR protégé par un `uuid4`, des
+  CVE corrigées par la version déjà épinglée.
 
 **Priorité recommandée au 2026-09-01** — UX-04, ARC-05 et SEC-01/02 étant livrés :
 
-1. **SEC-03 à SEC-06** — seuls tickets encore **non mesurés** du backlog. À mesurer
-   avant d'engager quoi que ce soit : 8 des 20 tickets déjà vérifiés se sont révélés
-   infondés.
+**Le backlog est désormais intégralement mesuré** — plus aucun ticket n'est pris sur
+parole.
+
+1. **Supprimer `admin_fix_mirrors`** (SEC-04) — le seul point de ce lot qui mérite du
+   travail, et pas pour la raison écrite au ticket : un endpoint HTTP qui exécute un
+   `ALTER TABLE` et réécrit des soldes. C'est par là que les fantômes Tangem sont entrés.
+   **SEC-03** en complément (~10 min).
 2. **UX-05** (taxonomie Objectifs/Stratégies) et **ARC-11** (formatage monétaire dans
    13 fichiers) — réels, mesurés, sans dépendance.
 3. **VERIF-01** — le 8,5/10 de design reste une hypothèse non vérifiée.
 4. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes) — à faire précéder
    de tests de rendu / de service, faute de quoi le refactor casse en silence.
+5. **UX-04 (fin)** — les 3 pages restantes, puis l'alerte Redis (SEC-05) et la docstring
+   du fingerprint. Polish.
 
 ### Ce que FIN-03 était réellement
 
@@ -244,7 +316,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |-------|---------|----------|
 | ~~**1 — Exactitude**~~ ✅ | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ | ✅ **Close le 2026-09-01.** Les 5 tickets FIN mesurés étaient déjà traités ; FIN-02 mesuré (0 transaction non-EUR, 0 dividende, XIRR 11,51 %), FIN-04 complété (rafraîchissement FX quotidien + conversion des frais payés en crypto). L'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée : **0 ligne concernée en prod**. |
 | **2 — Robustesse & vérité produit** | ✅ ARC-01 · ✅ EPIC E P1 (SEC-01/02) · **restent** ARC-03, ARC-04, EPIC B | ARC-02 écarté après mesure (le N+1 n'existe pas). EPIC B (onboarding, promesses d'actifs absents, titrage) n'a pas encore été mesuré. |
-| **3 — Cohérence UX & sécurité moyenne** | 🟢 UX-04 (14/17) · **restent** UX-05→08, SEC-03→06, EPIC G | SEC-03 à SEC-06 sont les **seuls tickets encore non mesurés** : commencer par là. |
+| **3 — Cohérence UX & sécurité moyenne** | 🟢 UX-04 (14/17) · **reste utile** : supprimer `admin_fix_mirrors` (SEC-04), SEC-03, UX-05→08, EPIC G | SEC-03→06 mesurés le 2026-09-01 : SEC-06 périmé, SEC-04 réel à un tiers, SEC-05 partiel. Le seul point sérieux est l'endpoint admin. |
 | **4 — Dette & polish** | EPIC F (god-files) + EPIC H (P3) | Refactors à dérouler en continu, sans bloquer la valeur. |
 
 > **VERIF-01** (rendu design) est à faire dès la vague 1 ou 2 : sans elle, on ne sait pas si le chantier design existe.
@@ -304,10 +376,10 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **SEC-01** Secret webhook Telegram obligatoire en prod *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-01 | `endpoints/telegram_webhook.py:54-57` | Vérif conditionnelle : sans secret en prod, webhook non authentifié. → Échouer au démarrage (ou 403 systématique) si `is_production and bot_enabled and not TELEGRAM_WEBHOOK_SECRET`. | En prod sans secret : le bot ne démarre pas / webhook 403 ; test de config. | S |
 | ✅ **SEC-02** Ne plus fuiter les exceptions au client *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-02 | `endpoints/api_keys.py:~1404-1407,~1601-1604` | `f"...{type(e).__name__}: {e}"` renvoyé au client. → Logger l'exception complète côté serveur, message générique au client (comme `system.py`). | Aucune réponse client ne contient de détail d'exception ; logs serveur conservent le détail. | XS |
-| **SEC-03** Énumération de comptes au register | P2 | 🟡 | M-01 | `endpoints/auth.py:145-149` | Confirme l'existence d'un email. → Message générique / 201 neutre, comme forgot/resend. | `/register` ne distingue plus email existant vs nouveau dans la réponse. | S |
-| **SEC-04** Durcissements config | P2 | 🟡 | M-03,M-04,M-05 | `main.py` (admin_fix_mirrors), `core/rate_limit.py:10-19`, `core/config.py:125-127` | Dump debug admin verbeux ; `X-Forwarded-For` spoofable ; Redis TLS `CERT_NONE`. → Réduire le log admin (compteurs) ; ne lire XFF que derrière proxy de confiance (hop Render) ; Redis `CERT_REQUIRED` + CA Upstash. | Rate limiting non contournable par header ; Redis en TLS vérifié ; endpoints admin one-shot retirés ou minimisés. | M |
-| **SEC-05** Documenter/renforcer fingerprint & fail-open | P3 | 🟡/🔵 | M-02,L-01,L-03,L-04 | `core/security.py:15-21`, `api_keys.py:~1678`, `api/deps.py:155-176`, blocklist Redis | Fingerprint UA-only (faux sentiment de sécurité) ; task_id sans ownership ; fail-open silencieux ; blocklist fail-open si Redis down. → Documenter explicitement les limites ; ajouter `user_id` aux tâches d'import ; stratégie fail-open/closed décidée + alerte Redis. | Décisions documentées ; ownership vérifié sur import-status ; alerte si Redis indisponible. | M |
-| **SEC-06** Migration `python-jose` → `pyjwt` (veille) | P3 | 🔵 | §3 rapport 04 | `requirements.txt` | `python-jose` peu maintenue ; `bcrypt==4.0.1` ancien. → Évaluer migration `pyjwt`, surveiller bcrypt. | Décision tranchée (migrer ou accepter le risque, daté). | S |
+| ✅ **SEC-03** Énumération de comptes au register *(réel — mesuré 2026-09-01)* | P2 | 🔵 | M-01 | `endpoints/auth.py:145-149` | Confirme l'existence d'un email. → Message générique / 201 neutre, comme forgot/resend. | `/register` ne distingue plus email existant vs nouveau. **Sévérité abaissée 🟡→🔵** : 1 seul utilisateur en base, l'oracle ne révèle que l'adresse du propriétaire. À faire pour la cohérence avec forgot/resend, qui sont déjà neutres. | XS |
+| ⚠️ **SEC-04** Durcissements config *(1 sous-point sur 3 — mesuré 2026-09-01)* | P2 | 🟡 | M-03,M-04,M-05 | `main.py` (admin_fix_mirrors), `core/rate_limit.py:10-19`, `core/config.py:125-127` | Dump debug admin verbeux ; `X-Forwarded-For` spoofable ; Redis TLS `CERT_NONE`. → Réduire le log admin (compteurs) ; ne lire XFF que derrière proxy de confiance (hop Render) ; Redis `CERT_REQUIRED` + CA Upstash. | ✅ XFF non spoofable (lecture depuis la droite) et ✅ Redis en TLS vérifié **étaient déjà faits**. **Reste** : `admin_fix_mirrors` (232 l.) exécute un `ALTER TABLE` depuis HTTP et renvoie un dump des transactions — c'est le chemin des fantômes Tangem. **→ le supprimer, pas le réduire.** | S |
+| 🟢 **SEC-05** Documenter/renforcer fingerprint & fail-open *(partiel — mesuré 2026-09-01)* | P3 | 🔵 | M-02,L-01,L-03,L-04 | `core/security.py:15-21`, `api_keys.py:~1678`, `api/deps.py:155-176`, blocklist Redis | Fingerprint UA-only (faux sentiment de sécurité) ; task_id sans ownership ; fail-open silencieux ; blocklist fail-open si Redis down. → Documenter explicitement les limites ; ajouter `user_id` aux tâches d'import ; stratégie fail-open/closed décidée + alerte Redis. | ✅ Le fail-open **n'est plus silencieux** : décidé, commenté, loggué en WARNING (`deps.py:115`, `auth.py:517`). **Restent** : (a) la docstring du fingerprint surpromet (« preventing stolen tokens from being used in a different browser » — un UA se recopie) ; (b) alerte Redis absente. L'IDOR sur `import-status` est réel mais **non exploitable** (`task_id` = `uuid4`). | S |
+| ❌ **SEC-06** Migration `python-jose` → `pyjwt` (veille) *(périmé — mesuré 2026-09-01)* | P3 | 🔵 | §3 rapport 04 | `requirements.txt` | `python-jose` peu maintenue ; `bcrypt==4.0.1` ancien. → Évaluer migration `pyjwt`, surveiller bcrypt. | `python-jose` est en **3.4.0**, la version qui corrige les CVE citées (elles visent ≤ 3.3.0), et `algorithms=[…]` est imposé aux deux `jwt.decode`. Reste `bcrypt==4.0.1` : **`passlib` n'étant pas installé**, l'obstacle habituel à la montée (passlib / bcrypt ≥ 4.1) n'existe pas. | XS |
 
 ---
 
