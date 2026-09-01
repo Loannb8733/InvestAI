@@ -14,7 +14,35 @@ import { describe, expect, it } from 'vitest'
  * une page critique qui interroge l'API sans prévoir l'échec.
  */
 
-const CRITIQUES = ['DashboardPage', 'CalendarPage', 'MasterDashboardPage', 'NotesPage'] as const
+const CRITIQUES = [
+  'DashboardPage',
+  'CalendarPage',
+  'MasterDashboardPage',
+  'NotesPage',
+  'PortfolioPage',
+  'TransactionsPage',
+  'AlertsPage',
+  'AdminPage',
+  'CrowdfundingDashboardPage',
+  'CrowdfundingPerformancePage',
+] as const
+
+/**
+ * Pages encore sans état d'erreur, volontairement hors liste.
+ *
+ * Leur structure ne se prête pas au motif commun : la query et le bloc de
+ * chargement vivent dans des composants différents du même fichier (GoalsPage), ou
+ * il n'y a pas de bloc `if (isLoading)` sur lequel s'appuyer. Les traiter demande
+ * une lecture au cas par cas — pas une transformation mécanique, qui casserait la
+ * portée des variables (constaté sur GoalsPage).
+ */
+const RESTANTES = [
+  'GoalsPage',
+  'ReportsPage',
+  'SettingsPage',
+  'SimulationsPage',
+  'CrowdfundingProjectsPage',
+] as const
 
 const source = (page: string) =>
   readFileSync(resolve(process.cwd(), `src/pages/${page}.tsx`), 'utf-8')
@@ -46,5 +74,13 @@ describe('états d’erreur des pages critiques', () => {
   it('le détail technique reste masqué en production', () => {
     // Un message d'exception expose des chemins et des internes (cf. SEC-02).
     expect(composant()).toContain('import.meta.env.DEV')
+  })
+
+  it.each(RESTANTES)('%s reste à traiter (dette connue)', (page) => {
+    // Ce test échouera le jour où la page sera traitée : il faudra alors la
+    // déplacer dans CRITIQUES. C'est voulu — la liste de dette ne doit pas
+    // survivre à sa résolution.
+    const gere = /<QueryErrorState|isError|error &&|error \?/.test(source(page))
+    expect(gere, `${page} est traitée : la déplacer dans CRITIQUES`).toBe(false)
   })
 })

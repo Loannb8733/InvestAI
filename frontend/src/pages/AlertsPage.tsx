@@ -63,6 +63,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
+import QueryErrorState from '@/components/ui/query-error-state'
 
 interface Alert {
   id: string
@@ -133,7 +134,7 @@ export default function AlertsPage() {
     notify_in_app: true,
   })
 
-  const { data: alerts, isLoading: loadingAlerts } = useQuery<Alert[]>({
+  const { data: alerts, isLoading: loadingAlerts , error: alertsPageError, refetch: alertsPageRefetch } = useQuery<Alert[]>({
     queryKey: queryKeys.alerts.list(),
     queryFn: () => alertsApi.list(),
   })
@@ -311,6 +312,12 @@ export default function AlertsPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (alertsPageError) {
+    return <QueryErrorState error={alertsPageError} onRetry={alertsPageRefetch} title="Impossible de charger les alertes" />
   }
 
   return (

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
@@ -39,7 +40,7 @@ const formatMonthLabel = (month: string) => {
 export default function CrowdfundingDashboardPage() {
   const queryClient = useQueryClient()
   const { theme, color } = useNivoTheme()
-  const { data, isLoading } = useQuery<CrowdfundingDashboard>({
+  const { data, isLoading , error: crowdfundingDashboardPageError, refetch: crowdfundingDashboardPageRefetch } = useQuery<CrowdfundingDashboard>({
     queryKey: queryKeys.crowdfunding.dashboard,
     queryFn: crowdfundingApi.getDashboard,
   })
@@ -65,6 +66,12 @@ export default function CrowdfundingDashboardPage() {
         <SkeletonStatCard />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (crowdfundingDashboardPageError) {
+    return <QueryErrorState error={crowdfundingDashboardPageError} onRetry={crowdfundingDashboardPageRefetch} title="Impossible de charger le tableau de bord crowdfunding" />
   }
 
   const d = data

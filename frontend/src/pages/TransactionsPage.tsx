@@ -78,6 +78,7 @@ import { isColdWallet } from '@/lib/platforms'
 import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import EmptyState from '@/components/ui/empty-state'
+import QueryErrorState from '@/components/ui/query-error-state'
 import AddTransactionForm from '@/components/forms/AddTransactionForm'
 import ImportCSVForm from '@/components/forms/ImportCSVForm'
 import EditTransactionForm from '@/components/forms/EditTransactionForm'
@@ -307,7 +308,7 @@ export default function TransactionsPage() {
     [selectedPortfolio, selectedType, selectedPlatform, selectedAsset, dateFrom, debouncedSearch]
   )
 
-  const { data: transactionsPage, isLoading } = useQuery<TransactionsListPage>({
+  const { data: transactionsPage, isLoading , error: transactionsPageError, refetch: transactionsPageRefetch } = useQuery<TransactionsListPage>({
     queryKey: [
       ...queryKeys.transactions.list(selectedPortfolio !== 'all' ? selectedPortfolio : undefined),
       serverFilters,
@@ -729,6 +730,12 @@ export default function TransactionsPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (transactionsPageError) {
+    return <QueryErrorState error={transactionsPageError} onRetry={transactionsPageRefetch} title="Impossible de charger les transactions" />
   }
 
   // ============== Main Render ==============
