@@ -1809,7 +1809,9 @@ async def import_history_async(
     import uuid
 
     task_id = uuid.uuid4().hex
-    _import_tasks[task_id] = {"status": "pending"}
+    # Le propriétaire est mémorisé à la création : sans lui, tout utilisateur
+    # authentifié porteur d'un task_id peut lire le statut de l'import d'autrui.
+    _import_tasks[task_id] = {"status": "pending", "user_id": str(current_user.id)}
 
     asyncio.create_task(_run_import_background(task_id, str(api_key_id)))
 
@@ -1868,13 +1870,21 @@ async def get_import_status(
     task_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Poll the status of a background import task."""
+    """Poll the status of a background import task.
+
+    Le `task_id` est un `uuid4` — non énumérable — mais l'entropie n'est pas un
+    contrôle d'accès : un identifiant peut fuiter par un journal, un référent ou
+    un partage d'écran. Le propriétaire est donc vérifié explicitement.
+    """
     task_info = _import_tasks.get(task_id)
 
-    if not task_info:
+    # Même réponse qu'une tâche inexistante : un 403 distinct confirmerait
+    # l'existence du task_id à qui n'en est pas propriétaire.
+    if not task_info or task_info.get("user_id") != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tâche non trouvée",
         )
 
-    return {"task_id": task_id, **task_info}
+    expose = {k: v for k, v in task_info.items() if k != "user_id"}
+    return {"task_id": task_id, **expose}

@@ -15,8 +15,24 @@ from app.core.config import settings
 def compute_token_fingerprint(user_agent: str) -> str:
     """Compute a fingerprint hash from the user-agent for token binding.
 
-    This binds the token to the client's browser, preventing stolen tokens
-    from being used in a different browser.
+    Portée réelle, et ses limites (SEC-05)
+    --------------------------------------
+    Ce contrôle gêne le rejeu d'un token volé depuis un client *différent* :
+    l'attaquant doit connaître le User-Agent exact de la victime en plus du
+    token. C'est une gêne, pas une barrière.
+
+    Ce qu'il ne fait PAS, malgré ce que « binding » laisse entendre :
+
+    - un User-Agent n'est pas un secret. Il est envoyé en clair à chaque
+      requête, journalisé partout, et se recopie en un en-tête ;
+    - quiconque a intercepté le token a très probablement vu la requête qui le
+      portait, donc son User-Agent ;
+    - les User-Agent sont peu variés (quelques valeurs couvrent l'essentiel du
+      parc), donc une valeur plausible se devine souvent sans rien intercepter.
+
+    À ne pas considérer comme une protection contre le vol de token : la
+    révocation (blocklist) et la durée de vie courte restent les vrais
+    contrôles.
     """
     return hashlib.sha256(user_agent.encode()).hexdigest()[:16]
 

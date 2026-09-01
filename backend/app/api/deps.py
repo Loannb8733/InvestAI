@@ -111,8 +111,16 @@ async def get_current_user(
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001
-            # Redis down — fail open (the token still expires within minutes)
-            logger.warning("Access-token blocklist check unavailable (failing open): %s", exc)
+            # Redis down — on laisse passer (le token expire de lui-même en
+            # quelques minutes), mais un contrôle de sécurité vient d'être
+            # contourné : c'est une ERREUR, pas un avertissement. Le niveau
+            # compte — l'intégration logging de Sentry remonte les ERROR comme
+            # événements, là où un WARNING ne laisse qu'un fil d'Ariane que
+            # personne ne consulte. C'est l'alerte Redis réclamée par SEC-05.
+            logger.error(
+                "SECURITY: access-token revocation check bypassed (Redis unreachable, failing open): %s",
+                exc,
+            )
 
     user_id = payload.get("sub")
     if not user_id:

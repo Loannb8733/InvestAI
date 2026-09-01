@@ -538,8 +538,14 @@ async def refresh_token(
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001
-            # Redis down — fail open (token still expires on its own)
-            logger.warning("Refresh-token blocklist check unavailable (failing open): %s", exc)
+            # Voir deps.py : contrôle de sécurité contourné, donc ERROR — c'est
+            # ce niveau que Sentry remonte en alerte. Le refresh token vit 7
+            # jours : ici la fenêtre de rejeu d'un token révoqué est bien plus
+            # large que pour l'access token.
+            logger.error(
+                "SECURITY: refresh-token revocation check bypassed (Redis unreachable, failing open): %s",
+                exc,
+            )
 
     user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == user_id))
@@ -594,8 +600,11 @@ async def logout(request: Request, response: Response) -> dict:
                 ttl = min(ttl, 7 * 86400)
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
         except Exception as exc:  # noqa: BLE001
-            # Best-effort revocation; cookie deletion still provides baseline protection
-            logger.warning("Failed to blocklist refresh token on logout: %s", exc)
+            # La suppression du cookie protège le navigateur d'origine, mais un
+            # refresh token déjà exfiltré reste utilisable jusqu'à 7 jours : la
+            # déconnexion n'a pas eu l'effet que l'utilisateur croit. ERROR pour
+            # que Sentry le remonte (SEC-05).
+            logger.error("SECURITY: refresh token not revoked on logout (Redis unreachable): %s", exc)
 
     # Blocklist the access token's jti too, so a token already in an attacker's
     # hands stops working immediately instead of lingering until it expires.
@@ -616,8 +625,9 @@ async def logout(request: Request, response: Response) -> dict:
                 ttl = min(ttl, 3600)  # access tokens are short-lived
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
         except Exception as exc:  # noqa: BLE001
-            # Best-effort; cookie deletion still provides baseline protection
-            logger.warning("Failed to blocklist access token on logout: %s", exc)
+            # Idem : un access token déjà volé continue d'être accepté jusqu'à
+            # son expiration malgré la déconnexion (SEC-05).
+            logger.error("SECURITY: access token not revoked on logout (Redis unreachable): %s", exc)
 
     # Deletion attributes (samesite/secure/domain) must match those used when
     # the cookies were set, otherwise the browser ignores the clearing
