@@ -172,7 +172,11 @@ services:
     restart: unless-stopped
     environment:
       - VITE_API_URL=/api/v1
-      - VITE_HMR_DISABLE=true
+      # Le conteneur écoute 3000, le port publié est 3001 : sans cette variable
+      # Vite annonce au navigateur le port interne, la websocket échoue et le
+      # HMR était désactivé pour faire taire l'erreur — au prix d'un
+      # rechargement manuel à chaque modification.
+      - VITE_HMR_PORT=3001
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -55,6 +55,13 @@ export default function IntelligencePage() {
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'Univers Crypto' }, { label: 'Analyses IA' }]} />
 
+      {/* La page n'affiche pas de titre — le breadcrumb et les onglets suffisent
+          visuellement — mais elle n'avait alors aucun <h1> : un lecteur d'écran
+          ne pouvait pas annoncer de quoi il s'agit, et la structure de titres
+          démarrait au niveau 2. Masqué à l'œil, présent pour l'arbre
+          d'accessibilité. */}
+      <h1 className="sr-only">Analyses IA</h1>
+
       {/* Le régime de marché, UNE fois pour tout le hub. */}
       <RegimeHeader />
 

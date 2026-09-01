@@ -34,7 +34,11 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
-    allowedHosts: 'all',
+    // `true`, pas 'all' : cette dernière est la syntaxe Vite 6. En Vite 5 la
+    // valeur inattendue faisait échouer la vérification d'origine ajoutée pour
+    // le HMR (handshake websocket rejeté en 400), ce qui avait conduit à
+    // désactiver le HMR plutôt qu'à le réparer.
+    allowedHosts: true,
     watch: {
       usePolling: true,
     },
