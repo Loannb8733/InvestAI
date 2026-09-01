@@ -140,7 +140,49 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
-À mesurer avant engagement : EPIC D (5), E (6), F (7), H (14).
+#### EPICs D, E, F et H — mesurés le 2026-09-01
+
+**EPIC E (sécurité)** — les deux P1 étaient réels et sont traités :
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| SEC-01 | vérif conditionnée à l'existence du secret : sans secret, webhook ouvert | ✅ **réel**, corrigé |
+| SEC-02 | `{type(e).__name__}: {e}` renvoyé par `GET /import-status/{task_id}` | ✅ **réel**, corrigé |
+| SEC-03 à SEC-06 | P2/P3 | à mesurer |
+
+**EPIC F (god-files)** — trois confirmés, un largement fait :
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| ARC-05 | `prediction_service.py` = **2 416 lignes** | ✅ réel |
+| ARC-07 | `ExchangesPage.tsx` = **1 368 lignes** | ✅ réel |
+| ARC-11 | aucun util de formatage ; **13 fichiers** formatent les montants à la main | ✅ réel |
+| ARC-09 | `lib/queryKeys.ts` existe (184 l.) et est importé par **43 fichiers** | ⚠️ **quasi fait** — restent 17 clés en ligne |
+
+**EPIC H (polish)** — deux tickets sont périmés :
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| FIN-05 | la docstring dit déjà « negative = cash outflow, positive = cash inflow » | ❌ **déjà correct** |
+| ARC-12 | `fetchUser` est utilisé (`VerifyEmailPage.tsx`) — ce n'est pas un alias mort | ❌ **infondé** |
+| UX-09 | le `<h1>` du Login porte `font-semibold`, pas `font-serif` | ✅ réel (polish) |
+
+**EPIC D (UX)** — le plus solide des quatre :
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| UX-04 | **6 pages sur 32** gèrent un état d'erreur | ✅ réel, le plus large |
+| UX-08 | 48 fichiers à spinner contre 19 à skeleton | ✅ réel |
+| UX-05 | « Objectifs » → `/strategy` et « Stratégies » → `/strategies` cohabitent toujours | ✅ réel |
+
+**Ce que la mesure de bout en bout donne** : sur 20 tickets vérifiés, **8 sont
+infondés ou déjà faits** (5 FIN de l'EPIC A, ARC-02, FIN-05, ARC-12) et **12 sont
+réels**. L'audit se trompe systématiquement là où le code a bougé depuis juin, et
+voit juste sur ce qui n'a jamais été touché — sécurité, god-files, états d'erreur.
+
+**Priorité recommandée pour la suite** : UX-04 (26 pages sans état d'erreur, c'est
+ce qui se voit quand une requête échoue), puis ARC-05/ARC-07 (les deux god-files),
+puis SEC-03 à SEC-06.
 
 ### Ce que FIN-03 était réellement
 
