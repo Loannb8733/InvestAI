@@ -5,15 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(value: number | string | null | undefined, currency = "EUR"): string {
+/**
+ * Point unique de formatage des montants (ARC-11).
+ *
+ * `maximumFractionDigits` existe pour les affichages qui arrondissent
+ * volontairement — une enveloppe d'investissement, un montant proposé — sans
+ * quoi ces cas justifieraient un `Intl.NumberFormat` local, et le formatage se
+ * remettrait à diverger d'un écran à l'autre. Passer 0 arrondit aussi le
+ * minimum : demander 2 décimales minimum pour 0 maximum lève un RangeError.
+ */
+export function formatCurrency(
+  value: number | string | null | undefined,
+  currency = "EUR",
+  options?: { maximumFractionDigits?: number },
+): string {
   if (value == null) return "—"
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (!Number.isFinite(num)) return "—"
+  const max = options?.maximumFractionDigits ?? 2
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: Math.min(2, max),
+    maximumFractionDigits: max,
   }).format(num)
 }
 

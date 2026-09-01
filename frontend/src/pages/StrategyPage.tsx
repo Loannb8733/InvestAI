@@ -36,7 +36,10 @@ export default function StrategyPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: 'Stratégie' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }]} />
+      {/* « <groupe de menu> › <page> », comme les autres pages. L'ancien premier
+          niveau « Stratégie » ne correspondait à aucun groupe ni à aucune page
+          (UX-05), et le répéter donnerait « Objectifs › Objectifs ». */}
+      <Breadcrumb items={[{ label: 'Outils' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }]} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">

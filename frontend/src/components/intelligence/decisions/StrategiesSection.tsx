@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { formatCurrency } from '@/lib/utils'
 import { strategiesApi } from '@/services/api'
 import { toast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -196,12 +197,12 @@ function StrategyCard({
               <div className="flex items-center gap-1.5 text-gain">
                 <Wallet className="h-3.5 w-3.5" />
                 <span className="font-medium">
-                  Munitions : {(strategy.params.available_liquidity as number).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  Munitions : {formatCurrency(strategy.params.available_liquidity as number, 'EUR', { maximumFractionDigits: 0 })}
                 </span>
               </div>
               {(strategy.params?.total_proposed_amount as number) > 0 && (
                 <span className="text-muted-foreground">
-                  Montant proposé : {(strategy.params.total_proposed_amount as number).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  Montant proposé : {formatCurrency(strategy.params.total_proposed_amount as number, 'EUR', { maximumFractionDigits: 0 })}
                   {' '}({(strategy.params.proposed_pct_of_liquidity as number)?.toFixed(1)}% des liquidités)
                 </span>
               )}
@@ -287,7 +288,7 @@ function StrategyCard({
                               }}
                               title={action.status === 'PENDING' ? 'Cliquer pour modifier le montant' : undefined}
                             >
-                              {action.amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} {action.currency}
+                              {formatCurrency(action.amount, action.currency)}
                             </button>
                           )
                         )}

@@ -51,11 +51,14 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Outils',
     items: [
-      { icon: Target, label: 'Objectifs', path: '/strategy' },
+      { icon: Target, label: 'Objectifs', path: '/goals' },
       { icon: FileText, label: 'Rapports', path: '/reports' },
       { icon: Bell, label: 'Alertes', path: '/alerts' },
       { icon: BookOpen, label: 'Notes', path: '/notes' },
-      { icon: Lightbulb, label: 'Stratégies', path: '/strategies' },
+      // Nommée d'après sa destination réelle : le pilier « Décisions » du hub
+      // Intelligence. L'ancien libellé « Stratégies » désignait un onglet
+      // supprimé et entrait en collision avec « /strategy » (UX-05).
+      { icon: Lightbulb, label: 'Décisions', path: '/strategies' },
     ],
   },
 ]

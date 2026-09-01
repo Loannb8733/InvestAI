@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import api, { calendarApi, predictionsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
+import { formatCurrency } from '@/lib/utils'
 import {
   Plus,
   Loader2,
@@ -108,7 +109,7 @@ interface SeedTaxEventsResult {
 }
 
 const fmtCount = (n: number) => Math.round(n).toString()
-const fmtEur = (n: number) => `${n.toLocaleString('fr-FR')} EUR`
+const fmtEur = (n: number) => formatCurrency(n)
 
 const formatMonthLabel = (month: string) => {
   const [year, monthIndex] = month.split('-').map(Number)
@@ -384,7 +385,7 @@ export default function CalendarPage() {
               Total revenus projetés ce mois
             </span>
             <span className="text-lg font-bold text-gain">
-              +{summary.projected_income_this_month.toLocaleString('fr-FR')} EUR
+              +{formatCurrency(summary.projected_income_this_month)}
             </span>
           </CardContent>
         </Card>
@@ -404,7 +405,7 @@ export default function CalendarPage() {
               <>
                 <div className="flex items-baseline gap-2 mb-4">
                   <span className="text-2xl font-bold text-gain">
-                    +{passiveIncome.total_12m.toLocaleString('fr-FR')} EUR
+                    +{formatCurrency(passiveIncome.total_12m)}
                   </span>
                   <span className="text-sm text-muted-foreground">attendus sur 12 mois</span>
                 </div>
@@ -422,7 +423,7 @@ export default function CalendarPage() {
                             <div
                               className="w-full max-w-[28px] rounded-t bg-gain/70"
                               style={{ height: `${m.amount > 0 ? Math.max((m.amount / maxAmount) * 100, 4) : 0}%` }}
-                              title={`${formatMonthLabel(m.month)} : ${m.amount.toLocaleString('fr-FR')} EUR`}
+                              title={`${formatMonthLabel(m.month)} : ${formatCurrency(m.amount)}`}
                             />
                           </div>
                           <span className="text-[10px] text-muted-foreground truncate">
@@ -434,7 +435,7 @@ export default function CalendarPage() {
                   )
                 })()}
                 <p className="text-xs text-muted-foreground mt-3">
-                  {`Dont ${passiveIncome.sources.events.toLocaleString('fr-FR')} EUR d'événements (dividendes, loyers, intérêts) et ${passiveIncome.sources.crowdfunding.toLocaleString('fr-FR')} EUR de coupons crowdfunding.`}
+                  {`Dont ${formatCurrency(passiveIncome.sources.events)} d'événements (dividendes, loyers, intérêts) et ${formatCurrency(passiveIncome.sources.crowdfunding)} de coupons crowdfunding.`}
                 </p>
               </>
             ) : (
@@ -533,7 +534,7 @@ export default function CalendarPage() {
                     <div className="flex items-center gap-3">
                       {event.amount && (
                         <span className="font-medium text-gain">
-                          +{event.amount.toLocaleString('fr-FR')} {event.currency}
+                          +{formatCurrency(event.amount, event.currency)}
                         </span>
                       )}
                       <Button
@@ -631,7 +632,7 @@ export default function CalendarPage() {
                       {event.amount && (
                         <div className="text-right">
                           <p className="font-medium text-gain">
-                            +{event.amount.toLocaleString('fr-FR')} {event.currency}
+                            +{formatCurrency(event.amount, event.currency)}
                           </p>
                           <Badge style={{ backgroundColor: typeInfo?.color }} className="text-white text-xs">
                             {typeInfo?.label}

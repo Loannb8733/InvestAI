@@ -56,11 +56,33 @@ describe('NavRail → routes', () => {
     },
   )
 
-  it('« Stratégies » atterrit sur le pilier Décisions', () => {
-    const strategies = navItems.find((item) => item.label === 'Stratégies')
-    expect(strategies?.path).toBe('/strategies')
-    expect(redirects.get('/strategies')).toBe('/intelligence?tab=strategies')
-    expect(LEGACY_TAB_MAP.strategies).toBe('decisions')
+  it('« Décisions » atterrit sur le pilier du même nom', () => {
+    // Le libellé nomme désormais la destination réelle, et la redirection vise
+    // directement le pilier au lieu de repasser par LEGACY_TAB_MAP (UX-05).
+    const decisions = navItems.find((item) => item.label === 'Décisions')
+    expect(decisions?.path).toBe('/strategies')
+    expect(redirects.get('/strategies')).toBe('/intelligence?tab=decisions')
     expect(TABS.map((t) => t.value)).toContain('decisions')
+  })
+
+  it('aucun libellé de menu ne reprend le nom d\'une autre destination', () => {
+    // « Objectifs » pointait sur /strategy pendant que « Stratégies » pointait
+    // ailleurs : deux URLs quasi identiques pour deux destinations sans rapport.
+    const paths = navItems.map((item) => item.path)
+    expect(paths).toContain('/goals')
+    expect(paths).not.toContain('/strategy')
+  })
+
+  it('« /strategy » reste servi, en alias de « /goals »', () => {
+    // Les favoris et liens externes pointant l'ancienne URL ne doivent pas
+    // tomber sur une 404.
+    expect(declaredRoutes).toContain('/strategy')
+    expect(redirects.get('/strategy')).toBe('/goals')
+  })
+
+  it('les anciens ?tab= restent connus de IntelligencePage', () => {
+    // LEGACY_TAB_MAP reste la porte d'entrée des liens externes, même si plus
+    // aucune redirection interne ne s'appuie dessus.
+    expect(LEGACY_TAB_MAP.strategies).toBe('decisions')
   })
 })
