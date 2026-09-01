@@ -46,6 +46,7 @@ import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import EmptyState from '@/components/ui/empty-state'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { isColdWallet } from '@/lib/platforms'
 import PortfolioAssetList from '@/components/portfolio/PortfolioAssetList'
 import CreatePortfolioForm from '@/components/portfolio/CreatePortfolioForm'
@@ -116,7 +117,7 @@ export default function PortfolioPage() {
   }
 
   // Fetch portfolios (exclude crowdfunding — managed via dedicated page)
-  const { data: allPortfolios, isLoading: loadingPortfolios } = useQuery<Portfolio[]>({
+  const { data: allPortfolios, isLoading: loadingPortfolios , error: portfolioPageError, refetch: portfolioPageRefetch } = useQuery<Portfolio[]>({
     queryKey: queryKeys.portfolios.list(),
     queryFn: portfoliosApi.list,
     staleTime: 60_000,
@@ -214,6 +215,12 @@ export default function PortfolioPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (portfolioPageError) {
+    return <QueryErrorState error={portfolioPageError} onRetry={portfolioPageRefetch} title="Impossible de charger le portefeuille" />
   }
 
   // Empty state

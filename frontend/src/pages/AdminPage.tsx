@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
+import QueryErrorState from '@/components/ui/query-error-state'
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,7 @@ export default function AdminPage() {
     role: 'user',
   })
 
-  const { data: users, isLoading } = useQuery<User[]>({
+  const { data: users, isLoading , error: adminPageError, refetch: adminPageRefetch } = useQuery<User[]>({
     queryKey: queryKeys.admin.users,
     queryFn: usersApi.list,
   })
@@ -124,6 +125,12 @@ export default function AdminPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (adminPageError) {
+    return <QueryErrorState error={adminPageError} onRetry={adminPageRefetch} title="Impossible de charger l'administration" />
   }
 
   const usersList = users || []

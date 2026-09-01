@@ -12,6 +12,7 @@ import StatCard from '@/components/ui/stat-card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import QueryErrorState from '@/components/ui/query-error-state'
 import {
   Tooltip,
   TooltipContent,
@@ -63,7 +64,7 @@ function XirrUnavailable() {
 
 export default function CrowdfundingPerformancePage() {
   const { theme, color } = useNivoTheme()
-  const { data, isLoading } = useQuery<{ projects: CrowdfundingPerformanceItem[] }>({
+  const { data, isLoading , error: crowdfundingPerformancePageError, refetch: crowdfundingPerformancePageRefetch } = useQuery<{ projects: CrowdfundingPerformanceItem[] }>({
     queryKey: queryKeys.crowdfunding.performance,
     queryFn: crowdfundingApi.getPerformance,
   })
@@ -83,6 +84,12 @@ export default function CrowdfundingPerformancePage() {
         <SkeletonStatCard />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide : une query
+  // rejetée ne lève rien pendant le rendu, le RouteErrorBoundary ne la voit pas.
+  if (crowdfundingPerformancePageError) {
+    return <QueryErrorState error={crowdfundingPerformancePageError} onRetry={crowdfundingPerformancePageRefetch} title="Impossible de charger la performance" />
   }
 
   const projects = data?.projects || []
