@@ -16,6 +16,7 @@ disait rien de leur dangerosité. D'où un consentement explicite obligatoire.
 Fonctions pures : ni base, ni réseau.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -68,19 +69,35 @@ class TestScriptsReellementArmes:
     def test_le_script_importe_et_appelle_le_garde(self, nom):
         src = (_SCRIPTS / nom).read_text(encoding="utf-8")
         assert "require_consent" in src, f"{nom} n'appelle pas le garde-fou"
-        # L'appel doit précéder l'exécution, donc figurer dans le bloc __main__.
-        bloc_main = src.split('if __name__ == "__main__":')[-1]
-        assert "require_consent(" in bloc_main, f"{nom} : le garde n'est pas dans le bloc __main__"
+
+        # L'appel doit figurer dans un bloc __main__ — il y en a deux depuis que le
+        # refus a été remonté avant les imports applicatifs : le premier refuse, le
+        # dernier lance le traitement.
+        blocs = src.split('if __name__ == "__main__":')[1:]
+        assert any("require_consent(" in b for b in blocs), f"{nom} : le garde n'est dans aucun bloc __main__"
+
+        # Et il doit précéder les imports applicatifs, sinon un import qui échoue le
+        # court-circuite : le script sort en erreur sans expliquer pourquoi.
+        assert src.index("require_consent(") < src.index(
+            "from app."
+        ), f"{nom} : le garde s'exécute après les imports applicatifs"
 
     @pytest.mark.parametrize("nom", ["recalc_avg_price.py", "recalculate_quantities.py"])
     def test_execution_sans_drapeau_sort_en_erreur(self, nom):
         # Sans le drapeau, le script doit s'arrêter AVANT toute connexion à la base.
+        #
+        # PYTHONPATH est fourni explicitement : les scripts font
+        # `sys.path.insert(0, "/app")`, le chemin du conteneur. Sans cet ajout, ils
+        # échouent sur ModuleNotFoundError avant même d'atteindre le garde-fou — ce
+        # qui donne bien un code 1, mais pour la mauvaise raison, et sans message.
+        env = {**os.environ, "PYTHONPATH": str(_SCRIPTS.parent)}
         r = subprocess.run(
             [sys.executable, str(_SCRIPTS / nom)],
             capture_output=True,
             text=True,
             timeout=60,
             cwd=str(_SCRIPTS.parent),
+            env=env,
         )
         assert r.returncode == 1, f"{nom} ne s'est pas arrêté (code {r.returncode})"
-        assert "EXÉCUTION BLOQUÉE" in r.stdout
+        assert "EXÉCUTION BLOQUÉE" in r.stdout, f"{nom} s'est arrêté sans afficher le refus — stderr: {r.stderr[:200]}"

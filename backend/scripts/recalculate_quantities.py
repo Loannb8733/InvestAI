@@ -7,10 +7,28 @@ from decimal import Decimal
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import create_engine, text
+from scripts._danger_guard import require_consent  # noqa: E402
 
-from app.core.config import settings
-from scripts._danger_guard import require_consent
+# Refus prononcé AVANT tout import applicatif : il ne doit dépendre ni de SQLAlchemy,
+# ni de la configuration, ni de la base. Placé plus bas, un import qui échoue le
+# court-circuite et le script sort en erreur sans jamais expliquer pourquoi — constaté
+# en CI, où le chemin « /app » du conteneur n'existe pas.
+if __name__ == "__main__":
+    require_consent(
+        "recalculate_quantities.py",
+        "Ce script ÉCRASE asset.quantity par la somme signée de l'historique, et\n"
+        "  avg_buy_price sans lire conversion_rate. Or l'historique n'est jamais exhaustif :\n"
+        "  les sorties d'un cold wallet ne sont pas récupérables (pas d'API) et la sync ne\n"
+        "  remonte qu'une fenêtre limitée. Il remplace des soldes justes par le total des\n"
+        "  seules entrées connues, et défait FIN-01 sur les prix de revient.",
+        "vérifier l'écart réel avec scripts/check_invariants.py — il distingue les\n"
+        "  violations matérielles du bruit (NEW-11). Voir aussi NEW-08 dans le backlog.",
+    )
+
+
+from sqlalchemy import create_engine, text  # noqa: E402
+
+from app.core.config import settings  # noqa: E402
 
 
 def recalculate_quantities():
@@ -108,14 +126,4 @@ def recalculate_quantities():
 
 
 if __name__ == "__main__":
-    require_consent(
-        "recalculate_quantities.py",
-        "Ce script ÉCRASE asset.quantity par la somme signée de l'historique, et\n"
-        "  avg_buy_price sans lire conversion_rate. Or l'historique n'est pas exhaustif :\n"
-        "  les sorties d'un cold wallet ne sont pas récupérables (pas d'API), et la sync ne\n"
-        "  remonte qu'une fenêtre limitée. Le lancer remplace des soldes justes par le total\n"
-        "  des seules entrées connues, et défait FIN-01 sur les prix de revient.",
-        "vérifier l'écart réel avec scripts/check_invariants.py — il distingue désormais\n"
-        "  les violations matérielles du bruit (NEW-11). Voir aussi NEW-08 dans le backlog.",
-    )
     recalculate_quantities()
