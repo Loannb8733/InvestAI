@@ -5,7 +5,7 @@
 
 ---
 
-## ⚠️ Mise à jour du 2026-08-31 — lire avant de reprendre ce backlog
+## ⚠️ Mises à jour des 2026-08-31 et 2026-09-01 — lire avant de reprendre ce backlog
 
 Une session de travail sur les données **réelles de production** a invalidé plusieurs
 hypothèses de l'audit. Ce qui suit prime sur le reste du document.
@@ -36,6 +36,12 @@ Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se r
    angle mort de conception) alors que la sync était simplement asynchrone et n'avait pas
    encore abouti. Attendre et mesurer, plutôt que raisonner.
 
+4. **Un garde-fou ne doit pas dépendre de ce qu'il protège.** Le refus des scripts
+   destructeurs était prononcé après `from app.core.database import …`. Hors conteneur,
+   l'import échouait d'abord : le script sortait en erreur sans jamais dire pourquoi, et
+   la CI restait rouge (NEW-12). Un contrôle de sécurité doit s'exécuter **avant** toute
+   dépendance faillible — ici, la stdlib suffit.
+
 Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
 vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
 Tout test de non-régression doit être validé par un canari : casser volontairement le code
@@ -60,16 +66,31 @@ parity/XIRR (FIN-TEST).
 | **NEW-04** | 🟠 | Une position Earn refermée laissait son marqueur `STAKING` figé indéfiniment : **404,14 € affichés** dans le patrimoine pour une position inexistante. Le type `UNSTAKING` existait sans être jamais généré. | ✅ corrigé **et validé en prod** : une sync Binance a écrit l'`UNSTAKING` automatiquement (libellé « Auto: sortie d'Earn/Staking »), les 404 € ont disparu |
 | **NEW-05** | 🟠 | La CI échouait sur **tous** les runs depuis ≥ 11/07 : `COOKIE_SECURE` n'était abaissé qu'en `development`, or la CI tourne en `testing` — le cookie n'était pas renvoyé, la révocation de jeton intestable. | ✅ corrigé, CI verte |
 | **NEW-06** | 🟠 | Historique **négatif** sur 3 actifs (USDC Binance −26,55). Diagnostic initial FAUX : on a cru à des entrées manquantes hors fenêtre de sync et écrit 7 `TRANSFER_IN` de réconciliation. **Elles ont dégradé le P&L affiché de 214 €** (+252 € → +38 €) car le FIFO comptait déjà ces actifs. La vraie cause était NEW-09. | ↩️ **annulé** — les 7 lignes ont été supprimées ; `scripts/reconcile_missing_entries.py` **ne doit pas être relancé** en l'état |
-| **NEW-07** | 🟡 | **Divergences de schéma dev/prod** : `prediction_logs.price_at_creation` absent en dev ; la FK `related_transaction_id` a `ON DELETE SET NULL` en dev mais pas en prod. Ce qui est validé en dev ne garantit donc pas le comportement en prod. | ❌ à traiter |
-| **NEW-08** | 🟡 | `recalc_avg_price.py` et `recalculate_quantities.py` recalculent `avg_buy_price` **sans lire `conversion_rate`** : les lancer défait FIN-01. | ❌ à traiter (ne pas exécuter) |
-
+| **NEW-07** | 🟡 | **Divergences de schéma dev/prod** : `prediction_logs.price_at_creation` absent en dev ; la FK `related_transaction_id` a `ON DELETE SET NULL` en dev mais pas en prod. Ce qui est validé en dev ne garantit donc pas le comportement en prod. | ✅ corrigé — migration idempotente `s0n1o2p3q4r5` (`ADD COLUMN IF NOT EXISTS`, FK recréée seulement si `confdeltype` diffère) |
+| **NEW-08** | 🟡 | `recalc_avg_price.py` et `recalculate_quantities.py` recalculent `avg_buy_price` **sans lire `conversion_rate`** : les lancer défait FIN-01. | ✅ neutralisés — `_danger_guard.py` exige `--i-know-what-im-doing`, refus motivé sinon |
 | **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
 | **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
 | **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
+| **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
+
+### Livré le 2026-09-01
+
+| Ticket | État | Détail |
+|---|---|---|
+| **ARC-01** | ✅ | 9 fichiers, 8 helpers `run_async` dupliqués → **1 seul** (`tasks/async_runner.py`) ; l'engine passe en `NullPool` quand il tourne dans un worker Celery (détection par `sys.argv` ou `DB_NULLPOOL`). |
+| **SEC-01** | ✅ | Le webhook Telegram n'est plus ouvert en l'absence de secret. |
+| **SEC-02** | ✅ | `GET /import-status/{task_id}` ne renvoie plus `{type(e).__name__}: {e}` au client. |
+| **UX-04** | 🟢 **14 / 17** | Composant `QueryErrorState` créé (détail technique visible sous `import.meta.env.DEV` seulement, bouton uniquement si `onRetry`). Sur les 17 pages qui émettent une requête, 14 gèrent l'échec, contre 6 au départ. **Restent 3** : `ExchangesPage`, `ReportsPage`, `SettingsPage` — elles traitent l'erreur de *mutation* (toast) mais pas l'échec de chargement. |
+| **ARC-05** | ✅ | `prediction_service.py` **2 416 → 1 655 lignes** ; 761 lignes extraites dans `prediction_alpha.py` (`PredictionAlphaMixin`). |
+| **ARC-07** | 🟢 partiel | `ExchangesPage.tsx` **1 368 → 1 286 lignes** ; `ExchangeLogo` et les types extraits. Le découpage complet est **volontairement différé** : sans tests de rendu sur cette page, un découpage large casserait en silence. |
+| **FX quotidien** | ✅ | Tâche Celery `refresh_fx_rates` (USD/GBP/CHF → EUR), `crontab(hour=16, minute=5)` — les taux ne dépendaient plus d'une synchronisation pour être rafraîchis. |
+| **NEW-07** | ✅ | Migration d'alignement dev/prod, idempotente. |
+| **NEW-08** | ✅ | Les deux scripts destructeurs exigent un consentement explicite. |
+| **NEW-12** | ✅ | CI **verte** : 5 jobs sur 5, après 6 exécutions rouges consécutives. **1 208 tests** au vert. |
 
 ### Bilan de l'EPIC A : les 5 tickets étaient déjà traités
 
@@ -180,9 +201,16 @@ infondés ou déjà faits** (5 FIN de l'EPIC A, ARC-02, FIN-05, ARC-12) et **12 
 réels**. L'audit se trompe systématiquement là où le code a bougé depuis juin, et
 voit juste sur ce qui n'a jamais été touché — sécurité, god-files, états d'erreur.
 
-**Priorité recommandée pour la suite** : UX-04 (26 pages sans état d'erreur, c'est
-ce qui se voit quand une requête échoue), puis ARC-05/ARC-07 (les deux god-files),
-puis SEC-03 à SEC-06.
+**Priorité recommandée au 2026-09-01** — UX-04, ARC-05 et SEC-01/02 étant livrés :
+
+1. **SEC-03 à SEC-06** — seuls tickets encore **non mesurés** du backlog. À mesurer
+   avant d'engager quoi que ce soit : 8 des 20 tickets déjà vérifiés se sont révélés
+   infondés.
+2. **UX-05** (taxonomie Objectifs/Stratégies) et **ARC-11** (formatage monétaire dans
+   13 fichiers) — réels, mesurés, sans dépendance.
+3. **VERIF-01** — le 8,5/10 de design reste une hypothèse non vérifiée.
+4. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes) — à faire précéder
+   de tests de rendu / de service, faute de quoi le refactor casse en silence.
 
 ### Ce que FIN-03 était réellement
 
@@ -214,9 +242,9 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Vague | Contenu | Pourquoi |
 |-------|---------|----------|
-| **1 — Exactitude** | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ → **FIN-02 et FIN-04 restants** | ⚠️ Révisé le 2026-08-31. FIN-01, UX-01 et FIN-03 sont livrés ; l'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée sur les données réelles (0 ligne concernée en prod). **Mesurer l'exposition avant d'engager FIN-02/03/04.** |
-| **2 — Robustesse & vérité produit** | EPIC C (async, ORM, erreurs) + EPIC B (onboarding, promesses, titrage) + EPIC E P1 (sécurité élevée) | Stabilise le backend (bugs prod non-déterministes) et arrête de promettre des features absentes. |
-| **3 — Cohérence UX & sécurité moyenne** | EPIC D + EPIC E P2 + EPIC G (a11y) | États d'erreur, taxonomie, durcissements. |
+| ~~**1 — Exactitude**~~ ✅ | ~~EPIC A (FIN-01→04) + FIN-TEST + UX-01~~ | ✅ **Close le 2026-09-01.** Les 5 tickets FIN mesurés étaient déjà traités ; FIN-02 mesuré (0 transaction non-EUR, 0 dividende, XIRR 11,51 %), FIN-04 complété (rafraîchissement FX quotidien + conversion des frais payés en crypto). L'estimation « ~8-9 % pour la majorité des traders » ne s'est PAS vérifiée : **0 ligne concernée en prod**. |
+| **2 — Robustesse & vérité produit** | ✅ ARC-01 · ✅ EPIC E P1 (SEC-01/02) · **restent** ARC-03, ARC-04, EPIC B | ARC-02 écarté après mesure (le N+1 n'existe pas). EPIC B (onboarding, promesses d'actifs absents, titrage) n'a pas encore été mesuré. |
+| **3 — Cohérence UX & sécurité moyenne** | 🟢 UX-04 (14/17) · **restent** UX-05→08, SEC-03→06, EPIC G | SEC-03 à SEC-06 sont les **seuls tickets encore non mesurés** : commencer par là. |
 | **4 — Dette & polish** | EPIC F (god-files) + EPIC H (P3) | Refactors à dérouler en continu, sans bloquer la valeur. |
 
 > **VERIF-01** (rendu design) est à faire dès la vague 1 ou 2 : sans elle, on ne sait pas si le chantier design existe.
@@ -230,9 +258,9 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **FIN-01** Devise réelle des trades exchange *(livré 2026-08-31)* | ~~🔴~~ | F-01 | `tasks/sync_exchanges.py` (~257,282,338,394,452,521,585,639,809,861), `services/exchanges/*` | Toutes les `Transaction` de la sync sont `currency="EUR"` en dur alors que le `price` vient de paires USD/USDT. → Détecter la quote currency de chaque paire ; stocker `currency` réelle + `conversion_rate` = taux EUR/USD à la **date d'exécution** (le moteur FIFO sait exploiter `fx_rate`). Script de migration pour re-traiter l'historique. | Un achat `BTCUSDT` produit un coût de base en EUR exact (±0,1 %) ; `avg_buy_price` homogène ; test FIN-TEST #1 vert ; script de backfill idempotent validé sur données synthétiques. | L |
-| **FIN-02** Refonte XIRR (devise + flux) | 🔴 | F-02, F-03, F-04 | `services/analytics_service.py:1564-1644` | (a) ignore `tx.currency` (suppose tout USD) ; (b) compte `TRANSFER_IN/OUT` comme cash-flows fantômes ; (c) ignore `DIVIDEND`/`INTEREST`. → Lire `tx.currency` ligne à ligne (même pipeline que `metrics_service`) ; exclure les transferts internes ; ajouter dividendes+intérêts comme flux entrants. | XIRR de référence correct sur cash-flows connus (FIN-TEST #2) ; transferts internes appariés n'affectent pas le XIRR (#3) ; div/intérêts comptés (#4) ; parité P&L/rendement dashboard↔XIRR < 0,5 %. | M |
+| ❌ **FIN-02** Refonte XIRR (devise + flux) *(déjà traité — mesuré 2026-09-01)* | ~~🔴~~ | F-02, F-03, F-04 | `services/analytics_service.py:1564-1644` | (a) ignore `tx.currency` (suppose tout USD) ; (b) compte `TRANSFER_IN/OUT` comme cash-flows fantômes ; (c) ignore `DIVIDEND`/`INTEREST`. → Lire `tx.currency` ligne à ligne (même pipeline que `metrics_service`) ; exclure les transferts internes ; ajouter dividendes+intérêts comme flux entrants. | ✅ Les 3 griefs sont traités dans `analytics_math.py`. Exposition réelle mesurée : **0 transaction non-EUR, 0 dividende**. XIRR = 11,51 %. | M |
 | ✅ **FIN-03** Coût de base des transferts non appariés *(traité 2026-08-31 — voir NEW-09/NEW-10 : la cause n'était pas le FIFO)* | ~~🟠→P0~~ | F-06 | `services/metrics_service.py:155-161,720-758`, `transfer_service.py:114-148` | Un `TRANSFER_IN` sans transit apparié crée une couche à **coût zéro** → P&L latent massivement surévalué. Règle divergente entre CUMP et FIFO. → À défaut d'appariement, utiliser `source_asset.avg_buy_price` ; unifier la règle entre les deux moteurs. | Un transfer_in non apparié n'apparaît jamais à coût zéro ; CUMP et FIFO donnent le même P&L (test dédié) ; couverture du cas « sync partielle ». | M |
-| **FIN-04** Service de taux de change robuste | 🟠 | F-05, A02 | `services/price_service.py:218-238`, `services/metrics_service.py:388-391,402,1325,1524` | Taux de repli figés en dur (`0.92`/`1.09`) + `except: pass` qui avalent les échecs forex → valorisation silencieusement fausse. → Un seul service de taux : dernière valeur connue **persistée** (pas une constante), TTL court, flag `forex_stale` propagé jusqu'à l'UI ; remplacer les 3 swallow par log + flag `partial`. | Aucun taux en dur dans le code ; `forex_stale` exposé dans la réponse API et affiché ; les échecs forex sont loggés (plus de `pass`) ; test FIN-TEST #7. | M |
+| ✅ **FIN-04** Service de taux de change robuste *(complété 2026-09-01)* | ~~🟠~~ | F-05, A02 | `services/price_service.py:218-238`, `services/metrics_service.py:388-391,402,1325,1524` | Taux de repli figés en dur (`0.92`/`1.09`) + `except: pass` qui avalent les échecs forex → valorisation silencieusement fausse. → Un seul service de taux : dernière valeur connue **persistée** (pas une constante), TTL court, flag `forex_stale` propagé jusqu'à l'UI ; remplacer les 3 swallow par log + flag `partial`. | ✅ Service unique, table ECB persistée, `forex_stale` propagé, 0 `except: pass` — déjà en place. **Deux manques comblés** : les taux n'étaient rafraîchis qu'à l'occasion d'une sync (→ tâche Celery quotidienne), et les frais payés en crypto n'étaient pas convertis (un `fee_currency` erroné aurait affiché ~19 700 € de frais). | M |
 | ✅ **FIN-TEST** Tests numériques de référence *(vérifié 2026-09-01 : déjà fait)* | ~~🔴~~ | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
 
 ---
@@ -251,8 +279,8 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
-| **ARC-01** Boucle async / engine Celery | 🔴 | A01, C06 | `core/database.py:14`, `tasks/*` (7 fichiers `new_event_loop`) | Engine async créé une fois au niveau module, réutilisé par des boucles recréées à chaque tâche → « Future attached to a different loop », fuites de pool. → Un seul helper `run_async` dans `tasks/__init__.py` + engine worker en `NullPool` (ou `asyncio.run` partout). | 1 seul helper async ; 0 `new_event_loop` dupliqué ; test de charge Celery local sans erreur de boucle. | M |
-| **ARC-02** Relations ORM + eager loading | 🟠 | B03 | tous les `models/*.py`, endpoints lourds | `relationship()` = 0 partout ; jointures FK manuelles ; aucun `selectinload` → N+1. → Déclarer les relations clés (portfolio→assets→transactions) avec `lazy="selectin"`. | Relations déclarées sur les 5 modèles centraux ; dashboard/portfolio sans N+1 (compteur de requêtes en test) ; pas de régression de valeur. | L |
+| ✅ **ARC-01** Boucle async / engine Celery *(livré 2026-09-01)* | ~~🔴~~ | A01, C06 | `core/database.py:14`, `tasks/*` (7 fichiers `new_event_loop`) | Engine async créé une fois au niveau module, réutilisé par des boucles recréées à chaque tâche → « Future attached to a different loop », fuites de pool. → Un seul helper `run_async` dans `tasks/__init__.py` + engine worker en `NullPool` (ou `asyncio.run` partout). | ✅ 1 seul helper (`tasks/async_runner.py`), 0 duplicata. Engine en `NullPool` sous Celery. **Attention** : une première version appelait `set_event_loop(None)` dans le `finally`, ce qui retirait la boucle de l'appelant et cassait 103 tests. | M |
+| ❌ **ARC-02** Relations ORM + eager loading *(infondé — mesuré 2026-09-01)* | ~~🟠~~ | B03 | tous les `models/*.py`, endpoints lourds | `relationship()` = 0 partout ; jointures FK manuelles ; aucun `selectinload` → N+1. → Déclarer les relations clés (portfolio→assets→transactions) avec `lazy="selectin"`. | Relations déclarées sur les 5 modèles centraux ; dashboard/portfolio sans N+1 (compteur de requêtes en test) ; pas de régression de valeur. | L |
 | **ARC-03** Sortir la logique des god-endpoints | 🟠 | B02 | `endpoints/transactions.py` (70 req.), `dashboard.py` (37), `api_keys.py` (59) | Logique métier + SQL dans les endpoints → non réutilisable par Celery, non testable hors HTTP. → Extraire `transaction_service.py`, `api_key_service.py` ; l'endpoint = validation + appel service + mapping. | Endpoints réduits au routing ; logique couverte par tests de service ; réutilisée par au moins une tâche. | L |
 | **ARC-04** Factoriser `_classify_and_mark_error` | 🟠 | B04 | `tasks/sync_exchanges.py:39`, `endpoints/api_keys.py:27` | Fonction dupliquée à l'identique. → `services/exchange_error_classifier.py` importé des deux côtés. | 1 seule implémentation ; les deux appelants l'importent ; test unitaire de classification. | XS |
 
@@ -262,7 +290,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Prio | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
-| **UX-04** États d'erreur React Query | P1 | 🟠 | F-06(UX), B07 | `frontend/src/pages/*` (26/36 sans gestion) | Échec API → écran vide/spinner infini (le RouteErrorBoundary ne capte pas les queries en erreur). → Composant `<QueryErrorState onRetry={refetch}/>` + convention « toute `useQuery` rend un état d'erreur ». | Composant créé ; branché sur ≥ pages critiques (dashboard, portfolio, transactions, exchanges, intelligence) ; test simulant un 500. | M |
+| 🟢 **UX-04** États d'erreur React Query *(14/17 pages — 2026-09-01)* | P1 | 🟠 | F-06(UX), B07 | `frontend/src/pages/*` — **restent** `ExchangesPage`, `ReportsPage`, `SettingsPage` | Échec API → écran vide/spinner infini (le RouteErrorBoundary ne capte pas les queries en erreur). → Composant `<QueryErrorState onRetry={refetch}/>` + convention « toute `useQuery` rend un état d'erreur ». | Composant créé ; branché sur ≥ pages critiques (dashboard, portfolio, transactions, exchanges, intelligence) ; test simulant un 500. | M |
 | **UX-05** Taxonomie Stratégie/Stratégies/Objectifs | P2 | 🟠 | F-05(UX) | routes + `ReportsPage` RebalancingTab | 3 emplacements, noms quasi identiques (`strategy` vs `strategies`). → « Objectifs » (`/goals`) + « Stratégies de rebalancing » (route unique) ; supprimer/relier le doublon RebalancingTab. | Un seul emplacement par concept ; URLs sans collision singulier/pluriel. | M |
 | **UX-06** Consolidation onglet Intelligence | P2 | 🟠 | F-05, tableau redondance | `IntelligencePage` (6 onglets) | Insights/Smart Insights/Analyses quasi-synonymes ; Stratégies mal classée sous « Analyses IA ». → Regrouper les 3 insights ; sortir Stratégies. | ≤ 4 onglets cohérents ; labels métier explicites (« Signaux Alpha » vs « Diagnostic portefeuille »). | M |
 | **UX-07** Corrections de navigation diverses | P2 | 🟡 | F-07,F-08,F-10,F-11,F-12(UX) | `MasterDashboardPage:578`, `Breadcrumb.tsx`, `CrowdfundingMesProjectsPage:36`, `ReportsPage:315` | Raccourci « Signaux Alpha » → mauvais onglet ; breadcrumb non cliquable ; breadcrumb crowdfunding figé ; onglet Rapports non synchronisé à l'URL ; dashboards jumeaux. → Lot de corrections ciblées. | Chaque sous-point vérifié individuellement (deep-link onglet, breadcrumb cliquable, cible raccourci correcte). | M |
@@ -274,8 +302,8 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Prio | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
-| **SEC-01** Secret webhook Telegram obligatoire en prod | P1 | 🟠 | H-01 | `endpoints/telegram_webhook.py:54-57` | Vérif conditionnelle : sans secret en prod, webhook non authentifié. → Échouer au démarrage (ou 403 systématique) si `is_production and bot_enabled and not TELEGRAM_WEBHOOK_SECRET`. | En prod sans secret : le bot ne démarre pas / webhook 403 ; test de config. | S |
-| **SEC-02** Ne plus fuiter les exceptions au client | P1 | 🟠 | H-02 | `endpoints/api_keys.py:~1404-1407,~1601-1604` | `f"...{type(e).__name__}: {e}"` renvoyé au client. → Logger l'exception complète côté serveur, message générique au client (comme `system.py`). | Aucune réponse client ne contient de détail d'exception ; logs serveur conservent le détail. | XS |
+| ✅ **SEC-01** Secret webhook Telegram obligatoire en prod *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-01 | `endpoints/telegram_webhook.py:54-57` | Vérif conditionnelle : sans secret en prod, webhook non authentifié. → Échouer au démarrage (ou 403 systématique) si `is_production and bot_enabled and not TELEGRAM_WEBHOOK_SECRET`. | En prod sans secret : le bot ne démarre pas / webhook 403 ; test de config. | S |
+| ✅ **SEC-02** Ne plus fuiter les exceptions au client *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-02 | `endpoints/api_keys.py:~1404-1407,~1601-1604` | `f"...{type(e).__name__}: {e}"` renvoyé au client. → Logger l'exception complète côté serveur, message générique au client (comme `system.py`). | Aucune réponse client ne contient de détail d'exception ; logs serveur conservent le détail. | XS |
 | **SEC-03** Énumération de comptes au register | P2 | 🟡 | M-01 | `endpoints/auth.py:145-149` | Confirme l'existence d'un email. → Message générique / 201 neutre, comme forgot/resend. | `/register` ne distingue plus email existant vs nouveau dans la réponse. | S |
 | **SEC-04** Durcissements config | P2 | 🟡 | M-03,M-04,M-05 | `main.py` (admin_fix_mirrors), `core/rate_limit.py:10-19`, `core/config.py:125-127` | Dump debug admin verbeux ; `X-Forwarded-For` spoofable ; Redis TLS `CERT_NONE`. → Réduire le log admin (compteurs) ; ne lire XFF que derrière proxy de confiance (hop Render) ; Redis `CERT_REQUIRED` + CA Upstash. | Rate limiting non contournable par header ; Redis en TLS vérifié ; endpoints admin one-shot retirés ou minimisés. | M |
 | **SEC-05** Documenter/renforcer fingerprint & fail-open | P3 | 🟡/🔵 | M-02,L-01,L-03,L-04 | `core/security.py:15-21`, `api_keys.py:~1678`, `api/deps.py:155-176`, blocklist Redis | Fingerprint UA-only (faux sentiment de sécurité) ; task_id sans ownership ; fail-open silencieux ; blocklist fail-open si Redis down. → Documenter explicitement les limites ; ajouter `user_id` aux tâches d'import ; stratégie fail-open/closed décidée + alerte Redis. | Décisions documentées ; ownership vérifié sur import-status ; alerte si Redis indisponible. | M |
@@ -287,13 +315,13 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
-| **ARC-05** Découper `prediction_service.py` | 🟠 | B01 | `services/prediction_service.py` (3 733 LOC) | God-file : prédiction + régime + sentiment + anomalies + cache + accuracy. → Découper en `forecasting/`, `regime/`, `sentiment/`, `accuracy/` (la couche `ml/` existe déjà). | Aucun fichier > ~800 LOC sur ce périmètre ; chaque sous-domaine testable isolément ; pas de régression. | L |
+| ✅ **ARC-05** Découper `prediction_service.py` *(livré 2026-09-01)* | ~~🟠~~ | B01 | `services/prediction_service.py` (**2 416 → 1 655 LOC** ; l'audit annonçait 3 733) | God-file : prédiction + régime + sentiment + anomalies + cache + accuracy. → Découper en `forecasting/`, `regime/`, `sentiment/`, `accuracy/` (la couche `ml/` existe déjà). | 🟢 761 lignes extraites (`prediction_alpha.py`, 800 LOC). La cible « aucun fichier > 800 LOC » n'est pas atteinte : le service reste à 1 655 lignes. Aucune régression (1 208 tests verts). | L |
 | **ARC-06** Découper les god-services secondaires | 🟡 | C04 | `report_service.py` (2744), `metrics_service.py` (2127), `analytics_service.py` (2111) | Mêmes risques à moindre échelle. → Découpage progressif calcul/agrégation/formatage. | Réduction mesurable de la taille ; tests conservés verts. | L |
-| **ARC-07** Découper `ExchangesPage.tsx` | 🟠 | B06 | `pages/ExchangesPage.tsx` (2185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | Page < ~400 LOC ; sous-composants réutilisables ; re-renders réduits. | L |
+| 🟢 **ARC-07** Découper `ExchangesPage.tsx` *(entamé 2026-09-01)* | 🟠 | B06 | `pages/ExchangesPage.tsx` (**1 368 → 1 286 LOC** ; l'audit annonçait 2 185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | ⚠️ Non atteint volontairement : `ExchangeLogo` et les types sont sortis, **le découpage large est différé jusqu'à ce que la page ait des tests de rendu** — sans eux, un refactor de cette ampleur casse en silence. | L |
 | **ARC-08** Trancher le doublon insights | 🟠 | B05 | `services/insights_service.py` (403) vs `smart_insights_service.py` (1525) + endpoints | Deux systèmes parallèles, recouvrement probable. → Confirmer le vivant, déprécier/supprimer l'ancien. | Une seule source de vérité insights ; code mort supprimé. | M |
 | **ARC-09** Unifier les `queryKey` | 🟡 | C03 | ~14 clés hardcodées (`charts/*`, `PlatformSelect`, `DashboardMunitionsCard`) | Contournent `lib/queryKeys.ts` → invalidation incohérente, caches périmés. → Migrer toutes les clés vers la factory. | 0 `queryKey` hardcodé ; invalidation testée. | S |
 | **ARC-10** Stratégie librairies de charts | 🟡 | C01 | `frontend/package.json:17-21,45` | `@nivo/*` **et** `lightweight-charts`. → Choisir par cas d'usage et documenter, ou consolider ; retirer la lib non utilisée. | Décision documentée ; bundle allégé si retrait. | S |
-| **ARC-11** Centraliser le formatage monétaire | 🟡 | C05 | 43 fichiers avec `toLocaleString`/`Intl`/`formatCurrency` | Formatage dispersé → incohérences devise/décimales. → Tout passer par `lib/utils.formatCurrency`. | 1 seul point de formatage ; cohérence visuelle vérifiée. | M |
+| **ARC-11** Centraliser le formatage monétaire | 🟡 | C05 | **13 fichiers** formatent les montants à la main (l'audit en annonçait 43) | Formatage dispersé → incohérences devise/décimales. → Tout passer par `lib/utils.formatCurrency`. | 1 seul point de formatage ; cohérence visuelle vérifiée. | M |
 
 ---
 
@@ -312,7 +340,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Source | Correctif | Effort |
 |--------|--------|-----------|--------|
-| **FIN-05** Corriger la docstring de signe `_xirr` | F-08 | Refléter la convention réelle (négatif = sortie). | XS |
+| ❌ **FIN-05** Corriger la docstring de signe `_xirr` *(déjà correct — vérifié 2026-09-01)* | F-08 | Refléter la convention réelle (négatif = sortie). | XS |
 | **FIN-06** Découpler les tirages Monte Carlo | F-09 | Graines distinctes ou re-tirage proba/ETA ; afficher un intervalle. | S |
 | **FIN-07** Mois restants via `relativedelta` | F-10 | Remplacer `delta/30.44` par mois calendaires exacts. | XS |
 | **FIN-08** `Decimal` pour montants advisory affichés | F-11 | Cashflows stress test / DCA affichés au centime en `Decimal`. | M |
@@ -321,7 +349,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | **FIN-11** Logguer le clamp XIRR | F-14 | Alerter quand `[-95,1000]` s'active au lieu de borner en silence. | XS |
 | **FIN-12** Hash dédup avec heure | F-15 | Inclure l'heure / `external_id` pour ne pas fusionner 2 DCA identiques le même jour. | S |
 | **FIN-13** Earn/wrapped par table explicite | F-16 | Remplacer le strip de préfixe `W` par une table de variantes connues (évite WIF/WLD cassés). | S |
-| **ARC-12** Supprimer l'alias mort `fetchUser` | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
+| ❌ **ARC-12** Supprimer l'alias mort `fetchUser` *(infondé : utilisé par `VerifyEmailPage` — 2026-09-01)* | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
 | **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
 | **UX-09** `font-serif` sur h1 du Login | F-13(UX) | Cohérence de marque dès l'entrée. | XS |
 | **UX-10** Remplir le Header | F-14(UX) | Breadcrumb/titre courant + recherche globale (cmd-K déjà présent). | S |
