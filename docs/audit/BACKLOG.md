@@ -60,7 +60,7 @@ devrait être engagé sans mesure préalable.
 | **A** — Exactitude financière | **5/5** | FIN-01, FIN-03, FIN-04 | FIN-02, FIN-TEST | — |
 | **B** — Navigation & vérité produit | **2/3** | UX-01 | — | UX-02 |
 | **C** — Robustesse backend | **3/4** | ARC-01 | ARC-02 | ARC-04 |
-| **D** — États d'erreur & UX | **3/5** | UX-04 (14/17), UX-05 | — | UX-06, UX-07 |
+| **D** — États d'erreur & UX | **3/5** | UX-04 (17/17), UX-05 | — | UX-06, UX-07 |
 | **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
 | **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
 | **G** — Accessibilité | **0/4** | — | — | A11Y-01→04 |
@@ -126,6 +126,7 @@ reste une hypothèse.
 | **SEC-03** | ✅ | `/register` répond la même chose que l'adresse soit libre ou prise. Le mot de passe est **haché dans les deux branches** : ne le faire que pour une adresse libre rendrait la réponse ~250 ms plus lente et rétablirait l'oracle au chronomètre. Le titulaire d'une adresse déjà inscrite est prévenu par email (best-effort). |
 | **SEC-04** | ✅ | `POST /api/v1/admin/fix-mirrors` **supprimé** (232 l.). Doublon manuel de `_create_missing_transfer_mirrors()`, qui tourne déjà à chaque démarrage sous verrou et de façon idempotente : aucune capacité perdue. Il exécutait un `ALTER TABLE` depuis HTTP, renvoyait un dump des transactions, et son `except` renvoyait `str(e)` — la fuite corrigée par SEC-02. |
 | **UX register** | ✅ | Défaut adjacent trouvé en corrigeant SEC-03 : le front ne traitait ni `access_token` ni `email_verification_required=false`, donc l'écran d'inscription restait **muet après un succès** — ni toast, ni redirection. |
+| **UX-04 (fin)** | ✅ | Les 3 dernières pages, chacune selon ce que sa requête empêche réellement. **`SettingsPage` cachait un défaut plus grave que l'état d'erreur manquant** : les 3 champs du profil restent vides quand la lecture échoue, et la sauvegarde envoie `null` pour tout champ vide — un clic sur « Enregistrer » effaçait TMI, profil de risque et DCA, silencieusement. Le formulaire est donc masqué, pas seulement signalé. Sur `ReportsPage`, à l'inverse, un état d'erreur de page aurait été une **régression** : la liste des années a un repli et tous les rapports restent générables. |
 | **UX-05** | ✅ | L'onglet `strategies` d'Intelligence **n'existe plus** depuis la refonte de juillet : le menu « Stratégies » menait à un onglet supprimé via deux redirections. `/goals` devient canonique, l'entrée est renommée « Décisions ». |
 | **ARC-11** | ✅ | 4 fichiers migrés. `CalendarPage` affichait « 1 234 EUR » là où le reste de l'app affiche « 1 234,00 € » — même donnée, deux rendus. |
 | **SEC-05** | ✅ | 4 fail-open de révocation passés en **ERROR** (préfixe `SECURITY:`) — dont 2 hors ticket, au logout. Ownership vérifié sur `import-status`, avec la même 404 qu'une tâche absente. Docstring du fingerprint réécrite : un User-Agent voyage en clair avec le token qu'il prétend protéger. |
@@ -328,11 +329,9 @@ et F ; 23 ne l'ont jamais été, dont l'EPIC G (accessibilité) au complet. Voir
    l'EPIC G (a11y, 4 tickets, aucun mesuré) et UX-02/UX-06/UX-07, qui touchent des
    écrans quotidiens. 11 des 27 tickets déjà vérifiés étaient sans objet ; il n'y a
    aucune raison que le taux change sur les suivants.
-5. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes) — à faire précéder
-   de tests de rendu / de service, faute de quoi le refactor casse en silence.
-6. **UX-04 (fin)** — les 3 pages restantes (`ExchangesPage`, `ReportsPage`,
-   `SettingsPage`). Polish.
-
+5. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes). `ExchangesPage`
+   a désormais **5 tests de rendu** : le socle qui manquait à ARC-07 existe, son
+   découpage peut reprendre. ARC-03 reste à faire précéder de tests de service.
 **Les EPICs A et E sont clos.** Pour A, les 5 tickets étaient déjà traités ou l'ont été
 en session ; pour E, SEC-01 à SEC-05 sont corrigés et SEC-06 est périmé.
 
@@ -414,7 +413,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Prio | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
-| 🟢 **UX-04** États d'erreur React Query *(14/17 pages — 2026-09-01)* | P1 | 🟠 | F-06(UX), B07 | `frontend/src/pages/*` — **restent** `ExchangesPage`, `ReportsPage`, `SettingsPage` | Échec API → écran vide/spinner infini (le RouteErrorBoundary ne capte pas les queries en erreur). → Composant `<QueryErrorState onRetry={refetch}/>` + convention « toute `useQuery` rend un état d'erreur ». | Composant créé ; branché sur ≥ pages critiques (dashboard, portfolio, transactions, exchanges, intelligence) ; test simulant un 500. | M |
+| ✅ **UX-04** États d'erreur React Query *(livré 2026-09-01 — 17/17)* | ~~P1~~ | ~~🟠~~ | F-06(UX), B07 | `frontend/src/pages/*` | Échec API → écran vide/spinner infini (le RouteErrorBoundary ne capte pas les queries en erreur). → Composant `<QueryErrorState onRetry={refetch}/>` + convention « toute `useQuery` rend un état d'erreur ». | ✅ **17/17 pages à requête**, contre 6 au départ. Les 3 dernières ont demandé 3 traitements distincts (voir ci-dessous) : appliquer le même composant partout aurait dégradé 2 écrans sur 3. 13 tests de rendu, validés par canari **dans les deux sens** — retirer l'état d'erreur *et* l'étendre trop largement font échouer les tests. | M |
 | ✅ **UX-05** Taxonomie Stratégie/Stratégies/Objectifs *(livré 2026-09-01)* | ~~P2~~ | ~~🟠~~ | F-05(UX) | routes + `ReportsPage` RebalancingTab | 3 emplacements, noms quasi identiques (`strategy` vs `strategies`). → « Objectifs » (`/goals`) + « Stratégies de rebalancing » (route unique) ; supprimer/relier le doublon RebalancingTab. | ✅ `/goals` sert la page, `/strategy` devient l'alias (l'inverse d'avant) ; `/strategies` vise directement `?tab=decisions` ; l'entrée de menu est renommée **« Décisions »**, d'après sa destination réelle ; breadcrumb aligné sur la convention (« Outils › Objectifs »). **RebalancingTab non touché** : moteur distinct de celui du pilier Risque (classes crypto vs MPT), sa fusion relève d'ARC-08/UX-06. | M |
 | **UX-06** Consolidation onglet Intelligence | P2 | 🟠 | F-05, tableau redondance | `IntelligencePage` (6 onglets) | Insights/Smart Insights/Analyses quasi-synonymes ; Stratégies mal classée sous « Analyses IA ». → Regrouper les 3 insights ; sortir Stratégies. | ≤ 4 onglets cohérents ; labels métier explicites (« Signaux Alpha » vs « Diagnostic portefeuille »). | M |
 | **UX-07** Corrections de navigation diverses | P2 | 🟡 | F-07,F-08,F-10,F-11,F-12(UX) | `MasterDashboardPage:578`, `Breadcrumb.tsx`, `CrowdfundingMesProjectsPage:36`, `ReportsPage:315` | Raccourci « Signaux Alpha » → mauvais onglet ; breadcrumb non cliquable ; breadcrumb crowdfunding figé ; onglet Rapports non synchronisé à l'URL ; dashboards jumeaux. → Lot de corrections ciblées. | Chaque sous-point vérifié individuellement (deep-link onglet, breadcrumb cliquable, cible raccourci correcte). | M |
