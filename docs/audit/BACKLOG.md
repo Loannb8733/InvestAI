@@ -42,6 +42,13 @@ Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se r
    la CI restait rouge (NEW-12). Un contrôle de sécurité doit s'exécuter **avant** toute
    dépendance faillible — ici, la stdlib suffit.
 
+5. **Les tests verts ne disent rien du rendu.** 160 tests front passaient pendant qu'un
+   rail affichait « CROW » au clavier, qu'une page n'avait aucun `<h1>`, qu'un titre
+   annonçait « Wealth Journey » au lieu d'« Objectifs » et qu'une requête mettait 92
+   secondes. Une assertion sur le DOM ne voit ni une largeur CSS, ni un temps de
+   réponse, ni une incohérence de vocabulaire. **Regarder l'app est une étape
+   distincte, pas une redondance.**
+
 Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
 vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
 Tout test de non-régression doit être validé par un canari : casser volontairement le code
@@ -65,21 +72,20 @@ devrait être engagé sans mesure préalable.
 | **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
 | **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
 | **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
-| **VÉRIF** | **1/2** | VERIF-02 | — | **VERIF-01** |
-| **Total** | **31/50** | 17 | 6 | 19 |
+| **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (7 écrans / 32) | — | — |
+| **Total** | **32/50** | 18 | 6 | 18 |
 
 UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent dans les
 mesurés de leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni
 écartés.
 
-**Ce qui n'a jamais été regardé** : UX-02, UX-06, UX-07, UX-10, UX-11, ARC-04, ARC-06,
-ARC-08, ARC-10, ARC-13, FIN-06 à FIN-13, VERIF-01.
+**Ce qui n'a jamais été regardé** : UX-06, UX-07, UX-10, UX-11, ARC-04, ARC-06, ARC-08,
+ARC-10, ARC-13, FIN-06 à FIN-13. (**UX-02 est confirmé** par le cas « Wealth Journey ».)
 
-**Angle mort de toute la session** : rien n'a été vérifié *à l'écran*. Les correctifs UX
-livrés (UX-04, UX-05) sont couverts par des tests déclaratifs — routes, libellés,
-formatage — qui ne disent rien du rendu. Les pages sont derrière l'authentification.
-C'est exactement l'objet de **VERIF-01**, et la raison pour laquelle le 8,5/10 de design
-reste une hypothèse.
+**L'angle mort a été levé** : l'app a été parcourue à l'écran le 2026-09-01 (voir
+« VERIF-01 — ce que le rendu a appris »). Trois défauts vivaient dans l'interface pendant
+que 160 tests étaient verts, et une lenteur de 92 s (NEW-13) qu'aucun ticket ne
+mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur 32.
 
 ### Livré le 2026-08-31
 
@@ -104,11 +110,83 @@ reste une hypothèse.
 | **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
 | **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
 | **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
+| **NEW-13** | 🔴 | **`/predictions/market-cycle` répond en 92 s** (1er appel), 1,4 s (cache chaud), **61 s** au 3e : le cache ne tient pas. Boucle séquentielle sur les 56 actifs avec appel d'API externe à cache froid ; la limite CoinGecko (50 req/min) rend le dépassement mécanique. Le bandeau de régime reste en squelette pendant tout ce temps. | ❌ **à traiter** (mesuré, non corrigé) |
 | **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
+
+### VERIF-01 — ce que le rendu a appris (2026-09-01)
+
+L'app a enfin été **regardée**, connectée sur les données réelles, en desktop (1280×800)
+et en mobile (390×844). Sept écrans parcourus en détail, treize audités
+automatiquement.
+
+**Le constat central : les 160 tests front étaient verts pendant que trois défauts
+visibles vivaient dans l'interface.** Aucun n'était détectable autrement qu'en
+regardant.
+
+| Trouvé | Nature | État |
+|---|---|---|
+| **Rail tronqué au clavier** | `group-focus-within:opacity-100` révélait les libellés, mais le rail restait à 76 px : « Crowdfunding » s'affichait « CROW ». Ma correction A11Y-03 était à moitié faite. | ✅ `focus-within:w-64` |
+| **`Badge` sans `forwardRef`** | Radix lui passe une ref via `asChild` ; React avertissait, et le tooltip du badge « prix périmé » ne pouvait pas se positionner. | ✅ corrigé |
+| **`IntelligencePage` sans `<h1>`** | Aucun titre dans l'arbre d'accessibilité, hiérarchie démarrant au niveau 2. | ✅ `<h1 class="sr-only">` |
+| **« Wealth Journey »** | Le `<h1>` de `/goals` contredisait le menu, le breadcrumb et l'onglet, qui disent tous « Objectifs » — et en anglais. **UX-02 confirmé par l'exemple.** | ✅ corrigé |
+| **HMR mort** | `VITE_HMR_DISABLE=true` masquait le problème : port interne 3000 annoncé au navigateur qui doit joindre 3001, plus `allowedHosts: 'all'` (syntaxe Vite 6) qui faisait rejeter le handshake en 400 sous Vite 5. | ✅ réparé |
+
+#### 🔴 NEW-13 — `/predictions/market-cycle` met jusqu'à 92 secondes
+
+**La découverte la plus lourde de la session, et elle ne figure dans aucun ticket.**
+
+Mesuré depuis le navigateur, sur le portefeuille réel (56 actifs) :
+
+| Appel | Durée |
+|---|---:|
+| 1er (cache froid) | **92 s** |
+| 2e (cache chaud) | 1,4 s |
+| 3e | **61 s** |
+
+Le cache ne tient pas : le troisième appel repart à une minute. `get_market_cycle`
+(`prediction_cycles.py`) boucle **séquentiellement** sur chaque actif du portefeuille et
+appelle l'API d'historique quand le cache est froid. Avec 56 actifs et la limite
+CoinGecko à 50 requêtes/minute, un rafraîchissement dépasse mécaniquement la minute.
+
+Effet visible : le bandeau de régime de marché reste en squelette pendant tout ce temps,
+sur `/intelligence` comme sur `/crypto` (6 squelettes encore affichés après 6 s).
+
+**Non corrigé** — le correctif (mise en cache qui tient, parallélisation bornée, respect
+du rate limit) est un chantier à part entière, à mesurer avant d'engager.
+
+#### Ce qui a été confirmé à l'écran
+
+- **UX-04** : l'état d'erreur s'affiche réellement (« Impossible de charger vos clés
+  API »), le bouton « Réessayer » relance la requête, le cycle complet fonctionne.
+- **UX-05** : « Décisions » → `/strategies` → onglet Décisions ; « Objectifs » →
+  `/goals` ; `/strategy` redirige ; breadcrumb « Outils › Objectifs ».
+- **ARC-11** : « 1 558,08 € », « +351,75 € » — format cohérent partout.
+- **A11Y-04** : contraste `--gain` mesuré **par le navigateur** à 4,80:1 sur carte et
+  4,67:1 sur fond (mes calculs Python donnaient 4,82 et 4,68).
+- **Responsive** : aucun débordement horizontal du document en 390 px.
+
+#### Deux faux positifs de mon propre audit
+
+À consigner, parce qu'ils invitent à se méfier des heuristiques DOM maison :
+
+- j'ai signalé un interrupteur « sans nom accessible » sur `/alerts` : le snapshot
+  d'accessibilité du navigateur le nomme correctement (« Activer les notifications
+  Telegram ») via son `<label for>` ;
+- j'ai signalé `/crypto` « sans `<h1>` » : le titre existe, mon audit l'avait mesuré
+  pendant le chargement.
+
+**Se fier à l'arbre d'accessibilité du navigateur, pas à un `querySelectorAll` maison.**
+
+#### Le 8,5/10 de design
+
+Toujours pas un verdict — 7 écrans sur 32, desktop et mobile, sans regard de designer
+professionnel. Première impression honnête : l'app est **plus soignée que l'audit ne le
+laissait croire** — serif assumé sur les titres, chiffres tabulaires, hiérarchie lisible,
+thèmes clair et sombre tous deux aboutis. Ce n'est pas un thème sombre paresseux.
 
 ### Livré le 2026-09-01
 
@@ -320,12 +398,13 @@ document reproche à l'audit — une conclusion étendue au-delà de ce qui a é
 D et F ; 19 ne l'ont jamais été. Voir le tableau « État au 2026-09-01 » en tête de
 document.
 
-1. ~~Supprimer `admin_fix_mirrors` (SEC-04) et corriger SEC-03~~ — ✅ **fait le
-   2026-09-01**. Détail dans « Livré le 2026-09-01 ».
+1. **NEW-13 — la lenteur de `/predictions/market-cycle`** (92 s au premier appel). C'est
+   ce qui dégrade le plus l'usage réel, et rien dans l'audit ne le mentionnait. Mesurer
+   d'abord pourquoi le cache ne tient pas entre deux appels.
 2. ~~UX-05 et ARC-11~~ — ✅ **faits le 2026-09-01**.
-3. **VERIF-01** — angle mort de toute la session : rien n'a été vérifié à l'écran. Les
-   correctifs UX livrés sont couverts par des tests déclaratifs, qui ne disent rien du
-   rendu. Le 8,5/10 de design reste une hypothèse.
+3. ~~VERIF-01~~ — ✅ **fait le 2026-09-01** sur 7 écrans. **À poursuivre** sur les 25
+   restants : le taux de trouvailles a été de 3 défauts réels et 1 lenteur majeure pour
+   7 écrans, tous invisibles aux tests.
 4. **Mesurer avant d'engager** les 19 tickets jamais regardés — UX-02, UX-06 et UX-07
    d'abord, qui touchent des écrans quotidiens. 11 des 31 tickets déjà vérifiés étaient
    sans objet ; il n'y a aucune raison que le taux change sur les suivants.
