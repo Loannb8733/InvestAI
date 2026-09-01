@@ -51,14 +51,22 @@ async def telegram_webhook(
     if not settings.telegram_bot_enabled:
         return JSONResponse({"ok": True})
 
-    # Validate Telegram webhook secret when configured. Use a constant-time
-    # comparison: == leaks the token byte-by-byte through response latency,
-    # letting a remote attacker brute-force the secret. hmac.compare_digest is
-    # the standard mitigation.
-    if settings.TELEGRAM_WEBHOOK_SECRET:
-        if not hmac.compare_digest(x_telegram_bot_api_secret_token or "", settings.TELEGRAM_WEBHOOK_SECRET):
-            logger.warning("Telegram webhook rejected: invalid or missing secret token")
-            return JSONResponse({"ok": False}, status_code=403)
+    # Un bot actif SANS secret configuré laissait ce webhook ouvert à tous : la
+    # vérification était conditionnée à l'existence du secret, donc silencieusement
+    # désactivée quand il manquait — exactement le cas où elle protège le plus.
+    # On refuse plutôt que d'accepter n'importe quelle requête.
+    if not settings.TELEGRAM_WEBHOOK_SECRET:
+        logger.error(
+            "Webhook Telegram refusé : le bot est actif mais TELEGRAM_WEBHOOK_SECRET "
+            "n'est pas défini. Sans ce secret, n'importe qui peut appeler ce endpoint."
+        )
+        return JSONResponse({"ok": False}, status_code=403)
+
+    # Comparaison à temps constant : `==` révèle le jeton octet par octet via la
+    # latence de réponse, ce qui permet de le reconstituer à distance.
+    if not hmac.compare_digest(x_telegram_bot_api_secret_token or "", settings.TELEGRAM_WEBHOOK_SECRET):
+        logger.warning("Telegram webhook rejected: invalid or missing secret token")
+        return JSONResponse({"ok": False}, status_code=403)
 
     try:
         body = await request.json()

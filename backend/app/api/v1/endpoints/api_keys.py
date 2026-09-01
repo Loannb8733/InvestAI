@@ -1767,11 +1767,15 @@ async def _run_import_background(task_id: str, api_key_id: str, heal_fx: bool = 
                 "status": "failed",
                 "error": result.get("error", "Unknown error"),
             }
-    except Exception as e:
-        logger.error(f"Background import error: {type(e).__name__}: {e}")
+    except Exception:
+        # Le détail reste côté serveur : type, message et trace sont journalisés.
+        # Le client, lui, ne reçoit qu'un libellé générique — un message d'exception
+        # expose des chemins, des fragments de requête ou des noms de classes
+        # internes, et ce statut est consultable via GET /import-status/{task_id}.
+        logger.exception("Background import error for task %s", task_id)
         _import_tasks[task_id] = {
             "status": "failed",
-            "error": f"{type(e).__name__}: {e}",
+            "error": "L'import a échoué. Consultez les journaux du serveur pour le détail.",
         }
 
 
