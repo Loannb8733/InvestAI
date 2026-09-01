@@ -85,6 +85,37 @@ parity/XIRR (FIN-TEST).
 sync fabriquant des ajustements contradictoires, transactions sans date, positions
 fantômes, marqueur Earn figé, CI rouge depuis juillet — n'y figuraient pas.
 
+### Décision d'architecture (2026-09-01) : le SOLDE fait foi
+
+Le FIFO et la somme signée des transactions divergent structurellement sur les
+transferts. La question « quelle source fait foi ? » est tranchée :
+
+**`asset.quantity` fait foi.** L'historique est un journal, incomplet par nature :
+un cold wallet n'a pas d'API pour ses sorties, et la synchronisation ne remonte
+qu'une fenêtre limitée. La session l'a vérifié à chaque fois — les soldes étaient
+justes, l'historique non.
+
+Conséquences pratiques :
+- l'invariant `check_holdings_qty` est un **indicateur**, pas une vérité : un écart
+  signale un journal incomplet, pas un solde faux ;
+- **on ne réécrit jamais `asset.quantity` depuis l'historique** (cf. NEW-03) ;
+- on ne « comble » pas l'historique pour faire taire l'invariant : c'est ce qui a
+  coûté 214 € de plus-value affichée (NEW-06).
+
+### Mesure des EPICs restants (2026-09-01)
+
+Après cinq tickets FIN trouvés déjà faits, les EPICs suivants ont été mesurés plutôt
+que lus. **Contrairement à l'EPIC A, ceux-ci sont réels.**
+
+| Ticket | Annoncé par l'audit | Mesuré | Verdict |
+|---|---|---|---|
+| **ARC-01** | 7 fichiers `new_event_loop` | **9 fichiers**, 8 helpers `run_async` dupliqués | ✅ réel, **aggravé** (dont un ajouté le 2026-09-01 par `fx_rates.py`, en suivant la convention en place) |
+| **ARC-02** | 0 `relationship()` | 0 `relationship()`, **0 eager loading** | ✅ réel, exact |
+| **ARC-03** | `transactions.py` 70 req · `dashboard.py` 37 · `api_keys.py` 59 | 70 · 22 · 56, pour 1 671 / 1 383 / 1 876 lignes | ✅ réel (dashboard amélioré depuis) |
+| **UX-03** | actions/ETF/immobilier « absents » | types présents au modèle, `get_stock_price` existe, mais **0 actif** de ces types et aucune page dédiée | ⚠️ réel mais **à reformuler** : ce n'est pas l'absence de support, c'est l'absence de parcours |
+
+À mesurer avant engagement : EPIC D (5), E (6), F (7), H (14).
+
 ### Ce que FIN-03 était réellement
 
 Le ticket décrivait « TRANSFER_IN non apparié → couche à coût zéro ; règle divergente CUMP vs FIFO ». Le moteur FIFO s'est révélé **correct** : ses couches transitent bien d'un wallet à l'autre. La divergence venait d'en amont — des écritures d'ajustement sans date (NEW-10) et des ajustements annulant des trades (NEW-09). Corriger le FIFO aurait été corriger le mauvais composant.
