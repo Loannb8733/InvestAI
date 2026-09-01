@@ -178,7 +178,11 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
       <div className="hidden w-[76px] shrink-0 lg:block" aria-hidden />
 
       {/* Desktop rail — collapsed 76px, expands to 256px on hover (overlay) */}
-      <aside className="group fixed inset-y-0 left-0 z-30 hidden w-[76px] overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-in-out hover:w-64 lg:block">
+      {/* `focus-within:w-64` en plus de `hover:w-64` : sans lui, la tabulation
+          révélait les libellés (A11Y-03) mais dans un rail resté à 76 px, donc
+          tronqués — « Crowdfunding » s'affichait « CROW ». Vu à l'écran, pas en
+          test : la largeur est du CSS, aucune assertion sur le DOM ne la voit. */}
+      <aside className="group fixed inset-y-0 left-0 z-30 hidden w-[76px] overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-in-out hover:w-64 focus-within:w-64 lg:block">
         <div className="relative h-full">{renderBody(false)}</div>
       </aside>
 
