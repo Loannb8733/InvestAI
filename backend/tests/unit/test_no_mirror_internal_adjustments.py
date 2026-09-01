@@ -63,12 +63,30 @@ class TestClauseSql:
         for prefix, pattern in zip(INTERNAL_ADJUSTMENT_NOTE_PREFIXES, INTERNAL_NOTE_PATTERNS):
             assert pattern == prefix + "%"
 
-    def test_les_deux_requetes_de_mirroring_filtrent(self):
-        # Celle du démarrage et celle de l'endpoint admin.
-        assert _MAIN_SRC.count("LIKE ANY(:internal_note_patterns)") == 2
+    def test_toute_requete_de_mirroring_filtre(self):
+        """Chaque sélection de transferts à miroiter doit exclure les ajustements.
+
+        On ne compte plus les occurrences : le nombre de chemins a déjà changé
+        une fois (l'endpoint admin `fix-mirrors` a été supprimé — SEC-04) et un
+        compteur codé en dur casse à chaque évolution sans rien dire du fond.
+        Ce qui compte est l'appariement : autant de filtres que de requêtes
+        sélectionnant des transferts non miroités, et au moins une.
+        """
+        # `related_transaction_id IS NULL` est le critère qui désigne un transfert
+        # pas encore miroité : c'est la signature d'une requête de mirroring.
+        requetes = _MAIN_SRC.count("t.related_transaction_id IS NULL")
+        filtres = _MAIN_SRC.count("LIKE ANY(:internal_note_patterns)")
+        assert requetes >= 1, "plus aucune requête de mirroring : le test ne protège plus rien"
+        assert filtres == requetes, (
+            f"{requetes} requête(s) de mirroring pour {filtres} filtre(s) : "
+            "une requête sélectionne des ajustements internes"
+        )
 
     def test_le_parametre_est_bien_passe(self):
-        assert _MAIN_SRC.count('{"internal_note_patterns": INTERNAL_NOTE_PATTERNS}') == 2
+        # Un filtre sans son paramètre lié lèverait à l'exécution.
+        assert _MAIN_SRC.count('{"internal_note_patterns": INTERNAL_NOTE_PATTERNS}') == _MAIN_SRC.count(
+            "LIKE ANY(:internal_note_patterns)"
+        )
 
     def test_les_libelles_ne_sont_jamais_concatenes_dans_le_sql(self):
         # Ils voyagent en paramètre lié : aucun n'apparaît dans une chaîne SQL.

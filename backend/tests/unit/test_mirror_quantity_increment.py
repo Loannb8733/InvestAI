@@ -17,30 +17,71 @@ aucun test d'exécution ne l'atteint, et une affectation de solde ne lève aucun
 erreur — elle écrit juste une valeur fausse.
 """
 
+import ast
 import re
 from pathlib import Path
 
 _MAIN = (Path(__file__).resolve().parents[2] / "app" / "main.py").read_text(encoding="utf-8")
 
-# Les deux chemins qui créent des miroirs : au démarrage, et via l'endpoint admin.
-_MIRROR_FUNCS = ("_create_missing_transfer_mirrors", "fix-mirrors")
-
 
 def _mirror_sections():
-    """Découpe le fichier autour des fonctions de mirroring."""
-    sections = []
+    """Découpe le fichier autour des fonctions de mirroring.
+
+    Il n'en reste qu'une depuis la suppression de l'endpoint admin
+    ``POST /api/v1/admin/fix-mirrors`` (SEC-04) : le mirroring de démarrage.
+    """
     start = _MAIN.find("def _create_missing_transfer_mirrors")
     assert start != -1, "fonction de mirroring de démarrage introuvable"
     # jusqu'à la fin de la fonction (prochaine def au niveau module)
     end = _MAIN.find("\ndef ", start + 1)
-    sections.append(_MAIN[start : end if end != -1 else len(_MAIN)])
+    return [_MAIN[start : end if end != -1 else len(_MAIN)]]
 
-    admin = _MAIN.find('@app.post("/api/v1/admin/fix-mirrors")')
-    assert admin != -1, "endpoint admin fix-mirrors introuvable"
-    # borne : la route suivante, sinon la fin du fichier
-    nxt = _MAIN.find("\n@app.", admin + 1)
-    sections.append(_MAIN[admin : nxt if nxt != -1 else len(_MAIN)])
-    return sections
+
+def _routes_declarees():
+    """Retourne [(chemin, noeud de fonction)] pour chaque route montée sur `app`.
+
+    Analyse de l'AST et non du texte : chercher une chaîne dans le fichier ferait
+    correspondre le commentaire qui documente la suppression, lequel cite
+    forcément le chemin de l'endpoint et le SQL qu'il exécutait.
+    """
+    arbre = ast.parse(_MAIN)
+    routes = []
+    for noeud in arbre.body:
+        if not isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for deco in noeud.decorator_list:
+            cible = deco.func if isinstance(deco, ast.Call) else deco
+            if (
+                isinstance(cible, ast.Attribute)
+                and isinstance(cible.value, ast.Name)
+                and cible.value.id == "app"
+                and cible.attr in ("get", "post", "put", "delete", "patch")
+            ):
+                args = deco.args if isinstance(deco, ast.Call) else []
+                chemin = args[0].value if args and isinstance(args[0], ast.Constant) else ""
+                routes.append((chemin, noeud))
+    return routes
+
+
+def test_l_endpoint_admin_de_mirroring_reste_supprime():
+    """Une route HTTP ne doit ni rejouer le mirroring ni migrer le schéma.
+
+    L'endpoint supprimé exécutait un ``ALTER TABLE`` depuis une requête et
+    renvoyait au client un dump des transactions ; il ne faisait rien que le
+    démarrage ne fasse déjà, sous verrou et de façon idempotente. Le rétablir
+    rouvrirait le chemin par lequel les fantômes Tangem sont entrés.
+    """
+    routes = _routes_declarees()
+    admin = [c for c, _ in routes if "admin" in c]
+    assert not admin, f"route admin réintroduite dans main.py : {admin}"
+
+    for chemin, noeud in routes:
+        sql = [
+            n.value
+            for n in ast.walk(noeud)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and "ALTER TABLE" in n.value
+        ]
+        assert not sql, f"la route {chemin} migre le schéma — cela relève d'Alembic : {sql}"
 
 
 def test_les_soldes_destination_sont_incrementes():

@@ -144,33 +144,58 @@ async def register(
     register_data: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
-    """Register a new user."""
-    # Check if email already exists
+    """Register a new user.
+
+    Répond la même chose que l'adresse soit libre ou déjà prise : un 400
+    « Un compte avec cet email existe déjà » transforme la route en oracle
+    d'énumération. `forgot-password` et `resend-verification` sont déjà neutres ;
+    seule cette route ne l'était pas.
+    """
     result = await db.execute(select(User).where(User.email == register_data.email))
     existing_user = result.scalar_one_or_none()
 
+    # Haché dans les deux cas : ne le faire que pour une adresse libre rendrait
+    # la réponse mesurablement plus lente pour un email inconnu, ce qui
+    # rétablirait l'oracle par le temps de réponse.
+    password_hash = hash_password(register_data.password)
+
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Un compte avec cet email existe déjà",
+        # Prévenir le titulaire, plutôt que l'inscrivant : lui seul a le droit de
+        # savoir que l'adresse est déjà prise. Best-effort, comme forgot-password.
+        try:
+            from app.services.notification_service import NotificationService
+
+            ns = NotificationService()
+            await ns._send_email(
+                to_email=existing_user.email,
+                to_name=existing_user.first_name or "",
+                subject="Tentative d'inscription avec votre adresse",
+                body=(
+                    "Quelqu'un vient de tenter de créer un compte InvestAI avec votre "
+                    "adresse email.<br><br>Vous possédez déjà un compte : aucune action "
+                    "n'est nécessaire. Si vous avez oublié votre mot de passe, utilisez "
+                    "« Mot de passe oublié » depuis la page de connexion."
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to send duplicate-registration notice: %s", exc)
+    else:
+        user = User(
+            email=register_data.email,
+            password_hash=password_hash,
+            first_name=register_data.first_name,
+            last_name=register_data.last_name,
+            is_active=True,
+            email_verified=True,
         )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
-    # Create new user (active immediately, no email verification)
-    user = User(
-        email=register_data.email,
-        password_hash=hash_password(register_data.password),
-        first_name=register_data.first_name,
-        last_name=register_data.last_name,
-        is_active=True,
-        email_verified=True,
-    )
-
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
+    # Message volontairement identique dans les deux branches, et vrai dans les
+    # deux : il n'affirme pas qu'un compte vient d'être créé.
     return RegisterResponse(
-        message="Compte créé avec succès.",
+        message="Inscription enregistrée. Vous pouvez vous connecter avec cette adresse.",
         email_verification_required=False,
     )
 
