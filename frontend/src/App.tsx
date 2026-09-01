@@ -107,7 +107,7 @@ function App() {
             <Route index element={<LazyPage><MasterDashboardPage /></LazyPage>} />
             <Route path="portfolio" element={<LazyPage><PortfolioUnifiedPage /></LazyPage>} />
             <Route path="intelligence" element={<LazyPage><IntelligencePage /></LazyPage>} />
-            <Route path="strategy" element={<LazyPage><StrategyPage /></LazyPage>} />
+            <Route path="goals" element={<LazyPage><StrategyPage /></LazyPage>} />
             <Route path="reports" element={<LazyPage><ReportsPage /></LazyPage>} />
             <Route path="notes" element={<LazyPage><NotesPage /></LazyPage>} />
             <Route path="calendar" element={<LazyPage><CalendarPage /></LazyPage>} />
@@ -121,11 +121,17 @@ function App() {
             <Route path="analytics" element={<Navigate to="/intelligence?tab=analytics" replace />} />
             <Route path="alerts" element={<Navigate to="/intelligence?tab=alerts" replace />} />
             <Route path="predictions" element={<Navigate to="/intelligence?tab=predictions" replace />} />
-            <Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace />} />
+            {/* L'onglet « strategies » n'existe plus depuis la refonte de juillet :
+                on pointe directement le pilier Décisions plutôt que de repasser par
+                LEGACY_TAB_MAP (UX-05). */}
+            <Route path="strategies" element={<Navigate to="/intelligence?tab=decisions" replace />} />
             <Route path="insights" element={<Navigate to="/intelligence" replace />} />
             <Route path="smart-insights" element={<Navigate to="/intelligence?tab=smart" replace />} />
-            <Route path="simulations" element={<Navigate to="/strategy?tab=simulations" replace />} />
-            <Route path="goals" element={<Navigate to="/strategy" replace />} />
+            <Route path="simulations" element={<Navigate to="/goals?tab=simulations" replace />} />
+            {/* Inversé (UX-05) : « /goals » sert la page, « /strategy » n'est plus
+                qu'un alias. Le singulier « strategy » et le pluriel « strategies »
+                menaient à deux destinations sans rapport. */}
+            <Route path="strategy" element={<Navigate to="/goals" replace />} />
             <Route path="crowdfunding/projects" element={<Navigate to="/crowdfunding?tab=projects" replace />} />
             <Route path="crowdfunding/performance" element={<Navigate to="/crowdfunding?tab=performance" replace />} />
             <Route path="settings" element={<LazyPage><SettingsPage /></LazyPage>} />

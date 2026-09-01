@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import type { TransactionEdit as Transaction } from '@/types'
 
 interface EditTransactionFormProps {
@@ -60,7 +60,6 @@ const TRANSACTION_TYPES = [
 
 const COMMON_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'BTC', 'ETH', 'USDT', 'USDC']
 
-const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
 
 export default function EditTransactionForm({
   transaction,
@@ -364,7 +363,7 @@ export default function EditTransactionForm({
               <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-muted-foreground">Montant total</span>
-                  <span className="text-sm font-semibold">{fmt.format(total)}</span>
+                  <span className="text-sm font-semibold">{formatCurrency(total)}</span>
                 </div>
               </div>
             )}

@@ -40,7 +40,7 @@ import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Sélectionnez un actif'),
@@ -106,7 +106,6 @@ const assetTypes = [
   { value: 'fiat', label: 'Fiat' },
 ]
 
-const makeFmt = (currency: string) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency })
 const fmtQty = (v: number, symbol: string) => {
   const str = v.toFixed(8).replace(/\.?0+$/, '')
   return `${str} ${symbol}`
@@ -122,7 +121,9 @@ export default function AddTransactionForm({
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const preferredCurrency = useAuthStore((s) => s.user?.preferredCurrency ?? 'EUR')
-  const fmt = useMemo(() => makeFmt(preferredCurrency), [preferredCurrency])
+  // `formatCurrency` prend la devise en second argument : plus besoin d'un
+  // formateur local mémoïsé (ARC-11).
+  const fmt = useCallback((v: number) => formatCurrency(v, preferredCurrency), [preferredCurrency])
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: queryKeys.portfolios.list(),
@@ -634,10 +635,10 @@ export default function AddTransactionForm({
                   size="sm"
                   className="h-auto py-0 px-1 text-[10px] text-primary gap-1"
                   onClick={handleFetchCurrentPrice}
-                  title={`Prix actuel: ${fmt.format(currentMarketPrice)}`}
+                  title={`Prix actuel: ${fmt(currentMarketPrice)}`}
                 >
                   <TrendingUp className="h-3 w-3" />
-                  {fmt.format(currentMarketPrice)}
+                  {fmt(currentMarketPrice)}
                 </Button>
               )}
             </div>
@@ -732,7 +733,7 @@ export default function AddTransactionForm({
                     'text-sm font-semibold',
                     isFreeCrypto ? 'text-muted-foreground' : isInbound ? 'text-loss' : 'text-gain',
                   )}>
-                    {isFreeCrypto ? '≈ ' : isInbound ? '-' : '+'}{fmt.format(total)}
+                    {isFreeCrypto ? '≈ ' : isInbound ? '-' : '+'}{fmt(total)}
                   </p>
                 </div>
               )}
