@@ -70,7 +70,11 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
   const renderBody = (expanded: boolean) => {
     const labelCls = cn(
       'overflow-hidden whitespace-nowrap transition-opacity duration-200',
-      expanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+      // `group-focus-within` en plus de `group-hover` : au clavier il n'y a pas
+      // de survol, les libellés restaient donc invisibles pendant toute la
+      // tabulation dans le rail — on ne savait pas sur quelle entrée on était
+      // (A11Y-03).
+      expanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
     )
 
     const renderLink = (item: NavItem) => (
@@ -133,7 +137,7 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
           {navGroups.map((group) => (
             <div key={group.label} className="space-y-1">
               <div className="h-4 px-3">
-                <span className={cn('eyebrow text-muted-foreground/70', labelCls)}>{group.label}</span>
+                <span className={cn('eyebrow text-muted-foreground', labelCls)}>{group.label}</span>
               </div>
               {group.items.map(renderLink)}
             </div>
@@ -142,7 +146,7 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
           {isAdmin && (
             <div className="space-y-1">
               <div className="h-4 px-3">
-                <span className={cn('eyebrow text-muted-foreground/70', labelCls)}>Administration</span>
+                <span className={cn('eyebrow text-muted-foreground', labelCls)}>Administration</span>
               </div>
               {renderLink({ icon: Users, label: 'Utilisateurs', path: '/admin' })}
             </div>

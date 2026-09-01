@@ -1221,7 +1221,7 @@ export default function TransactionsPage() {
                         <td className="text-center py-3">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 tap-target" aria-label="Actions sur la transaction">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -1259,8 +1259,9 @@ export default function TransactionsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 tap-target"
                       onClick={() => setCurrentPage(1)}
+                      aria-label="Première page"
                       disabled={currentPage === 1}
                     >
                       <ChevronsLeft className="h-4 w-4" />
@@ -1268,8 +1269,9 @@ export default function TransactionsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 tap-target"
                       onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      aria-label="Page précédente"
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -1292,8 +1294,10 @@ export default function TransactionsPage() {
                             key={pageNum}
                             variant={currentPage === pageNum ? 'default' : 'outline'}
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-8 w-8 tap-target"
                             onClick={() => setCurrentPage(pageNum)}
+                            aria-label={`Page ${pageNum}`}
+                            aria-current={currentPage === pageNum ? 'page' : undefined}
                           >
                             {pageNum}
                           </Button>
@@ -1304,8 +1308,9 @@ export default function TransactionsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 tap-target"
                       onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      aria-label="Page suivante"
                       disabled={currentPage === totalPages}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -1313,8 +1318,9 @@ export default function TransactionsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 tap-target"
                       onClick={() => setCurrentPage(totalPages)}
+                      aria-label="Dernière page"
                       disabled={currentPage === totalPages}
                     >
                       <ChevronsRight className="h-4 w-4" />

@@ -35,7 +35,11 @@
     --radius: 0.875rem;
 
     /* Sémantique financière (gain / perte / alerte) */
-    --gain: 0.58 0.15 155;
+    /* L abaissée de 0.58 à 0.53 : à 0.58 le vert tombait à 3,85:1 sur fond
+       clair et 3,97:1 sur les cartes, sous le seuil WCAG AA de 4,5:1 pour du
+       texte normal — or c'est la couleur des plus-values, lues au chiffre près.
+       0.53 donne 4,66:1 et 4,79:1. Le thème sombre passait déjà (8,48:1). */
+    --gain: 0.53 0.15 155;
     --gain-foreground: 0.99 0.004 285;
     --loss: 0.58 0.22 18;
     --loss-foreground: 0.99 0.004 285;
@@ -125,6 +129,26 @@
 }
 
 @layer utilities {
+  /* Cible tactile étendue sans changer le rendu (A11Y-03).
+     Les boutons d'action dans les tableaux mesurent 24 à 32 px : les agrandir
+     casserait la densité de ces vues, alors que le problème n'est pas leur
+     taille apparente mais la zone qui répond au doigt. Le pseudo-élément
+     étend la surface cliquable à 44 px — le minimum confortable sur mobile —
+     en laissant le bouton visuellement identique.
+     `pointer-events` n'a pas à être touché : le ::after appartient au bouton,
+     un appui dessus lui est donc attribué. */
+  .tap-target {
+    position: relative;
+  }
+  .tap-target::after {
+    content: '';
+    position: absolute;
+    inset: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
   /* Chiffres tabulaires (tables, métriques) — les chiffres sont sacrés */
   .tabular {
     font-variant-numeric: tabular-nums;

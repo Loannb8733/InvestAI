@@ -116,8 +116,9 @@ export default function CashBalanceForm({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 tap-target"
                       onClick={() => deleteMutation.mutate(ex)}
+                      aria-label="Supprimer ce solde"
                       disabled={deleteMutation.isPending}
                     >
                       <Trash2 className="h-3 w-3 text-destructive" />

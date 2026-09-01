@@ -614,6 +614,7 @@ export default function AlertsPage() {
                           size="icon"
                           onClick={() => setDeleteTarget(alert)}
                           className="text-destructive hover:text-destructive"
+                          aria-label="Supprimer l'alerte"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

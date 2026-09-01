@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import { MotionConfig } from 'framer-motion'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -87,6 +88,14 @@ function App() {
   }, [hydrateSession])
 
   return (
+    // `reducedMotion="user"` fait respecter prefers-reduced-motion à TOUS les
+    // composants framer-motion descendants, y compris ceux ajoutés plus tard.
+    // La media query CSS d'index.css ne les couvrait pas : framer-motion pilote
+    // les valeurs en JS, sans animation ni transition CSS à neutraliser — les
+    // 40 `motion.*` du dashboard patrimoine s'animaient donc quelle que soit la
+    // préférence système (A11Y-02). Les transforms sont supprimés, l'opacité
+    // conservée, conformément au comportement recommandé par la librairie.
+    <MotionConfig reducedMotion="user">
     <ThemeProvider defaultTheme="dark" storageKey="investai-theme-flux">
       <ErrorBoundary>
         <Routes>
@@ -150,6 +159,7 @@ function App() {
       </ErrorBoundary>
       <Toaster />
     </ThemeProvider>
+    </MotionConfig>
   )
 }
 
