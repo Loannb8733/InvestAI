@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import QueryErrorState from '@/components/ui/query-error-state'
 import {
   Table,
   TableBody,
@@ -493,7 +494,7 @@ export default function SimulationsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleteTarget, setDeleteTarget] = useState<SavedScenario | null>(null)
 
-  const { data: savedScenariosData, isLoading: scenariosLoading } = useQuery<SavedScenario[]>({
+  const { data: savedScenariosData, isLoading: scenariosLoading, error: scenariosError, refetch: refetchScenarios } = useQuery<SavedScenario[]>({
     queryKey: queryKeys.simulations.list,
     queryFn: () => simulationsApi.list(),
   })
@@ -2176,7 +2177,15 @@ export default function SimulationsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {scenariosLoading ? (
+          {scenariosError ? (
+            /* Avant le chargement et le vide : une requête en échec ne doit pas
+               se lire comme « aucun scénario enregistré ». */
+            <QueryErrorState
+              error={scenariosError}
+              onRetry={refetchScenarios}
+              title="Impossible de charger les scénarios"
+            />
+          ) : scenariosLoading ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
               Chargement des scénarios…

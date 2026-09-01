@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Slider } from '@/components/ui/slider'
 import EmptyState from '@/components/ui/empty-state'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { formatCurrency } from '@/lib/utils'
 import { goalsApi } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'
@@ -439,7 +440,7 @@ export default function GoalsPage() {
   // si l'utilisateur ne touchait pas au color-picker.
   const [color, setColor] = useState('#34d399')
 
-  const { data: goals = [], isLoading } = useQuery<Goal[]>({
+  const { data: goals = [], isLoading, error: goalsError, refetch: refetchGoals } = useQuery<Goal[]>({
     queryKey: queryKeys.goals.list,
     queryFn: goalsApi.list,
   })
@@ -514,6 +515,12 @@ export default function GoalsPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse la page vide, indistinguable
+  // d'un compte sans objectif.
+  if (goalsError) {
+    return <QueryErrorState error={goalsError} onRetry={refetchGoals} title="Impossible de charger les objectifs" />
   }
 
   return (
