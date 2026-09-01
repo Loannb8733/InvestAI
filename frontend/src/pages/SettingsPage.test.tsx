@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SettingsPage from './SettingsPage'
@@ -31,6 +31,12 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }))
 
+// Déclaré via vi.hoisted : vi.mock est remonté au-dessus des imports, une const
+// ordinaire ne serait pas encore initialisée au moment où la factory s'exécute.
+const getInvestorProfileMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ tmi_rate: null, risk_profile: null, monthly_dca_eur: null })
+)
+
 // Mock API
 vi.mock('@/services/api', () => ({
   authApi: {
@@ -42,7 +48,7 @@ vi.mock('@/services/api', () => ({
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
     // Profil investisseur (TMI / risque / DCA) — carte ajoutée à SettingsPage
-    getInvestorProfile: vi.fn().mockResolvedValue({ tmi_rate: null, risk_profile: null, monthly_dca_eur: null }),
+    getInvestorProfile: getInvestorProfileMock,
     updateInvestorProfile: vi.fn(),
   },
   investorProfileQueryKey: ['auth', 'investor-profile'],
@@ -108,5 +114,50 @@ describe('SettingsPage', () => {
     renderWithProviders()
     const emailInput = screen.getByDisplayValue('test@example.com')
     expect(emailInput).toBeDisabled()
+  })
+})
+
+describe('SettingsPage — profil investisseur indisponible (UX-04)', () => {
+  /**
+   * Pourquoi masquer le formulaire, et pas seulement afficher une alerte.
+   *
+   * `handleInvestorSave` envoie `null` pour tout champ vide. Quand la lecture du
+   * profil échoue, les trois champs restent vides : un clic sur « Enregistrer »
+   * effacerait TMI, profil de risque et DCA mensuel. La perte serait silencieuse
+   * — l'utilisateur n'a aucun moyen de voir que les champs affichés ne sont pas
+   * les siens.
+   */
+  beforeEach(() => {
+    getInvestorProfileMock.mockReset()
+  })
+
+  afterEach(() => {
+    getInvestorProfileMock.mockResolvedValue({ tmi_rate: null, risk_profile: null, monthly_dca_eur: null })
+  })
+
+  it('affiche un état d\'erreur quand le profil ne se charge pas', async () => {
+    getInvestorProfileMock.mockRejectedValue(new Error('500'))
+    renderWithProviders()
+    expect(await screen.findByText('Profil investisseur indisponible')).toBeInTheDocument()
+  })
+
+  it('retire le bouton d\'enregistrement, pour ne pas écraser le profil par des vides', async () => {
+    getInvestorProfileMock.mockRejectedValue(new Error('500'))
+    renderWithProviders()
+    await screen.findByText('Profil investisseur indisponible')
+    expect(screen.queryByText('Enregistrer le profil investisseur')).not.toBeInTheDocument()
+  })
+
+  it('propose de réessayer', async () => {
+    getInvestorProfileMock.mockRejectedValue(new Error('500'))
+    renderWithProviders()
+    expect(await screen.findByRole('button', { name: /réessayer/i })).toBeInTheDocument()
+  })
+
+  it('laisse le formulaire en place quand le chargement réussit', async () => {
+    getInvestorProfileMock.mockResolvedValue({ tmi_rate: 0.3, risk_profile: null, monthly_dca_eur: null })
+    renderWithProviders()
+    expect(await screen.findByText('Enregistrer le profil investisseur')).toBeInTheDocument()
+    expect(screen.queryByText('Profil investisseur indisponible')).not.toBeInTheDocument()
   })
 })

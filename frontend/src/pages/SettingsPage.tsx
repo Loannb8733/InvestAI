@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/authStore'
 import { useTheme } from '@/components/theme-provider'
 import { authApi, profileApi, investorProfileQueryKey, type RiskProfile } from '@/services/api'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { useToast } from '@/hooks/use-toast'
 import { Shield, User, Moon, Sun, Key, Loader2, Globe, TrendingUp } from 'lucide-react'
 import {
@@ -72,7 +73,13 @@ export default function SettingsPage() {
   const [riskProfile, setRiskProfile] = useState('')
   const [monthlyDca, setMonthlyDca] = useState('')
 
-  const { data: investorProfile } = useQuery({
+  const {
+    data: investorProfile,
+    isError: profileFailed,
+    error: profileError,
+    refetch: refetchProfile,
+    isFetching: refetchingProfile,
+  } = useQuery({
     queryKey: investorProfileQueryKey,
     queryFn: profileApi.getInvestorProfile,
     staleTime: 60_000,
@@ -294,6 +301,21 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Le formulaire est masqué, pas seulement signalé : les trois champs
+                restent vides quand le chargement échoue, et `handleInvestorSave`
+                envoie `null` pour tout champ vide. Un clic sur « Enregistrer »
+                effacerait donc TMI, profil de risque et DCA sans que rien ne
+                l'indique — la perte serait silencieuse (UX-04). */}
+            {profileFailed ? (
+              <QueryErrorState
+                error={profileError}
+                onRetry={refetchProfile}
+                busy={refetchingProfile}
+                title="Profil investisseur indisponible"
+                description="Vos paramètres n'ont pas pu être chargés. Ils ne sont pas modifiables tant que la lecture n'a pas abouti, pour éviter de les écraser."
+              />
+            ) : (
+            <>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="tmiRate">Tranche marginale d'imposition (TMI)</Label>
@@ -348,6 +370,8 @@ export default function SettingsPage() {
               {investorMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Enregistrer le profil investisseur
             </Button>
+            </>
+            )}
           </CardContent>
         </Card>
 
