@@ -17,12 +17,13 @@ aurait bien voulu rapatrier.
 Cette tâche coupe la dépendance : les taux se tiennent à jour d'eux-mêmes.
 """
 
-import asyncio
+
 import logging
 from datetime import date
 
 from app.core.database import AsyncSessionLocal
 from app.services.fx_history_service import FxHistoryService
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -35,15 +36,6 @@ _EARLIEST = date(2017, 1, 1)
 # amorcées d'avance pour qu'un actif dans l'une de ces devises ne tombe jamais sur
 # les constantes de dernier recours de metrics_service.
 _PAIRS = (("USD", "EUR"), ("GBP", "EUR"), ("CHF", "EUR"))
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 @celery_app.task(name="app.tasks.fx_rates.refresh_fx_rates")

@@ -1,25 +1,15 @@
 """Data cleanup tasks for database maintenance."""
 
-import asyncio
+
 import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, delete, func, select
 
 from app.core.database import AsyncSessionLocal
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 from app.models.notification import Notification
 from app.models.prediction_log import PredictionLog
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)

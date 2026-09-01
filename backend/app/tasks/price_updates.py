@@ -5,7 +5,7 @@ to the Redis pub/sub channel ``price_updates`` so that the WebSocket endpoint
 can broadcast them to connected clients in real time.
 """
 
-import asyncio
+
 import json
 import logging
 from typing import Dict, Set
@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.asset import Asset, AssetType
 from app.services.price_service import PriceService
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -65,28 +66,6 @@ def publish_price_update(
         r.close()
     except Exception as e:
         logger.debug("Failed to publish price update for %s: %s", symbol, e)
-
-
-def run_async(coro):
-    """Helper to run async code in sync context."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Create new loop if current is running
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-        return loop.run_until_complete(coro)
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
 
 
 async def get_unique_symbols_by_type() -> Dict[str, Set[str]]:
