@@ -7,6 +7,7 @@ import { useOnboarding } from '@/components/OnboardingWizard'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -434,6 +435,12 @@ export default function DashboardPage() {
         </div>
       </div>
     )
+  }
+
+  // Sans cet état, une requête en échec laisse la page vide : le RouteErrorBoundary
+  // ne rattrape pas une query rejetée, elle ne lève rien pendant le rendu.
+  if (error && !metrics) {
+    return <QueryErrorState error={error} onRetry={refetch} title="Impossible de charger le tableau de bord" />
   }
 
   if (error) {
