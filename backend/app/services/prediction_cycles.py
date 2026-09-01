@@ -27,6 +27,10 @@ from app.services.prediction_types import _HISTORY_DAYS
 
 # Temps maximal accordé aux données externes dans le chemin d'une requête HTTP.
 # Au-delà, mieux vaut une analyse partielle qu'un écran figé (NEW-13).
+#
+# Le budget est **global** : appliqué appel par appel, il s'additionnait
+# (12 s pour BTC, puis 12 s pour les autres actifs, et ainsi de suite), ce qui
+# ne bornait rien. Un unique compte à rebours partagé tient la promesse.
 _BUDGET_APPELS_EXTERNES = 12.0
 from app.services.price_service import PriceService
 
@@ -40,6 +44,13 @@ class PredictionCyclesMixin:
         user_id: str,
     ) -> Dict:
         """Analyse de cycle de marche globale avec regime par actif."""
+        # Compte à rebours commun à toutes les données externes de cette analyse.
+        echeance = asyncio.get_event_loop().time() + _BUDGET_APPELS_EXTERNES
+
+        def budget_restant() -> float:
+            """Secondes encore disponibles ; jamais zéro, pour laisser une chance au cache."""
+            return max(0.1, echeance - asyncio.get_event_loop().time())
+
         # ── 1. BTC as market reference ───────────────────────────────
         btc_prices = None
         for try_days in [_HISTORY_DAYS, 90]:
@@ -53,7 +64,7 @@ class PredictionCyclesMixin:
             try:
                 btc_dates, btc_prices = await asyncio.wait_for(
                     self.data_fetcher.get_crypto_history("BTC", days=_HISTORY_DAYS),
-                    timeout=_BUDGET_APPELS_EXTERNES,
+                    timeout=budget_restant(),
                 )
             except (asyncio.TimeoutError, TimeoutError):
                 logger.warning("Historique BTC : budget dépassé, analyse rendue sans référence fraîche")
@@ -68,14 +79,19 @@ class PredictionCyclesMixin:
 
         # Fear & Greed — enrichissement optionnel, jamais bloquant.
         try:
-            fear_greed = await asyncio.wait_for(fetch_fear_greed_index(), timeout=5.0)
+            fear_greed = await asyncio.wait_for(fetch_fear_greed_index(), timeout=min(5.0, budget_restant()))
         except (asyncio.TimeoutError, TimeoutError):
             logger.debug("Fear & Greed : délai dépassé, ignoré")
             fear_greed = None
 
         btc_dominance = None
         try:
-            btc_dominance = await self.data_fetcher.get_btc_dominance()
+            # Enrichissement facultatif : il ne doit jamais retarder l'analyse.
+            btc_dominance = await asyncio.wait_for(
+                self.data_fetcher.get_btc_dominance(), timeout=min(5.0, budget_restant())
+            )
+        except (asyncio.TimeoutError, TimeoutError):
+            logger.debug("Dominance BTC : délai dépassé, enrichissement ignoré")
         except Exception as exc:
             logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
@@ -148,7 +164,12 @@ class PredictionCyclesMixin:
             for sym, qty in cash_like_qty.items():
                 try:
                     if PriceService.is_stablecoin(sym):
-                        p = await self.price_service._stablecoin_price_eur(sym)
+                        # Un stablecoin vaut ~1 € : si le cours tarde, l'approximation
+                        # coûte moins cher que l'attente (le repli ci-dessous).
+                        p = await asyncio.wait_for(
+                            self.price_service._stablecoin_price_eur(sym),
+                            timeout=min(3.0, budget_restant()),
+                        )
                     else:
                         p = Decimal("1")
                     total_value += qty * p
@@ -200,24 +221,25 @@ class PredictionCyclesMixin:
             #
             # Cette fonction sert une requête HTTP : quand le quota CoinGecko est
             # épuisé, chaque symbole encaisse des secondes de backoff et l'écran
-            # restait en squelette une minute entière. Passé le budget, on rend
-            # ce qui a été récupéré plutôt que de faire attendre davantage —
-            # l'analyse se dégrade, l'interface répond.
-            try:
-                _hist_results, _price_results = await asyncio.wait_for(
-                    asyncio.gather(
-                        asyncio.gather(*[_prefetch_history(a) for a in _top_assets]),
-                        asyncio.gather(*[_prefetch_price(a) for a in _top_assets]),
-                    ),
-                    timeout=_BUDGET_APPELS_EXTERNES,
-                )
-            except (asyncio.TimeoutError, TimeoutError):
-                logger.warning(
-                    "Cycle de marché : budget de %.0f s dépassé sur les données externes, "
-                    "analyse rendue avec ce qui est disponible",
-                    _BUDGET_APPELS_EXTERNES,
-                )
-                _hist_results, _price_results = [], []
+            # restait en squelette une minute entière.
+            #
+            # Le budget s'applique **par actif**, pas au lot : un `wait_for` posé
+            # sur le `gather` annulait l'ensemble au dépassement, y compris les
+            # actifs déjà servis par le cache en quelques millisecondes. Un seul
+            # symbole absent du cache privait ainsi l'analyse de tous les autres.
+            async def _borne(coro, defaut: tuple) -> tuple:
+                try:
+                    return await asyncio.wait_for(coro, timeout=budget_restant())
+                except (asyncio.TimeoutError, TimeoutError):
+                    return defaut
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Pré-chargement abandonné : %s", exc)
+                    return defaut
+
+            _hist_results, _price_results = await asyncio.gather(
+                asyncio.gather(*[_borne(_prefetch_history(a), (a.symbol, [])) for a in _top_assets]),
+                asyncio.gather(*[_borne(_prefetch_price(a), (a.symbol, 0)) for a in _top_assets]),
+            )
 
             _hist_map: Dict[str, list] = {sym: prices for sym, prices in _hist_results}
             _price_map: Dict[str, float] = {sym: price for sym, price in _price_results}
