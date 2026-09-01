@@ -95,6 +95,15 @@ export default function RegisterPage() {
           description: 'Bienvenue sur InvestAI !',
         })
         navigate('/')
+      } else {
+        // Réponse neutre du backend : elle ne dit pas si l'adresse était libre
+        // (SEC-03, anti-énumération), donc pas d'auto-connexion possible. Sans
+        // cette branche l'écran restait muet — ni toast, ni redirection.
+        toast({
+          title: 'Inscription enregistrée',
+          description: response.message ?? 'Connectez-vous avec cette adresse.',
+        })
+        navigate('/login')
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message :
