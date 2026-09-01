@@ -31,8 +31,16 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+/**
+ * `forwardRef` n'est pas décoratif ici : Radix passe une ref à son enfant via
+ * `asChild` (Tooltip, Popover…). Sans elle, React avertissait « Function
+ * components cannot be given refs » et le tooltip du badge « prix périmé » ne
+ * pouvait pas se positionner sur son ancre. Constaté dans la console du
+ * navigateur, jamais en test.
+ */
+export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
+  ({ className, variant, ...props }, ref) => (
+    <div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
   )
-}
+)
+Badge.displayName = 'Badge'

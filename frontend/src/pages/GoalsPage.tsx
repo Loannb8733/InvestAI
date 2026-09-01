@@ -528,7 +528,10 @@ export default function GoalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Wealth Journey</h1>
+          {/* Le menu dit « Objectifs », le breadcrumb « Outils › Objectifs »,
+              et l'onglet « Objectifs » : un quatrième nom, en anglais dans une
+              interface française, ne désignait la même chose pour personne. */}
+          <h1 className="text-3xl font-serif font-medium">Objectifs</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Objectifs financiers avec projections intelligentes
           </p>
