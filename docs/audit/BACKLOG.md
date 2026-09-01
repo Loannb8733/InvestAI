@@ -63,17 +63,17 @@ devrait être engagé sans mesure préalable.
 | **D** — États d'erreur & UX | **3/5** | UX-04 (17/17), UX-05 | — | UX-06, UX-07 |
 | **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
 | **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
-| **G** — Accessibilité | **0/4** | — | — | A11Y-01→04 |
+| **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
 | **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
 | **VÉRIF** | **1/2** | VERIF-02 | — | **VERIF-01** |
-| **Total** | **27/50** | 13 | 6 | 23 |
+| **Total** | **31/50** | 17 | 6 | 19 |
 
 UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent dans les
 mesurés de leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni
 écartés.
 
 **Ce qui n'a jamais été regardé** : UX-02, UX-06, UX-07, UX-10, UX-11, ARC-04, ARC-06,
-ARC-08, ARC-10, ARC-13, FIN-06 à FIN-13, A11Y-01 à A11Y-04, VERIF-01.
+ARC-08, ARC-10, ARC-13, FIN-06 à FIN-13, VERIF-01.
 
 **Angle mort de toute la session** : rien n'a été vérifié *à l'écran*. Les correctifs UX
 livrés (UX-04, UX-05) sont couverts par des tests déclaratifs — routes, libellés,
@@ -126,6 +126,7 @@ reste une hypothèse.
 | **SEC-03** | ✅ | `/register` répond la même chose que l'adresse soit libre ou prise. Le mot de passe est **haché dans les deux branches** : ne le faire que pour une adresse libre rendrait la réponse ~250 ms plus lente et rétablirait l'oracle au chronomètre. Le titulaire d'une adresse déjà inscrite est prévenu par email (best-effort). |
 | **SEC-04** | ✅ | `POST /api/v1/admin/fix-mirrors` **supprimé** (232 l.). Doublon manuel de `_create_missing_transfer_mirrors()`, qui tourne déjà à chaque démarrage sous verrou et de façon idempotente : aucune capacité perdue. Il exécutait un `ALTER TABLE` depuis HTTP, renvoyait un dump des transactions, et son `except` renvoyait `str(e)` — la fuite corrigée par SEC-02. |
 | **UX register** | ✅ | Défaut adjacent trouvé en corrigeant SEC-03 : le front ne traitait ni `access_token` ni `email_verification_required=false`, donc l'écran d'inscription restait **muet après un succès** — ni toast, ni redirection. |
+| **EPIC G** | ✅ | Les 4 tickets d'accessibilité, **le premier EPIC où l'audit tombe juste partout** — mais aucun n'avait l'ampleur annoncée et deux visaient à côté. 9 boutons icône muets nommés ; `MotionConfig` à la racine plutôt que 40 gardes individuels ; libellés du rail visibles au clavier ; contrastes chiffrés et corrigés. |
 | **UX-04 (fin)** | ✅ | Les 3 dernières pages, chacune selon ce que sa requête empêche réellement. **`SettingsPage` cachait un défaut plus grave que l'état d'erreur manquant** : les 3 champs du profil restent vides quand la lecture échoue, et la sauvegarde envoie `null` pour tout champ vide — un clic sur « Enregistrer » effaçait TMI, profil de risque et DCA, silencieusement. Le formulaire est donc masqué, pas seulement signalé. Sur `ReportsPage`, à l'inverse, un état d'erreur de page aurait été une **régression** : la liste des années a un repli et tous les rapports restent générables. |
 | **UX-05** | ✅ | L'onglet `strategies` d'Intelligence **n'existe plus** depuis la refonte de juillet : le menu « Stratégies » menait à un onglet supprimé via deux redirections. `/goals` devient canonique, l'entrée est renommée « Décisions ». |
 | **ARC-11** | ✅ | 4 fichiers migrés. `CalendarPage` affichait « 1 234 EUR » là où le reste de l'app affiche « 1 234,00 € » — même donnée, deux rendus. |
@@ -315,9 +316,9 @@ Deux constats se répètent d'un EPIC à l'autre :
 ⚠️ **Correction (2026-09-01)** : ce paragraphe affirmait que « le backlog est désormais
 intégralement mesuré ». C'était faux, et l'erreur est du même genre que celles que ce
 document reproche à l'audit — une conclusion étendue au-delà de ce qui a été vérifié.
-**27 tickets sur 50 ont été mesurés** — les EPICs A et E en entier, la majorité de C, D
-et F ; 23 ne l'ont jamais été, dont l'EPIC G (accessibilité) au complet. Voir le tableau
-« État au 2026-09-01 » en tête de document.
+**31 tickets sur 50 ont été mesurés** — les EPICs A, E et G en entier, la majorité de C,
+D et F ; 19 ne l'ont jamais été. Voir le tableau « État au 2026-09-01 » en tête de
+document.
 
 1. ~~Supprimer `admin_fix_mirrors` (SEC-04) et corriger SEC-03~~ — ✅ **fait le
    2026-09-01**. Détail dans « Livré le 2026-09-01 ».
@@ -325,14 +326,13 @@ et F ; 23 ne l'ont jamais été, dont l'EPIC G (accessibilité) au complet. Voir
 3. **VERIF-01** — angle mort de toute la session : rien n'a été vérifié à l'écran. Les
    correctifs UX livrés sont couverts par des tests déclaratifs, qui ne disent rien du
    rendu. Le 8,5/10 de design reste une hypothèse.
-4. **Mesurer avant d'engager** les 23 tickets jamais regardés — en commençant par
-   l'EPIC G (a11y, 4 tickets, aucun mesuré) et UX-02/UX-06/UX-07, qui touchent des
-   écrans quotidiens. 11 des 27 tickets déjà vérifiés étaient sans objet ; il n'y a
-   aucune raison que le taux change sur les suivants.
+4. **Mesurer avant d'engager** les 19 tickets jamais regardés — UX-02, UX-06 et UX-07
+   d'abord, qui touchent des écrans quotidiens. 11 des 31 tickets déjà vérifiés étaient
+   sans objet ; il n'y a aucune raison que le taux change sur les suivants.
 5. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes). `ExchangesPage`
    a désormais **5 tests de rendu** : le socle qui manquait à ARC-07 existe, son
    découpage peut reprendre. ARC-03 reste à faire précéder de tests de service.
-**Les EPICs A et E sont clos.** Pour A, les 5 tickets étaient déjà traités ou l'ont été
+**Les EPICs A, E et G sont clos.** Pour A, les 5 tickets étaient déjà traités ou l'ont été
 en session ; pour E, SEC-01 à SEC-05 sont corrigés et SEC-06 est périmé.
 
 ### Ce que FIN-03 était réellement
@@ -452,10 +452,10 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 
 | Ticket | Sév. | Source | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------------------|------------------------|--------|
-| **A11Y-01** `aria-label` sur tous les boutons icône | 🟠 | A-01 | 29 boutons `size="icon"` à auditer. → Label sur chaque (suppression, refresh, fermeture…). | 0 bouton icône sans nom accessible (axe-core). | M |
-| **A11Y-02** `prefers-reduced-motion` sur framer-motion | 🟠 | A-02, F-15 | Animations JS (Master, Login) non couvertes. → Brancher `useReducedMotion()` sur les `motion.*`. | Avec reduced-motion actif : aucune entrée animée JS. | S |
-| **A11Y-03** Cibles tactiles & labels rail | 🟡 | A-04, A-03, F-16 | Boutons `h-7`/`h-8` < 44 px ; labels du rail visibles au hover seulement. → Padding tactile ≥ 40 px ; `group-focus-within:opacity-100`. | Cibles ≥ 40 px sur mobile ; labels visibles au focus clavier. | S |
-| **A11Y-04** Contrastes secondaires | 🔵 | A-05 | `--gain` light & `text-muted-foreground/70` possiblement < 4.5:1. → Vérifier au contrastomètre, remonter la luminance si besoin. | Tous les textes ≥ 4.5:1 (4.5 normal / 3:1 large). | S |
+| ✅ **A11Y-01** `aria-label` sur tous les boutons icône *(livré 2026-09-01)* | ~~🟠~~ | A-01 | **32** boutons `size="icon"` mesurés (l'audit en annonçait 29), **9 sans nom accessible** : le lecteur d'écran annonçait « bouton », rien d'autre. | ✅ 0 restant, vérifié par un test qui balaie tout `src/`. Les boutons de pagination gagnent `aria-current`. | M |
+| ✅ **A11Y-02** `prefers-reduced-motion` sur framer-motion *(livré 2026-09-01)* | ~~🟠~~ | A-02, F-15 | **L'audit vise à côté** : Login n'anime rien en JS, et `number-ticker`/`empty-state` avaient déjà leur garde `matchMedia`. Restaient `animated-number` et les **40 `motion.*`** du dashboard patrimoine. | ✅ `MotionConfig reducedMotion="user"` à la racine : couvre l'existant **et tout composant futur**. La media query CSS ne les atteignait pas — framer-motion pilote ses valeurs en JS, il n'y a aucune animation CSS à neutraliser. | S |
+| ✅ **A11Y-03** Cibles tactiles & labels rail *(livré 2026-09-01)* | ~~🟡~~ | A-04, A-03, F-16 | Libellés du rail révélés au survol seul → **invisibles pendant toute la tabulation**. 13 boutons de 24 à 32 px. | ✅ `group-focus-within` ajouté. Cible tactile portée à 44 px **par pseudo-élément, sans changer le rendu** : le problème n'est pas la taille apparente mais la zone qui répond au doigt, et agrandir les boutons casserait la densité des tableaux. | S |
+| ✅ **A11Y-04** Contrastes secondaires *(livré 2026-09-01)* | ~~🔵~~ | A-05 | **Chiffré** par conversion OKLCH → sRGB, au lieu de « possiblement » : `--gain` clair **3,85:1** · `muted-foreground/70` **3,07:1** · `muted-foreground/80` **3,76:1** (4 occurrences que la mesure initiale avait manquées — c'est le test qui les a trouvées). Le reste passait, thème sombre inclus (gain 8,48:1). | ✅ `--gain` abaissé de L 0.58 à **0.53** (4,68:1), opacités retirées. Le test recalcule le contraste **depuis `index.css`** : il vaudra pour tout token ajouté plus tard. | S |
 
 ---
 
