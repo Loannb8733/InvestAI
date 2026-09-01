@@ -90,6 +90,9 @@ parity/XIRR (FIN-TEST).
 | **FX quotidien** | ✅ | Tâche Celery `refresh_fx_rates` (USD/GBP/CHF → EUR), `crontab(hour=16, minute=5)` — les taux ne dépendaient plus d'une synchronisation pour être rafraîchis. |
 | **NEW-07** | ✅ | Migration d'alignement dev/prod, idempotente. |
 | **NEW-08** | ✅ | Les deux scripts destructeurs exigent un consentement explicite. |
+| **SEC-03** | ✅ | `/register` répond la même chose que l'adresse soit libre ou prise. Le mot de passe est **haché dans les deux branches** : ne le faire que pour une adresse libre rendrait la réponse ~250 ms plus lente et rétablirait l'oracle au chronomètre. Le titulaire d'une adresse déjà inscrite est prévenu par email (best-effort). |
+| **SEC-04** | ✅ | `POST /api/v1/admin/fix-mirrors` **supprimé** (232 l.). Doublon manuel de `_create_missing_transfer_mirrors()`, qui tourne déjà à chaque démarrage sous verrou et de façon idempotente : aucune capacité perdue. Il exécutait un `ALTER TABLE` depuis HTTP, renvoyait un dump des transactions, et son `except` renvoyait `str(e)` — la fuite corrigée par SEC-02. |
+| **UX register** | ✅ | Défaut adjacent trouvé en corrigeant SEC-03 : le front ne traitait ni `access_token` ni `email_verification_required=false`, donc l'écran d'inscription restait **muet après un succès** — ni toast, ni redirection. |
 | **NEW-12** | ✅ | CI **verte** : 5 jobs sur 5, après 6 exécutions rouges consécutives. **1 208 tests** au vert. |
 
 ### Bilan de l'EPIC A : les 5 tickets étaient déjà traités
@@ -169,8 +172,8 @@ priorité 🟠 ni le risque du correctif proposé.
 |---|---|---|
 | SEC-01 | vérif conditionnée à l'existence du secret : sans secret, webhook ouvert | ✅ **réel**, corrigé |
 | SEC-02 | `{type(e).__name__}: {e}` renvoyé par `GET /import-status/{task_id}` | ✅ **réel**, corrigé |
-| SEC-03 | `/register` renvoie « Un compte avec cet email existe déjà » | ✅ **réel**, impact faible |
-| SEC-04 | 2 sous-points sur 3 déjà corrigés ; l'endpoint admin est pire que décrit | ⚠️ **1/3 réel** |
+| SEC-03 | `/register` renvoie « Un compte avec cet email existe déjà » | ✅ réel, **corrigé** |
+| SEC-04 | 2 sous-points sur 3 déjà corrigés ; l'endpoint admin est pire que décrit | ✅ **clos** — endpoint supprimé |
 | SEC-05 | fail-open déjà décidé et loggué ; IDOR non exploitable ; docstring trompeuse | 🟢 **partiel** |
 | SEC-06 | `python-jose` **3.4.0** — les CVE citées visent ≤ 3.3.0 | ❌ **périmé** |
 
@@ -272,10 +275,8 @@ Deux constats se répètent d'un EPIC à l'autre :
 **Le backlog est désormais intégralement mesuré** — plus aucun ticket n'est pris sur
 parole.
 
-1. **Supprimer `admin_fix_mirrors`** (SEC-04) — le seul point de ce lot qui mérite du
-   travail, et pas pour la raison écrite au ticket : un endpoint HTTP qui exécute un
-   `ALTER TABLE` et réécrit des soldes. C'est par là que les fantômes Tangem sont entrés.
-   **SEC-03** en complément (~10 min).
+1. ~~Supprimer `admin_fix_mirrors` (SEC-04) et corriger SEC-03~~ — ✅ **fait le
+   2026-09-01**. Détail dans « Livré le 2026-09-01 ».
 2. **UX-05** (taxonomie Objectifs/Stratégies) et **ARC-11** (formatage monétaire dans
    13 fichiers) — réels, mesurés, sans dépendance.
 3. **VERIF-01** — le 8,5/10 de design reste une hypothèse non vérifiée.
@@ -376,8 +377,8 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **SEC-01** Secret webhook Telegram obligatoire en prod *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-01 | `endpoints/telegram_webhook.py:54-57` | Vérif conditionnelle : sans secret en prod, webhook non authentifié. → Échouer au démarrage (ou 403 systématique) si `is_production and bot_enabled and not TELEGRAM_WEBHOOK_SECRET`. | En prod sans secret : le bot ne démarre pas / webhook 403 ; test de config. | S |
 | ✅ **SEC-02** Ne plus fuiter les exceptions au client *(livré 2026-09-01)* | ~~P1~~ | ~~🟠~~ | H-02 | `endpoints/api_keys.py:~1404-1407,~1601-1604` | `f"...{type(e).__name__}: {e}"` renvoyé au client. → Logger l'exception complète côté serveur, message générique au client (comme `system.py`). | Aucune réponse client ne contient de détail d'exception ; logs serveur conservent le détail. | XS |
-| ✅ **SEC-03** Énumération de comptes au register *(réel — mesuré 2026-09-01)* | P2 | 🔵 | M-01 | `endpoints/auth.py:145-149` | Confirme l'existence d'un email. → Message générique / 201 neutre, comme forgot/resend. | `/register` ne distingue plus email existant vs nouveau. **Sévérité abaissée 🟡→🔵** : 1 seul utilisateur en base, l'oracle ne révèle que l'adresse du propriétaire. À faire pour la cohérence avec forgot/resend, qui sont déjà neutres. | XS |
-| ⚠️ **SEC-04** Durcissements config *(1 sous-point sur 3 — mesuré 2026-09-01)* | P2 | 🟡 | M-03,M-04,M-05 | `main.py` (admin_fix_mirrors), `core/rate_limit.py:10-19`, `core/config.py:125-127` | Dump debug admin verbeux ; `X-Forwarded-For` spoofable ; Redis TLS `CERT_NONE`. → Réduire le log admin (compteurs) ; ne lire XFF que derrière proxy de confiance (hop Render) ; Redis `CERT_REQUIRED` + CA Upstash. | ✅ XFF non spoofable (lecture depuis la droite) et ✅ Redis en TLS vérifié **étaient déjà faits**. **Reste** : `admin_fix_mirrors` (232 l.) exécute un `ALTER TABLE` depuis HTTP et renvoie un dump des transactions — c'est le chemin des fantômes Tangem. **→ le supprimer, pas le réduire.** | S |
+| ✅ **SEC-03** Énumération de comptes au register *(livré 2026-09-01)* | ~~P2~~ | ~~🔵~~ | M-01 | `endpoints/auth.py:145-149` | Confirme l'existence d'un email. → Message générique / 201 neutre, comme forgot/resend. | `/register` ne distingue plus email existant vs nouveau. **Sévérité abaissée 🟡→🔵** : 1 seul utilisateur en base, l'oracle ne révèle que l'adresse du propriétaire. À faire pour la cohérence avec forgot/resend, qui sont déjà neutres. | XS |
+| ✅ **SEC-04** Durcissements config *(clos 2026-09-01)* | ~~P2~~ | ~~🟡~~ | M-03,M-04,M-05 | `main.py` (admin_fix_mirrors), `core/rate_limit.py:10-19`, `core/config.py:125-127` | Dump debug admin verbeux ; `X-Forwarded-For` spoofable ; Redis TLS `CERT_NONE`. → Réduire le log admin (compteurs) ; ne lire XFF que derrière proxy de confiance (hop Render) ; Redis `CERT_REQUIRED` + CA Upstash. | ✅ XFF non spoofable (lecture depuis la droite) et ✅ Redis en TLS vérifié **étaient déjà faits**. **Reste** : `admin_fix_mirrors` (232 l.) exécute un `ALTER TABLE` depuis HTTP et renvoie un dump des transactions — c'est le chemin des fantômes Tangem. **→ supprimé** (232 lignes). | S |
 | 🟢 **SEC-05** Documenter/renforcer fingerprint & fail-open *(partiel — mesuré 2026-09-01)* | P3 | 🔵 | M-02,L-01,L-03,L-04 | `core/security.py:15-21`, `api_keys.py:~1678`, `api/deps.py:155-176`, blocklist Redis | Fingerprint UA-only (faux sentiment de sécurité) ; task_id sans ownership ; fail-open silencieux ; blocklist fail-open si Redis down. → Documenter explicitement les limites ; ajouter `user_id` aux tâches d'import ; stratégie fail-open/closed décidée + alerte Redis. | ✅ Le fail-open **n'est plus silencieux** : décidé, commenté, loggué en WARNING (`deps.py:115`, `auth.py:517`). **Restent** : (a) la docstring du fingerprint surpromet (« preventing stolen tokens from being used in a different browser » — un UA se recopie) ; (b) alerte Redis absente. L'IDOR sur `import-status` est réel mais **non exploitable** (`task_id` = `uuid4`). | S |
 | ❌ **SEC-06** Migration `python-jose` → `pyjwt` (veille) *(périmé — mesuré 2026-09-01)* | P3 | 🔵 | §3 rapport 04 | `requirements.txt` | `python-jose` peu maintenue ; `bcrypt==4.0.1` ancien. → Évaluer migration `pyjwt`, surveiller bcrypt. | `python-jose` est en **3.4.0**, la version qui corrige les CVE citées (elles visent ≤ 3.3.0), et `algorithms=[…]` est imposé aux deux `jwt.decode`. Reste `bcrypt==4.0.1` : **`passlib` n'étant pas installé**, l'obstacle habituel à la montée (passlib / bcrypt ≥ 4.1) n'existe pas. | XS |
 
