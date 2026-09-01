@@ -78,11 +78,34 @@ describe('A11Y-02 — les animations JS respectent prefers-reduced-motion', () =
 })
 
 describe('A11Y-03 — le rail est utilisable au clavier', () => {
+  /**
+   * Source du NavRail, commentaires retirés.
+   *
+   * Les commentaires citent les classes qu'ils expliquent : chercher dans le
+   * fichier brut ferait passer le test alors que la classe a disparu du
+   * `className`. Vérifié par canari — sans ce filtrage, retirer
+   * `focus-within:w-64` du composant laissait les 11 tests au vert.
+   */
+  const rail = () =>
+    readFileSync(join(SRC, 'components/layout/NavRail.tsx'), 'utf-8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+
   it('les libellés apparaissent aussi au focus, pas seulement au survol', () => {
-    const rail = readFileSync(join(SRC, 'components/layout/NavRail.tsx'), 'utf-8')
-    const survol = rail.includes('group-hover:opacity-100')
-    const focus = rail.includes('group-focus-within:opacity-100')
+    const src = rail()
+    const survol = src.includes('group-hover:opacity-100')
+    const focus = src.includes('group-focus-within:opacity-100')
     expect(survol && !focus, 'libellés révélés au survol seul : invisibles à la tabulation').toBe(false)
+  })
+
+  it('le rail s\'élargit aussi au focus, sinon les libellés sont tronqués', () => {
+    // Révéler les libellés ne suffit pas : sans l'élargissement, ils s'affichent
+    // dans un rail resté à 76 px et « Crowdfunding » devient « CROW ». Constaté
+    // à l'écran après coup — aucune assertion sur le DOM ne voit une largeur CSS.
+    const src = rail()
+    const survol = src.includes('hover:w-64')
+    const focus = src.includes('focus-within:w-64')
+    expect(survol && !focus, 'rail élargi au survol seul : libellés tronqués au clavier').toBe(false)
   })
 })
 
