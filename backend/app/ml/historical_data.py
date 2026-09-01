@@ -13,8 +13,18 @@ from app.core.symbol_map import COINGECKO_SYMBOL_MAP
 
 logger = logging.getLogger(__name__)
 
-# Global semaphore: max 5 concurrent CoinGecko requests (~50 req/min free tier)
-_coingecko_semaphore = asyncio.Semaphore(5)
+# Verrou d'espacement des appels CoinGecko.
+#
+# Il était dimensionné à 5, ce qui annulait le délai minimum au lieu de le faire
+# respecter : cinq coroutines entraient ensemble dans la section, lisaient le
+# même `_last_coingecko_call`, dormaient la même durée et repartaient à la même
+# milliseconde. Le délai retardait donc une rafale de 5 sans jamais l'espacer.
+# CoinGecko répondait 429, et chaque symbole payait 10 s + 20 s + 30 s de retry :
+# 64 secondes de mur pour finalement ne rien renvoyer (NEW-13).
+#
+# Un verrou à 1 sérialise réellement les appels, et l'espacement de 1,2 s tient
+# alors sa promesse : ~50 requêtes/minute, la limite du palier gratuit.
+_coingecko_lock = asyncio.Lock()
 # Minimum delay between CoinGecko calls (seconds)
 _COINGECKO_MIN_DELAY = 1.2
 _last_coingecko_call = 0.0
@@ -23,9 +33,9 @@ _api_key_invalid = False
 
 
 async def _coingecko_throttle():
-    """Rate-limit CoinGecko calls with semaphore + minimum delay."""
+    """Espace les appels CoinGecko : un seul à la fois, séparés de _COINGECKO_MIN_DELAY."""
     global _last_coingecko_call
-    async with _coingecko_semaphore:
+    async with _coingecko_lock:
         now = asyncio.get_event_loop().time()
         elapsed = now - _last_coingecko_call
         if elapsed < _COINGECKO_MIN_DELAY:
@@ -75,15 +85,26 @@ class HistoricalDataFetcher:
     ) -> Optional[dict]:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
         for attempt in range(max_retries):
+            # Un 429 récent vaut pour tous les symboles : insister ne fait
+            # qu'ajouter des minutes d'attente à un refus déjà acquis.
             await _coingecko_throttle()
             try:
                 response = await self.http_client.get(url, params=params)
                 if response.status_code == 200:
                     return response.json()
                 if response.status_code == 429:
-                    wait = 2 if fast else (attempt + 1) * 10  # fast: 2s, normal: 10s, 20s, 30s
+                    # Attente bornée : 10 s + 20 s + 30 s immobilisaient la
+                    # requête HTTP appelante une minute entière pour finir sans
+                    # donnée. `Retry-After` fait foi quand l'API le fournit,
+                    # sinon 2 s / 4 s / 6 s — plafonné à 10 s.
+                    entete = response.headers.get("Retry-After")
+                    try:
+                        indique = float(entete) if entete else None
+                    except ValueError:
+                        indique = None
+                    wait = min(indique if indique is not None else (2 if fast else (attempt + 1) * 2), 10)
                     logger.warning(
-                        "CoinGecko 429 for %s — retry %d/%d in %ds",
+                        "CoinGecko 429 pour %s — nouvelle tentative %d/%d dans %.0f s",
                         symbol,
                         attempt + 1,
                         max_retries,

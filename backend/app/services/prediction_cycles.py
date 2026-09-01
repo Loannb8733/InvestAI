@@ -5,6 +5,7 @@ sibling methods via ``self`` and resolve through the MRO, so behaviour is
 unchanged. Split out purely to shrink the 3.7k-line service.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -23,6 +24,10 @@ from app.models.portfolio import Portfolio
 from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_types import _HISTORY_DAYS
+
+# Temps maximal accordé aux données externes dans le chemin d'une requête HTTP.
+# Au-delà, mieux vaut une analyse partielle qu'un écran figé (NEW-13).
+_BUDGET_APPELS_EXTERNES = 12.0
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
@@ -43,7 +48,16 @@ class PredictionCyclesMixin:
                 btc_prices = btc_hist["prices"]
                 break
         if not btc_prices:
-            btc_dates, btc_prices = await self.data_fetcher.get_crypto_history("BTC", days=_HISTORY_DAYS)
+            # Borné comme le reste : un quota épuisé faisait patienter ici avant
+            # même d'atteindre le budget des prefetch, et les deux s'ajoutaient.
+            try:
+                btc_dates, btc_prices = await asyncio.wait_for(
+                    self.data_fetcher.get_crypto_history("BTC", days=_HISTORY_DAYS),
+                    timeout=_BUDGET_APPELS_EXTERNES,
+                )
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning("Historique BTC : budget dépassé, analyse rendue sans référence fraîche")
+                btc_dates, btc_prices = None, None
             if btc_dates and btc_prices:
                 await cache_history(
                     "BTC",
@@ -52,8 +66,12 @@ class PredictionCyclesMixin:
                     {"dates": [d.isoformat() for d in btc_dates], "prices": btc_prices},
                 )
 
-        # Fear & Greed
-        fear_greed = await fetch_fear_greed_index()
+        # Fear & Greed — enrichissement optionnel, jamais bloquant.
+        try:
+            fear_greed = await asyncio.wait_for(fetch_fear_greed_index(), timeout=5.0)
+        except (asyncio.TimeoutError, TimeoutError):
+            logger.debug("Fear & Greed : délai dépassé, ignoré")
+            fear_greed = None
 
         btc_dominance = None
         try:
@@ -138,7 +156,6 @@ class PredictionCyclesMixin:
                     total_value += qty
 
             # ── Pre-fetch histories + prices in parallel ──────────────
-            import asyncio as _aio
 
             _top_assets = list(asset_map.values())[:7]
 
@@ -179,10 +196,29 @@ class PredictionCyclesMixin:
                 except Exception:
                     return (a.symbol, 0)
 
-            _hist_results, _price_results = await _aio.gather(
-                _aio.gather(*[_prefetch_history(a) for a in _top_assets]),
-                _aio.gather(*[_prefetch_price(a) for a in _top_assets]),
-            )
+            # Budget de temps sur les appels externes (NEW-13).
+            #
+            # Cette fonction sert une requête HTTP : quand le quota CoinGecko est
+            # épuisé, chaque symbole encaisse des secondes de backoff et l'écran
+            # restait en squelette une minute entière. Passé le budget, on rend
+            # ce qui a été récupéré plutôt que de faire attendre davantage —
+            # l'analyse se dégrade, l'interface répond.
+            try:
+                _hist_results, _price_results = await asyncio.wait_for(
+                    asyncio.gather(
+                        asyncio.gather(*[_prefetch_history(a) for a in _top_assets]),
+                        asyncio.gather(*[_prefetch_price(a) for a in _top_assets]),
+                    ),
+                    timeout=_BUDGET_APPELS_EXTERNES,
+                )
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning(
+                    "Cycle de marché : budget de %.0f s dépassé sur les données externes, "
+                    "analyse rendue avec ce qui est disponible",
+                    _BUDGET_APPELS_EXTERNES,
+                )
+                _hist_results, _price_results = [], []
+
             _hist_map: Dict[str, list] = {sym: prices for sym, prices in _hist_results}
             _price_map: Dict[str, float] = {sym: price for sym, price in _price_results}
 
