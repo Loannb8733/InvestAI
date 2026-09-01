@@ -1,20 +1,12 @@
 """Celery task to detect overdue crowdfunding payment schedules."""
 
-import asyncio
+
 import logging
 
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 @celery_app.task(name="app.tasks.monitor_delays.check_crowdfunding_delays")

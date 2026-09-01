@@ -21,6 +21,7 @@ from app.core.redis_client import redis_async_url, redis_ssl_kwargs
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset
 from app.models.asset_price_history import AssetPriceHistory
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -35,16 +36,6 @@ DEFAULT_CACHE_DAYS = 365
 def _get_redis() -> Redis:
     url = redis_async_url()  # same cleaned URL used by async clients
     return Redis.from_url(url, decode_responses=True, **redis_ssl_kwargs())
-
-
-def _run_async(coro):
-    """Always create a fresh event loop to avoid 'attached to a different loop' errors."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 def _cache_key(symbol: str, days: int) -> str:
@@ -216,7 +207,7 @@ async def _fetch_and_cache_all():
 def cache_historical_data():
     """Celery task: fetch and cache historical data for all assets."""
     logger.info("Starting historical data cache task...")
-    result = _run_async(_fetch_and_cache_all())
+    result = run_async(_fetch_and_cache_all())
     return {"cached": result}
 
 
@@ -261,7 +252,7 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
 @celery_app.task(name="app.tasks.history_cache.cache_single_asset")
 def cache_single_asset(symbol: str, asset_type: str):
     """Celery task: cache history for a single newly-added asset."""
-    return _run_async(_cache_single(symbol, asset_type))
+    return run_async(_cache_single(symbol, asset_type))
 
 
 async def _find_missing_dates(symbol: str, start: datetime, end: datetime) -> list:
@@ -538,7 +529,7 @@ async def _deep_backfill_all():
 def deep_backfill_prices():
     """Celery task: deep backfill ALL historical prices since first transaction."""
     logger.info("Starting deep historical price backfill...")
-    result = _run_async(_deep_backfill_all())
+    result = run_async(_deep_backfill_all())
     return {"filled": result}
 
 
@@ -578,7 +569,7 @@ def get_cached_history(symbol: str, days: int = 90):
 
     # Final fallback: PostgreSQL persistent storage
     try:
-        dates, prices = _run_async(_load_prices_from_db(symbol, days))
+        dates, prices = run_async(_load_prices_from_db(symbol, days))
         if dates and prices:
             logger.info("Loaded %d prices for %s from DB (Redis miss)", len(prices), symbol)
             return dates, prices

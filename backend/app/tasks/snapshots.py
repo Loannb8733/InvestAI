@@ -1,6 +1,6 @@
 """Portfolio snapshot tasks for historical value tracking."""
 
-import asyncio
+
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -14,18 +14,10 @@ from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.user import User
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 async def _create_all_snapshots_async() -> dict:

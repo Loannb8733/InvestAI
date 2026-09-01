@@ -1,23 +1,12 @@
 """Email tasks for sending notifications and reports."""
 
-import asyncio
+
 import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
 
 from app.core.database import AsyncSessionLocal
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 from app.models.notification import Notification
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -25,6 +14,7 @@ from app.services.email_service import email_service
 from app.services.metrics_service import metrics_service
 from app.services.report_service import report_service
 from app.services.snapshot_service import snapshot_service
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)

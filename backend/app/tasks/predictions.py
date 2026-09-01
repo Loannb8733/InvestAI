@@ -1,6 +1,6 @@
 """ML prediction tasks."""
 
-import asyncio
+
 import logging
 
 from sqlalchemy import select
@@ -8,18 +8,10 @@ from sqlalchemy import select
 from app.core.database import AsyncSessionLocal as async_session_factory
 from app.models.asset import Asset
 from app.services.prediction_service import prediction_service
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-
-def run_async(coro):
-    """Run an async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 @celery_app.task(name="app.tasks.predictions.run_daily_predictions")
