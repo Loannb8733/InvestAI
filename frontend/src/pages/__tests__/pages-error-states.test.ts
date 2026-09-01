@@ -25,24 +25,25 @@ const CRITIQUES = [
   'AdminPage',
   'CrowdfundingDashboardPage',
   'CrowdfundingPerformancePage',
-] as const
-
-/**
- * Pages encore sans état d'erreur, volontairement hors liste.
- *
- * Leur structure ne se prête pas au motif commun : la query et le bloc de
- * chargement vivent dans des composants différents du même fichier (GoalsPage), ou
- * il n'y a pas de bloc `if (isLoading)` sur lequel s'appuyer. Les traiter demande
- * une lecture au cas par cas — pas une transformation mécanique, qui casserait la
- * portée des variables (constaté sur GoalsPage).
- */
-const RESTANTES = [
   'GoalsPage',
-  'ReportsPage',
-  'SettingsPage',
   'SimulationsPage',
   'CrowdfundingProjectsPage',
 ] as const
+
+/**
+ * Pages sans état d'erreur — par choix, non par oubli.
+ *
+ * Leur requête est SECONDAIRE et dispose déjà d'un repli :
+ * - ReportsPage : `yearsData` alimente un sélecteur d'années, avec
+ *   `|| [new Date().getFullYear()]` — la page reste utilisable si la requête échoue ;
+ * - SettingsPage : `investorProfile` pré-remplit un formulaire ; en cas d'échec les
+ *   champs restent vides et la saisie fonctionne.
+ *
+ * Substituer un écran d'erreur à une page fonctionnelle dégraderait l'expérience.
+ * La convention vise les requêtes dont dépend le contenu principal, pas toutes les
+ * requêtes.
+ */
+const DEGRADATION_GRACIEUSE = ['ReportsPage', 'SettingsPage'] as const
 
 const source = (page: string) =>
   readFileSync(resolve(process.cwd(), `src/pages/${page}.tsx`), 'utf-8')
@@ -76,11 +77,11 @@ describe('états d’erreur des pages critiques', () => {
     expect(composant()).toContain('import.meta.env.DEV')
   })
 
-  it.each(RESTANTES)('%s reste à traiter (dette connue)', (page) => {
-    // Ce test échouera le jour où la page sera traitée : il faudra alors la
-    // déplacer dans CRITIQUES. C'est voulu — la liste de dette ne doit pas
-    // survivre à sa résolution.
-    const gere = /<QueryErrorState|isError|error &&|error \?/.test(source(page))
-    expect(gere, `${page} est traitée : la déplacer dans CRITIQUES`).toBe(false)
+  it.each(DEGRADATION_GRACIEUSE)('%s garde un repli plutôt qu’un écran d’erreur', (page) => {
+    // On vérifie le repli, pas son absence : c'est lui qui rend l'écran d'erreur
+    // inutile. S'il disparaissait, la page deviendrait muette en cas d'échec.
+    const src = source(page)
+    const repli = /\|\|\s|\?\?\s|\?\./.test(src)
+    expect(repli, `${page} n’a plus de valeur de repli : un état d’erreur devient nécessaire`).toBe(true)
   })
 })

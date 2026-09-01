@@ -35,6 +35,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import { Textarea } from '@/components/ui/textarea'
 import EmptyState from '@/components/ui/empty-state'
+import QueryErrorState from '@/components/ui/query-error-state'
 import {
   Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText,
   Download, X, Banknote, ShieldCheck, ChevronRight,
@@ -153,7 +154,7 @@ export default function CrowdfundingProjectsPage() {
   const [repaymentForm, setRepaymentForm] = useState(emptyRepaymentForm)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
-  const { data: projects = [], isLoading } = useQuery<CrowdfundingProject[]>({
+  const { data: projects = [], isLoading, error: projectsError, refetch: refetchProjects } = useQuery<CrowdfundingProject[]>({
     queryKey: queryKeys.crowdfunding.list,
     queryFn: crowdfundingApi.list,
   })
@@ -612,7 +613,15 @@ export default function CrowdfundingProjectsPage() {
       </div>
 
       {/* Projects list */}
-      {isLoading ? (
+      {projectsError ? (
+        /* L'erreur passe AVANT le chargement et le vide : sans elle, une requête
+           en échec s'affichait comme « Aucun projet trouvé ». */
+        <QueryErrorState
+          error={projectsError}
+          onRetry={refetchProjects}
+          title="Impossible de charger les projets"
+        />
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
