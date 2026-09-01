@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import QueryErrorState from '@/components/ui/query-error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -154,7 +155,7 @@ export default function CalendarPage() {
   })
 
   // Fetch events
-  const { data: events, isLoading } = useQuery<CalendarEvent[]>({
+  const { data: events, isLoading, error, refetch } = useQuery<CalendarEvent[]>({
     queryKey: queryKeys.calendar.events(showCompleted, showIncomeOnly),
     queryFn: () => calendarApi.list({ show_completed: showCompleted, income_only: showIncomeOnly || undefined }),
   })
@@ -307,6 +308,12 @@ export default function CalendarPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Sans cet état, l'échec de la requête laisse le calendrier vide, indistinguable
+  // d'un mois sans évènement.
+  if (error && !events) {
+    return <QueryErrorState error={error} onRetry={refetch} title="Impossible de charger le calendrier" />
   }
 
   return (
