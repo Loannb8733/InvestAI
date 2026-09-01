@@ -283,13 +283,58 @@ async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int
         logger.warning("Failed to cache hyperparams: %s", e)
 
 
+# Couverture écrite par `tasks.history_cache` (DEFAULT_CACHE_DAYS). Dupliquée
+# plutôt qu'importée : ce module est chargé par le web comme par les workers, et
+# importer une tâche Celery ici créerait un cycle.
+_JOURS_CACHE_TACHE = 365
+
+
 async def get_cached_history(symbol: str, asset_type: str, days: int) -> Optional[dict]:
-    """Get cached historical OHLCV data."""
+    """Historique en cache, en lisant aussi ce qu'écrit la tâche périodique.
+
+    Deux caches d'historique coexistaient sans se connaître :
+
+    - ici, ``hist:<sym>:<type>:<jours>``, écrit à la demande, TTL 1 h ;
+    - dans ``tasks/history_cache.py``, ``hist:<SYM>_<jours>`` (plus une copie
+      ``:fallback`` à TTL long), alimenté toutes les 30 minutes par Celery avec
+      repli PostgreSQL.
+
+    Le second était donc rempli en permanence pour rien : aucun appelant de
+    cette fonction ne le lisait. `get_market_cycle` repartait chercher les mêmes
+    données chez CoinGecko dans le chemin d'une requête HTTP, jusqu'à 65 s
+    (NEW-13). On lit désormais les deux, du plus précis au plus large.
+    """
+    # `days` demandé, puis la couverture annuelle de la tâche, qu'on retaille.
+    candidats = [
+        f"hist:{symbol}:{asset_type}:{days}",
+        f"hist:{symbol.upper()}_{days}",
+        f"hist:{symbol.upper()}_{days}:fallback",
+    ]
+    if days != _JOURS_CACHE_TACHE:
+        candidats += [
+            f"hist:{symbol.upper()}_{_JOURS_CACHE_TACHE}",
+            f"hist:{symbol.upper()}_{_JOURS_CACHE_TACHE}:fallback",
+        ]
+
     try:
         r = await _get_redis_txt()
-        data = await r.get(f"hist:{symbol}:{asset_type}:{days}")
-        if data:
-            return json.loads(data)
+        for cle in candidats:
+            data = await r.get(cle)
+            if not data:
+                continue
+            charge = json.loads(data)
+            prix = charge.get("prices")
+            if not prix:
+                continue
+            # Une série annuelle sert une demande plus courte ; l'inverse serait
+            # trompeur, on ne complète jamais ce qu'on n'a pas.
+            if len(prix) > days:
+                charge = dict(charge)
+                charge["prices"] = prix[-days:]
+                dates = charge.get("dates")
+                if dates and len(dates) > days:
+                    charge["dates"] = dates[-days:]
+            return charge
     except Exception as e:
         logger.debug("Redis cache miss for history %s: %s", symbol, e)
     return None
