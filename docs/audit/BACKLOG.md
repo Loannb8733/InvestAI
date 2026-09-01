@@ -48,6 +48,39 @@ Tout test de non-régression doit être validé par un canari : casser volontair
 et vérifier que le test échoue. C'est exactement le reproche que ce backlog fait aux tests
 parity/XIRR (FIN-TEST).
 
+### État au 2026-09-01 — 27 tickets mesurés sur 50
+
+Ce tableau dit ce qui a été **vérifié dans le code**, et ce qui ne l'a pas été. Un ticket
+non mesuré n'est ni vrai ni faux : il n'a pas été regardé. Vu que **11 des 27 tickets
+vérifiés se sont révélés infondés, périmés ou déjà faits**, aucun des 23 restants ne
+devrait être engagé sans mesure préalable.
+
+| EPIC | Mesurés | Livrés | Infondés / périmés / déjà faits | Jamais mesurés |
+|---|---:|---|---|---|
+| **A** — Exactitude financière | **5/5** | FIN-01, FIN-03, FIN-04 | FIN-02, FIN-TEST | — |
+| **B** — Navigation & vérité produit | **2/3** | UX-01 | — | UX-02 |
+| **C** — Robustesse backend | **3/4** | ARC-01 | ARC-02 | ARC-04 |
+| **D** — États d'erreur & UX | **3/5** | UX-04 (14/17), UX-05 | — | UX-06, UX-07 |
+| **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
+| **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
+| **G** — Accessibilité | **0/4** | — | — | A11Y-01→04 |
+| **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
+| **VÉRIF** | **1/2** | VERIF-02 | — | **VERIF-01** |
+| **Total** | **27/50** | 13 | 6 | 23 |
+
+UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent dans les
+mesurés de leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni
+écartés.
+
+**Ce qui n'a jamais été regardé** : UX-02, UX-06, UX-07, UX-10, UX-11, ARC-04, ARC-06,
+ARC-08, ARC-10, ARC-13, FIN-06 à FIN-13, A11Y-01 à A11Y-04, VERIF-01.
+
+**Angle mort de toute la session** : rien n'a été vérifié *à l'écran*. Les correctifs UX
+livrés (UX-04, UX-05) sont couverts par des tests déclaratifs — routes, libellés,
+formatage — qui ne disent rien du rendu. Les pages sont derrière l'authentification.
+C'est exactement l'objet de **VERIF-01**, et la raison pour laquelle le 8,5/10 de design
+reste une hypothèse.
+
 ### Livré le 2026-08-31
 
 | Ticket | État | Détail |
@@ -257,10 +290,10 @@ version (incompatibilité passlib / bcrypt ≥ 4.1) n'existe pas ici. Rounds à 
 | UX-08 | 48 fichiers à spinner contre 19 à skeleton | ✅ réel |
 | UX-05 | « Objectifs » → `/strategy` et « Stratégies » → `/strategies` cohabitent toujours | ✅ réel |
 
-**Ce que la mesure de bout en bout donne** : sur **24 tickets vérifiés**, **11 sont
-infondés, périmés ou déjà faits** (5 FIN de l'EPIC A, ARC-02, FIN-05, ARC-12, SEC-06, et
-2 des 3 sous-points de SEC-04) et **13 sont réels** — dont plusieurs à une sévérité bien
-inférieure à celle annoncée.
+**Ce que la mesure de bout en bout donne** : sur **27 tickets vérifiés** (sur 50), **11
+sont infondés, périmés ou déjà faits** (FIN-02 et FIN-TEST, ARC-02, ARC-09, ARC-12,
+FIN-05, SEC-06, et 2 des 3 sous-points de SEC-04) et **16 sont réels** — dont plusieurs à
+une sévérité bien inférieure à celle annoncée.
 
 L'audit se trompe systématiquement là où le code a bougé depuis juin, et voit juste sur ce
 qui n'a jamais été touché — god-files, états d'erreur. **La lecture « la sécurité est le
@@ -278,19 +311,30 @@ Deux constats se répètent d'un EPIC à l'autre :
 
 **Priorité recommandée au 2026-09-01** — UX-04, ARC-05 et SEC-01/02 étant livrés :
 
-**Le backlog est désormais intégralement mesuré** — plus aucun ticket n'est pris sur
-parole.
+⚠️ **Correction (2026-09-01)** : ce paragraphe affirmait que « le backlog est désormais
+intégralement mesuré ». C'était faux, et l'erreur est du même genre que celles que ce
+document reproche à l'audit — une conclusion étendue au-delà de ce qui a été vérifié.
+**27 tickets sur 50 ont été mesurés** — les EPICs A et E en entier, la majorité de C, D
+et F ; 23 ne l'ont jamais été, dont l'EPIC G (accessibilité) au complet. Voir le tableau
+« État au 2026-09-01 » en tête de document.
 
 1. ~~Supprimer `admin_fix_mirrors` (SEC-04) et corriger SEC-03~~ — ✅ **fait le
    2026-09-01**. Détail dans « Livré le 2026-09-01 ».
 2. ~~UX-05 et ARC-11~~ — ✅ **faits le 2026-09-01**.
-3. **VERIF-01** — le 8,5/10 de design reste une hypothèse non vérifiée.
-4. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes) — à faire précéder
+3. **VERIF-01** — angle mort de toute la session : rien n'a été vérifié à l'écran. Les
+   correctifs UX livrés sont couverts par des tests déclaratifs, qui ne disent rien du
+   rendu. Le 8,5/10 de design reste une hypothèse.
+4. **Mesurer avant d'engager** les 23 tickets jamais regardés — en commençant par
+   l'EPIC G (a11y, 4 tickets, aucun mesuré) et UX-02/UX-06/UX-07, qui touchent des
+   écrans quotidiens. 11 des 27 tickets déjà vérifiés étaient sans objet ; il n'y a
+   aucune raison que le taux change sur les suivants.
+5. **ARC-07 (suite)** et **ARC-03** (`transactions.py`, 1 671 lignes) — à faire précéder
    de tests de rendu / de service, faute de quoi le refactor casse en silence.
-5. **UX-04 (fin)** — les 3 pages restantes (`ExchangesPage`, `ReportsPage`,
+6. **UX-04 (fin)** — les 3 pages restantes (`ExchangesPage`, `ReportsPage`,
    `SettingsPage`). Polish.
 
-**L'EPIC E est clos.** SEC-01 à SEC-05 sont corrigés, SEC-06 est périmé.
+**Les EPICs A et E sont clos.** Pour A, les 5 tickets étaient déjà traités ou l'ont été
+en session ; pour E, SEC-01 à SEC-05 sont corrigés et SEC-06 est périmé.
 
 ### Ce que FIN-03 était réellement
 
