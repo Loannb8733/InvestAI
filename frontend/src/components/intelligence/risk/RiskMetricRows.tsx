@@ -139,7 +139,7 @@ export default function RiskMetricRows({ analytics, diversification, xirr }: Ris
               {analytics.sharpe_ratio >= 2 ? 'Excellent' : analytics.sharpe_ratio >= 1 ? 'Bon' : analytics.sharpe_ratio >= 0 ? 'Moyen' : 'Faible'}
             </p>
             {analytics.interpretations?.sharpe && (
-              <p className="text-xs text-muted-foreground/80 mt-1.5 italic leading-snug">
+              <p className="text-xs text-muted-foreground mt-1.5 italic leading-snug">
                 {analytics.interpretations.sharpe}
               </p>
             )}
@@ -166,7 +166,7 @@ export default function RiskMetricRows({ analytics, diversification, xirr }: Ris
               Ne punit pas les hausses explosives
             </p>
             {analytics.interpretations?.sortino && (
-              <p className="text-xs text-muted-foreground/80 mt-1.5 italic leading-snug">
+              <p className="text-xs text-muted-foreground mt-1.5 italic leading-snug">
                 {analytics.interpretations.sortino}
               </p>
             )}
@@ -238,7 +238,7 @@ export default function RiskMetricRows({ analytics, diversification, xirr }: Ris
               Calmar: {safeFixed(analytics.calmar_ratio, 2)}
             </p>
             {analytics.interpretations?.calmar && (
-              <p className="text-xs text-muted-foreground/80 mt-1 italic leading-snug">
+              <p className="text-xs text-muted-foreground mt-1 italic leading-snug">
                 {analytics.interpretations.calmar}
               </p>
             )}

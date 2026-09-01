@@ -729,10 +729,10 @@ export default function PortfolioAssetList({
                         </td>
                         <td className="text-center py-2">
                           <div className="flex justify-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddTransaction(asset.id, asset.symbol)} title="Ajouter une transaction">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 tap-target" onClick={() => onAddTransaction(asset.id, asset.symbol)} title="Ajouter une transaction">
                               <ArrowRightLeft className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDeleteAsset(asset)} title="Supprimer">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 tap-target" onClick={() => onDeleteAsset(asset)} title="Supprimer">
                               <Trash2 className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </div>

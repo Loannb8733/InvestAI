@@ -505,7 +505,8 @@ export default function CrowdfundingAuditLabPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeFile(i)}
-                      className="h-6 w-6"
+                      className="h-6 w-6 tap-target"
+                      aria-label="Retirer ce fichier"
                     >
                       <X className="h-4 w-4" />
                     </Button>

@@ -243,8 +243,9 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive tap-target"
                           onClick={() => setDeleteTarget(user)}
+                          aria-label="Supprimer l'utilisateur"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

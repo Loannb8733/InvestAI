@@ -657,7 +657,7 @@ export default function CrowdfundingProjectsPage() {
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">{p.platform}</p>
                         {p.description && (
-                          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">{p.description}</p>
+                          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

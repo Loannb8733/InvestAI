@@ -141,7 +141,7 @@ export default function AllocationDriftCard() {
           <span className="text-xs text-muted-foreground">
             Poche crypto : {formatCurrency(data.total_crypto_value)}
           </span>
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs tap-target">
             <Link to="/reports?tab=strategy">
               Rééquilibrer
               <ArrowRight className="ml-1 h-3 w-3" aria-hidden />

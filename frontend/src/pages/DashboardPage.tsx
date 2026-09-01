@@ -324,7 +324,7 @@ function CustomizePanel({
     <Card elevation="floating" className="absolute right-0 top-12 z-50 w-72">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Personnaliser le dashboard</CardTitle>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0" aria-label="Fermer le panneau de personnalisation">
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0 tap-target" aria-label="Fermer le panneau de personnalisation">
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>

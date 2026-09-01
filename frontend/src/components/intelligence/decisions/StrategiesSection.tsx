@@ -257,7 +257,7 @@ function StrategyCard({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0"
+                                className="h-6 w-6 p-0 tap-target"
                                 onClick={() => {
                                   const val = parseFloat(editAmount)
                                   if (val > 0) onUpdateAmount(action.id, val)
@@ -269,7 +269,7 @@ function StrategyCard({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0"
+                                className="h-6 w-6 p-0 tap-target"
                                 onClick={() => setEditingId(null)}
                               >
                                 <X className="h-3 w-3" />
@@ -618,7 +618,7 @@ export default function StrategiesSection() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-muted-foreground">Action {idx + 1}</span>
                     {formActions.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeAction(idx)}>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 tap-target" onClick={() => removeAction(idx)}>
                         <X className="h-3 w-3" />
                       </Button>
                     )}
