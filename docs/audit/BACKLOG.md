@@ -110,7 +110,7 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 | **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
 | **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
 | **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
-| **NEW-13** | 🔴 | **`/predictions/market-cycle` répondait en 65 s à 92 s**, le bandeau de régime restant en squelette pendant tout ce temps. **Ma première explication était fausse** : ni le nombre d'actifs (7, pas 56), ni l'absence de parallélisme (`asyncio.gather` était déjà en place). La cause : `Semaphore(5)` laissait 5 coroutines entrer ensemble dans la section critique, lire le même horodatage et repartir à la même milliseconde — le délai de 1,2 s retardait une rafale sans jamais l'espacer. D'où les 429, puis 10 s + 20 s + 30 s de backoff par symbole, pour finir sans donnée. | ✅ **corrigé** — `Lock`, backoff plafonné, budget de temps |
+| **NEW-13** | 🔴 | **Deux causes, toutes deux invisibles en lecture rapide.** (1) `Semaphore(5)` annulait l'espacement des appels CoinGecko ; (2) la tâche Celery qui pré-charge l'historique écrivait dans des clés que personne ne lisait. **`/predictions/market-cycle` répondait en 65 s à 92 s**, le bandeau de régime restant en squelette pendant tout ce temps. **Ma première explication était fausse** : ni le nombre d'actifs (7, pas 56), ni l'absence de parallélisme (`asyncio.gather` était déjà en place). La cause : `Semaphore(5)` laissait 5 coroutines entrer ensemble dans la section critique, lire le même horodatage et repartir à la même milliseconde — le délai de 1,2 s retardait une rafale sans jamais l'espacer. D'où les 429, puis 10 s + 20 s + 30 s de backoff par symbole, pour finir sans donnée. | ✅ **corrigé** — `Lock`, backoff plafonné, budget de temps partagé, et lecture réconciliée avec le cache Celery |
 | **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
@@ -186,9 +186,40 @@ sans aucune donnée. Rapide parce que vide n'est pas un progrès ; la comparaiso
 code d'origine (`git stash`) l'a montré, et c'est elle qui a évité de livrer une fausse
 victoire.
 
-**Reste ouvert** : ces appels externes vivent toujours dans le chemin d'une requête HTTP.
-Les déporter vers une tâche périodique (comme `refresh_fx_rates`) rendrait l'endpoint
-instantané et insensible au quota. Non fait — c'est un chantier distinct.
+**Second temps (même jour) : deux caches qui s'ignoraient.**
+
+Le « déport vers une tâche périodique » n'avait pas à être construit : `cache_historical_data`
+tourne **toutes les 30 minutes depuis longtemps**, avec persistance PostgreSQL et une copie
+`:fallback` à 24 h. Elle travaillait pour rien.
+
+| Écrit par | Clé | Lu par |
+|---|---|---|
+| `tasks/history_cache.py` (Celery, 30 min) | `hist:<SYM>_<jours>` | personne, côté analyses |
+| `core/redis_client.py` (à la demande, TTL 1 h) | `hist:<sym>:<type>:<jours>` | `prediction_cycles` |
+
+Les deux conventions ne se croisaient jamais. `get_market_cycle` repartait chercher chez
+CoinGecko des séries **déjà présentes en Redis**, à quelques octets de là.
+
+`get_cached_history` lit désormais les deux formats, du plus précis au plus large, et
+retaille une série annuelle pour une demande plus courte. Aucune écriture dupliquée.
+
+| Mesure (quota épuisé — cas défavorable) | Avant | Après |
+|---|---:|---:|
+| Cache de la tâche disponible | 65 s | **2,9 s**, et **7 actifs** analysés au lieu de 1 |
+| Tout le cache vidé | 65 s | **12,0 s**, régime préservé |
+| Bandeau à l'écran | 92 s | **3,3 s** |
+
+**Le budget de temps a été corrigé deux fois en chemin**, et les deux erreurs méritent
+d'être notées :
+
+1. appliqué *appel par appel*, il s'additionnait (12 s pour BTC, puis 12 s pour les
+   autres) et ne bornait donc rien — il est maintenant partagé par un compte à rebours ;
+2. posé sur le `gather`, il **annulait au dépassement les actifs déjà servis par le
+   cache** en quelques millisecondes : un seul symbole manquant privait l'analyse de tous
+   les autres. Il s'applique désormais par actif.
+
+Deux appels échappaient encore au budget (dominance BTC, prix des stablecoins) : bornés
+également. Le pire cas absolu tient enfin la promesse annoncée — 12 s.
 
 #### Ce qui a été confirmé à l'écran
 
@@ -430,9 +461,9 @@ document reproche à l'audit — une conclusion étendue au-delà de ce qui a é
 D et F ; 19 ne l'ont jamais été. Voir le tableau « État au 2026-09-01 » en tête de
 document.
 
-1. ~~NEW-13~~ — ✅ **corrigé le 2026-09-01** (65 s → 8,5 s ; 92 s → 5,6 s à l'écran).
-   **Reste souhaitable** : déporter ces appels externes hors du chemin HTTP, vers une
-   tâche périodique, pour rendre l'endpoint insensible au quota.
+1. ~~NEW-13~~ — ✅ **clos le 2026-09-01**. 65 s → 2,9 s avec le cache de la tâche
+   (7 actifs analysés au lieu de 1), 12 s dans le pire cas, 3,3 s pour le bandeau à
+   l'écran contre 92 s au départ.
 2. ~~UX-05 et ARC-11~~ — ✅ **faits le 2026-09-01**.
 3. ~~VERIF-01~~ — ✅ **fait le 2026-09-01** sur 7 écrans. **À poursuivre** sur les 25
    restants : le taux de trouvailles a été de 3 défauts réels et 1 lenteur majeure pour
