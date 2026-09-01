@@ -48,7 +48,7 @@ parity/XIRR (FIN-TEST).
 |---|---|---|
 | **UX-01** | ✅ | La redirection `/strategies` existait déjà ; l'apport est le garde-fou croisant chaque entrée de menu avec les `<Route>` d'`App.tsx`. Vérifié à l'écran : 12 entrées, 0 404. |
 | **FIN-01** | ✅ | Backfill élargi aux trades order-book et aux « Instant Buy » (oubliés). Sur la base de dev : 0 → 15 lignes corrigées. En prod : 0 ligne concernée. |
-| **FIN-TEST** | 🟡 partiel | 31 tests numériques déterministes ajoutés (discriminant FX, Earn, mirroring, cookie). Les tests de parité/XIRR restent à durcir. |
+| **FIN-TEST** | ✅ | Le reproche (« XIRR juste borné [-95,1000], parité tolérée à 1 % ») décrit un état périmé. Les tests affirment des valeurs exactes : XIRR 10 000→11 000 sur 1 an = **10 %** (±0,002), doublement = 100 %, perte = −20 %, NPV nul à la solution ; parité = **863,90 €** au centime ; les transferts ne modifient pas le XIRR ; dividendes comptés. **65 tests numériques déterministes ajoutés** dans la session par-dessus (FX, Earn, mirroring, cookie, matérialité, garde-fous). |
 
 ### Findings découverts en session (absents de l'audit)
 
@@ -70,6 +70,20 @@ parity/XIRR (FIN-TEST).
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
+
+### Bilan de l'EPIC A : les 5 tickets étaient déjà traités
+
+| Ticket | Verdict après mesure |
+|---|---|
+| FIN-01 | implémenté à ~80 % ; complété. **0 ligne concernée en prod** |
+| FIN-02 | les 3 griefs traités dans `analytics_math.py`. **0 transaction non-EUR, 0 dividende**. XIRR = 11,51 % |
+| FIN-03 | le FIFO était correct ; la cause était en amont (NEW-09/NEW-10) |
+| FIN-04 | service unique, table ECB persistée, `forex_stale` propagé, 0 `except: pass`. Restait le rafraîchissement (corrigé) et la conversion des frais crypto (corrigée) |
+| FIN-TEST | valeurs exactes déjà vérifiées ; reproche périmé |
+
+**Aucun des cinq n'a été trouvé dans l'état décrit par l'audit.** Les vrais défauts —
+sync fabriquant des ajustements contradictoires, transactions sans date, positions
+fantômes, marqueur Earn figé, CI rouge depuis juillet — n'y figuraient pas.
 
 ### Ce que FIN-03 était réellement
 
@@ -120,7 +134,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | **FIN-02** Refonte XIRR (devise + flux) | 🔴 | F-02, F-03, F-04 | `services/analytics_service.py:1564-1644` | (a) ignore `tx.currency` (suppose tout USD) ; (b) compte `TRANSFER_IN/OUT` comme cash-flows fantômes ; (c) ignore `DIVIDEND`/`INTEREST`. → Lire `tx.currency` ligne à ligne (même pipeline que `metrics_service`) ; exclure les transferts internes ; ajouter dividendes+intérêts comme flux entrants. | XIRR de référence correct sur cash-flows connus (FIN-TEST #2) ; transferts internes appariés n'affectent pas le XIRR (#3) ; div/intérêts comptés (#4) ; parité P&L/rendement dashboard↔XIRR < 0,5 %. | M |
 | ✅ **FIN-03** Coût de base des transferts non appariés *(traité 2026-08-31 — voir NEW-09/NEW-10 : la cause n'était pas le FIFO)* | ~~🟠→P0~~ | F-06 | `services/metrics_service.py:155-161,720-758`, `transfer_service.py:114-148` | Un `TRANSFER_IN` sans transit apparié crée une couche à **coût zéro** → P&L latent massivement surévalué. Règle divergente entre CUMP et FIFO. → À défaut d'appariement, utiliser `source_asset.avg_buy_price` ; unifier la règle entre les deux moteurs. | Un transfer_in non apparié n'apparaît jamais à coût zéro ; CUMP et FIFO donnent le même P&L (test dédié) ; couverture du cas « sync partielle ». | M |
 | **FIN-04** Service de taux de change robuste | 🟠 | F-05, A02 | `services/price_service.py:218-238`, `services/metrics_service.py:388-391,402,1325,1524` | Taux de repli figés en dur (`0.92`/`1.09`) + `except: pass` qui avalent les échecs forex → valorisation silencieusement fausse. → Un seul service de taux : dernière valeur connue **persistée** (pas une constante), TTL court, flag `forex_stale` propagé jusqu'à l'UI ; remplacer les 3 swallow par log + flag `partial`. | Aucun taux en dur dans le code ; `forex_stale` exposé dans la réponse API et affiché ; les échecs forex sont loggés (plus de `pass`) ; test FIN-TEST #7. | M |
-| 🟡 **FIN-TEST** Tests numériques de référence *(partiel : 31 tests ajoutés ; parité/XIRR à durcir)* | 🟡 | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
+| ✅ **FIN-TEST** Tests numériques de référence *(vérifié 2026-09-01 : déjà fait)* | ~~🔴~~ | §3 rapport 01 | `backend/tests/unit/` | Les tests « parity/xirr » actuels ne vérifient **aucune valeur numérique** (XIRR juste borné `[-95,1000]`, parité tolérée à 1 %). → Ajouter des tests unitaires purs avec valeurs attendues : coût de base multi-devises, XIRR golden (10 000€→11 000€/1 an = 10 %), exclusion transferts, div/intérêts, transfer zéro-coût, forex périmé. | ≥ 7 nouveaux tests unitaires déterministes (sans Docker/HTTP) ; tournent en CI ; chacun mappé à un finding FIN-xx ; parité resserrée à < 0,5 %. | M |
 
 ---
 
