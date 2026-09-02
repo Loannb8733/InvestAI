@@ -294,8 +294,51 @@ le focus et porte un titre accessible ; `/admin` redirige bien un non-admin ; le
 onglets de Rapports, le Journal, le Calendrier, le Crowdfunding, l'Audit Lab et les
 Simulations n'ont **rien** à signaler.
 
-**Reste mesuré, non corrigé** : `GET /dashboard` met **12,6 s** au premier appel. C'est
-le même motif que NEW-13 — des données coûteuses calculées dans le chemin d'une requête.
+#### NEW-15 — `GET /dashboard` à 13,4 s, corrigé le 2026-09-02
+
+**Le diagnostic a écarté les suspects habituels un par un**, et c'est ce qui compte ici :
+
+| Hypothèse | Mesure | Verdict |
+|---|---:|---|
+| Requêtes SQL trop nombreuses | 30 requêtes, **0,43 s** cumulées | ❌ |
+| Appels réseau | **2,47 s** pour 17 requêtes | ❌ |
+| Calcul Python bloquant l'event loop | **0 blocage** > 0,4 s | ❌ |
+| Attente volontaire | **une seule, de 10 s** | ✅ |
+
+L'attente venait du `Retry-After` de CoinGecko — **introduite par ma propre correction de
+NEW-13**, qui avait remplacé un backoff de 60 s par « Retry-After plafonné à 10 s ».
+Mieux, mais toujours dix secondes devant un utilisateur.
+
+La bonne distinction n'est pas la durée, c'est **qui attend** :
+
+- une **tâche de fond** n'a personne en face ; l'API demande de patienter, on patiente ;
+- une **requête HTTP** a quelqu'un devant l'écran ; le cache et PostgreSQL savent déjà
+  répondre, on renonce.
+
+Une `ContextVar` posée par le middleware HTTP porte cette distinction sans faire descendre
+un drapeau à travers toute la pile d'appels. Les workers Celery et les scripts n'ont pas le
+marqueur et gardent le droit d'attendre — vérifié explicitement.
+
+| Mesure | Avant | Après |
+|---|---:|---:|
+| Cache vide, quota épuisé | 13,4 s | **2,6 s** |
+| Cache chaud | — | **0,01 s** |
+| Contenu affiché à l'écran | — | **0,26 s** |
+
+Contenu identique, comparé au code d'origine par `git stash` : mêmes valeurs, mêmes 31
+points d'historique.
+
+**Trouvés en chemin, non corrigés** (mesurés, consignés) :
+
+- `index_comparison` est **toujours absent** de la réponse — avant comme après, ce n'est
+  donc pas une régression, mais la comparaison aux indices ne s'affiche jamais ;
+- **PAXG est traité comme une devise** : appel à `exchangerate-api.com/v4/latest/PAXG`,
+  404 systématique. C'est un token or, pas une monnaie ;
+- `mantra-dao` : 404 sur CoinGecko, symbole mal mappé ;
+- `cryptocompare` répond **401** — clé absente ou invalide, chaque appel est perdu ;
+- `history_cache.get_cached_history` (version synchrone) appelle `run_async` depuis un
+  contexte déjà asynchrone : la coroutine n'est jamais attendue, l'exception est avalée,
+  et **le repli PostgreSQL de ce chemin ne fonctionne jamais**.
 
 #### Quatre faux positifs de mon propre audit
 
