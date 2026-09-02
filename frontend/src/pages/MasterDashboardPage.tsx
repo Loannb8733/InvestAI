@@ -1,5 +1,7 @@
 import { useState, useMemo, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/stores/authStore'
+import { useOnboarding } from '@/components/OnboardingWizard'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 import type { PnLBreakdown } from '@/types'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
@@ -114,11 +116,16 @@ const staggerContainer = {
 
 // ============== Component ==============
 
+const OnboardingWizard = lazyWithRetry(() => import('@/components/OnboardingWizard'))
+
 export default function MasterDashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30)
   const pageVisible = usePageVisibility()
   const navigate = useNavigate()
   const currency = useAuthStore((s) => s.user?.preferredCurrency || 'EUR')
+  const userId = useAuthStore((s) => s.user?.id)
+  const { showOnboarding, markDone } = useOnboarding(userId)
+  const [onboardingVisible, setOnboardingVisible] = useState(showOnboarding)
 
   // Fetch crypto dashboard metrics
   const {
@@ -322,6 +329,15 @@ export default function MasterDashboardPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
     >
+      {/* Le guide de démarrage vivait sur /crypto, où un nouveau venu n'arrive
+          jamais : la page d'accueil est celle-ci. Il ne s'affichait donc pour
+          personne. */}
+      {onboardingVisible && (
+        <Suspense fallback={null}>
+          <OnboardingWizard onComplete={() => { markDone(); setOnboardingVisible(false) }} />
+        </Suspense>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

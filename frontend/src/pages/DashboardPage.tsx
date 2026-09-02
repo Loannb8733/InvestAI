@@ -1,9 +1,7 @@
-import { useState, useRef, useMemo, Suspense, type ReactNode } from 'react'
-import { lazyWithRetry } from '@/lib/lazyWithRetry'
+import { useState, useRef, useMemo, type ReactNode } from 'react'
 import type { PnLBreakdown } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useOnboarding } from '@/components/OnboardingWizard'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -355,14 +353,10 @@ function CustomizePanel({
 
 // ============== Main Component ==============
 
-const OnboardingWizard = lazyWithRetry(() => import('@/components/OnboardingWizard'))
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [selectedPeriod, setSelectedPeriod] = useState(0)
-  const userId = useAuthStore((s) => s.user?.id)
-  const { showOnboarding, markDone } = useOnboarding(userId)
-  const [onboardingVisible, setOnboardingVisible] = useState(showOnboarding)
   const { exportToPdf } = useExportPdf()
   const pageVisible = usePageVisibility()
   const { visibleWidgets, hiddenWidgets, toggleWidget, moveWidget, resetLayout } = useDashboardLayout()
@@ -503,13 +497,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Onboarding wizard */}
-      {onboardingVisible && (
-        <Suspense fallback={null}>
-          <OnboardingWizard onComplete={() => { markDone(); setOnboardingVisible(false) }} />
-        </Suspense>
-      )}
-
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
