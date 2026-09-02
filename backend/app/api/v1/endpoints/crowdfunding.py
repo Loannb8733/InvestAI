@@ -932,6 +932,9 @@ async def create_repayment(
         project.id,
         repayment.id,
         data.payment_date,
+        # Le montant départage deux échéances proches en date bien mieux que
+        # quelques jours d'écart ne le font (FIN-09).
+        amount=data.amount,
     )
 
     await db.commit()

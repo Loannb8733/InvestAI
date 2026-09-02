@@ -174,14 +174,58 @@ class ReconciliationService:
 
         return entries
 
+    #: Tolérance sur le montant d'une échéance, en proportion.
+    #:
+    #: La dernière échéance d'un prêt porte l'arrondi de toutes les précédentes,
+    #: et un virement peut arriver amputé de quelques centimes de frais. Un
+    #: pour cent absorbe ces écarts sans confondre deux échéances distinctes,
+    #: qui diffèrent typiquement de plusieurs dizaines de pour cent.
+    TOLERANCE_MONTANT = Decimal("0.01")
+
+    def score_rapprochement(
+        self,
+        echeance: CrowdfundingPaymentSchedule,
+        payment_date: date,
+        amount: Decimal | None,
+    ) -> tuple[int, int]:
+        """(le montant colle ou non, écart de dates) — le plus petit l'emporte.
+
+        Le montant sert de premier critère quand il est connu : parmi les
+        échéances qu'il solde, on retient la plus proche dans le calendrier.
+        Quand aucune ne correspond, on retombe sur la date seule — le
+        comportement d'avant.
+
+        Méthode nommée plutôt que fermeture interne, pour que les tests
+        éprouvent cette implémentation-ci et non une copie.
+        """
+        jours = abs((echeance.due_date - payment_date).days)
+        if amount is None:
+            return (0, jours)
+
+        attendu = (echeance.expected_capital or Decimal("0")) + (echeance.expected_interest or Decimal("0"))
+        if attendu <= 0:
+            return (1, jours)
+
+        ecart = abs(attendu - Decimal(amount)) / attendu
+        return (0 if ecart <= self.TOLERANCE_MONTANT else 1, jours)
+
     async def reconcile_repayment(
         self,
         db: AsyncSession,
         project_id: uuid.UUID,
         repayment_id: uuid.UUID,
         payment_date: date,
+        amount: Decimal | None = None,
     ) -> CrowdfundingPaymentSchedule | None:
-        """Find closest uncompleted schedule entry and mark it completed."""
+        """Rapproche un remboursement de l'échéance qu'il solde.
+
+        L'appariement se faisait sur la seule distance de date. Deux échéances
+        proches dans le calendrier — un décalage de paiement, un mois à cheval —
+        se départageaient alors sur quelques jours, sans que le montant, qui les
+        distingue franchement, entre en ligne de compte.
+
+        Le montant reste facultatif : sans lui, le comportement est celui d'avant.
+        """
         result = await db.execute(
             select(CrowdfundingPaymentSchedule)
             .where(
@@ -195,8 +239,7 @@ class ReconciliationService:
         if not entries:
             return None
 
-        # Find closest by date distance
-        closest = min(entries, key=lambda e: abs((e.due_date - payment_date).days))
+        closest = min(entries, key=lambda e: self.score_rapprochement(e, payment_date, amount))
         closest.is_completed = True
         closest.completed_at = datetime.now(timezone.utc)
         closest.repayment_id = repayment_id
