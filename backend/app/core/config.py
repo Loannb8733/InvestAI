@@ -195,6 +195,11 @@ class Settings(BaseSettings):
     ]
 
     # AI / LLM (optional — falls back to static analysis if none configured)
+    # CryptoCompare sert de repli quand CoinGecko échoue. L'API exige une clé :
+    # sans elle, chaque appel repart en 401 et le repli n'a jamais fonctionné.
+    # Vide par défaut — le code s'abstient alors d'appeler plutôt que d'échouer.
+    CRYPTOCOMPARE_API_KEY: str = ""
+
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""

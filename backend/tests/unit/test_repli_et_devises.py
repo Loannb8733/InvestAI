@@ -92,3 +92,40 @@ class TestDevisesReelles:
         assert "DEVISES_FIAT" in source and "not in" in source, (
             "la garde doit vérifier l'appartenance à la liste des monnaies, " "pas l'absence d'une liste de cryptos"
         )
+
+
+class TestRepliCryptoCompare:
+    """Un repli qui ne peut pas aboutir ne doit pas être tenté.
+
+    CryptoCompare répond 401 à toute requête anonyme. Sans clé configurée, ce
+    repli — sollicité chaque fois que CoinGecko échoue, donc précisément quand
+    tout va mal — ajoutait une latence pour un échec certain.
+    """
+
+    @pytest.mark.asyncio
+    async def test_aucun_appel_sans_cle(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "CRYPTOCOMPARE_API_KEY", "", raising=False)
+        service = PriceService()
+
+        async def refuser(*a, **k):
+            pytest.fail("appel réseau tenté alors qu'aucune clé n'est configurée")
+
+        monkeypatch.setattr(service.http_client, "get", refuser)
+        assert await service._fetch_from_cryptocompare(["BTC"], "EUR") == {}
+
+    def test_la_cle_est_transmise_quand_elle_existe(self, monkeypatch):
+        """Sinon le réglage serait décoratif : l'API attend un en-tête précis."""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "CRYPTOCOMPARE_API_KEY", "abc123", raising=False)
+        entetes = PriceService._entetes_cryptocompare()
+        assert entetes["authorization"] == "Apikey abc123"
+
+    def test_le_reglage_existe_et_est_vide_par_defaut(self):
+        from app.core.config import Settings
+
+        assert (
+            "CRYPTOCOMPARE_API_KEY" in Settings.model_fields
+        ), "sans réglage déclaré, la clé ne peut pas être fournie par l'environnement"
