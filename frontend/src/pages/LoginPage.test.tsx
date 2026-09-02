@@ -66,10 +66,13 @@ describe('LoginPage', () => {
         <LoginPage />
       </MemoryRouter>
     )
+    // Les univers annoncés sont ceux que l'application couvre réellement :
+    // « Actions » et « Prédictions » ont été retirés, faute de parcours (UX-03).
     expect(screen.getByText('Crypto')).toBeInTheDocument()
-    expect(screen.getByText('Actions')).toBeInTheDocument()
     expect(screen.getByText('Crowdfunding')).toBeInTheDocument()
-    expect(screen.getByText('Prédictions')).toBeInTheDocument()
+    expect(screen.getByText('Analyses IA')).toBeInTheDocument()
+    expect(screen.getByText('Fiscalité')).toBeInTheDocument()
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument()
   })
 
   it('calls login on form submit', async () => {
