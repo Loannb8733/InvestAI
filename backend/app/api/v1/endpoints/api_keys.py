@@ -38,6 +38,7 @@ from app.core.security import decrypt_api_key, encrypt_api_key
 from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
+from app.services.exchange_error_classifier import classify_and_mark_error as _classify_and_mark_error
 from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
 from app.services.metrics_service import invalidate_dashboard_cache
 
@@ -64,32 +65,6 @@ def earn_positions_to_close(net_rows, still_staked, epsilon: float = 0.0001):
 
 
 router = APIRouter()
-
-
-def _classify_and_mark_error(api_key, exc: Exception) -> None:
-    """Classify an exchange error and update api_key status accordingly."""
-    import httpx
-
-    error_msg = str(exc)
-
-    if isinstance(exc, httpx.HTTPStatusError):
-        code = exc.response.status_code
-        if code in (401, 403):
-            api_key.mark_auth_failure(error_msg)
-            logger.warning("API key %s: auth failure (%d)", api_key.id, code)
-            return
-        if code == 429:
-            api_key.mark_rate_limited(error_msg)
-            logger.warning("API key %s: rate limited (429)", api_key.id)
-            return
-
-    lower_msg = error_msg.lower()
-    if "invalid key" in lower_msg or "invalid signature" in lower_msg or "permission denied" in lower_msg:
-        api_key.mark_auth_failure(error_msg)
-        logger.warning("API key %s: auth failure (json)", api_key.id)
-        return
-
-    api_key.mark_error(error_msg)
 
 
 @router.get("/exchanges", response_model=List[ExchangeInfo])

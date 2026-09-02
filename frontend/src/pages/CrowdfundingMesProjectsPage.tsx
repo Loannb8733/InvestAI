@@ -33,7 +33,14 @@ export default function CrowdfundingMesProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: 'Crowdfunding' }, { label: 'Mes Projets' }]} />
+      {/* Le second niveau suivait « Mes Projets » quel que soit l'onglet ouvert :
+          le fil d'Ariane annonçait donc une page où l'on n'était pas. */}
+      <Breadcrumb
+        items={[
+          { label: 'Crowdfunding' },
+          { label: TABS.find((t) => t.value === activeTab)?.label ?? 'Vue d\'ensemble' },
+        ]}
+      />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-3">
