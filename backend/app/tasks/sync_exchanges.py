@@ -355,9 +355,36 @@ def _normalize_earn_variant(symbol: str) -> Optional[str]:
     if not symbol:
         return None
 
-    # Skip obvious earn/wrapped products that shouldn't be tracked as separate assets
-    skip_prefixes = ["LD", "BF", "W"]  # LDBTC, BFUSD, WBTC
-    for prefix in skip_prefixes:
+    # Produits « wrapped » ramenés à leur sous-jacent, par table explicite.
+    #
+    # La règle précédente retirait un « W » initial dès que le symbole dépassait
+    # trois caractères. Elle traitait correctement WBTC ou WETH, mais mutilait
+    # toutes les cryptos dont le nom commence par W : WAVES devenait AVES, WAXP
+    # devenait AXP, WEMIX devenait EMIX, WING devenait ING. Un actif acheté sous
+    # l'un de ces symboles aurait été enregistré sous un autre — impossible à
+    # rattraper ensuite, puisque rien ne signale la substitution.
+    #
+    # WIF et WLD, cités par le ticket d'audit, échappaient en réalité à la règle
+    # par leur longueur : le défaut était réel, mais pas sur ces symboles-là.
+    variantes_wrapped = {
+        "WBTC": "BTC",
+        "WETH": "ETH",
+        "WBETH": "BETH",
+        "WBNB": "BNB",
+        "WSOL": "SOL",
+        "WMATIC": "MATIC",
+        "WAVAX": "AVAX",
+        "WSTETH": "STETH",
+        "WFTM": "FTM",
+        "WPOL": "POL",
+    }
+    if symbol in variantes_wrapped:
+        return variantes_wrapped[symbol]
+
+    # « LD » et « BF » restent des préfixes : ce sont des familles de produits
+    # Binance (LDBTC, LDETH… pour Earn ; BFUSD), et non des débuts de noms de
+    # jetons. Une table devrait les énumérer un par un sans rien y gagner.
+    for prefix in ("LD", "BF"):
         if symbol.startswith(prefix) and len(symbol) > len(prefix) + 2:
             return symbol[len(prefix) :]
 
