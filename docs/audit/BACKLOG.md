@@ -110,6 +110,7 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 | **NEW-09** | 🔴 | **La sync fabriquait des ajustements annulant ses propres trades.** La réconciliation de solde comparait notre quantité à celle de l'exchange sans tenir compte des trades qu'elle venait d'écrire : le 2026-08-04 sur Kraken, 4 achats (BTC 0,00332921 · ETH 0,02996601 · PAXG 0,00689502 · SOL 0,37863) ont chacun été suivis d'un « Ajustement balance » de quantité EXACTEMENT égale et de sens opposé. L'historique perdait les achats, le solde les gardait — et l'écart se lisait ensuite comme un « historique incomplet », d'où NEW-06. → `contradicts_recent_trade()`. | ✅ corrigé + 4 lignes supprimées |
 | **NEW-10** | 🔴 | **199 transactions sans `executed_at`** (152 TRANSFER_IN, 47 TRANSFER_OUT). Le FIFO trie par `(executed_at ?? epoch, …)` : sans date, la ligne est rejouée en 1970, AVANT tout achat, sur un stock vide — elle ne retire donc aucun coût, alors que la somme signée la décompte. **C'est la racine de la divergence CUMP/FIFO du ticket FIN-03.** Les 3 sites concernés (ajustement de balance, import initial, mise à zéro) datent désormais leurs écritures. | ✅ corrigé |
 | **NEW-11** | 🟡 | L'invariant `check_holdings_qty` sortait en échec pour tout écart, même d'un millionième d'euro : le watchdog était rouge en permanence, donc plus lu. → Seuil de matérialité (position soldée < 1 € · écart < 0,01 €), écarts listés en WARN avec leur raison, code de sortie fondé sur les seules violations matérielles. | ✅ corrigé |
+| **NEW-14** | 🟡 | **`update_all_prices` casse sur « Task attached to a different loop »** : elle appelle en direct trois tâches qui font chacune leur `run_async`, et l'engine SQLAlchemy async garde ses connexions liées à la première boucle. **Défaut latent** : la tâche n'est pas planifiée — seules `update_crypto_prices` et `update_stock_prices` le sont, séparément, donc chacune a sa propre boucle. Piège pour qui la déclencherait à la main ou l'ajouterait au planning. | ❌ à traiter (mesuré, non corrigé) |
 | **NEW-13** | 🔴 | **Deux causes, toutes deux invisibles en lecture rapide.** (1) `Semaphore(5)` annulait l'espacement des appels CoinGecko ; (2) la tâche Celery qui pré-charge l'historique écrivait dans des clés que personne ne lisait. **`/predictions/market-cycle` répondait en 65 s à 92 s**, le bandeau de régime restant en squelette pendant tout ce temps. **Ma première explication était fausse** : ni le nombre d'actifs (7, pas 56), ni l'absence de parallélisme (`asyncio.gather` était déjà en place). La cause : `Semaphore(5)` laissait 5 coroutines entrer ensemble dans la section critique, lire le même horodatage et repartir à la même milliseconde — le délai de 1,2 s retardait une rafale sans jamais l'espacer. D'où les 429, puis 10 s + 20 s + 30 s de backoff par symbole, pour finir sans donnée. | ✅ **corrigé** — `Lock`, backoff plafonné, budget de temps partagé, et lecture réconciliée avec le cache Celery |
 | **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
 
@@ -220,6 +221,29 @@ d'être notées :
 
 Deux appels échappaient encore au budget (dominance BTC, prix des stablecoins) : bornés
 également. Le pire cas absolu tient enfin la promesse annoncée — 12 s.
+
+**Troisième temps : plus aucun appel réseau d'historique dans le chemin HTTP.**
+
+Tant que `get_market_cycle` pouvait appeler CoinGecko, sa latence restait à la merci d'un
+quota. Le module `services/price_history_store.py` lit désormais Redis puis **PostgreSQL**,
+sans jamais sortir. Le repli en base compte autant que le cache : après un redémarrage,
+Redis est vide et `asset_price_history` contient 367 jours par symbole.
+
+| Mesure (Redis vidé, quota épuisé) | Avant | Après |
+|---|---:|---:|
+| Durée de l'analyse | 65 s | **0,9 – 1,2 s** |
+| Actifs analysés | 1 (souvent 0) | **7** |
+| Bandeau à l'écran | 92 s | **1,0 s** |
+
+L'analyse est donc **plus complète en plus d'être plus rapide** : les symboles qui
+échouaient en 429 sont servis localement.
+
+Restent trois appels sortants, tous bornés et mesurés sous la seconde : Fear & Greed,
+dominance BTC, prix courants. Ces derniers ont leur propre cache et leur propre tâche —
+les figer serait un contresens, un prix doit être frais.
+
+**Bilan des trois temps : 92 s → 1,0 s à l'écran.** Et une leçon : la « tâche périodique à
+créer » existait déjà ; le travail a consisté à la faire lire, pas à l'écrire.
 
 #### Ce qui a été confirmé à l'écran
 
