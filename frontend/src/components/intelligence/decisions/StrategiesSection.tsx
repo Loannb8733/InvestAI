@@ -173,17 +173,33 @@ function StrategyCard({
                   <Check className="h-4 w-4 mr-1" />
                   Accepter
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => onReject(strategy.id)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onReject(strategy.id)}
+                  aria-label={`Rejeter la stratégie ${strategy.name}`}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </>
             )}
             {strategy.source === 'USER' && (
-              <Button size="sm" variant="ghost" onClick={() => onDelete(strategy.id)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDelete(strategy.id)}
+                aria-label={`Supprimer la stratégie ${strategy.name}`}
+              >
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Replier' : 'Déplier'} le détail de ${strategy.name}`}
+            >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
           </div>

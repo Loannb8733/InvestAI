@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 logger = logging.getLogger(__name__)
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -329,7 +329,21 @@ async def get_dashboard(
 
     cached = await get_cached_dashboard(user_id, days, currency)
     if cached is not None:
-        return EnhancedDashboardResponse(**cached)
+        try:
+            return EnhancedDashboardResponse(**cached)
+        except ValidationError as exc:
+            # Une entrée écrite par une version antérieure du schéma ne peut plus
+            # être reconstruite : le modèle a gagné des champs que le cache ne
+            # contient pas. Sans ce filet, l'écran renvoyait 500 jusqu'à
+            # expiration du TTL — constaté sur `days=0`, l'option « Tout » du
+            # sélecteur de période, dont l'entrée avait survécu à une évolution
+            # du schéma. Un cache périmé doit se comporter comme un cache absent.
+            logger.warning(
+                "Dashboard : entrée de cache incompatible avec le schéma (user=%s, days=%s), " "recalcul — %s",
+                user_id,
+                days,
+                exc.errors()[0].get("loc") if exc.errors() else exc,
+            )
 
     try:
         result = await _get_dashboard_impl(request, days, current_user, db)

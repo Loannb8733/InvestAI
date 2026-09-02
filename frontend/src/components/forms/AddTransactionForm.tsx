@@ -395,7 +395,7 @@ export default function AddTransactionForm({
                 setShowNewAsset(false)
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Portefeuille">
                 <SelectValue placeholder="Portefeuille..." />
               </SelectTrigger>
               <SelectContent>
@@ -431,7 +431,7 @@ export default function AddTransactionForm({
                   setValue('asset_id', value)
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Actif">
                   <SelectValue placeholder={filteredAssets.length ? "Actif..." : "Aucun actif"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -470,7 +470,7 @@ export default function AddTransactionForm({
               <div className="space-y-1">
                 <Label className="text-xs">Type *</Label>
                 <Select value={newAssetType} onValueChange={setNewAssetType}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Type d'actif">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
