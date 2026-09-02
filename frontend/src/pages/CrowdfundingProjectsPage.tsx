@@ -337,7 +337,10 @@ export default function CrowdfundingProjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Mes Projets</h1>
+          {/* h2 : cette page n'est montée que comme onglet de CrowdfundingMesProjectsPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Mes Projets</h2>
           <p className="text-muted-foreground">
             Gérez vos investissements crowdfunding
           </p>

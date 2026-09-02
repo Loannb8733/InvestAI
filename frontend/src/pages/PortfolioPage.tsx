@@ -239,7 +239,10 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Portefeuille</h1>
+          {/* h2 : cette page n'est montée que comme onglet de PortfolioUnifiedPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Portefeuille</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Le détail de ce que tu possèdes, ligne par ligne.
           </p>

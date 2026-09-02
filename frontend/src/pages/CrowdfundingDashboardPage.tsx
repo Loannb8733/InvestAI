@@ -80,7 +80,10 @@ export default function CrowdfundingDashboardPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Crowdfunding</h1>
+          {/* h2 : cette page n'est montée que comme onglet de CrowdfundingMesProjectsPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Crowdfunding</h2>
           <p className="text-muted-foreground">
             Gérez vos investissements en crowdfunding immobilier et PME
           </p>
@@ -139,7 +142,7 @@ export default function CrowdfundingDashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Crowdfunding</h1>
+          <h2 className="text-3xl font-serif font-medium">Crowdfunding</h2>
           <p className="text-muted-foreground">
             Vue d'ensemble de vos investissements crowdfunding
           </p>

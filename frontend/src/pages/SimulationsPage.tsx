@@ -686,7 +686,10 @@ export default function SimulationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-medium">Simulations</h1>
+        {/* h2 : cette page n'est montée que comme onglet de StrategyPage, dont
+            le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+            que suivent les lecteurs d'écran (UX-02). */}
+        <h2 className="text-3xl font-serif font-medium">Simulations</h2>
         <p className="text-muted-foreground">
           Calculateur FIRE probabiliste, projections Monte Carlo et simulations DCA.
           {livePortfolioValue > 0 && (

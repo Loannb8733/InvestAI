@@ -745,7 +745,10 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Transactions</h1>
+          {/* h2 : cette page n'est montée que comme onglet de PortfolioUnifiedPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Transactions</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Chaque mouvement qui a façonné ton patrimoine.
           </p>

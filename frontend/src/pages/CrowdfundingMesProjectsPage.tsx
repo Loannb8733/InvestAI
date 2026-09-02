@@ -42,6 +42,10 @@ export default function CrowdfundingMesProjectsPage() {
         ]}
       />
 
+      {/* Le titre de la page vit ici, pas dans les onglets : ceux-ci sont
+          des sections. Masqué à l'œil — le fil d'Ariane et les onglets le
+          disent déjà — mais présent pour l'arbre d'accessibilité (UX-02). */}
+      <h1 className="sr-only">Crowdfunding</h1>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-3">
           {TABS.map(({ value, label, icon: Icon }) => (
