@@ -20,6 +20,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.contexte_execution import sert_une_requete_http
 from app.core.database import engine
 from app.core.logging import get_logger, setup_logging
 from app.core.rate_limit import limiter
@@ -73,6 +74,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Log request details and timing."""
         start_time = time.perf_counter()
+
+        # Marque toute la pile d'appels comme « servant une requête HTTP ».
+        # Les intégrations tierces s'en servent pour renoncer plutôt que
+        # d'attendre un `Retry-After` : un utilisateur est devant l'écran, et le
+        # cache sait déjà répondre. Les workers Celery n'ont pas ce marqueur et
+        # gardent le droit d'attendre.
+        sert_une_requete_http.set(True)
 
         # Generate or accept trace_id for request correlation
         trace_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
