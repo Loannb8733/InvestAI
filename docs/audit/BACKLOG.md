@@ -476,6 +476,23 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### UX-02 — deux titres de niveau 1 par page
+
+Huit pages portaient un `<h1>` sans être des routes : elles ne sont montées que comme
+onglets. Sur `/goals`, le mot « Objectifs » apparaissait **trois fois** — fil d'Ariane,
+onglet, titre — et deux `<h1>` cohabitaient dans le document.
+
+Un lecteur d'écran suit la hiérarchie des titres pour se repérer : deux niveaux 1, ce sont
+deux pages annoncées là où il n'y en a qu'une.
+
+Les huit titres passent en `<h2>` (mêmes classes, **rendu inchangé**) et les trois
+conteneurs reçoivent leur `<h1>`, masqué visuellement. Deux pages crowdfunding en avaient
+deux chacune, dans leurs rendus conditionnels — le premier passage n'en avait converti
+qu'un.
+
+**Ce qui reste relève du design** : la répétition *visuelle* du même mot. Ce n'est pas un
+défaut de structure et cela demande de voir les écrans.
+
 #### UX-03 — une promesse fausse coûte plus qu'une fonctionnalité manquante
 
 Le guide de démarrage annonçait **Crypto, Actions, ETF, Immobilier**. Trois de ces quatre
@@ -738,7 +755,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Prio | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **UX-01** Menu « Stratégies » → 404 *(livré 2026-08-31)* | ~~P0~~ | ~~🔴~~ | F-01(UX) | `components/layout/NavRail.tsx:67`, `App.tsx` | `/strategies` n'a ni route ni redirect → 404. → Ajouter `<Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace/>}/>` (ou pointer le menu directement). | Clic « Stratégies » n'atteint jamais la 404 ; test e2e de navigation menu. | XS |
-| **UX-02** Triple titrage des onglets | P1 | 🔴 | F-02(UX) | `IntelligencePage`, `PortfolioUnifiedPage`, `StrategyPage`, pages internes | Breadcrumb + label d'onglet + `<h1>` répètent le même mot. → Prop `embedded` sur les pages internes qui masque leur `<h1>` quand montées dans un conteneur. | Aucune page d'onglet n'affiche un titre dupliqué ; le titre unique vit dans le conteneur. | S |
+| ✅ **UX-02** Triple titrage des onglets *(structure livrée 2026-09-03)* | ~~P1~~ | 🔴 | F-02(UX) | `IntelligencePage`, `PortfolioUnifiedPage`, `StrategyPage`, pages internes | Breadcrumb + label d'onglet + `<h1>` répètent le même mot. → Prop `embedded` sur les pages internes qui masque leur `<h1>` quand montées dans un conteneur. | ✅ **Structure corrigée** : 8 pages-onglets passent de `<h1>` à `<h2>`, 3 conteneurs reçoivent le `<h1>` qui leur manquait (masqué visuellement). Aucune n'était une route — leur titre était un titre de section. ⚠️ **Reste au design** : la répétition *visuelle* du même mot entre fil d'Ariane, onglet et titre. C'est un choix d'affichage, il demande de voir les écrans. | S |
 | ✅ **UX-03** Promesses d'actifs inexistants + onboarding mal monté *(livré 2026-09-02)* | ~~P1~~ | ~~🔴/🟠~~ | F-03, F-04(UX) | `components/OnboardingWizard.tsx:35-48,93-96`, `pages/ReportsPage.tsx:354-369`, `DashboardPage.tsx:492` | Onboarding/Rapports vendent actions/ETF/immobilier/SCPI (absents) ; le wizard n'est monté que sur `/crypto`, jamais sur `/`. → Aligner sur crypto+crowdfunding ; remonter le wizard au `Layout` (ou `/`). | ✅ Les cartes annoncent Crypto, Crowdfunding, Analyses IA et Fiscalité — **le Crowdfunding, qui existe, n'était même pas mentionné**. Guide déplacé sur `/` et retiré de `/crypto`. `ReportsPage` était déjà honnête. **Clé de stockage conservée** (`user.id`) : avec `user.email`, le guide serait réapparu à ceux qui l'avaient terminé. | S |
 
 ---
