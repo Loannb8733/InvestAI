@@ -476,6 +476,35 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### FIN-06 à FIN-13 — mesurés le 2026-09-02
+
+Les huit derniers tickets financiers, jamais regardés. **Un seul méritait une
+correction.**
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| **FIN-13** | `WAVES → AVES`, `WAXP → AXP`, `WEMIX → EMIX`, `WING → ING` : la règle retirait un « W » initial dès 4 caractères | ✅ **réel, corrigé** |
+| **FIN-09** | l'appariement des remboursements se fait par distance de date seule, sans le montant | ✅ réel — **aucune exposition** : 59 échéances mensuelles, aucune paire à moins de 15 jours |
+| **FIN-10** | `get_stock_price` rend le prix dans sa devise de cotation ; les appelants convertissent eux-mêmes | ✅ réel — **aucune exposition** : 0 action détenue |
+| **FIN-07** | `int(delta / 30.44)` dans les projections d'objectifs | ✅ réel, impact marginal |
+| **FIN-08** | montants advisory en `float` | ⚠️ à préciser, polish |
+| **FIN-12** | le hash de déduplication ignore l'heure | ⚠️ **arbitrage documenté, pas un bug** |
+| **FIN-06** | graine Monte Carlo | ❌ **déjà fait** — graine explicite, commentée |
+| **FIN-11** | clamp XIRR silencieux | ❌ **déjà fait** — `logger.warning` avec le finding cité |
+
+**FIN-13 mérite d'être raconté** : le ticket citait WIF et WLD, or **tous deux
+échappaient à la règle par leur longueur** (trois caractères). Le défaut était réel, mais
+pas sur les symboles annoncés — cinq autres jetons l'étaient. Corriger sur la foi du
+ticket aurait traité un cas inexistant et laissé les vrais.
+
+**FIN-12 est le cas le plus intéressant.** La docstring de `compute_transaction_hash` dit
+explicitement que l'heure est exclue *pour que la même transaction réelle importée depuis
+deux sources* (CSV et synchronisation) *produise le même hash*. Inclure l'heure, comme le
+demande le ticket, casserait cette déduplication voulue. Un défaut voisin — la précision
+des montants collapsée en `float` à 8 décimales, qui faisait collisionner deux trades PEPE
+distincts — **a d'ailleurs déjà été corrigé**. Le risque résiduel (deux transactions
+identiques en tout point le même jour) existe, mais l'arbitrage appartient au produit.
+
 #### EPICs D, E, F et H — mesurés le 2026-09-01
 
 **EPIC E (sécurité)** — les deux P1 étaient réels et sont traités :
@@ -739,14 +768,14 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Source | Correctif | Effort |
 |--------|--------|-----------|--------|
 | ❌ **FIN-05** Corriger la docstring de signe `_xirr` *(déjà correct — vérifié 2026-09-01)* | F-08 | Refléter la convention réelle (négatif = sortie). | XS |
-| **FIN-06** Découpler les tirages Monte Carlo | F-09 | Graines distinctes ou re-tirage proba/ETA ; afficher un intervalle. | S |
+| ❌ **FIN-06** Découpler les tirages Monte Carlo *(déjà fait — mesuré 2026-09-02)* | F-09 | Graine explicite et documentée : `seed` forcé pour les tests, horloge XOR user_id en production. | S |
 | **FIN-07** Mois restants via `relativedelta` | F-10 | Remplacer `delta/30.44` par mois calendaires exacts. | XS |
 | **FIN-08** `Decimal` pour montants advisory affichés | F-11 | Cashflows stress test / DCA affichés au centime en `Decimal`. | M |
 | **FIN-09** Appariement remboursement par date+montant | F-12 | Pondérer la réconciliation ; documenter l'arrondi « last installment ». | S |
 | **FIN-10** Centraliser conversion prix actions | F-13 | `price_service.get_price` renvoie toujours en devise demandée. | S |
-| **FIN-11** Logguer le clamp XIRR | F-14 | Alerter quand `[-95,1000]` s'active au lieu de borner en silence. | XS |
+| ❌ **FIN-11** Logguer le clamp XIRR *(déjà fait — mesuré 2026-09-02)* | F-14 | Le `logger.warning` est en place, avec le finding F-14 cité en commentaire. | XS |
 | **FIN-12** Hash dédup avec heure | F-15 | Inclure l'heure / `external_id` pour ne pas fusionner 2 DCA identiques le même jour. | S |
-| **FIN-13** Earn/wrapped par table explicite | F-16 | Remplacer le strip de préfixe `W` par une table de variantes connues (évite WIF/WLD cassés). | S |
+| ✅ **FIN-13** Earn/wrapped par table explicite *(livré 2026-09-02)* | F-16 | Remplacer le strip de préfixe `W` par une table de variantes connues. **WIF/WLD n'étaient pas concernés** (3 caractères) ; les jetons réellement mutilés étaient WAVES, WAXP, WEMIX, WING, WHITE. | S |
 | ❌ **ARC-12** Supprimer l'alias mort `fetchUser` *(infondé : utilisé par `VerifyEmailPage` — 2026-09-01)* | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
 | **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
 | **UX-09** `font-serif` sur h1 du Login | F-13(UX) | Cohérence de marque dès l'entrée. | XS |
