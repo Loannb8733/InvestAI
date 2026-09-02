@@ -152,6 +152,10 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
               variant="outline"
               role="combobox"
               aria-expanded={open}
+              // Le <Label> voisin est visuel : il n'est rattaché à rien pour un
+              // lecteur d'écran, qui annonçait « liste déroulante » sans dire
+              // de quel champ il s'agit.
+              aria-label={placeholder}
               className="w-full justify-between font-normal"
             >
               <span className={cn('flex items-center gap-1.5', !value && 'text-muted-foreground')}>

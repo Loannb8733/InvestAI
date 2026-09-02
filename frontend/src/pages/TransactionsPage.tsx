@@ -1140,6 +1140,7 @@ export default function TransactionsPage() {
                             paginatedTransactions.every((tx) => selectedIds.has(tx.id))
                           }
                           onCheckedChange={handleSelectAll}
+                          aria-label="Sélectionner toutes les transactions de la page"
                         />
                       </th>
                       <SortableHeader field="date">Date</SortableHeader>
@@ -1157,7 +1158,15 @@ export default function TransactionsPage() {
                     {paginatedTransactions.map((tx) => (
                       <tr key={tx.id} className="border-b last:border-0 hover:bg-muted/50">
                         <td className="text-center py-3">
-                          <Checkbox checked={selectedIds.has(tx.id)} onCheckedChange={() => handleSelectOne(tx.id)} />
+                          {/* Sans nom, un lecteur d'écran annonçait « case à cocher »
+                              vingt et une fois de suite, sans dire ce qu'on sélectionne. */}
+                          <Checkbox
+                            checked={selectedIds.has(tx.id)}
+                            onCheckedChange={() => handleSelectOne(tx.id)}
+                            aria-label={`Sélectionner ${typeLabels[tx.transaction_type] ?? tx.transaction_type} ${
+                              tx.asset_symbol ?? ''
+                            } du ${formatDateTime(tx.executed_at || tx.created_at)}`}
+                          />
                         </td>
                         <td className="py-3 text-sm text-center whitespace-nowrap">
                           {formatDateTime(tx.executed_at || tx.created_at)}

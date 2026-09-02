@@ -324,7 +324,11 @@ export default function AlertsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Alertes</h1>
+          {/* h2 et non h1 : cette page n'est plus montée que comme onglet du hub
+              Intelligence, dont le <h1> est « Analyses IA ». La route /alerts y
+              redirige. Deux <h1> sur une même page cassent la hiérarchie de titres
+              que suivent les lecteurs d'écran. */}
+          <h2 className="text-3xl font-serif font-medium">Alertes</h2>
           <p className="text-muted-foreground">
             Configurez des alertes sur vos actifs
           </p>
