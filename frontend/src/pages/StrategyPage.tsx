@@ -41,6 +41,10 @@ export default function StrategyPage() {
           (UX-05), et le répéter donnerait « Objectifs › Objectifs ». */}
       <Breadcrumb items={[{ label: 'Outils' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }]} />
 
+      {/* Le titre de la page vit ici, pas dans les onglets : ceux-ci sont
+          des sections. Masqué à l'œil — le fil d'Ariane et les onglets le
+          disent déjà — mais présent pour l'arbre d'accessibilité (UX-02). */}
+      <h1 className="sr-only">Objectifs et simulations</h1>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           {TABS.map(({ value, label, icon: Icon }) => (

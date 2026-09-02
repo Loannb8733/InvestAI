@@ -531,7 +531,10 @@ export default function GoalsPage() {
           {/* Le menu dit « Objectifs », le breadcrumb « Outils › Objectifs »,
               et l'onglet « Objectifs » : un quatrième nom, en anglais dans une
               interface française, ne désignait la même chose pour personne. */}
-          <h1 className="text-3xl font-serif font-medium">Objectifs</h1>
+          {/* h2 : cette page n'est montée que comme onglet de StrategyPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Objectifs</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Objectifs financiers avec projections intelligentes
           </p>

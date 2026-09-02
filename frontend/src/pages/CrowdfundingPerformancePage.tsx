@@ -98,7 +98,10 @@ export default function CrowdfundingPerformancePage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-serif font-medium">Performance Crowdfunding</h1>
+          {/* h2 : cette page n'est montée que comme onglet de CrowdfundingMesProjectsPage, dont
+              le <h1> porte le titre. Deux <h1> sur une page cassent la hiérarchie
+              que suivent les lecteurs d'écran (UX-02). */}
+          <h2 className="text-3xl font-serif font-medium">Performance Crowdfunding</h2>
           <p className="text-muted-foreground">Aucun projet à analyser</p>
         </div>
       </div>
@@ -140,7 +143,7 @@ export default function CrowdfundingPerformancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-medium">Performance Crowdfunding</h1>
+        <h2 className="text-3xl font-serif font-medium">Performance Crowdfunding</h2>
         <p className="text-muted-foreground">
           Suivi des rendements projetés vs réalisés
         </p>
