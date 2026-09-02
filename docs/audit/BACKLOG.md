@@ -476,6 +476,20 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### UX-09 — et une promesse fausse sur le premier écran
+
+Le titre du Login était le seul de l'application hors serif. Sa page jumelle, `Register`,
+l'était déjà exactement au même endroit : ce n'était pas un parti pris, c'était un oubli.
+
+**Trouvé en passant, plus gênant que le ticket** : la page annonçait « Actions » parmi ses
+univers, dans les pastilles comme dans l'accroche. Même promesse sans parcours que celle
+corrigée dans le guide de démarrage — sauf qu'ici, c'est la toute première chose qu'un
+visiteur lit.
+
+**Erreur de méthode à consigner** : j'ai poussé ce correctif avec un test rouge.
+`LoginPage.test.tsx` attendait la pastille « Actions » ; je n'ai pas regardé la suite front
+avant de committer. Rattrapé au commit suivant, mais la vérification aurait dû précéder.
+
 #### FIN-07 — un écart rare, mais qui gonfle l'effort demandé
 
 `int(jours / 30,44)` se trompait d'un mois dans **3 % des échéances possibles** — 118 cas
@@ -656,7 +670,7 @@ version (incompatibilité passlib / bcrypt ≥ 4.1) n'existe pas ici. Rounds à 
 |---|---|---|
 | FIN-05 | la docstring dit déjà « negative = cash outflow, positive = cash inflow » | ❌ **déjà correct** |
 | ARC-12 | `fetchUser` est utilisé (`VerifyEmailPage.tsx`) — ce n'est pas un alias mort | ❌ **infondé** |
-| UX-09 | le `<h1>` du Login porte `font-semibold`, pas `font-serif` | ✅ réel (polish) |
+| UX-09 | le `<h1>` du Login porte `font-semibold` quand tout le reste — Register compris — est en serif | ✅ réel, **corrigé** |
 
 **EPIC D (UX)** — le plus solide des quatre :
 
@@ -849,7 +863,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | ✅ **FIN-13** Earn/wrapped par table explicite *(livré 2026-09-02)* | F-16 | Remplacer le strip de préfixe `W` par une table de variantes connues. **WIF/WLD n'étaient pas concernés** (3 caractères) ; les jetons réellement mutilés étaient WAVES, WAXP, WEMIX, WING, WHITE. | S |
 | ❌ **ARC-12** Supprimer l'alias mort `fetchUser` *(infondé : utilisé par `VerifyEmailPage` — 2026-09-01)* | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
 | **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
-| **UX-09** `font-serif` sur h1 du Login | F-13(UX) | Cohérence de marque dès l'entrée. | XS |
+| ✅ **UX-09** `font-serif` sur h1 du Login *(livré 2026-09-03)* | F-13(UX) | Le Login était le **seul** titre de l'application hors serif — sa page jumelle Register l'était déjà au même endroit. Corrigé, **et la page annonçait « Actions »** dans ses pastilles comme dans son accroche : même promesse sans parcours qu'UX-03, sur le premier écran vu. | XS |
 | ⚠️ **UX-10** Remplir le Header *(mesuré 2026-09-03)* | F-14(UX) | **Le cmd-K n'est PAS présent** : `cmdk` est installé mais ne sert qu'au sélecteur de plateforme, et aucun raccourci global n'existe. Une palette de recherche est un chantier entier (que cherche-t-on ? actifs, transactions, projets, pages ?), pas un ticket S. Quant au titre courant, l'ajouter créerait un **quatrième** titrage juste après la correction d'UX-02. **Demande un arbitrage produit, et de voir les écrans.** | S |
 | **UX-11** Crowdfunding Audit Lab : onglet ou route | F-17(UX) | Trancher l'asymétrie onglets vs route dédiée. | S |
 
