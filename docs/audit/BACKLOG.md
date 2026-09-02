@@ -72,7 +72,7 @@ devrait être engagé sans mesure préalable.
 | **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
 | **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
 | **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
-| **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (7 écrans / 32) | — | — |
+| **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
 | **Total** | **32/50** | 18 | 6 | 18 |
 
 UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent dans les
@@ -256,15 +256,59 @@ créer » existait déjà ; le travail a consisté à la faire lire, pas à l'é
   4,67:1 sur fond (mes calculs Python donnaient 4,82 et 4,68).
 - **Responsive** : aucun débordement horizontal du document en 390 px.
 
-#### Deux faux positifs de mon propre audit
+#### Second passage (2026-09-02) — les 25 écrans restants
+
+Tous les écrans ont été parcourus, en desktop (1280×800) et en mobile (390×844),
+onglets et modales compris.
+
+**🔴 Un 500 en production, sur un cas d'usage courant.**
+`GET /dashboard?days=0` — l'option **« Tout »** du sélecteur de période — répondait 500 ;
+toutes les autres valeurs passaient. La cause n'est pas le calcul mais **le cache** :
+l'entrée `days=0` avait survécu à une évolution de `EnhancedDashboardResponse`, qui a
+gagné des champs (`active_alerts`, `upcoming_events`, `advanced_metrics`,
+`last_updated`…). Le dict relu ne pouvait plus construire le modèle, et l'exception
+Pydantic remontait en 500 jusqu'à expiration du TTL.
+
+Le piège **se réarme à chaque ajout de champ au schéma**, et ne frappe que les
+utilisateurs dont le cache est chaud — ce qui le rend difficile à reproduire. Un cache
+qu'on ne sait plus relire est désormais traité comme un cache absent, avec une trace.
+
+**Accessibilité — 27 éléments sans nom accessible**, tous vérifiés dans l'arbre du
+navigateur et non par un heuristique DOM :
+
+| Où | Quoi |
+|---|---|
+| Tableau des transactions | 21 cases de sélection annonçaient « case à cocher » sans dire laquelle |
+| Pilier Décisions | 3 boutons icône (rejeter, supprimer, déplier) |
+| Formulaire de transaction | 3 listes déroulantes dont le `<Label>` voisin n'était rattaché à rien |
+| Toutes les modales | le bouton de fermeture s'annonçait **« Close »** — seul texte anglais restant |
+
+**Hiérarchie de titres** : `AlertsPage` rendait un second `<h1>` alors qu'elle n'est plus
+montée que comme onglet du hub Intelligence. Passée en `<h2>`. Défaut introduit par ma
+propre correction de la veille — le `<h1>` que j'avais ajouté au conteneur entrait en
+collision avec celui de la page interne.
+
+**Ce qui va bien** : aucun débordement horizontal en 390 px sur aucun écran ; le tiroir
+de navigation mobile est correctement `inert` + `aria-hidden` ; la modale d'ajout piège
+le focus et porte un titre accessible ; `/admin` redirige bien un non-admin ; les 4
+onglets de Rapports, le Journal, le Calendrier, le Crowdfunding, l'Audit Lab et les
+Simulations n'ont **rien** à signaler.
+
+**Reste mesuré, non corrigé** : `GET /dashboard` met **12,6 s** au premier appel. C'est
+le même motif que NEW-13 — des données coûteuses calculées dans le chemin d'une requête.
+
+#### Quatre faux positifs de mon propre audit
 
 À consigner, parce qu'ils invitent à se méfier des heuristiques DOM maison :
 
-- j'ai signalé un interrupteur « sans nom accessible » sur `/alerts` : le snapshot
-  d'accessibilité du navigateur le nomme correctement (« Activer les notifications
-  Telegram ») via son `<label for>` ;
-- j'ai signalé `/crypto` « sans `<h1>` » : le titre existe, mon audit l'avait mesuré
-  pendant le chargement.
+- un interrupteur « sans nom accessible » sur `/alerts` : le navigateur le nomme
+  correctement (« Activer les notifications Telegram ») via son `<label for>` ;
+- `/crypto` « sans `<h1>` » : le titre existe, mon audit l'avait mesuré pendant le
+  chargement ;
+- « 9 squelettes bloqués » sur `/crypto` : **tous décoratifs** — `animate-pulse` sert
+  aussi au point clignotant du badge « Live », pas seulement aux squelettes ;
+- « 7 textes tronqués » sur `/crowdfunding` : des éléments `sr-only`, larges de 1 px
+  **exprès**, destinés aux lecteurs d'écran.
 
 **Se fier à l'arbre d'accessibilité du navigateur, pas à un `querySelectorAll` maison.**
 
