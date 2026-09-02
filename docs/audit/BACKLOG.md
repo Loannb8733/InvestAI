@@ -476,6 +476,19 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### UX-03 — une promesse fausse coûte plus qu'une fonctionnalité manquante
+
+Le guide de démarrage annonçait **Crypto, Actions, ETF, Immobilier**. Trois de ces quatre
+catégories n'ont aucun parcours : ni page, ni formulaire, ni type d'actif utilisé. Et il
+taisait le **Crowdfunding**, qui existe pour de bon — six projets, cinquante-neuf
+échéances.
+
+Le défaut n'est pas seulement l'inexactitude : un nouvel arrivant qui cherche « Actions »
+et ne trouve rien conclut que l'outil est cassé, non qu'il ne fait pas cela.
+
+Second volet, plus discret : le guide était monté sur `/crypto`. La route d'accueil est
+`/`, servie par `MasterDashboardPage`. **Il ne s'affichait donc pour personne.**
+
 #### Les neuf derniers tickets — mesurés le 2026-09-02
 
 **Le backlog est désormais intégralement mesuré.** Sur ces neuf, deux méritaient une
@@ -726,7 +739,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **UX-01** Menu « Stratégies » → 404 *(livré 2026-08-31)* | ~~P0~~ | ~~🔴~~ | F-01(UX) | `components/layout/NavRail.tsx:67`, `App.tsx` | `/strategies` n'a ni route ni redirect → 404. → Ajouter `<Route path="strategies" element={<Navigate to="/intelligence?tab=strategies" replace/>}/>` (ou pointer le menu directement). | Clic « Stratégies » n'atteint jamais la 404 ; test e2e de navigation menu. | XS |
 | **UX-02** Triple titrage des onglets | P1 | 🔴 | F-02(UX) | `IntelligencePage`, `PortfolioUnifiedPage`, `StrategyPage`, pages internes | Breadcrumb + label d'onglet + `<h1>` répètent le même mot. → Prop `embedded` sur les pages internes qui masque leur `<h1>` quand montées dans un conteneur. | Aucune page d'onglet n'affiche un titre dupliqué ; le titre unique vit dans le conteneur. | S |
-| **UX-03** Promesses d'actifs inexistants + onboarding mal monté | P1 | 🔴/🟠 | F-03, F-04(UX) | `components/OnboardingWizard.tsx:35-48,93-96`, `pages/ReportsPage.tsx:354-369`, `DashboardPage.tsx:492` | Onboarding/Rapports vendent actions/ETF/immobilier/SCPI (absents) ; le wizard n'est monté que sur `/crypto`, jamais sur `/`. → Aligner sur crypto+crowdfunding ; remonter le wizard au `Layout` (ou `/`). | Plus aucune mention d'actif non géré ; un nouveau compte voit l'onboarding dès `/`. | S |
+| ✅ **UX-03** Promesses d'actifs inexistants + onboarding mal monté *(livré 2026-09-02)* | ~~P1~~ | ~~🔴/🟠~~ | F-03, F-04(UX) | `components/OnboardingWizard.tsx:35-48,93-96`, `pages/ReportsPage.tsx:354-369`, `DashboardPage.tsx:492` | Onboarding/Rapports vendent actions/ETF/immobilier/SCPI (absents) ; le wizard n'est monté que sur `/crypto`, jamais sur `/`. → Aligner sur crypto+crowdfunding ; remonter le wizard au `Layout` (ou `/`). | ✅ Les cartes annoncent Crypto, Crowdfunding, Analyses IA et Fiscalité — **le Crowdfunding, qui existe, n'était même pas mentionné**. Guide déplacé sur `/` et retiré de `/crypto`. `ReportsPage` était déjà honnête. **Clé de stockage conservée** (`user.id`) : avec `user.email`, le guide serait réapparu à ceux qui l'avaient terminé. | S |
 
 ---
 
