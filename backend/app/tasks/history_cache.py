@@ -116,6 +116,45 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
         logger.warning("Failed to persist prices for %s to DB: %s", symbol, e)
 
 
+def _charger_prix_depuis_db_sync(symbol: str, days: int):
+    """Même lecture que `_load_prices_from_db`, sans boucle d'événements.
+
+    `get_cached_history` est synchrone et appelée depuis des services web qui,
+    eux, tournent dans une boucle. Y faire `run_async(...)` échouait : on ne peut
+    pas démarrer une boucle à l'intérieur d'une boucle. L'exception était avalée
+    par le `except` voisin, la coroutine jamais attendue, et **le repli
+    PostgreSQL ne fonctionnait dans aucun chemin HTTP** — vérifié : 91 prix
+    rendus depuis un script, 0 depuis un endpoint.
+
+    Un moteur synchrone supprime la question : il n'y a plus de boucle à créer.
+    """
+    from sqlalchemy import create_engine, text
+
+    moteur = create_engine(settings.DATABASE_URL_SYNC, pool_pre_ping=True)
+    try:
+        limite = datetime.now(timezone.utc).date() - timedelta(days=days)
+        with moteur.connect() as conn:
+            lignes = conn.execute(
+                text(
+                    "SELECT price_date, price_eur FROM asset_price_history"
+                    " WHERE symbol = :sym AND price_date >= :limite"
+                    " ORDER BY price_date"
+                ),
+                {"sym": symbol.upper(), "limite": limite},
+            ).fetchall()
+        if not lignes:
+            return [], []
+        return (
+            [datetime.combine(ligne[0], datetime.min.time()) for ligne in lignes],
+            [float(ligne[1]) for ligne in lignes],
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Repli PostgreSQL indisponible pour %s : %s", symbol, exc)
+        return [], []
+    finally:
+        moteur.dispose()
+
+
 async def _load_prices_from_db(symbol: str, days: int):
     """Load price history from PostgreSQL. Returns (dates, prices) or ([], [])."""
     try:
@@ -569,7 +608,7 @@ def get_cached_history(symbol: str, days: int = 90):
 
     # Final fallback: PostgreSQL persistent storage
     try:
-        dates, prices = run_async(_load_prices_from_db(symbol, days))
+        dates, prices = _charger_prix_depuis_db_sync(symbol, days)
         if dates and prices:
             logger.info("Loaded %d prices for %s from DB (Redis miss)", len(prices), symbol)
             return dates, prices

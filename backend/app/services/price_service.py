@@ -551,8 +551,30 @@ class PriceService:
 
         return results
 
+    #: Monnaies acceptées par le service de change (ISO 4217).
+    #:
+    #: `fee_currency` contient légitimement des symboles crypto — payer ses frais
+    #: en PAXG ou en OM est courant sur un exchange. Sans cette garde, chaque
+    #: transaction de ce genre déclenchait un appel à
+    #: `exchangerate-api.com/v4/latest/PAXG`, qui répond 404 : une requête
+    #: réseau perdue à chaque calcul, et un avertissement dans les journaux.
+    #:
+    #: Liste blanche plutôt que liste noire : une devise oubliée se rajoute ici,
+    #: alors qu'un symbole crypto oublié repartirait en appel inutile.
+    DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK", "PLN", "CZK"})
+
     async def get_forex_rate(self, from_currency: str, to_currency: str) -> Optional[Decimal]:
-        """Get exchange rate between two currencies."""
+        """Taux de change entre deux monnaies. `None` si l'un des codes n'en est pas une."""
+        for code in (from_currency, to_currency):
+            if code.upper() not in self.DEVISES_FIAT:
+                logger.debug(
+                    "Taux de change non demandé pour %s→%s : %s n'est pas une monnaie",
+                    from_currency,
+                    to_currency,
+                    code,
+                )
+                return None
+
         cache_key = f"forex:{from_currency}:{to_currency}"
         try:
             redis = await _get_redis_txt()
