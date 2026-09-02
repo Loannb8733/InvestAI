@@ -476,6 +476,19 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### FIN-07 — un écart rare, mais qui gonfle l'effort demandé
+
+`int(jours / 30,44)` se trompait d'un mois dans **3 % des échéances possibles** — 118 cas
+sur 3 621, mesurés d'un mois à dix ans.
+
+Ce chiffre divise le montant restant à rassembler : un mois de moins, c'est un effort
+mensuel plus élevé. Sur une échéance courte, deux mois au lieu de trois demandent **50 %
+de plus** que nécessaire — et c'est le nombre que l'utilisateur lit pour décider combien
+épargner.
+
+Note de méthode : mon premier commentaire disait « sous-estimait presque toujours ». La
+mesure a donné 3 %. Le commentaire porte maintenant le chiffre plutôt que l'impression.
+
 #### UX-02 — deux titres de niveau 1 par page
 
 Huit pages portaient un `<h1>` sans être des routes : elles ne sont montées que comme
@@ -827,7 +840,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|--------|-----------|--------|
 | ❌ **FIN-05** Corriger la docstring de signe `_xirr` *(déjà correct — vérifié 2026-09-01)* | F-08 | Refléter la convention réelle (négatif = sortie). | XS |
 | ❌ **FIN-06** Découpler les tirages Monte Carlo *(déjà fait — mesuré 2026-09-02)* | F-09 | Graine explicite et documentée : `seed` forcé pour les tests, horloge XOR user_id en production. | S |
-| **FIN-07** Mois restants via `relativedelta` | F-10 | Remplacer `delta/30.44` par mois calendaires exacts. | XS |
+| ✅ **FIN-07** Mois restants via `relativedelta` *(livré 2026-09-03)* | F-10 | L'approximation se trompait d'un mois dans **3 % des échéances** (118 cas sur 3 621). Rare mais jamais anodin : ce nombre divise le montant restant, donc un mois de moins demande un effort mensuel plus élevé — jusqu'à **+50 %** sur une échéance courte. | XS |
 | **FIN-08** `Decimal` pour montants advisory affichés | F-11 | Cashflows stress test / DCA affichés au centime en `Decimal`. | M |
 | **FIN-09** Appariement remboursement par date+montant | F-12 | Pondérer la réconciliation ; documenter l'arrondi « last installment ». | S |
 | **FIN-10** Centraliser conversion prix actions | F-13 | `price_service.get_price` renvoie toujours en devise demandée. | S |
@@ -837,7 +850,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | ❌ **ARC-12** Supprimer l'alias mort `fetchUser` *(infondé : utilisé par `VerifyEmailPage` — 2026-09-01)* | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
 | **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
 | **UX-09** `font-serif` sur h1 du Login | F-13(UX) | Cohérence de marque dès l'entrée. | XS |
-| **UX-10** Remplir le Header | F-14(UX) | Breadcrumb/titre courant + recherche globale (cmd-K déjà présent). | S |
+| ⚠️ **UX-10** Remplir le Header *(mesuré 2026-09-03)* | F-14(UX) | **Le cmd-K n'est PAS présent** : `cmdk` est installé mais ne sert qu'au sélecteur de plateforme, et aucun raccourci global n'existe. Une palette de recherche est un chantier entier (que cherche-t-on ? actifs, transactions, projets, pages ?), pas un ticket S. Quant au titre courant, l'ajouter créerait un **quatrième** titrage juste après la correction d'UX-02. **Demande un arbitrage produit, et de voir les écrans.** | S |
 | **UX-11** Crowdfunding Audit Lab : onglet ou route | F-17(UX) | Trancher l'asymétrie onglets vs route dédiée. | S |
 
 ---
