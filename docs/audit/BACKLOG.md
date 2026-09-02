@@ -328,17 +328,37 @@ marqueur et gardent le droit d'attendre — vérifié explicitement.
 Contenu identique, comparé au code d'origine par `git stash` : mêmes valeurs, mêmes 31
 points d'historique.
 
-**Trouvés en chemin, non corrigés** (mesurés, consignés) :
+#### NEW-16 — trois filets de sécurité qui ne fonctionnaient pas (2026-09-02)
 
-- `index_comparison` est **toujours absent** de la réponse — avant comme après, ce n'est
-  donc pas une régression, mais la comparaison aux indices ne s'affiche jamais ;
-- **PAXG est traité comme une devise** : appel à `exchangerate-api.com/v4/latest/PAXG`,
-  404 systématique. C'est un token or, pas une monnaie ;
-- `mantra-dao` : 404 sur CoinGecko, symbole mal mappé ;
-- `cryptocompare` répond **401** — clé absente ou invalide, chaque appel est perdu ;
-- `history_cache.get_cached_history` (version synchrone) appelle `run_async` depuis un
-  contexte déjà asynchrone : la coroutine n'est jamais attendue, l'exception est avalée,
-  et **le repli PostgreSQL de ce chemin ne fonctionne jamais**.
+Le profilage du dashboard a mis au jour une série cohérente : **des secours qui coûtent le
+prix d'un secours sans en rendre le service**.
+
+| Filet | Défaut | État |
+|---|---|---|
+| Repli PostgreSQL de `get_cached_history` | `run_async` appelé depuis une boucle déjà en cours → exception avalée, coroutine jamais attendue | ✅ corrigé |
+| Repli CryptoCompare | 401 systématique : aucune clé, aucun réglage pour en fournir une, en-tête jamais transmis | ✅ corrigé |
+| Taux de change pour `fee_currency` crypto | 65 transactions paient leurs frais en PAXG, OM, USDC… chacune déclenchait un `latest/PAXG` en 404 | ✅ corrigé |
+
+**Le repli PostgreSQL est le plus sérieux.** `get_cached_history` est synchrone et appelée
+par `snapshot_service`, `metrics_service` et `analytics_service` — tous dans une boucle
+d'événements. On ne démarre pas une boucle dans une boucle : le filet rendait `[], []` en
+silence. Mesuré : **91 prix depuis un script, 0 depuis un endpoint**. Il ne se déclenchait
+que là où on n'en avait pas besoin. Une lecture SQL synchrone supprime la question.
+
+**Pour les devises**, la garde est posée dans `get_forex_rate` elle-même, donc elle protège
+aussi les appelants futurs. Liste blanche et non liste noire : une monnaie oubliée se
+rajoute, un symbole crypto oublié repartirait en appel inutile.
+
+**Reste ouvert, mesuré :**
+
+- `index_comparison` est **toujours absent** de la réponse du dashboard — avant comme après
+  la correction de NEW-15, ce n'est donc pas une régression, mais la comparaison aux
+  indices ne s'affiche jamais ;
+- `coins/mantra-dao/market_chart` répond 404 quand `simple/price` répond 200 : CoinGecko a
+  retiré l'historique de ce coin. L'actif OM est soldé et le dashboard filtre déjà les
+  actifs à quantité nulle — **l'appel vient donc d'un autre chemin, non identifié**.
+  Changer le mapping serait hasardeux : les deux identifiants candidats donnent des prix
+  à un ordre de grandeur d'écart.
 
 #### Quatre faux positifs de mon propre audit
 
