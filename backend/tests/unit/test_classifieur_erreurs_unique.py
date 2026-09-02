@@ -44,19 +44,20 @@ class TestUneSeuleImplementation:
         assert tache_sync._classify_and_mark_error is classify_and_mark_error
         assert endpoints_cles._classify_and_mark_error is classify_and_mark_error
 
-    @pytest.mark.parametrize(
-        "chemin",
-        ["app/tasks/sync_exchanges.py", "app/api/v1/endpoints/api_keys.py"],
-    )
-    def test_aucune_copie_locale_ne_reapparait(self, chemin):
-        source = Path("/app", chemin).read_text(encoding="utf-8")
+    @pytest.mark.parametrize("module", [tache_sync, endpoints_cles])
+    def test_aucune_copie_locale_ne_reapparait(self, module):
+        # Le chemin vient du module importé, jamais d'un « /app » codé en dur :
+        # ce répertoire n'existe que dans le conteneur, et la CI tombait dessus
+        # en FileNotFoundError. C'est le piège de NEW-12, reproduit ici.
+        chemin = Path(module.__file__)
+        source = chemin.read_text(encoding="utf-8")
         definitions = [
             n.name
             for n in ast.walk(ast.parse(source))
             if isinstance(n, ast.FunctionDef) and "classify_and_mark_error" in n.name
         ]
         assert not definitions, (
-            f"{chemin} redéfinit le classifieur : les copies divergent en silence, "
+            f"{chemin.name} redéfinit le classifieur : les copies divergent en silence, "
             "et rien n'indique laquelle fait autorité"
         )
 
