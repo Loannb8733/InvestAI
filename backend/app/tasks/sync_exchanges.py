@@ -17,6 +17,7 @@ from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
+from app.services.exchange_error_classifier import classify_and_mark_error as _classify_and_mark_error
 from app.services.exchanges import get_exchange_service
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.fx_history_service import FxHistoryService
@@ -255,36 +256,6 @@ async def _heal_transaction_fx(
             row.conversion_rate = tx_rate
             changed = True
     return changed
-
-
-def _classify_and_mark_error(api_key: APIKey, exc: Exception) -> None:
-    """Classify an exchange error and update api_key status accordingly."""
-    import httpx
-
-    error_msg = str(exc)
-
-    # httpx HTTP errors (raise_for_status)
-    if isinstance(exc, httpx.HTTPStatusError):
-        code = exc.response.status_code
-        if code in (401, 403):
-            api_key.mark_auth_failure(error_msg)
-            logger.warning("API key %s: auth failure (%d), disabling", api_key.id, code)
-            return
-        if code == 429:
-            api_key.mark_rate_limited(error_msg)
-            logger.warning("API key %s: rate limited (429)", api_key.id)
-            return
-
-    # Kraken returns auth errors in JSON (not HTTP status)
-    lower_msg = error_msg.lower()
-    if "invalid key" in lower_msg or "invalid signature" in lower_msg or "permission denied" in lower_msg:
-        api_key.mark_auth_failure(error_msg)
-        logger.warning("API key %s: auth failure (json), disabling", api_key.id)
-        return
-
-    # Generic error
-    api_key.mark_error(error_msg)
-    logger.error("API key %s: sync error: %s", api_key.id, error_msg[:200])
 
 
 # Global price service instance (reused across sync operations)
