@@ -81,6 +81,11 @@ class TestAttenteBornee:
 
         Vérifié par canari : sans ce test, restaurer le backoff 10/20/30 laissait
         la suite au vert.
+
+        Le plafond porte désormais sur les **tâches de fond** seules — une requête
+        HTTP renonce sans attendre (voir `test_contexte_execution.py`). Il reste
+        nécessaire : hors requête, une API qui répondrait `Retry-After: 3600`
+        immobiliserait un worker une heure.
         """
         expression = self._affectation_de_wait()
         assert expression.startswith("min("), (
@@ -89,7 +94,7 @@ class TestAttenteBornee:
             "constante ne le laisse voir"
         )
         plafond = ast.literal_eval(expression.rsplit(",", 1)[1].rstrip(")").strip())
-        assert plafond <= 10, f"plafond de {plafond}s : trop long pour une requête HTTP"
+        assert plafond <= 60, f"plafond de {plafond}s : un worker resterait immobilisé trop longtemps"
 
     def test_retry_after_est_respecte(self):
         assert "Retry-After" in _SOURCE, (

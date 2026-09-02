@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 import numpy as np
 
+from app.core.contexte_execution import un_humain_attend
 from app.core.symbol_map import COINGECKO_SYMBOL_MAP
 
 logger = logging.getLogger(__name__)
@@ -93,16 +94,28 @@ class HistoricalDataFetcher:
                 if response.status_code == 200:
                     return response.json()
                 if response.status_code == 429:
-                    # Attente bornée : 10 s + 20 s + 30 s immobilisaient la
-                    # requête HTTP appelante une minute entière pour finir sans
-                    # donnée. `Retry-After` fait foi quand l'API le fournit,
-                    # sinon 2 s / 4 s / 6 s — plafonné à 10 s.
+                    # Qui attend décide de la conduite à tenir.
+                    #
+                    # Devant un écran, patienter n'a pas de sens : le cache et
+                    # PostgreSQL savent déjà répondre, et le `Retry-After` de
+                    # CoinGecko dépasse la dizaine de secondes. Le dashboard y
+                    # perdait 10 s par rendu.
+                    #
+                    # En tâche de fond, au contraire, attendre est la bonne
+                    # manière — personne n'est bloqué, et l'API le demande.
+                    if un_humain_attend():
+                        logger.info(
+                            "CoinGecko 429 pour %s — abandon immédiat (requête HTTP en cours)",
+                            symbol,
+                        )
+                        return None
+
                     entete = response.headers.get("Retry-After")
                     try:
                         indique = float(entete) if entete else None
                     except ValueError:
                         indique = None
-                    wait = min(indique if indique is not None else (2 if fast else (attempt + 1) * 2), 10)
+                    wait = min(indique if indique is not None else (2 if fast else (attempt + 1) * 2), 60)
                     logger.warning(
                         "CoinGecko 429 pour %s — nouvelle tentative %d/%d dans %.0f s",
                         symbol,
