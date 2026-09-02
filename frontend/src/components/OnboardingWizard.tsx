@@ -33,11 +33,14 @@ const steps = [
     content: (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
+          {/* Ce que l'application gère réellement. Les cartes annonçaient
+              Actions, ETF et Immobilier — aucun de ces parcours n'existe — et
+              passaient sous silence le Crowdfunding, qui lui existe. */}
           {[
-            { icon: Wallet, label: 'Crypto', desc: 'Bitcoin, Ethereum...' },
-            { icon: BarChart3, label: 'Actions', desc: 'Apple, Tesla...' },
-            { icon: PieChart, label: 'ETF', desc: 'S&P 500, MSCI World...' },
-            { icon: Shield, label: 'Immobilier', desc: 'SCPI, biens physiques' },
+            { icon: Wallet, label: 'Crypto', desc: 'Bitcoin, Ethereum, et vos cold wallets' },
+            { icon: PieChart, label: 'Crowdfunding', desc: 'Projets, échéanciers, coupons' },
+            { icon: BarChart3, label: 'Analyses IA', desc: 'Régimes de marché, signaux, risque' },
+            { icon: Shield, label: 'Fiscalité', desc: 'Déclaration 2086, plus-values' },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
               <item.icon className="h-5 w-5 text-primary shrink-0" />
@@ -49,7 +52,8 @@ const steps = [
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          InvestAI supporte tous ces types d'actifs dans un seul tableau de bord unifié.
+          Crypto et crowdfunding réunis dans un même tableau de bord, avec leur
+          fiscalité et leurs analyses.
         </p>
       </div>
     ),
@@ -63,7 +67,7 @@ const steps = [
         <ol className="space-y-3">
           {[
             'Allez dans Portfolio et cliquez "Nouveau portefeuille"',
-            'Donnez-lui un nom (ex: "Crypto", "Actions PEA")',
+            'Donnez-lui un nom (ex: "Crypto long terme", "Crowdfunding")',
             'Ajoutez vos actifs avec leur quantité et prix d\'achat',
             'Ajoutez vos transactions pour un suivi précis',
           ].map((step, i) => (
