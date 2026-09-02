@@ -22,6 +22,16 @@ class PriceService:
 
     COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
     CRYPTOCOMPARE_BASE_URL = "https://min-api.cryptocompare.com/data"
+
+    @staticmethod
+    def _entetes_cryptocompare() -> Dict[str, str]:
+        """En-tête d'authentification CryptoCompare.
+
+        Sans lui, une clé configurée resterait lettre morte : l'API attend
+        `authorization: Apikey <clé>` et répond 401 à toute requête anonyme.
+        """
+        return {"authorization": f"Apikey {settings.CRYPTOCOMPARE_API_KEY}"}
+
     YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
     # Cache TTL in seconds
@@ -298,6 +308,11 @@ class PriceService:
             logger.warning(f"CoinGecko failed for {symbol}: {e}, trying CryptoCompare...")
 
         # Fallback to CryptoCompare
+        if not settings.CRYPTOCOMPARE_API_KEY:
+            # L'API répond 401 sans clé : tenter l'appel, c'est payer une
+            # latence pour un échec certain. Ce repli n'a jamais fonctionné.
+            logger.debug("Repli CryptoCompare ignoré pour %s : aucune clé configurée", symbol)
+            return None
         try:
             response = await self.http_client.get(
                 f"{self.CRYPTOCOMPARE_BASE_URL}/pricemultifull",
@@ -305,6 +320,7 @@ class PriceService:
                     "fsyms": symbol.upper(),
                     "tsyms": currency.upper(),
                 },
+                headers=self._entetes_cryptocompare(),
             )
             response.raise_for_status()
             data = response.json()
@@ -414,14 +430,22 @@ class PriceService:
         return None
 
     async def _fetch_from_cryptocompare(self, symbols: List[str], currency: str = "EUR") -> Dict[str, Dict]:
-        """Fallback: Fetch prices from CryptoCompare API."""
-        results = {}
+        """Repli CryptoCompare. Sans clé configurée, l'appel n'est pas tenté.
+
+        L'API répond 401 à toute requête anonyme : le repli échouait donc
+        systématiquement, en consommant une latence à chaque tentative.
+        """
+        results: Dict[str, Dict] = {}
+        if not settings.CRYPTOCOMPARE_API_KEY:
+            logger.debug("Repli CryptoCompare ignoré : aucune clé configurée")
+            return results
         try:
             # CryptoCompare uses uppercase symbols directly
             symbols_str = ",".join([s.upper() for s in symbols])
 
             response = await self.http_client.get(
                 f"{self.CRYPTOCOMPARE_BASE_URL}/pricemultifull",
+                headers=self._entetes_cryptocompare(),
                 params={
                     "fsyms": symbols_str,
                     "tsyms": currency.upper(),
