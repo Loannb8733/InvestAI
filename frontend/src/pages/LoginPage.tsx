@@ -63,7 +63,9 @@ export default function LoginPage() {
     }
   }
 
-  const univers = ['Crypto', 'Actions', 'Crowdfunding', 'Prédictions']
+  // Ce que l'application gère réellement. « Actions » figurait ici comme dans
+  // le guide de démarrage : aucun parcours ne lui correspond (UX-03).
+  const univers = ['Crypto', 'Crowdfunding', 'Analyses IA', 'Fiscalité']
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-background">
@@ -82,14 +84,14 @@ export default function LoginPage() {
           {/* Narrative headline */}
           <div className="max-w-lg space-y-6">
             <div className="eyebrow text-primary">Votre patrimoine, une seule histoire</div>
-            <h1 className="text-5xl font-semibold leading-[1.08] tracking-tight">
+            <h1 className="text-5xl font-serif font-medium leading-[1.08] tracking-tight">
               Tout votre patrimoine,
               <br />
               <span className="gradient-text">lu d'un seul regard.</span>
             </h1>
             <p className="text-lg leading-relaxed text-muted-foreground">
-              Crypto, actions, crowdfunding et prédictions réunis dans un récit clair —
-              piloté par l'IA, sans le bruit.
+              Crypto et crowdfunding réunis dans un récit clair — analyses, fiscalité
+              et prédictions comprises, sans le bruit.
             </p>
 
             {/* Univers pills */}
