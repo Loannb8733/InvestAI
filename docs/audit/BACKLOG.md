@@ -79,8 +79,8 @@ UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent 
 mesurés de leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni
 écartés.
 
-**Ce qui n'a jamais été regardé** : UX-06, UX-07, UX-10, UX-11, ARC-04, ARC-06, ARC-08,
-ARC-10, ARC-13, FIN-06 à FIN-13. (**UX-02 est confirmé** par le cas « Wealth Journey ».)
+**Tout a été regardé.** Les 50 tickets ont désormais un verdict fondé sur le code, non
+sur le texte de l'audit. (**UX-02 est confirmé** par le cas « Wealth Journey ».)
 
 **L'angle mort a été levé** : l'app a été parcourue à l'écran le 2026-09-01 (voir
 « VERIF-01 — ce que le rendu a appris »). Trois défauts vivaient dans l'interface pendant
@@ -475,6 +475,34 @@ groupé explicite par un chargement implicite plus coûteux.
 Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écrites à
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
+
+#### Les neuf derniers tickets — mesurés le 2026-09-02
+
+**Le backlog est désormais intégralement mesuré.** Sur ces neuf, deux méritaient une
+correction.
+
+| Ticket | Mesuré | Verdict |
+|---|---|---|
+| **ARC-04** | deux copies du classifieur d'erreurs, **déjà divergentes** : celle des endpoints avait perdu son `logger.error` | ✅ **réel, corrigé** |
+| **UX-07** | 4 sous-points : breadcrumb cliquable ✅ fait, onglet Rapports synchronisé ✅ fait, raccourci « Signaux Alpha » introuvable, **fil d'Ariane Crowdfunding figé** | 🟢 **1 sur 4, corrigé** |
+| **UX-10** | le Header ne contient que menu, notifications, thème et déconnexion — ni titre courant, ni recherche | ✅ réel |
+| **UX-11** | Audit Lab est une route dédiée quand le reste du Crowdfunding est en onglets | ✅ réel, mais c'est un **choix produit** |
+| **ARC-13** | `^` sur react-query, axios, zod, react | ⚠️ réel, **discutable** : le lockfile fixe déjà les versions installées |
+| **ARC-10** | `@nivo` dans **23 fichiers**, `lightweight-charts` dans **3** | ⚠️ **aucune librairie à retirer** — les deux servent, à des usages différents |
+| **ARC-06** | `report_service` fait **697 lignes**, pas 2 744 | ⚠️ réel mais **les chiffres de l'audit sont faux** (divisé par 4 depuis) |
+| **UX-06** | IntelligencePage a **4 onglets**, pas 6 | ❌ **déjà fait** — refonte de juillet |
+| **ARC-08** | aucune méthode commune : `insights_service` traite frais, fiscalité et revenus passifs ; `smart_insights_service` traite santé, rééquilibrage et régime de marché | ❌ **infondé** |
+
+**ARC-04 est le plus instructif du lot.** Le ticket signalait une fonction « dupliquée à
+l'identique ». Elle ne l'était déjà plus : la copie des endpoints avait perdu son
+`logger.error` final, si bien qu'une erreur générique n'y laissait **aucune trace** là où
+la tâche la journalisait. L'écart portait précisément sur la capacité à diagnostiquer un
+incident — c'est le défaut habituel de la duplication, invisible tant que les copies se
+ressemblent.
+
+**ARC-08 illustre l'inverse.** Deux services aux noms voisins ne sont pas deux systèmes
+parallèles. Le grief réel serait le nommage — « insights » et « smart insights » ne disent
+pas ce qui les sépare — pas la duplication.
 
 #### FIN-06 à FIN-13 — mesurés le 2026-09-02
 
