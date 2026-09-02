@@ -15,7 +15,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import cache_history, get_cached_history
+from app.core.redis_client import get_cached_history
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeResult, _rsi
@@ -24,6 +24,7 @@ from app.models.portfolio import Portfolio
 from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_types import _HISTORY_DAYS
+from app.services.price_history_store import prix_locaux
 
 # Temps maximal accordé aux données externes dans le chemin d'une requête HTTP.
 # Au-delà, mieux vaut une analyse partielle qu'un écran figé (NEW-13).
@@ -59,22 +60,15 @@ class PredictionCyclesMixin:
                 btc_prices = btc_hist["prices"]
                 break
         if not btc_prices:
-            # Borné comme le reste : un quota épuisé faisait patienter ici avant
-            # même d'atteindre le budget des prefetch, et les deux s'ajoutaient.
-            try:
-                btc_dates, btc_prices = await asyncio.wait_for(
-                    self.data_fetcher.get_crypto_history("BTC", days=_HISTORY_DAYS),
-                    timeout=budget_restant(),
-                )
-            except (asyncio.TimeoutError, TimeoutError):
-                logger.warning("Historique BTC : budget dépassé, analyse rendue sans référence fraîche")
-                btc_dates, btc_prices = None, None
-            if btc_dates and btc_prices:
-                await cache_history(
-                    "BTC",
-                    "crypto",
-                    _HISTORY_DAYS,
-                    {"dates": [d.isoformat() for d in btc_dates], "prices": btc_prices},
+            # Sources locales uniquement (Redis puis PostgreSQL). Le réseau est
+            # le travail de `tasks.history_cache`, qui passe toutes les 30
+            # minutes : l'appeler ici exposait la requête HTTP au quota d'une
+            # API tierce, jusqu'à 65 s d'attente (NEW-13).
+            btc_prices = await prix_locaux("BTC", "crypto", _HISTORY_DAYS)
+            if not btc_prices:
+                logger.warning(
+                    "Historique BTC absent des sources locales — analyse rendue sans "
+                    "référence de marché ; la tâche de pré-chargement a-t-elle tourné ?"
                 )
 
         # Fear & Greed — enrichissement optionnel, jamais bloquant.
@@ -192,22 +186,11 @@ class PredictionCyclesMixin:
                     if cached and cached.get("prices"):
                         p = cached["prices"]
                         return (sym, p[-90:] if len(p) > 90 else p)
-                try:
-                    a_dates, a_prices = await self.data_fetcher.get_history(sym, atype, days=90)
-                    if a_dates and a_prices:
-                        await cache_history(
-                            sym,
-                            atype,
-                            90,
-                            {
-                                "dates": [d.isoformat() for d in a_dates],
-                                "prices": a_prices,
-                            },
-                        )
-                        return (sym, a_prices)
-                except Exception:
-                    logger.warning("Failed to fetch history for %s, skipping", sym)
-                return (sym, [])
+                # Idem : sources locales seulement. Un symbole que la tâche
+                # n'a pas encore vu est simplement absent de l'analyse, ce qui
+                # coûte moins cher qu'une minute d'attente pour tout le monde.
+                locaux = await prix_locaux(sym, atype, 90)
+                return (sym, locaux or [])
 
             async def _prefetch_price(a: object) -> tuple:
                 """Return (symbol, price)."""
