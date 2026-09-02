@@ -476,6 +476,18 @@ Ce qui reste vrai dans le ticket : le code est verbeux, les jointures sont écri
 la main. C'est un sujet de confort, pas de performance — et il ne justifie pas la
 priorité 🟠 ni le risque du correctif proposé.
 
+#### FIN-09 — un mauvais rapprochement ne se voit pas
+
+Deux échéances proches dans le calendrier se départageaient sur quelques jours, alors que
+leurs montants les distinguent franchement. Et l'erreur est silencieuse : l'échéance est
+marquée soldée, le tableau de bord affiche un remboursement de plus, et rien ne cloche
+avant la fin du prêt — quand une échéance reste ouverte sans raison.
+
+**Note de méthode** : mes premiers tests rejouaient la logique de rapprochement dans une
+copie locale. Ils seraient restés verts si le service avait changé. Le score est devenu une
+méthode publique pour qu'ils éprouvent l'implémentation utilisée en production — c'est le
+même travers que les tests « qui ne vérifient rien » relevés au début de la mission.
+
 #### UX-09 — et une promesse fausse sur le premier écran
 
 Le titre du Login était le seul de l'application hors serif. Sa page jumelle, `Register`,
@@ -856,7 +868,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | ❌ **FIN-06** Découpler les tirages Monte Carlo *(déjà fait — mesuré 2026-09-02)* | F-09 | Graine explicite et documentée : `seed` forcé pour les tests, horloge XOR user_id en production. | S |
 | ✅ **FIN-07** Mois restants via `relativedelta` *(livré 2026-09-03)* | F-10 | L'approximation se trompait d'un mois dans **3 % des échéances** (118 cas sur 3 621). Rare mais jamais anodin : ce nombre divise le montant restant, donc un mois de moins demande un effort mensuel plus élevé — jusqu'à **+50 %** sur une échéance courte. | XS |
 | **FIN-08** `Decimal` pour montants advisory affichés | F-11 | Cashflows stress test / DCA affichés au centime en `Decimal`. | M |
-| **FIN-09** Appariement remboursement par date+montant | F-12 | Pondérer la réconciliation ; documenter l'arrondi « last installment ». | S |
+| ✅ **FIN-09** Appariement remboursement par date+montant *(livré 2026-09-03)* | F-12 | Le montant devient le premier critère quand il est connu ; sinon la date, comme avant. Tolérance de 1 % pour l'arrondi de la dernière échéance et les frais de virement. Aucune exposition actuelle (59 échéances, aucune paire à moins de 15 jours) mais le piège s'arme dès qu'un projet a des versements rapprochés. | S |
 | **FIN-10** Centraliser conversion prix actions | F-13 | `price_service.get_price` renvoie toujours en devise demandée. | S |
 | ❌ **FIN-11** Logguer le clamp XIRR *(déjà fait — mesuré 2026-09-02)* | F-14 | Le `logger.warning` est en place, avec le finding F-14 cité en commentaire. | XS |
 | **FIN-12** Hash dédup avec heure | F-15 | Inclure l'heure / `external_id` pour ne pas fusionner 2 DCA identiques le même jour. | S |
