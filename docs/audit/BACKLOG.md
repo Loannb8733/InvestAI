@@ -123,6 +123,8 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 
 | **NEW-17** | 🟠 | **Le serveur de développement servait deux copies de React.** Les pages sont montées en `React.lazy` : une dépendance absente d'`optimizeDeps.include` n'était découverte qu'à la première visite de la page qui l'importe. Vite l'optimisait alors à la volée, sous un nouveau hash de cache, et la servait avec sa propre instance de React — `useContext` lisait `null`, la page tombait dans l'ErrorBoundary sur « Invalid hook call ». Après un démarrage à froid, /login et le dashboard s'affichaient ; la première ouverture de **/portfolio** tirait `@radix-ui/react-tabs` et cassait tout. Vider `node_modules/.vite` ne réglait rien : le défaut revenait à la page neuve suivante. `dedupe` ne protège pas — il résout les doublons du graphe de modules, pas ceux d'une seconde passe d'optimisation. → 37 spécificateurs pré-bundlés, **dérivés des imports réels du code**, sous-chemins compris (`zustand/middleware`, `@hookform/resolvers/zod`). N'affecte que le dev. | ✅ corrigé |
 
+| **NEW-18** | 🟡 | **Deux entrées du rail marquées « page courante ».** React Router allume un `NavLink` par correspondance de préfixe, et `end` n'était posé que sur la racine : sur `/crowdfunding/audit-lab`, « Mes Projets » (`/crowdfunding`) s'allumait en même temps qu'« Audit Lab ». Mesuré dans le navigateur : **4 éléments** avec `aria-current="page"` — deux libellés, chacun rendu deux fois (barre fixe + tiroir mobile). La spécification n'en admet qu'un ; un lecteur d'écran annonçait deux destinations comme étant la page courante. → Règle **calculée** : une entrée passe en `end` dès qu'une autre entrée du rail vit sous son chemin ; celles sans descendance gardent l'activation par préfixe pour leurs sous-routes non listées. **Trouvé en regardant une capture d'écran**, pas en lisant le code. | ✅ corrigé |
+
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
@@ -600,7 +602,7 @@ correction.
 | **ARC-04** | deux copies du classifieur d'erreurs, **déjà divergentes** : celle des endpoints avait perdu son `logger.error` | ✅ **réel, corrigé** |
 | **UX-07** | 4 sous-points : breadcrumb cliquable ✅ fait, onglet Rapports synchronisé ✅ fait, raccourci « Signaux Alpha » introuvable, **fil d'Ariane Crowdfunding figé** | 🟢 **1 sur 4, corrigé** |
 | **UX-10** | le Header ne contient que menu, notifications, thème et déconnexion — ni titre courant, ni recherche | ✅ réel |
-| **UX-11** | Audit Lab est une route dédiée quand le reste du Crowdfunding est en onglets | ✅ réel, mais c'est un **choix produit** |
+| **UX-11** | Audit Lab est une route dédiée quand le reste du Crowdfunding est en onglets | ✅ **tranché et livré le 2026-09-05** : la route reste — les onglets montrent ce qu'on possède, l'Audit Lab évalue un projet qu'on ne possède pas encore. Le défaut réel était le repère absent (pas de fil d'Ariane), pas l'asymétrie. |
 | **ARC-13** | `^` sur react-query, axios, zod, react | ⚠️ réel, **discutable** : le lockfile fixe déjà les versions installées |
 | **ARC-10** | `@nivo` dans **23 fichiers**, `lightweight-charts` dans **3** | ⚠️ **aucune librairie à retirer** — les deux servent, à des usages différents |
 | **ARC-06** | `report_service` fait **697 lignes**, pas 2 744 | ⚠️ réel mais **les chiffres de l'audit sont faux** (divisé par 4 depuis) |
@@ -922,7 +924,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
 | ✅ **UX-09** `font-serif` sur h1 du Login *(livré 2026-09-03)* | F-13(UX) | Le Login était le **seul** titre de l'application hors serif — sa page jumelle Register l'était déjà au même endroit. Corrigé, **et la page annonçait « Actions »** dans ses pastilles comme dans son accroche : même promesse sans parcours qu'UX-03, sur le premier écran vu. | XS |
 | ⚠️ **UX-10** Remplir le Header *(mesuré 2026-09-03)* | F-14(UX) | **Le cmd-K n'est PAS présent** : `cmdk` est installé mais ne sert qu'au sélecteur de plateforme, et aucun raccourci global n'existe. Une palette de recherche est un chantier entier (que cherche-t-on ? actifs, transactions, projets, pages ?), pas un ticket S. Quant au titre courant, l'ajouter créerait un **quatrième** titrage juste après la correction d'UX-02. **Demande un arbitrage produit, et de voir les écrans.** | S |
-| **UX-11** Crowdfunding Audit Lab : onglet ou route | F-17(UX) | Trancher l'asymétrie onglets vs route dédiée. | S |
+| ✅ **UX-11** Crowdfunding Audit Lab : onglet ou route *(livré 2026-09-05)* | F-17(UX) | **La route dédiée est conservée** : deux tâches distinctes — les trois onglets montrent le portefeuille existant, l'Audit Lab analyse un DECK/FICI avant d'investir. L'asymétrie n'était pas le défaut. Le défaut : `/crowdfunding` porte un fil d'Ariane depuis UX-02, l'Audit Lab n'en avait aucun — rien n'y disait d'où l'on venait, alors que le rail les présente comme deux entrées sœurs. | S |
 
 ---
 
