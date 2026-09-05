@@ -2,6 +2,7 @@ import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from
 import { Outlet, useLocation } from 'react-router-dom'
 import NavRail from './NavRail'
 import Header from './Header'
+import { FilDArianeProvider } from './FilDArianeProvider'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
@@ -63,6 +64,9 @@ export default function Layout() {
   }, [])
 
   return (
+    // Le fil d'Ariane est fourni ici pour que le Header l'affiche et que les
+    // pages à onglets puissent le surcharger depuis l'`Outlet`.
+    <FilDArianeProvider>
     <div className="flex h-screen bg-background">
       {/* WCAG 2.4.1 — let keyboard / screen-reader users bypass the nav rail
           and header, which take ~15 tab stops before the actual content. */}
@@ -82,5 +86,6 @@ export default function Layout() {
         </main>
       </div>
     </div>
+    </FilDArianeProvider>
   )
 }

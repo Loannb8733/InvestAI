@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useFilDAriane } from '@/components/layout/fil-ariane'
 import { Target, Calculator, Loader2 } from 'lucide-react'
-import Breadcrumb from '@/components/layout/Breadcrumb'
 import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
 const GoalsPage = lazyWithRetry(() => import('@/pages/GoalsPage'))
@@ -30,6 +30,8 @@ export default function StrategyPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') || 'goals'
 
+  useFilDAriane([{ label: 'Outils' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }])
+
   const handleTabChange = (value: string) => {
     setSearchParams(value === 'goals' ? {} : { tab: value }, { replace: true })
   }
@@ -39,8 +41,6 @@ export default function StrategyPage() {
       {/* « <groupe de menu> › <page> », comme les autres pages. L'ancien premier
           niveau « Stratégie » ne correspondait à aucun groupe ni à aucune page
           (UX-05), et le répéter donnerait « Objectifs › Objectifs ». */}
-      <Breadcrumb items={[{ label: 'Outils' }, { label: TAB_LABELS[activeTab] || 'Objectifs' }]} />
-
       {/* Le titre de la page vit ici, pas dans les onglets : ceux-ci sont
           des sections. Masqué à l'œil — le fil d'Ariane et les onglets le
           disent déjà — mais présent pour l'arbre d'accessibilité (UX-02). */}

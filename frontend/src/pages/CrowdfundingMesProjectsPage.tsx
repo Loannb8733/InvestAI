@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useFilDAriane } from '@/components/layout/fil-ariane'
 import { LayoutDashboard, FolderOpen, BarChart3, Loader2 } from 'lucide-react'
-import Breadcrumb from '@/components/layout/Breadcrumb'
 import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
 const CrowdfundingDashboardPage = lazyWithRetry(() => import('@/pages/CrowdfundingDashboardPage'))
@@ -27,21 +27,20 @@ export default function CrowdfundingMesProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') || 'dashboard'
 
+  // Le fil suivait « Mes Projets » quel que soit l'onglet ouvert : il annonçait
+  // une page où l'on n'était pas. Il est désormais rendu par le Header, mais
+  // c'est toujours ici que le libellé de l'onglet est connu.
+  useFilDAriane([
+    { label: 'Crowdfunding' },
+    { label: TABS.find((t) => t.value === activeTab)?.label ?? "Vue d'ensemble" },
+  ])
+
   const handleTabChange = (value: string) => {
     setSearchParams(value === 'dashboard' ? {} : { tab: value }, { replace: true })
   }
 
   return (
     <div className="space-y-6">
-      {/* Le second niveau suivait « Mes Projets » quel que soit l'onglet ouvert :
-          le fil d'Ariane annonçait donc une page où l'on n'était pas. */}
-      <Breadcrumb
-        items={[
-          { label: 'Crowdfunding' },
-          { label: TABS.find((t) => t.value === activeTab)?.label ?? 'Vue d\'ensemble' },
-        ]}
-      />
-
       {/* Le titre de la page vit ici, pas dans les onglets : ceux-ci sont
           des sections. Masqué à l'œil — le fil d'Ariane et les onglets le
           disent déjà — mais présent pour l'arbre d'accessibilité (UX-02). */}

@@ -4,7 +4,6 @@ import { useDropzone } from 'react-dropzone'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { Badge } from '@/components/ui/badge'
-import Breadcrumb from '@/components/layout/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { crowdfundingApi } from '@/services/api'
@@ -448,20 +447,6 @@ export default function CrowdfundingAuditLabPage() {
 
   return (
     <div className="space-y-6">
-      {/* Même repère que /crowdfunding, qui porte le sien depuis UX-02.
-          L'Audit Lab est une route à part — et c'est justifié : les trois
-          onglets de /crowdfunding montrent ce qu'on possède, l'Audit Lab
-          évalue un projet qu'on ne possède pas encore. Mais rien n'y disait
-          d'où l'on venait, ni ne ramenait au reste du Crowdfunding.
-          « Crowdfunding » est ici un lien, contrairement à /crowdfunding où
-          l'on s'y trouve déjà. */}
-      <Breadcrumb
-        items={[
-          { label: 'Crowdfunding', path: '/crowdfunding' },
-          { label: 'Audit Lab' },
-        ]}
-      />
-
       {/* Header */}
       <div>
         <h1 className="text-3xl font-serif font-medium flex items-center gap-2">
