@@ -82,9 +82,9 @@ devrait être engagé sans mesure préalable.
 | **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
 | **Total** | **32/50** | 18 | 6 | 18 |
 
-UX-03 et UX-08 (mesurés réels, non traités) et UX-09 (polish réel) comptent dans les
-mesurés de leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni
-écartés.
+UX-03 (mesuré réel, non traité) et UX-09 (polish réel) comptent dans les mesurés de
+leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni écartés. UX-08
+a rejoint les livrés le 2026-09-05.
 
 **Tout a été regardé.** Les 50 tickets ont désormais un verdict fondé sur le code, non
 sur le texte de l'audit. (**UX-02 est confirmé** par le cas « Wealth Journey ».)
@@ -120,6 +120,8 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 | **NEW-14** | 🟡 | **`update_all_prices` cassait sur « Task attached to a different loop »** : elle appelait en direct trois tâches faisant chacune leur `run_async`, alors que l'engine async garde ses connexions liées à la première boucle. Défaut latent (la tâche n'est pas planifiée). **Un second bug se cachait derrière** : une fois la boucle unifiée, `price_service.get_exchange_rate(...)` s'est révélé ne jamais avoir existé — la méthode s'appelle `get_forex_rate`. L'`AttributeError` était rattrapée par le `except` voisin : la tâche rapportait « 0 mis à jour » sans rien tenter. Changes : **0 → 6**. | ✅ corrigé |
 | **NEW-13** | 🔴 | **Deux causes, toutes deux invisibles en lecture rapide.** (1) `Semaphore(5)` annulait l'espacement des appels CoinGecko ; (2) la tâche Celery qui pré-charge l'historique écrivait dans des clés que personne ne lisait. **`/predictions/market-cycle` répondait en 65 s à 92 s**, le bandeau de régime restant en squelette pendant tout ce temps. **Ma première explication était fausse** : ni le nombre d'actifs (7, pas 56), ni l'absence de parallélisme (`asyncio.gather` était déjà en place). La cause : `Semaphore(5)` laissait 5 coroutines entrer ensemble dans la section critique, lire le même horodatage et repartir à la même milliseconde — le délai de 1,2 s retardait une rafale sans jamais l'espacer. D'où les 429, puis 10 s + 20 s + 30 s de backoff par symbole, pour finir sans donnée. | ✅ **corrigé** — `Lock`, backoff plafonné, budget de temps partagé, et lecture réconciliée avec le cache Celery |
 | **NEW-12** | 🟠 | **Le garde-fou des scripts dangereux ne protégeait pas dans un environnement dégradé.** `require_consent()` était appelé en fin de fichier, donc après `from app.core.database import …`. Or ces scripts font `sys.path.insert(0, "/app")` — le chemin du conteneur. Hors conteneur, l'import échouait sur `ModuleNotFoundError` avant que le garde soit atteint : sortie en code 1, mais sans message et pour la mauvaise raison. **La CI était rouge depuis 6 exécutions** pour cette raison. → Refus remonté au-dessus de tout import applicatif (stdlib seule) + second `sys.path.insert` portable. | ✅ corrigé, CI verte |
+
+| **NEW-17** | 🟠 | **Le serveur de développement servait deux copies de React.** Les pages sont montées en `React.lazy` : une dépendance absente d'`optimizeDeps.include` n'était découverte qu'à la première visite de la page qui l'importe. Vite l'optimisait alors à la volée, sous un nouveau hash de cache, et la servait avec sa propre instance de React — `useContext` lisait `null`, la page tombait dans l'ErrorBoundary sur « Invalid hook call ». Après un démarrage à froid, /login et le dashboard s'affichaient ; la première ouverture de **/portfolio** tirait `@radix-ui/react-tabs` et cassait tout. Vider `node_modules/.vite` ne réglait rien : le défaut revenait à la page neuve suivante. `dedupe` ne protège pas — il résout les doublons du graphe de modules, pas ceux d'une seconde passe d'optimisation. → 37 spécificateurs pré-bundlés, **dérivés des imports réels du code**, sous-chemins compris (`zustand/middleware`, `@hookform/resolvers/zod`). N'affecte que le dev. | ✅ corrigé |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
@@ -732,7 +734,7 @@ version (incompatibilité passlib / bcrypt ≥ 4.1) n'existe pas ici. Rounds à 
 | Ticket | Mesuré | Verdict |
 |---|---|---|
 | UX-04 | **6 pages sur 32** gèrent un état d'erreur | ✅ réel, le plus large |
-| UX-08 | 48 fichiers à spinner contre 19 à skeleton | ✅ réel |
+| UX-08 | 48 fichiers à spinner contre 19 à skeleton | ✅ **réel, corrigé le 2026-09-05** — mais pas pour la raison annoncée. **8 pages** en spinner plein écran, pas 29 ; **CLS mesuré à 0**, donc aucun saut de mise en page. Le vrai défaut : **0 des 95 spinners** du front n'a de libellé accessible, et 3 pages perdaient leur `<h1>` pendant le chargement. |
 | UX-05 | « Objectifs » → `/strategy` et « Stratégies » → `/strategies` cohabitent toujours | ✅ réel |
 
 **Ce que la mesure de bout en bout donne** : sur **27 tickets vérifiés** (sur 50), **11
@@ -861,7 +863,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | ✅ **UX-05** Taxonomie Stratégie/Stratégies/Objectifs *(livré 2026-09-01)* | ~~P2~~ | ~~🟠~~ | F-05(UX) | routes + `ReportsPage` RebalancingTab | 3 emplacements, noms quasi identiques (`strategy` vs `strategies`). → « Objectifs » (`/goals`) + « Stratégies de rebalancing » (route unique) ; supprimer/relier le doublon RebalancingTab. | ✅ `/goals` sert la page, `/strategy` devient l'alias (l'inverse d'avant) ; `/strategies` vise directement `?tab=decisions` ; l'entrée de menu est renommée **« Décisions »**, d'après sa destination réelle ; breadcrumb aligné sur la convention (« Outils › Objectifs »). **RebalancingTab non touché** : moteur distinct de celui du pilier Risque (classes crypto vs MPT), sa fusion relève d'ARC-08/UX-06. | M |
 | **UX-06** Consolidation onglet Intelligence | P2 | 🟠 | F-05, tableau redondance | `IntelligencePage` (6 onglets) | Insights/Smart Insights/Analyses quasi-synonymes ; Stratégies mal classée sous « Analyses IA ». → Regrouper les 3 insights ; sortir Stratégies. | ≤ 4 onglets cohérents ; labels métier explicites (« Signaux Alpha » vs « Diagnostic portefeuille »). | M |
 | **UX-07** Corrections de navigation diverses | P2 | 🟡 | F-07,F-08,F-10,F-11,F-12(UX) | `MasterDashboardPage:578`, `Breadcrumb.tsx`, `CrowdfundingMesProjectsPage:36`, `ReportsPage:315` | Raccourci « Signaux Alpha » → mauvais onglet ; breadcrumb non cliquable ; breadcrumb crowdfunding figé ; onglet Rapports non synchronisé à l'URL ; dashboards jumeaux. → Lot de corrections ciblées. | Chaque sous-point vérifié individuellement (deep-link onglet, breadcrumb cliquable, cible raccourci correcte). | M |
-| **UX-08** Skeletons vs spinners | P2 | 🟡 | F-09(UX) | 29 pages en `Loader2` plein écran | Saut de mise en page + perception de lenteur. → Skeletons sur les écrans à structure connue (tables, KPI rows). | Pages à structure fixe en skeleton ; pas de layout shift mesuré. | M |
+| ✅ **UX-08** Skeletons vs spinners *(livré 2026-09-05)* | P2 | 🟡 | F-09(UX) | **8** pages en `Loader2` plein écran (pas 29) | Le saut de mise en page annoncé **n'existe pas** (CLS 0). Défauts réels mesurés : **0/95 spinners** avec libellé accessible — page muette pour un lecteur d'écran (WCAG 4.1.3) ; 3 pages perdant leur `<h1>` ; ~1 s d'attente en production (latence mesurée 0,48–0,95 s). → `PageSkeleton` : titre conservé, `role="status" aria-live`, `aria-busy`, espace à la forme du contenu. | Titre présent et attente annoncée pendant le chargement des 8 pages. | M |
 
 ---
 
