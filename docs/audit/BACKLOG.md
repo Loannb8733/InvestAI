@@ -49,6 +49,13 @@ Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se r
    réponse, ni une incohérence de vocabulaire. **Regarder l'app est une étape
    distincte, pas une redondance.**
 
+6. **Un correctif n'est livré que sur tous ses points d'appel.** FIN-07 a été corrigé le
+   2026-09-03 dans `goal_projection_service`, ticket clos. Le 2026-09-05, `endpoints/goals.py`
+   calculait toujours le **même chiffre** avec l'ancienne formule — et l'affichait sous le
+   même libellé. Deux écrans, deux résultats, sur 99,5 % des échéances. Avant de clore un
+   ticket de calcul : chercher le concept, pas le fichier. Ici, un `grep 30.44` de dix
+   secondes aurait suffi.
+
 Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
 vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
 Tout test de non-régression doit être validé par un canari : casser volontairement le code
@@ -515,6 +522,42 @@ de plus** que nécessaire — et c'est le nombre que l'utilisateur lit pour déc
 Note de méthode : mon premier commentaire disait « sous-estimait presque toujours ». La
 mesure a donné 3 %. Le commentaire porte maintenant le chiffre plutôt que l'impression.
 
+**Suite, le 2026-09-05 — le correctif n'avait couvert qu'un des deux points d'appel.**
+`endpoints/goals.py` calculait encore les mois restants en `jours / 30,44` pour produire
+le **même chiffre**, affiché sous le même libellé (« X €/mois nécessaire »). Deux écrans,
+deux méthodes, un seul nombre aux yeux de l'utilisateur.
+
+Mesure sur 3 652 échéances : les deux chemins divergent dans **99,5 % des cas**. L'écart
+médian reste sous 1 %, mais il devient absurde à l'approche du terme, où le diviseur passe
+sous l'unité — à un jour de l'échéance, 0,03 mois transformait 10 000 € restants en
+« **304 400 €/mois nécessaire** ». Le `min(..., 9 999 999.99)` déjà présent dans le code
+était l'aveu du problème : il n'existe que pour empêcher le nombre de partir à l'infini.
+
+Le plancher à un mois calendaire dit la seule chose vraie dans ce cas : il reste ce montant
+à trouver, et il reste ce mois-ci pour le faire.
+
+Les deux `/30.44` restants (`crowdfunding.py:187` et `551`) ont été mesurés et laissés en
+place : ce sont des usages **proportionnels** — une barre de progression, et un prorata
+d'intérêts courus comparé avec 90 % de tolérance. L'écart y vaut 0,077 % (365,28 contre
+365 jours). La distinction est ce qui compte : le défaut n'était pas l'approximation, mais
+le fait qu'elle **divise un montant affiché**.
+
+#### FIN-08 — un piège armé qu'aucune donnée ne déclenche
+
+Le ticket demandait de passer les montants advisory en `Decimal`. Mesure sur les données
+réelles : **0 divergence sur 948 calculs** — 54 positions (valeur et montant investi) et
+840 transactions, `float` contre `Decimal` arrondi au centime.
+
+Le piège existe pourtant. Sur 200 000 montants tombant **pile sur un demi-centime**,
+`round()` de Python diverge dans **50 % des cas** : il arrondit à l'entier pair, pas au
+supérieur. Mais aucune donnée réelle n'atteint ce cas — les échéanciers sont stockés en
+`Numeric(12,2)`, donc déjà au centime, et un produit quantité × prix ne tombe jamais pile
+sur `X,XX5`. Le backtest DCA, lui, ne manipule que des montants simulés.
+
+Verdict : réel, sans exposition. La réécriture en `Decimal` (effort M) corrigerait un
+défaut que rien ne déclenche. Ce qui a réellement été trouvé en cherchant, c'est le
+résidu de FIN-07 ci-dessus — un vrai bug d'affichage, à côté du ticket.
+
 #### UX-02 — deux titres de niveau 1 par page
 
 Huit pages portaient un `<h1>` sans être des routes : elles ne sont montées que comme
@@ -583,8 +626,8 @@ correction.**
 | **FIN-13** | `WAVES → AVES`, `WAXP → AXP`, `WEMIX → EMIX`, `WING → ING` : la règle retirait un « W » initial dès 4 caractères | ✅ **réel, corrigé** |
 | **FIN-09** | l'appariement des remboursements se fait par distance de date seule, sans le montant | ✅ réel — **aucune exposition** : 59 échéances mensuelles, aucune paire à moins de 15 jours |
 | **FIN-10** | `get_stock_price` rend le prix dans sa devise de cotation ; les appelants convertissent eux-mêmes | ✅ réel — **aucune exposition** : 0 action détenue |
-| **FIN-07** | `int(delta / 30.44)` dans les projections d'objectifs | ✅ réel, impact marginal |
-| **FIN-08** | montants advisory en `float` | ⚠️ à préciser, polish |
+| **FIN-07** | `int(delta / 30.44)` dans les projections d'objectifs | ✅ réel — **corrigé en deux fois** : le service le 2026-09-03, l'endpoint `/goals` le 2026-09-05. Le premier correctif avait laissé le second point d'appel. |
+| **FIN-08** | montants advisory en `float` | ✅ réel mais **aucune exposition** : 0 divergence sur 948 calculs réels (54 positions × 2, 840 transactions). Le piège n'est armé que sur un demi-centime exact, où `round()` de Python arrondit à l'entier **pair** et perd un centime une fois sur deux — cas qu'aucune donnée réelle n'atteint. Les échéanciers sont en `Numeric(12,2)`, le backtest DCA est simulé. |
 | **FIN-12** | le hash de déduplication ignore l'heure | ⚠️ **arbitrage documenté, pas un bug** |
 | **FIN-06** | graine Monte Carlo | ❌ **déjà fait** — graine explicite, commentée |
 | **FIN-11** | clamp XIRR silencieux | ❌ **déjà fait** — `logger.warning` avec le finding cité |
@@ -866,8 +909,8 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|--------|-----------|--------|
 | ❌ **FIN-05** Corriger la docstring de signe `_xirr` *(déjà correct — vérifié 2026-09-01)* | F-08 | Refléter la convention réelle (négatif = sortie). | XS |
 | ❌ **FIN-06** Découpler les tirages Monte Carlo *(déjà fait — mesuré 2026-09-02)* | F-09 | Graine explicite et documentée : `seed` forcé pour les tests, horloge XOR user_id en production. | S |
-| ✅ **FIN-07** Mois restants via `relativedelta` *(livré 2026-09-03)* | F-10 | L'approximation se trompait d'un mois dans **3 % des échéances** (118 cas sur 3 621). Rare mais jamais anodin : ce nombre divise le montant restant, donc un mois de moins demande un effort mensuel plus élevé — jusqu'à **+50 %** sur une échéance courte. | XS |
-| **FIN-08** `Decimal` pour montants advisory affichés | F-11 | Cashflows stress test / DCA affichés au centime en `Decimal`. | M |
+| ✅ **FIN-07** Mois restants via `relativedelta` *(livré 2026-09-03, complété 2026-09-05)* | F-10 | L'approximation se trompait d'un mois dans **3 % des échéances** (118 cas sur 3 621). Rare mais jamais anodin : ce nombre divise le montant restant, donc un mois de moins demande un effort mensuel plus élevé — jusqu'à **+50 %** sur une échéance courte. **Second point d'appel corrigé le 2026-09-05** : `endpoints/goals.py` calculait encore `jours / 30,44` pour le même chiffre affiché. Les deux écrans divergeaient sur **99,5 % des échéances** ; à un jour du terme, 0,03 mois transformait 10 000 € restants en « 304 400 €/mois nécessaire ». | XS |
+| ❌ **FIN-08** `Decimal` pour montants advisory affichés *(écarté après mesure 2026-09-05)* | F-11 | **0 divergence sur 948 calculs réels.** Le piège ne s'arme que sur un demi-centime exact, que ni les échéanciers (`Numeric(12,2)`) ni les produits quantité × prix n'atteignent. | M |
 | ✅ **FIN-09** Appariement remboursement par date+montant *(livré 2026-09-03)* | F-12 | Le montant devient le premier critère quand il est connu ; sinon la date, comme avant. Tolérance de 1 % pour l'arrondi de la dernière échéance et les frais de virement. Aucune exposition actuelle (59 échéances, aucune paire à moins de 15 jours) mais le piège s'arme dès qu'un projet a des versements rapprochés. | S |
 | **FIN-10** Centraliser conversion prix actions | F-13 | `price_service.get_price` renvoie toujours en devise demandée. | S |
 | ❌ **FIN-11** Logguer le clamp XIRR *(déjà fait — mesuré 2026-09-02)* | F-14 | Le `logger.warning` est en place, avec le finding F-14 cité en commentaire. | XS |
