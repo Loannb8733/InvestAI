@@ -56,6 +56,16 @@ Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se r
    ticket de calcul : chercher le concept, pas le fichier. Ici, un `grep 30.44` de dix
    secondes aurait suffi.
 
+7. **Un test qui passe seul ne prouve pas qu'il ne casse personne.** Trois tests écrits
+   pour la sonde de version appelaient `asyncio.run()`. Or `asyncio_mode = auto` et la
+   fixture `event_loop` de portée session font partager une seule boucle à toute la
+   suite : `asyncio.run()` la ferme au milieu, et les tests suivants deviennent des
+   coroutines jamais attendues. Lancés seuls, mes tests passaient — et les 19 de
+   `test_alert_service.py` aussi. Seule la **suite complète** a montré les 18 échecs,
+   dans un fichier sans rapport, sans que le code de production y soit pour rien.
+   `test_pas_de_boucle_fermee.py` interdit désormais le motif, et porte ses propres
+   tests de détection pour ne pas être un garde-fou vert qui ne garde rien.
+
 Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
 vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
 Tout test de non-régression doit être validé par un canari : casser volontairement le code
@@ -124,6 +134,8 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 | **NEW-17** | 🟠 | **Le serveur de développement servait deux copies de React.** Les pages sont montées en `React.lazy` : une dépendance absente d'`optimizeDeps.include` n'était découverte qu'à la première visite de la page qui l'importe. Vite l'optimisait alors à la volée, sous un nouveau hash de cache, et la servait avec sa propre instance de React — `useContext` lisait `null`, la page tombait dans l'ErrorBoundary sur « Invalid hook call ». Après un démarrage à froid, /login et le dashboard s'affichaient ; la première ouverture de **/portfolio** tirait `@radix-ui/react-tabs` et cassait tout. Vider `node_modules/.vite` ne réglait rien : le défaut revenait à la page neuve suivante. `dedupe` ne protège pas — il résout les doublons du graphe de modules, pas ceux d'une seconde passe d'optimisation. → 37 spécificateurs pré-bundlés, **dérivés des imports réels du code**, sous-chemins compris (`zustand/middleware`, `@hookform/resolvers/zod`). N'affecte que le dev. | ✅ corrigé |
 
 | **NEW-18** | 🟡 | **Deux entrées du rail marquées « page courante ».** React Router allume un `NavLink` par correspondance de préfixe, et `end` n'était posé que sur la racine : sur `/crowdfunding/audit-lab`, « Mes Projets » (`/crowdfunding`) s'allumait en même temps qu'« Audit Lab ». Mesuré dans le navigateur : **4 éléments** avec `aria-current="page"` — deux libellés, chacun rendu deux fois (barre fixe + tiroir mobile). La spécification n'en admet qu'un ; un lecteur d'écran annonçait deux destinations comme étant la page courante. → Règle **calculée** : une entrée passe en `end` dès qu'une autre entrée du rail vit sous son chemin ; celles sans descendance gardent l'activation par préfixe pour leurs sous-routes non listées. **Trouvé en regardant une capture d'écran**, pas en lisant le code. | ✅ corrigé |
+
+| **NEW-19** | 🟡 | **La version reellement deployee n'etait pas verifiable.** Trois fois cette semaine, etablir ce qui tournait en production a demande de sonder une route supprimee en esperant un 404 — un marqueur consomme des qu'il sert. Les autres changements d'une release vivent derriere l'authentification. → `/health` expose le SHA court du commit (`RENDER_GIT_COMMIT`, repli `GIT_COMMIT`, « inconnu » sinon) et l'heure de demarrage du processus, qui ne bouge pas entre deux appels : un redemarrage se lit dessus. | ✅ corrigé |
 
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
