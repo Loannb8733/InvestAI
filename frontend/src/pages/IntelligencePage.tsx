@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2 } from 'lucide-react'
-import Breadcrumb from '@/components/layout/Breadcrumb'
 import RegimeHeader from '@/components/intelligence/RegimeHeader'
 import { lazyWithRetry } from '@/lib/lazyWithRetry'
 import { LEGACY_TAB_MAP, TABS } from './intelligenceTabs'
@@ -53,7 +52,6 @@ export default function IntelligencePage() {
 
   return (
     <div className="space-y-4">
-      <Breadcrumb items={[{ label: 'Univers Crypto' }, { label: 'Analyses IA' }]} />
 
       {/* La page n'affiche pas de titre — le breadcrumb et les onglets suffisent
           visuellement — mais elle n'avait alors aucun <h1> : un lecteur d'écran

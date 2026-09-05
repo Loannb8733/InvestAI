@@ -4,12 +4,15 @@ import { useTheme } from '@/components/theme-provider'
 import { Button } from '@/components/ui/button'
 import { LogOut, Menu, Moon, Sun } from 'lucide-react'
 import NotificationBell from './NotificationBell'
+import Breadcrumb from './Breadcrumb'
+import { useFilCourant } from './fil-ariane'
 
 interface HeaderProps {
   onMenuClick?: () => void
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
+  const fil = useFilCourant()
   const navigate = useNavigate()
   const logout = useAuthStore((state) => state.logout)
   const { theme, setTheme } = useTheme()
@@ -36,7 +39,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
         >
           <Menu className="h-5 w-5" strokeWidth={1.5} />
         </Button>
-        {/* Breadcrumb or page title could go here */}
+        {/* Le repère de page, unique et au même endroit sur toutes les routes.
+            Quinze pages n'en avaient aucun ; les cinq qui en portaient un le
+            rendaient elles-mêmes, chacune à sa hauteur (UX-10). */}
+        {fil ? <Breadcrumb items={fil} /> : null}
       </div>
 
       <div className="flex items-center gap-2">

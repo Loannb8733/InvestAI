@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Wallet, ArrowRightLeft, Link2, Loader2 } from 'lucide-react'
-import Breadcrumb from '@/components/layout/Breadcrumb'
 import { lazyWithRetry } from '@/lib/lazyWithRetry'
 
 const PortfolioPage = lazyWithRetry(() => import('@/pages/PortfolioPage'))
@@ -33,7 +32,6 @@ export default function PortfolioUnifiedPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: 'Univers Crypto' }, { label: 'Portefeuille' }]} />
 
       {/* Le titre de la page vit ici, pas dans les onglets : ceux-ci sont
           des sections. Masqué à l'œil — le fil d'Ariane et les onglets le
