@@ -54,7 +54,9 @@ export const navGroups: NavGroup[] = [
       { icon: Target, label: 'Objectifs', path: '/goals' },
       { icon: FileText, label: 'Rapports', path: '/reports' },
       { icon: Bell, label: 'Alertes', path: '/alerts' },
-      { icon: BookOpen, label: 'Notes', path: '/notes' },
+      // « Journal », comme le titre de la page et le module : le rail disait
+      // « Notes » pour la seule destination dont il ne reprenait pas le nom.
+      { icon: BookOpen, label: 'Journal', path: '/notes' },
       // Nommée d'après sa destination réelle : le pilier « Décisions » du hub
       // Intelligence. L'ancien libellé « Stratégies » désignait un onglet
       // supprimé et entrait en collision avec « /strategy » (UX-05).
