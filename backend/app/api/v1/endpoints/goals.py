@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -157,12 +158,25 @@ def _build_response(goal: Goal) -> dict:
             pass
 
     if effective_date:
-        delta = (effective_date - date.today()).days
+        aujourd_hui = date.today()
+        delta = (effective_date - aujourd_hui).days
         days_remaining = max(delta, 0)
         remaining_amount = float(goal.target_amount - goal.current_amount)
         if remaining_amount > 0 and days_remaining > 0:
-            months_left = days_remaining / 30.44
-            monthly_needed = min(round(remaining_amount / months_left, 2), 9_999_999.99) if months_left > 0 else None
+            # Mois restants, en mois calendaires — même convention que
+            # `GoalProjectionService.project()`, qui affiche le même chiffre
+            # ailleurs dans l'application (FIN-07).
+            #
+            # `jours / 30,44` donnait un nombre de mois fractionnaire, donc un
+            # effort mensuel différent de l'autre écran pour 99,5 % des
+            # échéances. L'écart médian restait sous 1 %, mais il devenait
+            # absurde à l'approche du terme : à un jour de l'échéance, 0,03 mois
+            # transformait 10 000 € restants en « 304 400 €/mois nécessaire ».
+            # Le plancher à un mois dit la seule chose vraie dans ce cas : il
+            # reste ce montant à trouver, et il reste ce mois-ci pour le faire.
+            ecart = relativedelta(effective_date, aujourd_hui)
+            months_left = max(ecart.years * 12 + ecart.months, 1)
+            monthly_needed = min(round(remaining_amount / months_left, 2), 9_999_999.99)
 
     return {
         "id": goal.id,
