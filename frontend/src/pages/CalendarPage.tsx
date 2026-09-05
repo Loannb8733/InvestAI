@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import QueryErrorState from '@/components/ui/query-error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -305,9 +306,12 @@ export default function CalendarPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageSkeleton
+        titre="Calendrier"
+        description="Gérez vos échéances et événements financiers."
+        forme="liste"
+        action
+      />
     )
   }
 

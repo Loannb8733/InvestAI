@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -211,9 +212,13 @@ export default function PortfolioPage() {
 
   if (loadingPortfolios) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageSkeleton
+        titre="Portefeuille"
+        description="Le détail de ce que tu possèdes, ligne par ligne."
+        niveauTitre={2}
+        forme="table"
+        action
+      />
     )
   }
 
