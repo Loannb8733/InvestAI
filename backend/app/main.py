@@ -5,9 +5,12 @@ Plateforme multi-utilisateurs de gestion et d'analyse d'investissements
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -602,7 +605,11 @@ async def _rehash_transactions_internal_hash():
                     changed += 1
             if changed or nulled:
                 await db.commit()
-                logger.info("Rehashed transactions: %d updated, %d nulled on collision", changed, nulled)
+                logger.info(
+                    "Rehashed transactions: %d updated, %d nulled on collision",
+                    changed,
+                    nulled,
+                )
     except Exception as e:
         logger.warning("Transaction rehash skipped or failed: %s", e)
 
@@ -633,7 +640,10 @@ async def _boot_advisory_lock(key: int, lock_engine=None):
             try:
                 await lock_conn.close()
             except Exception as close_exc:  # noqa: BLE001
-                logger.debug("Failed to close boot advisory-lock connection after acquire error: %s", close_exc)
+                logger.debug(
+                    "Failed to close boot advisory-lock connection after acquire error: %s",
+                    close_exc,
+                )
         lock_conn = None
     try:
         yield
@@ -642,7 +652,10 @@ async def _boot_advisory_lock(key: int, lock_engine=None):
             try:
                 await lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
             except Exception as unlock_exc:  # noqa: BLE001
-                logger.debug("Failed to release boot advisory lock (auto-released on disconnect): %s", unlock_exc)
+                logger.debug(
+                    "Failed to release boot advisory lock (auto-released on disconnect): %s",
+                    unlock_exc,
+                )
             try:
                 await lock_conn.close()
             except Exception as close_exc:  # noqa: BLE001
@@ -951,11 +964,39 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 # (NEW-02/NEW-03). La création de colonne relève d'Alembic, pas d'une route.
 
 
+# Version du code déployé, résolue une fois au démarrage.
+#
+# Vérifier qu'un déploiement a bien pris demandait jusqu'ici de sonder une route
+# supprimée et d'espérer un 404 : la méthode marche une fois, puis le marqueur
+# est consommé. Les seuls autres changements d'une release vivent derrière
+# l'authentification, donc invérifiables depuis l'extérieur.
+#
+# `RENDER_GIT_COMMIT` est fourni par Render à chaque build ; `GIT_COMMIT` sert
+# de repli pour les autres hébergeurs et Docker local.
+#
+# Le SHA est tronqué à 7 caractères : de quoi identifier une version sans en
+# dire plus qu'un `git log` du dépôt, qui est privé.
+def resoudre_commit(env: Mapping[str, str] | None = None) -> str:
+    """SHA court du commit déployé, ou « inconnu » si l'hébergeur n'en fournit pas."""
+    source = os.environ if env is None else env
+    brut = (source.get("RENDER_GIT_COMMIT") or source.get("GIT_COMMIT") or "").strip()
+    return brut[:7] if brut else "inconnu"
+
+
+_COMMIT_DEPLOYE = resoudre_commit()
+_DEMARRE_A = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
 @app.get("/health")
 @app.get("/api/v1/health")
 async def health_check():
     """Liveness probe — returns 200 if the process is running."""
-    return {"app": settings.APP_NAME, "status": "alive"}
+    return {
+        "app": settings.APP_NAME,
+        "status": "alive",
+        "commit": _COMMIT_DEPLOYE,
+        "demarre_a": _DEMARRE_A,
+    }
 
 
 @app.get("/health/ready")
