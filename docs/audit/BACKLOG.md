@@ -82,9 +82,9 @@ devrait être engagé sans mesure préalable.
 | **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
 | **Total** | **32/50** | 18 | 6 | 18 |
 
-UX-03 (mesuré réel, non traité) et UX-09 (polish réel) comptent dans les mesurés de
-leur EPIC sans figurer ci-dessus : ils sont vérifiés mais ni livrés ni écartés. UX-08
-a rejoint les livrés le 2026-09-05.
+UX-03, UX-08 et UX-09 comptent dans les mesurés de leur EPIC sans figurer dans le
+tableau ci-dessus. Ils sont désormais **tous les trois livrés** (2026-09-02, 09-05 et
+09-03) : cette note datait d'avant leur traitement.
 
 **Tout a été regardé.** Les 50 tickets ont désormais un verdict fondé sur le code, non
 sur le texte de l'audit. (**UX-02 est confirmé** par le cas « Wealth Journey ».)
