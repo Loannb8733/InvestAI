@@ -29,7 +29,58 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'],
+    // Toutes les dépendances applicatives sont pré-bundlées au démarrage.
+    //
+    // Les pages sont montées en `React.lazy` : une dépendance absente de cette
+    // liste n'est découverte qu'à la première visite de la page qui l'importe.
+    // Vite l'optimise alors à la volée, sous un nouveau hash de cache — et la
+    // sert avec sa propre copie de React. L'application se retrouve avec deux
+    // instances, `useContext` lit `null`, et la page tombe dans l'ErrorBoundary
+    // avec « Invalid hook call ». C'est arrivé sur `@radix-ui/react-tabs` à la
+    // première ouverture de /portfolio, alors que /login et le dashboard
+    // fonctionnaient : le défaut ne se voit qu'en visitant une page neuve.
+    //
+    // `dedupe` ne suffit pas : il résout les doublons du graphe de modules, pas
+    // ceux que crée une seconde passe d'optimisation.
+    include: [
+      '@hookform/resolvers/zod',
+      '@nivo/bar',
+      '@nivo/line',
+      '@nivo/pie',
+      '@nivo/radar',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-label',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-slider',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-tooltip',
+      '@tanstack/react-query',
+      'axios',
+      'class-variance-authority',
+      'clsx',
+      'cmdk',
+      'framer-motion',
+      'lightweight-charts',
+      'lucide-react',
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react-dropzone',
+      'react-hook-form',
+      'react-router-dom',
+      'react/jsx-runtime',
+      'tailwind-merge',
+      'zod',
+      'zustand',
+      'zustand/middleware',
+    ],
   },
   server: {
     port: 3000,
