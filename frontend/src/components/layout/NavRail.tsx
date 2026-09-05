@@ -77,11 +77,31 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
       expanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
     )
 
+    // Une entrée ne reste allumée que sur sa propre page dès qu'une autre
+    // entrée du rail vit sous son chemin. Sans cela, React Router allume par
+    // préfixe : sur /crowdfunding/audit-lab, « Mes Projets » (/crowdfunding)
+    // s'allumait en même temps qu'« Audit Lab ». Deux entrées surlignées, et
+    // surtout deux `aria-current="page"` — un lecteur d'écran annonçait deux
+    // fois la page courante alors que la spécification n'en admet qu'une.
+    //
+    // La règle est calculée, pas codée en dur : ajouter demain une entrée sous
+    // un chemin existant se corrige toute seule. Les entrées sans descendance
+    // gardent l'activation par préfixe, pour rester allumées sur leurs
+    // sous-routes non listées (une fiche ouverte depuis une liste, par exemple).
+    const cheminsDuRail = [
+      '/',
+      ...navGroups.flatMap((g) => g.items.map((i) => i.path)),
+      '/admin',
+      '/settings',
+    ]
+    const aUneEntreeDescendante = (chemin: string) =>
+      cheminsDuRail.some((autre) => autre !== chemin && autre.startsWith(chemin.replace(/\/$/, '') + '/'))
+
     const renderLink = (item: NavItem) => (
       <NavLink
         key={item.path}
         to={item.path}
-        end={item.path === '/'}
+        end={aUneEntreeDescendante(item.path)}
         onClick={handleNavClick}
         title={item.label}
         className={({ isActive }) =>
