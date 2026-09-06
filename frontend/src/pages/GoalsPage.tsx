@@ -144,7 +144,7 @@ function ProjectionChart({ goalId, color }: { goalId: string; color: string }) {
   const userTouched = useRef(false)
 
   const { data, isLoading, isFetching } = useQuery<GoalProjection>({
-    queryKey: ['goals', 'projection', goalId, debouncedDca],
+    queryKey: queryKeys.goals.projection(goalId, debouncedDca),
     queryFn: () => goalsApi.projection(goalId, debouncedDca),
     staleTime: 60_000,
     placeholderData: (prev) => prev,

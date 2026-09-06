@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { dashboardApi } from '@/services/api'
 import { Zap, AlertTriangle, CheckCircle2, Info, ArrowRight } from 'lucide-react'
+import { queryKeys } from '@/lib/queryKeys'
 
 interface MunitionsData {
   available_liquidity: number
@@ -36,7 +37,7 @@ const profileLabel: Record<string, string> = {
 
 export default function DashboardMunitionsCard({ availableLiquidity, totalValue, privacyMode }: { availableLiquidity?: number; totalValue?: number; privacyMode?: boolean }) {
   const { data, isLoading } = useQuery<MunitionsData>({
-    queryKey: ['dashboard', 'munitions'],
+    queryKey: queryKeys.dashboard.munitions,
     queryFn: () => dashboardApi.getMunitions(),
     staleTime: 60_000,
     retry: 1,

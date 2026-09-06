@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { getTrustColor, getTrustLabel, getTrustScore } from '@/lib/platforms'
 import { Loader2, Shield } from 'lucide-react'
 import { useNivoTheme } from './nivo-theme'
+import { queryKeys } from '@/lib/queryKeys'
 
 interface PlatformPieChartProps {
   onPlatformClick?: (platform: string | null) => void
@@ -18,7 +19,7 @@ export default memo(function PlatformPieChart({ onPlatformClick }: PlatformPieCh
   const [activeName, setActiveName] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['platform-distribution'],
+    queryKey: queryKeys.platforms.distribution,
     queryFn: () => analyticsApi.getPlatformDistribution(),
     staleTime: 60_000,
   })

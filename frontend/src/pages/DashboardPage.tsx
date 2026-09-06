@@ -389,7 +389,7 @@ export default function DashboardPage() {
   })
 
   const { data: cfDashboard } = useQuery<import('@/types/crowdfunding').CrowdfundingDashboard>({
-    queryKey: ['crowdfunding', 'dashboard'],
+    queryKey: queryKeys.crowdfunding.dashboard,
     queryFn: () => crowdfundingApi.getDashboard(),
     staleTime: 60_000,
   })

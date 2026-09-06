@@ -324,7 +324,7 @@ export default function SimulationsPage() {
 
   // Fetch live portfolio value
   const { data: dashboard } = useQuery({
-    queryKey: ['dashboard', 0],
+    queryKey: queryKeys.dashboard.metrics(0),
     queryFn: () => dashboardApi.getMetrics(0),
   })
 
