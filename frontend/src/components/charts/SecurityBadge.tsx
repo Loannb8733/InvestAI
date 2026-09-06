@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { analyticsApi } from '@/services/api'
 import { getTrustColor, getTrustLabel, getTrustScore } from '@/lib/platforms'
 import { Shield, Loader2 } from 'lucide-react'
+import { queryKeys } from '@/lib/queryKeys'
 
 export default memo(function SecurityBadge() {
   const { data, isLoading } = useQuery({
-    queryKey: ['platform-distribution'],
+    queryKey: queryKeys.platforms.distribution,
     queryFn: () => analyticsApi.getPlatformDistribution(),
     staleTime: 60_000,
   })

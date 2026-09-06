@@ -26,6 +26,7 @@ export const queryKeys = {
 
   dashboard: {
     all: ['dashboard'] as const,
+    munitions: ['dashboard', 'munitions'] as const,
     metrics: (days?: number) =>
       [...queryKeys.dashboard.all, 'metrics', ...(days !== undefined ? [days] : [])] as const,
     benchmarks: (days?: number) =>
@@ -114,6 +115,8 @@ export const queryKeys = {
   goals: {
     all: ['goals'] as const,
     list: ['goals', 'list'] as const,
+    projection: (goalId: string, dca?: number) =>
+      ['goals', 'projection', goalId, ...(dca !== undefined ? [dca] : [])] as const,
   },
 
   apiKeys: {
@@ -180,5 +183,13 @@ export const queryKeys = {
     audits: ['crowdfunding', 'audits'] as const,
     audit: (id: string) => ['crowdfunding', 'audit', id] as const,
     stressTest: (id: string, delay: number) => ['crowdfunding', 'stress-test', id, delay] as const,
+  },
+
+  platforms: {
+    all: ['platforms'] as const,
+    /** Répartition par plateforme — partagée par le badge et le camembert. */
+    distribution: ['platform-distribution'] as const,
+    /** Plateformes de l'utilisateur, pour les sélecteurs de formulaire. */
+    user: ['user-platforms'] as const,
   },
 } as const

@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { EXCHANGES, COLD_WALLETS, getTrustScore, getTrustColor, getTrustLabel } from '@/lib/platforms'
 import { transactionsApi } from '@/services/api'
+import { queryKeys } from '@/lib/queryKeys'
 
 interface PlatformSelectProps {
   value: string
@@ -42,7 +43,7 @@ export function PlatformSelect({ value, onChange, placeholder = 'Sélectionner u
   const [newPlatformName, setNewPlatformName] = useState('')
 
   const { data } = useQuery({
-    queryKey: ['user-platforms'],
+    queryKey: queryKeys.platforms.user,
     queryFn: () => transactionsApi.getPlatforms(),
     staleTime: 60_000,
   })
