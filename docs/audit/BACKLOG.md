@@ -560,6 +560,51 @@ d'intérêts courus comparé avec 90 % de tolérance. L'écart y vaut 0,077 % (3
 365 jours). La distinction est ce qui compte : le défaut n'était pas l'approximation, mais
 le fait qu'elle **divise un montant affiché**.
 
+#### ARC-03 — le découpage d'`import_trade_history`, en quatre étapes
+
+Le ticket visait trois « god-endpoints ». La remesure a d'abord corrigé ses
+chiffres (48 requêtes dans `transactions.py`, pas 70) puis **infirmé son
+argument** : `import_trade_history` ne duplique pas la tâche Celery — 4 % de
+recouvrement ligne à ligne, les 32 appels communs étant du réemploi de services
+partagés.
+
+Ce qui justifiait vraiment le travail est apparu en délimitant le code :
+**déchiffrer les identifiants et instancier le service était recopié à
+l'identique sur 4 sites**, résoudre le portefeuille « Crypto » sur 3. Deux de
+ces copies portaient le commentaire « same logic as import-history ».
+
+Le découpage a été précédé d'un **filet de caractérisation** : 28 tests qui
+épinglent le comportement d'aujourd'hui, bizarreries comprises. Il a servi
+exactement comme prévu — et ses deux trous ont été trouvés par des canaris, pas
+par les tests eux-mêmes.
+
+| Étape | Ce qui sort | `import_trade_history` |
+|---|---|---|
+| — | *départ* | 1 195 lignes |
+| 1 | préparation : déchiffrement, portefeuille, fusion des héritages | 1 120 |
+| 2 | collecte : normalisation Earn, déduplication convert/fiat | 1 051 |
+| 3 | classification : les six préfixes de `trade_id` | 1 034 |
+| 4 | valorisation : mise en euros des prix et des frais | **1 012** |
+
+`api_keys.py` passe de 1 865 à 1 665 lignes. **97 tests** couvrent désormais les
+quatre modules extraits, en moins d'une seconde — contre 38 s pour les tests de
+caractérisation, qui montent tout l'endpoint.
+
+Trois découvertes valent d'être retenues :
+
+- **Le type d'une transaction se lit dans le préfixe de son identifiant.**
+  `reward_staking_`, `fiat_`, `convert_`, `withdrawal_` — tout le reste est un
+  achat. Rien ne l'annonce, et aucune erreur ne survient si un préfixe se perd.
+- **La déduplication ne couvre pas les doublons d'un même import.**
+  `existing_trade_ids` est construit avant la boucle et jamais complété pendant.
+- **Les frais sans cours propre sont valorisés au cours de l'actif échangé** —
+  du BNB au prix du PEPE. Conservé tel quel : le corriger demande un arbitrage,
+  pas un refactor.
+
+Ce qui reste dans la fonction : la boucle d'écriture elle-même, le rapprochement
+des soldes, le mirroring des retraits et les compteurs. Tous touchent la base ;
+leur extraction demanderait d'abord d'élargir le filet.
+
 #### FIN-08 — un piège armé qu'aucune donnée ne déclenche
 
 Le ticket demandait de passer les montants advisory en `Decimal`. Mesure sur les données
@@ -866,7 +911,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **ARC-01** Boucle async / engine Celery *(livré 2026-09-01)* | ~~🔴~~ | A01, C06 | `core/database.py:14`, `tasks/*` (7 fichiers `new_event_loop`) | Engine async créé une fois au niveau module, réutilisé par des boucles recréées à chaque tâche → « Future attached to a different loop », fuites de pool. → Un seul helper `run_async` dans `tasks/__init__.py` + engine worker en `NullPool` (ou `asyncio.run` partout). | ✅ 1 seul helper (`tasks/async_runner.py`), 0 duplicata. Engine en `NullPool` sous Celery. **Attention** : une première version appelait `set_event_loop(None)` dans le `finally`, ce qui retirait la boucle de l'appelant et cassait 103 tests. | M |
 | ❌ **ARC-02** Relations ORM + eager loading *(infondé — mesuré 2026-09-01)* | ~~🟠~~ | B03 | tous les `models/*.py`, endpoints lourds | `relationship()` = 0 partout ; jointures FK manuelles ; aucun `selectinload` → N+1. → Déclarer les relations clés (portfolio→assets→transactions) avec `lazy="selectin"`. | Relations déclarées sur les 5 modèles centraux ; dashboard/portfolio sans N+1 (compteur de requêtes en test) ; pas de régression de valeur. | L |
-| **ARC-03** Sortir la logique des god-endpoints | 🟠 | B02 | `endpoints/transactions.py` (70 req.), `dashboard.py` (37), `api_keys.py` (59) | Logique métier + SQL dans les endpoints → non réutilisable par Celery, non testable hors HTTP. → Extraire `transaction_service.py`, `api_key_service.py` ; l'endpoint = validation + appel service + mapping. | Endpoints réduits au routing ; logique couverte par tests de service ; réutilisée par au moins une tâche. | L |
+| 🔵 **ARC-03** Sortir la logique des god-endpoints *(4 étapes livrées 2026-09-06)* | 🟠 | B02 | `endpoints/transactions.py` (48 req.), `dashboard.py` (21), `api_keys.py` (32) | **`import_trade_history` : 1 195 → 1 012 lignes**, 4 modules extraits, 97 tests directs, sous un filet de 28 tests de caractérisation. La duplication réelle (4 sites de déchiffrement, 3 de résolution de portefeuille) est supprimée. `transactions.py` et `dashboard.py` restent. | L |
 | **ARC-04** Factoriser `_classify_and_mark_error` | 🟠 | B04 | `tasks/sync_exchanges.py:39`, `endpoints/api_keys.py:27` | Fonction dupliquée à l'identique. → `services/exchange_error_classifier.py` importé des deux côtés. | 1 seule implémentation ; les deux appelants l'importent ; test unitaire de classification. | XS |
 
 ---
