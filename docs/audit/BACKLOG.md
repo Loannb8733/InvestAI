@@ -66,6 +66,33 @@ Trois erreurs de la session du 2026-08-31 valent d'être consignées, elles se r
    `test_pas_de_boucle_fermee.py` interdit désormais le motif, et porte ses propres
    tests de détection pour ne pas être un garde-fou vert qui ne garde rien.
 
+8. **Un canari mal posé ment dans le sens rassurant.** Sur quatre extractions, six
+   canaris n'ont d'abord rien fait tomber. Aucun ne signalait un test inutile : deux
+   visaient un motif inexistant (le code écrivait `fee=fee_amount`, pas
+   `fee=float(trade.fee)`), deux ne coupaient qu'un des deux chemins d'une logique
+   redondante, et deux vérifiaient un résultat que la garde supprimée ne changeait pas —
+   `_xirr` rendait `None` de toute façon. Un canari qui ne détecte rien doit être
+   *vérifié* avant d'être cru : il accuse le test, alors qu'il s'accuse souvent lui-même.
+
+9. **Le filet ne couvre que ce qu'on lui a montré.** Trois fois, une extraction a cassé
+   un chemin que les tests traversaient sans l'éprouver : un import supprimé dont une
+   autre boucle dépendait, un branchement de frais court-circuité, un `time` non importé.
+   Les deux premiers ne faisaient tomber **aucun** test — c'est `flake8`, puis un canari,
+   qui les ont vus. Avant de toucher une ligne, éprouver le filet **sur cette ligne**.
+
+10. **Manipuler du code avec une expression régulière finit par couper au mauvais
+    endroit.** Une insertion d'import a atterri au milieu d'un import parenthésé, rendant
+    un fichier insyntaxique ; une autre a supprimé une ligne `svc = ...` nécessaire. Les
+    deux ont été reprises en lisant l'AST. De même, extraire un bloc par ses **bornes**
+    calculées vaut mieux que le retaper : trois remplacements ont échoué parce que
+    `black` avait reformaté le motif entre-temps.
+
+11. **Un linter ne connaît pas les API.** `flake8` a signalé `_var_parametric` comme
+    import mort après une extraction. Il n'était effectivement plus appelé — mais restait
+    **ré-exporté**, et des tests l'importaient depuis ce module. Le retirer a cassé la
+    collecte. Un import inutilisé dans un module qui sert de façade est une interface,
+    pas un oubli.
+
 Corollaire sur les tests : deux tests écrits ce jour-là passaient au vert **sans rien
 vérifier** — l'un cherchait `executed_at` et trouvait le mot dans un commentaire voisin.
 Tout test de non-régression doit être validé par un canari : casser volontairement le code
@@ -86,7 +113,7 @@ devrait être engagé sans mesure préalable.
 | **C** — Robustesse backend | **3/4** | ARC-01 | ARC-02 | ARC-04 |
 | **D** — États d'erreur & UX | **3/5** | UX-04 (17/17), UX-05 | — | UX-06, UX-07 |
 | **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
-| **F** — God-files | **4/7** | ARC-05, ARC-07 (partiel), ARC-11 | ARC-09 (quasi fait) | ARC-06, ARC-08, ARC-10 |
+| **F** — God-files | **5/7** | ARC-05, ARC-07 (partiel), ARC-11, **ARC-06** (analytics) | ARC-09 (quasi fait) | ARC-08, ARC-10 |
 | **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
 | **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
 | **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
@@ -605,6 +632,52 @@ Ce qui reste dans la fonction : la boucle d'écriture elle-même, le rapprocheme
 des soldes, le mirroring des retraits et les compteurs. Tous touchent la base ;
 leur extraction demanderait d'abord d'élargir le filet.
 
+#### ARC-06 — un filet d'abord, un découpage ensuite
+
+Même méthode qu'ARC-03, et même surprise à la mesure : les chiffres du ticket
+sont surévalués (`report_service` fait **697** lignes, pas 2 744), et la moitié
+du découpage annoncé était **déjà faite** — `analytics_math.py` existe et porte
+les 14 primitives de calcul.
+
+Ce qui justifiait le travail, c'est la **couverture** : 26 % pour
+`analytics_service`, 57 % pour `metrics_service`. Douze fichiers de tests
+touchaient déjà ces services, mais couvraient le noyau mathématique, pas
+l'orchestration : `compute_xirr` était à **7 %**.
+
+**Le filet, en trois passes** — 50 tests de caractérisation, treize canaris :
+
+| Passe | Fonctions | Couverture |
+|---|---|---|
+| 1 | `compute_xirr` | 26 % → 33 % |
+| 2 | corrélation, bêta, diversification, rééquilibrage | → 66 % |
+| 3 | Monte-Carlo, optimisation, stress test | → **82 %** |
+
+**Le découpage** : huit méthodes pures (271 lignes, sept déjà `@staticmethod`)
+sorties en `analytics_simulation` et `analytics_scoring` ; les six dataclasses
+en `analytics_types` — elles vivaient en tête du service, ce qui créait un cycle
+dès qu'un module de calcul en rendait une. Résultat : **1 952 → 1 577 lignes**,
+la god-class de 1 777 à 1 402.
+
+Cinq comportements ont été épinglés **sans être approuvés** :
+
+- **Plus la perte est lourde, moins le TRI est calculable.** Une perte de 95 %
+  donne −95 %, écrêté ; au-delà, `_xirr` ne converge plus et rend `None` :
+  l'utilisateur qui a le plus perdu ne voit aucun taux.
+- **« Stress test » couvre un scénario haussier.** `bull_run_2021` applique
+  +100 % aux cryptos. Qui suppose que toute sortie est une perte se trompe de
+  signe.
+- **Trois méthodes ignorent `current_price`** au profit d'une source live —
+  `get_rebalance_orders`, `compute_beta` et `stress_test`. Un portefeuille
+  déclaré à 50 000 € était valorisé 90 186 € dans un test.
+- Les poids cibles du rééquilibrage sont des **pourcentages** : `0.5` demande
+  0,5 %, pas la moitié. La docstring le dit ; la signature, non.
+
+Ce qui reste : `metrics_service` (57 %) et `report_service`, non entamés. Les
+1 402 lignes restantes de la god-class sont de l'orchestration qui touche la
+base et le réseau — même situation qu'`import_trade_history` après ses quatre
+étapes, et même conclusion : les extraire demanderait d'élargir le filet pour
+un gain moindre.
+
 #### FIN-08 — un piège armé qu'aucune donnée ne déclenche
 
 Le ticket demandait de passer les montants advisory en `Decimal`. Mesure sur les données
@@ -664,7 +737,7 @@ correction.
 | **UX-11** | Audit Lab est une route dédiée quand le reste du Crowdfunding est en onglets | ✅ **tranché et livré le 2026-09-05** : la route reste — les onglets montrent ce qu'on possède, l'Audit Lab évalue un projet qu'on ne possède pas encore. Le défaut réel était le repère absent (pas de fil d'Ariane), pas l'asymétrie. |
 | **ARC-13** | `^` sur react-query, axios, zod, react | ⚠️ réel, **discutable** : le lockfile fixe déjà les versions installées |
 | **ARC-10** | `@nivo` dans **23 fichiers**, `lightweight-charts` dans **3** | ⚠️ **aucune librairie à retirer** — les deux servent, à des usages différents |
-| **ARC-06** | `report_service` fait **697 lignes**, pas 2 744 | ⚠️ réel mais **les chiffres de l'audit sont faux** (divisé par 4 depuis) |
+| **ARC-06** | `report_service` fait **697 lignes**, pas 2 744 | ✅ **filet posé et découpage livré le 2026-09-06** — les chiffres de l'audit sont faux (`metrics_service` 1 847 et non 2 127, `analytics_service` 1 952 et non 2 111), et la moitié du découpage annoncé était **déjà faite** : `analytics_math.py` existait. Ce qui justifiait le travail, c'est la **couverture** : 26 %. |
 | **UX-06** | IntelligencePage a **4 onglets**, pas 6 | ❌ **déjà fait** — refonte de juillet |
 | **ARC-08** | aucune méthode commune : `insights_service` traite frais, fiscalité et revenus passifs ; `smart_insights_service` traite santé, rééquilibrage et régime de marché | ❌ **infondé** |
 
@@ -946,7 +1019,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **ARC-05** Découper `prediction_service.py` *(livré 2026-09-01)* | ~~🟠~~ | B01 | `services/prediction_service.py` (**2 416 → 1 655 LOC** ; l'audit annonçait 3 733) | God-file : prédiction + régime + sentiment + anomalies + cache + accuracy. → Découper en `forecasting/`, `regime/`, `sentiment/`, `accuracy/` (la couche `ml/` existe déjà). | 🟢 761 lignes extraites (`prediction_alpha.py`, 800 LOC). La cible « aucun fichier > 800 LOC » n'est pas atteinte : le service reste à 1 655 lignes. Aucune régression (1 208 tests verts). | L |
-| **ARC-06** Découper les god-services secondaires | 🟡 | C04 | `report_service.py` (2744), `metrics_service.py` (2127), `analytics_service.py` (2111) | Mêmes risques à moindre échelle. → Découpage progressif calcul/agrégation/formatage. | Réduction mesurable de la taille ; tests conservés verts. | L |
+| 🔵 **ARC-06** Découper les god-services secondaires *(analytics livré 2026-09-06)* | 🟡 | C04 | `report_service.py` (**697**), `metrics_service.py` (**1 847**), `analytics_service.py` (**1 952**) | **`analytics_service` : 1 952 → 1 577 lignes**, god-class 1 777 → 1 402, sous un filet de **50 tests de caractérisation** (couverture 26 % → 82 %). Trois modules extraits : `analytics_simulation`, `analytics_scoring`, `analytics_types`. `metrics_service` (57 % de couverture) et `report_service` restent. | L |
 | 🟢 **ARC-07** Découper `ExchangesPage.tsx` *(entamé 2026-09-01)* | 🟠 | B06 | `pages/ExchangesPage.tsx` (**1 368 → 1 286 LOC** ; l'audit annonçait 2 185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | ⚠️ Non atteint volontairement : `ExchangeLogo` et les types sont sortis, **le découpage large est différé jusqu'à ce que la page ait des tests de rendu** — sans eux, un refactor de cette ampleur casse en silence. | L |
 | **ARC-08** Trancher le doublon insights | 🟠 | B05 | `services/insights_service.py` (403) vs `smart_insights_service.py` (1525) + endpoints | Deux systèmes parallèles, recouvrement probable. → Confirmer le vivant, déprécier/supprimer l'ancien. | Une seule source de vérité insights ; code mort supprimé. | M |
 | **ARC-09** Unifier les `queryKey` | 🟡 | C03 | ~14 clés hardcodées (`charts/*`, `PlatformSelect`, `DashboardMunitionsCard`) | Contournent `lib/queryKeys.ts` → invalidation incohérente, caches périmés. → Migrer toutes les clés vers la factory. | 0 `queryKey` hardcodé ; invalidation testée. | S |
