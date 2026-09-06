@@ -68,6 +68,7 @@ import DashboardMunitionsCard from '@/components/dashboard/DashboardMunitionsCar
 import DashboardEarnCard from '@/components/dashboard/DashboardEarnCard'
 import IASummaryWidget from '@/components/dashboard/IASummaryWidget'
 import StalePriceBadge from '@/components/dashboard/StalePriceBadge'
+import type { ActiveAlert, UpcomingEvent } from '@/types/dashboard'
 
 // ============== Interfaces ==============
 
@@ -151,23 +152,6 @@ interface RecentTransaction {
   price: number
   total: number
   executed_at: string
-}
-
-interface ActiveAlert {
-  id: string
-  name: string
-  symbol?: string
-  condition: string
-  threshold: number
-  current_price?: number
-}
-
-interface UpcomingEvent {
-  id: string
-  title: string
-  event_type: string
-  event_date: string
-  amount?: number
 }
 
 interface IndexComparison {
