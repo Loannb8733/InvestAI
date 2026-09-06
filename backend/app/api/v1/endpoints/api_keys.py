@@ -39,6 +39,7 @@ from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
 from app.services.exchange_error_classifier import rollback_puis_marquer
+from app.services.exchange_import_classification import classifier_origine, determiner_type_transaction
 from app.services.exchange_import_collection import dedupliquer_convert_contre_fiat, normaliser_balances_earn
 from app.services.exchange_import_preparation import (
     construire_service_exchange,
@@ -856,16 +857,14 @@ async def import_trade_history(
                 if trade.trade_id.startswith("fiat_") and trade.trade_id[5:] in existing_trade_ids:
                     continue
 
-                # Determine transaction type based on trade source
-                is_staking_reward = trade.trade_id.startswith("reward_staking_")
-                is_airdrop = (
-                    trade.trade_id.startswith("reward_airdrop_")
-                    or trade.trade_id.startswith("reward_")
-                    and not trade.trade_id.startswith("reward_staking_")
-                )
-                is_fiat_order = trade.trade_id.startswith("fiat_") or trade.trade_id.startswith("instant_")
-                is_conversion = trade.trade_id.startswith("convert_")
-                is_withdrawal = trade.trade_id.startswith("withdrawal_")
+                # Le type se lit dans le préfixe de l'identifiant, pas dans le
+                # sens de l'opération.
+                origine = classifier_origine(trade.trade_id)
+                is_staking_reward = origine.est_recompense_staking
+                is_airdrop = origine.est_airdrop
+                is_fiat_order = origine.est_ordre_fiat
+                is_conversion = origine.est_conversion
+                is_withdrawal = origine.est_retrait
 
                 # Skip withdrawals for transferred assets (e.g., BTC withdrawn from Kraken
                 # to Tangem wallet). The BUYs are already on the Tangem asset, so adding
@@ -873,22 +872,7 @@ async def import_trade_history(
                 if is_withdrawal and symbol in transferred_symbols:
                     continue
 
-                if is_withdrawal:
-                    trans_type = TransactionType.TRANSFER_OUT
-                elif is_staking_reward:
-                    trans_type = TransactionType.STAKING_REWARD
-                elif is_airdrop:
-                    trans_type = TransactionType.AIRDROP
-                elif is_conversion:
-                    # Use dedicated conversion types
-                    if trade.trade_id.startswith("convert_sell_"):
-                        trans_type = TransactionType.CONVERSION_OUT
-                    else:  # convert_buy_
-                        trans_type = TransactionType.CONVERSION_IN
-                elif trade.side == "buy":
-                    trans_type = TransactionType.BUY
-                else:
-                    trans_type = TransactionType.SELL
+                trans_type = determiner_type_transaction(origine, trade.trade_id, trade.side)
 
                 # Convert the trade price to EUR using the USD→EUR rate as of the trade's
                 # execution date (FIN-01), not a single current rate for the whole history.
