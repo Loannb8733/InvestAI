@@ -27,6 +27,28 @@ import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingPerformanceItem, CrowdfundingTaxReport } from '@/types/crowdfunding'
 
+/**
+ * Séries du graphique « Intérêts Projetés vs Perçus ».
+ *
+ * `cle` nomme la donnée et s'affiche dans le tooltip, qui a la place de la
+ * porter en entier. `libelle` est ce que lit la légende, où la place est
+ * comptée : Nivo aligne les entrées sur `LARGEUR_ITEM_LEGENDE` pixels et ne
+ * renvoie jamais à la ligne. « Intérêts projetés (bruts) » y mesurait 131 px
+ * pour 70 alloués — les deux entrées se chevauchaient de 61 px, mesurés à
+ * l'écran. Élargir n'aurait fait que déplacer le problème sur un écran étroit.
+ *
+ * Le titre de la carte dit déjà « Intérêts Projetés vs Perçus » et son
+ * sous-titre « montants bruts de fiscalité » : la légende n'a qu'à distinguer
+ * les deux séries.
+ */
+export const SERIES_GRAPHIQUE = [
+  { cle: 'Intérêts projetés (bruts)', libelle: 'Projetés' },
+  { cle: 'Intérêts perçus', libelle: 'Perçus' },
+] as const
+
+/** Largeur allouée à chaque entrée de légende, en pixels. */
+export const LARGEUR_ITEM_LEGENDE = 84
+
 /** Format FR d'un pourcentage : « 8,42 % ». */
 const formatPercent = (n: number) => `${n.toFixed(2).replace('.', ',')} %`
 
@@ -218,7 +240,7 @@ export default function CrowdfundingPerformancePage() {
             <div className="h-[300px]">
               <ResponsiveBar
                 data={chartData}
-                keys={['Intérêts projetés (bruts)', 'Intérêts perçus']}
+                keys={SERIES_GRAPHIQUE.map((s) => s.cle)}
                 indexBy="name"
                 groupMode="grouped"
                 theme={theme}
@@ -226,7 +248,7 @@ export default function CrowdfundingPerformancePage() {
                 padding={0.25}
                 innerPadding={4}
                 colors={({ id }) =>
-                  id === 'Intérêts projetés (bruts)' ? color('--primary', 0.3) : color('--chart-3')
+                  id === SERIES_GRAPHIQUE[0].cle ? color('--primary', 0.3) : color('--chart-3')
                 }
                 borderRadius={4}
                 enableLabel={false}
@@ -254,12 +276,33 @@ export default function CrowdfundingPerformancePage() {
                     anchor: 'top-right',
                     direction: 'row',
                     translateY: -22,
-                    itemWidth: 70,
+                    itemWidth: LARGEUR_ITEM_LEGENDE,
                     itemHeight: 18,
                     symbolSize: 10,
                     symbolShape: 'circle',
                     itemTextColor: color('--muted-foreground'),
+                    // `dataFrom` reste exigé par le typage de Nivo, mais `data`
+                    // le supplante quand il est fourni.
                     dataFrom: 'keys',
+                    // Libellés courts plutôt que les clés brutes.
+                    //
+                    // Les clés servent au tooltip, qui les affiche en entier —
+                    // « Intérêts projetés (bruts) » y est utile. Dans la
+                    // légende, elles mesuraient 131 px pour les 70 alloués :
+                    // les deux entrées se chevauchaient de 61 px, mesurés à
+                    // l'écran. Nivo ne renvoie pas à la ligne, et élargir
+                    // n'aurait fait que repousser le problème sur un écran
+                    // étroit.
+                    //
+                    // Le titre de la carte dit déjà « Intérêts Projetés vs
+                    // Perçus », et son sous-titre « montants bruts de
+                    // fiscalité » : la légende n'a qu'à distinguer les deux
+                    // séries.
+                    data: SERIES_GRAPHIQUE.map((serie, i) => ({
+                      id: serie.cle,
+                      label: serie.libelle,
+                      color: i === 0 ? color('--primary', 0.3) : color('--chart-3'),
+                    })),
                   },
                 ]}
                 animate
