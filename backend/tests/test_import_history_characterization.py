@@ -192,7 +192,13 @@ async def _importer(client, db_session, utilisateur, service):
     """
     cle = await _cle_api(db_session, utilisateur)
     token = create_access_token(subject=str(utilisateur.id))
-    with patch("app.api.v1.endpoints.api_keys.get_exchange_service", return_value=service), patch(
+    # Le double est injecté à la frontière `construire_service_exchange`, qui rend
+    # une **instance** (l'ancien `get_exchange_service` rendait une classe). C'est
+    # le point d'injection qui a changé avec l'extraction, pas le comportement.
+    with patch(
+        "app.api.v1.endpoints.api_keys.construire_service_exchange",
+        return_value=service(),
+    ), patch(
         "app.services.price_service.price_service.get_historical_crypto_price",
         new=AsyncMock(return_value=50000.0),
     ):
@@ -349,8 +355,8 @@ class TestIdempotence:
         token = create_access_token(subject=str(regular_user.id))
 
         with patch(
-            "app.api.v1.endpoints.api_keys.get_exchange_service",
-            return_value=service_double,
+            "app.api.v1.endpoints.api_keys.construire_service_exchange",
+            return_value=service_double(),
         ):
             for _ in range(2):
                 reponse = await client.post(
