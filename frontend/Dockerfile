@@ -4,7 +4,11 @@ FROM node:20-alpine AS development
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+# `npm ci` et non `npm install` : le développement installe exactement ce que la
+# CI et la production installent. `npm install` réécrit le lockfile dès qu'une
+# version plus récente satisfait une plage — la dérive commence là, et elle ne
+# se voit qu'au moment où un test passe ici et échoue en intégration.
+RUN npm ci
 
 COPY . .
 
