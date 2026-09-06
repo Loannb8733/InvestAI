@@ -113,7 +113,7 @@ devrait être engagé sans mesure préalable.
 | **C** — Robustesse backend | **3/4** | ARC-01 | ARC-02 | ARC-04 |
 | **D** — États d'erreur & UX | **3/5** | UX-04 (17/17), UX-05 | — | UX-06, UX-07 |
 | **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
-| **F** — God-files | **5/7** | ARC-05, ARC-07 (partiel), ARC-11, **ARC-06** (analytics) | ARC-09 (quasi fait) | ARC-08, ARC-10 |
+| **F** — God-files | **7/7** | ARC-05, ARC-07 (partiel), ARC-11, ARC-06 (analytics), **ARC-09**, **ARC-13** | — | **ARC-08 écarté**, ARC-10 (arbitrage produit) |
 | **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
 | **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
 | **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
@@ -632,6 +632,23 @@ Ce qui reste dans la fonction : la boucle d'écriture elle-même, le rapprocheme
 des soldes, le mirroring des retraits et les compteurs. Tous touchent la base ;
 leur extraction demanderait d'abord d'élargir le filet.
 
+#### ARC-13 — le déterminisme était déjà là où il compte
+
+La CI et l'image de production installent avec `npm ci` : elles respectent donc
+le lockfile. Deux écarts subsistaient.
+
+Les plages déclarées avaient laissé filer : `@tanstack/react-query` était
+déclaré `^5.17.19` et installé en **5.90.21** — soixante-treize versions
+mineures d'écart. Les trois dépendances citées sont épinglées à la version du
+**lockfile**, celle qui est réellement testée. Les épingler aux versions
+déclarées aurait été un retour de soixante-treize versions en arrière, présenté
+comme une mesure de sécurité.
+
+Le conteneur de développement, lui, installait avec `npm install` — qui réécrit
+le lockfile dès qu'une version plus récente satisfait une plage. La dérive
+commence là, et ne se voit qu'au moment où un test passe en local et échoue en
+intégration. Les trois étapes utilisent désormais `npm ci`.
+
 #### ARC-06 — un filet d'abord, un découpage ensuite
 
 Même méthode qu'ARC-03, et même surprise à la mesure : les chiffres du ticket
@@ -1050,7 +1067,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | ✅ **ARC-05** Découper `prediction_service.py` *(livré 2026-09-01)* | ~~🟠~~ | B01 | `services/prediction_service.py` (**2 416 → 1 655 LOC** ; l'audit annonçait 3 733) | God-file : prédiction + régime + sentiment + anomalies + cache + accuracy. → Découper en `forecasting/`, `regime/`, `sentiment/`, `accuracy/` (la couche `ml/` existe déjà). | 🟢 761 lignes extraites (`prediction_alpha.py`, 800 LOC). La cible « aucun fichier > 800 LOC » n'est pas atteinte : le service reste à 1 655 lignes. Aucune régression (1 208 tests verts). | L |
 | 🔵 **ARC-06** Découper les god-services secondaires *(analytics livré, metrics écarté — 2026-09-06)* | 🟡 | C04 | `report_service.py` (**697**), `metrics_service.py` (**1 847**), `analytics_service.py` (**1 952**) | **`analytics_service` : 1 952 → 1 577 lignes** sous un filet de 50 tests (couverture 26 % → 82 %), trois modules extraits. **`metrics_service` : filet posé** (dashboard 3 % → 91 %, variations de période 7 % → 78 %, service 57 % → **74 %**) mais **découpage écarté** — 77 lignes pures seulement, aucune duplication, et une god-méthode qui est un replay FIFO avec SQL entrelacé, déjà couvert à 79 %. **`report_service` : filet posé** (formulaire 2086 de 3 % → 97 %, service 42 % → **64 %**). | L |
 | 🟢 **ARC-07** Découper `ExchangesPage.tsx` *(entamé 2026-09-01)* | 🟠 | B06 | `pages/ExchangesPage.tsx` (**1 368 → 1 286 LOC** ; l'audit annonçait 2 185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | ⚠️ Non atteint volontairement : `ExchangeLogo` et les types sont sortis, **le découpage large est différé jusqu'à ce que la page ait des tests de rendu** — sans eux, un refactor de cette ampleur casse en silence. | L |
-| **ARC-08** Trancher le doublon insights | 🟠 | B05 | `services/insights_service.py` (403) vs `smart_insights_service.py` (1525) + endpoints | Deux systèmes parallèles, recouvrement probable. → Confirmer le vivant, déprécier/supprimer l'ancien. | Une seule source de vérité insights ; code mort supprimé. | M |
+| ❌ **ARC-08** Trancher le doublon insights *(écarté après contre-mesure 2026-09-06)* | 🟠 | B05 | `insights_service.py` (**403**) vs `smart_insights_service.py` (**1 093**, et non 1 525) | **Il n'y a ni doublon ni code mort.** Mesure indépendante : **0 nom de fonction commun**, **0 bloc identique de 6 lignes ou plus**. Les deux sont vivants — `insights_service` sert un endpoint (frais, fiscalité, revenus passifs), `smart_insights_service` en sert cinq (santé, rééquilibrage, régime de marché). Des noms voisins, pas des systèmes parallèles. | M |
 | ✅ **ARC-09** Unifier les `queryKey` *(livré 2026-09-06)* | 🟡 | C03 | ~14 clés hardcodées (`charts/*`, `PlatformSelect`, `DashboardMunitionsCard`) | Contournent `lib/queryKeys.ts` → invalidation incohérente, caches périmés. → Migrer toutes les clés vers la factory. | 0 `queryKey` hardcodé ; invalidation testée. | S |
 | **ARC-10** Stratégie librairies de charts | 🟡 | C01 | `frontend/package.json:17-21,45` | `@nivo/*` **et** `lightweight-charts`. → Choisir par cas d'usage et documenter, ou consolider ; retirer la lib non utilisée. | Décision documentée ; bundle allégé si retrait. | S |
 | ✅ **ARC-11** Centraliser le formatage monétaire *(livré 2026-09-01)* | ~~🟡~~ | C05 | **4 fichiers** formataient une devise à la main — l'audit en annonçait 43, ma propre mesure 13 : les deux comptaient les fichiers utilisant correctement `formatCurrency` | Formatage dispersé → incohérences devise/décimales. → Tout passer par `lib/utils.formatCurrency`. | ✅ `CalendarPage` (5×), `StrategiesSection` (3×), les deux formulaires de transaction. `formatCurrency` accepte désormais `maximumFractionDigits`, pour que les affichages volontairement arrondis n'aient plus de raison de se recréer un formateur local. Garde-fou statique sur tout `src/`. | M |
