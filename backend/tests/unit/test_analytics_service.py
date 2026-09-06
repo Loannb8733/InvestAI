@@ -10,6 +10,14 @@ from datetime import datetime
 import numpy as np
 import pytest
 
+from app.services.analytics_scoring import (
+    _build_portfolio_var_parametric,
+    _calc_beta,
+    _diversification_rating,
+    _diversification_score,
+    _hhi,
+    _interpret_beta,
+)
 from app.services.analytics_service import (
     RISK_FREE_RATE,
     AnalyticsService,
@@ -443,41 +451,41 @@ class TestDiversificationHelpers:
 
     def test_hhi_single_asset(self):
         allocation = {"BTC": 100.0}
-        result = AnalyticsService._hhi(allocation)
+        result = _hhi(allocation)
         assert pytest.approx(result) == 1.0
 
     def test_hhi_equal_two_assets(self):
         allocation = {"BTC": 50.0, "ETH": 50.0}
-        result = AnalyticsService._hhi(allocation)
+        result = _hhi(allocation)
         assert pytest.approx(result) == 0.5
 
     def test_hhi_empty(self):
-        assert AnalyticsService._hhi({}) == 0
+        assert _hhi({}) == 0
 
     def test_diversification_score_high(self):
         # 10 assets, 4 types, low concentration
-        score = AnalyticsService._diversification_score(10, 4, 0.1)
+        score = _diversification_score(10, 4, 0.1)
         assert score > 60
 
     def test_diversification_score_low(self):
         # 1 asset, 1 type, max concentration
-        score = AnalyticsService._diversification_score(1, 1, 1.0)
+        score = _diversification_score(1, 1, 1.0)
         assert score < 20
 
     def test_diversification_rating_excellent(self):
-        assert AnalyticsService._diversification_rating(85) == "Excellent"
+        assert _diversification_rating(85) == "Excellent"
 
     def test_diversification_rating_bon(self):
-        assert AnalyticsService._diversification_rating(65) == "Bon"
+        assert _diversification_rating(65) == "Bon"
 
     def test_diversification_rating_moyen(self):
-        assert AnalyticsService._diversification_rating(45) == "Moyen"
+        assert _diversification_rating(45) == "Moyen"
 
     def test_diversification_rating_faible(self):
-        assert AnalyticsService._diversification_rating(25) == "Faible"
+        assert _diversification_rating(25) == "Faible"
 
     def test_diversification_rating_tres_faible(self):
-        assert AnalyticsService._diversification_rating(10) == "Très faible"
+        assert _diversification_rating(10) == "Très faible"
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +498,7 @@ class TestCalcBeta:
         """Identical series should have beta ~ 1."""
         np.random.seed(42)
         returns = np.random.normal(0, 0.02, 100)
-        beta = AnalyticsService._calc_beta(returns, returns)
+        beta = _calc_beta(returns, returns)
         assert beta is not None
         assert pytest.approx(beta, abs=0.01) == 1.0
 
@@ -499,26 +507,26 @@ class TestCalcBeta:
         np.random.seed(42)
         bench = np.random.normal(0, 0.01, 100)
         asset = bench * 2
-        beta = AnalyticsService._calc_beta(asset, bench)
+        beta = _calc_beta(asset, bench)
         assert beta is not None
         assert pytest.approx(beta, abs=0.1) == 2.0
 
     def test_insufficient_data_returns_none(self):
         asset = np.array([0.01] * 5)
         bench = np.array([0.01] * 5)
-        assert AnalyticsService._calc_beta(asset, bench) is None
+        assert _calc_beta(asset, bench) is None
 
     def test_zero_variance_benchmark_returns_none(self):
         bench = np.zeros(20)
         asset = np.random.normal(0, 0.01, 20)
-        assert AnalyticsService._calc_beta(asset, bench) is None
+        assert _calc_beta(asset, bench) is None
 
     def test_negative_beta(self):
         """Inversely correlated series should have negative beta."""
         np.random.seed(42)
         bench = np.random.normal(0, 0.02, 100)
         asset = -bench * 0.5
-        beta = AnalyticsService._calc_beta(asset, bench)
+        beta = _calc_beta(asset, bench)
         assert beta is not None
         assert beta < 0
 
@@ -530,23 +538,23 @@ class TestInterpretBeta:
     """Tests for _interpret_beta."""
 
     def test_none_beta(self):
-        result = AnalyticsService._interpret_beta(None)
+        result = _interpret_beta(None)
         assert "insuffisantes" in result.lower()
 
     def test_very_aggressive(self):
-        result = AnalyticsService._interpret_beta(2.0)
+        result = _interpret_beta(2.0)
         assert "agressif" in result.lower()
 
     def test_neutral(self):
-        result = AnalyticsService._interpret_beta(0.9)
+        result = _interpret_beta(0.9)
         assert "neutre" in result.lower()
 
     def test_defensive(self):
-        result = AnalyticsService._interpret_beta(0.5)
+        result = _interpret_beta(0.5)
         assert "défensif" in result.lower()
 
     def test_inversely_correlated(self):
-        result = AnalyticsService._interpret_beta(-0.5)
+        result = _interpret_beta(-0.5)
         assert "inverse" in result.lower()
 
 
@@ -574,10 +582,9 @@ class TestBuildPortfolioVarParametric:
     """Tests for _build_portfolio_var_parametric."""
 
     def test_with_sufficient_data(self):
-        svc = object.__new__(AnalyticsService)
         np.random.seed(42)
         port_returns = np.random.normal(-0.001, 0.02, 200)
-        result = svc._build_portfolio_var_parametric(port_returns, 100000.0)
+        result = _build_portfolio_var_parametric(port_returns, 100000.0)
 
         assert "var_95_historical_pct" in result
         assert "var_95_parametric_pct" in result
@@ -590,8 +597,7 @@ class TestBuildPortfolioVarParametric:
         assert result["var_95_parametric_eur"] > 0
 
     def test_with_insufficient_data(self):
-        svc = object.__new__(AnalyticsService)
         port_returns = np.array([0.01, 0.02])
-        result = svc._build_portfolio_var_parametric(port_returns, 100000.0)
+        result = _build_portfolio_var_parametric(port_returns, 100000.0)
         assert result["var_95_historical_pct"] == 0.0
         assert result["var_95_parametric_pct"] == 0.0

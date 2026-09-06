@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
@@ -22,7 +21,10 @@ from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
-from app.services.analytics_math import (
+
+# `_var_parametric` n'est plus appelé ici depuis l'extraction du scoring, mais
+# reste ré-exporté : des tests l'importent depuis ce module.
+from app.services.analytics_math import (  # noqa: F401
     _annualized_return,
     _annualized_volatility,
     _build_xirr_cashflows,
@@ -38,6 +40,23 @@ from app.services.analytics_math import (
     _var_parametric,
     _xirr,
 )
+from app.services.analytics_scoring import (
+    _build_interpretations,
+    _calc_beta,
+    _diversification_rating,
+    _diversification_score,
+    _hhi,
+    _interpret_beta,
+)
+from app.services.analytics_simulation import _monte_carlo_compute
+from app.services.analytics_types import (  # noqa: F401  (ré-export pour les appelants existants)
+    AssetPerformance,
+    CorrelationData,
+    MonteCarloResult,
+    OptimizationResult,
+    PortfolioAnalytics,
+    RebalanceOrder,
+)
 from app.services.price_service import PriceService
 from app.tasks.history_cache import get_cached_history
 
@@ -47,121 +66,6 @@ logger = logging.getLogger(__name__)
 
 # Cache TTL for historical data (seconds) — shared across all endpoint calls
 _HISTORY_CACHE_TTL = 300  # 5 minutes
-
-
-@dataclass
-class AssetPerformance:
-    """Performance metrics for a single asset."""
-
-    symbol: str
-    name: str
-    asset_type: str
-    current_value: float
-    total_invested: float
-    gain_loss: float
-    gain_loss_percent: float
-    weight: float
-    daily_return: float
-    volatility_30d: float
-    sharpe_ratio: float
-    sortino_ratio: float
-    max_drawdown: float
-
-
-@dataclass
-class PortfolioAnalytics:
-    """Comprehensive portfolio analytics."""
-
-    total_value: float
-    total_invested: float
-    total_gain_loss: float
-    total_gain_loss_percent: float
-
-    # Risk metrics
-    portfolio_volatility: float
-    sharpe_ratio: float
-    sortino_ratio: float
-    calmar_ratio: float
-    max_drawdown: float
-    var_95: float
-    cvar_95: float  # Conditional VaR / Expected Shortfall
-
-    # Diversification
-    diversification_score: float
-    concentration_risk: float
-    asset_count: int
-
-    # Allocation
-    allocation_by_type: Dict[str, float]
-    allocation_by_asset: Dict[str, float]
-
-    # Performance
-    assets: List[AssetPerformance]
-    best_performer: Optional[str]
-    worst_performer: Optional[str]
-
-    # Human-readable VaR explanation (P12)
-    var_95_description: str = ""
-
-    # Contextual interpretations for ratios
-    interpretations: Dict[str, str] = None  # type: ignore[assignment]
-
-    def __post_init__(self):
-        if self.interpretations is None:
-            self.interpretations = {}
-
-
-@dataclass
-class CorrelationData:
-    """Correlation matrix data."""
-
-    symbols: List[str]
-    matrix: List[List[float]]
-    strongly_correlated: List[Tuple[str, str, float]]
-    negatively_correlated: List[Tuple[str, str, float]]
-    # Cross-asset analysis (P1)
-    benchmark_correlations: Optional[Dict[str, Dict[str, float]]] = None  # {benchmark: {symbol: corr}}
-    portfolio_beta: Optional[float] = None  # vs S&P500
-    is_beta_heavy: bool = False  # True if portfolio is overly correlated with market
-
-
-@dataclass
-class MonteCarloResult:
-    """Monte Carlo simulation result."""
-
-    percentiles: Dict[str, float]  # p5, p25, p50, p75, p95
-    expected_return: float
-    prob_positive: float  # probability of positive return
-    prob_loss_10: float  # probability of >10% loss
-    prob_ruin: float  # probability of portfolio reaching zero
-    simulations: int
-    horizon_days: int
-
-
-@dataclass
-class RebalanceOrder:
-    """Single rebalancing order."""
-
-    symbol: str
-    name: str
-    asset_type: str
-    current_weight: float
-    target_weight: float
-    diff_weight: float
-    current_value: float
-    target_value: float
-    diff_value: float  # positive = buy, negative = sell
-    action: str  # "buy" | "sell" | "hold"
-
-
-@dataclass
-class OptimizationResult:
-    """Portfolio optimization (MPT) result."""
-
-    weights: Dict[str, float]
-    expected_return: float
-    expected_volatility: float
-    sharpe_ratio: float
 
 
 # ---------------------------------------------------------------------------
@@ -584,80 +488,6 @@ class AnalyticsService:
 
         return self._assemble_analytics(list(aggregated.values()), risk_free_rate=risk_free_rate)
 
-    @staticmethod
-    def _build_interpretations(
-        sharpe: float,
-        sortino: float,
-        calmar: float,
-        volatility: float,
-        max_dd: float,
-        asset_data: list,
-    ) -> Dict[str, str]:
-        """Build contextual, human-readable interpretations for portfolio ratios."""
-        interp: Dict[str, str] = {}
-
-        # Detect actual data depth (min data points across non-stablecoin assets)
-        data_lengths = [
-            len(d.get("returns", []))
-            for d in asset_data
-            if not d.get("is_stablecoin", False) and len(d.get("returns", [])) > 0
-        ]
-        min_days = min(data_lengths) if data_lengths else 0
-
-        # ── Short history warning ──
-        if min_days < 20:
-            short_msg = (
-                "Donnée non significative (échantillon < 20 jours). "
-                "Les ratios nécessitent au moins 30 jours d'historique pour être fiables."
-            )
-            interp["sharpe"] = short_msg
-            interp["sortino"] = short_msg
-            interp["calmar"] = short_msg
-            interp["global"] = "Historique trop court pour des conclusions fiables."
-            return interp
-
-        # ── Sharpe ──
-        if sharpe > 3:
-            interp["sharpe"] = (
-                "Performance atypique (Sharpe > 3) : probablement liée à une volatilité "
-                "extrême ou un pump récent. Ne pas extrapoler."
-            )
-        elif sharpe >= 2:
-            interp["sharpe"] = "Excellent rapport rendement/risque. Vérifiez que la période est représentative."
-        elif sharpe >= 1:
-            interp["sharpe"] = "Bon ratio — le portefeuille rémunère correctement le risque pris."
-        elif sharpe >= 0:
-            interp["sharpe"] = "Rendement positif mais faible par rapport au risque. Marge d'optimisation possible."
-        else:
-            interp["sharpe"] = "Rendement inférieur au taux sans risque. Le portefeuille ne compense pas sa volatilité."
-
-        # ── Sortino vs Sharpe ──
-        if sortino > sharpe + 0.5 and sortino > 0:
-            interp["sortino"] = (
-                "Sortino nettement supérieur au Sharpe : votre volatilité est principalement "
-                "positive (hausses). C'est un signe de force — le Sortino est plus pertinent "
-                "en crypto car il ne punit pas les gains explosifs."
-            )
-        elif sortino > 0:
-            interp["sortino"] = (
-                "Ratio positif. Le Sortino est le ratio de référence en crypto car il "
-                "ne pénalise que la volatilité baissière, pas les hausses brutales."
-            )
-        else:
-            interp["sortino"] = "Sortino négatif : les pertes dominent. Le risque baissier dépasse le rendement."
-
-        # ── Calmar ──
-        if calmar > 2:
-            interp["calmar"] = "Excellente récupération : le rendement compense largement le pire drawdown subi."
-        elif calmar > 1:
-            interp["calmar"] = "Le rendement annualisé dépasse le max drawdown. Bonne résilience."
-        elif calmar > 0:
-            interp["calmar"] = "Rendement positif mais inférieur au max drawdown. Récupération lente."
-        else:
-            interp["calmar"] = "Le portefeuille n'a pas récupéré de sa plus grosse perte."
-
-        return interp
-
     def _assemble_analytics(self, asset_data: list, risk_free_rate: float = RISK_FREE_RATE) -> PortfolioAnalytics:
         """From a list of asset dicts, compute all portfolio-level analytics."""
         # Separate stablecoins from real assets
@@ -704,8 +534,8 @@ class AnalyticsService:
             else ""
         )
 
-        concentration = self._hhi(allocation_by_asset)
-        diversification = self._diversification_score(len(real_assets), len(allocation_by_type), concentration)
+        concentration = _hhi(allocation_by_asset)
+        diversification = _diversification_score(len(real_assets), len(allocation_by_type), concentration)
 
         # Build per-asset performances (exclude stablecoins)
         perfs = []
@@ -737,7 +567,7 @@ class AnalyticsService:
         worst = sorted_p[-1].symbol if len(sorted_p) > 1 else (None if len(sorted_p) <= 1 else sorted_p[0].symbol)
 
         # ── Contextual interpretations ──
-        interpretations = self._build_interpretations(
+        interpretations = _build_interpretations(
             sharpe=sharpe,
             sortino=sortino,
             calmar=calmar,
@@ -963,7 +793,7 @@ class AnalyticsService:
             "type_count": len(analytics.allocation_by_type),
             "allocation_by_type": analytics.allocation_by_type,
             "recommendations": recs,
-            "rating": self._diversification_rating(analytics.diversification_score),
+            "rating": _diversification_rating(analytics.diversification_score),
         }
 
     # ------------------------------------------------------------------
@@ -1091,7 +921,7 @@ class AnalyticsService:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,
-            self._monte_carlo_compute,
+            _monte_carlo_compute,
             mu_vec,
             L,
             w,
@@ -1104,141 +934,6 @@ class AnalyticsService:
             monthly_withdrawal,
             total_value,
             vol_regime,
-        )
-
-    @staticmethod
-    def _monte_carlo_compute(
-        mu_vec: np.ndarray,
-        L: np.ndarray,
-        w: np.ndarray,
-        num_simulations: int,
-        horizon_days: int,
-        n_assets: int,
-        user_id: str,
-        annual_withdrawal_rate: float = 0.0,
-        ter_percentage: float = 0.0,
-        monthly_withdrawal: float = 0.0,
-        initial_portfolio_value: float = 0.0,
-        vol_regime: str = "normal",
-        seed: Optional[int] = None,
-    ) -> "MonteCarloResult":
-        """CPU-bound Monte Carlo with volatility shrinkage, withdrawals and fees.
-
-        Volatility shrinkage: for horizons > 90 days, the Cholesky factor (L)
-        is blended towards a long-term average volatility (~20% annualized)
-        using a linear shrinkage schedule.  This prevents unrealistic
-        extreme outcomes when short-term crypto vol (80%+) is extrapolated
-        over multi-year horizons.
-
-        vol_regime controls the long-term vol assumption:
-        - "stress" (bear): 30% annualized — heavier tails, more pessimistic
-        - "normal": 20% annualized — baseline
-        - "low" (bull): 15% annualized — compressed vol, more optimistic
-
-        Withdrawal modes (mutually exclusive, ``monthly_withdrawal`` takes priority):
-        - ``monthly_withdrawal`` (€): absolute daily deduction = amount / 30.
-          Formula: V(t) = V(t-1) * exp(r_t) * (1 - ter/365) - monthly_withdrawal/30
-        - ``annual_withdrawal_rate`` (%): proportional daily deduction.
-
-        A path is marked as "ruined" when portfolio value drops to ≤ 0.
-        """
-        # Cap allocation: 200 MB / 8 bytes per float64
-        max_elements = 200_000_000 // 8
-        capped_sims = min(num_simulations, max_elements // max(horizon_days * n_assets, 1))
-        capped_sims = max(capped_sims, 100)  # At least 100 simulations
-
-        # --- Volatility shrinkage (mean reversion) ---
-        # Regime-aware long-term vol target
-        _VOL_BY_REGIME = {"stress": 0.30, "normal": 0.20, "low": 0.15}
-        LONG_TERM_DAILY_VOL = _VOL_BY_REGIME.get(vol_regime, 0.20) / np.sqrt(252)
-        # Shrinkage ramps from 0 at 90 days to 1 at 1825 days (5 years)
-        shrinkage = np.clip((horizon_days - 90) / (1825 - 90), 0.0, 1.0)
-
-        if shrinkage > 0:
-            # Build a long-term L: diagonal matrix with uniform long-term vol
-            L_longterm = np.eye(n_assets) * LONG_TERM_DAILY_VOL
-            L_blended = (1 - shrinkage) * L + shrinkage * L_longterm
-        else:
-            L_blended = L
-
-        # Reproducibility: an explicit ``seed`` forces deterministic draws (tests,
-        # or any caller that needs repeatable runs). Production leaves it None, so
-        # each run gets fresh randomness from the wall clock XOR the user id.
-        if seed is None:
-            seed = int(time.time()) ^ (hash(user_id) % (2**31))
-        rng = np.random.default_rng(seed & 0x7FFFFFFF)
-        Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
-        correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)
-        port_daily_returns = correlated_returns @ w  # (capped_sims, horizon_days)
-
-        # --- Daily deductions from withdrawals + TER ---
-        # TER: multiplicative daily factor  (1 - ter/365) applied each day.
-        daily_ter_factor = 1.0
-        if ter_percentage > 0:
-            daily_ter_factor = 1.0 - ter_percentage / 100.0 / 365.0
-
-        # Withdrawal: absolute daily amount (monthly_withdrawal / 30) normalised
-        # to portfolio-relative units (we simulate starting at V=1.0).
-        # Fallback: proportional annual_withdrawal_rate for backward compat.
-        daily_abs_withdrawal = 0.0  # in normalised units (fraction of initial)
-        daily_prop_withdrawal = 1.0  # multiplicative factor
-        use_absolute = monthly_withdrawal > 0 and initial_portfolio_value > 0
-
-        if use_absolute:
-            daily_abs_withdrawal = (monthly_withdrawal / 30.0) / initial_portfolio_value
-        elif annual_withdrawal_rate > 0:
-            daily_prop_withdrawal = (1 - annual_withdrawal_rate / 100) ** (1 / 252)
-
-        has_deductions = daily_ter_factor < 1.0 or daily_abs_withdrawal > 0 or daily_prop_withdrawal < 1.0
-
-        if has_deductions:
-            # Step-by-step simulation: V(t) starts at 1.0 (normalised)
-            portfolio_values = np.ones((capped_sims, horizon_days + 1))
-            for day in range(horizon_days):
-                # V(t) = V(t-1) * exp(r_t) * ter_factor - abs_withdrawal
-                # (or  * prop_factor  when using proportional mode)
-                v_next = (
-                    portfolio_values[:, day]
-                    * np.exp(port_daily_returns[:, day])
-                    * daily_ter_factor
-                    * daily_prop_withdrawal
-                )
-                if daily_abs_withdrawal > 0:
-                    v_next -= daily_abs_withdrawal
-                # Floor at zero: once ruined, stay ruined
-                portfolio_values[:, day + 1] = np.maximum(v_next, 0.0)
-
-            # Ruin = portfolio touched 0 (or near-zero)
-            ruin_mask = np.any(portfolio_values[:, 1:] <= 0.001, axis=1)
-            prob_ruin = float(np.mean(ruin_mask) * 100)
-
-            # Total returns from final portfolio value
-            final_values = portfolio_values[:, -1]
-            total_returns_pct = (final_values - 1.0) * 100
-        else:
-            # Original path without deductions (faster vectorized)
-            cumulative_path = np.cumsum(port_daily_returns, axis=1)
-            portfolio_values = np.exp(cumulative_path)  # relative to initial (1.0)
-            ruin_mask = np.any(portfolio_values <= 0.01, axis=1)
-            prob_ruin = float(np.mean(ruin_mask) * 100)
-
-            cumulative = cumulative_path[:, -1]
-            total_returns_pct = (np.exp(cumulative) - 1) * 100
-
-        return MonteCarloResult(
-            percentiles={
-                "p5": round(float(np.percentile(total_returns_pct, 5)), 2),
-                "p25": round(float(np.percentile(total_returns_pct, 25)), 2),
-                "p50": round(float(np.percentile(total_returns_pct, 50)), 2),
-                "p75": round(float(np.percentile(total_returns_pct, 75)), 2),
-                "p95": round(float(np.percentile(total_returns_pct, 95)), 2),
-            },
-            expected_return=round(float(np.mean(total_returns_pct)), 2),
-            prob_positive=round(float(np.mean(total_returns_pct > 0) * 100), 1),
-            prob_loss_10=round(float(np.mean(total_returns_pct < -10) * 100), 1),
-            prob_ruin=round(prob_ruin, 1),
-            simulations=capped_sims,
-            horizon_days=horizon_days,
         )
 
     # ------------------------------------------------------------------
@@ -1812,7 +1507,7 @@ class AnalyticsService:
                 bench_returns = spy_returns
                 bench_name = "SPY"
 
-            beta = self._calc_beta(rets, bench_returns)
+            beta = _calc_beta(rets, bench_returns)
 
             asset_betas.append(
                 {
@@ -1820,7 +1515,7 @@ class AnalyticsService:
                     "asset_type": at,
                     "beta": round(beta, 3) if beta is not None else None,
                     "benchmark": bench_name,
-                    "interpretation": self._interpret_beta(beta),
+                    "interpretation": _interpret_beta(beta),
                     "value": round(val, 2),
                 }
             )
@@ -1846,54 +1541,9 @@ class AnalyticsService:
             },
         }
 
-    @staticmethod
-    def _calc_beta(asset_returns: np.ndarray, bench_returns: np.ndarray) -> Optional[float]:
-        """Compute beta = Cov(asset, bench) / Var(bench)."""
-        if len(asset_returns) < 10 or len(bench_returns) < 10:
-            return None
-        min_len = min(len(asset_returns), len(bench_returns))
-        a = asset_returns[-min_len:]
-        b = bench_returns[-min_len:]
-        var_b = float(np.var(b, ddof=1))
-        if var_b == 0:
-            return None
-        cov = float(np.cov(a, b)[0, 1])
-        return cov / var_b
-
-    @staticmethod
-    def _interpret_beta(beta: Optional[float]) -> str:
-        """Interpret beta value in French using centralized classification."""
-        if beta is None:
-            return "Données insuffisantes"
-        category = adaptive_th.beta_classification(beta)
-        labels = {
-            "very_aggressive": "Très agressif — amplifie les mouvements du marché",
-            "aggressive": "Agressif — plus volatil que le marché",
-            "neutral": "Neutre — suit le marché",
-            "defensive": "Défensif — moins volatil que le marché",
-            "very_defensive": "Très défensif — quasi décorrélé du marché",
-            "inverse": "Inversement corrélé — se comporte à l'inverse du marché",
-        }
-        return labels.get(category, "Données insuffisantes")
-
     # ------------------------------------------------------------------
     # Parametric VaR (#16)
     # ------------------------------------------------------------------
-
-    def _build_portfolio_var_parametric(self, port_returns: np.ndarray, total_value: float) -> dict:
-        """Compute parametric VaR alongside historical VaR for comparison."""
-        var_hist = _var_historical(port_returns) if len(port_returns) >= 5 else 0.0
-        var_param = _var_parametric(port_returns) if len(port_returns) >= 5 else 0.0
-        cvar = _cvar_historical(port_returns) if len(port_returns) >= 5 else 0.0
-
-        return {
-            "var_95_historical_pct": round(var_hist, 2),
-            "var_95_parametric_pct": round(var_param, 2),
-            "var_95_historical_eur": round(total_value * var_hist / 100, 2),
-            "var_95_parametric_eur": round(total_value * var_param / 100, 2),
-            "cvar_95_pct": round(cvar, 2),
-            "cvar_95_eur": round(total_value * cvar / 100, 2),
-        }
 
     # ------------------------------------------------------------------
     # Helpers
@@ -1921,31 +1571,6 @@ class AnalyticsService:
             best_performer=None,
             worst_performer=None,
         )
-
-    @staticmethod
-    def _hhi(allocation: Dict[str, float]) -> float:
-        if not allocation:
-            return 0
-        return round(sum((w / 100) ** 2 for w in allocation.values()), 4)
-
-    @staticmethod
-    def _diversification_score(asset_count: int, type_count: int, concentration: float) -> float:
-        a = min(asset_count * 3, 30)
-        t = min(type_count * 10, 30)
-        c = max(0, 40 * (1 - concentration * 2))
-        return round(a + t + c, 1)
-
-    @staticmethod
-    def _diversification_rating(score: float) -> str:
-        if score >= 80:
-            return "Excellent"
-        elif score >= 60:
-            return "Bon"
-        elif score >= 40:
-            return "Moyen"
-        elif score >= 20:
-            return "Faible"
-        return "Très faible"
 
 
 # Singleton instance
