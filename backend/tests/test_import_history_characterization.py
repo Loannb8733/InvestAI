@@ -43,7 +43,7 @@ from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder, Exch
 MAINTENANT = datetime.now(timezone.utc)
 
 
-def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None):
+def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None, devise_frais="EUR"):
     return ExchangeTrade(
         trade_id=trade_id,
         symbol=symbol,
@@ -51,7 +51,7 @@ def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None):
         quantity=Decimal(quantite),
         price=Decimal(prix),
         fee=Decimal(frais),
-        fee_currency="EUR",
+        fee_currency=devise_frais,
         timestamp=quand or (MAINTENANT - timedelta(days=30)),
     )
 
@@ -348,6 +348,38 @@ class TestFrais:
 
         tx = (await db_session.execute(select(Transaction))).scalars().first()
         assert float(tx.fee) == 1.5
+
+
+class TestFraisEnJeton:
+    """Les frais prélevés en jeton sont ramenés en euros avant écriture.
+
+    Ce chemin n'était couvert par aucun test : couper son branchement ne
+    faisait tomber aucun des 26 précédents. Vérifié par canari avant d'écrire
+    ceux-ci.
+    """
+
+    async def test_des_frais_dans_le_jeton_echange_sont_valorises(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """0,001 BTC de frais sur un BTC à 30 000 € font 30 € de frais."""
+        service_double.trades = [_trade("t1", "BTCEUR", "buy", "0.5", "30000", frais="0.001", devise_frais="BTC")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert float(tx.fee) == pytest.approx(30.0)
+        assert tx.fee_currency == "EUR", "la devise suit la conversion"
+
+    async def test_des_frais_deja_en_euros_ne_bougent_pas(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        service_double.trades = [_trade("t1", "BTCEUR", "buy", "0.5", "30000", frais="1.5", devise_frais="EUR")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert float(tx.fee) == 1.5
+        assert tx.fee_currency == "EUR"
 
 
 class TestIdempotence:

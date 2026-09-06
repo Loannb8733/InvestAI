@@ -46,6 +46,12 @@ from app.services.exchange_import_preparation import (
     fusionner_portefeuilles_herites,
     resoudre_portefeuille_crypto,
 )
+from app.services.exchange_import_valuation import (
+    convertir_frais_en_eur,
+    est_cote_en_usd,
+    frais_a_convertir,
+    lire_prix_jeton,
+)
 from app.services.exchanges import SUPPORTED_EXCHANGES
 from app.services.metrics_service import invalidate_dashboard_cache
 
@@ -877,9 +883,8 @@ async def import_trade_history(
                 # Convert the trade price to EUR using the USD→EUR rate as of the trade's
                 # execution date (FIN-01), not a single current rate for the whole history.
                 # Falls back to the current spot rate only when no historical rate exists.
-                trade_symbol = getattr(trade, "symbol", "")
                 price_eur = float(trade.price)
-                if any(trade_symbol.endswith(q) for q in ["USDT", "USDC", "BUSD", "FDUSD", "USD"]):
+                if est_cote_en_usd(getattr(trade, "symbol", "")):
                     price_eur = price_eur * await _usd_eur_at(trade.timestamp.date())
 
                 # For conversions, store the conversion rate
@@ -887,41 +892,20 @@ async def import_trade_history(
                 if is_conversion and trade.price:
                     conversion_rate = float(trade.price)
 
-                # Handle fee: convert crypto fees to EUR
+                # Les frais prélevés en jeton sont ramenés en euros : sans cela,
+                # le coût de revient et la fiscalité qui en découle seraient faux.
                 fee_amount = float(trade.fee) if trade.fee else 0
                 fee_currency = getattr(trade, "fee_currency", None) or "EUR"
 
-                # If fee is in a crypto currency, convert to EUR
-                if fee_currency not in ["EUR", "USD", "GBP", "CAD", "JPY"] and fee_amount > 0:
-                    if fee_currency == symbol:
-                        # Fee is in the same token as the trade (e.g., PEPE fee on PEPE trade)
-                        if price_eur > 0:
-                            fee_amount = fee_amount * price_eur
-                        else:
-                            fee_amount = 0
-                    else:
-                        # Fee is in a different token (e.g., BNB fee on PEPE trade)
-                        # Look up the fee token's current price
-                        fee_token_price = 0
+                if frais_a_convertir(fee_currency, fee_amount):
+                    prix_jeton_eur = 0.0
+                    if fee_currency != symbol:
                         try:
-                            fee_price_data = await price_service.get_multiple_crypto_prices([fee_currency], "eur")
-                            if fee_currency.lower() in fee_price_data:
-                                fee_token_price = float(fee_price_data[fee_currency.lower()].get("price", 0))
-                            elif fee_currency.upper() in fee_price_data:
-                                fee_token_price = float(fee_price_data[fee_currency.upper()].get("price", 0))
+                            reponse = await price_service.get_multiple_crypto_prices([fee_currency], "eur")
+                            prix_jeton_eur = lire_prix_jeton(reponse, fee_currency)
                         except Exception as exc:  # noqa: BLE001
-                            logger.debug(
-                                "Fee-token price lookup failed for %s: %s",
-                                fee_currency,
-                                exc,
-                            )
-                        if fee_token_price > 0:
-                            fee_amount = fee_amount * fee_token_price
-                        elif price_eur > 0:
-                            # Fallback: use asset price (better than nothing)
-                            fee_amount = fee_amount * price_eur
-                        else:
-                            fee_amount = 0
+                            logger.debug("Cours introuvable pour les frais en %s : %s", fee_currency, exc)
+                    fee_amount = convertir_frais_en_eur(fee_amount, fee_currency, symbol, price_eur, prix_jeton_eur)
                     fee_currency = "EUR"
 
                 transaction = Transaction(
