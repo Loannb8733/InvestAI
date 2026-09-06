@@ -274,14 +274,14 @@ class TestMonteCarloRuin:
 
     def test_positive_returns_zero_ruin(self):
         """With strongly positive drift and low vol, ruin should be ~0%."""
-        from app.services.analytics_service import AnalyticsService
+        from app.services.analytics_simulation import _monte_carlo_compute
 
         # Daily drift of +0.5% with negligible volatility
         mu_vec = np.array([0.005])
         L = np.array([[0.001]])
         w = np.array([1.0])
 
-        result = AnalyticsService._monte_carlo_compute(
+        result = _monte_carlo_compute(
             mu_vec=mu_vec,
             L=L,
             w=w,
@@ -295,14 +295,14 @@ class TestMonteCarloRuin:
 
     def test_negative_drift_increases_ruin(self):
         """With strongly negative drift, ruin probability should be > 0."""
-        from app.services.analytics_service import AnalyticsService
+        from app.services.analytics_simulation import _monte_carlo_compute
 
         # Daily drift of -2% with moderate vol → paths frequently collapse
         mu_vec = np.array([-0.02])
         L = np.array([[0.05]])
         w = np.array([1.0])
 
-        result = AnalyticsService._monte_carlo_compute(
+        result = _monte_carlo_compute(
             mu_vec=mu_vec,
             L=L,
             w=w,
@@ -316,7 +316,7 @@ class TestMonteCarloRuin:
 
     def test_volatility_shrinkage_reduces_extremes(self):
         """Long horizons with shrinkage should have tighter daily vol than raw."""
-        from app.services.analytics_service import AnalyticsService
+        from app.services.analytics_simulation import _monte_carlo_compute
 
         # High vol (crypto-like: 80% annualized → daily ~5%)
         high_daily_vol = 0.80 / np.sqrt(252)
@@ -337,7 +337,7 @@ class TestMonteCarloRuin:
         assert 0.1 < shrinkage < 0.2, f"Expected ~15.9% shrinkage at 365d, got {shrinkage:.3f}"
 
         # Run simulation and verify it completes without error
-        result = AnalyticsService._monte_carlo_compute(
+        result = _monte_carlo_compute(
             mu_vec=mu_vec,
             L=L_high,
             w=w,

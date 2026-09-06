@@ -187,7 +187,11 @@ class TestDiversification:
         resultat = await service.get_diversification_analysis(db_session, str(regular_user.id))
 
         assert resultat["type_count"] == 1
-        assert resultat["allocation_by_type"] == {"crypto": 100.0}
+        # Comparaison approchée : la somme des parts passe par des flottants et
+        # rend 100.00000000000001. Une égalité stricte rendait ce test
+        # dépendant de l'ordre des additions.
+        assert set(resultat["allocation_by_type"]) == {"crypto"}
+        assert resultat["allocation_by_type"]["crypto"] == pytest.approx(100.0)
         types = {r["type"] for r in resultat["recommendations"]}
         assert "asset_types" in types
 
