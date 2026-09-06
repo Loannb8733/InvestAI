@@ -11,14 +11,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.core.security import decrypt_api_key
 from app.models.api_key import APIKey
 from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.exchange_error_classifier import rollback_puis_marquer
-from app.services.exchanges import get_exchange_service
+from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.fx_history_service import FxHistoryService
 from app.services.metrics_service import invalidate_dashboard_cache
@@ -1039,19 +1038,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             return {"success": False, "error": "API key not found or inactive"}
 
         try:
-            # Decrypt credentials
-            decrypted_api = decrypt_api_key(api_key.encrypted_api_key)
-            decrypted_secret = None
-            decrypted_passphrase = None
-
-            if api_key.encrypted_secret_key:
-                decrypted_secret = decrypt_api_key(api_key.encrypted_secret_key)
-            if api_key.encrypted_passphrase:
-                decrypted_passphrase = decrypt_api_key(api_key.encrypted_passphrase)
-
-            # Get exchange service
-            service_class = get_exchange_service(api_key.exchange)
-            service = service_class(decrypted_api, decrypted_secret, decrypted_passphrase)
+            service = construire_service_exchange(api_key)
 
             # Get balances
             balances = await service.get_balances()
@@ -1062,36 +1049,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                 await db.commit()
                 return {"success": True, "synced": 0}
 
-            # Get or create unified "Crypto" portfolio (same logic as import-history)
-            portfolio_result = await db.execute(
-                select(Portfolio).where(
-                    Portfolio.user_id == api_key.user_id,
-                    Portfolio.name == "Crypto",
-                )
-            )
-            portfolio = portfolio_result.scalar_one_or_none()
-
-            if not portfolio:
-                # Check for legacy per-exchange portfolio
-                legacy_result = await db.execute(
-                    select(Portfolio).where(
-                        Portfolio.user_id == api_key.user_id,
-                        Portfolio.name == f"{service.exchange_name}",
-                    )
-                )
-                portfolio = legacy_result.scalar_one_or_none()
-                if portfolio:
-                    portfolio.name = "Crypto"
-                    portfolio.description = "Portefeuille crypto consolidé"
-
-            if not portfolio:
-                portfolio = Portfolio(
-                    user_id=api_key.user_id,
-                    name="Crypto",
-                    description="Portefeuille crypto consolidé",
-                )
-                db.add(portfolio)
-                await db.flush()
+            portfolio = await resoudre_portefeuille_crypto(db, api_key.user_id, service.exchange_name)
 
             # Get existing assets (match by exchange or transferred assets)
             assets_result = await db.execute(

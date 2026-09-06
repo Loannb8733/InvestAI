@@ -34,12 +34,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import limiter
-from app.core.security import decrypt_api_key, encrypt_api_key
+from app.core.security import encrypt_api_key
 from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
 from app.services.exchange_error_classifier import rollback_puis_marquer
-from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
+from app.services.exchange_import_preparation import (
+    construire_service_exchange,
+    fusionner_portefeuilles_herites,
+    resoudre_portefeuille_crypto,
+)
+from app.services.exchanges import SUPPORTED_EXCHANGES
 from app.services.metrics_service import invalidate_dashboard_cache
 
 
@@ -241,19 +246,7 @@ async def test_api_key(
         )
 
     try:
-        # Decrypt credentials
-        decrypted_api = decrypt_api_key(api_key.encrypted_api_key)
-        decrypted_secret = None
-        decrypted_passphrase = None
-
-        if api_key.encrypted_secret_key:
-            decrypted_secret = decrypt_api_key(api_key.encrypted_secret_key)
-        if api_key.encrypted_passphrase:
-            decrypted_passphrase = decrypt_api_key(api_key.encrypted_passphrase)
-
-        # Get exchange service
-        service_class = get_exchange_service(api_key.exchange)
-        service = service_class(decrypted_api, decrypted_secret, decrypted_passphrase)
+        service = construire_service_exchange(api_key)
 
         # Test connection
         success = await service.test_connection()
@@ -352,7 +345,6 @@ async def import_trade_history(
     from collections import defaultdict
 
     from app.models.asset import Asset, AssetType
-    from app.models.portfolio import Portfolio
     from app.models.transaction import Transaction, TransactionType
 
     result = await db.execute(
@@ -370,85 +362,11 @@ async def import_trade_history(
         )
 
     try:
-        # Decrypt credentials
-        decrypted_api = decrypt_api_key(api_key.encrypted_api_key)
-        decrypted_secret = None
-        decrypted_passphrase = None
+        service = construire_service_exchange(api_key)
 
-        if api_key.encrypted_secret_key:
-            decrypted_secret = decrypt_api_key(api_key.encrypted_secret_key)
-        if api_key.encrypted_passphrase:
-            decrypted_passphrase = decrypt_api_key(api_key.encrypted_passphrase)
+        portfolio = await resoudre_portefeuille_crypto(db, current_user.id, service.exchange_name)
 
-        # Get exchange service
-        service_class = get_exchange_service(api_key.exchange)
-        service = service_class(decrypted_api, decrypted_secret, decrypted_passphrase)
-
-        # Get or create a single "Crypto" portfolio (all exchanges go into one portfolio)
-        portfolio_result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == current_user.id,
-                Portfolio.name == "Crypto",
-            )
-        )
-        portfolio = portfolio_result.scalar_one_or_none()
-
-        # Also check for legacy per-exchange portfolios to reuse
-        if not portfolio:
-            legacy_result = await db.execute(
-                select(Portfolio).where(
-                    Portfolio.user_id == current_user.id,
-                    Portfolio.name == f"{service.exchange_name}",
-                )
-            )
-            portfolio = legacy_result.scalar_one_or_none()
-            if portfolio:
-                # Rename legacy portfolio to "Crypto"
-                portfolio.name = "Crypto"
-                portfolio.description = "Portefeuille crypto consolidé"
-
-        if not portfolio:
-            portfolio = Portfolio(
-                user_id=current_user.id,
-                name="Crypto",
-                description="Portefeuille crypto consolidé",
-            )
-            db.add(portfolio)
-            await db.flush()
-
-        # Merge assets from other exchange portfolios into this one
-        other_portfolios_result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == current_user.id,
-                Portfolio.id != portfolio.id,
-                Portfolio.name.in_(["Binance", "Kraken", "Crypto.com"]),
-            )
-        )
-        other_portfolios = other_portfolios_result.scalars().all()
-        for other_portfolio in other_portfolios:
-            # Move all assets to the Crypto portfolio
-            other_assets_result = await db.execute(select(Asset).where(Asset.portfolio_id == other_portfolio.id))
-            for other_asset in other_assets_result.scalars().all():
-                other_asset.portfolio_id = portfolio.id
-            # Move snapshots
-            from app.models.portfolio_snapshot import PortfolioSnapshot
-
-            snapshot_result = await db.execute(
-                select(PortfolioSnapshot).where(PortfolioSnapshot.portfolio_id == other_portfolio.id)
-            )
-            for snapshot in snapshot_result.scalars().all():
-                snapshot.portfolio_id = portfolio.id
-            # Merge cash_balances
-            if other_portfolio.cash_balances:
-                if not portfolio.cash_balances:
-                    portfolio.cash_balances = {}
-                for key, val in other_portfolio.cash_balances.items():
-                    portfolio.cash_balances[key] = portfolio.cash_balances.get(key, 0) + val
-            # Delete empty portfolio
-            await db.delete(other_portfolio)
-            logger.info(f"Merged portfolio '{other_portfolio.name}' into 'Crypto'")
-
-        await db.flush()
+        await fusionner_portefeuilles_herites(db, portfolio, current_user.id)
 
         # Get current balances first
         balances = await service.get_balances()
@@ -1550,7 +1468,6 @@ async def sync_exchange(
 ):
     """Sync balances from an exchange to portfolio assets."""
     from app.models.asset import Asset, AssetType
-    from app.models.portfolio import Portfolio
 
     result = await db.execute(
         select(APIKey).where(
@@ -1567,19 +1484,7 @@ async def sync_exchange(
         )
 
     try:
-        # Decrypt credentials
-        decrypted_api = decrypt_api_key(api_key.encrypted_api_key)
-        decrypted_secret = None
-        decrypted_passphrase = None
-
-        if api_key.encrypted_secret_key:
-            decrypted_secret = decrypt_api_key(api_key.encrypted_secret_key)
-        if api_key.encrypted_passphrase:
-            decrypted_passphrase = decrypt_api_key(api_key.encrypted_passphrase)
-
-        # Get exchange service
-        service_class = get_exchange_service(api_key.exchange)
-        service = service_class(decrypted_api, decrypted_secret, decrypted_passphrase)
+        service = construire_service_exchange(api_key)
 
         # Get balances
         balances = await service.get_balances()
@@ -1590,36 +1495,7 @@ async def sync_exchange(
                 "synced_assets": 0,
             }
 
-        # Get or create unified "Crypto" portfolio (same logic as import-history)
-        portfolio_result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == current_user.id,
-                Portfolio.name == "Crypto",
-            )
-        )
-        portfolio = portfolio_result.scalar_one_or_none()
-
-        if not portfolio:
-            # Check for legacy per-exchange portfolio
-            legacy_result = await db.execute(
-                select(Portfolio).where(
-                    Portfolio.user_id == current_user.id,
-                    Portfolio.name == f"{service.exchange_name}",
-                )
-            )
-            portfolio = legacy_result.scalar_one_or_none()
-            if portfolio:
-                portfolio.name = "Crypto"
-                portfolio.description = "Portefeuille crypto consolidé"
-
-        if not portfolio:
-            portfolio = Portfolio(
-                user_id=current_user.id,
-                name="Crypto",
-                description="Portefeuille crypto consolidé",
-            )
-            db.add(portfolio)
-            await db.flush()
+        portfolio = await resoudre_portefeuille_crypto(db, current_user.id, service.exchange_name)
 
         # Get existing assets (match by exchange or transferred assets)
         assets_result = await db.execute(
