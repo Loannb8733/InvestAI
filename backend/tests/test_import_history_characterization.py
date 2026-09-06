@@ -26,7 +26,7 @@ chose que cette exploration a révélée, et elle venait du double, pas du code.
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -38,7 +38,7 @@ from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.services.exchanges.base import ExchangeTrade
+from app.services.exchanges.base import ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
 
 MAINTENANT = datetime.now(timezone.utc)
 
@@ -56,12 +56,53 @@ def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None):
     )
 
 
+def _retrait(wid, symbole, montant, frais="0"):
+    return ExchangeWithdrawal(
+        withdrawal_id=wid,
+        symbol=symbole,
+        amount=Decimal(montant),
+        fee=Decimal(frais),
+        timestamp=MAINTENANT - timedelta(days=20),
+        status="completed",
+        tx_id="tx",
+        address="adresse",
+    )
+
+
+def _ordre_fiat(oid, symbole, quantite, montant_fiat, prix, frais="0"):
+    return ExchangeFiatOrder(
+        order_id=oid,
+        crypto_symbol=symbole,
+        fiat_currency="EUR",
+        side="buy",
+        crypto_amount=Decimal(quantite),
+        fiat_amount=Decimal(montant_fiat),
+        price=Decimal(prix),
+        fee=Decimal(frais),
+        status="completed",
+        timestamp=MAINTENANT - timedelta(days=20),
+    )
+
+
 class ServiceDouble:
-    """Double du service d'exchange, fidèle au contrat de `base.py`."""
+    """Double du service d'exchange, fidèle au contrat de `base.py`.
+
+    Les taux sont figés (forex à 1, prix historique à 50 000 €) pour que les
+    montants attendus soient lisibles : sans cela, chaque assertion de prix
+    dépendrait d'une conversion.
+    """
 
     exchange_name = "binance"
     trades: list = []
     balances: list = []
+    rewards: list = []
+    conversions: list = []
+    withdrawals: list = []
+    fiat_orders: list = []
+    auto_invest: list = []
+    # `get_auto_invest_history` est interrogé par fenêtres de 30 jours : sans ce
+    # compteur, le double rendrait le même ordre à chaque fenêtre.
+    fenetres_auto_invest: int = 0
 
     def __init__(self, *args, **kwargs):
         pass
@@ -73,23 +114,26 @@ class ServiceDouble:
         return list(type(self).balances)
 
     async def get_fiat_orders(self, **k):
-        return []
+        return list(type(self).fiat_orders)
 
     async def get_rewards(self, **k):
-        return []
+        return list(type(self).rewards)
 
     async def get_withdrawals(self, **k):
-        return []
+        return list(type(self).withdrawals)
 
     async def get_crypto_conversions(self, **k):
-        return []
+        return list(type(self).conversions)
 
     async def get_instant_buys(self, **k):
         # Seule méthode du contrat à rendre un tuple : (trades, refids).
         return [], set()
 
     async def get_auto_invest_history(self, **k):
-        return []
+        # Une seule fenêtre porte les ordres : l'exchange ne rend pas le même
+        # ordre dans deux tranches de temps disjointes.
+        type(self).fenetres_auto_invest += 1
+        return list(type(self).auto_invest) if type(self).fenetres_auto_invest == 1 else []
 
     async def get_convert_history(self, **k):
         return []
@@ -98,10 +142,10 @@ class ServiceDouble:
         return []
 
     async def get_forex_rate(self, *a, **k):
-        return 0.92
+        return 1.0
 
     async def get_historical_crypto_price(self, *a, **k):
-        return None
+        return 50000.0
 
     async def get_multiple_crypto_prices(self, *a, **k):
         return {}
@@ -114,6 +158,12 @@ class ServiceDouble:
 def service_double():
     ServiceDouble.trades = []
     ServiceDouble.balances = []
+    ServiceDouble.rewards = []
+    ServiceDouble.conversions = []
+    ServiceDouble.withdrawals = []
+    ServiceDouble.fiat_orders = []
+    ServiceDouble.auto_invest = []
+    ServiceDouble.fenetres_auto_invest = 0
     return ServiceDouble
 
 
@@ -133,9 +183,19 @@ async def _cle_api(db_session, utilisateur) -> APIKey:
 
 
 async def _importer(client, db_session, utilisateur, service):
+    """Lance l'import avec le double, et le cours historique figé.
+
+    Le prix des récompenses et des conversions ne vient **pas** du service
+    d'exchange mais de `price_service.get_historical_crypto_price` — donc de
+    CoinGecko. Sans ce second patch, le test part sur le réseau, attend 1,5 s
+    par prix, et son résultat dépend du cours du jour.
+    """
     cle = await _cle_api(db_session, utilisateur)
     token = create_access_token(subject=str(utilisateur.id))
-    with patch("app.api.v1.endpoints.api_keys.get_exchange_service", return_value=service):
+    with patch("app.api.v1.endpoints.api_keys.get_exchange_service", return_value=service), patch(
+        "app.services.price_service.price_service.get_historical_crypto_price",
+        new=AsyncMock(return_value=50000.0),
+    ):
         reponse = await client.post(
             f"/api/v1/api-keys/{cle.id}/import-history",
             headers={"Authorization": f"Bearer {token}"},
@@ -329,6 +389,171 @@ class TestDoubleDeduplication:
             "les notes portent aussi l'identifiant : c'est le second filet de "
             "déduplication, pour l'historique importé avant `external_id`"
         )
+
+
+class TestClassificationParPrefixe:
+    """Le type d'une transaction se lit sur le **préfixe de `trade_id`**.
+
+    `reward_staking_`, `reward_` (airdrop), `fiat_`, `instant_`, `convert_`,
+    `withdrawal_` — tout le reste est un trade spot. C'est la mécanique
+    centrale de la fonction, et la plus fragile : un découpage qui perdrait ces
+    préfixes reclasserait silencieusement toute l'activité en achats.
+
+    Vérifié par l'exploration : le même objet avec `trade_id="r1"` est importé
+    comme spot, avec `trade_id="reward_staking_1"` comme récompense.
+    """
+
+    async def test_sans_prefixe_c_est_un_trade_spot(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        service_double.rewards = [_trade("r1", "BTCEUR", "buy", "0.01", "0")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["spot_trades"] == 1
+        assert corps["rewards"] == 0, "sans préfixe, la récompense est comptée comme un achat"
+
+    async def test_prefixe_reward_staking(self, client: AsyncClient, regular_user: User, db_session, service_double):
+        service_double.rewards = [_trade("reward_staking_1", "BTCEUR", "buy", "0.01", "0")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["rewards"] == 1
+        assert corps["spot_trades"] == 0
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert tx.transaction_type.value == "staking_reward"
+
+    async def test_prefixe_convert(self, client: AsyncClient, regular_user: User, db_session, service_double):
+        service_double.conversions = [_trade("convert_1", "ETHEUR", "buy", "1", "2000")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["conversions"] == 1
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert tx.transaction_type.value == "conversion_in"
+
+
+class TestRecompenses:
+    async def test_le_prix_vient_du_cours_historique(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """Une récompense arrive sans prix : il est reconstitué au cours du jour.
+
+        Le double fige `get_historical_crypto_price` à 50 000 € et le forex à 1.
+        """
+        service_double.rewards = [_trade("reward_staking_1", "BTCEUR", "buy", "0.01", "0")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert float(tx.price) == 50000.0
+        assert float(tx.quantity) == 0.01
+
+
+class TestRetraits:
+    async def test_un_retrait_produit_deux_ecritures(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """Le retrait est **miroité** : une sortie et son entrée correspondante.
+
+        C'est le mécanisme qui avait produit les écritures fantômes de NEW-02 :
+        un découpage doit garder les deux écritures ensemble, ou n'en garder
+        aucune.
+        """
+        service_double.withdrawals = [_retrait("w1", "BTC", "0.1")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["withdrawals"] == 1
+        transactions = (await db_session.execute(select(Transaction))).scalars().all()
+        types = sorted(t.transaction_type.value for t in transactions)
+        assert types == ["transfer_in", "transfer_out"]
+
+    async def test_les_deux_ecritures_sont_au_prix_zero(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """Un transfert n'est pas une cession : il ne porte pas de prix."""
+        service_double.withdrawals = [_retrait("w1", "BTC", "0.1")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        transactions = (await db_session.execute(select(Transaction))).scalars().all()
+        assert all(float(t.price) == 0.0 for t in transactions)
+        assert all(float(t.quantity) == 0.1 for t in transactions)
+
+
+class TestOrdresFiat:
+    async def test_un_ordre_fiat_devient_un_achat(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        service_double.fiat_orders = [_ordre_fiat("f1", "BTC", "0.02", "1000", "50000")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["fiat_orders"] == 1
+        assert corps["spot_trades"] == 0
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert tx.transaction_type.value == "buy"
+        assert float(tx.price) == 50000.0
+
+    async def test_le_bloc_debug_compte_les_ordres_recus(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """`debug` compte ce que l'exchange a **rendu** ; les compteurs de haut
+        niveau comptent ce qui a été **importé**. Les deux peuvent différer."""
+        service_double.fiat_orders = [_ordre_fiat("f1", "BTC", "0.02", "1000", "50000")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["debug"]["fiat_orders_count"] == 1
+        assert corps["debug"]["total_fiat_orders"] == 1
+
+
+class TestAutoInvest:
+    async def test_un_ordre_programme_devient_un_achat(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """L'auto-invest rend des `ExchangeFiatOrder`, pas des `ExchangeTrade`.
+
+        Un double qui se trompe de type échoue sur
+        `AttributeError: 'ExchangeTrade' object has no attribute 'crypto_symbol'`.
+        """
+        service_double.auto_invest = [_ordre_fiat("ai1", "BTC", "0.005", "240", "48000")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["imported_transactions"] == 1
+        assert corps["fiat_orders"] == 1, "l'auto-invest est compté avec les ordres fiat"
+        tx = (await db_session.execute(select(Transaction))).scalars().first()
+        assert float(tx.price) == 48000.0
+
+
+class TestDeduplicationIntraImport:
+    """La déduplication ne couvre pas les doublons d'un même import.
+
+    `existing_trade_ids` est construit **avant** la boucle, à partir de la base,
+    et n'est jamais complété pendant. Deux occurrences du même identifiant dans
+    un même flux sont donc insérées deux fois.
+
+    Observé à l'improviste : un double qui rendait le même ordre à chacune des
+    fenêtres de 30 jours a produit **28 transactions identiques**. Les fenêtres
+    réelles sont disjointes, donc le cas ne devrait pas se présenter — mais rien
+    dans le code ne l'empêche, et un découpage ne doit pas croire cette
+    protection acquise.
+    """
+
+    async def test_deux_fois_le_meme_identifiant_dans_un_import(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        meme = _trade("t1", "BTCEUR", "buy", "0.5", "30000")
+        service_double.trades = [meme, meme]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        transactions = (await db_session.execute(select(Transaction))).scalars().all()
+        assert len(transactions) == corps["imported_transactions"]
+        # Comportement épinglé, non approuvé : le doublon passe.
+        assert len(transactions) == 2
 
 
 class TestAutorisation:
