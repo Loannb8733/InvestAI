@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import ExchangesPage from './ExchangesPage'
+import type { APIKey } from '@/types/exchanges'
 
 /**
  * UX-04 — deux requêtes, deux portées d'erreur.
@@ -47,6 +48,19 @@ vi.mock('@/services/api', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('@/components/exchanges/ColdWalletsManager', () => ({ default: () => null }))
 vi.mock('@/lib/invalidate-queries', () => ({ invalidateAllFinancialData: vi.fn() }))
+
+function cle(surcharges: Partial<APIKey> = {}): APIKey {
+  return {
+    id: 'k1',
+    exchange: 'binance',
+    label: null,
+    is_active: true,
+    last_sync_at: '2026-09-01T10:00:00Z',
+    last_error: null,
+    created_at: '2026-01-01T00:00:00Z',
+    ...surcharges,
+  }
+}
 
 const EXCHANGES = [
   { id: 'binance', name: 'Binance', description: 'Exchange', requires_secret: true, requires_passphrase: false },
@@ -117,5 +131,80 @@ describe('ExchangesPage — échec de la liste des plateformes (UX-04)', () => {
     renderWithProviders()
     await screen.findByText('Exchanges supportés')
     expect(screen.queryByText('Liste des plateformes indisponible')).not.toBeInTheDocument()
+  })
+})
+
+
+/**
+ * ARC-07 — socle de rendu avant découpage.
+ *
+ * Le découpage de cette page (1 334 lignes, une seule fonction) était différé
+ * faute de couverture : rien ne disait ce qu'elle affiche. Les tests d'erreur
+ * ci-dessus en couvraient les deux échecs ; ceux-ci couvrent le rendu nominal,
+ * c'est-à-dire ce qu'un déplacement de code ne doit pas faire disparaître.
+ */
+describe('ExchangesPage — rendu nominal (socle ARC-07)', () => {
+  it('liste les plateformes connectées', async () => {
+    listMock.mockResolvedValue([cle({ exchange: 'binance' }), cle({ id: 'k2', exchange: 'kraken' })])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    // « Binance » figure aussi dans la liste des plateformes supportées :
+    // ce qui compte ici, c'est qu'il apparaisse **en plus** comme carte connectée.
+    expect((await screen.findAllByText('Binance')).length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Kraken').length).toBeGreaterThan(1)
+  })
+
+  it("affiche le libellé d'une clé quand il existe", async () => {
+    listMock.mockResolvedValue([cle({ label: 'Compte principal' })])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    expect(await screen.findByText('Compte principal')).toBeInTheDocument()
+  })
+
+  it('signale une clé en erreur', async () => {
+    listMock.mockResolvedValue([cle({ is_active: false, last_error: 'Clé révoquée' })])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    await screen.findAllByText('Binance')
+    expect(screen.getByText(/révoquée/i)).toBeInTheDocument()
+  })
+
+  it('propose de connecter une plateforme quand aucune ne l\'est', async () => {
+    listMock.mockResolvedValue([])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    // Le bouton d'ajout reste offert : une page sans clé n'est pas une impasse.
+    const boutons = await screen.findAllByRole('button', { name: /ajouter|connecter|nouvelle/i })
+    expect(boutons.length).toBeGreaterThan(0)
+  })
+
+  it('ouvre la confirmation avant de supprimer une connexion', async () => {
+    // Le dialogue est un composant à part depuis ARC-07 : ce test vérifie que
+    // la page l'ouvre encore. Sans lui, forcer sa cible à `null` ne faisait
+    // tomber aucun test — vérifié par canari avant de l'écrire.
+    listMock.mockResolvedValue([cle({ exchange: 'binance', label: 'Compte principal' })])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    await screen.findAllByText('Binance')
+    fireEvent.click(screen.getByRole('button', { name: /suppr/i }))
+
+    expect(await screen.findByText(/Supprimer cette connexion/i)).toBeInTheDocument()
+    // Le texte rassure sur ce qui ne disparaît pas : c'est le sens du dialogue.
+    expect(screen.getByText(/resteront dans l'application/i)).toBeInTheDocument()
+  })
+
+  it('rend les sections permanentes de la page', async () => {
+    listMock.mockResolvedValue([cle()])
+    listExchangesMock.mockResolvedValue(EXCHANGES)
+    renderWithProviders()
+
+    await screen.findAllByText('Binance')
+    // Ce bloc ne dépend pas des données : il doit survivre au découpage.
+    expect(screen.getByText(/exchanges supportés/i)).toBeInTheDocument()
   })
 })

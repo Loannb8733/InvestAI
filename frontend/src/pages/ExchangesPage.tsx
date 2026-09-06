@@ -15,16 +15,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,13 +39,11 @@ import {
   Trash2,
   RefreshCw,
   CheckCircle,
-  XCircle,
   AlertCircle,
   Download,
   Coins,
   Calendar,
   Clock,
-  Wallet,
   Shield,
   ChevronRight,
   Info,
@@ -67,6 +55,9 @@ import {
 import ExchangeLogo from '@/components/exchanges/exchange-logo'
 import QueryErrorState from '@/components/ui/query-error-state'
 import type { APIKey, Exchange, TestResult } from '@/types/exchanges'
+import DeleteConnectionDialog from '@/components/exchanges/DeleteConnectionDialog'
+import TestResultDialog from '@/components/exchanges/TestResultDialog'
+import { formatBalance } from '@/components/exchanges/format-balance'
 
 
 
@@ -465,15 +456,6 @@ export default function ExchangesPage() {
 
   const getExchangeName = (exchangeId: string) => {
     return exchanges?.find((e) => e.id === exchangeId)?.name || exchangeId
-  }
-
-  // Format balance for display
-  const formatBalance = (amount: number) => {
-    if (amount === 0) return '0'
-    if (amount < 0.00001) return amount.toExponential(2)
-    if (amount < 1) return amount.toFixed(6)
-    if (amount < 1000) return amount.toFixed(4)
-    return amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
   }
 
   // Freshness of the last sync: relative label + color (gain <24h, warning 1-3j, loss >3j)
@@ -1174,50 +1156,7 @@ export default function ExchangesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Test Result Dialog */}
-      <Dialog open={!!testResult} onOpenChange={() => setTestResult(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {testResult?.success ? (
-                <CheckCircle className="h-5 w-5 text-gain" />
-              ) : (
-                <XCircle className="h-5 w-5 text-loss" />
-              )}
-              {testResult?.success ? 'Connexion réussie' : 'Échec de connexion'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground">{testResult?.message}</p>
-            {testResult?.balance && Object.keys(testResult.balance).length > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Wallet className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-medium">Soldes détectés ({Object.keys(testResult.balance).length} actifs)</p>
-                </div>
-                <div className="grid gap-2 max-h-64 overflow-y-auto pr-2">
-                  {Object.entries(testResult.balance)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([symbol, amount]) => (
-                      <div
-                        key={symbol}
-                        className="flex justify-between items-center bg-muted p-2 rounded-md"
-                      >
-                        <span className="font-medium">{symbol}</span>
-                        <span className="font-mono text-sm">
-                          {formatBalance(amount)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setTestResult(null)}>Fermer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TestResultDialog resultat={testResult} onFermer={() => setTestResult(null)} />
 
       {/* API Key Guide Dialog */}
       <Dialog open={!!guideExchange} onOpenChange={() => setGuideExchange(null)}>
@@ -1304,31 +1243,12 @@ export default function ExchangesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette connexion ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vous êtes sur le point de supprimer la connexion à{' '}
-              <strong>{deleteTarget && getExchangeName(deleteTarget.exchange)}</strong>
-              {deleteTarget?.label && <> ({deleteTarget.label})</>}.
-              <br /><br />
-              Vos données importées (transactions, actifs) resteront dans l'application.
-              Vous pourrez reconnecter cet exchange à tout moment.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConnectionDialog
+        cible={deleteTarget}
+        nomExchange={getExchangeName}
+        onConfirmer={handleDelete}
+        onFermer={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }
