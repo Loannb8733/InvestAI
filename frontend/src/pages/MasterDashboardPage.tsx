@@ -37,28 +37,12 @@ import {
   BarChart3,
 } from 'lucide-react'
 import type { ProjectAudit, CrowdfundingDashboard } from '@/types/crowdfunding'
+import type { ActiveAlert, UpcomingEvent } from '@/types/dashboard'
 
 // ============== Interfaces ==============
 
-interface ActiveAlert {
-  id: string
-  name: string
-  symbol?: string
-  condition: string
-  threshold: number
-  current_price?: number
-}
-
-interface UpcomingEvent {
-  id: string
-  title: string
-  event_type: string
-  event_date: string
-  amount?: number
-}
-
 interface AdvancedMetrics {
-  roi_annualized: number
+  roi_annualized: number | null
   risk_metrics: Record<string, unknown>
   concentration: Record<string, unknown>
   stress_tests: unknown[]
