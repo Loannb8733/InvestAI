@@ -137,6 +137,8 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 
 | **NEW-19** | 🟡 | **La version reellement deployee n'etait pas verifiable.** Trois fois cette semaine, etablir ce qui tournait en production a demande de sonder une route supprimee en esperant un 404 — un marqueur consomme des qu'il sert. Les autres changements d'une release vivent derriere l'authentification. → `/health` expose le SHA court du commit (`RENDER_GIT_COMMIT`, repli `GIT_COMMIT`, « inconnu » sinon) et l'heure de demarrage du processus, qui ne bouge pas entre deux appels : un redemarrage se lit dessus. | ✅ corrigé |
 
+| **NEW-20** | 🔴 | **Un import interrompu laissait des transactions partielles en base.** Trois `except` appelaient `classify_and_mark_error` puis `db.commit()` pour garder la trace de l'échec sur la clé API — mais `commit()` valide **toute la session**. Or ces blocs enveloppent des imports qui écrivent au fil de l'eau : `import_trade_history` compte **7 `db.add()` et 8 `db.flush()`** dans un `try` de 1 147 lignes, pour un seul commit normal à la ligne 1477. Une erreur dans l'une des **1 065 lignes** précédentes faisait valider les écritures en attente. Même mécanique que les écritures fantômes NEW-02/03, sur des données financières. → `rollback_puis_marquer` : annuler, recharger la clé (le rollback expire les objets de la session), marquer, committer ce seul marquage. Garde-fou statique sur les 165 modules applicatifs. | ✅ corrigé |
+
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
@@ -470,7 +472,7 @@ que lus. **Contrairement à l'EPIC A, ceux-ci sont réels.**
 |---|---|---|---|
 | **ARC-01** | 7 fichiers `new_event_loop` | **9 fichiers**, 8 helpers `run_async` dupliqués | ✅ réel, **aggravé** (dont un ajouté le 2026-09-01 par `fx_rates.py`, en suivant la convention en place) |
 | **ARC-02** | 0 `relationship()` → « N+1 » | 0 `relationship()`, mais **le N+1 n'existe pas** : 50 actifs → 8 requêtes, 6 actifs → 1 ; 3 requêtes pour 2 portefeuilles + 56 actifs + 840 transactions | ❌ **infondé** — voir ci-dessous |
-| **ARC-03** | `transactions.py` 70 req · `dashboard.py` 37 · `api_keys.py` 59 | 70 · 22 · 56, pour 1 671 / 1 383 / 1 876 lignes | ✅ réel (dashboard amélioré depuis) |
+| **ARC-03** | `transactions.py` 70 req · `dashboard.py` 37 · `api_keys.py` 59 | **48 · 21 · 32**, pour 1 671 / 1 397 / 1 865 lignes *(remesuré 2026-09-06)* | ⚠️ réel, mais le bénéfice annoncé ne tient pas : `import_trade_history` (**1 174 lignes**, 63 % de `api_keys.py`) **ne duplique pas** la tâche Celery — 4 % de recouvrement ligne à ligne (38 sur 898). Les 32 appels communs sont du réemploi de services partagés. Le vrai défaut de cette fonction était transactionnel (NEW-20), pas structurel. |
 | **UX-03** | actions/ETF/immobilier « absents » | types présents au modèle, `get_stock_price` existe, mais **0 actif** de ces types et aucune page dédiée | ⚠️ réel mais **à reformuler** : ce n'est pas l'absence de support, c'est l'absence de parcours |
 
 #### ARC-02 : pourquoi le ticket se contredit
