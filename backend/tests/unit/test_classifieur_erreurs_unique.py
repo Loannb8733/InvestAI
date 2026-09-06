@@ -19,7 +19,7 @@ import pytest
 
 import app.api.v1.endpoints.api_keys as endpoints_cles
 import app.tasks.sync_exchanges as tache_sync
-from app.services.exchange_error_classifier import classify_and_mark_error
+from app.services.exchange_error_classifier import classify_and_mark_error, rollback_puis_marquer
 
 
 class CleFactice:
@@ -40,9 +40,15 @@ class CleFactice:
 
 
 class TestUneSeuleImplementation:
-    def test_les_deux_modules_pointent_la_meme_fonction(self):
-        assert tache_sync._classify_and_mark_error is classify_and_mark_error
-        assert endpoints_cles._classify_and_mark_error is classify_and_mark_error
+    def test_les_deux_modules_passent_par_le_module_partage(self):
+        """Ils n'appellent plus le classifieur en direct.
+
+        Les deux passent par `rollback_puis_marquer`, qui annule le travail en
+        cours avant de marquer la clé — sans quoi le `commit()` du gestionnaire
+        d'erreur validait aussi les écritures déjà en attente.
+        """
+        assert tache_sync.rollback_puis_marquer is rollback_puis_marquer
+        assert endpoints_cles.rollback_puis_marquer is rollback_puis_marquer
 
     @pytest.mark.parametrize("module", [tache_sync, endpoints_cles])
     def test_aucune_copie_locale_ne_reapparait(self, module):
@@ -70,7 +76,10 @@ class TestComportement:
 
         cle = CleFactice()
         reponse = httpx.Response(401, request=httpx.Request("GET", "https://exchange.test"))
-        classify_and_mark_error(cle, httpx.HTTPStatusError("nope", request=reponse.request, response=reponse))
+        classify_and_mark_error(
+            cle,
+            httpx.HTTPStatusError("nope", request=reponse.request, response=reponse),
+        )
         assert cle.appels == [("auth", "nope")]
 
     def test_429_ne_desactive_pas_la_cle(self):
@@ -79,7 +88,10 @@ class TestComportement:
 
         cle = CleFactice()
         reponse = httpx.Response(429, request=httpx.Request("GET", "https://exchange.test"))
-        classify_and_mark_error(cle, httpx.HTTPStatusError("trop", request=reponse.request, response=reponse))
+        classify_and_mark_error(
+            cle,
+            httpx.HTTPStatusError("trop", request=reponse.request, response=reponse),
+        )
         assert cle.appels == [("debit", "trop")]
 
     def test_kraken_signale_son_refus_dans_le_corps(self):

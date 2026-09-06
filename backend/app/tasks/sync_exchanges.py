@@ -17,7 +17,7 @@ from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.services.exchange_error_classifier import classify_and_mark_error as _classify_and_mark_error
+from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchanges import get_exchange_service
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.fx_history_service import FxHistoryService
@@ -87,7 +87,10 @@ async def _add_transaction_if_new(db: AsyncSession, transaction: Transaction) ->
         await db.flush()
     except IntegrityError:
         await db.rollback()
-        logger.debug("Race: transaction hash=%s inserted by concurrent sync", transaction.internal_hash)
+        logger.debug(
+            "Race: transaction hash=%s inserted by concurrent sync",
+            transaction.internal_hash,
+        )
         return False
     return True
 
@@ -1291,7 +1294,11 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
 
                         cache_single_asset.delay(asset.symbol, asset.asset_type.value)
                     except Exception as exc:
-                        logger.debug("Best-effort history pre-cache dispatch failed for %s: %s", asset.symbol, exc)
+                        logger.debug(
+                            "Best-effort history pre-cache dispatch failed for %s: %s",
+                            asset.symbol,
+                            exc,
+                        )
 
                     # Create initial transfer transaction with market price
                     if exchange_quantity > 0:
@@ -1363,9 +1370,11 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             # task result. ``str(e)`` can carry crypto error details (InvalidToken),
             # DB constraint names, or upstream API noise — none of which belong in
             # the response payload or in any user-visible monitoring view.
-            logger.exception("Sync failed for api_key=%s", api_key.id)
-            _classify_and_mark_error(api_key, e)
-            await db.commit()
+            logger.exception("Sync failed for api_key=%s", api_key_id)
+            # Annule la synchronisation partielle avant de marquer la clé : sans
+            # rollback, le `commit()` validait aussi les transactions ajoutées
+            # plus haut dans ce `try`.
+            await rollback_puis_marquer(db, APIKey, api_key_id, e)
             return {"success": False, "error": "sync_failed"}
 
 

@@ -38,7 +38,7 @@ from app.core.security import decrypt_api_key, encrypt_api_key
 from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
-from app.services.exchange_error_classifier import classify_and_mark_error as _classify_and_mark_error
+from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchanges import SUPPORTED_EXCHANGES, get_exchange_service
 from app.services.metrics_service import invalidate_dashboard_cache
 
@@ -288,7 +288,11 @@ async def test_api_key(
                         body = resp.json()
                         error_detail = f"HTTP {resp.status_code}: {body.get('msg', resp.text[:200])}"
             except Exception as exc:  # noqa: BLE001
-                logger.debug("Could not fetch detailed connection-test error for key %s: %s", api_key.id, exc)
+                logger.debug(
+                    "Could not fetch detailed connection-test error for key %s: %s",
+                    api_key.id,
+                    exc,
+                )
 
             api_key.last_error = error_detail
             await db.commit()
@@ -1076,7 +1080,11 @@ async def import_trade_history(
                             elif fee_currency.upper() in fee_price_data:
                                 fee_token_price = float(fee_price_data[fee_currency.upper()].get("price", 0))
                         except Exception as exc:  # noqa: BLE001
-                            logger.debug("Fee-token price lookup failed for %s: %s", fee_currency, exc)
+                            logger.debug(
+                                "Fee-token price lookup failed for %s: %s",
+                                fee_currency,
+                                exc,
+                            )
                         if fee_token_price > 0:
                             fee_amount = fee_amount * fee_token_price
                         elif price_eur > 0:
@@ -1258,7 +1266,10 @@ async def import_trade_history(
                 # merged normalized balance so the stablecoin card picks it up.
                 earn_balance = balance_map.get(base_sym)
                 if not earn_balance:
-                    logger.warning("%s: earn_staked entry but no balance_map entry, skipping", base_sym)
+                    logger.warning(
+                        "%s: earn_staked entry but no balance_map entry, skipping",
+                        base_sym,
+                    )
                     continue
                 existing_earn_check = await db.execute(
                     select(Asset).where(
@@ -1347,8 +1358,14 @@ async def import_trade_history(
                 Asset.symbol,
                 func.sum(
                     case(
-                        (Transaction.transaction_type == TransactionType.STAKING, Transaction.quantity),
-                        (Transaction.transaction_type == TransactionType.UNSTAKING, -Transaction.quantity),
+                        (
+                            Transaction.transaction_type == TransactionType.STAKING,
+                            Transaction.quantity,
+                        ),
+                        (
+                            Transaction.transaction_type == TransactionType.UNSTAKING,
+                            -Transaction.quantity,
+                        ),
                         else_=0,
                     )
                 ).label("net"),
@@ -1411,7 +1428,13 @@ async def import_trade_history(
                     if w_asset:
                         # amount_is_net: exchange APIs report the net received
                         # amount (network fee charged on top) — do not deduct.
-                        await create_mirror_transfer_in(db, w_tx, w_asset, cold_wallet_destination, amount_is_net=True)
+                        await create_mirror_transfer_in(
+                            db,
+                            w_tx,
+                            w_asset,
+                            cold_wallet_destination,
+                            amount_is_net=True,
+                        )
                 await db.flush()
 
         # Create assets for API balances that have no transactions (e.g. airdrops, dust)
@@ -1504,8 +1527,10 @@ async def import_trade_history(
         logger.error(f"Import error: {type(e).__name__}: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-        _classify_and_mark_error(api_key, e)
-        await db.commit()
+        # Annule l'import partiel avant de marquer la clé : sans rollback, le
+        # `commit()` validait aussi les transactions déjà ajoutées et flushées
+        # plus haut dans ce `try`.
+        await rollback_puis_marquer(db, APIKey, api_key_id, e)
 
         # Do not leak the exception type/message to the client (it can contain
         # internal details). The full error + traceback is in the server logs.
@@ -1705,8 +1730,7 @@ async def sync_exchange(
         logger.error(f"Sync error: {type(e).__name__}: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-        _classify_and_mark_error(api_key, e)
-        await db.commit()
+        await rollback_puis_marquer(db, APIKey, api_key_id, e)
 
         # Do not leak the exception type/message to the client (it can contain
         # internal details). The full error + traceback is in the server logs.
