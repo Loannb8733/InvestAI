@@ -38,7 +38,7 @@ from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.services.exchanges.base import ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
+from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
 
 MAINTENANT = datetime.now(timezone.utc)
 
@@ -53,6 +53,16 @@ def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None):
         fee=Decimal(frais),
         fee_currency="EUR",
         timestamp=quand or (MAINTENANT - timedelta(days=30)),
+    )
+
+
+def _solde(symbole, total, libre=None, bloque="0"):
+    total = Decimal(total)
+    return ExchangeBalance(
+        symbol=symbole,
+        free=Decimal(libre) if libre is not None else total,
+        locked=Decimal(bloque),
+        total=total,
     )
 
 
@@ -560,6 +570,48 @@ class TestDeduplicationIntraImport:
         assert len(transactions) == corps["imported_transactions"]
         # Comportement épinglé, non approuvé : le doublon passe.
         assert len(transactions) == 2
+
+
+class TestSoldesEtRapprochement:
+    """Le chemin qui lit `get_balances`, laissé à découvert jusqu'ici.
+
+    Aucun des tests précédents ne fournissait de soldes : la boucle de
+    rapprochement n'était donc jamais exécutée. Une extraction a supprimé un
+    import dont elle dépendait sans qu'un seul test ne bronche — c'est `flake8`
+    qui l'a signalé, pas le filet. Ces tests ferment le trou.
+    """
+
+    async def test_un_solde_cree_l_actif_correspondant(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        service_double.balances = [_solde("BTC", "0.75")]
+
+        corps = (await _importer(client, db_session, regular_user, service_double)).json()
+
+        assert corps["debug"]["balances_count"] == 1
+        assert "BTC" in corps["debug"]["balances_symbols"]
+
+    async def test_une_variante_earn_ne_cree_pas_un_second_actif(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        """`LDUSDC` est de l'USDC placé : un seul actif, pas deux."""
+        service_double.balances = [_solde("USDC", "100"), _solde("LDUSDC", "300")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        actifs = (await db_session.execute(select(Asset))).scalars().all()
+        symboles = sorted(a.symbol for a in actifs)
+        assert "LDUSDC" not in symboles, "la variante ne doit pas devenir un actif"
+
+    async def test_les_devises_fiat_ne_deviennent_pas_des_actifs(
+        self, client: AsyncClient, regular_user: User, db_session, service_double
+    ):
+        service_double.balances = [_solde("EUR", "500"), _solde("BTC", "0.1")]
+
+        await _importer(client, db_session, regular_user, service_double)
+
+        actifs = (await db_session.execute(select(Asset))).scalars().all()
+        assert "EUR" not in [a.symbol for a in actifs]
 
 
 class TestAutorisation:

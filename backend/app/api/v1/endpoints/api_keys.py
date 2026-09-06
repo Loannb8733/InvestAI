@@ -39,6 +39,7 @@ from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
 from app.services.exchange_error_classifier import rollback_puis_marquer
+from app.services.exchange_import_collection import dedupliquer_convert_contre_fiat, normaliser_balances_earn
 from app.services.exchange_import_preparation import (
     construire_service_exchange,
     fusionner_portefeuilles_herites,
@@ -372,48 +373,8 @@ async def import_trade_history(
         balances = await service.get_balances()
         balance_map = {b.symbol: b for b in balances}
 
-        # Normalize Binance Earn variants (LDUSDC → USDC, etc.)
-        # Merge earn balances into base symbol and track staked amounts
-        from app.tasks.sync_exchanges import _normalize_earn_variant
-
-        earn_staked: dict = {}  # {base_symbol: staked_qty}
-        normalized_balance_map: dict = {}
-        for b in balances:
-            norm = _normalize_earn_variant(b.symbol)
-            if norm != b.symbol:
-                # This is an earn variant — track staked amount
-                earn_staked[norm] = earn_staked.get(norm, 0) + float(b.total)
-                logger.info(f"Earn variant: {b.symbol} ({float(b.total)}) → staked {norm}")
-                # Merge into base symbol balance for reconciliation
-                if norm in normalized_balance_map:
-                    existing = normalized_balance_map[norm]
-                    from app.services.exchanges.base import ExchangeBalance
-
-                    normalized_balance_map[norm] = ExchangeBalance(
-                        symbol=norm,
-                        free=existing.free + b.free,
-                        locked=existing.locked + b.locked,
-                        total=existing.total + b.total,
-                    )
-                else:
-                    from app.services.exchanges.base import ExchangeBalance
-
-                    base_balance = balance_map.get(norm)
-                    if base_balance:
-                        normalized_balance_map[norm] = ExchangeBalance(
-                            symbol=norm,
-                            free=base_balance.free + b.free,
-                            locked=base_balance.locked + b.locked,
-                            total=base_balance.total + b.total,
-                        )
-                    else:
-                        normalized_balance_map[norm] = ExchangeBalance(
-                            symbol=norm, free=b.free, locked=b.locked, total=b.total
-                        )
-            else:
-                if b.symbol not in normalized_balance_map:
-                    normalized_balance_map[b.symbol] = b
-        balance_map = normalized_balance_map
+        # Les variantes Earn (LDUSDC → USDC) sont fondues dans leur symbole de base.
+        balance_map, earn_staked = normaliser_balances_earn(balances)
 
         # Get all trades (no arbitrary cap — paginate fully)
         trades = await service.get_trades(limit=10000)
@@ -599,40 +560,7 @@ async def import_trade_history(
             withdrawals = await service.get_withdrawals(limit=500)
             logger.info(f"Withdrawals found: {len(withdrawals)}")
 
-        # Deduplicate convert_orders against fiat_orders
-        # Both APIs (fiat/payments and convert/tradeFlow) return the same EUR->crypto
-        # purchases with different IDs. Match by (symbol, quantity, timestamp±60s).
-        fiat_order_keys = set()
-        for fo in fiat_orders:
-            # Round timestamp to nearest minute for fuzzy matching
-            ts_key = int(fo.timestamp.timestamp()) // 60
-            normalized_amount = (
-                str(fo.crypto_amount.normalize()) if hasattr(fo.crypto_amount, "normalize") else str(fo.crypto_amount)
-            )
-            fiat_order_keys.add((fo.crypto_symbol, normalized_amount, ts_key))
-            # Also add adjacent minute to handle boundary cases
-            fiat_order_keys.add((fo.crypto_symbol, normalized_amount, ts_key + 1))
-            fiat_order_keys.add((fo.crypto_symbol, normalized_amount, ts_key - 1))
-
-        deduped_convert_orders = []
-        for co in convert_orders:
-            ts_key = int(co.timestamp.timestamp()) // 60
-            co_normalized = (
-                str(co.crypto_amount.normalize()) if hasattr(co.crypto_amount, "normalize") else str(co.crypto_amount)
-            )
-            key = (co.crypto_symbol, co_normalized, ts_key)
-            if key in fiat_order_keys:
-                logger.debug(
-                    f"Skipping duplicate convert order: {co.crypto_symbol} {co.crypto_amount} at {co.timestamp}"
-                )
-                continue
-            deduped_convert_orders.append(co)
-
-        if len(convert_orders) != len(deduped_convert_orders):
-            logger.info(
-                f"Deduplicated {len(convert_orders) - len(deduped_convert_orders)} convert orders "
-                f"that overlap with fiat orders"
-            )
+        deduped_convert_orders = dedupliquer_convert_contre_fiat(convert_orders, fiat_orders)
 
         # Combine all orders
         all_fiat_orders = fiat_orders + deduped_convert_orders + auto_invest_orders
@@ -1368,9 +1296,13 @@ async def import_trade_history(
             "CAD",
             "JPY",
         }
+        # Importé ici plutôt qu'en tête : `app.tasks.sync_exchanges` importe
+        # lui-même des services applicatifs, et le remonter créerait un cycle.
+        from app.tasks.sync_exchanges import _normalize_earn_variant
+
         for balance in balances:
             symbol = balance.symbol
-            # Skip earn variants — they're merged into base asset
+            # Les variantes Earn sont déjà fondues dans leur symbole de base.
             norm = _normalize_earn_variant(symbol)
             if norm != symbol:
                 continue
