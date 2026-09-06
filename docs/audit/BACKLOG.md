@@ -672,7 +672,28 @@ Cinq comportements ont été épinglés **sans être approuvés** :
 - Les poids cibles du rééquilibrage sont des **pourcentages** : `0.5` demande
   0,5 %, pas la moitié. La docstring le dit ; la signature, non.
 
-Ce qui reste : `metrics_service` (57 %) et `report_service`, non entamés. Les
+**`metrics_service` : filet posé, découpage écarté après mesure (2026-09-06).**
+
+Le filet a été porté là où il manquait le plus : `_compute_user_dashboard_metrics`,
+qui compose l'écran principal, était couverte à **3 %** — 281 lignes, 272 non
+atteintes. Elle passe à **~91 %**, et le service de 57 % à **67 %**.
+
+Le découpage, lui, ne se justifie pas. Les trois arguments qui ont porté ARC-03
+et le découpage d'`analytics_service` sont tous absents :
+
+| Critère | `analytics_service` | `metrics_service` |
+|---|---|---|
+| Lignes pures extractibles | 271 | **77**, déjà couvertes à 100 % |
+| Duplication avec d'autres services | — | **aucune** (0 bloc de 8 lignes) |
+| Nature de la god-méthode | calculs + orchestration | **replay FIFO avec SQL entrelacé** |
+
+`get_portfolio_metrics` fait 831 lignes, mais son bloc principal — 196 lignes —
+est le replay FIFO du coût de revient, avec ses requêtes au milieu. Le sortir
+demanderait une réécriture, pas un déplacement, et il est déjà couvert à 79 %.
+Le gain serait faible, le risque élevé, et il porterait sur le calcul de la
+plus-value imposable.
+
+Ce qui reste : `report_service` (697 lignes), non entamé, et Les
 1 402 lignes restantes de la god-class sont de l'orchestration qui touche la
 base et le réseau — même situation qu'`import_trade_history` après ses quatre
 étapes, et même conclusion : les extraire demanderait d'élargir le filet pour
@@ -1019,7 +1040,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | Ticket | Sév. | Source | Fichiers | Problème → Correctif | Critères d'acceptation | Effort |
 |--------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **ARC-05** Découper `prediction_service.py` *(livré 2026-09-01)* | ~~🟠~~ | B01 | `services/prediction_service.py` (**2 416 → 1 655 LOC** ; l'audit annonçait 3 733) | God-file : prédiction + régime + sentiment + anomalies + cache + accuracy. → Découper en `forecasting/`, `regime/`, `sentiment/`, `accuracy/` (la couche `ml/` existe déjà). | 🟢 761 lignes extraites (`prediction_alpha.py`, 800 LOC). La cible « aucun fichier > 800 LOC » n'est pas atteinte : le service reste à 1 655 lignes. Aucune régression (1 208 tests verts). | L |
-| 🔵 **ARC-06** Découper les god-services secondaires *(analytics livré 2026-09-06)* | 🟡 | C04 | `report_service.py` (**697**), `metrics_service.py` (**1 847**), `analytics_service.py` (**1 952**) | **`analytics_service` : 1 952 → 1 577 lignes**, god-class 1 777 → 1 402, sous un filet de **50 tests de caractérisation** (couverture 26 % → 82 %). Trois modules extraits : `analytics_simulation`, `analytics_scoring`, `analytics_types`. `metrics_service` (57 % de couverture) et `report_service` restent. | L |
+| 🔵 **ARC-06** Découper les god-services secondaires *(analytics livré, metrics écarté — 2026-09-06)* | 🟡 | C04 | `report_service.py` (**697**), `metrics_service.py` (**1 847**), `analytics_service.py` (**1 952**) | **`analytics_service` : 1 952 → 1 577 lignes** sous un filet de 50 tests (couverture 26 % → 82 %), trois modules extraits. **`metrics_service` : filet posé** (dashboard 3 % → 91 %, service 57 % → 67 %) mais **découpage écarté** — 77 lignes pures seulement, aucune duplication, et une god-méthode qui est un replay FIFO avec SQL entrelacé, déjà couvert à 79 %. `report_service` non entamé. | L |
 | 🟢 **ARC-07** Découper `ExchangesPage.tsx` *(entamé 2026-09-01)* | 🟠 | B06 | `pages/ExchangesPage.tsx` (**1 368 → 1 286 LOC** ; l'audit annonçait 2 185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | ⚠️ Non atteint volontairement : `ExchangeLogo` et les types sont sortis, **le découpage large est différé jusqu'à ce que la page ait des tests de rendu** — sans eux, un refactor de cette ampleur casse en silence. | L |
 | **ARC-08** Trancher le doublon insights | 🟠 | B05 | `services/insights_service.py` (403) vs `smart_insights_service.py` (1525) + endpoints | Deux systèmes parallèles, recouvrement probable. → Confirmer le vivant, déprécier/supprimer l'ancien. | Une seule source de vérité insights ; code mort supprimé. | M |
 | **ARC-09** Unifier les `queryKey` | 🟡 | C03 | ~14 clés hardcodées (`charts/*`, `PlatformSelect`, `DashboardMunitionsCard`) | Contournent `lib/queryKeys.ts` → invalidation incohérente, caches périmés. → Migrer toutes les clés vers la factory. | 0 `queryKey` hardcodé ; invalidation testée. | S |
