@@ -99,25 +99,31 @@ Tout test de non-régression doit être validé par un canari : casser volontair
 et vérifier que le test échoue. C'est exactement le reproche que ce backlog fait aux tests
 parity/XIRR (FIN-TEST).
 
-### État au 2026-09-01 — 27 tickets mesurés sur 50
+### État au 2026-09-07 — 50 tickets mesurés sur 50
 
 Ce tableau dit ce qui a été **vérifié dans le code**, et ce qui ne l'a pas été. Un ticket
-non mesuré n'est ni vrai ni faux : il n'a pas été regardé. Vu que **11 des 27 tickets
-vérifiés se sont révélés infondés, périmés ou déjà faits**, aucun des 23 restants ne
-devrait être engagé sans mesure préalable.
+non mesuré n'est ni vrai ni faux : il n'a pas été regardé — c'est pourquoi la colonne a
+existé jusqu'ici. **Elle est désormais vide** : les 50 tickets sont passés sous mesure.
 
-| EPIC | Mesurés | Livrés | Infondés / périmés / déjà faits | Jamais mesurés |
-|---|---:|---|---|---|
-| **A** — Exactitude financière | **5/5** | FIN-01, FIN-03, FIN-04 | FIN-02, FIN-TEST | — |
-| **B** — Navigation & vérité produit | **2/3** | UX-01 | — | UX-02 |
-| **C** — Robustesse backend | **3/4** | ARC-01 | ARC-02 | ARC-04 |
-| **D** — États d'erreur & UX | **3/5** | UX-04 (17/17), UX-05 | — | UX-06, UX-07 |
-| **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 | — |
-| **F** — God-files | **7/7** | ARC-05, ARC-07 (partiel), ARC-11, ARC-06 (analytics), **ARC-09**, **ARC-13** | — | **ARC-08 écarté**, ARC-10 (arbitrage produit) |
-| **G** — Accessibilité | **4/4** | A11Y-01→04 | — | — |
-| **H** — Polish | **3/14** | — | FIN-05, ARC-12 | FIN-06→13, ARC-13, UX-10, UX-11 |
-| **VÉRIF** | **2/2** | VERIF-02, **VERIF-01** (32 écrans / 32) | — | — |
-| **Total** | **32/50** | 18 | 6 | 18 |
+Le chiffre qui compte n'est pas le nombre de livraisons, mais celui-ci : **13 tickets sur
+50 se sont révélés infondés, périmés ou déjà faits** — un sur quatre. Et parmi les 37
+livrés, plusieurs ne portaient pas sur ce que l'audit annonçait (UX-08 visait le CLS,
+c'était le spinner plein écran ; ARC-06 visait la taille, c'était la couverture à 26 % ;
+ARC-10 visait une librairie morte, c'était un chunk de 597 kB). La règle vaut donc au-delà
+de ce backlog : **mesurer avant d'engager**.
+
+| EPIC | Mesurés | Livrés | Infondés / périmés / déjà faits |
+|---|---:|---|---|
+| **A** — Exactitude financière | **5/5** | FIN-01, FIN-03, FIN-04 | FIN-02, FIN-TEST |
+| **B** — Navigation & vérité produit | **3/3** | UX-01, UX-02, UX-03 | — |
+| **C** — Robustesse backend | **4/4** | ARC-01, ARC-03, **ARC-04** | ARC-02 |
+| **D** — États d'erreur & UX | **5/5** | UX-04 (17/17), UX-05, UX-08, **UX-07** | **UX-06** |
+| **E** — Sécurité | **6/6** | SEC-01→05 | SEC-06 |
+| **F** — God-files | **7/7** | ARC-05, ARC-06, ARC-07, ARC-09, **ARC-10**, ARC-11 | **ARC-08** |
+| **G** — Accessibilité | **4/4** | A11Y-01→04 | — |
+| **H** — Polish | **14/14** | FIN-07, FIN-09, FIN-13, ARC-13, UX-09, UX-10, UX-11 | FIN-05, FIN-06, FIN-08, FIN-10, FIN-11, FIN-12, ARC-12 |
+| **VÉRIF** | **2/2** | VERIF-02, VERIF-01 (32 écrans / 32) | — |
+| **Total** | **50/50** | **37** | **13** |
 
 UX-03, UX-08 et UX-09 comptent dans les mesurés de leur EPIC sans figurer dans le
 tableau ci-dessus. Ils sont désormais **tous les trois livrés** (2026-09-02, 09-05 et
@@ -445,7 +451,7 @@ thèmes clair et sombre tous deux aboutis. Ce n'est pas un thème sombre paresse
 | **SEC-02** | ✅ | `GET /import-status/{task_id}` ne renvoie plus `{type(e).__name__}: {e}` au client. |
 | **UX-04** | 🟢 **14 / 17** | Composant `QueryErrorState` créé (détail technique visible sous `import.meta.env.DEV` seulement, bouton uniquement si `onRetry`). Sur les 17 pages qui émettent une requête, 14 gèrent l'échec, contre 6 au départ. **Restent 3** : `ExchangesPage`, `ReportsPage`, `SettingsPage` — elles traitent l'erreur de *mutation* (toast) mais pas l'échec de chargement. |
 | **ARC-05** | ✅ | `prediction_service.py` **2 416 → 1 655 lignes** ; 761 lignes extraites dans `prediction_alpha.py` (`PredictionAlphaMixin`). |
-| **ARC-07** | 🟢 partiel | `ExchangesPage.tsx` **1 368 → 1 286 lignes** ; `ExchangeLogo` et les types extraits. Le découpage complet est **volontairement différé** : sans tests de rendu sur cette page, un découpage large casserait en silence. |
+| **ARC-07** | 🟢 **1 368 → 1 254 lignes** | Deux temps. D'abord `ExchangeLogo` et les types, découpage large **différé faute de tests de rendu**. Puis, le filet posé (5 → 11 tests), `TestResultDialog`, `DeleteConnectionDialog` et `formatBalance` extraits *(livré 2026-09-05)*. Le canari décisif : forcer la cible du dialogue de suppression à `null` ne faisait **tomber aucun test** — rien n'ouvrait les dialogues que j'allais sortir. Trou comblé avant l'extraction. **Trois dialogues restent en place** : « Add API Key » tient à un formulaire entier, les deux autres à des setters multiples ; les sortir demande d'abord d'étendre le filet à leur ouverture. |
 | **FX quotidien** | ✅ | Tâche Celery `refresh_fx_rates` (USD/GBP/CHF → EUR), `crontab(hour=16, minute=5)` — les taux ne dépendaient plus d'une synchronisation pour être rafraîchis. |
 | **NEW-07** | ✅ | Migration d'alignement dev/prod, idempotente. |
 | **NEW-08** | ✅ | Les deux scripts destructeurs exigent un consentement explicite. |
@@ -778,13 +784,13 @@ correction.
 | Ticket | Mesuré | Verdict |
 |---|---|---|
 | **ARC-04** | deux copies du classifieur d'erreurs, **déjà divergentes** : celle des endpoints avait perdu son `logger.error` | ✅ **réel, corrigé** |
-| **UX-07** | 4 sous-points : breadcrumb cliquable ✅ fait, onglet Rapports synchronisé ✅ fait, raccourci « Signaux Alpha » introuvable, **fil d'Ariane Crowdfunding figé** | 🟢 **1 sur 4, corrigé** |
+| **UX-07** | 5 sous-points, tous vérifiés un à un | ✅ **clos le 2026-09-06**. Quatre étaient résolus ou infondés : breadcrumb cliquable ✅, onglet Rapports synchronisé ✅, fil d'Ariane Crowdfunding corrigé avec UX-10, raccourci « Signaux Alpha » intact (`?tab=market` → `MarketSignalsPillar`, qui porte `AlphaSignalsSection` ; `LEGACY_TAB_MAP` redirige même l'ancien `?tab=alpha`). Le cinquième — « dashboards jumeaux » — est **écarté** (8,4 % de recouvrement, et du type, pas de la logique) mais a mené ailleurs : les deux pages lisaient le même endpoint en déclarant chacune ses types, dont un qui **niait un `null` réel** (`roi_annualized: number` là où le backend renvoie `None` sur période trop courte). Rien ne cassait — un `?? null` protégeait — mais le type invitait à écrire l'appel qui aurait planté sur un compte neuf. |
 | **UX-10** | le Header ne contient que menu, notifications, thème et déconnexion — ni titre courant, ni recherche | ✅ **tranché et livré le 2026-09-05** : fil d'Ariane global dans le Header (5 pages sur ~20 en portaient un, 15 n'avaient aucun repère). **Recherche écartée sur mesure** : 56 actifs, 6 projets, 0 note, 0 alerte — tout est atteignable en deux clics. |
 | **UX-11** | Audit Lab est une route dédiée quand le reste du Crowdfunding est en onglets | ✅ **tranché et livré le 2026-09-05** : la route reste — les onglets montrent ce qu'on possède, l'Audit Lab évalue un projet qu'on ne possède pas encore. Le défaut réel était le repère absent (pas de fil d'Ariane), pas l'asymétrie. |
 | **ARC-13** | `^` sur react-query, axios, zod, react | ⚠️ réel, **discutable** : le lockfile fixe déjà les versions installées |
-| **ARC-10** | `@nivo` dans **23 fichiers**, `lightweight-charts` dans **3** | ⚠️ **aucune librairie à retirer** — les deux servent, à des usages différents |
+| **ARC-10** | `@nivo` dans **24 fichiers**, `lightweight-charts` dans **2** | ✅ **tranché et livré le 2026-09-07** (ADR-010). Aucune librairie à retirer — les deux servent. Le défaut réel était ailleurs : `manualChunks` les rangeait sous un même nom, **597 kB** d'un bloc, si bien que la moindre page à camembert téléchargeait aussi Lightweight Charts et que le `lazy()` de `PortfolioAreaChart` ne protégeait plus rien. Chunks séparés → **169 kB (55 gzip) économisés** sur toute page sans courbe de patrimoine. |
 | **ARC-06** | `report_service` fait **697 lignes**, pas 2 744 | ✅ **filet posé et découpage livré le 2026-09-06** — les chiffres de l'audit sont faux (`metrics_service` 1 847 et non 2 127, `analytics_service` 1 952 et non 2 111), et la moitié du découpage annoncé était **déjà faite** : `analytics_math.py` existait. Ce qui justifiait le travail, c'est la **couverture** : 26 %. |
-| **UX-06** | IntelligencePage a **4 onglets**, pas 6 | ❌ **déjà fait** — refonte de juillet |
+| **UX-06** | IntelligencePage a **4 onglets**, pas 6 | ❌ **déjà fait** — refonte de juillet. Revérifié le 2026-09-05 sur les deux critères : `intelligenceTabs.ts` déclare exactement 4 onglets à libellés métier, et `RiskPerformancePillar` se documente comme « fusion réelle d'AnalyticsPage + SmartInsightsPage » — les trois insights quasi-synonymes sont bien regroupés. |
 | **ARC-08** | aucune méthode commune : `insights_service` traite frais, fiscalité et revenus passifs ; `smart_insights_service` traite santé, rééquilibrage et régime de marché | ❌ **infondé** |
 
 **ARC-04 est le plus instructif du lot.** Le ticket signalait une fonction « dupliquée à
@@ -942,8 +948,8 @@ Deux constats se répètent d'un EPIC à l'autre :
 intégralement mesuré ». C'était faux, et l'erreur est du même genre que celles que ce
 document reproche à l'audit — une conclusion étendue au-delà de ce qui a été vérifié.
 **31 tickets sur 50 ont été mesurés** — les EPICs A, E et G en entier, la majorité de C,
-D et F ; 19 ne l'ont jamais été. Voir le tableau « État au 2026-09-01 » en tête de
-document.
+D et F ; 19 ne l'ont jamais été. *(Chiffre du 2026-09-01, conservé tel quel : les 19
+restants ont été mesurés depuis, voir le tableau en tête de document, désormais 50/50.)*
 
 1. ~~NEW-13~~ — ✅ **clos le 2026-09-01**. 65 s → 2,9 s avec le cache de la tâche
    (7 actifs analysés au lieu de 1), 12 s dans le pire cas, 3,3 s pour le bandeau à
@@ -1041,8 +1047,8 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 |--------|------|------|--------|----------|----------------------|------------------------|--------|
 | ✅ **UX-04** États d'erreur React Query *(livré 2026-09-01 — 17/17)* | ~~P1~~ | ~~🟠~~ | F-06(UX), B07 | `frontend/src/pages/*` | Échec API → écran vide/spinner infini (le RouteErrorBoundary ne capte pas les queries en erreur). → Composant `<QueryErrorState onRetry={refetch}/>` + convention « toute `useQuery` rend un état d'erreur ». | ✅ **17/17 pages à requête**, contre 6 au départ. Les 3 dernières ont demandé 3 traitements distincts (voir ci-dessous) : appliquer le même composant partout aurait dégradé 2 écrans sur 3. 13 tests de rendu, validés par canari **dans les deux sens** — retirer l'état d'erreur *et* l'étendre trop largement font échouer les tests. | M |
 | ✅ **UX-05** Taxonomie Stratégie/Stratégies/Objectifs *(livré 2026-09-01)* | ~~P2~~ | ~~🟠~~ | F-05(UX) | routes + `ReportsPage` RebalancingTab | 3 emplacements, noms quasi identiques (`strategy` vs `strategies`). → « Objectifs » (`/goals`) + « Stratégies de rebalancing » (route unique) ; supprimer/relier le doublon RebalancingTab. | ✅ `/goals` sert la page, `/strategy` devient l'alias (l'inverse d'avant) ; `/strategies` vise directement `?tab=decisions` ; l'entrée de menu est renommée **« Décisions »**, d'après sa destination réelle ; breadcrumb aligné sur la convention (« Outils › Objectifs »). **RebalancingTab non touché** : moteur distinct de celui du pilier Risque (classes crypto vs MPT), sa fusion relève d'ARC-08/UX-06. | M |
-| **UX-06** Consolidation onglet Intelligence | P2 | 🟠 | F-05, tableau redondance | `IntelligencePage` (6 onglets) | Insights/Smart Insights/Analyses quasi-synonymes ; Stratégies mal classée sous « Analyses IA ». → Regrouper les 3 insights ; sortir Stratégies. | ≤ 4 onglets cohérents ; labels métier explicites (« Signaux Alpha » vs « Diagnostic portefeuille »). | M |
-| **UX-07** Corrections de navigation diverses | P2 | 🟡 | F-07,F-08,F-10,F-11,F-12(UX) | `MasterDashboardPage:578`, `Breadcrumb.tsx`, `CrowdfundingMesProjectsPage:36`, `ReportsPage:315` | Raccourci « Signaux Alpha » → mauvais onglet ; breadcrumb non cliquable ; breadcrumb crowdfunding figé ; onglet Rapports non synchronisé à l'URL ; dashboards jumeaux. → Lot de corrections ciblées. | Chaque sous-point vérifié individuellement (deep-link onglet, breadcrumb cliquable, cible raccourci correcte). | M |
+| ❌ **UX-06** Consolidation onglet Intelligence *(déjà fait — refonte de juillet)* | ~~P2~~ | ~~🟠~~ | F-05, tableau redondance | `IntelligencePage` (6 onglets) | Insights/Smart Insights/Analyses quasi-synonymes ; Stratégies mal classée sous « Analyses IA ». → Regrouper les 3 insights ; sortir Stratégies. | ≤ 4 onglets cohérents ; labels métier explicites (« Signaux Alpha » vs « Diagnostic portefeuille »). | M |
+| ✅ **UX-07** Corrections de navigation diverses *(clos 2026-09-06)* | ~~P2~~ | ~~🟡~~ | F-07,F-08,F-10,F-11,F-12(UX) | `MasterDashboardPage:578`, `Breadcrumb.tsx`, `CrowdfundingMesProjectsPage:36`, `ReportsPage:315` | Raccourci « Signaux Alpha » → mauvais onglet ; breadcrumb non cliquable ; breadcrumb crowdfunding figé ; onglet Rapports non synchronisé à l'URL ; dashboards jumeaux. → Lot de corrections ciblées. | Chaque sous-point vérifié individuellement (deep-link onglet, breadcrumb cliquable, cible raccourci correcte). | M |
 | ✅ **UX-08** Skeletons vs spinners *(livré 2026-09-05)* | P2 | 🟡 | F-09(UX) | **8** pages en `Loader2` plein écran (pas 29) | Le saut de mise en page annoncé **n'existe pas** (CLS 0). Défauts réels mesurés : **0/95 spinners** avec libellé accessible — page muette pour un lecteur d'écran (WCAG 4.1.3) ; 3 pages perdant leur `<h1>` ; ~1 s d'attente en production (latence mesurée 0,48–0,95 s). → `PageSkeleton` : titre conservé, `role="status" aria-live`, `aria-busy`, espace à la forme du contenu. | Titre présent et attente annoncée pendant le chargement des 8 pages. | M |
 
 ---
@@ -1069,7 +1075,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | 🟢 **ARC-07** Découper `ExchangesPage.tsx` *(entamé 2026-09-01)* | 🟠 | B06 | `pages/ExchangesPage.tsx` (**1 368 → 1 286 LOC** ; l'audit annonçait 2 185) | Monolithe (dialogs, formulaires, tables, sync, cold wallets). → `ApiKeyForm`, `ApiKeyList`, `SyncStatusCard`, `ColdWalletSection` + hooks. | ⚠️ Non atteint volontairement : `ExchangeLogo` et les types sont sortis, **le découpage large est différé jusqu'à ce que la page ait des tests de rendu** — sans eux, un refactor de cette ampleur casse en silence. | L |
 | ❌ **ARC-08** Trancher le doublon insights *(écarté après contre-mesure 2026-09-06)* | 🟠 | B05 | `insights_service.py` (**403**) vs `smart_insights_service.py` (**1 093**, et non 1 525) | **Il n'y a ni doublon ni code mort.** Mesure indépendante : **0 nom de fonction commun**, **0 bloc identique de 6 lignes ou plus**. Les deux sont vivants — `insights_service` sert un endpoint (frais, fiscalité, revenus passifs), `smart_insights_service` en sert cinq (santé, rééquilibrage, régime de marché). Des noms voisins, pas des systèmes parallèles. | M |
 | ✅ **ARC-09** Unifier les `queryKey` *(livré 2026-09-06)* | 🟡 | C03 | ~14 clés hardcodées (`charts/*`, `PlatformSelect`, `DashboardMunitionsCard`) | Contournent `lib/queryKeys.ts` → invalidation incohérente, caches périmés. → Migrer toutes les clés vers la factory. | 0 `queryKey` hardcodé ; invalidation testée. | S |
-| **ARC-10** Stratégie librairies de charts | 🟡 | C01 | `frontend/package.json:17-21,45` | `@nivo/*` **et** `lightweight-charts`. → Choisir par cas d'usage et documenter, ou consolider ; retirer la lib non utilisée. | Décision documentée ; bundle allégé si retrait. | S |
+| ✅ **ARC-10** Stratégie librairies de charts *(livré 2026-09-07)* | ~~🟡~~ | C01 | `frontend/package.json:17-21,45`, `vite.config.ts:23` | `@nivo/*` **et** `lightweight-charts`. → Choisir par cas d'usage et documenter, ou consolider ; retirer la lib non utilisée. | ✅ **ADR-010** : frontière d'usage écrite (Nivo pour l'analytique, Lightweight Charts pour l'unique série temporelle navigable), `recharts` retiré de CLAUDE.md où il était annoncé sans avoir jamais été installé, et surtout **chunk `charts` de 597 kB scindé** en `charts-nivo` (428) + `charts-timeseries` (169). Garde-fou : `strategie-graphiques.test.ts` tient la frontière **et** la séparation des chunks — sans le second test, une refusion annulerait le gain en silence. | S |
 | ✅ **ARC-11** Centraliser le formatage monétaire *(livré 2026-09-01)* | ~~🟡~~ | C05 | **4 fichiers** formataient une devise à la main — l'audit en annonçait 43, ma propre mesure 13 : les deux comptaient les fichiers utilisant correctement `formatCurrency` | Formatage dispersé → incohérences devise/décimales. → Tout passer par `lib/utils.formatCurrency`. | ✅ `CalendarPage` (5×), `StrategiesSection` (3×), les deux formulaires de transaction. `formatCurrency` accepte désormais `maximumFractionDigits`, pour que les affichages volontairement arrondis n'aient plus de raison de se recréer un formateur local. Garde-fou statique sur tout `src/`. | M |
 
 ---
@@ -1099,7 +1105,7 @@ Je ne vais pas valider ce cadrage tel quel — il est en partie contre-productif
 | **FIN-12** Hash dédup avec heure | F-15 | Inclure l'heure / `external_id` pour ne pas fusionner 2 DCA identiques le même jour. | S |
 | ✅ **FIN-13** Earn/wrapped par table explicite *(livré 2026-09-02)* | F-16 | Remplacer le strip de préfixe `W` par une table de variantes connues. **WIF/WLD n'étaient pas concernés** (3 caractères) ; les jetons réellement mutilés étaient WAVES, WAXP, WEMIX, WING, WHITE. | S |
 | ❌ **ARC-12** Supprimer l'alias mort `fetchUser` *(infondé : utilisé par `VerifyEmailPage` — 2026-09-01)* | D02 | `authStore.ts` — retirer l'alias inutilisé. | XS |
-| **ARC-13** Épingler les deps critiques | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
+| ✅ **ARC-13** Épingler les deps critiques *(livré 2026-09-06)* | C02 | Pin strict react-query/axios/zod (au-delà du lockfile). | XS |
 | ✅ **UX-09** `font-serif` sur h1 du Login *(livré 2026-09-03)* | F-13(UX) | Le Login était le **seul** titre de l'application hors serif — sa page jumelle Register l'était déjà au même endroit. Corrigé, **et la page annonçait « Actions »** dans ses pastilles comme dans son accroche : même promesse sans parcours qu'UX-03, sur le premier écran vu. | XS |
 | ✅ **UX-10** Remplir le Header *(livré 2026-09-05)* | F-14(UX) | **Arbitrage rendu.** *Repère* : fil d'Ariane global, dérivé du rail « [groupe] › [entrée] », avec surcharge par les pages à onglets ; retiré des 5 pages qui le rendaient elles-mêmes. Quinze pages y gagnent un repère, aucune n'en a deux. *Recherche* : **écartée**, mesure à l'appui — 56 actifs, 6 projets crowdfunding, 0 note, 0 alerte ; les 840 transactions sont déjà filtrables dans leur page. Le `cmdk` installé ne sert toujours qu'au sélecteur de plateforme. À rouvrir si les volumes changent d'ordre de grandeur. | S |
 | ✅ **UX-11** Crowdfunding Audit Lab : onglet ou route *(livré 2026-09-05)* | F-17(UX) | **La route dédiée est conservée** : deux tâches distinctes — les trois onglets montrent le portefeuille existant, l'Audit Lab analyse un DECK/FICI avant d'investir. L'asymétrie n'était pas le défaut. Le défaut : `/crowdfunding` porte un fil d'Ariane depuis UX-02, l'Audit Lab n'en avait aucun — rien n'y disait d'où l'on venait, alors que le rail les présente comme deux entrées sœurs. | S |
