@@ -136,3 +136,55 @@ Decisions techniques prises lors de l'audit de securite et qualite ML (mars 2026
 - Un readiness check lent ne doit pas tuer le pod (liveness)
 - `/health/ready` retourne HTTP 503 si une dependance est down
 - Les logs filtrent `/health*` pour reduire le bruit
+
+---
+
+## ADR-010 : Deux librairies de graphiques — frontière d'usage et chunks séparés
+
+**Contexte :** Le frontend embarque `@nivo/*` (bar, line, pie, radar) **et**
+`lightweight-charts`. Le ticket d'audit ARC-10 demandait de « choisir par cas d'usage et
+documenter, ou consolider ; retirer la lib non utilisée ».
+
+**Mesure :** Nivo est importé dans **24 fichiers** ; Lightweight Charts dans **deux** —
+`PortfolioAreaChart.tsx` et son thème. Aucune des deux n'est morte. `recharts`, annoncé
+dans CLAUDE.md, n'a jamais été installé ni utilisé.
+
+**Décision :** Garder les deux, avec une frontière explicite.
+
+| Besoin | Librairie |
+|---|---|
+| Répartitions, comparaisons, radars, séries courtes non navigables | **Nivo** |
+| Série temporelle financière navigable (pan, zoom, crosshair sur l'axe temps) | **Lightweight Charts** |
+
+Un seul écran relève du second cas : la courbe de patrimoine du dashboard d'accueil.
+Tout nouveau graphique passe par Nivo, sauf à avoir besoin de la navigation temporelle.
+
+**Justification :** Nivo est déclaratif et thématisé, mais son `ResponsiveLine` ne navigue
+pas dans le temps. Lightweight Charts fait exactement cela et rien d'autre. Porter la
+courbe de patrimoine vers Nivo lui ferait perdre le crosshair et le zoom ; porter les 24
+autres graphiques vers Lightweight Charts reviendrait à réécrire des camemberts et des
+radars avec une librairie qui n'en propose pas.
+
+**Le vrai coût n'était pas la cohabitation, mais le chunk.** `manualChunks` rangeait
+`@nivo`, `d3-*` et `lightweight-charts` sous un même nom `charts` : **597 kB** (196 kB
+gzip), le plus gros chunk du build, au-delà du seuil d'alerte de Vite. Toute page
+affichant le moindre camembert téléchargeait donc aussi Lightweight Charts — et le
+`lazy()` posé sur `PortfolioAreaChart` ne protégeait plus rien, puisque son code arrivait
+avec celui de Nivo.
+
+Les deux chunks sont désormais distincts :
+
+| Chunk | Taille | Gzip |
+|---|---|---|
+| `charts-nivo` | 428 kB | 141 kB |
+| `charts-timeseries` | 169 kB | 55 kB |
+
+Les pages qui n'affichent pas la courbe de patrimoine — portefeuille, rapports,
+simulations, crowdfunding — économisent **169 kB** (55 kB gzip). Le dashboard d'accueil,
+qui utilise les deux, télécharge le même volume qu'avant en deux requêtes
+parallélisables. L'avertissement Vite « chunks larger than 500 kB » disparaît.
+
+**Garde-fou :** `src/components/charts/strategie-graphiques.test.ts` vérifie que
+Lightweight Charts n'est importé que par les deux fichiers de sa portée, et que la
+configuration maintient les deux chunks séparés. Sans ce second test, une refusion des
+chunks annulerait le gain sans que rien ne le signale.

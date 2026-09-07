@@ -20,7 +20,14 @@ export default defineConfig({
           if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
             return 'react-vendor'
           if (id.includes('@tanstack')) return 'query'
-          if (/[\\/]node_modules[\\/](@nivo|d3-|lightweight-charts)/.test(id)) return 'charts'
+          // Deux librairies de graphiques cohabitent (ADR-010) : Nivo pour les
+          // graphiques analytiques, Lightweight Charts pour l'unique série
+          // temporelle navigable du dashboard. Les fusionner dans un chunk
+          // `charts` faisait payer 597 kB à toute page affichant le moindre
+          // camembert, Lightweight Charts compris — et annulait le `lazy()`
+          // qui protégeait déjà `PortfolioAreaChart`.
+          if (/[\\/]node_modules[\\/](@nivo|d3-)/.test(id)) return 'charts-nivo'
+          if (/[\\/]node_modules[\\/]lightweight-charts/.test(id)) return 'charts-timeseries'
           if (id.includes('framer-motion')) return 'motion'
           if (id.includes('@radix-ui')) return 'radix'
           return undefined

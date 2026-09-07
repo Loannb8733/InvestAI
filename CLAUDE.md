@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Framework**: React 18+ / TypeScript
 - **State**: Zustand
 - **UI**: Tailwind CSS + shadcn/ui
-- **Charts**: Recharts
+- **Charts**: Nivo (analytique) + Lightweight Charts (série temporelle navigable) — voir `docs/ADR.md` ADR-010
 - **Tables**: TanStack Table
 - **Forms**: React Hook Form + Zod
 
