@@ -879,6 +879,15 @@ class MetricsService:
                             rate_val, _ = await _get_rate_with_cache(base_ccy, target)
                             _fx_rate_cache[base_ccy] = rate_val
                         except Exception:
+                            # Retomber sur le taux d'achat annule l'écart de
+                            # change : le gain FX de cette couche est déclaré
+                            # nul et `asset_gain` l'absorbe. Le P&L total reste
+                            # juste, seule sa décomposition est approximative.
+                            logger.warning(
+                                "Taux %s→%s indisponible — gain de change non décomposé",
+                                base_ccy,
+                                target,
+                            )
                             _fx_rate_cache[base_ccy] = purchase_fx
                     current_fx = _fx_rate_cache[base_ccy]
                     fx_delta = current_fx - purchase_fx
@@ -1078,6 +1087,11 @@ class MetricsService:
             try:
                 _dates, prices = get_cached_history(symbol.upper(), days=max(days, 2))
             except Exception:
+                # Sans historique, aucune variation n'est publiée pour ce
+                # symbole — le test `if prices and len(prices) >= 2` en aval
+                # l'écarte proprement. Rien de faux n'est produit, mais un cache
+                # durablement cassé ne laissait aucune trace.
+                logger.warning("Historique indisponible pour %s — variation non calculée", symbol)
                 prices = []
             if prices and len(prices) >= 2 and prices[0] != 0:
                 change = (prices[-1] - prices[0]) / prices[0] * 100
