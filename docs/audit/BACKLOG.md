@@ -243,6 +243,24 @@ et leur exposition réelle a été comptée quand elle était mesurable.
 
 | **NEW-38** | 🟢 | **265 lignes mortes dans `snapshot_service`** — un quart du fichier. `get_historical_values`, `_get_invested_timeline`, `generate_historical_from_transactions` et `_generate_flat_history` formaient un îlot que plus rien n'appelait : ni le backend, ni les tâches, ni les scripts, ni le frontend, ni un accès dynamique. Le commit du **2026-02-20** avait introduit `build_portfolio_value_series` pour remplacer l'approche par snapshots, sans retirer l'ancienne — restée sept mois. C'est aussi ce qui plafonnait la couverture du fichier : un quart du code n'était jamais exécuté parce qu'il n'était jamais appelé. | ✅ **supprimé** — `snapshot_service` passe de **1 005 à 736 lignes**, sa couverture de 26 % à **31 %** sans un seul test ajouté. `_get_invested_timeline` recalculait le capital investi selon des règles voisines mais distinctes de `_replay_transactions_to_daily_holdings` (le successeur) : une seconde vérité qui ne pouvait que diverger. |
 
+| **NEW-39** | 🟢 | **Balayage du code mort sur tout `app/`** (673 fonctions examinées, 579 fichiers). Après NEW-38, la même recherche a été généralisée. **19 fonctions ne sont appelées nulle part** (517 lignes) et **6 ne le sont que par leurs tests** (42 lignes). Les trois plus grosses sont privées, donc sans contrat externe : `_compute_hit_rate` et `_compute_accuracy_from_data` (`prediction_metrics`), `_build_defensive_strategy` (`ai_strategy_service`). | 🟢 **203 lignes supprimées** (les trois privées). **Les 16 autres sont listées ci-dessous, non supprimées** : plusieurs sont des API publiques ou des alias de compatibilité dont le retrait est un arbitrage, pas un nettoyage. L'outil est conservé — `scripts/balayage_code_mort.py`. |
+
+**Les 16 fonctions mortes non supprimées**, par nature de la décision :
+
+| Fonction | Lignes | Pourquoi ce n'est pas un simple nettoyage |
+|---|---:|---|
+| `get_simple_earn_history` (`exchanges/binance.py`) | 62 | Méthode d'un connecteur d'exchange : la retirer réduit la parité d'API du connecteur avec ce que Binance expose. |
+| `get_optional_current_user` (`api/deps.py`) | 42 | Dépendance FastAPI d'authentification facultative — prévue pour des routes publiques à contenu enrichi. |
+| `calculate_beta` + `calculate_alpha` (`snapshot_risk`) | 52 | Deux métriques de risque que la docstring du module annonce, sans qu'aucun écran ne les affiche. Les supprimer ferme la porte ; les brancher l'ouvre. |
+| `get_stock_price_eur`, `get_staleness_info` (`market_data_service`) | 54 | Conversion en euros et fraîcheur : utiles le jour où des actions seront détenues (0 aujourd'hui, cf. FIN-10). |
+| `get_multiple_historical_prices` (`price_service`) | 23 | Variante groupée d'un appel déjà utilisé au singulier. |
+| `create_user_snapshot_if_missing` (`snapshot_service`) | 33 | Idempotence de snapshot — filet pour une tâche planifiée. |
+| `get_cached_hyperparams`, `get_cached_reliability`, `cache_reliability`, `get_redis` (`core/redis_client`) | 29 | `get_redis` se déclare lui-même « backward compat alias » : sa conservation était délibérée. |
+| `ci_safety_margin`, `xgboost_decay`, `sentiment_significance_threshold` (`ml/adaptive_thresholds`) | 20 | Seuils adaptatifs prévus pour des modèles qui ne les consomment pas encore. |
+| `stablecoin_peg` (`asset_classification`) | 3 | Accesseur d'une table déjà lue directement ailleurs. |
+
+Les **6 appelées seulement par des tests** — `_build_portfolio_var_parametric`, `invert_rate`, `calculate_cagr`, `calculate_roi`, `build_sorted_rates`, `is_crypto_quote` — sont mortes en production mais leur suppression emporterait les tests qui les couvrent. `calculate_roi` et `calculate_cagr` sont de surcroît des formules de référence, utiles à garder documentées et testées.
+
 #### Pièges de lecture documentés (pas des défauts)
 
 | Constat | Pourquoi il compte |
