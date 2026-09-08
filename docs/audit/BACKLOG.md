@@ -125,6 +125,12 @@ de ce backlog : **mesurer avant d'engager**.
 | **VÉRIF** | **2/2** | VERIF-02, VERIF-01 (32 écrans / 32) | — |
 | **Total** | **50/50** | **37** | **13** |
 
+**Le backlog d'audit est clos.** Le travail engagé depuis suit une autre boussole : la
+**couverture de tests**, à 41 % pour un seuil de projet de 70 %. Sept modules de calcul
+financier ont été mis sous filet de caractérisation ; les onze écarts qu'ils ont mis au
+jour sont consignés en **NEW-21 à NEW-31**, avec leur exposition mesurée. Aucun n'est
+corrigé : ils attendent un arbitrage.
+
 UX-03, UX-08 et UX-09 comptent dans les mesurés de leur EPIC sans figurer dans le
 tableau ci-dessus. Ils sont désormais **tous les trois livrés** (2026-09-02, 09-05 et
 09-03) : cette note datait d'avant leur traitement.
@@ -175,6 +181,62 @@ mentionnait. Le 8,5/10 de design reste néanmoins une hypothèse : 7 écrans sur
 **Invariant A (`check_holdings_qty`)** : 11 violations → **0 violation matérielle** (4 avertissements sur des poussières), code retour 0. Vérifié en production.
 
 **P&L du portefeuille Crypto** : +252 € après nettoyage, contre +38 € au plus bas de la session. Contrôle indépendant : le PRU BTC/Kraken calculé tombe sur celui affiché par Kraken (55 544 €).
+
+### Les filets de caractérisation — ce que la couverture a appris (2026-09-07/08)
+
+Le backlog d'audit étant clos, la couverture backend a servi de boussole : **41 %**
+pour un seuil de projet à 70 %. Sept modules de calcul ou de livrable financier ont été
+mis sous filet, en visant à chaque fois les fonctions **pures** — testables sans base ni
+réseau — puis, une fois la fixture `db_session` retrouvée, celles qui lisent la base.
+
+| Module | Avant | Après |
+|---|---:|---:|
+| `snapshot_service._replay_transactions_to_daily_holdings` | 24 % | **100 %** (fonction) |
+| `snapshot_risk` (volatilité, Sharpe, drawdown, VaR, HHI) | 11 % | **77 %** |
+| `smart_insights_analyzers` + score de santé | 8 % | **98 %** |
+| `market_data_service` (calendrier boursier) | 0 % | **48 %** |
+| `stress_test_service` (crowdfunding) | 43 % | **100 %** |
+| `report_transactions` (PDF / Excel / CSV) | 18 % | **100 %** |
+| `insights_service` (fiscalité, frais, revenus passifs) | 13 % | **75 %** |
+
+Ces filets épinglent le comportement **actuel**, verrues comprises. Ils ne valident rien :
+leur rôle est qu'un changement se voie. Chaque test a été validé par canari — casser
+volontairement le code et vérifier que le test échoue.
+
+**Neuf tests creux ont été trouvés ainsi, et corrigés avant livraison.** Le motif est
+toujours le même : le test regardait un résultat qui valait la même chose pour deux
+causes différentes. Une VaR nulle par seuil ou par queue gauche positive ; un rapport de
+volatilités où le diviseur de Bessel s'annule ; une série de trois mois où `[-3:]` vaut
+la liste entière ; une fusion de clusters jamais atteinte parce que le cas empruntait la
+branche voisine.
+
+#### Écarts mesurés, épinglés mais **non corrigés**
+
+Ils attendent un arbitrage produit. Aucun n'est un incident : plusieurs sont dormants,
+et leur exposition réelle a été comptée quand elle était mesurable.
+
+| ID | Sév. | Écart | Exposition mesurée |
+|---|---|---|---|
+| **NEW-21** | 🟠 | **Frais de devises différentes additionnés sans conversion.** 1 EUR + 1 USDC + 0,001 BTC font « 2,001 ». `fee_currency` est reporté ligne par ligne, mais le total et toutes les ventilations somment des montants bruts. | **Sept devises** en base : 52 EUR, 7 sans devise, 2 USDC, un chacun PAXG/BTC/ETH/SOL/TAO. Écart actuel < 1 €, mais 0,001 BTC compte pour 0,001 € au lieu de ~90 € — trois ordres de grandeur. |
+| **NEW-22** | 🟠 | **Dividendes et intérêts absents des revenus passifs**, alors que la docstring les annonce. `passive_types` ne contient que `STAKING_REWARD` et `AIRDROP` ; les deux types existent et comptent partout ailleurs (entrées du TRI, crédit des quantités à l'import). | **0 transaction** de ces types en base. Dormant — se réveille au premier dividende enregistré. |
+| **NEW-23** | 🟠 | **Un prix indisponible fait disparaître l'opportunité fiscale.** Le cours manquant retombe sur le prix de revient, la position affiche une plus-value exactement nulle et sort de la liste. Un cours à **zéro** — jeton effondré — produit le même effet, `price_data.get("price")` étant testé en truthiness : la perte totale est celle qui passe le plus sûrement inaperçue. | Non quantifiée (dépend de la disponibilité des cours à l'instant T). |
+| **NEW-24** | 🟡 | **Heure d'été approximée par numéros de jour.** US : `day < 7` en novembre prolonge le DST du 1er au 6 ; EU : `day >= 25` en mars l'avance du 25 au 28. Une heure de décalage sur les horaires d'ouverture, **6 jours/an** (US) et **4 jours/an** (EU). Le 2 novembre 2026 à 13 h 45 UTC, le NYSE est déclaré ouvert alors qu'il ouvre 45 minutes plus tard. | **Nulle** : 0 action détenue (cf. FIN-10). `zoneinfo` réglerait la question. |
+| **NEW-25** | 🟡 | **Export CSV : séparateur français, décimale anglaise.** Le BOM `utf-8-sig` et le `;` visent Excel FR, mais les montants partent en `f"{x:.2f}"`. Les colonnes Quantité, Prix, Valeur et Frais y arrivent en **texte**, ni sommables ni triables. | Systématique sur tout export CSV. Correction d'une ligne. |
+| **NEW-26** | 🟡 | **Trois formats, trois vocabulaires.** `transfer_in` s'affiche « Transfert ↓ » en PDF, « Transfert entrant » en Excel, `transfer_in` brut en CSV. | Systématique. |
+| **NEW-27** | 🟡 | **Deux moyennes qui ne mesurent pas ce que leur nom annonce.** `avg_monthly_fee` et `avg_monthly` divisent par le nombre de mois **ayant porté un mouvement**, pas par la durée de détention : 12 € payés en janvier donnent une « moyenne mensuelle » de 12 €. `projected_annual` extrapole les trois derniers mois **perçus**, non calendaires — un portefeuille inactif depuis un an projette encore sur ses derniers revenus. | Systématique dès que l'activité est irrégulière. |
+| **NEW-28** | 🟡 | **VaR déclarée nulle sous 20 intervalles** — pas « indisponible ». Une série hebdomadaire sur trois mois n'en a que 12 : l'écran annonce 0 % de risque. | Dépend de l'échantillonnage de la série. |
+| **NEW-29** | 🟡 | **Le stress test ignore les allocations qu'on lui passe.** C'est un choc uniforme : une ligne stablecoin y chute autant qu'un altcoin. `int(scenario_drop * 100)` **tronque** en prime — un scénario à −25,5 % s'intitule « Correction -25% ». | Systématique. |
+| **NEW-30** | 🟢 | **Flat tax de 30 % codée en dur** dans l'optimisation fiscale, et note d'avertissement citant le **wash sale** — règle américaine que le droit français ne connaît pas pour les particuliers. | Systématique ; relève de la formulation produit. |
+| **NEW-31** | 🟢 | **Un in fine à intérêts périodiques affiche des lignes vides.** 12 échéances dont 11 à zéro : le capital ne tombe qu'à la fin et les intérêts ne sont versés qu'à l'échéance. Ces lignes sont retirées du calcul du TRI mais restent à l'écran. | Tout projet in fine à fréquence non terminale. |
+
+#### Pièges de lecture documentés (pas des défauts)
+
+| Constat | Pourquoi il compte |
+|---|---|
+| **Deux HHI, deux échelles.** `analytics_scoring._hhi` rend une fraction (1,0 pour un mono-actif) et alimente les analyseurs, dont les seuils sont 0,10 et 0,25 ; `snapshot_risk.calculate_hhi` rend l'échelle 0-10000 de la convention antitrust. | Même métrique, même nom, **facteur 10 000**. Les intervertir déclarerait « concentration élevée » à un portefeuille parfaitement diversifié. Chacun est cohérent chez lui — rien ne le signalait. |
+| **Contrat d'unité tenu par un commentaire.** Volatilité, VaR, drawdown, HHI et poids de ligne circulent en fraction ; les services qui les calculent les rendent en pourcentage. La conversion vit dans l'appelant. | Retirer une division par 100 ferait basculer **tout** portefeuille en « volatilité extrême ». Trois tests tombent désormais si on le fait. |
+| **Trois gardes derrière une contrainte de base.** `Asset.quantity > 0` en SQL, `qty <= 0` en Python et `unrealized_pnl < 0` en aval écartent les positions vides ; les retirer **tous les trois** ne change rien. Le seul cas qu'ils protégeraient — une quantité négative — est refusé à l'écriture par `ck_assets_quantity_positive`. | C'est la contrainte qui méritait un test. Elle en a un. |
+| **Code inerte.** `executed_at.replace(tzinfo=None)` avant un `strftime("%Y-%m-%d")` ne change rien : le format lit les champs tels quels. Idem pour deux raccourcis du stress test (`payment <= 0` et le court-circuit à délai nul), qui sont des économies de calcul, pas des règles. | Ces constats sont écrits dans les docstrings pour qu'un futur canari muet ne relance pas la même enquête. |
 
 ### VERIF-01 — ce que le rendu a appris (2026-09-01)
 
