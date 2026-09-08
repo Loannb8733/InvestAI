@@ -127,7 +127,10 @@ class RebalancingReportMixin:
                 continue
             cls = CRYPTO_ASSET_CLASSES.get(sym, "Other")
             class_totals[cls] += val
-            class_assets[cls].append(a)
+            # `_estimate_rebalancing_tax` lit `value`, pas `current_value` :
+            # sans cet alias, elle valorisait chaque ligne à zéro et l'impôt
+            # estimé restait nul quelle que soit la plus-value latente.
+            class_assets[cls].append({**a, "value": val})
 
         crypto_total = sum(class_totals.values())
         if crypto_total <= 0:

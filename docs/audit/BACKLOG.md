@@ -229,6 +229,8 @@ et leur exposition réelle a été comptée quand elle était mesurable.
 | **NEW-30** | 🟢 | **Flat tax de 30 % codée en dur** dans l'optimisation fiscale, et note d'avertissement citant le **wash sale** — règle américaine que le droit français ne connaît pas pour les particuliers. | Systématique ; relève de la formulation produit. |
 | **NEW-31** | 🟢 | **Un in fine à intérêts périodiques affiche des lignes vides.** 12 échéances dont 11 à zéro : le capital ne tombe qu'à la fin et les intérêts ne sont versés qu'à l'échéance. Ces lignes sont retirées du calcul du TRI mais restent à l'écran. | Tout projet in fine à fréquence non terminale. |
 
+| **NEW-32** | 🔴 | **L'impôt estimé d'un rebalancement valait toujours zéro.** `_estimate_rebalancing_tax` lit `value` et `current_price` sur les lignes qu'on lui passe ; `get_rebalancing_report` les tire d'`aggregated_assets`, qui expose `current_value` et **aucun prix**. Le garde `if current_price <= 0: continue` écartait donc chaque ligne. L'endpoint `/rebalancing` appelle pourtant l'estimation par défaut : l'utilisateur lisait « impôt estimé : 0 € » quelle que soit sa plus-value latente — sur une vente de 20 000 € entièrement en gain, 6 000 € de PFU passaient sous silence. | ✅ **corrigé** — `aggregated_assets` projette le `current_price` qu'il agrégeait déjà, et le rapport ajoute l'alias `value`. Un test de contrat vérifie que la projection garde ses clés : les tests unitaires de `_estimate_rebalancing_tax` passaient depuis toujours, nourris à la main par des dicts conformes que personne ne produisait. |
+
 #### Pièges de lecture documentés (pas des défauts)
 
 | Constat | Pourquoi il compte |
