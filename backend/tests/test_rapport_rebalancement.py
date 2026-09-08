@@ -381,3 +381,105 @@ class TestQuantiteAgregee:
         # cohérence interne des trois clés, seule chose dont dépend le résumé
         # Earn.
         assert eth["current_value"] / eth["quantity"] == pytest.approx(eth["current_price"], rel=1e-6)
+
+    async def test_l_exposition_par_devise_recoit_des_actifs_a_regrouper(self, db_session, regular_user):
+        """Bout en bout : la clé `assets` porte bien les entrées individuelles.
+
+        L'endpoint regroupe ces entrées par devise de cotation. Il lui faut
+        l'`id` et l'`asset_type` de chacune — `aggregated_assets`, agrégé par
+        symbole, ne les fournit pas. Une liste vide se traduisait côté client
+        par une carte d'exposition simplement absente de l'écran.
+        """
+        from decimal import Decimal
+
+        from app.models.asset import Asset, AssetType
+        from app.models.portfolio import Portfolio
+        from app.services.metrics_service import metrics_service
+
+        pf = Portfolio(user_id=regular_user.id, name="P")
+        db_session.add(pf)
+        await db_session.flush()
+        db_session.add(
+            Asset(
+                portfolio_id=pf.id,
+                symbol="ETH",
+                name="Ethereum",
+                asset_type=AssetType.CRYPTO,
+                quantity=Decimal("2"),
+                avg_buy_price=Decimal("1500"),
+                current_price=Decimal("2000"),
+                exchange="Binance",
+            )
+        )
+        await db_session.commit()
+
+        metrics = await metrics_service.get_user_dashboard_metrics(db_session, str(regular_user.id))
+
+        assert metrics["assets"], "aucune entrée individuelle à regrouper"
+        entree = metrics["assets"][0]
+        for champ in ("id", "symbol", "asset_type", "current_value"):
+            assert champ in entree, f"`{champ}` manque à l'entrée d'actif"
+        assert isinstance(metrics["total_dividend_income"], float)
+        assert isinstance(metrics["total_return"], float)
+
+    async def test_les_dividendes_percus_remontent_au_niveau_utilisateur(self, db_session, regular_user):
+        """Un dividende encaissé doit se retrouver dans le total du dashboard.
+
+        Le rejeu FIFO le comptabilise par actif (`dividend_income`), chaque
+        portefeuille le somme (`total_dividend_income`), et le niveau
+        utilisateur doit cumuler les portefeuilles. Vérifier le seul type de la
+        clé ne dit rien de ce cumul : les deux canaris qui figent la valeur à
+        zéro ou suppriment l'accumulation passaient inaperçus.
+        """
+        from datetime import datetime, timezone
+        from decimal import Decimal
+
+        from app.models.asset import Asset, AssetType
+        from app.models.portfolio import Portfolio
+        from app.models.transaction import Transaction, TransactionType
+        from app.services.metrics_service import metrics_service
+
+        pf = Portfolio(user_id=regular_user.id, name="P")
+        db_session.add(pf)
+        await db_session.flush()
+        aapl = Asset(
+            portfolio_id=pf.id,
+            symbol="AAPL",
+            name="Apple",
+            asset_type=AssetType.STOCK,
+            quantity=Decimal("10"),
+            avg_buy_price=Decimal("150"),
+            current_price=Decimal("200"),
+            currency="EUR",
+        )
+        db_session.add(aapl)
+        await db_session.flush()
+        db_session.add(
+            Transaction(
+                asset_id=aapl.id,
+                transaction_type=TransactionType.BUY,
+                quantity=Decimal("10"),
+                price=Decimal("150"),
+                fee=Decimal("0"),
+                currency="EUR",
+                executed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
+        )
+        db_session.add(
+            Transaction(
+                asset_id=aapl.id,
+                transaction_type=TransactionType.DIVIDEND,
+                quantity=Decimal("10"),
+                price=Decimal("2.5"),
+                fee=Decimal("0"),
+                currency="EUR",
+                executed_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            )
+        )
+        await db_session.commit()
+
+        metrics = await metrics_service.get_user_dashboard_metrics(db_session, str(regular_user.id))
+
+        assert metrics["total_dividend_income"] == pytest.approx(25.0, abs=0.01)
+        # Le rendement total ajoute les dividendes à la plus-value affichée.
+        assert metrics["total_return"] == pytest.approx(metrics["total_gain_loss"] + 25.0, abs=0.01)
