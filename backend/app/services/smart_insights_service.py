@@ -134,7 +134,8 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 for symbol, weight in sorted(allocation_by_asset.items(), key=lambda x: -x[1])[:5]
             ]
         except Exception:
-            hhi = 0.0
+            logger.warning("Analyse de diversification indisponible — HHI non mesuré", exc_info=True)
+            hhi = None
             top_holdings = []
 
         # Scale VaR to the chosen timeframe window (sqrt-T scaling from daily)
@@ -912,7 +913,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         sharpe: float,
         volatility: float,
         var_95: float,
-        hhi: float,
+        hhi: Optional[float],
         anomaly_count: int,
         max_drawdown: float = 0.0,
         gold_exposure: float = 0.0,
@@ -949,8 +950,10 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         elif var_95 > var_warn:
             score -= 10
 
-        # Concentration penalty (0 to -15)
-        if hhi > conc_crit:
+        # Concentration penalty (0 to -15) — rien à pénaliser sans mesure.
+        if hhi is None:
+            pass
+        elif hhi > conc_crit:
             score -= 15
         elif hhi > conc_warn:
             score -= 10

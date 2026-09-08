@@ -5,7 +5,7 @@ SmartInsightsService for call-site compatibility)."""
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from app.ml import adaptive_thresholds as adaptive_th
 from app.services.smart_insights_types import InsightCategory, InsightSeverity, SmartInsight
@@ -163,8 +163,15 @@ class SmartInsightAnalyzersMixin:
 
         return insights
 
-    def _analyze_diversification(self, hhi: float, top_holdings: List[Dict]) -> List[SmartInsight]:
-        """Analyze portfolio diversification."""
+    def _analyze_diversification(self, hhi: Optional[float], top_holdings: List[Dict]) -> List[SmartInsight]:
+        """Analyze portfolio diversification.
+
+        `hhi=None` signifie que la mesure n'a pas pu être obtenue. Aucun verdict
+        n'est alors rendu : convertir l'échec en `0.0` le ferait passer sous le
+        seuil de 0,10 et produirait « Bonne diversification » — la conclusion la
+        plus rassurante possible, tirée d'une absence de donnée. Le poids de la
+        première ligne, lui, vient d'une autre source et reste évalué.
+        """
         insights = []
         conc_warn, conc_crit = adaptive_th.concentration_thresholds()
 
@@ -206,7 +213,9 @@ class SmartInsightAnalyzersMixin:
                     )
                 )
 
-        # HHI analysis
+        # HHI analysis — sautée quand la mesure est absente.
+        if hhi is None:
+            return insights
         if hhi > conc_warn:
             insights.append(
                 SmartInsight(
