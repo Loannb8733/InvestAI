@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { formatQuantity, generateCSV, getDateRangeStart } from './transactions-format'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageSkeleton } from "@/components/ui/page-skeleton"
@@ -178,53 +179,8 @@ type SortDirection = 'asc' | 'desc'
 
 // ============== Helper Functions ==============
 
-function formatQuantity(quantity: number): string {
-  const q = Number(quantity)
-  if (!q || q === 0) return '0'
-  quantity = q
-  const absQuantity = Math.abs(quantity)
-  if (absQuantity >= 1000) {
-    return quantity.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
-  } else if (absQuantity >= 1) {
-    return quantity.toLocaleString('fr-FR', { maximumFractionDigits: 4 })
-  } else if (absQuantity >= 0.0001) {
-    return quantity.toLocaleString('fr-FR', { maximumFractionDigits: 6 })
-  } else {
-    return quantity.toLocaleString('fr-FR', { maximumSignificantDigits: 4 })
-  }
-}
 
-function getDateRangeStart(value: string): Date | null {
-  if (value === '0') return null
-  if (value === 'ytd') {
-    const now = new Date()
-    return new Date(now.getFullYear(), 0, 1)  // January 1st of current year
-  }
-  const days = parseInt(value)
-  if (isNaN(days) || days === 0) return null
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
 
-function generateCSV(transactions: Transaction[]): string {
-  // Use backend-compatible format: machine-readable types, ISO dates, period decimals
-  const headers = ['symbol', 'type', 'quantity', 'price', 'fee', 'date', 'notes']
-
-  const rows = transactions.map((tx) => [
-    tx.asset_symbol,
-    tx.transaction_type,
-    tx.quantity.toString(),
-    tx.price.toString(),
-    (tx.fee || 0).toString(),
-    new Date(tx.executed_at || tx.created_at).toISOString().replace('T', ' ').substring(0, 19),
-    (tx.notes || '').replace(/;/g, ',').replace(/\n/g, ' '),
-  ])
-
-  const csvContent = [headers.join(';'), ...rows.map((row) => row.join(';'))].join('\n')
-  return '\uFEFF' + csvContent // BOM for Excel compatibility
-}
 
 function downloadCSV(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })

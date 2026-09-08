@@ -96,7 +96,14 @@ export interface TransactionWithAssetInfo {
   price: number
   fee: number | null
   currency: string
-  executed_at: string
+  /** Date d'exécution — **peut être absente**.
+   *
+   * Le schéma du serveur la déclare `Optional[datetime]`, et 195 transactions
+   * sur 840 n'en portent pas en base : les trois sites qui écrivaient sans
+   * dater ont été corrigés (NEW-10), mais l'historique garde ses trous. Le
+   * type disait `string` : il autorisait un accès direct qui aurait planté
+   * sur près d'un quart des lignes. */
+  executed_at: string | null
   notes: string | null
   created_at: string
   exchange: string | null
@@ -118,7 +125,14 @@ export interface TransactionEdit {
   fee: number | null
   fee_currency?: string | null
   currency: string
-  executed_at: string
+  /** Date d'exécution — **peut être absente**.
+   *
+   * Le schéma du serveur la déclare `Optional[datetime]`, et 195 transactions
+   * sur 840 n'en portent pas en base : les trois sites qui écrivaient sans
+   * dater ont été corrigés (NEW-10), mais l'historique garde ses trous. Le
+   * type disait `string` : il autorisait un accès direct qui aurait planté
+   * sur près d'un quart des lignes. */
+  executed_at: string | null
   exchange?: string | null
   notes: string | null
 }
