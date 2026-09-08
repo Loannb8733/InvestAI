@@ -872,6 +872,9 @@ class SnapshotService(SnapshotRiskMixin):
             _ps = PriceService()
             stablecoin_eur_rate = float(await _ps.get_forex_rate("USD", "EUR") or COLD_START_USD_EUR)
         except Exception:
+            # Constante de démarrage à froid : un repli assumé et documenté,
+            # mais qui gagne à laisser une trace s'il devient permanent.
+            logger.warning("Taux USD→EUR indisponible — repli sur la constante de démarrage à froid")
             stablecoin_eur_rate = float(COLD_START_USD_EUR)
 
         # Fallback: if most symbols have no price data (API down), use DB snapshots

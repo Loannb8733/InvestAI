@@ -491,6 +491,15 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                     if not current_price:
                         current_price = await price_service.get_current_price(symbol, "stock")
             except Exception:
+                # Le prix de revient approxime la valeur de la position. Mettre
+                # 0 afficherait « impact : 0 EUR », un faux zéro rassurant —
+                # le motif même que NEW-35 et NEW-36 ont corrigé ailleurs. Le
+                # repli reste, mais il cesse d'être muet.
+                logger.warning(
+                    "Cours indisponible pour %s — impact d'anomalie valorisé au prix de revient",
+                    symbol,
+                    exc_info=True,
+                )
                 current_price = asset_data.get("avg_buy_price", 0)
 
             position_value = quantity * (current_price or 0)
@@ -549,6 +558,9 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 try:
                     _, btc_prices = await self.data_fetcher.get_crypto_history("BTC", days=regime_days)
                 except Exception:
+                    # L'appelant sort proprement (`len(btc_prices) < 7 → None`) :
+                    # rien de faux n'est publié. Seule la trace manquait.
+                    logger.warning("Historique BTC indisponible — régime de marché non calculé")
                     btc_prices = []
 
             if len(btc_prices) < 7:
@@ -1089,6 +1101,12 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             cfg = RegimeConfig.from_regime(result.dominant_regime, result.confidence)
             return cfg.vol_regime
         except Exception:
+            # « normal » est le milieu de l'échelle (stress / normal / low) et
+            # le défaut assumé du domaine — c'est aussi ce que rend une série
+            # trop courte. Le repli est neutre ; c'est son silence qui ne
+            # l'était pas : une détection en échec durable passait inaperçue
+            # alors qu'elle alimente les projections Monte Carlo.
+            logger.warning("Détection de régime indisponible — régime supposé normal", exc_info=True)
             return "normal"
 
 
