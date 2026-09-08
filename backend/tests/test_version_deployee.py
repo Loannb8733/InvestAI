@@ -60,3 +60,64 @@ class TestSondeDeVivacite:
         """C'est le démarrage du processus, pas l'heure courante — un
         redémarrage se lit donc à ce champ."""
         assert (await health_check())["demarre_a"] == (await health_check())["demarre_a"]
+
+
+class TestVersionDeSchema:
+    """Le schéma a-t-il suivi le code ?
+
+    Le conteneur lance `alembic upgrade head || echo "ALEMBIC MIGRATION
+    FAILED"` : un échec de migration **ne bloque pas** le démarrage. C'est un
+    choix assumé — un déploiement automatique ne doit pas couper le service —
+    mais il laissait une question sans réponse depuis l'extérieur : le code
+    tourne, et le schéma ?
+
+    Le marqueur de commit répond pour l'un. Ces deux clés répondent pour
+    l'autre : `/health` annonce la révision attendue, `/health/ready` la
+    compare à celle que la base porte réellement.
+    """
+
+    async def test_la_sonde_de_vivacite_annonce_la_revision_attendue(self, client):
+        reponse = await client.get("/health")
+
+        assert reponse.status_code == 200
+        assert reponse.json()["schema_attendu"] != "inconnue"
+
+    async def test_la_revision_attendue_est_celle_qu_alembic_designe(self):
+        """Elle est lue par Alembic, non déduite des fichiers.
+
+        Un premier essai cherchait la révision que nul ne cite en
+        `down_revision` : il en trouvait **trois** là où Alembic n'en voit
+        qu'une. Le graphe se lit avec l'outil qui le construit.
+        """
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+        from app.main import _REVISION_ATTENDUE
+
+        script = ScriptDirectory.from_config(Config("alembic.ini"))
+
+        assert script.get_heads() == [_REVISION_ATTENDUE]
+
+    async def test_la_sonde_de_disponibilite_compare_les_deux_versions(self, client):
+        reponse = await client.get("/health/ready")
+        corps = reponse.json()
+
+        assert corps["schema_applique"] == corps["schema_attendu"]
+        assert corps["status"] == "ready"
+
+    async def test_un_schema_en_retard_rend_le_service_degrade(self, client, monkeypatch):
+        """C'est le cas que tout ceci sert à voir.
+
+        Les deux versions coïncident toujours en test : sans cette simulation,
+        retirer la comparaison ne ferait tomber aucun test — le canari l'a
+        montré. Une révision attendue différente de celle que porte la base doit
+        faire répondre **503**, pour qu'un déploiement dont la migration a
+        échoué se voie de l'extérieur.
+        """
+        from app import main
+
+        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "revision_qui_n_existe_pas")
+
+        reponse = await client.get("/health/ready")
+
+        assert reponse.status_code == 503
+        assert reponse.json()["status"] == "degraded"

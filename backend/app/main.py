@@ -10,6 +10,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Mapping
 
 from fastapi import FastAPI, Request
@@ -983,7 +984,36 @@ def resoudre_commit(env: Mapping[str, str] | None = None) -> str:
     return brut[:7] if brut else "inconnu"
 
 
+def resoudre_revision_attendue() -> str:
+    """Révision Alembic que ce code attend, lue par Alembic lui-même.
+
+    Le conteneur lance `alembic upgrade head || echo …` : l'échec d'une
+    migration ne bloque pas le démarrage — un choix assumé, pour qu'un
+    déploiement automatique ne coupe pas le service. Mais rien ne disait alors
+    si le schéma avait suivi le code. Le marqueur de commit répond pour l'un ;
+    celui-ci répond pour l'autre.
+
+    Un premier essai déduisait la tête des fichiers de migration — la révision
+    que nul ne cite en `down_revision`. Il en trouvait **trois** là où Alembic
+    n'en voit qu'une : le graphe réel se lit avec l'outil qui le construit, pas
+    avec une expression régulière. La lecture reste hors base et n'a lieu qu'au
+    démarrage.
+    """
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        racine = Path(__file__).resolve().parent.parent
+        script = ScriptDirectory.from_config(Config(str(racine / "alembic.ini")))
+        tetes = script.get_heads()
+        return tetes[0] if len(tetes) == 1 else "inconnue"
+    except Exception:
+        logger.warning("Révision de schéma attendue illisible", exc_info=True)
+        return "inconnue"
+
+
 _COMMIT_DEPLOYE = resoudre_commit()
+_REVISION_ATTENDUE = resoudre_revision_attendue()
 _DEMARRE_A = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
@@ -995,6 +1025,7 @@ async def health_check():
         "app": settings.APP_NAME,
         "status": "alive",
         "commit": _COMMIT_DEPLOYE,
+        "schema_attendu": _REVISION_ATTENDUE,
         "demarre_a": _DEMARRE_A,
     }
 
@@ -1015,6 +1046,20 @@ async def readiness_check():
         checks["database"] = "error"
         checks["status"] = "degraded"
         http_status = 503
+
+    # Version de schéma réellement appliquée. Comparée à celle qu'attend le
+    # code, elle dit si la migration du dernier déploiement est passée — le
+    # démarrage, lui, n'en dépend pas.
+    try:
+        async with engine.connect() as conn:
+            applique = (await conn.execute(text("SELECT version_num FROM alembic_version"))).scalar()
+        checks["schema_applique"] = applique or "aucune"
+        checks["schema_attendu"] = _REVISION_ATTENDUE
+        if _REVISION_ATTENDUE != "inconnue" and applique != _REVISION_ATTENDUE:
+            checks["status"] = "degraded"
+            http_status = 503
+    except Exception:
+        checks["schema_applique"] = "illisible"
 
     # Check Redis
     try:
