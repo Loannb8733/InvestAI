@@ -165,6 +165,13 @@ jobs:
       - name: Type check (TypeScript)
         run: npx tsc --noEmit
 
+      # Les URL du client sont ecrites a la main : rien ne les relie aux routes
+      # que FastAPI declare. Une route renommee d'un cote fait partir l'appel en
+      # 404, que le client traite comme une erreur reseau ordinaire.
+      - name: Les appels du client visent des routes existantes
+        working-directory: .
+        run: python3 scripts/verifier_routes_client.py
+
   # ──────────────────────────────────────────
   # Frontend: Tests (Vitest)
   # ──────────────────────────────────────────
