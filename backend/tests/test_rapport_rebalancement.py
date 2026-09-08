@@ -336,3 +336,48 @@ class TestContratDesAgregats:
 
         for cle in ("symbol", "asset_type", "current_value", "current_price"):
             assert f'"{cle}"' in projection, f"`{cle}` a disparu des agrégats du dashboard"
+
+
+class TestQuantiteAgregee:
+    async def test_la_quantite_projetee_permet_de_retrouver_le_prix_unitaire(self, db_session, regular_user):
+        """Le résumé Earn calcule `current_value / quantity` pour son prix unitaire.
+
+        Ce test appelle le vrai `get_user_dashboard_metrics` — pas un double —
+        et vérifie que le quotient retombe sur le cours de l'actif. Deux
+        positions du même symbole sur deux plateformes sont agrégées : la
+        quantité doit être leur somme, sans quoi le prix unitaire serait faux
+        d'un facteur deux.
+        """
+        from decimal import Decimal
+
+        from app.models.asset import Asset, AssetType
+        from app.models.portfolio import Portfolio
+        from app.services.metrics_service import metrics_service
+
+        pf = Portfolio(user_id=regular_user.id, name="P")
+        db_session.add(pf)
+        await db_session.flush()
+        for plateforme in ("Binance", "Kraken"):
+            db_session.add(
+                Asset(
+                    portfolio_id=pf.id,
+                    symbol="ETH",
+                    name="Ethereum",
+                    asset_type=AssetType.CRYPTO,
+                    quantity=Decimal("2"),
+                    avg_buy_price=Decimal("1500"),
+                    current_price=Decimal("2000"),
+                    exchange=plateforme,
+                )
+            )
+        await db_session.commit()
+
+        metrics = await metrics_service.get_user_dashboard_metrics(db_session, str(regular_user.id))
+        eth = next(a for a in metrics["aggregated_assets"] if a["symbol"] == "ETH")
+
+        assert eth["quantity"] == 4.0  # 2 + 2, les deux plateformes
+        # Le cours retenu est celui que le service est allé chercher, pas
+        # forcément celui écrit en base : l'assertion porte donc sur la
+        # cohérence interne des trois clés, seule chose dont dépend le résumé
+        # Earn.
+        assert eth["current_value"] / eth["quantity"] == pytest.approx(eth["current_price"], rel=1e-6)
