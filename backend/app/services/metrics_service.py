@@ -1327,6 +1327,7 @@ class MetricsService:
         total_pnl_fees = Decimal("0")
         total_liquidity = Decimal("0")
         all_assets = []
+        total_dividends = Decimal("0")
         any_forex_stale = False
 
         for portfolio in portfolios:
@@ -1382,6 +1383,7 @@ class MetricsService:
             for _ccy, amount in (portfolio.cash_balances or {}).items():
                 total_liquidity += Decimal(str(amount))
             all_assets.extend(portfolio_metrics["assets"])
+            total_dividends += Decimal(str(portfolio_metrics.get("total_dividend_income", 0)))
             any_forex_stale = any_forex_stale or portfolio_metrics.get("forex_stale", False)
 
         # total_gain_loss: same base as net_gain_loss (pnl_value includes stablecoins/fiat)
@@ -1525,6 +1527,19 @@ class MetricsService:
                 for a in worst_performers
             ],
             "available_liquidity": float(total_liquidity),
+            # Les trois clés suivantes étaient lues par l'endpoint sans jamais
+            # être produites. `assets` porte les entrées individuelles (avec
+            # `id` et `asset_type`) dont l'exposition par devise a besoin : sans
+            # elle, `ccy_totals` restait vide et la carte correspondante ne
+            # s'affichait jamais côté client. Les deux autres retombaient sur
+            # leur défaut de 0.
+            "assets": all_assets,
+            "total_dividend_income": float(total_dividends),
+            # Base cohérente avec le reste de l'écran : `total_gain_loss` du
+            # dashboard, augmenté des dividendes perçus. Sommer les
+            # `total_return` de chaque portefeuille donnerait une autre base
+            # (leur plus-value latente), qui contredirait le P&L affiché.
+            "total_return": float(total_gain_loss + total_dividends),
             "period_changes": period_changes,
             # Pre-built asset allocation (avoids N+1 re-fetch in dashboard endpoint)
             "aggregated_assets": [

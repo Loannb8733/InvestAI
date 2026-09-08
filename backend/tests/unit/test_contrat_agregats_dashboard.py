@@ -1,4 +1,4 @@
-"""Le contrat d'`aggregated_assets` : ce que la projection doit fournir.
+"""Les contrats de `get_user_dashboard_metrics` : ce que ses lecteurs attendent.
 
 `metrics_service.get_user_dashboard_metrics` publie une liste `aggregated_assets`
 que cinq consommateurs relisent. Chacun y prend les clés dont il a besoin — et
@@ -11,7 +11,11 @@ conformes que personne ne produisait :
 - `current_price` manquait, et l'estimation fiscale du rebalancement annonçait
   **0 EUR d'impôt** quelle que soit la plus-value (corrigé, NEW-32) ;
 - `quantity` manquait, et le résumé Earn du tableau de bord valorisait à **0 EUR**
-  toute crypto stakée non-stablecoin (corrigé ici).
+  toute crypto stakée non-stablecoin (corrigé, NEW-33) ;
+- au niveau du dictionnaire racine, `assets`, `total_dividend_income` et
+  `total_return` manquaient aussi : l'exposition par devise restait vide — la
+  carte n'était donc **jamais affichée** — et les deux autres valeurs
+  retombaient sur leur défaut de 0 (corrigé, NEW-34).
 
 Ce test tient la liste. Il est volontairement statique — monter le dashboard
 complet demanderait toute la chaîne, alors que la régression à verrouiller est
@@ -69,3 +73,40 @@ def test_le_prix_unitaire_du_resume_earn_est_calculable():
     projetees = cles_projetees()
 
     assert {"current_value", "quantity"} <= projetees
+
+
+def cles_racine() -> set[str]:
+    """Clés du dictionnaire que `get_user_dashboard_metrics` retourne."""
+    lignes = Path(module_metrics.__file__).read_text().split("\n")
+    i = next(i for i, l in enumerate(lignes) if '"aggregated_assets": [' in l)
+    debut = max(j for j in range(i) if lignes[j].strip().startswith("return {"))
+    fin = next(j for j in range(i, len(lignes)) if lignes[j].rstrip() == "        }")
+    return set(re.findall(r'^\s+"(\w+)":', "\n".join(lignes[debut : fin + 1]), re.M))
+
+
+# Clés du dictionnaire racine lues par ses sept consommateurs.
+CONTRAT_RACINE = {
+    "total_value": "rebalancement, simulations, stratégie, alertes, emails, dashboard",
+    "aggregated_assets": "rebalancement, alertes, dashboard, rapports",
+    "assets": "dashboard — exposition par devise (NEW-34)",
+    "total_dividend_income": "dashboard — bandeau de synthèse (NEW-34)",
+    "total_return": "dashboard — bandeau de synthèse (NEW-34)",
+    "available_liquidity": "dashboard",
+    "period_changes": "dashboard",
+}
+
+
+@pytest.mark.parametrize("cle", sorted(CONTRAT_RACINE))
+def test_chaque_cle_racine_attendue_est_projetee(cle):
+    assert cle in cles_racine(), f"`{cle}` a disparu du dictionnaire du dashboard — lue par {CONTRAT_RACINE[cle]}."
+
+
+def test_l_exposition_par_devise_a_de_quoi_travailler():
+    """`currency_exposure` regroupe les actifs par devise de cotation.
+
+    Elle a besoin des entrées **individuelles** — `aggregated_assets`, agrégé
+    par symbole, ne porte ni `id` ni la granularité par plateforme. Sans la clé
+    `assets`, les deux boucles de l'endpoint tournaient à vide et le client
+    recevait une liste vide, qu'il traduit par une carte masquée.
+    """
+    assert "assets" in cles_racine()
