@@ -543,23 +543,45 @@ class AlertService:
             logger.debug("24h change fetch failed for %s: %s", asset.symbol, exc)
         return None
 
+    # Types dont le cours vient d'un fournisseur externe. Pour les autres
+    # (immobilier, crowdfunding), `avg_buy_price` EST la valeur de référence.
+    _TYPES_COTES = (AssetType.CRYPTO, AssetType.STOCK, AssetType.ETF)
+
     async def _get_asset_price(self, asset: Asset) -> float:
-        """Get current price for an asset."""
+        """Cours courant de l'actif, ou 0 s'il est indisponible.
+
+        Rendre `avg_buy_price` quand le fournisseur ne répond pas serait pire
+        que ne rien rendre : ce repli est indistinguable d'un vrai cours, et
+        l'appelant l'évalue comme tel. `CHANGE_PERCENT_*` compare alors le prix
+        de revient à lui-même — écart nul, aucune alerte, au moment précis où
+        les prix ne circulent plus. Et `PRICE_BELOW` se déclenche **à tort** dès
+        que le prix de revient passe sous le seuil : l'utilisateur reçoit une
+        alerte de baisse pour un actif qui n'a pas bougé.
+
+        Le zéro, lui, est reconnu par l'appelant, qui saute l'évaluation.
+        """
+        cote = asset.asset_type in self._TYPES_COTES
         try:
             if asset.asset_type == AssetType.CRYPTO:
                 price = await self.price_service.get_crypto_price(asset.symbol)
                 if isinstance(price, dict):
                     return float(price.get("price", 0) or price.get("eur", 0))
-                return float(price) if price else float(asset.avg_buy_price)
-            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
+                return float(price) if price else 0.0
+            elif asset.asset_type in (AssetType.STOCK, AssetType.ETF):
                 data = await self.price_service.get_stock_price(asset.symbol)
                 if isinstance(data, dict):
                     return float(data.get("price", 0))
-                return float(data) if data else float(asset.avg_buy_price)
+                return float(data) if data else 0.0
             else:
                 return float(asset.avg_buy_price)
-        except Exception:
-            return float(asset.avg_buy_price)
+        except Exception as exc:
+            logger.warning(
+                "Cours indisponible pour %s (%s) : %s — alerte non évaluée",
+                asset.symbol,
+                asset.asset_type,
+                exc,
+            )
+            return 0.0 if cote else float(asset.avg_buy_price)
 
     async def get_alert_summary(
         self,
