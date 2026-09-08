@@ -15,6 +15,7 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  Sparkles,
   CheckCircle2,
   TrendingUp,
   MapPin,
@@ -59,6 +60,41 @@ function VerdictBadge({ verdict }: { verdict: string }) {
   )
 }
 
+/** D'où viennent les chiffres d'un audit.
+ *
+ * Le service tente quatre modèles avant de retomber sur une extraction par
+ * expressions régulières. Sans cette mention, les deux donnaient le même
+ * radar, les mêmes scores et le même verdict : rien ne les séparait à l'œil.
+ */
+function ProvenanceAnalyse({ source }: { source?: string | null }) {
+  if (!source) return null
+
+  const statique = source === 'statique'
+  return (
+    <div
+      className={
+        'flex items-start gap-2 rounded-md border px-3 py-2 text-sm ' +
+        (statique
+          ? 'border-warning/40 bg-warning/10 text-warning-foreground'
+          : 'border-border bg-muted/40 text-muted-foreground')
+      }
+    >
+      {statique ? <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" /> : <Sparkles className="h-4 w-4 shrink-0 mt-0.5" />}
+      <span>
+        {statique ? (
+          <>
+            <strong>Analyse sans IA.</strong> Aucun modèle n'a répondu : les chiffres viennent
+            d'une extraction automatique du PDF, et les scores d'une grille fixe. À relire de
+            près avant d'investir.
+          </>
+        ) : (
+          <>Analyse produite par <strong>{source}</strong>.</>
+        )}
+      </span>
+    </div>
+  )
+}
+
 function AuditResults({ audit }: { audit: ProjectAudit }) {
   const { theme, color } = useNivoTheme()
   const radarData = [
@@ -92,6 +128,8 @@ function AuditResults({ audit }: { audit: ProjectAudit }) {
         </div>
         <VerdictBadge verdict={audit.verdict} />
       </div>
+
+      <ProvenanceAnalyse source={audit.analysis_source} />
 
       {/* KPI Grid */}
       <SpotlightGroup className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
