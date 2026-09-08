@@ -4,7 +4,10 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, delete, func, select
+# `case` est importé du module, non pris sur `func` : accolé à ce dernier il
+# construit un appel de fonction SQL nommée « case », qui refuse le mot-clé
+# `else_` et lève `TypeError` avant même d'atteindre la base.
+from sqlalchemy import and_, case, delete, func, select
 
 from app.core.database import AsyncSessionLocal
 from app.models.notification import Notification
@@ -131,7 +134,7 @@ async def _validate_portfolio_consistency_async() -> dict:
                 select(
                     func.coalesce(
                         func.sum(
-                            func.case(
+                            case(
                                 (
                                     Transaction.transaction_type.in_(
                                         [
@@ -151,7 +154,7 @@ async def _validate_portfolio_consistency_async() -> dict:
                     )
                     - func.coalesce(
                         func.sum(
-                            func.case(
+                            case(
                                 (
                                     Transaction.transaction_type.in_(
                                         [
