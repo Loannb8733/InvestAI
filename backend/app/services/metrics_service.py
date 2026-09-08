@@ -1533,6 +1533,11 @@ class MetricsService:
                     "name": a["name"],
                     "asset_type": a["asset_type"],
                     "current_value": a["current_value"],
+                    # Le prix courant est agrégé plus haut mais n'était pas
+                    # projeté ici. Son absence rendait l'estimation fiscale du
+                    # rebalancement invariablement nulle (elle le lit pour
+                    # convertir un montant en quantité à céder).
+                    "current_price": a.get("current_price"),
                     "total_invested": a["total_invested"],
                     "avg_buy_price": (a["total_invested"] / a["total_quantity"] if a["total_quantity"] > 0 else 0.0),
                     "gain_loss_percent": round(a.get("period_change_percent", 0), 2),
