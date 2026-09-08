@@ -15,12 +15,93 @@ from app.services.price_service import price_service
 logger = logging.getLogger(__name__)
 
 
+# Devises dont le montant est déjà exploitable tel quel, ou converti par le
+# taux capté à l'exécution. Les autres sont des jetons : il leur faut un cours.
+DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CAD", "JPY", "CHF", "AUD"})
+
+
+def convertir_frais_en_devise_portefeuille(
+    montant: float,
+    devise_frais: str,
+    symbole_actif: str,
+    prix_transaction: float,
+    devise_transaction: str,
+    taux_conversion: Optional[float],
+    cours_par_jeton: Optional[Dict[str, float]] = None,
+) -> tuple[float, bool]:
+    """Ramène des frais dans la devise du portefeuille. Rend (montant, converti).
+
+    Additionner des frais sans les convertir revenait à faire « 1 EUR + 1 USDC
+    + 0,001 BTC = 2,001 » : `fee_currency` était reporté ligne par ligne, mais
+    le total et toutes les ventilations sommaient des montants bruts. Sur un
+    frais en BTC, l'écart est de trois ordres de grandeur.
+
+    Quatre situations, dans l'ordre où elles se présentent :
+
+    - **frais déjà dans la devise du portefeuille** — rien à faire ;
+    - **frais dans la devise de la transaction** (des frais en USD sur un trade
+      libellé en USD) — le `conversion_rate` capté à l'exécution s'applique,
+      et c'est le taux du jour de l'opération, pas celui d'aujourd'hui ;
+    - **frais dans le jeton échangé** (des frais en BTC sur un achat de BTC) —
+      le prix unitaire de la transaction fait l'affaire, converti lui aussi ;
+    - **frais dans un autre jeton** (des frais en BNB sur un achat de PEPE) —
+      il faut le cours de ce jeton, que l'appelant fournit.
+
+    Faute de cours, le montant est rendu **tel quel** avec `converti=False` :
+    l'appelant sait alors qu'une part du total n'est pas homogène, plutôt que
+    de recevoir un zéro qui minorerait silencieusement les frais.
+    """
+    if montant <= 0:
+        return 0.0, True
+
+    devise = (devise_frais or "EUR").upper()
+    if devise == "EUR":
+        return montant, True
+
+    fx = float(taux_conversion) if taux_conversion else 1.0
+
+    if devise in DEVISES_FIAT:
+        if devise == (devise_transaction or "EUR").upper():
+            return montant * fx, True
+        return montant, False
+
+    if devise == (symbole_actif or "").upper():
+        return (montant * prix_transaction * fx, True) if prix_transaction > 0 else (montant, False)
+
+    cours = (cours_par_jeton or {}).get(devise, 0.0)
+    if cours > 0:
+        return montant * cours, True
+
+    return montant, False
+
+
 class InsightsService:
     """Service for advanced portfolio insights."""
 
     # ------------------------------------------------------------------
     # Fee Analysis
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _mois_couverts(mois_observes: list[str]) -> int:
+        """Nombre de mois entre le premier et le dernier mois observé, inclus.
+
+        Diviser par le nombre de mois **ayant porté un mouvement** répond à
+        « combien un mois actif coûte-t-il », pas à « combien cela me coûte par
+        mois » — ce que le libellé laisse entendre. Douze euros payés en
+        janvier et rien les onze mois suivants donnaient une « moyenne
+        mensuelle » de 12 EUR ; ils en donnent désormais 1.
+
+        Les mois sans mouvement comptent donc au dénominateur, y compris ceux
+        du milieu. Les clés hors format (`"?"`, pour une transaction sans date)
+        sont ignorées : elles ne situent rien sur l'axe du temps.
+        """
+        valides = sorted(m for m in mois_observes if len(m) == 7 and m[4] == "-")
+        if not valides:
+            return 1
+        debut, fin = valides[0], valides[-1]
+        ecart = (int(fin[:4]) - int(debut[:4])) * 12 + (int(fin[5:]) - int(debut[5:]))
+        return max(ecart + 1, 1)
 
     async def get_fee_analysis(self, db: AsyncSession, user_id: str) -> dict:
         """Analyse complète des frais payés : par exchange, par actif, par mois."""
@@ -51,8 +132,42 @@ class InsightsService:
         by_month: Dict[str, float] = {}
         fee_list = []
 
+        # Cours des jetons dans lesquels des frais ont été prélevés sans que la
+        # transaction porte de quoi les convertir. Un appel par jeton, pas un
+        # par transaction.
+        jetons_a_coter = {
+            (tx.fee_currency or "").upper()
+            for tx in txns
+            if (tx.fee_currency or "EUR").upper() not in DEVISES_FIAT
+            and (tx.fee_currency or "").upper()
+            != (asset_map.get(str(tx.asset_id)).symbol.upper() if asset_map.get(str(tx.asset_id)) else "")
+        }
+        cours_par_jeton: Dict[str, float] = {}
+        for jeton in jetons_a_coter:
+            if not jeton:
+                continue
+            try:
+                donnees = await price_service.get_price(jeton, "crypto")
+                if donnees and donnees.get("price"):
+                    cours_par_jeton[jeton] = float(donnees["price"])
+            except Exception:
+                logger.warning("Cours indisponible pour %s — frais laissés dans leur devise", jeton)
+
+        frais_non_convertis = 0
+
         for tx in txns:
-            fee = float(tx.fee or 0)
+            asset_courant = asset_map.get(str(tx.asset_id))
+            fee, converti = convertir_frais_en_devise_portefeuille(
+                float(tx.fee or 0),
+                tx.fee_currency or "EUR",
+                asset_courant.symbol if asset_courant else "",
+                float(tx.price or 0),
+                tx.currency or "EUR",
+                tx.conversion_rate,
+                cours_par_jeton,
+            )
+            if not converti:
+                frais_non_convertis += 1
             total_fees += fee
 
             exchange = tx.exchange or "Inconnu"
@@ -76,6 +191,7 @@ class InsightsService:
                     "type": tx_type,
                     "fee": round(fee, 2),
                     "fee_currency": tx.fee_currency or "EUR",
+                    "fee_convertie": converti,
                 }
             )
 
@@ -83,11 +199,14 @@ class InsightsService:
         by_month_sorted = dict(sorted(by_month.items()))
 
         # Average monthly fee
-        avg_monthly = total_fees / max(len(by_month), 1)
+        avg_monthly = total_fees / self._mois_couverts(list(by_month))
 
         return {
             "total_fees": round(total_fees, 2),
             "nb_transactions_with_fees": len(txns),
+            # Nombre de frais dont la devise n'a pas pu être ramenée en euros :
+            # tant qu'il est non nul, le total mélange des unités.
+            "nb_frais_non_convertis": frais_non_convertis,
             "avg_monthly_fee": round(avg_monthly, 2),
             "by_exchange": {k: round(v, 2) for k, v in sorted(by_exchange.items(), key=lambda x: -x[1])},
             "by_asset": {k: round(v, 2) for k, v in sorted(by_asset.items(), key=lambda x: -x[1])[:10]},
@@ -234,8 +353,7 @@ class InsightsService:
             )
 
         by_month_sorted = dict(sorted(by_month.items()))
-        months_count = max(len(by_month), 1)
-        avg_monthly = total / months_count
+        avg_monthly = total / self._mois_couverts(list(by_month))
 
         # Project annual income
         if by_month_sorted:

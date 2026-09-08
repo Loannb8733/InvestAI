@@ -233,6 +233,17 @@ class TransactionsReportMixin:
 
     # ── Transactions CSV ─────────────────────────────────────────────
 
+    @staticmethod
+    def _nombre_fr(valeur: float, decimales: int) -> str:
+        """Formate un nombre à la française : virgule décimale, pas de séparateur de milliers.
+
+        Le fichier vise Excel en locale française — le BOM `utf-8-sig` et le
+        point-virgule le disent. Un point décimal y arrive comme du texte : les
+        colonnes chiffrées ne se somment ni ne se trient. La virgule les rend
+        numériques.
+        """
+        return f"{valeur:.{decimales}f}".replace(".", ",")
+
     def generate_transactions_csv(self, data: Dict[str, Any]) -> bytes:
         """Generate a CSV file with full transaction history."""
         import csv
@@ -259,10 +270,10 @@ class TransactionsReportMixin:
                     tx.date.strftime("%d/%m/%Y") if tx.date else "",
                     tx.transaction_type,
                     tx.symbol,
-                    f"{tx.quantity:.6f}",
-                    f"{tx.price:.2f}",
-                    f"{tx.total:.2f}",
-                    f"{tx.fee:.2f}",
+                    self._nombre_fr(tx.quantity, 6),
+                    self._nombre_fr(tx.price, 2),
+                    self._nombre_fr(tx.total, 2),
+                    self._nombre_fr(tx.fee, 2),
                 ]
             )
 
