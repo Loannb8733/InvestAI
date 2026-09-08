@@ -757,67 +757,6 @@ class AIStrategyService:
             "actions": actions,
         }
 
-    def _build_defensive_strategy(
-        self,
-        assets: List[Dict],
-        regime: str,
-        confidence: float,
-        liquidity: float,
-        total_value: float,
-    ) -> Dict[str, Any]:
-        """Defensive strategy for bear markets."""
-        liquidity_pct = round(liquidity / total_value * 100, 1) if total_value > 0 else 0
-
-        actions = []
-        if liquidity_pct < 20:
-            target_cash = round(total_value * 0.20, 2)
-            deficit = round(target_cash - liquidity, 2)
-            weak = [a for a in assets if a.get("alpha_score", 50) < 30]
-            for w in weak[:3]:
-                actions.append(
-                    {
-                        "action": "ALLÉGER",
-                        "symbol": w["symbol"],
-                        "amount": round(deficit / max(len(weak[:3]), 1), 2),
-                        "currency": "EUR",
-                        "reason": f"Alpha faible ({w.get('alpha_score', 0)}/100) — libérer du cash",
-                    }
-                )
-
-        actions.append(
-            {
-                "action": "HOLD",
-                "symbol": None,
-                "amount": None,
-                "currency": "EUR",
-                "reason": "Conserver les positions fortes et attendre des signaux de retournement.",
-            }
-        )
-
-        return {
-            "name": "Mode Défensif — Préservation du capital",
-            "description": (
-                f"Marché en phase '{regime}' avec {confidence:.0%} de confiance. "
-                f"Liquidité actuelle : {liquidity_pct:.0f}%. "
-                "Priorité : protéger le capital, augmenter la réserve de cash, "
-                "et se préparer pour le prochain cycle d'accumulation."
-            ),
-            "params": {
-                "type": "defensive",
-                "target_cash_pct": 20,
-                "current_cash_pct": liquidity_pct,
-                "regime": regime,
-            },
-            "ai_reasoning": (
-                "En bear market, la préservation du capital est prioritaire. "
-                "Réduire l'exposition sur les assets faibles et augmenter la réserve de cash "
-                "permet de saisir les opportunités d'accumulation au bottom."
-            ),
-            "market_regime": regime,
-            "confidence": confidence,
-            "actions": actions,
-        }
-
     def _build_conviction_buy_strategy(
         self,
         buy_assets: List[Dict],
