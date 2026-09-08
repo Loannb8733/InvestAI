@@ -369,12 +369,28 @@ class TestGetAssetPriceDelegation:
         assert result == 250000.0
 
     @pytest.mark.asyncio
-    async def test_exception_falls_back_to_avg_buy_price(self, alert_service):
+    async def test_exception_on_quoted_asset_returns_zero(self, alert_service):
+        """Changé le 2026-09-08 : une panne rendait `avg_buy_price` (40 000).
+
+        Ce repli était indistinguable d'un vrai cours et l'appelant l'évaluait
+        comme tel : `CHANGE_PERCENT_*` comparait le prix de revient à lui-même
+        — écart nul, aucune alerte — et `PRICE_BELOW` se déclenchait à tort dès
+        que le prix de revient passait sous le seuil. Le zéro, lui, est reconnu
+        par `_check_single_alert`, qui saute l'évaluation.
+        """
         asset = _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO, avg_buy_price="40000.0")
         alert_service.price_service.get_crypto_price = AsyncMock(side_effect=Exception("API error"))
 
         result = await alert_service._get_asset_price(asset)
-        assert result == 40000.0
+        assert result == 0.0
+
+    @pytest.mark.asyncio
+    async def test_exception_on_unquoted_asset_keeps_avg_buy_price(self, alert_service):
+        """Un actif sans cotation garde sa référence : il n'y a rien à chercher."""
+        asset = _make_asset(symbol="PROP1", asset_type=AssetType.REAL_ESTATE, avg_buy_price="250000.0")
+
+        result = await alert_service._get_asset_price(asset)
+        assert result == 250000.0
 
 
 # ---------------------------------------------------------------------------
