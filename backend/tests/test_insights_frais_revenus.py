@@ -133,16 +133,31 @@ class TestAnalyseDesFrais:
         assert list(res["by_exchange"]) == ["B", "A"]
         assert list(res["by_asset"]) == ["ETH", "BTC"]
 
-    async def test_la_moyenne_mensuelle_ne_porte_que_sur_les_mois_avec_frais(self, db_session, regular_user, service):
-        """`total / len(by_month)` — le dénominateur est le nombre de mois **ayant
-        porté des frais**, pas la durée de détention.
+    async def test_la_moyenne_mensuelle_porte_sur_la_duree_couverte(self, db_session, regular_user, service):
+        """Corrigé le 2026-09-08 (NEW-27) : le diviseur était le nombre de mois
+        **ayant porté des frais**, pas la durée.
 
-        Douze euros payés en janvier et rien les onze mois suivants donnent une
-        « moyenne mensuelle » de 12 EUR, non de 1 EUR. Le chiffre répond donc à
-        « combien un mois de frais coûte-t-il quand il y en a » et non à
-        « combien mes frais me coûtent par mois » — ce que son libellé laisse
-        entendre.
+        Six euros en janvier et six en décembre couvrent douze mois : la
+        moyenne vaut **1 EUR**. L'ancien calcul divisait par 2 et annonçait
+        6 EUR — il répondait à « combien coûte un mois actif », non à « combien
+        cela me coûte par mois », ce que le libellé laisse entendre.
+
+        Deux mois espacés, pas un seul : sur un mois unique les deux calculs
+        donnent le même chiffre, et le test ne prouverait rien.
         """
+        pf = await portefeuille(db_session, regular_user)
+        btc = await actif(db_session, pf)
+        db_session.add(mouvement(btc, frais="6", quand="2026-01-10"))
+        db_session.add(mouvement(btc, frais="6", quand="2026-12-10"))
+        await db_session.commit()
+
+        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+
+        assert res["total_fees"] == 12.0
+        assert res["avg_monthly_fee"] == 1.0
+
+    async def test_un_mois_unique_reste_son_propre_denominateur(self, db_session, regular_user, service):
+        # Rien à étaler : la durée couverte vaut un mois.
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="12", quand="2026-01-10"))
@@ -152,20 +167,47 @@ class TestAnalyseDesFrais:
 
         assert res["avg_monthly_fee"] == 12.0
 
-    async def test_les_frais_de_devises_differentes_sont_additionnes_tels_quels(
-        self, db_session, regular_user, service
-    ):
-        """Aucune conversion : 1 EUR + 1 USDC + 0,001 BTC font « 2,001 ».
+    async def test_une_transaction_sans_date_ne_fausse_pas_la_duree(self, db_session, regular_user, service):
+        """Les mouvements non datés tombent dans un mois « ? ».
 
-        `fee_currency` est reporté ligne par ligne dans `recent_fees`, mais le
-        total et toutes les ventilations somment les montants bruts. La base de
-        développement porte des frais en **sept devises** (EUR, USDC, PAXG, BTC,
-        ETH, SOL, TAO) : l'écart y reste faible parce que les montants crypto
-        sont minuscules, mais 0,001 BTC compté comme 0,001 EUR au lieu de ~90
-        EUR est une sous-estimation de trois ordres de grandeur.
-
-        Épinglé, pas corrigé.
+        Cette clé ne situe rien sur l'axe du temps : elle est écartée du calcul
+        de durée, sans quoi elle allongerait arbitrairement le dénominateur.
         """
+        pf = await portefeuille(db_session, regular_user)
+        btc = await actif(db_session, pf)
+        sans_date = mouvement(btc, frais="4", quand="2026-01-10")
+        sans_date.executed_at = None
+        db_session.add(sans_date)
+        db_session.add(mouvement(btc, frais="8", quand="2026-01-10"))
+        await db_session.commit()
+
+        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+
+        assert res["avg_monthly_fee"] == 12.0
+
+    async def test_les_frais_sont_ramenes_en_euros_avant_d_etre_sommes(
+        self, db_session, regular_user, service, monkeypatch
+    ):
+        """Corrigé le 2026-09-08 (NEW-21) : le total sommait des devises brutes.
+
+        « 1 EUR + 1 USDC + 0,001 BTC = 2,001 » mélangeait trois unités. Chaque
+        frais est désormais ramené en euros avant d'entrer dans le total et
+        dans les ventilations :
+
+        - l'euro passe tel quel ;
+        - **0,001 BTC** est valorisé au prix unitaire de sa propre transaction —
+          40 000 € — soit **40 €**, contre 0,001 auparavant ;
+        - l'USDC, jeton distinct de l'actif échangé, prend son cours.
+
+        Le cours est fixé ici : sans cela, le test dépendrait du marché du jour.
+        """
+        from app.services import insights_service as module
+
+        async def cours(symbole, type_actif):
+            return {"price": 0.9} if symbole.upper() == "USDC" else None
+
+        monkeypatch.setattr(module.price_service, "get_price", cours)
+
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="1", devise_frais="EUR"))
@@ -175,8 +217,53 @@ class TestAnalyseDesFrais:
 
         res = await service.get_fee_analysis(db_session, str(regular_user.id))
 
-        assert res["total_fees"] == 2.0  # 2,001 arrondi
-        assert {f["fee_currency"] for f in res["recent_fees"]} == {"EUR", "USDC", "BTC"}
+        assert res["total_fees"] == 41.9  # 1 + 0,9 + 40
+        assert res["nb_frais_non_convertis"] == 0
+
+    async def test_un_frais_sans_cours_reste_signale_plutot_qu_efface(
+        self, db_session, regular_user, service, monkeypatch
+    ):
+        """Faute de cours, le montant est gardé tel quel et compté à part.
+
+        Le remettre à zéro minorerait silencieusement les frais — le défaut
+        qu'on vient de corriger, dans l'autre sens. `nb_frais_non_convertis`
+        dit combien de lignes restent hétérogènes.
+        """
+        from app.services import insights_service as module
+
+        async def aucun_cours(symbole, type_actif):
+            return None
+
+        monkeypatch.setattr(module.price_service, "get_price", aucun_cours)
+
+        pf = await portefeuille(db_session, regular_user)
+        btc = await actif(db_session, pf)
+        db_session.add(mouvement(btc, frais="2", devise_frais="BNB"))
+        await db_session.commit()
+
+        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+
+        assert res["total_fees"] == 2.0
+        assert res["nb_frais_non_convertis"] == 1
+        assert res["recent_fees"][0]["fee_convertie"] is False
+
+    async def test_un_frais_fiat_suit_le_taux_capte_a_l_execution(self, db_session, regular_user, service):
+        """Des frais en USD sur une transaction en USD prennent son taux.
+
+        C'est le taux du jour de l'opération, pas celui d'aujourd'hui : les
+        frais historiques ne bougent plus avec le marché.
+        """
+        pf = await portefeuille(db_session, regular_user)
+        btc = await actif(db_session, pf)
+        tx = mouvement(btc, frais="10", devise_frais="USD")
+        tx.currency = "USD"
+        tx.conversion_rate = Decimal("0.92")
+        db_session.add(tx)
+        await db_session.commit()
+
+        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+
+        assert res["total_fees"] == 9.2
 
     async def test_la_ventilation_par_actif_est_tronquee_aux_dix_premiers(self, db_session, regular_user, service):
         # Le total reste complet : la somme des dix lignes affichées ne le
@@ -307,7 +394,24 @@ class TestRevenusPassifs:
         res = await service.get_passive_income(db_session, str(regular_user.id))
 
         assert res["projected_annual"] == 1200.0  # 100 x 12, le mois maigre écarté
-        assert res["avg_monthly"] == 77.5  # 310 / 4, celui-là compte tout
+        # 310 EUR sur quatre mois couverts (janvier à avril) : 77,5.
+        assert res["avg_monthly"] == 77.5
+
+    async def test_la_moyenne_des_revenus_porte_aussi_sur_la_duree_couverte(self, db_session, regular_user, service):
+        # Même correction que pour les frais : deux versements espacés d'un an
+        # couvrent treize mois, pas deux.
+        pf = await portefeuille(db_session, regular_user)
+        eth = await actif(db_session, pf, "ETH")
+        for quand in ("2025-01-01", "2026-01-01"):
+            db_session.add(
+                mouvement(eth, type_tx=TransactionType.STAKING_REWARD, quantite="1", prix="650", quand=quand)
+            )
+        await db_session.commit()
+
+        res = await service.get_passive_income(db_session, str(regular_user.id))
+
+        assert res["total_income"] == 1300.0
+        assert res["avg_monthly"] == 100.0  # 1300 / 13
 
     async def test_l_historique_est_limite_a_trente_evenements(self, db_session, regular_user, service):
         pf = await portefeuille(db_session, regular_user)

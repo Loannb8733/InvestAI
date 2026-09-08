@@ -164,20 +164,29 @@ class TestExportCsv:
         assert lignes[0][0] == "Date"
         assert lignes[0][-1] == "Frais (EUR)"
 
-    def test_les_nombres_utilisent_le_point_decimal(self):
-        """Le CSV vise Excel français — BOM et point-virgule le disent — mais
-        écrit ses nombres avec un **point** décimal.
+    def test_les_nombres_utilisent_la_virgule_decimale(self):
+        """Corrigé le 2026-09-08 (NEW-25) : les nombres partaient avec un point.
 
-        Excel en locale française attend la virgule : les colonnes Quantité,
-        Prix, Valeur et Frais y arrivent en **texte**, non sommables et non
-        triables. L'écart entre l'intention (le séparateur) et le format des
-        nombres est épinglé ici, pas corrigé.
+        Le fichier vise Excel en locale française — le BOM `utf-8-sig` et le
+        point-virgule le disent — mais un point décimal y arrive comme du
+        texte : les colonnes Quantité, Prix, Valeur et Frais ne se sommaient ni
+        ne se triaient. La virgule les rend numériques.
+
+        Aucun séparateur de milliers : il entrerait en conflit avec le
+        point-virgule qui sépare déjà les colonnes.
         """
         lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": [tx()]}))
 
-        assert lignes[1][3] == "0.500000"
-        assert lignes[1][4] == "40000.00"
-        assert "," not in lignes[1][4]
+        assert lignes[1][3] == "0,500000"
+        assert lignes[1][4] == "40000,00"
+        assert "." not in lignes[1][4]
+
+    def test_un_grand_montant_ne_prend_pas_de_separateur_de_milliers(self):
+        # Un espace ou un point de milliers casserait la lecture numérique
+        # autant que le point décimal qu'on vient de retirer.
+        lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": [tx(total=1234567.89)]}))
+
+        assert lignes[1][5] == "1234567,89"
 
     def test_les_types_ne_sont_pas_traduits_contrairement_aux_deux_autres(self):
         """Troisième format, troisième traitement des types.
