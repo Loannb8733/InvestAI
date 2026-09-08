@@ -1538,6 +1538,11 @@ class MetricsService:
                     # rebalancement invariablement nulle (elle le lit pour
                     # convertir un montant en quantité à céder).
                     "current_price": a.get("current_price"),
+                    # Quantité agrégée du symbole. Son absence laissait la carte
+                    # des prix du résumé Earn vide (`a.get("quantity", 0)` y rend
+                    # 0), si bien que toute position stakée non-stablecoin était
+                    # valorisée à 0 EUR — APR compris.
+                    "quantity": a["total_quantity"],
                     "total_invested": a["total_invested"],
                     "avg_buy_price": (a["total_invested"] / a["total_quantity"] if a["total_quantity"] > 0 else 0.0),
                     "gain_loss_percent": round(a.get("period_change_percent", 0), 2),
