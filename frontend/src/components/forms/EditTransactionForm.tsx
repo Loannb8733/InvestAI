@@ -170,9 +170,14 @@ export default function EditTransactionForm({
     }
     if (executedDate && executedTime) {
       const newExecutedAt = `${executedDate}T${executedTime}:00`
-      const oldDate = new Date(transaction.executed_at)
+      // Une transaction peut n'avoir aucune date d'exécution — 195 sur 840 en
+      // portent encore la trace. `new Date(null)` rendrait 1970, ce qui
+      // diffère de toute saisie et donnait le bon résultat par accident. Le
+      // cas est désormais explicite : sans date antérieure, toute date saisie
+      // est un changement.
+      const dateAvant = transaction.executed_at ? new Date(transaction.executed_at) : null
       const newDate = new Date(newExecutedAt)
-      if (oldDate.getTime() !== newDate.getTime()) {
+      if (dateAvant === null || dateAvant.getTime() !== newDate.getTime()) {
         updates.executed_at = newExecutedAt
       }
     }
