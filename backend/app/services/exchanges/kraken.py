@@ -55,6 +55,12 @@ class KrakenService(BaseExchangeService):
         "ZGBP",
         "XXBT",
         "XETH",
+        # `XBT` est la forme que Kraken emploie **dans ses paires** : ETHXBT,
+        # XRPXBT, ADAXBT cotent en bitcoin. Sans elle, aucune devise de la
+        # liste ne correspondait et le dernier repli attribuait « EUR » — un
+        # prix de 0,05 BTC était alors lu comme 0,05 EUR, soit trois ordres de
+        # grandeur d'écart sur la valorisation du trade.
+        "XBT",
         "EUR",
         "USD",
         "GBP",
