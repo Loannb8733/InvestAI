@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **State**: Zustand
 - **UI**: Tailwind CSS + shadcn/ui
 - **Charts**: Nivo (analytique) + Lightweight Charts (série temporelle navigable) — voir `docs/ADR.md` ADR-010
-- **Tables**: TanStack Table
+- **Tables**: composant maison (`components/ui/table.tsx`) — TanStack Table a été retiré, il n'était pas utilisé
 - **Forms**: React Hook Form + Zod
 
 ### Infrastructure

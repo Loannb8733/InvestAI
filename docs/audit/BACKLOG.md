@@ -261,6 +261,8 @@ et leur exposition réelle a été comptée quand elle était mesurable.
 
 Les **6 appelées seulement par des tests** — `_build_portfolio_var_parametric`, `invert_rate`, `calculate_cagr`, `calculate_roi`, `build_sorted_rates`, `is_crypto_quote` — sont mortes en production mais leur suppression emporterait les tests qui les couvrent. `calculate_roi` et `calculate_cagr` sont de surcroît des formules de référence, utiles à garder documentées et testées.
 
+| **NEW-40** | 🟢 | **Quatre dépendances frontend déclarées et jamais importées** : `date-fns` (**37 Mo**), `@tanstack/react-table` (796 ko), `@radix-ui/react-avatar` et `@radix-ui/react-separator`. Sur 40 dépendances examinées. Le bundle n'en portait rien — elles n'étaient dans aucun graphe d'import — mais elles s'installaient à chaque `npm ci`, en CI comme en Docker. **CLAUDE.md annonçait « Tables : TanStack Table »** alors que `components/ui/table.tsx` est un composant maison, seconde inexactitude de la doc après « Charts : Recharts » (corrigée en ARC-10). | ✅ **retirées**, doc corrigée. `@nivo/core` **conservée** : transitive de `@nivo/bar`, son épinglage explicite fige sa version — même intention qu'ARC-13. Les cinq devDependencies signalées étaient toutes des **faux positifs** : ESLint et PostCSS les référencent sans leur préfixe de paquet (`plugin:react-hooks/recommended` pour `eslint-plugin-react-hooks`), et `@vitest/coverage-v8` ne s'importe pas, il s'active par `--coverage`. |
+
 #### Pièges de lecture documentés (pas des défauts)
 
 | Constat | Pourquoi il compte |
