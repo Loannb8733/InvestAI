@@ -63,6 +63,11 @@ class ProjectAudit(Base):
     verdict = Column(String(20), nullable=True)
     suggested_investment = Column(Numeric(precision=12, scale=2), nullable=True)
     raw_analysis = Column(Text, nullable=True)
+    # Ce qui a produit les chiffres : le nom du fournisseur ayant répondu
+    # ("Groq", "Gemini", "Anthropic", "Ollama") ou "statique" pour l'extraction
+    # par expressions régulières. Sans ce champ, les deux étaient
+    # indistinguables à l'écran — mêmes scores, même radar, même verdict.
+    analysis_source = Column(String(20), nullable=True)
 
     # Diversification analysis
     diversification_impact = Column(String(20), nullable=True)  # "ameliore" / "degrade" / "neutre"

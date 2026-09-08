@@ -259,6 +259,9 @@ export interface ProjectAudit {
   points_vigilance: string[]
   red_flags: string[]
   verdict: 'INVESTIR' | 'VIGILANCE' | 'NE_PAS_INVESTIR'
+  /** Fournisseur ayant produit l'analyse, ou 'statique' pour l'extraction par
+   *  expressions régulières. `null` sur les audits antérieurs au suivi. */
+  analysis_source?: string | null
   suggested_investment: number | null
   diversification_impact: string | null
   correlation_score: number | null

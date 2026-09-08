@@ -288,6 +288,9 @@ class ProjectAuditResponse(BaseModel):
     diversification_impact: Optional[str] = None
     correlation_score: Optional[float] = None
     portfolio_concentration: Optional[dict] = None
+    # Ce qui a produit l'analyse : un fournisseur nommé, ou "statique" quand
+    # aucun n'a répondu et que les chiffres sortent d'expressions régulières.
+    analysis_source: Optional[str] = None
     created_at: datetime
 
     @field_validator("guarantees", "points_forts", "points_vigilance", "red_flags", mode="before")

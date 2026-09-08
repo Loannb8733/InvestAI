@@ -18,6 +18,10 @@ from app.services.ai.pdf_parser import PDFParser
 
 logger = logging.getLogger(__name__)
 
+# Valeur d'`analysis_source` quand aucun modèle n'a répondu et que les chiffres
+# viennent de l'extraction par expressions régulières.
+STATIQUE = "statique"
+
 _ANALYSIS_SCHEMA = {
     "project_name": "string — nom du projet",
     "operator": "string — nom de l'opérateur / promoteur",
@@ -600,9 +604,11 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
 
         raw_text = None
         data = None
+        analysis_source = None
         for provider_name, provider_fn in providers:
             try:
                 raw_text = await provider_fn(messages)
+                analysis_source = provider_name
                 break
             except Exception as exc:
                 logger.warning("Provider %s failed: %s", provider_name, exc)
@@ -627,9 +633,13 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
 
         # Ultimate fallback: static regex analysis
         if data is None:
+            # Le repli reste légitime — des chiffres extraits du PDF valent
+            # mieux que rien — mais il cesse d'être muet : `analysis_source`
+            # dira « statique » et l'écran l'affichera.
             logger.info("All LLM providers failed or unavailable — using static analysis")
             data = self._analyze_statically(file_contents)
             raw_text = json.dumps(data, ensure_ascii=False)
+            analysis_source = STATIQUE
 
         # Validate and enrich
         data = self._validate_and_enrich(data)
@@ -697,6 +707,7 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
             verdict=data.get("verdict", "VIGILANCE"),
             suggested_investment=Decimal(str(data.get("suggested_investment", 0))),
             raw_analysis=raw_text,
+            analysis_source=analysis_source,
             diversification_impact=data.get("diversification_impact"),
             correlation_score=(
                 Decimal(str(data["correlation_score"])) if data.get("correlation_score") is not None else None
@@ -707,10 +718,11 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         await db.flush()
 
         logger.info(
-            "Audit saved: %s — verdict=%s, risk_score=%s",
+            "Audit saved: %s — verdict=%s, risk_score=%s, source=%s",
             audit.id,
             audit.verdict,
             audit.risk_score,
+            audit.analysis_source,
         )
         return audit
 

@@ -55,6 +55,17 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      # Analyse des projets de crowdfunding (Audit Lab). Sans au moins une de
+      # ces clés, le service retombe sur une extraction par expressions
+      # régulières : l'écran l'annonce désormais, mais l'analyse n'est plus
+      # celle d'un modèle. `sync: false` = la valeur se saisit dans Render,
+      # jamais dans ce fichier.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
   # Celery Worker (requires Upstash Redis)
   - type: worker
