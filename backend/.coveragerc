@@ -1,0 +1,17 @@
+[run]
+# SQLAlchemy 2.0 en mode asyncio exécute chaque requête dans un greenlet.
+# Sans cette ligne, coverage cesse de tracer dès qu'une route touche la base :
+# il voit l'appel entrer, pas le corps s'exécuter. Les routes et services les
+# plus proches de la base étaient donc mesurés très en dessous de la réalité —
+# `endpoints/transactions.py` était rapporté à 12 % là où ses tests en
+# parcourent 31 %, et le total du projet passe de 47 % à 50 % (561 lignes).
+#
+# `thread` couvre en plus les dépendances FastAPI synchrones, que Starlette
+# exécute dans son pool de threads.
+concurrency = greenlet,thread
+source = app
+
+[report]
+exclude_also =
+    if TYPE_CHECKING:
+    raise NotImplementedError
