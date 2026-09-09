@@ -461,13 +461,24 @@ async def list_balance_gaps(
                     """
         SELECT a.id::text AS asset_id, a.symbol, COALESCE(a.exchange,'') AS exchange,
                a.quantity AS stored, a.current_price,
+               -- Ces deux listes doivent rester celles de create_transaction et de
+               -- l'import CSV. DIVIDEND et INTEREST -- des revenus versés en jetons --
+               -- et FEE en manquaient : ils tombaient dans le ELSE 0, si bien qu'un
+               -- dividende en nature creusait un écart que credit-all aurait comblé
+               -- par un AIRDROP, comptant la même quantité deux fois.
                COALESCE(SUM(CASE
-                   WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP','STAKING_REWARD')
+                   WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP',
+                                               'STAKING_REWARD','DIVIDEND','INTEREST')
                        THEN t.quantity
-                   WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT')
+                   WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')
                        THEN -t.quantity ELSE 0
                END), 0) AS computed,
-               COALESCE(SUM(CASE WHEN t.transaction_type = 'STAKING' THEN t.quantity ELSE 0 END), 0) AS staking_qty,
+               -- Le dé-staking rend le principal au journal : sans le déduire, un
+               -- actif sorti d'Earn restait exclu pour toujours.
+               COALESCE(SUM(CASE
+                   WHEN t.transaction_type = 'STAKING' THEN t.quantity
+                   WHEN t.transaction_type = 'UNSTAKING' THEN -t.quantity ELSE 0
+               END), 0) AS staking_qty,
                MAX(CASE WHEN t.transaction_type = 'STAKING_REWARD' THEN t.executed_at END) AS last_reward_at,
                MAX(CASE WHEN t.transaction_type = 'AIRDROP' THEN t.executed_at END) AS last_airdrop_at
         FROM assets a
@@ -615,6 +626,14 @@ async def credit_balance_gaps(
             }
         )
     await db.commit()
+
+    # Créditer un écart ajoute des AIRDROP en base : sans cette invalidation, le
+    # tableau de bord garde ses chiffres d'avant jusqu'à expiration du cache,
+    # alors que toutes les autres routes qui écrivent des transactions
+    # l'invalident.
+    if credited:
+        invalidate_dashboard_cache(str(current_user.id))
+
     return {"credited": len(credited), "skipped": len(skipped), "details": {"credited": credited, "skipped": skipped}}
 
 
