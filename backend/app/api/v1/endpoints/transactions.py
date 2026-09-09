@@ -1032,8 +1032,11 @@ async def update_transaction(
         if field in _PATCHABLE:
             setattr(transaction, field, value)
 
-    # Recalculate avg_buy_price if quantity or price changed
-    if quantity_changed or type_changed or "price" in update_data:
+    # Recalculate avg_buy_price if quantity, type, price or fee changed.
+    # ``fee`` belongs in this list: _recalculate_avg_buy_price sums
+    # ``quantity * price + fee``, so correcting the fee alone moves the cost basis.
+    # It was missing, and the stale value survived silently until the next edit.
+    if quantity_changed or type_changed or "price" in update_data or "fee" in update_data:
         await db.flush()  # Persist transaction changes before recalculating
         asset_for_avg = asset if (quantity_changed or type_changed) else None
         if not asset_for_avg:
@@ -1218,6 +1221,12 @@ async def delete_transaction(
             # Clear back-reference before deleting to avoid FK constraint
             mirror.related_transaction_id = None
             await db.delete(mirror)
+            # The mirror is a TRANSFER_IN, and TRANSFER_IN feeds avg_buy_price:
+            # removing it without recalculating left the destination asset carrying
+            # the cost basis of a transaction that no longer exists.
+            if mirror_asset:
+                await db.flush()
+                await _recalculate_avg_buy_price(db, mirror_asset)
 
     # Clear any other transactions that reference this one
     from sqlalchemy import update as sql_update

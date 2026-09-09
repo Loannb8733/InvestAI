@@ -119,16 +119,26 @@ async def create_mirror_transfer_in(
     # symbol, similar date (±1 day) and similar quantity (within 1%).
     # This prevents duplicates when users manually create transfer_in before
     # the auto-mirror runs.
+    # ``executed_at`` is optional on TransactionCreate and null on 195 of the 840
+    # rows already in the database, 43 of them transfers out. Without this guard,
+    # ``exec_date - timedelta`` raised a TypeError that surfaced as a plain HTTP 500
+    # on an otherwise valid request. A dateless transfer simply cannot be matched
+    # against a ±1-day window, so the duplicate check is skipped rather than the
+    # mirror: creating the mirror is what the caller asked for; deduplication is
+    # the bonus.
     exec_date = source_transaction.executed_at
-    existing_result = await db.execute(
-        select(Transaction).where(
-            Transaction.asset_id == dest_asset.id,
-            Transaction.transaction_type == TransactionType.TRANSFER_IN,
-            Transaction.executed_at >= exec_date - timedelta(days=1),
-            Transaction.executed_at <= exec_date + timedelta(days=1),
+    candidats = []
+    if exec_date is not None:
+        existing_result = await db.execute(
+            select(Transaction).where(
+                Transaction.asset_id == dest_asset.id,
+                Transaction.transaction_type == TransactionType.TRANSFER_IN,
+                Transaction.executed_at >= exec_date - timedelta(days=1),
+                Transaction.executed_at <= exec_date + timedelta(days=1),
+            )
         )
-    )
-    for existing_tx in existing_result.scalars().all():
+        candidats = existing_result.scalars().all()
+    for existing_tx in candidats:
         existing_qty = float(existing_tx.quantity)
         if existing_qty > 0 and abs(existing_qty - float(mirror_qty)) / existing_qty < 0.01:
             logger.info(
