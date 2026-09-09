@@ -228,10 +228,18 @@ async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
 
 
 class CSVImportResult(BaseModel):
-    """Result of CSV import operation."""
+    """Result of CSV import operation.
+
+    ``skipped_count`` was tallied and thrown away: a file whose every row was
+    already in the database came back as ``0 successes, 0 errors``, which the
+    interface rendered as "Import failed — 0 errors detected". Nothing said the
+    rows had simply been seen before. It is the third possible outcome of an
+    import and belongs in the answer.
+    """
 
     success_count: int
     error_count: int
+    skipped_count: int = 0
     errors: List[str]
     created_transactions: List[UUID]
 
@@ -1501,22 +1509,37 @@ async def import_transactions_csv(
                 ts_key,
             )
             if dedup_key in existing_tx_keys:
+                skipped += 1
                 continue  # Skip duplicate
             existing_tx_keys.add(dedup_key)  # Prevent duplicates within same import
 
-            # Sanitize values to prevent numeric overflow
-            # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
-            MAX_NUMERIC_VALUE = 9_999_999_999.0
+            # Clamp to each column's REAL capacity, far above any realistic amount,
+            # and LOG whenever it triggers — same guard as create_transaction.
+            #
+            # The single 1e10 ceiling that stood here cited NUMERIC(18, 8), a precision
+            # no column involved actually has: Transaction.quantity is NUMERIC(30, 12),
+            # price and fee NUMERIC(24, 12), Asset.quantity NUMERIC(24, 8). It truncated
+            # large but legitimate holdings — 50 billion SHIB became 9,999,999,999, a
+            # fifth of the amount — and counted the row as a success, silently. The
+            # portfolio already holds 12.7 million PEPE, so the order of magnitude is
+            # not hypothetical.
             MIN_QUANTITY = 1e-8  # Minimum meaningful quantity
 
-            quantity = float(parsed.quantity)
-            price = float(parsed.price)
-            fee = float(parsed.fee)
+            def _borner(valeur: float, plafond: float, champ: str) -> float:
+                if valeur > plafond:
+                    logger.warning(
+                        "CSV import: %s=%s for %s exceeds column capacity; clamping to %s",
+                        champ,
+                        valeur,
+                        parsed.symbol,
+                        plafond,
+                    )
+                    return plafond
+                return max(0.0, valeur)
 
-            # Clamp values to valid ranges
-            quantity = max(0, min(quantity, MAX_NUMERIC_VALUE))
-            price = max(0, min(price, MAX_NUMERIC_VALUE))
-            fee = max(0, min(fee, MAX_NUMERIC_VALUE))
+            quantity = _borner(float(parsed.quantity), 9.9999e17, "quantity")
+            price = _borner(float(parsed.price), 9.9999e11, "price")
+            fee = _borner(float(parsed.fee), 9.9999e11, "fee")
 
             # Skip transactions with negligible quantities
             if quantity < MIN_QUANTITY:
@@ -1557,8 +1580,7 @@ async def import_transactions_csv(
             ]
             csv_subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
             if trans_type.value in csv_add_types:
-                new_total = float(asset.quantity) + quantity
-                asset.quantity = min(new_total, MAX_NUMERIC_VALUE)
+                asset.quantity = _borner(float(asset.quantity) + quantity, 9.9999e15, "asset.quantity")
             elif trans_type.value in csv_subtract_types:
                 new_quantity = float(asset.quantity) - quantity
                 asset.quantity = max(0, new_quantity)  # Prevent negative quantities
@@ -1675,6 +1697,7 @@ async def import_transactions_csv(
     return CSVImportResult(
         success_count=success_count,
         error_count=error_count,
+        skipped_count=skipped,
         errors=errors[:50],
         created_transactions=created_transactions,
     )
