@@ -79,13 +79,12 @@ class ResetPasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def check_password(cls, v: str) -> str:
-        import re
+        # Même règle que l'inscription et le changement de mot de passe, appelée
+        # plutôt que redite : la version locale qui vivait ici était identique
+        # mot pour mot, donc libre de diverger sans que rien ne le signale.
+        from app.schemas.auth import _validate_password_complexity
 
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Le mot de passe doit contenir au moins une majuscule")
-        if not re.search(r"\d", v):
-            raise ValueError("Le mot de passe doit contenir au moins un chiffre")
-        return v
+        return _validate_password_complexity(v)
 
 
 router = APIRouter()
