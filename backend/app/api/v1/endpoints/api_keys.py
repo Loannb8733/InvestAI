@@ -1123,7 +1123,9 @@ async def import_trade_history(
                     Transaction.asset_id == asset.id,
                     Transaction.transaction_type == TransactionType.STAKING,
                 )
-                .order_by(Transaction.executed_at.desc())
+                # LIMIT 1 : une position de staking sans date serait choisie
+                # à tort comme la plus récente.
+                .order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc())
                 .limit(1)
             )
             existing_staking_tx = existing_staking.scalar_one_or_none()

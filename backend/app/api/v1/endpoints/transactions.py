@@ -400,7 +400,11 @@ async def list_transactions(
         count_result = await db.execute(select(func.count()).select_from(query.subquery()))
         total = int(count_result.scalar() or 0)
 
-    result = await db.execute(query.order_by(Transaction.executed_at.desc()).offset(skip).limit(limit))
+    # Même repli que l'affichage : sans lui, les lignes sans date d'exécution
+    # occupent toute la première page (PostgreSQL trie les nulles en tête en DESC).
+    result = await db.execute(
+        query.order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc()).offset(skip).limit(limit)
+    )
     transactions = result.scalars().all()
 
     # Enrich transactions with asset info
@@ -885,7 +889,9 @@ async def export_transactions_csv(
 
     # Get transactions
     result = await db.execute(
-        select(Transaction).where(Transaction.asset_id.in_(asset_ids)).order_by(Transaction.executed_at.desc())
+        select(Transaction)
+        .where(Transaction.asset_id.in_(asset_ids))
+        .order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc())
     )
     transactions = result.scalars().all()
 

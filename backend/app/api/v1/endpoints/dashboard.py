@@ -894,7 +894,11 @@ async def get_recent_transactions_internal(
     query = (
         select(Transaction)
         .where(Transaction.asset_id.in_(asset_ids))
-        .order_by(Transaction.executed_at.desc())
+        # Une transaction sans date d'exécution garde sa date de création, et c'est
+        # elle qui doit la situer : PostgreSQL place les valeurs nulles EN TÊTE d'un tri
+        # décroissant, si bien que les 195 lignes sans date (sur 840) monopolisaient
+        # toute vue limitée ou paginée. L'affichage faisait déjà ce repli ; le tri non.
+        .order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc())
         .limit(limit)
     )
     if days > 0:
