@@ -16,6 +16,18 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile.render
     healthCheckPath: /health
+    # Déclarés explicitement bien que ce soient les valeurs par défaut.
+    #
+    # Le 2026-09-10, deux poussées sur `main` n'ont rien déclenché et il a fallu
+    # lancer chaque déploiement à la main, sans que rien n'indique pourquoi.
+    # Ces deux lignes rendent l'intention lisible dans le dépôt et rattrapent la
+    # dérive à la prochaine synchronisation du blueprint.
+    #
+    # Elles ne suffisent pas si le service a « Auto-Deploy: No » dans son
+    # interface : ce réglage-là prime, et se change dans
+    # Settings → Build & Deploy.
+    autoDeploy: true
+    branch: main
     envVars:
       - key: APP_ENV
         value: production
@@ -75,6 +87,10 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile.render
     startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    # Même image que l'API : les trois services doivent avancer ensemble, sans
+    # quoi un worker exécuterait du code plus ancien que celui qui l'appelle.
+    autoDeploy: true
+    branch: main
     envVars:
       - fromGroup: investai-shared
 
@@ -86,6 +102,10 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile.render
     startCommand: celery -A app.tasks.celery_app beat --loglevel=info
+    # Même image que l'API : les trois services doivent avancer ensemble, sans
+    # quoi un worker exécuterait du code plus ancien que celui qui l'appelle.
+    autoDeploy: true
+    branch: main
     envVars:
       - fromGroup: investai-shared
 
