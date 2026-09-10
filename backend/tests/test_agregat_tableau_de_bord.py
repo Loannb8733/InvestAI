@@ -453,3 +453,102 @@ class TestRendementAnnualise:
         reponse = await appeler(db_session, regular_user, mesures=mesures)
 
         assert reponse.advanced_metrics.roi_annualized is None
+
+
+class TestResistanceDesBlocsSecondaires:
+    """L'écran d'accueil ne doit pas tomber pour un graphique.
+
+    Constaté en production le 2026-09-10 : `/api/v1/dashboard` répondait 500,
+    et l'utilisateur perdait **tout** — patrimoine, transactions, alertes —
+    sans qu'aucun message ne dise pourquoi. La réponse assemble une douzaine de
+    blocs, dont la plupart ne portent que des graphiques ou des indicateurs
+    d'analyse ; l'échec de l'un d'eux emportait les autres.
+
+    Ces tests posent la frontière : ce qui est secondaire dégrade et se
+    journalise en ERREUR ; ce qui est le cœur — la valeur du patrimoine —
+    continue de faire échouer la requête, parce qu'un tableau de bord qui
+    afficherait de faux montants serait pire qu'un tableau de bord absent.
+    """
+
+    async def _appeler_avec_panne(self, db_session, utilisateur, cible, **surcharges):
+        mesures = surcharges.pop("mesures", None) or metriques()
+        patches = {
+            "app.api.v1.endpoints.dashboard.metrics_service.get_user_dashboard_metrics": AsyncMock(
+                return_value=mesures
+            ),
+            "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series": AsyncMock(return_value=[]),
+            "app.api.v1.endpoints.dashboard.get_index_comparison": AsyncMock(return_value=[]),
+            "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics": AsyncMock(return_value=RISQUES),
+            "app.services.price_service.PriceService._get_eur_usd_rate": AsyncMock(return_value=0.92),
+        }
+        patches[cible] = AsyncMock(side_effect=RuntimeError("panne simulée"))
+        contextes = [patch(nom, new=double) for nom, double in patches.items()]
+        for c in contextes:
+            c.__enter__()
+        try:
+            return await _get_dashboard_impl(None, 30, utilisateur, db_session)
+        finally:
+            for c in reversed(contextes):
+                c.__exit__(None, None, None)
+
+    async def test_une_serie_de_valeur_en_panne_laisse_l_ecran_debout(self, db_session, regular_user, portefeuille):
+        mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=3)
+
+        reponse = await self._appeler_avec_panne(
+            db_session,
+            regular_user,
+            "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series",
+            mesures=mesures,
+        )
+
+        assert reponse.total_value == 5000.0
+        assert reponse.assets_count == 3
+        assert reponse.historical_data == []
+
+    async def test_des_indices_de_marche_en_panne_laissent_l_ecran_debout(self, db_session, regular_user, portefeuille):
+        mesures = metriques(total_value=5000.0, total_invested=4000.0)
+
+        reponse = await self._appeler_avec_panne(
+            db_session,
+            regular_user,
+            "app.api.v1.endpoints.dashboard.get_index_comparison",
+            mesures=mesures,
+        )
+
+        assert reponse.total_value == 5000.0
+        assert reponse.index_comparison == []
+
+    async def test_des_metriques_de_risque_en_panne_laissent_l_ecran_debout(
+        self, db_session, regular_user, portefeuille
+    ):
+        """Volatilité, Sharpe, VaR, concentration : de l'analyse, pas le patrimoine.
+
+        La carte affiche des valeurs neutres et une concentration
+        « Indisponible » — visible à l'écran, plutôt qu'un écran vide.
+        """
+        mesures = metriques(total_value=5000.0, total_invested=4000.0)
+
+        reponse = await self._appeler_avec_panne(
+            db_session,
+            regular_user,
+            "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics",
+            mesures=mesures,
+        )
+
+        assert reponse.total_value == 5000.0
+        assert reponse.advanced_metrics.concentration.interpretation == "Indisponible"
+        assert reponse.advanced_metrics.risk_metrics.volatility == 0.0
+
+    async def test_le_patrimoine_lui_ne_se_remplace_pas(self, db_session, regular_user, portefeuille):
+        """La limite de la règle.
+
+        Si le calcul du patrimoine échoue, la requête doit échouer aussi. Rendre
+        un tableau de bord à zéro euro laisserait croire à une perte totale — et
+        rien, à l'écran, ne distinguerait ce zéro d'un vrai.
+        """
+        with pytest.raises(RuntimeError):
+            await self._appeler_avec_panne(
+                db_session,
+                regular_user,
+                "app.api.v1.endpoints.dashboard.metrics_service.get_user_dashboard_metrics",
+            )

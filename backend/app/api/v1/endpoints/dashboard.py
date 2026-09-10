@@ -393,10 +393,21 @@ async def _get_dashboard_impl(
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
     metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=days)
 
-    # Run historical data (heaviest call) in parallel with index comparison (HTTP only)
+    # Run historical data (heaviest call) in parallel with index comparison (HTTP only).
+    #
+    # `return_exceptions=True` : ces deux blocs alimentent des graphiques, non les
+    # chiffres du patrimoine. Un échec de l'un faisait tomber **tout** l'écran
+    # d'accueil en 500 — l'utilisateur perdait ses montants, ses transactions et
+    # ses alertes parce qu'une courbe n'avait pas pu être tracée.
     historical_task = snapshot_service.build_portfolio_value_series(db, user_id, days)
     index_task = get_index_comparison(days)
-    historical_data, index_comparison = await asyncio.gather(historical_task, index_task)
+    historical_data, index_comparison = await asyncio.gather(historical_task, index_task, return_exceptions=True)
+    if isinstance(historical_data, BaseException):
+        logger.error("Série de valeur indisponible (user=%s, days=%s)", user_id, days, exc_info=historical_data)
+        historical_data = []
+    if isinstance(index_comparison, BaseException):
+        logger.error("Comparaison d'indices indisponible (days=%s)", days, exc_info=index_comparison)
+        index_comparison = []
 
     # Light DB queries (fast, sequential to avoid session conflicts)
     events_window = min(days, 90) if days > 0 else 90
@@ -431,6 +442,10 @@ async def _get_dashboard_impl(
             metrics["period_change_percent"] = 0.0
 
     # Query net staked quantities per symbol (STAKING - UNSTAKING)
+    #
+    # Tout ce bloc — positions en staking, valorisation, rendement — nourrit une
+    # carte parmi d'autres, et interroge au passage un service de change. Il ne
+    # doit pas pouvoir emporter l'écran entier.
     from sqlalchemy import case as sa_case
 
     from app.models.transaction import TransactionType
@@ -592,16 +607,33 @@ async def _get_dashboard_impl(
     else:
         roi_annualized = None
 
-    # Risk metrics — pass roi_annualized so Sharpe uses the real CAGR
-    risk_data = await snapshot_service.get_all_risk_metrics(
-        db,
-        user_id,
-        metrics["total_value"],
-        [{"symbol": a.symbol, "value": a.value} for a in asset_allocation],
-        days,
-        history=historical_data,
-        roi_annualized=roi_annualized,
-    )
+    # Risk metrics — pass roi_annualized so Sharpe uses the real CAGR.
+    #
+    # Volatilité, Sharpe, drawdown, VaR, concentration et tests de résistance
+    # sont des indicateurs d'analyse : ils enrichissent l'écran, ils ne le
+    # portent pas. Leur calcul dépend de la série historique, donc de données
+    # qui peuvent manquer ou surprendre — et un échec ici emportait le
+    # patrimoine, les transactions et les alertes avec lui.
+    _RISQUES_INDISPONIBLES = {
+        "volatility": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown": {"max_drawdown_percent": 0.0},
+        "var_95": {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": 95},
+        "concentration": {"hhi": 0.0, "interpretation": "Indisponible", "is_concentrated": False},
+    }
+    try:
+        risk_data = await snapshot_service.get_all_risk_metrics(
+            db,
+            user_id,
+            metrics["total_value"],
+            [{"symbol": a.symbol, "value": a.value} for a in asset_allocation],
+            days,
+            history=historical_data,
+            roi_annualized=roi_annualized,
+        )
+    except Exception:
+        logger.error("Métriques de risque indisponibles (user=%s, days=%s)", user_id, days, exc_info=True)
+        risk_data = dict(_RISQUES_INDISPONIBLES)
 
     volatility = risk_data["volatility"]
     sharpe_ratio = risk_data["sharpe_ratio"]
@@ -706,8 +738,6 @@ async def _get_dashboard_impl(
         except Exception as exc:
             logger.debug("Daily portfolio snapshot creation skipped for user %s: %s", user_id, exc)
 
-    from app.core.timeframe import get_period_label_fr
-
     # ============== Currency Exposure ==============
     #
     # Une première boucle calculait ici un `ccy_totals` par type d'actif
@@ -752,6 +782,57 @@ async def _get_dashboard_impl(
         )
         for ccy, val in sorted(ccy_totals.items(), key=lambda x: x[1], reverse=True)
     ]
+
+    # La construction du schéma est le dernier point où l'agrégat peut échouer, et
+    # le plus muet : Pydantic refuse un champ obligatoire à `None` sans dire lequel
+    # des quarante il est, et le middleware transforme cela en « Internal server
+    # error ». Nommer l'étape épargne une enquête.
+    try:
+        return _batir_reponse(
+            metrics=metrics,
+            days=days,
+            original_days=original_days,
+            asset_allocation=asset_allocation,
+            historical_data=historical_data,
+            is_data_estimated=is_data_estimated,
+            period_twr_percent=period_twr_percent,
+            recent_transactions=recent_transactions,
+            active_alerts=active_alerts,
+            upcoming_events=upcoming_events,
+            index_comparison=index_comparison,
+            advanced_metrics=advanced_metrics,
+            earn_summary=earn_summary,
+            currency_exposure=currency_exposure,
+        )
+    except Exception:
+        logger.error(
+            "Assemblage de la réponse du tableau de bord impossible (user=%s, days=%s)",
+            user_id,
+            days,
+            exc_info=True,
+        )
+        raise
+
+
+def _batir_reponse(
+    *,
+    metrics: dict,
+    days: int,
+    original_days: int,
+    asset_allocation: list,
+    historical_data: list,
+    is_data_estimated: bool,
+    period_twr_percent,
+    recent_transactions: list,
+    active_alerts: list,
+    upcoming_events: list,
+    index_comparison: list,
+    advanced_metrics,
+    earn_summary,
+    currency_exposure: list,
+) -> "EnhancedDashboardResponse":
+    """Assemble la réponse. Séparée pour que son échec se nomme dans le journal."""
+    from app.core.timeframe import get_period_label_fr
 
     return EnhancedDashboardResponse(
         total_value=metrics["total_value"],
