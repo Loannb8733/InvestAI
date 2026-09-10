@@ -1050,15 +1050,22 @@ async def readiness_check():
     # Version de schéma réellement appliquée. Comparée à celle qu'attend le
     # code, elle dit si la migration du dernier déploiement est passée — le
     # démarrage, lui, n'en dépend pas.
+    # La révision attendue est connue au démarrage, sans la base : elle est donc
+    # posée avant toute lecture. Elle manquait dans la branche d'erreur —
+    # précisément le moment où savoir ce qu'on attendait a le plus de valeur.
+    checks["schema_attendu"] = _REVISION_ATTENDUE
     try:
         async with engine.connect() as conn:
             applique = (await conn.execute(text("SELECT version_num FROM alembic_version"))).scalar()
         checks["schema_applique"] = applique or "aucune"
-        checks["schema_attendu"] = _REVISION_ATTENDUE
         if _REVISION_ATTENDUE != "inconnue" and applique != _REVISION_ATTENDUE:
             checks["status"] = "degraded"
             http_status = 503
     except Exception:
+        # La table `alembic_version` n'existe pas : soit la base n'a jamais été
+        # migrée, soit le schéma a été monté autrement (c'est le cas de la base
+        # de test, bâtie par `create_all`). Dans les deux cas on ne peut rien
+        # comparer, et le service n'est pas pour autant en défaut.
         checks["schema_applique"] = "illisible"
 
     # Check Redis
