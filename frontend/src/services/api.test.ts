@@ -212,6 +212,39 @@ describe('rafraîchissement du jeton', () => {
     expect(deconnecter).toHaveBeenCalled()
   })
 
+  it("dit pourquoi la session s'est fermée quand le mot de passe a changé", async () => {
+    // NEW-65 : changer son mot de passe coupe les sessions ouvertes ailleurs.
+    // Sans ce message, l'utilisateur se retrouve devant l'écran de connexion
+    // sans savoir pourquoi — alors que le serveur, lui, l'a dit.
+    rafraichir.mockRejectedValue({
+      response: { data: { detail: 'Session expirée : le mot de passe a été modifié.' } },
+    })
+    scenario = [{ status: 401 }]
+
+    await api.get('/portfolios').catch(() => undefined)
+    await laisserPasser()
+
+    expect(deconnecter).toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Session expirée', variant: 'destructive' }),
+    )
+  })
+
+  it("ne parle pas de mot de passe quand la session a simplement expiré", async () => {
+    // Un jeton arrivé au bout de sa durée de vie n'appelle pas d'explication :
+    // annoncer un changement de mot de passe inquiéterait pour rien.
+    rafraichir.mockRejectedValue({ response: { data: { detail: 'Token has been revoked' } } })
+    scenario = [{ status: 401 }]
+
+    await api.get('/portfolios').catch(() => undefined)
+    await laisserPasser()
+
+    expect(deconnecter).toHaveBeenCalled()
+    expect(toastMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Session expirée' }),
+    )
+  })
+
   it("ne tente pas de rafraîchir un rafraîchissement refusé", async () => {
     /* Sans cette exception, un refresh token périmé provoquerait une boucle :
        401 sur `/auth/refresh` → rafraîchir → 401 → … */

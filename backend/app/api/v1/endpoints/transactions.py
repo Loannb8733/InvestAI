@@ -228,10 +228,18 @@ async def _recalculate_avg_buy_price(db: AsyncSession, asset: Asset):
 
 
 class CSVImportResult(BaseModel):
-    """Result of CSV import operation."""
+    """Result of CSV import operation.
+
+    ``skipped_count`` was tallied and thrown away: a file whose every row was
+    already in the database came back as ``0 successes, 0 errors``, which the
+    interface rendered as "Import failed — 0 errors detected". Nothing said the
+    rows had simply been seen before. It is the third possible outcome of an
+    import and belongs in the answer.
+    """
 
     success_count: int
     error_count: int
+    skipped_count: int = 0
     errors: List[str]
     created_transactions: List[UUID]
 
@@ -392,7 +400,11 @@ async def list_transactions(
         count_result = await db.execute(select(func.count()).select_from(query.subquery()))
         total = int(count_result.scalar() or 0)
 
-    result = await db.execute(query.order_by(Transaction.executed_at.desc()).offset(skip).limit(limit))
+    # Même repli que l'affichage : sans lui, les lignes sans date d'exécution
+    # occupent toute la première page (PostgreSQL trie les nulles en tête en DESC).
+    result = await db.execute(
+        query.order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc()).offset(skip).limit(limit)
+    )
     transactions = result.scalars().all()
 
     # Enrich transactions with asset info
@@ -453,13 +465,24 @@ async def list_balance_gaps(
                     """
         SELECT a.id::text AS asset_id, a.symbol, COALESCE(a.exchange,'') AS exchange,
                a.quantity AS stored, a.current_price,
+               -- Ces deux listes doivent rester celles de create_transaction et de
+               -- l'import CSV. DIVIDEND et INTEREST -- des revenus versés en jetons --
+               -- et FEE en manquaient : ils tombaient dans le ELSE 0, si bien qu'un
+               -- dividende en nature creusait un écart que credit-all aurait comblé
+               -- par un AIRDROP, comptant la même quantité deux fois.
                COALESCE(SUM(CASE
-                   WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP','STAKING_REWARD')
+                   WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP',
+                                               'STAKING_REWARD','DIVIDEND','INTEREST')
                        THEN t.quantity
-                   WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT')
+                   WHEN t.transaction_type IN ('SELL','TRANSFER_OUT','CONVERSION_OUT','FEE')
                        THEN -t.quantity ELSE 0
                END), 0) AS computed,
-               COALESCE(SUM(CASE WHEN t.transaction_type = 'STAKING' THEN t.quantity ELSE 0 END), 0) AS staking_qty,
+               -- Le dé-staking rend le principal au journal : sans le déduire, un
+               -- actif sorti d'Earn restait exclu pour toujours.
+               COALESCE(SUM(CASE
+                   WHEN t.transaction_type = 'STAKING' THEN t.quantity
+                   WHEN t.transaction_type = 'UNSTAKING' THEN -t.quantity ELSE 0
+               END), 0) AS staking_qty,
                MAX(CASE WHEN t.transaction_type = 'STAKING_REWARD' THEN t.executed_at END) AS last_reward_at,
                MAX(CASE WHEN t.transaction_type = 'AIRDROP' THEN t.executed_at END) AS last_airdrop_at
         FROM assets a
@@ -607,6 +630,14 @@ async def credit_balance_gaps(
             }
         )
     await db.commit()
+
+    # Créditer un écart ajoute des AIRDROP en base : sans cette invalidation, le
+    # tableau de bord garde ses chiffres d'avant jusqu'à expiration du cache,
+    # alors que toutes les autres routes qui écrivent des transactions
+    # l'invalident.
+    if credited:
+        invalidate_dashboard_cache(str(current_user.id))
+
     return {"credited": len(credited), "skipped": len(skipped), "details": {"credited": credited, "skipped": skipped}}
 
 
@@ -858,7 +889,9 @@ async def export_transactions_csv(
 
     # Get transactions
     result = await db.execute(
-        select(Transaction).where(Transaction.asset_id.in_(asset_ids)).order_by(Transaction.executed_at.desc())
+        select(Transaction)
+        .where(Transaction.asset_id.in_(asset_ids))
+        .order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc())
     )
     transactions = result.scalars().all()
 
@@ -1032,8 +1065,11 @@ async def update_transaction(
         if field in _PATCHABLE:
             setattr(transaction, field, value)
 
-    # Recalculate avg_buy_price if quantity or price changed
-    if quantity_changed or type_changed or "price" in update_data:
+    # Recalculate avg_buy_price if quantity, type, price or fee changed.
+    # ``fee`` belongs in this list: _recalculate_avg_buy_price sums
+    # ``quantity * price + fee``, so correcting the fee alone moves the cost basis.
+    # It was missing, and the stale value survived silently until the next edit.
+    if quantity_changed or type_changed or "price" in update_data or "fee" in update_data:
         await db.flush()  # Persist transaction changes before recalculating
         asset_for_avg = asset if (quantity_changed or type_changed) else None
         if not asset_for_avg:
@@ -1218,6 +1254,12 @@ async def delete_transaction(
             # Clear back-reference before deleting to avoid FK constraint
             mirror.related_transaction_id = None
             await db.delete(mirror)
+            # The mirror is a TRANSFER_IN, and TRANSFER_IN feeds avg_buy_price:
+            # removing it without recalculating left the destination asset carrying
+            # the cost basis of a transaction that no longer exists.
+            if mirror_asset:
+                await db.flush()
+                await _recalculate_avg_buy_price(db, mirror_asset)
 
     # Clear any other transactions that reference this one
     from sqlalchemy import update as sql_update
@@ -1492,22 +1534,37 @@ async def import_transactions_csv(
                 ts_key,
             )
             if dedup_key in existing_tx_keys:
+                skipped += 1
                 continue  # Skip duplicate
             existing_tx_keys.add(dedup_key)  # Prevent duplicates within same import
 
-            # Sanitize values to prevent numeric overflow
-            # NUMERIC(18, 8) max value is 10^10 - 1 = 9,999,999,999.99999999
-            MAX_NUMERIC_VALUE = 9_999_999_999.0
+            # Clamp to each column's REAL capacity, far above any realistic amount,
+            # and LOG whenever it triggers — same guard as create_transaction.
+            #
+            # The single 1e10 ceiling that stood here cited NUMERIC(18, 8), a precision
+            # no column involved actually has: Transaction.quantity is NUMERIC(30, 12),
+            # price and fee NUMERIC(24, 12), Asset.quantity NUMERIC(24, 8). It truncated
+            # large but legitimate holdings — 50 billion SHIB became 9,999,999,999, a
+            # fifth of the amount — and counted the row as a success, silently. The
+            # portfolio already holds 12.7 million PEPE, so the order of magnitude is
+            # not hypothetical.
             MIN_QUANTITY = 1e-8  # Minimum meaningful quantity
 
-            quantity = float(parsed.quantity)
-            price = float(parsed.price)
-            fee = float(parsed.fee)
+            def _borner(valeur: float, plafond: float, champ: str) -> float:
+                if valeur > plafond:
+                    logger.warning(
+                        "CSV import: %s=%s for %s exceeds column capacity; clamping to %s",
+                        champ,
+                        valeur,
+                        parsed.symbol,
+                        plafond,
+                    )
+                    return plafond
+                return max(0.0, valeur)
 
-            # Clamp values to valid ranges
-            quantity = max(0, min(quantity, MAX_NUMERIC_VALUE))
-            price = max(0, min(price, MAX_NUMERIC_VALUE))
-            fee = max(0, min(fee, MAX_NUMERIC_VALUE))
+            quantity = _borner(float(parsed.quantity), 9.9999e17, "quantity")
+            price = _borner(float(parsed.price), 9.9999e11, "price")
+            fee = _borner(float(parsed.fee), 9.9999e11, "fee")
 
             # Skip transactions with negligible quantities
             if quantity < MIN_QUANTITY:
@@ -1548,8 +1605,7 @@ async def import_transactions_csv(
             ]
             csv_subtract_types = ["sell", "transfer_out", "conversion_out", "fee"]
             if trans_type.value in csv_add_types:
-                new_total = float(asset.quantity) + quantity
-                asset.quantity = min(new_total, MAX_NUMERIC_VALUE)
+                asset.quantity = _borner(float(asset.quantity) + quantity, 9.9999e15, "asset.quantity")
             elif trans_type.value in csv_subtract_types:
                 new_quantity = float(asset.quantity) - quantity
                 asset.quantity = max(0, new_quantity)  # Prevent negative quantities
@@ -1666,6 +1722,7 @@ async def import_transactions_csv(
     return CSVImportResult(
         success_count=success_count,
         error_count=error_count,
+        skipped_count=skipped,
         errors=errors[:50],
         created_transactions=created_transactions,
     )

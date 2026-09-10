@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import pathlib
 from typing import AsyncGenerator, Generator
 
 # Set test env vars before any app import
@@ -40,6 +41,46 @@ TestSessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
 )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Refuse un second pytest tant qu'un autre tourne sur la même base.
+
+    La fixture ``db_session`` crée puis supprime tout le schéma **à chaque
+    test**, sur la base ``investai_test`` partagée. Deux exécutions simultanées
+    se détruisent donc mutuellement les tables, et le symptôme ne dit rien de la
+    cause : on lit ``relation "users" does not exist`` et
+    ``duplicate key ... pg_type_typname_nsp_index`` sur des tests parfaitement
+    sains, en nombre variable d'une fois sur l'autre.
+
+    C'est arrivé : une suite lancée en arrière-plan, un second pytest lancé
+    par-dessus pour vérifier un fichier, et vingt-sept erreurs à expliquer qui
+    n'avaient aucun rapport avec le code. Mieux vaut un refus immédiat et
+    explicite qu'un diagnostic à refaire.
+
+    Le verrou est posé pour la durée du processus et relâché à sa mort, y
+    compris s'il est tué : ``flock`` est attaché au descripteur, non au fichier.
+    """
+    import fcntl
+    import tempfile
+
+    verrou = pathlib.Path(tempfile.gettempdir()) / "investai-pytest.lock"
+    descripteur = verrou.open("w")
+    try:
+        fcntl.flock(descripteur, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        descripteur.close()
+        raise pytest.UsageError(
+            f"Un autre pytest tourne déjà (verrou {verrou}).\n"
+            "Les deux partagent la base investai_test, dont le schéma est recréé à chaque "
+            "test : les lancer ensemble produit des erreurs SQL sans rapport avec le code.\n"
+            "Attendez la fin de l'exécution en cours, ou arrêtez-la."
+        )
+    descripteur.write(str(os.getpid()))
+    descripteur.flush()
+    # Référence gardée sur la configuration : refermer le descripteur relâcherait
+    # le verrou, et le laisser au ramasse-miettes reviendrait au même.
+    config._investai_verrou = descripteur
 
 
 @pytest.fixture(scope="session")

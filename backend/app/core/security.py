@@ -55,6 +55,7 @@ def create_access_token(
     subject: str | Any,
     expires_delta: Optional[timedelta] = None,
     fingerprint: Optional[str] = None,
+    token_version: int = 0,
 ) -> str:
     """Create a JWT access token."""
     if expires_delta:
@@ -65,6 +66,10 @@ def create_access_token(
     to_encode: Dict[str, Any] = {
         "sub": str(subject),
         "exp": expire,
+        # Génération de jetons qui l'a vu naître : un changement de mot de passe
+        # incrémente le compteur de l'utilisateur et périme tout ce qui précède
+        # (NEW-65).
+        "tv": int(token_version),
         "type": "access",
         "jti": uuid.uuid4().hex,  # enables per-token revocation (logout / blocklist)
     }
@@ -78,6 +83,7 @@ def create_refresh_token(
     subject: str | Any,
     expires_delta: Optional[timedelta] = None,
     fingerprint: Optional[str] = None,
+    token_version: int = 0,
 ) -> str:
     """Create a JWT refresh token with a unique jti for revocation support."""
     if expires_delta:
@@ -88,6 +94,10 @@ def create_refresh_token(
     to_encode: Dict[str, Any] = {
         "sub": str(subject),
         "exp": expire,
+        # Génération de jetons qui l'a vu naître : un changement de mot de passe
+        # incrémente le compteur de l'utilisateur et périme tout ce qui précède
+        # (NEW-65).
+        "tv": int(token_version),
         "type": "refresh",
         "jti": uuid.uuid4().hex,
     }

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -384,11 +384,27 @@ def _normalize_earn_variant(symbol: str) -> Optional[str]:
         "USDT",
     ]
 
+    # Les suffixes Earn sont énumérés, non devinés.
+    #
+    # La règle précédente acceptait **tout** suffixe de un ou deux caractères
+    # alphanumériques. C'est la même erreur de forme que le « W » initial retiré
+    # plus haut, et elle mutilait des jetons bien réels :
+    #
+    #     ETHFI → ETH     SOLV → SOL     OMNI → OM     OMG → OM
+    #     ADAX  → ADA     INJX → INJ     SUIA → SUI    TAOX → TAO
+    #
+    # Ether.fi et Solv Protocol n'ont rien à voir avec l'ether ou le solana : un
+    # achat d'ETHFI serait venu grossir la position ETH, quantité et prix de
+    # revient mêlés, sans rien qui permette de les démêler ensuite.
+    #
+    # BTCB (Bitcoin BEP2) et USDCE (USDC.e) sont, eux, bien adossés à leur
+    # sous-jacent — mais c'est à `variantes_wrapped` de le dire nommément, pas à
+    # une règle de longueur qui emporte tout le reste avec elle.
+    SUFFIXES_EARN = ("U", "S", "KA", "US")
+
     for base in known_bases:
         if symbol.startswith(base) and len(symbol) > len(base):
-            suffix = symbol[len(base) :]
-            # If suffix is short alphanumeric (U, S, KA, US, etc.), it's likely an earn variant
-            if len(suffix) <= 2 and suffix.isalnum():
+            if symbol[len(base) :] in SUFFIXES_EARN:
                 return base
 
     return symbol  # Return original if no transformation needed
@@ -400,6 +416,37 @@ def _is_earn_variant(symbol: str) -> bool:
         return False
     normalized = _normalize_earn_variant(symbol)
     return normalized != symbol
+
+
+def _extract_base_asset(symbol: str, known_symbols: Iterable[str]) -> Optional[str]:
+    """Extract the base asset of a crypto-to-crypto conversion symbol ("DOGEPEPE" -> "DOGE").
+
+    A conversion pair has no fiat quote to split on, so ``pair_utils.split_pair`` does not
+    apply: both halves are crypto and neither is a known quote suffix. The symbol is
+    matched against the portfolio's existing assets, longest first so that "DOGE" wins over
+    a shorter "DO" that also prefixes it.
+
+    When nothing matches, it *guesses* a prefix length — 4, then 3, 5, 6, in that order.
+    The guess is why a brand-new 5- or 6-letter asset (PENDLE, KAITO) converted for the
+    first time would be truncated to its first four letters; see NEW-54.
+
+    Lifted out of ``_sync_detailed_transactions`` as a module-level function so it can be
+    tested directly: it decides which asset a conversion is booked against, and a wrong
+    answer here creates a phantom asset holding real quantities.
+    """
+    symbol = _normalize_earn_variant(symbol) or symbol
+
+    # Try matching against known assets first (longest first to avoid partial matches)
+    for asset_sym in sorted(known_symbols, key=lambda x: -len(x)):
+        if symbol.startswith(asset_sym):
+            return asset_sym
+    # Fallback: try common lengths (4, 3, 5, 6 chars)
+    for length in [4, 3, 5, 6]:
+        if len(symbol) >= length:
+            potential = symbol[:length]
+            if potential.isupper() and potential.isalpha():
+                return potential
+    return None
 
 
 async def _sync_detailed_transactions(
@@ -444,24 +491,6 @@ async def _sync_detailed_transactions(
         logger.warning("FX seeding failed (%s); trades will fall back to EUR", e)
         fx_svc = None
 
-    # Helper to extract base asset from symbol like "DOGEPEPE" -> "DOGE"
-    def _extract_base_asset(symbol: str) -> Optional[str]:
-        """Extract base asset from a trading pair symbol."""
-        # First normalize any earn variants
-        symbol = _normalize_earn_variant(symbol) or symbol
-
-        # Try matching against known assets first (longest first to avoid partial matches)
-        for asset_sym in sorted(existing_assets.keys(), key=lambda x: -len(x)):
-            if symbol.startswith(asset_sym):
-                return asset_sym
-        # Fallback: try common lengths (4, 3, 5, 6 chars)
-        for length in [4, 3, 5, 6]:
-            if len(symbol) >= length:
-                potential = symbol[:length]
-                if potential.isupper() and potential.isalpha():
-                    return potential
-        return None
-
     # === 1. Sync crypto-to-crypto conversions ===
     try:
         if hasattr(service, "get_crypto_conversions"):
@@ -473,7 +502,7 @@ async def _sync_detailed_transactions(
                     continue
 
                 # Parse base asset from symbol (e.g., "DOGEPEPE" -> "DOGE")
-                base_asset = _extract_base_asset(trade.symbol)
+                base_asset = _extract_base_asset(trade.symbol, existing_assets)
                 if not base_asset or base_asset in fiat_currencies:
                     logger.warning(f"Could not parse base asset from conversion symbol: {trade.symbol}")
                     continue

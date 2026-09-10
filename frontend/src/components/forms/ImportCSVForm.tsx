@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { transactionsApi, portfoliosApi } from '@/services/api'
-import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, HelpCircle } from 'lucide-react'
+import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, HelpCircle, SkipForward } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
@@ -33,6 +33,8 @@ interface ImportCSVFormProps {
 interface ImportResult {
   success_count: number
   error_count: number
+  /** Lignes déjà présentes en base, ignorées. Absent des réponses d'avant NEW-60. */
+  skipped_count?: number
   errors: string[]
   created_transactions: string[]
 }
@@ -77,16 +79,27 @@ export default function ImportCSVForm({
       setImportResult(result)
       invalidateAllFinancialData(queryClient)
 
+      const ignorees = result.skipped_count ?? 0
+      const mentionIgnorees = ignorees > 0 ? ` ${ignorees} déjà présentes, ignorées.` : ''
+
       if (result.success_count > 0 && result.error_count === 0) {
         toast({
           title: 'Import réussi',
-          description: `${result.success_count} transactions importées avec succès.`,
+          description: `${result.success_count} transactions importées avec succès.${mentionIgnorees}`,
         })
         onSuccess?.()
       } else if (result.success_count > 0 && result.error_count > 0) {
         toast({
           title: 'Import partiel',
-          description: `${result.success_count} transactions importées, ${result.error_count} erreurs.`,
+          description: `${result.success_count} transactions importées, ${result.error_count} erreurs.${mentionIgnorees}`,
+        })
+      } else if (result.error_count === 0 && ignorees > 0) {
+        // Un fichier entièrement déjà connu n'est pas un échec : rien à
+        // reprocher au fichier, rien à corriger. L'annoncer comme tel évitait
+        // le « Échec de l'import — 0 erreurs détectées » qui ne disait rien.
+        toast({
+          title: 'Rien de nouveau',
+          description: `${ignorees} transactions étaient déjà présentes.`,
         })
       } else {
         toast({
@@ -292,6 +305,12 @@ export default function ImportCSVForm({
               <div className="flex items-center gap-2 text-loss">
                 <XCircle className="h-5 w-5" />
                 <span>{importResult.error_count} erreurs</span>
+              </div>
+            )}
+            {(importResult.skipped_count ?? 0) > 0 && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <SkipForward className="h-5 w-5" />
+                <span>{importResult.skipped_count} déjà présentes</span>
               </div>
             )}
           </div>

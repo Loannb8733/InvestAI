@@ -204,7 +204,8 @@ class ReportService(
                     Transaction.executed_at >= datetime(year, 1, 1),
                     Transaction.executed_at <= datetime(year, 12, 31, 23, 59, 59),
                 )
-            trans_query = trans_query.order_by(Transaction.executed_at.desc())
+            # Les lignes sans date figureraient sinon en tête du rapport.
+            trans_query = trans_query.order_by(func.coalesce(Transaction.executed_at, Transaction.created_at).desc())
             trans_result = await db.execute(trans_query)
             transactions = trans_result.scalars().all()
 

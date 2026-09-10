@@ -43,15 +43,24 @@ class CryptoComService(BaseExchangeService):
     def exchange_name(self) -> str:
         return "Crypto.com"
 
-    def _sign_request(self, method: str, request_id: str, params: dict) -> str:
-        """Sign a request with Crypto.com's signature method."""
+    def _sign_request(self, method: str, request_id: str, params: dict, nonce: str) -> str:
+        """Sign a request with Crypto.com's signature method.
+
+        ``nonce`` is passed in rather than read from the clock here: it is part of
+        both the signed payload *and* the request body, and Crypto.com recomputes
+        the signature from the nonce it receives. Reading the clock twice — once
+        here, once in the caller — made the two disagree whenever a millisecond
+        boundary fell between the two reads, and the request was then rejected as
+        unauthorized. The connector swallows that error and returns an empty list,
+        so the failure showed up as an occasionally empty Crypto.com portfolio
+        rather than as an error.
+        """
         param_string = ""
         if params:
             # Sort params alphabetically
             sorted_params = sorted(params.items())
             param_string = "".join(f"{k}{v}" for k, v in sorted_params)
 
-        nonce = str(int(time.time() * 1000))
         sig_payload = f"{method}{request_id}{self.api_key}{param_string}{nonce}"
 
         signature = hmac.new(
@@ -70,7 +79,7 @@ class CryptoComService(BaseExchangeService):
         if params is None:
             params = {}
 
-        signature = self._sign_request(method, request_id, params)
+        signature = self._sign_request(method, request_id, params, nonce)
 
         payload = {
             "id": request_id,

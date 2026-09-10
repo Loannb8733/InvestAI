@@ -3,7 +3,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Numeric, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
@@ -50,6 +50,23 @@ class User(Base):
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)
     password_reset_token = Column(String(255), nullable=True)
     password_reset_expires = Column(DateTime(timezone=True), nullable=True)
+    # Génération de jetons en cours pour cet utilisateur.
+    #
+    # La révocation se faisait jeton par jeton, à la déconnexion : rien ne
+    # rattachait un jeton déjà émis au mot de passe qui l'avait produit. Un
+    # jeton de rafraîchissement dérobé restait donc valable **sept jours** après
+    # que la victime a changé son mot de passe — alors que c'est précisément le
+    # geste par lequel on reprend la main sur un compte compromis (NEW-65).
+    #
+    # Incrémentée à chaque changement ou réinitialisation ; chaque jeton porte
+    # la génération qui l'a vu naître, et seule celle en cours est reçue.
+    #
+    # Un compteur plutôt qu'un horodatage : la date d'émission d'un JWT (`iat`)
+    # se compte en **secondes**, si bien qu'un jeton émis dans la même seconde
+    # que le changement serait accepté — et que le jeton neuf rendu à la session
+    # courante, lui, risquerait d'être refusé. Un entier ne connaît pas cette
+    # ambiguïté.
+    token_version = Column(Integer, default=0, nullable=False, server_default="0")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { HEALTH_CONFIG, getScheduleHealth, trierEtFiltrer } from './crowdfunding-projets'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,7 +40,6 @@ import QueryErrorState from '@/components/ui/query-error-state'
 import {
   Plus, Trash2, Edit, Loader2, FolderOpen, Upload, FileText,
   Download, X, Banknote, ShieldCheck, ChevronRight,
-  AlertTriangle, CheckCircle2, Clock,
 } from 'lucide-react'
 import type { CrowdfundingProject, ProjectStatus, RepaymentType, PaymentType, InterestFrequency } from '@/types/crowdfunding'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types/crowdfunding'
@@ -60,27 +60,6 @@ const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
   interest: 'Intérêts',
   capital: 'Capital',
   both: 'Intérêts + Capital',
-}
-
-// ─── Schedule health helpers ───
-
-type ScheduleHealth = 'none' | 'healthy' | 'warning' | 'danger'
-
-function getScheduleHealth(project: CrowdfundingProject): ScheduleHealth {
-  const schedule = project.schedule ?? []
-  if (schedule.length === 0) return 'none'
-  const overdueCount = schedule.filter((s) => s.status === 'overdue').length
-  const paidCount = schedule.filter((s) => s.status === 'paid').length
-  if (overdueCount > 0) return 'danger'
-  if (paidCount > 0) return 'healthy'
-  return 'warning'
-}
-
-const HEALTH_CONFIG: Record<ScheduleHealth, { dot: string; label: string; icon: typeof CheckCircle2 }> = {
-  none: { dot: 'bg-muted-foreground', label: 'Pas d\'échéancier', icon: Clock },
-  healthy: { dot: 'bg-gain', label: 'À jour', icon: CheckCircle2 },
-  warning: { dot: 'bg-warning', label: 'En attente', icon: Clock },
-  danger: { dot: 'bg-loss', label: 'Retard détecté', icon: AlertTriangle },
 }
 
 // ─── Form types ───
@@ -319,17 +298,10 @@ export default function CrowdfundingProjectsPage() {
     setDialogOpen(true)
   }
 
-  const filtered = useMemo(() => {
-    const list = statusFilter === 'all' ? [...projects] : projects.filter((p) => p.status === statusFilter)
-    switch (sortBy) {
-      case 'amount_desc': return list.sort((a, b) => Number(b.invested_amount) - Number(a.invested_amount))
-      case 'amount_asc': return list.sort((a, b) => Number(a.invested_amount) - Number(b.invested_amount))
-      case 'rate_desc': return list.sort((a, b) => Number(b.annual_rate) - Number(a.annual_rate))
-      case 'rate_asc': return list.sort((a, b) => Number(a.annual_rate) - Number(b.annual_rate))
-      case 'date_asc': return list.sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
-      default: return list.sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
-    }
-  }, [projects, statusFilter, sortBy])
+  const filtered = useMemo(
+    () => trierEtFiltrer(projects, statusFilter, sortBy),
+    [projects, statusFilter, sortBy],
+  )
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 

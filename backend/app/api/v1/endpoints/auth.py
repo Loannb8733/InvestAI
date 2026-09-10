@@ -18,7 +18,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, jeton_perime_par_un_changement
 from app.core.database import get_db
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.security import (
@@ -79,13 +79,12 @@ class ResetPasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def check_password(cls, v: str) -> str:
-        import re
+        # Même règle que l'inscription et le changement de mot de passe, appelée
+        # plutôt que redite : la version locale qui vivait ici était identique
+        # mot pour mot, donc libre de diverger sans que rien ne le signale.
+        from app.schemas.auth import _validate_password_complexity
 
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Le mot de passe doit contenir au moins une majuscule")
-        if not re.search(r"\d", v):
-            raise ValueError("Le mot de passe doit contenir au moins un chiffre")
-        return v
+        return _validate_password_complexity(v)
 
 
 router = APIRouter()
@@ -271,8 +270,8 @@ async def verify_email(
 
     # Generate tokens for automatic login with fingerprint
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
-    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
-    refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp)
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp, token_version=user.token_version)
+    refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp, token_version=user.token_version)
 
     return Token(
         access_token=access_token,
@@ -477,12 +476,14 @@ async def login(
 
     # Generate tokens with fingerprint binding
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
-    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp, token_version=user.token_version)
 
     # "Remember me" → 30-day refresh token, otherwise default (7 days)
     remember_days = 30 if login_data.remember_me else None
     refresh_delta = timedelta(days=remember_days) if remember_days else None
-    refresh_tok = create_refresh_token(subject=str(user.id), fingerprint=fp, expires_delta=refresh_delta)
+    refresh_tok = create_refresh_token(
+        subject=str(user.id), fingerprint=fp, expires_delta=refresh_delta, token_version=user.token_version
+    )
 
     # Set httpOnly cookies
     _set_auth_cookies(response, access_token, refresh_tok, refresh_max_age_days=remember_days)
@@ -558,6 +559,15 @@ async def refresh_token(
         )
 
     # Verify refresh token fingerprint
+    # Même contrôle que sur un jeton d'accès : sans lui, un jeton de
+    # rafraîchissement dérobé rouvrirait une session après le changement de mot
+    # de passe, et la faille resterait entière (NEW-65).
+    if jeton_perime_par_un_changement(payload, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expirée : le mot de passe a été modifié.",
+        )
+
     token_fp = payload.get("fp")
     if token_fp:
         user_agent = request.headers.get("user-agent", "")
@@ -570,8 +580,8 @@ async def refresh_token(
 
     # Generate new tokens with fingerprint
     fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
-    access_token = create_access_token(subject=str(user.id), fingerprint=fp)
-    new_refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp)
+    access_token = create_access_token(subject=str(user.id), fingerprint=fp, token_version=user.token_version)
+    new_refresh_token = create_refresh_token(subject=str(user.id), fingerprint=fp, token_version=user.token_version)
 
     # Set httpOnly cookies
     _set_auth_cookies(response, access_token, new_refresh_token)
@@ -868,6 +878,7 @@ async def update_profile(
 @limiter.limit("5/minute")
 async def change_password(
     request: Request,
+    response: Response,
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -880,7 +891,20 @@ async def change_password(
         )
 
     current_user.password_hash = hash_password(password_data.new_password)
+    # Toutes les sessions ouvertes avant cet instant tombent (NEW-65) : un jeton
+    # dérobé ne survit pas au changement de mot de passe.
+    current_user.token_version = (current_user.token_version or 0) + 1
     await db.commit()
+
+    # …y compris celle qui vient de faire la demande : on lui rend aussitôt des
+    # jetons neufs, sans quoi l'utilisateur se retrouverait déconnecté pour
+    # avoir suivi le conseil de changer son mot de passe.
+    fp = compute_token_fingerprint(request.headers.get("user-agent", ""))
+    _set_auth_cookies(
+        response,
+        create_access_token(subject=str(current_user.id), fingerprint=fp, token_version=current_user.token_version),
+        create_refresh_token(subject=str(current_user.id), fingerprint=fp, token_version=current_user.token_version),
+    )
 
     return {"message": "Mot de passe modifié avec succès"}
 
@@ -969,6 +993,9 @@ async def reset_password(
     user.password_hash = hash_password(data.new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
+    # C'est le geste par lequel on reprend la main sur un compte compromis :
+    # toutes les sessions ouvertes tombent, sans exception (NEW-65).
+    user.token_version = (user.token_version or 0) + 1
     await db.commit()
 
     return {"message": "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter."}
