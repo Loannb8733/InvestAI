@@ -276,7 +276,19 @@ describe('SimulationsPage — les trois autres onglets', () => {
   })
 
   it('Monte Carlo passe ses paramètres en arguments positionnels', async () => {
-    getMonteCarloMock.mockResolvedValue({ percentiles: {}, expected_return: 0, prob_positive: 0 })
+    // Le double porte les sept champs que `MonteCarloData` declare obligatoires.
+    // Il en omettait quatre, dont `simulations`, que l'onglet lit directement :
+    // le rendu levait un TypeError qui n'echouait aucun test -- React le
+    // rattrape -- mais faisait sortir vitest en erreur, et la CI avec lui.
+    getMonteCarloMock.mockResolvedValue({
+      percentiles: { p5: -12, p25: -3, p50: 8, p75: 19, p95: 34 },
+      expected_return: 8,
+      prob_positive: 62,
+      prob_loss_10: 18,
+      prob_ruin: 0.4,
+      simulations: 5000,
+      horizon_days: 365,
+    })
     await ouvrirOnglet(/Monte Carlo/i)
 
     fireEvent.click(screen.getByRole('button', { name: /Simuler \(5 000 chemins\)/i }))
