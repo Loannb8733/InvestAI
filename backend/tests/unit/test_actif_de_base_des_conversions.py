@@ -15,6 +15,8 @@ Ce filet épingle le comportement actuel, son devinage compris — voir
 corriger en douce.
 """
 
+import pytest
+
 from app.tasks.sync_exchanges import _extract_base_asset
 
 RIEN: set = set()
@@ -52,44 +54,31 @@ class TestCorrespondanceAvecLesActifsConnus:
         assert _extract_base_asset("WBTC", {"BTC"}) == "BTC"
 
 
-class TestRepliParDevinage:
-    def test_le_repli_tronque_a_quatre_lettres(self):
-        """La verrue, épinglée telle quelle (NEW-54).
+class TestSansCorrespondance:
+    """NEW-54 : renoncer plutôt que deviner.
 
-        Quand aucun actif connu ne correspond, la fonction devine une longueur :
-        4, puis 3, 5, 6. Un actif de cinq ou six lettres converti pour la
-        **première** fois — donc absent du portefeuille — se retrouve tronqué,
-        et `_get_or_create_asset` crée « PEND » de toutes pièces.
+    Un repli devinait une longueur de préfixe — 4, puis 3, 5, 6 — quand aucun
+    actif connu ne correspondait. Il tronquait donc tout actif de cinq ou six
+    lettres converti pour la **première** fois : `PENDLEPEPE` devenait `PEND`,
+    et `_get_or_create_asset` créait l'actif fantôme, qui portait ensuite des
+    quantités réelles.
 
-        Aucun actif de ce genre n'existe aujourd'hui en base : les six symboles
-        longs concernés (PENDLE, KAITO…) étaient déjà connus quand leur
-        première conversion est arrivée. Le défaut est latent, pas actif.
-        """
-        assert _extract_base_asset("PENDLEPEPE", RIEN) == "PEND"
-        assert _extract_base_asset("KAITOSOL", RIEN) == "KAIT"
+    Le devinage traitait correctement les actifs nouveaux de trois ou quatre
+    lettres ; ce cas est perdu, et c'est l'échange consenti : une conversion
+    ignorée se signale dans le journal et se saisit à la main, un actif fantôme
+    pollue le prix de revient sans se voir.
+    """
 
-    def test_la_longueur_quatre_est_essayee_avant_la_longueur_trois(self):
-        # L'ordre [4, 3, 5, 6] n'est pas croissant : c'est un pari sur la
-        # longueur de ticker la plus fréquente, pas une règle.
-        assert _extract_base_asset("BTCPEPE", RIEN) == "BTCP"
+    @pytest.mark.parametrize("symbole", ["PENDLEPEPE", "KAITOSOL", "BTCPEPE", "BTC", "OBSCURXYZ"])
+    def test_un_symbole_sans_actif_connu_ne_rend_rien(self, symbole):
+        assert _extract_base_asset(symbole, RIEN) is None
 
-    def test_un_symbole_de_trois_lettres_tombe_sur_la_longueur_trois(self):
-        assert _extract_base_asset("BTC", RIEN) == "BTC"
-
-    def test_un_prefixe_non_alphabetique_est_refuse(self):
-        """« 1INCH » et consorts : le repli n'accepte que des lettres.
-
-        Ici la longueur 4 donnerait « BTC1 », rejetée, et la longueur 3 rend
-        « BTC ».
-        """
-        assert _extract_base_asset("BTC1PEPE", RIEN) == "BTC"
-
-    def test_un_prefixe_en_minuscules_est_refuse(self):
-        assert _extract_base_asset("dogepepe", RIEN) is None
-
-    def test_un_symbole_trop_court_ne_rend_rien(self):
-        # Aucune des longueurs tentées ne tient dans deux caractères.
-        assert _extract_base_asset("AB", RIEN) is None
+    def test_un_actif_connu_est_toujours_reconnu(self):
+        # La règle ne coupe que le devinage : la reconnaissance par préfixe,
+        # elle, reste entière — c'est elle qui traite les 81 conversions
+        # réelles.
+        assert _extract_base_asset("PENDLEPEPE", {"PENDLE"}) == "PENDLE"
+        assert _extract_base_asset("BTCPEPE", {"BTC"}) == "BTC"
 
     def test_un_symbole_vide_ne_rend_rien(self):
         assert _extract_base_asset("", RIEN) is None

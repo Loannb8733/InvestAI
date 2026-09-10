@@ -83,6 +83,12 @@ export interface Transaction {
 export interface PortfolioSummary {
   id: string
   name: string
+  /**
+   * Nature du portefeuille, quand elle n'est pas ordinaire — `'crowdfunding'`
+   * pour celui que l'application gère elle-même. Facultatif : une réponse
+   * d'avant NEW-68 n'en porte pas, et le nom sert alors de repli.
+   */
+  kind?: string | null
   description?: string
   cash_balances?: Record<string, number>
 }

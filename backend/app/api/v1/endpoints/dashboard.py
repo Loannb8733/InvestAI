@@ -48,9 +48,20 @@ def _compute_period_twr(points: list) -> Optional[float]:
         if prev is not None and prev[0] > 0:
             flow = net_cap - prev[1]
             ratio = (value - flow) / prev[0]
-            # Garde-fou : une sous-période aberrante (données trouées) ne doit
-            # pas produire un TWR négatif impossible ou explosif.
-            twr *= min(max(ratio, 0.0), 10.0)
+            if ratio <= 0:
+                # Un instantané à zéro (ou négatif) est un défaut de collecte,
+                # non un événement financier : un portefeuille ne perd pas
+                # 100 % en un jour pour se reconstituer le lendemain.
+                #
+                # Le multiplier remettait le produit à zéro, et il n'en
+                # remontait jamais — la sous-période suivante partant d'une
+                # valeur nulle, la garde anti-division la faisait sauter. Le
+                # tableau de bord annonçait alors −100 % sur un portefeuille
+                # intact (NEW-63). La sous-période est écartée : on ne mesure
+                # pas ce qu'on n'a pas observé.
+                prev = (value, net_cap)
+                continue
+            twr *= min(ratio, 10.0)
         prev = (value, net_cap)
     return round((twr - 1.0) * 100, 2)
 

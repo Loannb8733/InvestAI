@@ -975,19 +975,27 @@ async def reset_password(
             detail="Lien de réinitialisation invalide ou expiré.",
         )
 
-    # Check expiration
-    if user.password_reset_expires:
-        expires = user.password_reset_expires
-        if hasattr(expires, "tzinfo") and expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expires:
-            user.password_reset_token = None
-            user.password_reset_expires = None
-            await db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Lien de réinitialisation expiré. Veuillez en demander un nouveau.",
-            )
+    # Un jeton sans date d'expiration est refusé (NEW-66).
+    #
+    # La vérification était conditionnée à la présence de la date : un jeton
+    # dont elle manquait n'était donc **jamais** considéré expiré et valait
+    # indéfiniment. La règle était écrite à l'envers — en l'absence
+    # d'information, elle autorisait là où la prudence veut qu'elle refuse.
+    #
+    # `forgot-password` pose toujours les deux ensemble ; un jeton sans date ne
+    # peut donc venir que d'une écriture partielle ou d'une reprise de données,
+    # et rien ne permet alors de dire son âge.
+    expires = user.password_reset_expires
+    if expires is None or datetime.now(timezone.utc) > (
+        expires.replace(tzinfo=timezone.utc) if expires.tzinfo is None else expires
+    ):
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lien de réinitialisation expiré. Veuillez en demander un nouveau.",
+        )
 
     # Update password and clear token
     user.password_hash = hash_password(data.new_password)

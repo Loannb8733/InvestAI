@@ -177,16 +177,13 @@ class TestReinitialisation:
         assert "expiré" in reponse.json()["detail"]
         assert (await _recharger(db_session, compte)).password_reset_token is None
 
-    async def test_un_jeton_sans_date_d_expiration_est_accepte(self, client, db_session, compte, monkeypatch):
-        """Le trou (NEW-66), épinglé tel quel.
+    async def test_un_jeton_sans_date_d_expiration_est_refuse(self, client, db_session, compte, monkeypatch):
+        """NEW-66 : en l'absence d'information, on refuse.
 
-        La vérification d'expiration est conditionnée à la présence de la date :
-        `if user.password_reset_expires:`. Un jeton dont la date manque n'est
-        donc **jamais** considéré expiré — il vaut indéfiniment.
-
-        La route pose toujours les deux ensemble, si bien que le cas ne se
-        produit pas aujourd'hui. Mais la règle est écrite à l'envers : en
-        l'absence d'information, elle autorise là où elle devrait refuser.
+        La vérification était conditionnée à la présence de la date, si bien
+        qu'un jeton dont elle manquait n'était **jamais** considéré expiré et
+        valait indéfiniment. Rien ne permet pourtant de dire l'âge d'un tel
+        jeton — et c'est justement pourquoi il faut le refuser.
         """
         jeton = await self._jeton(client, db_session, compte, monkeypatch)
         compte.password_reset_expires = None
@@ -196,7 +193,8 @@ class TestReinitialisation:
             "/api/v1/auth/reset-password", json={"token": jeton, "new_password": MOT_DE_PASSE_VALIDE}
         )
 
-        assert reponse.status_code == 200, "le trou est comblé : mettre à jour NEW-66"
+        assert reponse.status_code == 400
+        assert (await _recharger(db_session, compte)).password_reset_token is None, "le jeton est efface"
 
     @pytest.mark.parametrize("faible", ["Court1!", "sansmajuscule1!", "SansChiffre!!"])
     async def test_un_mot_de_passe_faible_est_refuse(self, client, db_session, compte, monkeypatch, faible):
