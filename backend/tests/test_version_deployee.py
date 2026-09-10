@@ -7,6 +7,7 @@ l'authentification, donc invérifiables de l'extérieur.
 """
 
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.main import health_check, resoudre_commit
 
@@ -97,12 +98,54 @@ class TestVersionDeSchema:
 
         assert script.get_heads() == [_REVISION_ATTENDUE]
 
-    async def test_la_sonde_de_disponibilite_compare_les_deux_versions(self, client):
+    async def test_la_sonde_annonce_toujours_la_revision_attendue(self, client):
+        """Même quand la base ne peut rien confirmer.
+
+        La base de test est bâtie par `create_all`, non par Alembic : elle n'a
+        donc pas de table `alembic_version` et la lecture échoue. C'est le cas
+        où l'information a le plus de valeur — et c'est celui où elle manquait,
+        la branche d'erreur oubliant de poser la clé. Constaté en CI, invisible
+        en local, où la base de test traînait la table d'une migration passée.
+        """
         reponse = await client.get("/health/ready")
         corps = reponse.json()
 
-        assert corps["schema_applique"] == corps["schema_attendu"]
-        assert corps["status"] == "ready"
+        assert corps["schema_attendu"]
+        assert corps["schema_applique"]
+
+    async def test_la_revision_attendue_survit_a_une_base_illisible(self, client):
+        """Le défaut exact, et la raison pour laquelle il a échappé au local.
+
+        `/health/ready` interroge le moteur de l'application, non la base de
+        test : en local il tombe sur la base de développement, migrée, qui
+        porte `alembic_version`. En intégration continue cette table n'existe
+        pas, la lecture lève, et la branche d'erreur oubliait de poser
+        `schema_attendu` — la seule information encore disponible à ce
+        moment-là, puisqu'elle est connue au démarrage sans la base.
+
+        Le test force l'échec de lecture au lieu de dépendre de ce que la base
+        locale contient ce jour-là.
+        """
+        with patch("app.main.engine") as moteur:
+            moteur.connect.side_effect = RuntimeError("base injoignable")
+            reponse = await client.get("/health/ready")
+
+        corps = reponse.json()
+        assert corps["schema_applique"] == "illisible"
+        assert corps["schema_attendu"], "l'information la plus utile disparaissait au pire moment"
+
+    async def test_un_schema_lisible_et_concordant_rend_le_service_pret(self, client, monkeypatch):
+        from app import main
+
+        with patch.object(main, "_REVISION_ATTENDUE", "abc123"):
+            with patch("app.main.engine") as moteur:
+                connexion = AsyncMock()
+                connexion.execute = AsyncMock(return_value=MagicMock(scalar=lambda: "abc123"))
+                moteur.connect.return_value.__aenter__ = AsyncMock(return_value=connexion)
+                moteur.connect.return_value.__aexit__ = AsyncMock(return_value=False)
+                reponse = await client.get("/health/ready")
+
+        assert reponse.json()["schema_applique"] == reponse.json()["schema_attendu"]
 
     async def test_un_schema_en_retard_rend_le_service_degrade(self, client, monkeypatch):
         """C'est le cas que tout ceci sert à voir.
