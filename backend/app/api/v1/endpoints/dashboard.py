@@ -709,27 +709,12 @@ async def _get_dashboard_impl(
     from app.core.timeframe import get_period_label_fr
 
     # ============== Currency Exposure ==============
-    # Group asset values by their denomination currency
-    ccy_totals: dict[str, float] = {}
-    # Use assets from metrics (contains all individual asset entries with currency info)
-    for a in metrics.get("assets", []):
-        # Determine the asset's denomination currency:
-        # For crypto: typically USD. For stocks/ETF: from the asset model.
-        # The asset entry has asset_type; crypto is priced in USD by default.
-        a_type = a.get("asset_type", "")
-        a_val = a.get("current_value", 0.0)
-        if a_val <= 0:
-            continue
-        # Get currency from the asset model if available
-        a_id = a.get("id")
-        a_ccy = "EUR"  # default
-        if a_type == "crypto":
-            a_ccy = "USD"
-        elif a_type in ("crowdfunding", "real_estate", "bond"):
-            a_ccy = "EUR"
-        ccy_totals[a_ccy] = ccy_totals.get(a_ccy, 0.0) + a_val
-
-    # Also query asset-level currencies from DB for stocks/ETFs (more accurate)
+    #
+    # Une première boucle calculait ici un `ccy_totals` par type d'actif
+    # (« crypto = USD »), que la seconde écrasait aussitôt par `ccy_totals = {}`
+    # avant de tout recalculer : vingt lignes sans effet, retirées.
+    #
+    # Devise de dénomination de chaque actif, lue sur l'actif lui-même.
     asset_ccy_result = await db.execute(
         select(Asset.id, Asset.currency)
         .join(Portfolio, Asset.portfolio_id == Portfolio.id)
@@ -737,12 +722,11 @@ async def _get_dashboard_impl(
     )
     asset_ccy_map = {str(row[0]): (row[1] or "EUR").upper() for row in asset_ccy_result.fetchall()}
 
-    # Re-compute with accurate per-asset currencies.
     # « crypto = USD » était trompeur pour le risque de change : l'or tokenisé
     # (PAXG…) est une exposition OR, les stablecoins EUR une exposition EUR.
     from app.services.asset_classification import STABLECOIN_PEGS, is_safe_haven
 
-    ccy_totals = {}
+    ccy_totals: dict[str, float] = {}
     for a in metrics.get("assets", []):
         a_val = a.get("current_value", 0.0)
         if a_val <= 0:
