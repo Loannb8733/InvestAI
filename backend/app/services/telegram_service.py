@@ -64,14 +64,31 @@ class TelegramService:
         return cls._client
 
     async def _is_on_cooldown(self, key: str) -> bool:
-        """Check if an alert key is within cooldown period."""
-        r = await _get_redis()
-        return await r.exists(key) > 0
+        """Check if an alert key is within cooldown period.
+
+        Rend ``False`` quand Redis est injoignable : le message part. C'est le
+        choix délibéré entre deux imperfections — un doublon se remarque et
+        s'ignore, un silence sur une alerte de prix ne se voit pas.
+
+        Sans cette garde, l'exception remontait jusqu'à la route de test
+        Telegram, qui répondait 500 au lieu du 502 prévu (même famille que
+        NEW-69).
+        """
+        try:
+            r = await _get_redis()
+            return await r.exists(key) > 0
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pause d'alerte illisible, le message part quand même : %s", exc)
+            return False
 
     async def _set_cooldown(self, key: str, ttl: int = COOLDOWN_TTL) -> None:
-        """Set cooldown for an alert key."""
-        r = await _get_redis()
-        await r.set(key, "1", ex=ttl)
+        """Set cooldown for an alert key. Best-effort : sans Redis, la pause
+        n'est pas posée et un doublon reste possible."""
+        try:
+            r = await _get_redis()
+            await r.set(key, "1", ex=ttl)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pause d'alerte non posée : %s", exc)
 
     async def send_message(
         self,

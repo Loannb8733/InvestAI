@@ -86,14 +86,33 @@ class RegimeAlertService:
             return []
 
     async def _get_last_regime(self) -> Optional[str]:
-        """Read last known regime from Redis."""
-        r = await _get_redis_txt()
-        return await r.get(REDIS_KEY_LAST_REGIME)
+        """Read last known regime from Redis.
+
+        Rend ``None`` quand Redis est injoignable — la même valeur qu'à la
+        première exécution. L'appelant amorce alors sans alerter, ce qui est le
+        comportement juste : sans mémoire du régime précédent, aucun changement
+        ne peut être établi, et annoncer une mutation qu'on n'a pas constatée
+        serait pire que se taire.
+
+        Sans cette garde, l'exception remontait à la route `/cron/regime-check`
+        et la rendait en 500 : la tâche planifiée échouait, et plus aucune
+        alerte de régime ne partait (même famille que NEW-69).
+        """
+        try:
+            r = await _get_redis_txt()
+            return await r.get(REDIS_KEY_LAST_REGIME)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Mémoire du régime injoignable (aucune alerte ne sera émise) : %s", exc)
+            return None
 
     async def _set_last_regime(self, regime: str) -> None:
-        """Store current regime in Redis."""
-        r = await _get_redis_txt()
-        await r.set(REDIS_KEY_LAST_REGIME, regime, ex=REDIS_REGIME_TTL)
+        """Store current regime in Redis. Best-effort : l'écriture n'est pas
+        critique, la prochaine passe réamorcera."""
+        try:
+            r = await _get_redis_txt()
+            await r.set(REDIS_KEY_LAST_REGIME, regime, ex=REDIS_REGIME_TTL)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Mémoire du régime non écrite : %s", exc)
 
     def format_mutation_alert(
         self,
