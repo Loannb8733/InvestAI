@@ -578,21 +578,34 @@ def get_cached_history(symbol: str, days: int = 90):
     Returns (dates, prices) or ([], []).
     Tries: exact Redis key → 365d Redis key → legacy 90d key → PostgreSQL.
     """
-    redis = _get_redis()
+    # Toute la lecture Redis sous une même garde. Sans elle, une base
+    # injoignable levait ici — et le repli PostgreSQL annoncé par la docstring
+    # n'était jamais atteint. L'exception remontait jusqu'à
+    # `build_portfolio_value_series`, puis à `_get_dashboard_impl`, et l'écran
+    # d'accueil entier répondait 500 : constaté en production le 2026-09-10,
+    # les jours où Upstash mettait la base en veille.
+    #
+    # Un cache dont l'indisponibilité fait tomber la page qu'il devait
+    # accélérer est pire que pas de cache du tout.
+    raw = None
+    try:
+        redis = _get_redis()
 
-    # Try exact key first
-    key = _cache_key(symbol, days)
-    raw = redis.get(key) or redis.get(f"{key}:fallback")
+        # Try exact key first
+        key = _cache_key(symbol, days)
+        raw = redis.get(key) or redis.get(f"{key}:fallback")
 
-    # Fall back to the full 365d cache and trim
-    if not raw and days != DEFAULT_CACHE_DAYS:
-        full_key = _cache_key(symbol, DEFAULT_CACHE_DAYS)
-        raw = redis.get(full_key) or redis.get(f"{full_key}:fallback")
+        # Fall back to the full 365d cache and trim
+        if not raw and days != DEFAULT_CACHE_DAYS:
+            full_key = _cache_key(symbol, DEFAULT_CACHE_DAYS)
+            raw = redis.get(full_key) or redis.get(f"{full_key}:fallback")
 
-    # Legacy: try old 90-day key for backwards compatibility
-    if not raw and days != 90:
-        legacy_key = _cache_key(symbol, 90)
-        raw = redis.get(legacy_key) or redis.get(f"{legacy_key}:fallback")
+        # Legacy: try old 90-day key for backwards compatibility
+        if not raw and days != 90:
+            legacy_key = _cache_key(symbol, 90)
+            raw = redis.get(legacy_key) or redis.get(f"{legacy_key}:fallback")
+    except Exception as e:  # noqa: BLE001 — le cache ne doit jamais faire tomber l'appelant
+        logger.warning("Cache Redis injoignable pour %s (repli sur PostgreSQL) : %s", symbol, e)
 
     if raw:
         try:
