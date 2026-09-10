@@ -440,12 +440,24 @@ def _extract_base_asset(symbol: str, known_symbols: Iterable[str]) -> Optional[s
     for asset_sym in sorted(known_symbols, key=lambda x: -len(x)):
         if symbol.startswith(asset_sym):
             return asset_sym
-    # Fallback: try common lengths (4, 3, 5, 6 chars)
-    for length in [4, 3, 5, 6]:
-        if len(symbol) >= length:
-            potential = symbol[:length]
-            if potential.isupper() and potential.isalpha():
-                return potential
+
+    # Aucun actif connu ne correspond : on renonce (NEW-54).
+    #
+    # Un repli devinait ici une longueur de préfixe — 4, puis 3, 5, 6 — ce qui
+    # tronquait tout actif de cinq ou six lettres converti pour la première
+    # fois : `PENDLEPEPE` devenait `PEND`, et `_get_or_create_asset` créait
+    # l'actif fantôme, qui portait ensuite des quantités réelles et polluait
+    # durablement le prix de revient.
+    #
+    # Le devinage traitait correctement les actifs nouveaux de trois ou quatre
+    # lettres ; on perd ce cas. C'est l'échange consenti : une conversion
+    # ignorée se signale dans le journal et se saisit à la main, un actif
+    # fantôme ne se voit pas.
+    logger.warning(
+        "Conversion ignorée : aucun actif connu ne correspond au symbole %s "
+        "(saisir la transaction à la main, ou créer l'actif au préalable)",
+        symbol,
+    )
     return None
 
 

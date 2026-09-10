@@ -38,6 +38,11 @@ class PortfolioResponse(PortfolioBase):
 
     id: UUID
     user_id: UUID
+    # Nature du portefeuille, quand elle n'est pas ordinaire. L'écran s'en sert
+    # pour écarter celui du crowdfunding, qui a sa propre page — il le
+    # reconnaissait auparavant à son nom, ce qu'un simple renommage suffisait à
+    # défaire (NEW-68).
+    kind: Optional[str] = None
     cash_balances: dict[str, float] = {}
     created_at: datetime
     updated_at: datetime

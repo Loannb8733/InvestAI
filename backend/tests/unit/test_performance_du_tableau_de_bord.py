@@ -87,20 +87,27 @@ class TestGardeFous:
         """
         assert _compute_period_twr(serie((100, 0), (5000, 0))) == 900.0
 
-    def test_une_valeur_nulle_annule_le_rendement_de_toute_la_periode(self):
-        """Le comportement à connaître, épinglé tel quel.
+    def test_un_instantane_a_zero_est_ecarte_au_lieu_de_tout_annuler(self):
+        """NEW-63 : on ne mesure pas ce qu'on n'a pas observé.
 
-        Un ratio nul remet le produit à zéro : le rendement de la période entière
-        tombe à −100 %, et il n'en remonte pas — la sous-période suivante part
-        d'une valeur nulle, donc elle est sautée, et le produit reste à zéro.
+        Un ratio nul remettait le produit à zéro, et il n'en remontait jamais —
+        la sous-période suivante partant d'une valeur nulle, la garde
+        anti-division la faisait sauter. Un seul jour où l'instantané avait
+        échoué suffisait à afficher **−100 %** sur un portefeuille intact.
 
-        Un seul jour où l'instantané a échoué suffirait donc à afficher −100 %
-        sur un portefeuille intact. Aucun des 222 instantanés en base n'est à
-        zéro : le cas est latent. Le corriger — sauter la sous-période plutôt
-        que l'annuler — changerait la définition du calcul, ce n'est pas une
-        décision de test.
+        Un portefeuille ne perd pas tout en un jour pour se reconstituer le
+        lendemain : c'est un défaut de collecte, et la sous-période est écartée.
+        Ici, la seule mesure exploitable va de 100 à 200 — soit +100 %.
         """
-        assert _compute_period_twr(serie((100, 0), (0, 0), (100, 0), (200, 0))) == -100.0
+        assert _compute_period_twr(serie((100, 0), (0, 0), (100, 0), (200, 0))) == 100.0
+
+    def test_une_perte_reelle_reste_comptee(self):
+        """La limite de la règle : seul le **zéro** est écarté.
+
+        Une baisse de 90 % est une perte, pas un trou de mesure — la confondre
+        avec un instantané manquant effacerait des pertes réelles du calcul.
+        """
+        assert _compute_period_twr(serie((100, 0), (10, 0))) == -90.0
 
     def test_une_valeur_de_depart_nulle_fait_sauter_la_sous_periode(self):
         # Sans cette garde, la division par zéro remonterait en erreur 500.
@@ -108,10 +115,11 @@ class TestGardeFous:
         # portefeuille n'est jamais négative, les deux formes se valent ici.
         assert _compute_period_twr(serie((0, 0), (100, 0), (110, 0))) == 10.0
 
-    def test_une_perte_superieure_au_capital_est_ramenee_a_zero(self):
-        # Un retrait mal horodaté peut rendre (valeur − flux) négatif ; le
-        # rendement s'arrête à −100 %, il ne descend pas plus bas.
-        assert _compute_period_twr(serie((100, 0), (10, 200))) == -100.0
+    def test_une_sous_periode_negative_est_ecartee(self):
+        # Un retrait mal horodaté peut rendre (valeur − flux) négatif : une
+        # valeur impossible, donc une mesure à ignorer, non une perte à compter.
+        # Sans autre sous-période exploitable, il n'y a rien à mesurer.
+        assert _compute_period_twr(serie((100, 0), (10, 200))) == 0.0
 
     def test_une_cle_absente_vaut_zero(self):
         assert _compute_period_twr([{"value": 100}, {"value": 110}]) == 10.0

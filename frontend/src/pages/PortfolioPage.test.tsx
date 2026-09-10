@@ -48,7 +48,7 @@ vi.mock('@/stores/authStore', () => ({
 }))
 
 const CRYPTO = { id: 'p-crypto', name: 'Crypto', total_value: 100000 }
-const CROWDFUNDING = { id: 'p-cf', name: 'Crowdfunding', total_value: 6000 }
+const CROWDFUNDING = { id: 'p-cf', name: 'Crowdfunding', kind: 'crowdfunding', total_value: 6000 }
 
 const METRIQUES_VIDES = {
   total_value: 0,
@@ -129,10 +129,22 @@ describe('le choix du portefeuille', () => {
     expect(screen.queryByRole('button', { name: 'Crowdfunding' })).not.toBeInTheDocument()
   })
 
-  it('écarte le portefeuille quelle que soit la casse de son nom', async () => {
-    // Le filtre compare en minuscules ; le serveur, lui, cherche « Crowdfunding »
-    // à la casse exacte (voir NEW-68). Ce test épingle la règle de l'écran.
-    listerPortefeuilles.mockResolvedValue([CRYPTO, { ...CROWDFUNDING, name: 'crowdfunding' }])
+  it('l’écarte même s’il a été renommé', async () => {
+    // NEW-68 : le portefeuille se reconnaît à son marqueur, non à son libellé.
+    // Le reconnaître au nom laissait un simple renommage faire réapparaître ses
+    // actifs ici — et disperser les projets à venir côté serveur.
+    listerPortefeuilles.mockResolvedValue([CRYPTO, { ...CROWDFUNDING, name: 'Mes prêts' }])
+    afficher()
+
+    await screen.findByRole('button', { name: 'Crypto' })
+    expect(screen.queryByRole('button', { name: 'Mes prêts' })).not.toBeInTheDocument()
+  })
+
+  it('l’écarte encore par son nom quand la réponse ne porte pas de marqueur', async () => {
+    // Repli pour les réponses d'avant NEW-68 : le serveur peut ne pas encore
+    // exposer `kind`, et l'écran ne doit pas se mettre à afficher un
+    // portefeuille qu'il masquait la veille.
+    listerPortefeuilles.mockResolvedValue([CRYPTO, { id: 'p-cf', name: 'crowdfunding', total_value: 6000 }])
     afficher()
 
     await screen.findByRole('button', { name: 'Crypto' })

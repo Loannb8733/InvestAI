@@ -113,6 +113,25 @@ class TestVersionDeSchema:
         assert corps["schema_attendu"]
         assert corps["schema_applique"]
 
+    @staticmethod
+    def _base_qui_annonce(revision: str):
+        """Double du moteur : la base répond, et dit porter cette révision.
+
+        Indispensable pour éprouver la comparaison. La base de test est bâtie
+        par `create_all`, non par Alembic : elle n'a pas de table
+        `alembic_version`, la lecture lève, et la comparaison n'a jamais lieu.
+        En local le test passait quand même — `/health/ready` interroge le
+        moteur de l'application, qui tombe sur la base de développement,
+        migrée. Quatre exécutions rouges en intégration continue ont eu raison
+        de cette dépendance cachée.
+        """
+        moteur = MagicMock()
+        connexion = AsyncMock()
+        connexion.execute = AsyncMock(return_value=MagicMock(scalar=lambda: revision))
+        moteur.connect.return_value.__aenter__ = AsyncMock(return_value=connexion)
+        moteur.connect.return_value.__aexit__ = AsyncMock(return_value=False)
+        return patch("app.main.engine", moteur)
+
     async def test_la_revision_attendue_survit_a_une_base_illisible(self, client):
         """Le défaut exact, et la raison pour laquelle il a échappé au local.
 
@@ -137,15 +156,14 @@ class TestVersionDeSchema:
     async def test_un_schema_lisible_et_concordant_rend_le_service_pret(self, client, monkeypatch):
         from app import main
 
-        with patch.object(main, "_REVISION_ATTENDUE", "abc123"):
-            with patch("app.main.engine") as moteur:
-                connexion = AsyncMock()
-                connexion.execute = AsyncMock(return_value=MagicMock(scalar=lambda: "abc123"))
-                moteur.connect.return_value.__aenter__ = AsyncMock(return_value=connexion)
-                moteur.connect.return_value.__aexit__ = AsyncMock(return_value=False)
-                reponse = await client.get("/health/ready")
+        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "abc123")
 
-        assert reponse.json()["schema_applique"] == reponse.json()["schema_attendu"]
+        with self._base_qui_annonce("abc123"):
+            reponse = await client.get("/health/ready")
+
+        corps = reponse.json()
+        assert corps["schema_applique"] == corps["schema_attendu"] == "abc123"
+        assert corps["status"] != "degraded"
 
     async def test_un_schema_en_retard_rend_le_service_degrade(self, client, monkeypatch):
         """C'est le cas que tout ceci sert à voir.
@@ -158,9 +176,10 @@ class TestVersionDeSchema:
         """
         from app import main
 
-        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "revision_qui_n_existe_pas")
+        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "revision_attendue")
 
-        reponse = await client.get("/health/ready")
+        with self._base_qui_annonce("revision_plus_ancienne"):
+            reponse = await client.get("/health/ready")
 
         assert reponse.status_code == 503
         assert reponse.json()["status"] == "degraded"

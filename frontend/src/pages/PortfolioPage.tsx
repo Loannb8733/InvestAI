@@ -124,7 +124,14 @@ export default function PortfolioPage() {
     staleTime: 60_000,
   })
   const portfolios = useMemo(
-    () => allPortfolios?.filter((p) => p.name.toLowerCase() !== 'crowdfunding') ?? [],
+    // Le portefeuille de crowdfunding a sa propre page. Il se reconnaît à son
+    // marqueur, non à son libellé : le reconnaître au nom laissait un simple
+    // renommage faire réapparaître ses actifs ici (NEW-68). Le repli sur le nom
+    // couvre les réponses d'avant le marqueur.
+    () =>
+      allPortfolios?.filter(
+        (p) => p.kind !== 'crowdfunding' && p.name.toLowerCase() !== 'crowdfunding',
+      ) ?? [],
     [allPortfolios],
   )
 

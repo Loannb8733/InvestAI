@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
@@ -17,7 +17,7 @@ from app.models.asset import Asset, AssetType
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
 from app.models.crowdfunding_repayment import CrowdfundingRepayment, PaymentType
-from app.models.portfolio import Portfolio
+from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
 from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
 from app.models.user import User
@@ -41,6 +41,46 @@ from app.services.analytics_math import _xirr as _solve_xirr
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 from app.services.reconciliation_service import reconciliation_service
 from app.services.stress_test_service import ALLOWED_DELAY_MONTHS, stress_test_service
+
+
+async def resoudre_portefeuille_crowdfunding(db: AsyncSession, user_id) -> Portfolio:
+    """Le portefeuille que l'application gère pour le crowdfunding, créé au besoin.
+
+    Il se reconnaît à son **marqueur**, non à son nom. Il était retrouvé par
+    `name == "Crowdfunding"`, à la casse exacte : renommer ce portefeuille — un
+    geste banal, que rien n'empêche — le rendait invisible, et le projet suivant
+    en créait un second. Les projets se répartissaient alors entre deux
+    portefeuilles sans que rien ne le signale (NEW-68).
+
+    Le repli sur le nom rattrape ceux créés avant le marqueur, et les marque au
+    passage.
+
+    Fonction nommée plutôt que corps d'endpoint : les tests éprouvent ainsi
+    cette implémentation-ci, et non une copie de sa requête.
+    """
+    resultat = await db.execute(
+        select(Portfolio).where(
+            Portfolio.user_id == user_id,
+            or_(Portfolio.kind == PORTEFEUILLE_CROWDFUNDING, Portfolio.name == "Crowdfunding"),
+        )
+    )
+    portefeuille = resultat.scalars().first()
+    if portefeuille is not None:
+        if portefeuille.kind != PORTEFEUILLE_CROWDFUNDING:
+            portefeuille.kind = PORTEFEUILLE_CROWDFUNDING
+        return portefeuille
+
+    portefeuille = Portfolio(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        name="Crowdfunding",
+        kind=PORTEFEUILLE_CROWDFUNDING,
+        description="Portefeuille dédié aux investissements crowdfunding",
+    )
+    db.add(portefeuille)
+    await db.flush()
+    return portefeuille
+
 
 router = APIRouter()
 
@@ -338,23 +378,7 @@ async def create_project(
         if not portfolio or portfolio.user_id != current_user.id:
             raise HTTPException(403, "Portefeuille non trouvé")
     else:
-        # Find or create a dedicated "Crowdfunding" portfolio for this user
-        result = await db.execute(
-            select(Portfolio).where(
-                Portfolio.user_id == current_user.id,
-                Portfolio.name == "Crowdfunding",
-            )
-        )
-        portfolio = result.scalar_one_or_none()
-        if not portfolio:
-            portfolio = Portfolio(
-                id=uuid.uuid4(),
-                user_id=current_user.id,
-                name="Crowdfunding",
-                description="Portefeuille dédié aux investissements crowdfunding",
-            )
-            db.add(portfolio)
-            await db.flush()
+        portfolio = await resoudre_portefeuille_crowdfunding(db, current_user.id)
 
     # Create the Asset row
     asset = Asset(
