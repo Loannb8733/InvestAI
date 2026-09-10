@@ -257,18 +257,21 @@ class TestChangementDeMotDePasse:
 
 
 class TestPorteeDesSessions:
-    async def test_un_jeton_emis_avant_survit_au_changement_de_mot_de_passe(self, client, compte):
-        """Le constat (NEW-65), épinglé tel qu'il est aujourd'hui.
+    """NEW-65 : changer son mot de passe coupe les sessions ouvertes.
 
-        La révocation se fait **jeton par jeton**, à la déconnexion : rien ne
-        rattache un jeton déjà émis au mot de passe qui l'a produit. Changer ou
-        réinitialiser son mot de passe ne coupe donc aucune session en cours.
+    La révocation se faisait jeton par jeton, à la déconnexion, via une liste de
+    blocage indexée par `jti` : rien ne rattachait un jeton déjà émis au mot de
+    passe qui l'avait produit. Un jeton d'accès dérobé restait valable quinze
+    minutes, un **jeton de rafraîchissement sept jours** — alors que
+    réinitialiser son mot de passe est le geste par lequel on reprend la main
+    sur un compte compromis.
 
-        Un jeton d'accès volé reste valable jusqu'à quinze minutes, un jeton de
-        rafraîchissement jusqu'à **sept jours** — alors que réinitialiser son
-        mot de passe est précisément le geste par lequel on reprend la main sur
-        un compte compromis.
-        """
+    Chaque jeton porte désormais la **génération** qui l'a vu naître, et
+    l'utilisateur celle en cours ; un changement de mot de passe incrémente la
+    sienne et périme tout ce qui précède.
+    """
+
+    async def test_un_jeton_emis_avant_le_changement_ne_passe_plus(self, client, compte):
         jeton = create_access_token(subject=str(compte.id))
         entetes = {"Authorization": f"Bearer {jeton}"}
         assert (await client.get("/api/v1/auth/me", headers=entetes)).status_code == 200
@@ -280,9 +283,10 @@ class TestPorteeDesSessions:
         )
 
         apres = await client.get("/api/v1/auth/me", headers=entetes)
-        assert apres.status_code == 200, "le trou est comblé : mettre à jour NEW-65"
+        assert apres.status_code == 401
+        assert "mot de passe a été modifié" in apres.json()["detail"]
 
-    async def test_un_jeton_emis_avant_survit_a_la_reinitialisation(self, client, db_session, compte, monkeypatch):
+    async def test_la_reinitialisation_coupe_aussi_les_sessions(self, client, db_session, compte, monkeypatch):
         jeton = create_access_token(subject=str(compte.id))
         entetes = {"Authorization": f"Bearer {jeton}"}
         await _demander_reinitialisation(client, compte.email, monkeypatch)
@@ -292,8 +296,115 @@ class TestPorteeDesSessions:
             "/api/v1/auth/reset-password", json={"token": jeton_reinit, "new_password": MOT_DE_PASSE_VALIDE}
         )
 
-        apres = await client.get("/api/v1/auth/me", headers=entetes)
-        assert apres.status_code == 200, "le trou est comblé : mettre à jour NEW-65"
+        assert (await client.get("/api/v1/auth/me", headers=entetes)).status_code == 401
+
+    async def test_un_jeton_de_rafraichissement_anterieur_ne_rouvre_pas_de_session(
+        self, client, db_session, compte, monkeypatch
+    ):
+        """Le cœur du défaut : c'est lui qui vivait sept jours.
+
+        Sans ce contrôle sur `/refresh`, un jeton d'accès coupé se remplaçait
+        aussitôt par un neuf et la faille restait entière.
+        """
+        from app.core.security import create_refresh_token
+
+        rafraichissement = create_refresh_token(subject=str(compte.id))
+        await _demander_reinitialisation(client, compte.email, monkeypatch)
+        jeton_reinit = (await _recharger(db_session, compte)).password_reset_token
+        await client.post(
+            "/api/v1/auth/reset-password", json={"token": jeton_reinit, "new_password": MOT_DE_PASSE_VALIDE}
+        )
+
+        client.cookies.set("refresh_token", rafraichissement)
+        reponse = await client.post("/api/v1/auth/refresh")
+        client.cookies.clear()
+
+        assert reponse.status_code == 401
+
+    async def test_la_session_qui_change_le_mot_de_passe_reste_ouverte(self, client, compte):
+        """On ne déconnecte pas quelqu'un pour avoir suivi le bon conseil.
+
+        La réponse repose des cookies neufs : la session courante continue,
+        toutes les autres tombent.
+        """
+        jeton = create_access_token(subject=str(compte.id))
+        entetes = {"Authorization": f"Bearer {jeton}"}
+
+        reponse = await client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "AncienMotDePasse1!", "new_password": MOT_DE_PASSE_VALIDE},
+            headers=entetes,
+        )
+
+        assert reponse.status_code == 200
+        assert "access_token" in reponse.cookies
+        suite = await client.get("/api/v1/auth/me")
+        client.cookies.clear()
+        assert suite.status_code == 200
+
+    async def test_un_compte_sans_changement_garde_ses_sessions(self, client, compte):
+        """Le déploiement ne doit déconnecter personne.
+
+        Tant que `tokens_valid_from` est nul — donc tant qu'aucun mot de passe
+        n'a changé depuis ce correctif — aucun jeton n'est refusé, pas même
+        ceux émis avant lui, qui ne portent pas de date d'émission.
+        """
+        jeton = create_access_token(subject=str(compte.id))
+
+        reponse = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {jeton}"})
+
+        assert reponse.status_code == 200
+
+    async def test_un_jeton_sans_generation_vaut_la_generation_zero(self, client, db_session, compte):
+        """Les jetons d'avant le correctif n'en portent pas.
+
+        Ils valent génération zéro, comme un compte dont le mot de passe n'a
+        jamais changé depuis : ils passent tant que rien n'a bougé, et tombent
+        au premier changement, avec les autres.
+        """
+        from jose import jwt as jose_jwt
+
+        from app.core.config import settings
+
+        ancien_style = jose_jwt.encode(
+            {
+                "sub": str(compte.id),
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+                "type": "access",
+                "jti": "sans-generation",
+            },
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
+        )
+        entetes = {"Authorization": f"Bearer {ancien_style}"}
+        assert (await client.get("/api/v1/auth/me", headers=entetes)).status_code == 200
+
+        compte.token_version = 1
+        await db_session.commit()
+
+        assert (await client.get("/api/v1/auth/me", headers=entetes)).status_code == 401
+
+    async def test_le_compteur_avance_a_chaque_changement(self, client, db_session, compte):
+        # Deux changements successifs doivent périmer deux fois : sans
+        # incrément, le second laisserait passer les jetons du premier.
+        entetes = {"Authorization": f"Bearer {create_access_token(subject=str(compte.id))}"}
+
+        await client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "AncienMotDePasse1!", "new_password": MOT_DE_PASSE_VALIDE},
+            headers=entetes,
+        )
+        premier = (await _recharger(db_session, compte)).token_version
+        client.cookies.clear()
+
+        await client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": MOT_DE_PASSE_VALIDE, "new_password": "EncoreUnAutre1!"},
+            headers={"Authorization": f"Bearer {create_access_token(subject=str(compte.id), token_version=premier)}"},
+        )
+        client.cookies.clear()
+
+        assert (await _recharger(db_session, compte)).token_version == premier + 1
 
 
 class TestUneSeuleRegleDeMotDePasse:

@@ -114,6 +114,16 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null)
         useAuthStore.getState().logout()
+        // Une session coupée par un changement de mot de passe (NEW-65) se
+        // solde par une déconnexion silencieuse : l'utilisateur se retrouve
+        // devant l'écran de connexion sans savoir pourquoi. Le serveur, lui,
+        // dit exactement ce qui s'est passé — autant le répéter.
+        const raison = (
+          (refreshError as AxiosError)?.response?.data as { detail?: string } | undefined
+        )?.detail
+        if (raison?.includes('mot de passe')) {
+          toast({ title: 'Session expirée', description: raison, variant: 'destructive' })
+        }
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false

@@ -32,6 +32,22 @@ def require_debug_enabled() -> None:
 security_optional = HTTPBearer(auto_error=False)
 
 
+def jeton_perime_par_un_changement(payload: dict, user: User) -> bool:
+    """Le jeton appartient-il à une génération périmée ?
+
+    Chaque jeton porte la génération (`tv`) qui l'a vu naître ; l'utilisateur
+    porte celle en cours. Un changement de mot de passe incrémente la sienne, et
+    tout ce qui précède cesse d'être reçu — jeton d'accès comme jeton de
+    rafraîchissement.
+
+    Un jeton émis avant ce correctif n'a pas de `tv` : il vaut génération zéro,
+    comme un compte dont le mot de passe n'a jamais changé depuis. Le
+    déploiement ne déconnecte donc personne, et le premier changement de mot de
+    passe fait tomber ces jetons-là avec les autres.
+    """
+    return int(payload.get("tv", 0)) != int(user.token_version or 0)
+
+
 async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
@@ -153,6 +169,14 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User is inactive",
+        )
+
+    if jeton_perime_par_un_changement(payload, user):
+        logger.info("Jeton d'une génération périmée (sub=%s)", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expirée : le mot de passe a été modifié.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Expose the authenticated user id for downstream middleware (e.g. cache
