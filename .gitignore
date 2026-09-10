@@ -55,6 +55,11 @@ Thumbs.db
 
 # Testing
 .coverage
+# Fragments ecrits par coverage en mode `concurrency = greenlet,thread` : un
+# fichier par processus, fusionnes puis effaces a la fin du run. Ils ont ete
+# ajoutes a un commit une fois, et supprimes sous ses pieds par le run encore
+# en cours -- le crochet a echoue sans dire pourquoi.
+.coverage.*
 htmlcov/
 .tox/
 .pytest_cache/
