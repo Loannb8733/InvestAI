@@ -392,6 +392,143 @@ class TestInstantaneQuotidien:
         )
         assert compte.scalar() == 1
 
+    async def _poser_une_course(self, db_session, regular_user, monkeypatch):
+        """L'état exact de deux chargements qui se croisent.
+
+        L'autre requête vient de poser l'instantané du jour ; celle-ci ne l'a
+        pas vu, sa lecture ayant précédé l'écriture de l'autre. L'index unique
+        qui les départage vient du modèle — la base de test le porte désormais.
+        """
+        from unittest.mock import MagicMock
+
+        db_session.add(
+            PortfolioSnapshot(
+                user_id=regular_user.id,
+                portfolio_id=None,
+                snapshot_date=datetime.now(timezone.utc),
+                total_value=4900,
+                total_invested=4000,
+                total_gain_loss=900,
+            )
+        )
+        await db_session.commit()
+
+        execute_reel = db_session.execute
+
+        async def execute_en_course(instruction, *args, **kwargs):
+            sql = str(instruction).lower()
+            if "count" in sql and "portfolio_snapshots" in sql:
+                resultat = MagicMock()
+                resultat.scalar.return_value = 0
+                return resultat
+            return await execute_reel(instruction, *args, **kwargs)
+
+        monkeypatch.setattr(db_session, "execute", execute_en_course)
+
+    async def test_une_course_entre_deux_chargements_ne_fait_pas_tomber_la_reponse(
+        self, db_session, regular_user, portefeuille, monkeypatch
+    ):
+        """Deux chargements simultanés en début de journée.
+
+        L'écran d'accueil demande `days=30` et `days=0` **en même temps**. Les
+        deux requêtes pouvaient voir « aucun instantané aujourd'hui », puis
+        insérer toutes les deux : la seconde heurtait l'index unique, son
+        `commit()` échouait, l'erreur était avalée en DEBUG — et la session,
+        laissée sans rollback, faisait lever la requête suivante. HTTP 500 sur
+        le premier chargement de la journée.
+        """
+        await self._poser_une_course(db_session, regular_user, monkeypatch)
+        mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=1, total_gain_loss=1000.0)
+
+        reponse = await appeler(db_session, regular_user, mesures=mesures)
+
+        assert reponse.total_value == 5000.0
+
+    async def test_la_course_est_absorbee_sans_etre_une_panne(
+        self, db_session, regular_user, portefeuille, monkeypatch, caplog
+    ):
+        """`ON CONFLICT DO NOTHING` : la base tranche, rien n'échoue.
+
+        Deux chargements qui se croisent sont un fonctionnement normal, non un
+        incident. L'instantané déjà posé est conservé, et aucun avertissement
+        n'est émis — un rollback seul aurait sauvé la réponse, mais en signalant
+        une panne à chaque chargement matinal.
+        """
+        import logging
+
+        await self._poser_une_course(db_session, regular_user, monkeypatch)
+        mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=1, total_gain_loss=1000.0)
+
+        with caplog.at_level(logging.WARNING, logger="app.api.v1.endpoints.dashboard"):
+            await appeler(db_session, regular_user, mesures=mesures)
+
+        assert "snapshot creation failed" not in caplog.text
+
+    async def test_un_autre_echec_remet_la_session_en_etat_et_se_voit(
+        self, db_session, regular_user, portefeuille, monkeypatch, caplog
+    ):
+        """Toute autre erreur : rollback, avertissement, et l'écran reste debout.
+
+        Sans rollback, la session restait empoisonnée et la requête suivante du
+        même appel levait. Sans avertissement — le niveau DEBUG d'origine est
+        invisible en production — un point manquant dans l'historique ne se
+        serait jamais expliqué.
+        """
+        import logging
+
+        commit_reel, rollback_reel = db_session.commit, db_session.rollback
+        tentatives, rollbacks = [], []
+
+        async def commit_qui_echoue_une_fois():
+            tentatives.append(1)
+            if len(tentatives) == 1:
+                raise RuntimeError("panne de base simulée")
+            return await commit_reel()
+
+        async def rollback_espion():
+            rollbacks.append(1)
+            return await rollback_reel()
+
+        monkeypatch.setattr(db_session, "commit", commit_qui_echoue_une_fois)
+        monkeypatch.setattr(db_session, "rollback", rollback_espion)
+        mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=1, total_gain_loss=1000.0)
+
+        with caplog.at_level(logging.WARNING, logger="app.api.v1.endpoints.dashboard"):
+            reponse = await appeler(db_session, regular_user, mesures=mesures)
+
+        assert reponse.total_value == 5000.0
+        assert rollbacks, "la session n'a pas été remise en état après l'échec"
+        assert any(
+            r.levelno == logging.WARNING and "snapshot creation failed" in r.getMessage() for r in caplog.records
+        ), "l'échec doit se voir en production, où DEBUG est invisible"
+
+    async def test_la_base_de_test_porte_la_vraie_contrainte(self, db_session, regular_user):
+        """L'index unique est déclaré dans le modèle, donc bâti en test.
+
+        Il n'existait que dans la migration `n5i6j7k8l9m0` : la base de test,
+        construite par `create_all`, ne l'avait pas, et aucun test ne pouvait
+        voir la course. Deux instantanés globaux le même jour doivent être
+        refusés ici comme en production.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        maintenant = datetime.now(timezone.utc)
+        for _ in range(2):
+            db_session.add(
+                PortfolioSnapshot(
+                    user_id=regular_user.id,
+                    portfolio_id=None,
+                    snapshot_date=maintenant,
+                    total_value=1,
+                    total_invested=1,
+                    total_gain_loss=0,
+                )
+            )
+
+        with pytest.raises(IntegrityError):
+            await db_session.commit()
+        await db_session.rollback()
+
     async def test_un_portefeuille_vide_ne_laisse_pas_de_trace(self, db_session, regular_user, portefeuille):
         await appeler(db_session, regular_user, mesures=metriques(assets_count=0))
 
