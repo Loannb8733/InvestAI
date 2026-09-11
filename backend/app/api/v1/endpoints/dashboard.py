@@ -380,6 +380,14 @@ async def _get_dashboard_impl(
     db,
 ) -> "EnhancedDashboardResponse":
     user_id = str(current_user.id)
+    # L'identifiant brut, capturé tant que `current_user` est chargé.
+    #
+    # Un `rollback()` plus bas — celui qui remet la session en état après un
+    # instantané quotidien raté — périme tous les objets de la session, y
+    # compris `current_user`. Lire ensuite `current_user.id` déclenchait un
+    # rechargement synchrone en contexte asynchrone (`MissingGreenlet`), et le
+    # correctif censé éviter un 500 en produisait un autre.
+    identifiant_utilisateur = current_user.id
     original_days = days  # Preserve for period label before resolution
 
     # Resolve days=0 ("all time") to actual days since first transaction
@@ -735,19 +743,45 @@ async def _get_dashboard_impl(
                 )
             )
             if existing.scalar() == 0:
-                snap = PortfolioSnapshot(
-                    user_id=user_id,
-                    portfolio_id=None,
-                    snapshot_date=datetime.now(timezone.utc),
-                    total_value=_Dec(str(metrics["total_value"])),
-                    total_invested=_Dec(str(metrics["total_invested"])),
-                    total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
-                    currency=currency,
+                # `ON CONFLICT DO NOTHING` : la vérification ci-dessus n'est
+                # qu'un raccourci, pas une garantie.
+                #
+                # L'écran d'accueil appelle `days=30` et `days=0` **en même
+                # temps**. Les deux requêtes pouvaient voir « aucun instantané
+                # aujourd'hui » et insérer toutes les deux ; la seconde heurtait
+                # l'index `uq_portfolio_snapshots_user_day_global`, son commit
+                # échouait, l'erreur était avalée en DEBUG — et la session,
+                # laissée sans rollback, faisait lever la requête suivante :
+                # HTTP 500 sur le premier chargement de la journée.
+                #
+                # C'est la base qui tranche désormais : l'instantané déjà posé
+                # par l'autre requête est conservé, et celle-ci continue.
+                from uuid import uuid4
+
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+                await db.execute(
+                    pg_insert(PortfolioSnapshot)
+                    .values(
+                        id=uuid4(),
+                        user_id=user_id,
+                        portfolio_id=None,
+                        snapshot_date=datetime.now(timezone.utc),
+                        total_value=_Dec(str(metrics["total_value"])),
+                        total_invested=_Dec(str(metrics["total_invested"])),
+                        total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
+                        currency=currency,
+                    )
+                    .on_conflict_do_nothing()
                 )
-                db.add(snap)
                 await db.commit()
         except Exception as exc:
-            logger.debug("Daily portfolio snapshot creation skipped for user %s: %s", user_id, exc)
+            # Remettre la session en état avant toute autre requête : sans ce
+            # rollback, la moindre erreur ici empoisonnait la suite de l'appel.
+            await db.rollback()
+            # WARNING, non DEBUG : un instantané manquant est un point de moins
+            # dans l'historique affiché, et DEBUG est invisible en production.
+            logger.warning("Daily portfolio snapshot creation failed for user %s: %s", user_id, exc)
 
     # ============== Currency Exposure ==============
     #
@@ -759,7 +793,7 @@ async def _get_dashboard_impl(
     asset_ccy_result = await db.execute(
         select(Asset.id, Asset.currency)
         .join(Portfolio, Asset.portfolio_id == Portfolio.id)
-        .where(Portfolio.user_id == current_user.id)
+        .where(Portfolio.user_id == identifiant_utilisateur)
     )
     asset_ccy_map = {str(row[0]): (row[1] or "EUR").upper() for row in asset_ccy_result.fetchall()}
 

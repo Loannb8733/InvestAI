@@ -214,7 +214,11 @@ class AlertService:
                             alert_type=trigger.condition,
                         )
                 except Exception as e:
-                    logger.debug("Telegram alert failed for %s: %s", trigger.symbol, e)
+                    # WARNING, non DEBUG : l'alerte est bien marquée déclenchée
+                    # et notifiée dans l'application, mais le canal Telegram
+                    # s'est perdu. En DEBUG — invisible en production — un
+                    # utilisateur qui compte sur Telegram ne l'aurait jamais su.
+                    logger.warning("Telegram alert failed for %s: %s", trigger.symbol, e)
 
         if triggered:
             await db.commit()
