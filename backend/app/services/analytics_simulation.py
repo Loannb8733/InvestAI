@@ -9,12 +9,16 @@ projection. Sans cela, l'utilisateur verrait ses percentiles changer à chaque
 rafraîchissement, sans avoir rien fait.
 """
 
-import time
 from typing import Optional
 
 import numpy as np
 
 from app.services.analytics_types import MonteCarloResult
+
+#: Graine des tirages Monte Carlo lorsqu'aucune n'est imposée.
+#:
+#: Sa valeur n'a aucune importance ; sa **constance** en a une.
+_GRAINE_PAR_DEFAUT = 20260911
 
 
 def _monte_carlo_compute(
@@ -71,11 +75,30 @@ def _monte_carlo_compute(
     else:
         L_blended = L
 
-    # Reproducibility: an explicit ``seed`` forces deterministic draws (tests,
-    # or any caller that needs repeatable runs). Production leaves it None, so
-    # each run gets fresh randomness from the wall clock XOR the user id.
+    # Graine constante par défaut — ni horloge, ni données d'entrée.
+    #
+    # Ce que l'écran montre n'est pas « le futur du portefeuille » mais
+    # l'**estimation** d'une distribution. Deux incertitudes s'y mêlent : celle
+    # du marché, qu'on veut montrer, et l'erreur d'échantillonnage du calcul,
+    # qu'on ne veut pas. Une graine tirée de l'horloge changeait à **chaque
+    # seconde** : les percentiles bougeaient d'un rafraîchissement à l'autre
+    # sans que rien n'ait changé, et l'utilisateur ne pouvait plus distinguer
+    # une évolution réelle de son portefeuille d'un simple bruit de calcul.
+    #
+    # Constante, et non dérivée des entrées : c'est la technique des *nombres
+    # aléatoires communs*. Deux scénarios comparés — « et si j'ajoutais
+    # 1 BTC ? » — partagent alors les mêmes chocs, et leur différence isole
+    # l'effet de la décision au lieu de le noyer dans deux tirages distincts.
+    #
+    # (`hash(user_id)` était de surcroît instable d'un processus à l'autre :
+    # Python randomise le hachage des chaînes à chaque démarrage.)
+    #
+    # Le chiffre reste une estimation : avec 5 000 chemins et une volatilité
+    # crypto de l'ordre de 70 %, l'erreur standard sur p5 avoisine deux points
+    # de pourcentage. Stable ne veut pas dire exact — d'où l'arrondi à l'unité
+    # côté écran.
     if seed is None:
-        seed = int(time.time()) ^ (hash(user_id) % (2**31))
+        seed = _GRAINE_PAR_DEFAUT
     rng = np.random.default_rng(seed & 0x7FFFFFFF)
     Z = rng.standard_normal(size=(capped_sims, horizon_days, n_assets))
     correlated_returns = mu_vec + np.einsum("ij,...j->...i", L_blended, Z)

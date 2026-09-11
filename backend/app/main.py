@@ -537,6 +537,10 @@ def _run_alembic_upgrade():
         from app.core.config import settings
 
         alembic_cfg = Config("alembic.ini")
+        # Garder le journal de l'application : sans ce drapeau, `env.py` appelle
+        # `fileConfig` et impose `[logger_root] level = WARN` à tout le
+        # processus, pour le reste de son exécution.
+        alembic_cfg.attributes["configure_logger"] = False
 
         # Check if alembic_version table exists and has a current revision
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)

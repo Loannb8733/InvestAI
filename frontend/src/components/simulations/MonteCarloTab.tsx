@@ -45,6 +45,22 @@ interface Props {
  * y deviennent `undefined` (`|| undefined`), ce qui laisse le backend appliquer
  * ses défauts au lieu de forcer un retrait nul.
  */
+/**
+ * Un percentile s'affiche à l'unité, jamais au dixième.
+ *
+ * Ces chiffres sont des **estimations** tirées de 5 000 chemins simulés. Avec
+ * une volatilité crypto de l'ordre de 70 %, l'erreur d'échantillonnage sur les
+ * percentiles extrêmes avoisine **deux points de pourcentage** : écrire
+ * « −32,4 % » promet une précision au dixième que la simulation n'a pas, et
+ * invite à comparer des décimales qui ne sont que du bruit.
+ *
+ * Diviser cette erreur par deux demanderait quatre fois plus de chemins.
+ * L'arrondi coûte moins cher et dit la vérité.
+ */
+function formatPercentile(valeur: number): string {
+  return `${valeur >= 0 ? '+' : ''}${Math.round(valeur)}%`
+}
+
 export default function MonteCarloTab({
   params,
   setParams,
@@ -293,10 +309,7 @@ export default function MonteCarloTab({
                     return (
                       <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
                         <p className="text-xs text-muted-foreground">{point.data.x as string}</p>
-                        <span className="font-mono text-sm tabular-nums">
-                          {v > 0 ? '+' : ''}
-                          {v.toFixed(2)}%
-                        </span>
+                        <span className="font-mono text-sm tabular-nums">{formatPercentile(v)}</span>
                       </div>
                     )
                   }}
@@ -325,8 +338,7 @@ export default function MonteCarloTab({
                 <span
                   className={`text-sm font-medium w-16 text-right ${d.value >= 0 ? 'text-gain' : 'text-loss'}`}
                 >
-                  {d.value >= 0 ? '+' : ''}
-                  {d.value.toFixed(1)}%
+                  {formatPercentile(d.value)}
                 </span>
               </div>
             ))}
