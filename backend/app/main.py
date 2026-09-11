@@ -562,8 +562,13 @@ def _run_alembic_upgrade():
         logger.warning("Alembic migration skipped or failed: %s", e)
 
 
-async def _rehash_transactions_internal_hash():
+async def _rehash_transactions_internal_hash(session_factory=None):
     """One-shot, idempotent: recompute internal_hash with the precise formula.
+
+    ``session_factory`` est injectable, comme ``lock_engine`` l'est pour le
+    verrou de démarrage : sans cela la fonction ouvre sa propre session sur la
+    base de l'application, et un test ne peut pas l'observer — il croirait
+    l'éprouver tout en la regardant travailler ailleurs.
 
     The dedup hash formula moved from float(.8f) to full Decimal(12) precision
     (fixes micro-price assets like PEPE collapsing to a single hash). Existing
@@ -579,12 +584,15 @@ async def _rehash_transactions_internal_hash():
         from app.core.database import AsyncSessionLocal
         from app.models.transaction import Transaction, compute_transaction_hash
 
-        async with AsyncSessionLocal() as db:
+        fabrique = session_factory or AsyncSessionLocal
+        async with fabrique() as db:
             result = await db.execute(select(Transaction))
             txs = result.scalars().all()
+
+            # Première passe : décider, sans rien écrire.
             seen: dict = {}
-            changed = 0
-            nulled = 0
+            a_ecrire: list = []
+            a_liberer: list = []
             for tx in txs:
                 ts = tx.executed_at.strftime("%Y-%m-%d") if tx.executed_at else ""
                 ttype = tx.transaction_type.value if hasattr(tx.transaction_type, "value") else str(tx.transaction_type)
@@ -597,22 +605,46 @@ async def _rehash_transactions_internal_hash():
                 )
                 if target in seen:
                     if tx.internal_hash is not None:
-                        tx.internal_hash = None
-                        nulled += 1
+                        a_liberer.append(tx)
                     continue
                 seen[target] = tx.id
                 if tx.internal_hash != target:
-                    tx.internal_hash = target
-                    changed += 1
-            if changed or nulled:
+                    a_ecrire.append((tx, target))
+
+            # Deux commits, dans cet ordre : la place se libère avant qu'on
+            # l'occupe.
+            #
+            # Une seule transaction ne suffit pas. SQLAlchemy émet les UPDATE
+            # dans son propre ordre, et celui qui *posait* un hash partait avant
+            # celui qui *libérait* la même valeur en la mettant à NULL. La
+            # contrainte `uq_transactions_internal_hash` rejetait, tout était
+            # annulé, et l'avertissement se noyait dans le flot du démarrage.
+            #
+            # Constaté le 2026-09-10 : depuis l'insertion des deux bons PEPE du
+            # 6 juin — deux lignes légitimes qui partagent un hash — ce
+            # rattrapage n'avait plus jamais abouti. Quarante-huit hashs périmés
+            # et vingt et une lignes sans hash s'étaient accumulés sans que rien
+            # ne le signale, la déduplication cessant d'y protéger des doublons.
+            if a_liberer:
+                for tx in a_liberer:
+                    tx.internal_hash = None
                 await db.commit()
+            if a_ecrire:
+                for tx, target in a_ecrire:
+                    tx.internal_hash = target
+                await db.commit()
+
+            if a_ecrire or a_liberer:
                 logger.info(
                     "Rehashed transactions: %d updated, %d nulled on collision",
-                    changed,
-                    nulled,
+                    len(a_ecrire),
+                    len(a_liberer),
                 )
     except Exception as e:
-        logger.warning("Transaction rehash skipped or failed: %s", e)
+        # ERREUR, non avertissement : un rattrapage qui échoue laisse la
+        # déduplication ouverte aux doublons, et son inaction ressemble en tout
+        # point à son succès — dans les deux cas, rien ne change.
+        logger.error("Transaction rehash FAILED (deduplication left stale): %s", e, exc_info=True)
 
 
 # Fixed key serializing concurrent boot migrations across processes.
