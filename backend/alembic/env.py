@@ -10,7 +10,19 @@ from app.models import Base
 
 config = context.config
 
-if config.config_file_name is not None:
+# `fileConfig` remplace la configuration du journal du **processus entier**, et
+# `alembic.ini` y pose `[logger_root] level = WARN`. Lancé seul, c'est ce qu'on
+# veut. Appelé depuis l'application, cela coupait tous les messages INFO pour
+# le reste de l'exécution : sur 1 214 démarrages, aucun n'a jamais pu écrire
+# « Alembic migrations applied successfully », ni le bilan du rattrapage des
+# hashs qui le suit.
+#
+# Ce silence a coûté cher : il a contribué à masquer trois mois durant un
+# rattrapage qui échouait à chaque démarrage.
+#
+# `configure_logger` est le drapeau que la documentation d'Alembic prévoit pour
+# ce cas ; l'application le pose à faux.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

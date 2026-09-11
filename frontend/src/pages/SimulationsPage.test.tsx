@@ -275,6 +275,31 @@ describe('SimulationsPage — les trois autres onglets', () => {
     expect(envoye.expected_volatility).toBe(20)
   })
 
+  it('affiche les percentiles à l’unité, jamais au dixième', async () => {
+    // Ces chiffres sont des estimations tirées de 5 000 chemins. Avec une
+    // volatilité crypto de l'ordre de 70 %, l'erreur d'échantillonnage sur les
+    // percentiles extrêmes avoisine deux points : écrire « −32,4 % » promet une
+    // précision que la simulation n'a pas, et invite à comparer des décimales
+    // qui ne sont que du bruit.
+    getMonteCarloMock.mockResolvedValue({
+      percentiles: { p5: -32.4, p25: -3.7, p50: 8.2, p75: 19.6, p95: 34.1 },
+      expected_return: 8,
+      prob_positive: 62,
+      prob_loss_10: 18,
+      prob_ruin: 0.4,
+      simulations: 5000,
+      horizon_days: 365,
+    })
+    await ouvrirOnglet(/Monte Carlo/i)
+
+    fireEvent.click(screen.getByRole('button', { name: /Simuler \(5 000 chemins\)/i }))
+    await waitFor(() => expect(getMonteCarloMock).toHaveBeenCalled())
+
+    expect(await screen.findByText('-32%')).toBeInTheDocument()
+    expect(screen.getByText('+34%')).toBeInTheDocument()
+    expect(screen.queryByText(/32[.,]4/)).not.toBeInTheDocument()
+  })
+
   it('Monte Carlo passe ses paramètres en arguments positionnels', async () => {
     // Le double porte les sept champs que `MonteCarloData` declare obligatoires.
     // Il en omettait quatre, dont `simulations`, que l'onglet lit directement :
