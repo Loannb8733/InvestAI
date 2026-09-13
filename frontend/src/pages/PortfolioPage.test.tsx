@@ -86,6 +86,18 @@ beforeEach(() => {
   sparklines.mockResolvedValue([])
 })
 
+/**
+ * Le bouton d'export apparaît au rendu où les portefeuilles arrivent, mais la
+ * sélection automatique du premier n'est posée qu'à l'effet suivant. Cliquer
+ * entre les deux exporte sans portefeuille : sur un runner CI lent, le test
+ * tombait dans cette fenêtre. Les métriques ne sont demandées qu'une fois un
+ * portefeuille sélectionné — c'est le signal attendu.
+ */
+async function boutonExportPret() {
+  await waitFor(() => expect(metriques).toHaveBeenCalledWith('p-crypto'))
+  return screen.getByRole('button', { name: /Exporter CSV/i })
+}
+
 describe('les états de la page', () => {
   it('montre un squelette tant que les portefeuilles arrivent', () => {
     listerPortefeuilles.mockReturnValue(new Promise(() => {}))
@@ -188,7 +200,7 @@ describe("l'export CSV", () => {
     exporterCSV.mockResolvedValue(new Blob(['symbol,type\n']))
     afficher()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Exporter CSV/i }))
+    fireEvent.click(await boutonExportPret())
 
     await waitFor(() => expect(exporterCSV).toHaveBeenCalledWith('p-crypto'))
     expect(toastMock.mock.calls.at(-1)![0].title).toBe('Export réussi')
@@ -199,7 +211,7 @@ describe("l'export CSV", () => {
     exporterCSV.mockResolvedValue(new Blob(['symbol,type\n']))
     afficher()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Exporter CSV/i }))
+    fireEvent.click(await boutonExportPret())
 
     await waitFor(() => expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:faux'))
   })
@@ -208,7 +220,7 @@ describe("l'export CSV", () => {
     exporterCSV.mockRejectedValue(new Error('serveur'))
     afficher()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Exporter CSV/i }))
+    fireEvent.click(await boutonExportPret())
 
     await waitFor(() => expect(toastMock).toHaveBeenCalled())
     const message = toastMock.mock.calls.at(-1)![0]
