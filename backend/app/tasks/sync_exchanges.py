@@ -264,8 +264,26 @@ async def _heal_transaction_fx(
 _price_service: Optional[PriceService] = None
 
 
-async def _get_current_price(symbol: str) -> float:
-    """Get current market price for a crypto symbol in EUR."""
+async def _get_current_price(symbol: str, repli: float = 0.0) -> float:
+    """Cours en EUR d'une crypto, ou le meilleur repli disponible.
+
+    Le repli était toujours **zéro**. Or ce prix sert de prix de revient aux
+    transferts entrants que crée la synchronisation — ajustements de balance,
+    dépôts externes, import d'un actif nouveau. Un fournisseur de prix
+    momentanément muet transformait donc une vraie position en quantité
+    gratuite : prix de revient nul, plus-value fictive de 100 %.
+
+    Mesuré le 2026-09-13 : 15 des 152 ajustements de balance — sur de l'ETH et
+    du SOL, qui ont toujours un cours — portaient un prix nul. Une fois sur dix.
+
+    ``repli`` est désormais le **dernier cours connu** de l'actif quand
+    l'appelant en a un : bien plus proche de la réalité que zéro. Zéro ne reste
+    que pour un jeton qui n'a jamais eu de cours, où il dit la vérité.
+
+    On ne saute pas l'écriture pour autant : pour un jeton sans cours connu, un
+    « réessayer au passage suivant » ne convergerait jamais, et sa quantité ne
+    serait plus jamais mise à jour.
+    """
     global _price_service
     if _price_service is None:
         _price_service = PriceService()
@@ -274,10 +292,15 @@ async def _get_current_price(symbol: str) -> float:
         result = await _price_service.get_price(symbol, "crypto", "eur")
         if result and result.get("price"):
             return float(result["price"])
-    except Exception as e:
-        logger.warning(f"Could not fetch price for {symbol}: {e}")
+        motif = "aucun cours rendu"
+    except Exception as e:  # noqa: BLE001 — une panne de prix ne doit pas arrêter la synchronisation
+        motif = str(e)
 
-    return 0.0
+    if repli > 0:
+        logger.warning("Cours de %s indisponible (%s) : dernier cours connu retenu (%s EUR)", symbol, motif, repli)
+    else:
+        logger.warning("Cours de %s indisponible (%s) et aucun cours connu : prix nul retenu", symbol, motif)
+    return repli
 
 
 async def _get_or_create_asset(
@@ -943,7 +966,7 @@ async def _sync_detailed_transactions(
 
                 qty = float(deposit.amount)
                 # Get current price for the deposit
-                current_price = await _get_current_price(base_asset)
+                current_price = await _get_current_price(base_asset, repli=float(asset.current_price or 0))
 
                 transaction = Transaction(
                     asset_id=asset.id,
@@ -1235,7 +1258,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         # Get current market price for TRANSFER_IN
                         current_price = 0.0
                         if trans_type == TransactionType.TRANSFER_IN:
-                            current_price = await _get_current_price(symbol)
+                            current_price = await _get_current_price(symbol, repli=float(asset.current_price or 0))
 
                         sync_ts = int(datetime.now(timezone.utc).timestamp())
                         transaction = Transaction(
