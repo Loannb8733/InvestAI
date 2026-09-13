@@ -568,7 +568,7 @@ async def _send_ruin_alert(
             alert_type="RUIN_PROBABILITY",
         )
     except Exception as exc:
-        logger.debug("Ruin alert Telegram failed: %s", exc)
+        logger.warning("Ruin alert Telegram failed: %s", exc)
 
 
 @router.get("/xirr", response_model=XIRRResponse)

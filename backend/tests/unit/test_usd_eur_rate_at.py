@@ -7,6 +7,7 @@ current-spot fallback so a missing/unreachable history never blocks an import. N
 the FX service is faked.
 """
 
+import logging
 from datetime import date
 from decimal import Decimal
 
@@ -71,3 +72,35 @@ class TestUsdEurRateAt:
         rate = await _usd_eur_rate_at(fx, _D, _FALLBACK)
         assert isinstance(rate, float)
         assert rate == pytest.approx(0.9120)
+
+
+class TestRepliVisible:
+    """Le repli sur le cours du jour réintroduit l'écart FIN-01 pour ce trade :
+    il ne bloque pas l'import, mais ne doit plus passer inaperçu."""
+
+    NOM_JOURNAL = "app.api.v1.endpoints.api_keys"
+
+    def _avertissements(self, caplog):
+        return [r.getMessage() for r in caplog.records if r.name == self.NOM_JOURNAL and r.levelno == logging.WARNING]
+
+    @pytest.mark.asyncio
+    async def test_un_taux_absent_est_signale_avec_la_date(self, caplog):
+        caplog.set_level(logging.DEBUG, logger=self.NOM_JOURNAL)
+        await _usd_eur_rate_at(_FakeFx({("USD", "EUR"): None}), _D, _FALLBACK)
+        messages = self._avertissements(caplog)
+        assert len(messages) == 1
+        assert "2021-05-17" in messages[0] and "cours du jour" in messages[0]
+
+    @pytest.mark.asyncio
+    async def test_une_erreur_de_lecture_est_signalee_avec_son_motif(self, caplog):
+        caplog.set_level(logging.DEBUG, logger=self.NOM_JOURNAL)
+        await _usd_eur_rate_at(_FakeFx(raises=True), _D, _FALLBACK)
+        messages = self._avertissements(caplog)
+        assert len(messages) == 1
+        assert "transient FX read error" in messages[0]
+
+    @pytest.mark.asyncio
+    async def test_un_taux_historique_reste_silencieux(self, caplog):
+        caplog.set_level(logging.DEBUG, logger=self.NOM_JOURNAL)
+        await _usd_eur_rate_at(_FakeFx({("USD", "EUR"): Decimal("0.8231")}), _D, _FALLBACK)
+        assert self._avertissements(caplog) == []
