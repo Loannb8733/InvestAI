@@ -17,13 +17,24 @@ async def _usd_eur_rate_at(fx, trade_date: date, fallback: float) -> float:
     ``fallback`` (the current spot rate) so a missing history never blocks an import.
     A transient FX read error is swallowed and treated as "no rate" -> fallback.
     """
-    if fx is not None:
-        try:
-            rate = await fx.get_rate(trade_date, "USD", "EUR")
-        except Exception:  # noqa: BLE001 - an FX read must never break the import
-            rate = None
-        if rate is not None:
-            return float(rate)
+    if fx is None:
+        return fallback
+    try:
+        rate = await fx.get_rate(trade_date, "USD", "EUR")
+        motif = "aucun taux historique"
+    except Exception as exc:  # noqa: BLE001 - an FX read must never break the import
+        rate = None
+        motif = str(exc)
+    if rate is not None:
+        return float(rate)
+    # Le repli applique le cours du jour à un trade ancien : c'est précisément
+    # l'écart que FIN-01 corrigeait. Il ne bloque pas l'import, mais doit se voir.
+    logger.warning(
+        "Taux USD→EUR du %s indisponible (%s) : cours du jour retenu (%s), prix en euros approximatif",
+        trade_date,
+        motif,
+        fallback,
+    )
     return fallback
 
 
@@ -796,7 +807,7 @@ async def import_trade_history(
             if forex_rate:
                 usd_eur_rate = float(forex_rate)
         except Exception as exc:  # noqa: BLE001
-            logger.debug("USD→EUR spot fetch failed; using default fallback rate: %s", exc)
+            logger.warning("USD→EUR spot fetch failed; using default fallback rate: %s", exc)
 
         try:
             async with AsyncSessionLocal() as _fx_seed_db:

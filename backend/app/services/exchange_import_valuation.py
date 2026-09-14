@@ -74,19 +74,35 @@ def convertir_frais_en_eur(
         return 0.0
 
     if devise_frais == symbole_actif:
-        return montant * prix_actif_eur if prix_actif_eur > 0 else 0.0
+        if prix_actif_eur > 0:
+            return montant * prix_actif_eur
+        logger.warning(
+            "Frais de %s %s abandonnés : aucun cours de %s pour les mettre en euros",
+            montant,
+            devise_frais,
+            symbole_actif,
+        )
+        return 0.0
 
     if prix_jeton_eur > 0:
         return montant * prix_jeton_eur
 
     if prix_actif_eur > 0:
-        logger.debug(
-            "Frais en %s valorisés au cours de %s, faute de cours propre",
+        logger.warning(
+            "Frais de %s %s valorisés au cours de %s, faute de cours propre : montant approximatif",
+            montant,
             devise_frais,
             symbole_actif,
         )
         return montant * prix_actif_eur
 
+    logger.warning(
+        "Frais de %s %s abandonnés : ni cours de %s ni cours de %s",
+        montant,
+        devise_frais,
+        devise_frais,
+        symbole_actif,
+    )
     return 0.0
 
 

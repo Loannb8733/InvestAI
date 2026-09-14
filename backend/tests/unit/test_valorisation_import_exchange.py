@@ -5,6 +5,8 @@ qui l'arrange. Ces conversions décident du coût de revient, donc de la
 plus-value imposable — et vivaient sans test au milieu d'une boucle d'écriture.
 """
 
+import logging
+
 import pytest
 
 from app.services.exchange_import_valuation import (
@@ -101,3 +103,44 @@ class TestLectureDuCoursDuJeton:
         """Une source qui rend autre chose qu'un dictionnaire ne doit pas faire
         échouer tout l'import."""
         assert lire_prix_jeton({"bnb": "500"}, "BNB") == 0.0
+
+
+class TestFraisApproximatifsVisibles:
+    """Un repli qui change le coût de revient doit se voir en production.
+
+    Au niveau DEBUG, ces messages n'apparaissaient jamais : des frais valorisés
+    au cours d'un autre jeton, ou purement abandonnés, passaient pour exacts.
+    """
+
+    NOM_JOURNAL = "app.services.exchange_import_valuation"
+
+    def _avertissements(self, caplog):
+        return [r for r in caplog.records if r.name == self.NOM_JOURNAL and r.levelno == logging.WARNING]
+
+    def test_le_repli_sur_le_cours_de_l_actif_est_signale(self, caplog):
+        caplog.set_level("DEBUG", logger=self.NOM_JOURNAL)
+        convertir_frais_en_eur(2.0, "BNB", "PEPE", prix_actif_eur=3.0, prix_jeton_eur=0.0)
+        messages = [r.getMessage() for r in self._avertissements(caplog)]
+        assert len(messages) == 1
+        assert "BNB" in messages[0] and "PEPE" in messages[0] and "approximatif" in messages[0]
+
+    def test_des_frais_abandonnes_faute_de_tout_cours_sont_signales(self, caplog):
+        caplog.set_level("DEBUG", logger=self.NOM_JOURNAL)
+        convertir_frais_en_eur(2.0, "BNB", "PEPE", prix_actif_eur=0.0, prix_jeton_eur=0.0)
+        messages = [r.getMessage() for r in self._avertissements(caplog)]
+        assert len(messages) == 1
+        assert "abandonnés" in messages[0] and "BNB" in messages[0]
+
+    def test_des_frais_dans_l_actif_sans_cours_sont_signales(self, caplog):
+        caplog.set_level("DEBUG", logger=self.NOM_JOURNAL)
+        convertir_frais_en_eur(100.0, "PEPE", "PEPE", prix_actif_eur=0.0)
+        messages = [r.getMessage() for r in self._avertissements(caplog)]
+        assert len(messages) == 1
+        assert "abandonnés" in messages[0] and "PEPE" in messages[0]
+
+    def test_une_conversion_exacte_reste_silencieuse(self, caplog):
+        caplog.set_level("DEBUG", logger=self.NOM_JOURNAL)
+        convertir_frais_en_eur(2.0, "BNB", "PEPE", prix_actif_eur=3.0, prix_jeton_eur=500.0)
+        convertir_frais_en_eur(100.0, "PEPE", "PEPE", prix_actif_eur=0.02)
+        convertir_frais_en_eur(0.0, "BNB", "PEPE", prix_actif_eur=0.0)
+        assert self._avertissements(caplog) == []
