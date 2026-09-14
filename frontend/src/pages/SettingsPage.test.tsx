@@ -151,7 +151,10 @@ describe('SettingsPage — profil investisseur indisponible (UX-04)', () => {
   it('propose de réessayer', async () => {
     getInvestorProfileMock.mockRejectedValue(new Error('500'))
     renderWithProviders()
-    expect(await screen.findByRole('button', { name: /réessayer/i })).toBeInTheDocument()
+    // Le titre d'abord : `findByRole` relancerait à chaque sondage une requête
+    // quarante fois plus coûteuse que `findByText` sur cette page.
+    await screen.findByText('Profil investisseur indisponible')
+    expect(screen.getByRole('button', { name: /réessayer/i })).toBeInTheDocument()
   })
 
   it('laisse le formulaire en place quand le chargement réussit', async () => {

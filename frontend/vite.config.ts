@@ -131,6 +131,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
+    // Plusieurs attentes de 4 s peuvent se suivre dans un même test (cf. setupTests.ts).
+    testTimeout: 15000,
     css: true,
     env: {
       NODE_ENV: 'test',
