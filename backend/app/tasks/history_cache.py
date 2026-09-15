@@ -59,6 +59,34 @@ def _cache_key(symbol: str, days: int) -> str:
     return f"{REDIS_HISTORY_PREFIX}{symbol.upper()}_{days}"
 
 
+def _lire_cache(redis: Redis, key: str) -> Optional[str]:
+    """Lit une clé du cache ; une panne Redis vaut « pas en cache »."""
+    try:
+        return redis.get(key)
+    except Exception as e:  # noqa: BLE001 — le cache ne doit jamais faire tomber l'appelant
+        logger.warning("Cache Redis illisible pour %s (traité comme absent) : %s", key, e)
+        return None
+
+
+def _ecrire_cache(redis: Redis, key: str, payload: str) -> bool:
+    """Écrit une entrée et sa copie de secours ; une panne Redis se voit, sans plus.
+
+    À appeler *après* la persistance en base : `asset_price_history` est la
+    copie durable, celle qui sert le tableau de bord quand Redis manque. Écrire
+    Redis d'abord, dans le même bloc, faisait sauter la persistance sur une
+    écriture refusée — journaux Render du 2026-09-15, quota Upstash épuisé :
+    « Fetched 366 data points for TAO » puis « Failed to fetch history for TAO:
+    max requests limit exceeded ». Les données étaient là, et perdues.
+    """
+    try:
+        redis.setex(key, REDIS_HISTORY_TTL, payload)
+        redis.setex(f"{key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Cache Redis non écrit pour %s (données persistées en base) : %s", key, e)
+        return False
+
+
 async def _get_all_crypto_symbols() -> list:
     """Get all unique crypto symbols from DB."""
     async with AsyncSessionLocal() as db:
@@ -214,7 +242,7 @@ async def _fetch_and_cache_all():
             key = _cache_key(symbol, days)
 
             # Skip if already cached and not expired
-            existing = redis.get(key)
+            existing = _lire_cache(redis, key)
             if existing:
                 try:
                     data = json.loads(existing)
@@ -236,10 +264,9 @@ async def _fetch_and_cache_all():
                             "fetched_at": datetime.now(timezone.utc).timestamp(),
                         }
                     )
-                    redis.setex(key, REDIS_HISTORY_TTL, payload)
-                    redis.setex(f"{key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
-                    # Persist to PostgreSQL for long-term storage
+                    # Persist to PostgreSQL first (durable), then cache best-effort
                     await _persist_prices_to_db(symbol, dates, prices)
+                    _ecrire_cache(redis, key, payload)
                     cached_count += 1
                     logger.info("Cached %d data points for %s (%dd)", len(prices), symbol, days)
                 else:
@@ -272,7 +299,7 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
     key = _cache_key(symbol, days)
 
     # Skip if already cached
-    if redis.get(key):
+    if _lire_cache(redis, key):
         return True
 
     coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
@@ -287,9 +314,8 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
                     "fetched_at": datetime.now(timezone.utc).timestamp(),
                 }
             )
-            redis.setex(key, REDIS_HISTORY_TTL, payload)
-            redis.setex(f"{key}:fallback", REDIS_HISTORY_FALLBACK_TTL, payload)
             await _persist_prices_to_db(symbol, dates, prices)
+            _ecrire_cache(redis, key, payload)
             logger.info(
                 "Cached %d data points for %s (on-demand, %dd)",
                 len(prices),
