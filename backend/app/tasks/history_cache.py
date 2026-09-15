@@ -22,7 +22,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.ml.historical_data import HistoricalDataFetcher
-from app.models.asset import Asset
+from app.models.asset import Asset, AssetType
 from app.models.asset_price_history import AssetPriceHistory
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -87,10 +87,23 @@ def _ecrire_cache(redis: Redis, key: str, payload: str) -> bool:
         return False
 
 
+# Seuls les actifs cotés ont un historique à demander. Un projet de crowdfunding
+# ou une obligation passaient pourtant par le pré-chargement : aucune source ne
+# les connaît, `get_history` rendait vide, et la boucle dormait quand même ses
+# 7 s « entre deux appels » — 42 s par démarrage pour six projets, et six
+# avertissements « No history data » à chaque fois (journaux Render du
+# 2026-09-15).
+_TYPES_COTES = (AssetType.CRYPTO, AssetType.STOCK, AssetType.ETF, AssetType.REAL_ESTATE)
+
+
 async def _get_all_crypto_symbols() -> list:
-    """Get all unique crypto symbols from DB."""
+    """Get all unique market-traded symbols (with a non-zero position) from DB."""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
+        result = await db.execute(
+            select(Asset.symbol, Asset.asset_type)
+            .where(Asset.quantity > 0, Asset.asset_type.in_(_TYPES_COTES))
+            .distinct()
+        )
         return [(row[0].upper(), row[1].value) for row in result.all()]
 
 
