@@ -96,6 +96,16 @@ API Router (v1)
 | cache-historical-data | 30 min | Pre-cache des historiques |
 | create-daily-snapshots | 00:00 UTC | Snapshots portefeuille |
 
+**En production, ce tableau ne s'applique pas** : Render ne fait tourner ni worker ni
+beat (ADR-011). Seules tournent les tâches déclenchées par GitHub Actions
+(`.github/workflows/scheduled-tasks.yml`) via `/api/v1/cron/*`, en ligne dans le
+processus web : `sync-exchanges` (1 h), `daily-snapshot` (00:00 UTC), `sync-goals`
+(00:10), `contrarian-refresh` (02:15), `regime-check` (12 h), plus le contrôle
+hebdomadaire d'invariants (`invariants-watchdog.yml`, lundi 06:00 UTC). Les prix,
+alertes, prédictions, dérive, réglage d'hyperparamètres et pré-cache périodique ne
+tournent qu'en local ; en production les cours sont rafraîchis à la demande et
+l'historique pré-chargé au démarrage du service.
+
 ## Securite
 
 | Couche | Mecanisme |

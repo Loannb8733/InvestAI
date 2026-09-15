@@ -29,6 +29,14 @@ _coingecko_lock = asyncio.Lock()
 # Minimum delay between CoinGecko calls (seconds)
 _COINGECKO_MIN_DELAY = 1.2
 _last_coingecko_call = 0.0
+# Instant (horloge de la boucle) jusqu'auquel CoinGecko a dit refuser (429 et
+# son Retry-After). Une requête HTTP qui tombe dans cette fenêtre renonce sans
+# appeler : le refus est déjà acquis, et chaque tentative coûtait 1,2 s de
+# throttle pour l'obtenir de nouveau — huit symboles, dix secondes par tableau
+# de bord recalculé (journaux Render du 2026-09-15). Les tâches de fond, elles,
+# continuent d'attendre le délai demandé.
+_refus_coingecko_jusqua = 0.0
+_REFUS_PAR_DEFAUT = 30.0  # secondes, quand CoinGecko n'envoie pas de Retry-After
 # Flag to remember if the API key is invalid (avoid wasting rate-limited slots)
 _api_key_invalid = False
 
@@ -85,15 +93,31 @@ class HistoricalDataFetcher:
         fast: bool = False,
     ) -> Optional[dict]:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
+        global _refus_coingecko_jusqua
         for attempt in range(max_retries):
             # Un 429 récent vaut pour tous les symboles : insister ne fait
             # qu'ajouter des minutes d'attente à un refus déjà acquis.
+            if un_humain_attend():
+                reste = _refus_coingecko_jusqua - asyncio.get_event_loop().time()
+                if reste > 0:
+                    logger.info("CoinGecko a refusé il y a peu — %s non demandé (%.0f s restantes)", symbol, reste)
+                    return None
             await _coingecko_throttle()
             try:
                 response = await self.http_client.get(url, params=params)
                 if response.status_code == 200:
                     return response.json()
                 if response.status_code == 429:
+                    entete = response.headers.get("Retry-After")
+                    try:
+                        indique = float(entete) if entete else None
+                    except ValueError:
+                        indique = None
+                    _refus_coingecko_jusqua = max(
+                        _refus_coingecko_jusqua,
+                        asyncio.get_event_loop().time() + (indique if indique is not None else _REFUS_PAR_DEFAUT),
+                    )
+
                     # Qui attend décide de la conduite à tenir.
                     #
                     # Devant un écran, patienter n'a pas de sens : le cache et
@@ -110,11 +134,6 @@ class HistoricalDataFetcher:
                         )
                         return None
 
-                    entete = response.headers.get("Retry-After")
-                    try:
-                        indique = float(entete) if entete else None
-                    except ValueError:
-                        indique = None
                     wait = min(indique if indique is not None else (2 if fast else (attempt + 1) * 2), 60)
                     logger.warning(
                         "CoinGecko 429 pour %s — nouvelle tentative %d/%d dans %.0f s",
