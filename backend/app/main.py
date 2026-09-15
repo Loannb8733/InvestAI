@@ -1117,8 +1117,14 @@ async def readiness_check():
         await r.ping()
         await r.aclose()
         checks["redis"] = "ok"
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — la sonde rend un état, jamais une erreur
         checks["redis"] = "error"
+        # Le type seul : il suffit à distinguer un délai dépassé d'un refus ou
+        # d'une authentification, sans exposer publiquement le message, qui
+        # peut nommer l'hôte. Le détail va au journal. Avant, l'exception était
+        # avalée : un Redis en échec une fois sur trois restait inexplicable.
+        checks["redis_erreur"] = type(exc).__name__
+        logger.warning("Readiness: Redis ping failed (%s): %s", type(exc).__name__, exc)
         checks["status"] = "degraded"
         http_status = 503
 

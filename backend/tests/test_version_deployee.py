@@ -6,6 +6,7 @@ consommé. Les autres changements d'une release vivent derrière
 l'authentification, donc invérifiables de l'extérieur.
 """
 
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -183,3 +184,43 @@ class TestVersionDeSchema:
 
         assert reponse.status_code == 503
         assert reponse.json()["status"] == "degraded"
+
+
+class TestRedisEnEchecDansLaSonde:
+    """Une panne Redis intermittente doit pouvoir s'expliquer de l'extérieur.
+
+    En production, `/health/ready` a répondu 503 une fois sur trois après un
+    déploiement, en 0,4 s — une erreur immédiate, pas un délai dépassé. La
+    sonde avalait l'exception : impossible de savoir laquelle.
+    """
+
+    @staticmethod
+    def _redis_qui_refuse(message: str):
+        client = MagicMock()
+        client.ping = AsyncMock(side_effect=ConnectionError(message))
+        client.aclose = AsyncMock()
+        return patch("redis.asyncio.from_url", return_value=client)
+
+    async def test_le_type_d_erreur_est_expose(self, client):
+        with TestVersionDeSchema._base_qui_annonce("x"), self._redis_qui_refuse("refus"):
+            reponse = await client.get("/health/ready")
+
+        corps = reponse.json()
+        assert reponse.status_code == 503
+        assert corps["redis"] == "error"
+        assert corps["redis_erreur"] == "ConnectionError"
+
+    async def test_le_message_reste_hors_de_la_reponse_publique(self, client):
+        with TestVersionDeSchema._base_qui_annonce("x"), self._redis_qui_refuse("cache-secret.upstash.io:6379"):
+            reponse = await client.get("/health/ready")
+
+        assert "upstash" not in reponse.text
+
+    async def test_le_detail_va_au_journal(self, client, caplog):
+        caplog.set_level(logging.DEBUG, logger="app.main")
+
+        with TestVersionDeSchema._base_qui_annonce("x"), self._redis_qui_refuse("max clients reached"):
+            await client.get("/health/ready")
+
+        messages = [r.getMessage() for r in caplog.records if r.name == "app.main" and r.levelno >= logging.WARNING]
+        assert any("max clients reached" in m for m in messages), messages
