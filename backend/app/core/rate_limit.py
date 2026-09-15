@@ -31,22 +31,27 @@ def _get_real_client_ip(request: Request) -> str:
 
 
 def _limiter_storage_uri() -> str:
-    """Return a cleaned Redis URL for the synchronous limits storage.
+    """Storage URI for the limits counters.
 
-    Reuses the same cleaning logic as the async client: the kombu-spelled
-    ssl_cert_reqs query param is stripped and re-passed as a kwarg via
-    redis_ssl_kwargs(), with certificate validation enabled.
+    In-process memory on a single instance (see RATE_LIMIT_SHARED_STORAGE);
+    otherwise a cleaned Redis URL: the kombu-spelled ssl_cert_reqs query param
+    is stripped and re-passed as a kwarg via redis_client_kwargs(), with
+    certificate validation enabled.
     """
+    if not settings.RATE_LIMIT_SHARED_STORAGE:
+        return "memory://"
     return redis_async_url()
 
 
 def _limiter_storage_options() -> dict:
-    """Return SSL kwargs and network timeouts for the synchronous limits Redis connection.
+    """SSL kwargs and network timeouts for the synchronous limits Redis connection.
 
     The limits storage is a *synchronous* client called from async routes: a
     silent Redis without timeouts would freeze the whole event loop, not just
-    one request.
+    one request. Memory storage takes no options.
     """
+    if not settings.RATE_LIMIT_SHARED_STORAGE:
+        return {}
     return redis_client_kwargs()
 
 

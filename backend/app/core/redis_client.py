@@ -62,6 +62,12 @@ def redis_client_kwargs() -> Dict[str, Any]:
         **redis_ssl_kwargs(),
         "socket_timeout": REDIS_DELAI_RESEAU,
         "socket_connect_timeout": REDIS_DELAI_RESEAU,
+        # redis-py 5 annonce sa version au serveur à chaque connexion : deux
+        # CLIENT SETINFO, facturés par Upstash, pour une information que rien
+        # n'exploite. Douze des 47 commandes d'un tableau de bord recalculé à
+        # froid (mesuré le 2026-09-15).
+        "lib_name": None,
+        "lib_version": None,
     }
 
 

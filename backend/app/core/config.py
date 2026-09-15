@@ -212,6 +212,14 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+    # Compteurs de limitation partagés dans Redis (plusieurs instances web) ou
+    # tenus en mémoire par le processus (une seule instance : Render, offre
+    # gratuite, un seul uvicorn sans --workers). En mémoire, la limite est
+    # exactement aussi efficace et ne coûte aucune commande Upstash — le
+    # limiteur en coûtait trois par requête, soit les trois quarts du coût fixe
+    # d'une requête authentifiée. À passer à True dès qu'une seconde instance
+    # existe, sans quoi chaque instance compterait de son côté.
+    RATE_LIMIT_SHARED_STORAGE: bool = False
     # Number of trusted reverse proxies that append to X-Forwarded-For. The real
     # client IP is read that many entries from the RIGHT of the chain, so a client
     # cannot spoof its rate-limit key by pre-setting the header. Render's edge adds
