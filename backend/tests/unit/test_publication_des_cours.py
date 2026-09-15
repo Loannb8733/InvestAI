@@ -25,3 +25,25 @@ def test_le_client_a_un_delai_reseau():
 
     assert options["socket_timeout"] == redis_client.REDIS_DELAI_RESEAU
     assert options["socket_connect_timeout"] == redis_client.REDIS_DELAI_RESEAU
+
+
+def test_les_publications_partagent_une_connexion(monkeypatch):
+    """Une connexion par cours coûtait quatre commandes Upstash au lieu d'une."""
+    crees = []
+
+    class _Client:
+        def __init__(self):
+            self.publies = []
+            crees.append(self)
+
+        def publish(self, canal, message):
+            self.publies.append(canal)
+
+    monkeypatch.setattr(price_updates, "_client_de_publication", None)
+    monkeypatch.setattr(price_updates, "_get_sync_redis", _Client)
+
+    for symbole in ("BTC", "ETH", "SOL"):
+        price_updates.publish_price_update(symbole, 1.0, 0.0, "crypto")
+
+    assert len(crees) == 1
+    assert len(crees[0].publies) == 3

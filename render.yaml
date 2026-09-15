@@ -86,7 +86,9 @@ services:
     region: frankfurt
     plan: free
     dockerfilePath: ./backend/Dockerfile.render
-    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    # Sans heartbeat, gossip ni mingle : ces échanges entre workers publient
+    # dans Redis toutes les 2 s et épuisaient le quota Upstash (cf. celery_app.py).
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1 --without-heartbeat --without-gossip --without-mingle
     # Même image que l'API : les trois services doivent avancer ensemble, sans
     # quoi un worker exécuterait du code plus ancien que celui qui l'appelle.
     autoDeploy: true

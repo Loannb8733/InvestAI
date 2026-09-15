@@ -8,7 +8,7 @@ can broadcast them to connected clients in real time.
 
 import json
 import logging
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 
 from redis import Redis
 from sqlalchemy import select
@@ -40,6 +40,20 @@ def _get_sync_redis() -> Redis:
     return Redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
 
 
+# Client de publication, créé paresseusement dans le processus qui publie (après
+# le fork du worker, jamais partagé entre processus). Une connexion neuve par
+# cours coûtait CLIENT SETINFO ×2 + PUBLISH + fermeture : quatre commandes au
+# lieu d'une, facturées une à une par Upstash.
+_client_de_publication: Optional[Redis] = None
+
+
+def _publieur() -> Redis:
+    global _client_de_publication
+    if _client_de_publication is None:
+        _client_de_publication = _get_sync_redis()
+    return _client_de_publication
+
+
 def publish_price_update(
     symbol: str,
     price: float,
@@ -55,7 +69,7 @@ def publish_price_update(
         asset_type: One of "crypto", "stock", "etf".
     """
     try:
-        r = _get_sync_redis()
+        r = _publieur()
         payload = json.dumps(
             {
                 "symbol": symbol.upper(),
@@ -65,7 +79,6 @@ def publish_price_update(
             }
         )
         r.publish(PRICE_UPDATES_CHANNEL, payload)
-        r.close()
     except Exception as e:
         logger.debug("Failed to publish price update for %s: %s", symbol, e)
 
