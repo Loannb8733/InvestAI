@@ -112,6 +112,17 @@ async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
     yield
 
 
+@pytest.fixture(autouse=True)
+def _vider_memo_de_change():
+    """Le mémo des taux de change est partagé par la classe PriceService : sans
+    remise à zéro, un taux mémorisé par un test fausserait le suivant."""
+    from app.services.price_service import PriceService
+
+    PriceService._forex_memo.clear()
+    yield
+    PriceService._forex_memo.clear()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
