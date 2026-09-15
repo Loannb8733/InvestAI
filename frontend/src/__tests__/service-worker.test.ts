@@ -38,7 +38,6 @@ function chargerWorker(caches: unknown, fetchImpl: unknown) {
     clients: { claim: vi.fn() },
   }
   const source = readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8')
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
   new Function('self', 'caches', 'fetch', source)(self, caches, fetchImpl)
   return handlers
 }
