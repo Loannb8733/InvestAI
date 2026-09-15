@@ -70,6 +70,7 @@ services:
       - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
       # Redis
       - REDIS_HOST=redis
+      - CELERY_WORKER_AVAILABLE=true
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       # Security (no defaults - must be in .env)
@@ -122,6 +123,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB:-investai}
       - REDIS_HOST=redis
+      - CELERY_WORKER_AVAILABLE=true
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - SECRET_KEY=${SECRET_KEY}
@@ -152,6 +154,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB:-investai}
       - REDIS_HOST=redis
+      - CELERY_WORKER_AVAILABLE=true
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - SECRET_KEY=${SECRET_KEY}

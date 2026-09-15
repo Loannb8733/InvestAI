@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # those endpoints are disabled (503). Set to a long random value in prod and in
     # the GitHub Actions cron workflow that calls them. No worker needed on free tier.
     CRON_SECRET: str = ""
+    # Un worker Celery consomme-t-il la file ? Vrai sous docker-compose, faux sur
+    # Render (offre gratuite : un seul service web). Sans worker, une mise en
+    # file coûte des commandes Upstash pour une tâche que personne n'exécute.
+    CELERY_WORKER_AVAILABLE: bool = False
 
     # Cookie settings
     COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
