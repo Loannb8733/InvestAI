@@ -441,7 +441,7 @@ class SnapshotService(SnapshotRiskMixin):
         # Use a semaphore to avoid saturating CoinGecko (50 req/min free tier)
         import asyncio as _asyncio
 
-        from app.tasks.history_cache import _persist_prices_to_db, cache_single_asset
+        from app.tasks.history_cache import _persist_prices_to_db, planifier_cache_historique
 
         coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
         fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
@@ -497,7 +497,7 @@ class SnapshotService(SnapshotRiskMixin):
                 # Trigger background deep backfill for this symbol
                 try:
                     asset_type = symbols_need_api.get(symbol_upper, "crypto")
-                    cache_single_asset.delay(symbol_upper, asset_type)
+                    planifier_cache_historique(symbol_upper, asset_type)
                 except Exception as exc:
                     logger.debug("Failed to schedule deep backfill for %s: %s", symbol_upper, exc)
         finally:

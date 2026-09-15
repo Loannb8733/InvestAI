@@ -116,9 +116,9 @@ async def create_asset(
 
     # Pre-cache historical data for this asset (background)
     try:
-        from app.tasks.history_cache import cache_single_asset
+        from app.tasks.history_cache import planifier_cache_historique
 
-        cache_single_asset.delay(asset.symbol, asset.asset_type.value)
+        planifier_cache_historique(asset.symbol, asset.asset_type.value)
     except Exception as exc:
         # Non-critical: history pre-cache is a best-effort background dispatch.
         logger.debug("History pre-cache dispatch failed for %s: %s", asset.symbol, exc)

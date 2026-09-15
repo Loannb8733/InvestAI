@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
@@ -307,6 +308,53 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
 def cache_single_asset(symbol: str, asset_type: str):
     """Celery task: cache history for a single newly-added asset."""
     return run_async(_cache_single(symbol, asset_type))
+
+
+# Pré-chargements confiés à la boucle du processus web (sans worker) : la tâche
+# en cours par symbole, pour ne pas la lancer deux fois, et l'instant du dernier
+# essai, pour ne pas réinterroger CoinGecko à chaque recalcul pour un symbole
+# qui n'a pas d'historique.
+_prechargements_en_cours: Dict[str, "asyncio.Task"] = {}
+_dernier_essai: Dict[str, float] = {}
+_DELAI_ENTRE_ESSAIS = 3600.0
+
+
+def planifier_cache_historique(symbol: str, asset_type: str) -> str:
+    """Programme le pré-chargement d'historique d'un actif, selon l'infrastructure.
+
+    Avec un worker Celery (docker-compose) : mise en file, comme avant. Sans
+    worker (Render, offre gratuite), `.delay()` empilait la tâche dans Redis —
+    8 commandes Upstash (4 LLEN, MULTI, SADD, LPUSH, EXEC) mesurées par appel —
+    sans que personne ne la consomme jamais : la file `celery` grossissait à
+    chaque tableau de bord recalculé avec un symbole sans historique. Le travail
+    est alors confié à la boucle asyncio du processus web, quand il y en a une.
+
+    Renvoie où le travail est parti : « file », « boucle », « deja » (même
+    symbole en cours ou essayé il y a moins d'une heure) ou « ignore » (pas de
+    boucle en cours).
+    """
+    if settings.CELERY_WORKER_AVAILABLE:
+        cache_single_asset.delay(symbol, asset_type)
+        return "file"
+
+    cle = symbol.upper()
+    maintenant = time.monotonic()
+    if (
+        cle in _prechargements_en_cours
+        or maintenant - _dernier_essai.get(cle, -_DELAI_ENTRE_ESSAIS) < _DELAI_ENTRE_ESSAIS
+    ):
+        return "deja"
+    try:
+        boucle = asyncio.get_running_loop()
+    except RuntimeError:
+        logger.warning("Pré-chargement de %s non planifié : ni worker Celery ni boucle en cours", cle)
+        return "ignore"
+
+    _dernier_essai[cle] = maintenant
+    tache = boucle.create_task(_cache_single(symbol, asset_type))
+    _prechargements_en_cours[cle] = tache
+    tache.add_done_callback(lambda _t, _cle=cle: _prechargements_en_cours.pop(_cle, None))
+    return "boucle"
 
 
 async def _find_missing_dates(symbol: str, start: datetime, end: datetime) -> list:
