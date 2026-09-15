@@ -188,3 +188,41 @@ parallélisables. L'avertissement Vite « chunks larger than 500 kB » disparaî
 Lightweight Charts n'est importé que par les deux fichiers de sa portée, et que la
 configuration maintient les deux chunks séparés. Sans ce second test, une refusion des
 chunks annulerait le gain sans que rien ne le signale.
+
+---
+
+## ADR-011 : Une seule instance web en production — pas de worker Celery, compteurs en mémoire
+
+**Contexte :** `render.yaml` déclare trois services (API, worker Celery, beat). En
+production (Render, offre gratuite) **seul `InvestAI-api` existe** — un uvicorn sans
+`--workers`, variables d'environnement posées à la main sur le service (constaté le
+2026-09-15). Les tâches planifiées passent par GitHub Actions
+(`.github/workflows/scheduled-tasks.yml`) qui appelle `/api/v1/cron/*`. Redis est un
+Upstash gratuit : **500 000 commandes par mois**, chaque commande facturée.
+
+**Mesure (2026-09-15, quota épuisé) :** un worker Celery au repos coûtait 94 commandes
+par minute (~4 millions par mois) ; un tableau de bord recalculé 107 ; une requête
+authentifiée 4 avant tout travail utile (3 pour le limiteur, 1 pour la révocation) ;
+chaque `.delay()` émis par le web empilait une tâche que rien ne consommait
+(8 commandes, liste `celery` qui grossit sans fin).
+
+**Décision :** le code sait sur quelle topologie il tourne, par deux réglages dont le
+défaut décrit la production :
+
+| Réglage | Défaut (prod) | docker-compose | Effet |
+|---|---|---|---|
+| `CELERY_WORKER_AVAILABLE` | `False` | `true` | Sans worker, `planifier_cache_historique()` confie le pré-chargement à la boucle asyncio du web (une fois par symbole et par heure) au lieu de mettre en file |
+| `RATE_LIMIT_SHARED_STORAGE` | `False` | (défaut) | Compteurs du limiteur en mémoire du processus ; à passer à `True` dès qu'une seconde instance existe, sinon chaque instance compte de son côté |
+
+Règles qui en découlent : un client Redis par processus (jamais par appel), lectures
+groupées (`MGET`) plutôt qu'une commande par symbole, pas d'annonce de version
+(`lib_name=None`), délai réseau sur tout client (`redis_client_kwargs()`), et
+PostgreSQL écrit **avant** Redis pour l'historique des cours — la base est la copie
+durable, le cache un accélérateur.
+
+**Conséquences :** recalcul du tableau de bord ≈ 25 commandes, requête authentifiée 1,
+cache servi 2. Le worker local reste sobre (`polling_interval`, sans heartbeat).
+Le jour où un worker existe en production, poser `CELERY_WORKER_AVAILABLE=true` sur
+le service web suffit ; le jour où une seconde instance web existe, poser
+`RATE_LIMIT_SHARED_STORAGE=true` sur toutes. Détail des mesures : `docs/audit/BACKLOG.md`,
+NEW-77 à NEW-87.
