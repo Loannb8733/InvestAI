@@ -134,7 +134,7 @@ services:
       redis:
         condition: service_healthy
     # --concurrency=4 for production, --max-tasks-per-child=1000 to prevent memory leaks
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2 --without-heartbeat --without-gossip --without-mingle
 
   # Celery Beat (scheduler)
   celery-beat:

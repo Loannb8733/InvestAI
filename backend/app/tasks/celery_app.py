@@ -33,10 +33,24 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    task_track_started=True,
+    # Aucun code ne lit le résultat d'une tâche (ni AsyncResult, ni .get()) :
+    # chaque exécution écrivait pourtant son état dans Redis (MULTI, HSET,
+    # EXPIRE, EXEC, PUBLISH), deux fois avec l'état STARTED. Mesuré : l'essentiel
+    # des commandes restantes une fois le worker au repos.
+    task_track_started=False,
+    task_ignore_result=True,
     task_time_limit=300,  # 5 minutes
     worker_prefetch_multiplier=1,
     task_acks_late=True,
+    # Upstash (plan gratuit) facture chaque commande : 500 000 par mois. Au
+    # repos, un worker interrogeait la file toutes les secondes (BRPOP, délai 1 s)
+    # et publiait un battement toutes les 2 s — 94 commandes/minute mesurées,
+    # soit ~4 millions par mois, huit fois le quota (épuisé le 2026-09-15).
+    # kombu reprend `polling_interval` comme délai du BRPOP : une tâche qui
+    # arrive le débloque aussitôt, seule la relance à vide s'espace.
+    # `health_check_interval` : un PING par connexion toutes les 25 s par défaut,
+    # soit la moitié des commandes restantes au repos.
+    broker_transport_options={"polling_interval": 30, "health_check_interval": 120},
 )
 
 # Scheduled tasks (Celery Beat)
