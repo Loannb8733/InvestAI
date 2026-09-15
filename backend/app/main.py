@@ -975,14 +975,17 @@ async def dashboard_cache_invalidation_middleware(request: Request, call_next):
                 from app.core.redis_client import invalidate_dashboard_cache as invalidate_redis_dashboard
                 from app.services.metrics_service import invalidate_dashboard_cache as invalidate_inmem_dashboard
 
-                # Purge Redis (cross-worker) AND the per-process in-memory cache.
+                # Purge the per-process in-memory cache AND Redis (cross-worker).
                 # Skipping in-memory left stale data live for up to TTL (2 min)
                 # after mutations -- which the user saw on 2026-06-08 when a
                 # Tangem qty fix was masked by a stale +630 EUR PnL display.
-                await invalidate_redis_dashboard(user_id)
+                # In-memory first: a Redis failure must not skip it.
                 invalidate_inmem_dashboard(user_id)
+                await invalidate_redis_dashboard(user_id)
     except Exception as exc:  # noqa: BLE001 — never let cache bookkeeping break a successful request
-        logger.debug("Dashboard cache invalidation after write failed: %s", exc)
+        # Un cache non vidé affiche des chiffres périmés pendant plusieurs
+        # minutes : l'écriture réussit, mais l'échec doit se voir.
+        logger.warning("Dashboard cache invalidation after write failed (stale figures possible): %s", exc)
     return response
 
 

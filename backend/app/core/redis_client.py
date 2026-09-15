@@ -41,6 +41,30 @@ def redis_ssl_kwargs() -> Dict[str, Any]:
     return {}
 
 
+# Délai réseau de tout client Redis de l'application, en secondes.
+#
+# Sans lui, redis-py attend indéfiniment un serveur qui a accepté la connexion
+# puis ne répond plus (connexion à moitié ouverte, réseau qui avale les
+# paquets). Aucune erreur n'est levée, donc aucun repli ne se déclenche : le
+# contrôle de révocation des jetons, exécuté à chaque requête authentifiée,
+# suspendait l'API entière (mesuré : toujours bloqué après 10 s).
+REDIS_DELAI_RESEAU = 3.0
+
+
+def redis_client_kwargs() -> Dict[str, Any]:
+    """Options de connexion de tout client Redis applicatif : TLS et délais réseau.
+
+    À utiliser pour chaque client qui exécute des commandes à réponse immédiate.
+    Exception : un abonné pub/sub qui attend des messages (`pubsub.listen()`)
+    resterait sans nouvelles par nature et tomberait en délai dépassé.
+    """
+    return {
+        **redis_ssl_kwargs(),
+        "socket_timeout": REDIS_DELAI_RESEAU,
+        "socket_connect_timeout": REDIS_DELAI_RESEAU,
+    }
+
+
 # HMAC key derived from SECRET_KEY for pickle integrity verification
 _HMAC_KEY: bytes = settings.SECRET_KEY.encode() if isinstance(settings.SECRET_KEY, str) else settings.SECRET_KEY
 
@@ -59,7 +83,7 @@ async def _get_redis_bin() -> aioredis.Redis:
             redis_async_url(),
             encoding=None,
             decode_responses=False,
-            **redis_ssl_kwargs(),
+            **redis_client_kwargs(),
         )
     return _redis_bin
 
@@ -72,7 +96,7 @@ async def _get_redis_txt() -> aioredis.Redis:
             redis_async_url(),
             encoding="utf-8",
             decode_responses=True,
-            **redis_ssl_kwargs(),
+            **redis_client_kwargs(),
         )
     return _redis_txt
 

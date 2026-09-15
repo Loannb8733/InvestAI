@@ -10,7 +10,7 @@ import logging
 
 from redis import Redis
 
-from app.core.redis_client import CONTRARIAN_STATS_KEY, CONTRARIAN_STATS_TTL, redis_async_url, redis_ssl_kwargs
+from app.core.redis_client import CONTRARIAN_STATS_KEY, CONTRARIAN_STATS_TTL, redis_async_url, redis_client_kwargs
 from app.services.contrarian_stats_service import compute_contrarian_stats
 from app.tasks.celery_app import celery_app
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_redis() -> Redis:
-    return Redis.from_url(redis_async_url(), decode_responses=True, **redis_ssl_kwargs())
+    return Redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
 
 
 @celery_app.task(name="app.tasks.contrarian_stats.refresh_contrarian_stats")

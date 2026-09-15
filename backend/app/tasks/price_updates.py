@@ -13,8 +13,8 @@ from typing import Dict, Set
 from redis import Redis
 from sqlalchemy import select
 
-from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.models.asset import Asset, AssetType
 from app.services.price_service import PriceService
 from app.tasks.async_runner import run_async
@@ -30,12 +30,14 @@ PRICE_UPDATES_CHANNEL = "price_updates"
 
 
 def _get_sync_redis() -> Redis:
-    """Get a synchronous Redis client for publishing from Celery workers."""
-    return Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        decode_responses=True,
-    )
+    """Get a synchronous Redis client for publishing from Celery workers.
+
+    Built from REDIS_URL like every other client: REDIS_HOST/REDIS_PORT only
+    exist in docker-compose. On Render (Upstash, TLS) they fell back to
+    localhost:6379, so every publish failed at DEBUG level and no live price
+    ever reached the WebSocket.
+    """
+    return Redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
 
 
 def publish_price_update(

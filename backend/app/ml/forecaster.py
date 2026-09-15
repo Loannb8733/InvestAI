@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import redis
 
-from app.core.redis_client import redis_async_url, redis_ssl_kwargs
+from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext
 
@@ -32,7 +32,7 @@ def _get_sync_redis() -> Optional[redis.Redis]:
         try:
             # URL nettoyée + kwargs TLS validés : l'URL brute porte le param
             # kombu (CERT_REQUIRED) que redis-py 5 rejette en query string.
-            _sync_redis = redis.from_url(redis_async_url(), decode_responses=True, **redis_ssl_kwargs())
+            _sync_redis = redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
         except Exception as e:  # noqa: BLE001 — degrade to no-cache
             logger.warning("Sync Redis init failed (forecaster will run uncached): %s", e)
             return None
