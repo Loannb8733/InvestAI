@@ -56,7 +56,7 @@ class TestRedisInjoignable:
         # La connexion s'ouvre, puis la commande échoue — le cas d'une base
         # mise en veille entre deux requêtes.
         client = MagicMock()
-        client.get.side_effect = ConnectionError("connexion perdue")
+        client.mget.side_effect = ConnectionError("connexion perdue")
 
         with patch("app.tasks.history_cache._get_redis", return_value=client), patch(
             "app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=([], [])
@@ -72,10 +72,10 @@ class TestRedisInjoignable:
         import json
         from datetime import datetime
 
+        charge = json.dumps({"dates": ["2026-09-01T00:00:00", "2026-09-02T00:00:00"], "prices": [50000.0, 51000.0]})
         client = MagicMock()
-        client.get.return_value = json.dumps(
-            {"dates": ["2026-09-01T00:00:00", "2026-09-02T00:00:00"], "prices": [50000.0, 51000.0]}
-        )
+        # Une seule commande pour toutes les clés candidates : seule la première répond.
+        client.mget.side_effect = lambda cles: [charge] + [None] * (len(cles) - 1)
         base = MagicMock()
 
         with patch("app.tasks.history_cache._get_redis", return_value=client), patch(

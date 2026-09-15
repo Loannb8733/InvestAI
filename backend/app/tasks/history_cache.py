@@ -8,8 +8,10 @@ PostgreSQL provides persistent storage; Redis is the fast-read layer.
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Dict, List, Optional, Tuple
 
 from redis import Redis
 from sqlalchemy import func, select
@@ -33,9 +35,22 @@ REDIS_HISTORY_FALLBACK_TTL = 86400  # 24 hours — stale-but-usable fallback
 DEFAULT_CACHE_DAYS = 365
 
 
+# Client partagé par processus. Un client neuf à chaque lecture ouvrait une
+# connexion par symbole — deux CLIENT SETINFO chacune, facturées par Upstash :
+# 30 des 120 commandes d'un tableau de bord recalculé (mesuré le 2026-09-15).
+# Le PID garde la réutilisation sûre après un fork (worker Celery prefork) :
+# un processus enfant ne partage jamais la connexion de son parent.
+_client: Optional[Redis] = None
+_client_pid: Optional[int] = None
+
+
 def _get_redis() -> Redis:
-    url = redis_async_url()  # same cleaned URL used by async clients
-    return Redis.from_url(url, decode_responses=True, **redis_client_kwargs())
+    global _client, _client_pid
+    if _client is None or _client_pid != os.getpid():
+        url = redis_async_url()  # same cleaned URL used by async clients
+        _client = Redis.from_url(url, decode_responses=True, **redis_client_kwargs())
+        _client_pid = os.getpid()
+    return _client
 
 
 def _cache_key(symbol: str, days: int) -> str:
@@ -572,12 +587,40 @@ def deep_backfill_prices():
     return {"filled": result}
 
 
-def get_cached_history(symbol: str, days: int = 90):
-    """Read cached history from Redis, falling back to PostgreSQL.
+def _cles_candidates(symbol: str, days: int) -> List[str]:
+    """Clés à essayer pour un symbole, par ordre de préférence.
 
-    Returns (dates, prices) or ([], []).
-    Tries: exact Redis key → 365d Redis key → legacy 90d key → PostgreSQL.
+    Clé exacte → 365 jours (tronquée ensuite) → ancienne clé 90 jours, chacune
+    suivie de sa copie de secours à 24 h.
     """
+    cles = []
+    periodes = [days]
+    if days != DEFAULT_CACHE_DAYS:
+        periodes.append(DEFAULT_CACHE_DAYS)
+    if days != 90:
+        periodes.append(90)
+    for periode in periodes:
+        cle = _cache_key(symbol, periode)
+        cles += [cle, f"{cle}:fallback"]
+    return cles
+
+
+def get_cached_histories(symbols: List[str], days: int = 90) -> Dict[str, Tuple[list, list]]:
+    """Lit l'historique de plusieurs symboles en **une seule** commande Redis.
+
+    Renvoie ``{symbole: (dates, prices)}`` pour chaque symbole demandé, avec
+    ``([], [])`` quand rien n'est disponible. Même ordre de préférence et même
+    repli PostgreSQL que la lecture unitaire.
+
+    Upstash facture chaque commande. Lire symbole par symbole coûtait jusqu'à
+    six GET chacun (clé exacte, 365 jours, 90 jours, et leurs secours) : environ
+    40 des 120 commandes d'un tableau de bord recalculé. Un MGET compte pour un.
+    """
+    demandes = list(dict.fromkeys(symbols))
+    candidates = {symbole: _cles_candidates(symbole, days) for symbole in demandes}
+    toutes = [cle for cles in candidates.values() for cle in cles]
+    valeurs: Dict[str, Optional[str]] = {}
+
     # Toute la lecture Redis sous une même garde. Sans elle, une base
     # injoignable levait ici — et le repli PostgreSQL annoncé par la docstring
     # n'était jamais atteint. L'exception remontait jusqu'à
@@ -587,45 +630,48 @@ def get_cached_history(symbol: str, days: int = 90):
     #
     # Un cache dont l'indisponibilité fait tomber la page qu'il devait
     # accélérer est pire que pas de cache du tout.
-    raw = None
-    try:
-        redis = _get_redis()
-
-        # Try exact key first
-        key = _cache_key(symbol, days)
-        raw = redis.get(key) or redis.get(f"{key}:fallback")
-
-        # Fall back to the full 365d cache and trim
-        if not raw and days != DEFAULT_CACHE_DAYS:
-            full_key = _cache_key(symbol, DEFAULT_CACHE_DAYS)
-            raw = redis.get(full_key) or redis.get(f"{full_key}:fallback")
-
-        # Legacy: try old 90-day key for backwards compatibility
-        if not raw and days != 90:
-            legacy_key = _cache_key(symbol, 90)
-            raw = redis.get(legacy_key) or redis.get(f"{legacy_key}:fallback")
-    except Exception as e:  # noqa: BLE001 — le cache ne doit jamais faire tomber l'appelant
-        logger.warning("Cache Redis injoignable pour %s (repli sur PostgreSQL) : %s", symbol, e)
-
-    if raw:
+    if toutes:
         try:
-            data = json.loads(raw)
-            dates = [datetime.fromisoformat(d) for d in data["dates"]]
-            prices = data["prices"]
-            # Trim to requested days
-            if len(dates) > days:
-                return dates[-days:], prices[-days:]
-            return dates, prices
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.warning("Failed to parse cached history for %s: %s", symbol, e)
+            valeurs = dict(zip(toutes, _get_redis().mget(toutes)))
+        except Exception as e:  # noqa: BLE001 — le cache ne doit jamais faire tomber l'appelant
+            for symbole in demandes:
+                logger.warning("Cache Redis injoignable pour %s (repli sur PostgreSQL) : %s", symbole, e)
 
-    # Final fallback: PostgreSQL persistent storage
-    try:
-        dates, prices = _charger_prix_depuis_db_sync(symbol, days)
-        if dates and prices:
-            logger.info("Loaded %d prices for %s from DB (Redis miss)", len(prices), symbol)
-            return dates, prices
-    except Exception as e:
-        logger.warning("DB fallback failed for %s: %s", symbol, e)
+    resultats: Dict[str, Tuple[list, list]] = {}
+    for symbole in demandes:
+        raw = next((valeurs[cle] for cle in candidates[symbole] if valeurs.get(cle)), None)
+        if raw:
+            try:
+                data = json.loads(raw)
+                dates = [datetime.fromisoformat(d) for d in data["dates"]]
+                prices = data["prices"]
+                # Trim to requested days
+                if len(dates) > days:
+                    resultats[symbole] = (dates[-days:], prices[-days:])
+                else:
+                    resultats[symbole] = (dates, prices)
+                continue
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning("Failed to parse cached history for %s: %s", symbole, e)
 
-    return [], []
+        # Final fallback: PostgreSQL persistent storage
+        resultats[symbole] = ([], [])
+        try:
+            dates, prices = _charger_prix_depuis_db_sync(symbole, days)
+            if dates and prices:
+                logger.info("Loaded %d prices for %s from DB (Redis miss)", len(prices), symbole)
+                resultats[symbole] = (dates, prices)
+        except Exception as e:
+            logger.warning("DB fallback failed for %s: %s", symbole, e)
+
+    return resultats
+
+
+def get_cached_history(symbol: str, days: int = 90):
+    """Read cached history from Redis, falling back to PostgreSQL.
+
+    Returns (dates, prices) or ([], []).
+    Tries: exact Redis key → 365d Redis key → legacy 90d key → PostgreSQL.
+    Pour plusieurs symboles, préférer :func:`get_cached_histories` (une commande).
+    """
+    return get_cached_histories([symbol], days)[symbol]
