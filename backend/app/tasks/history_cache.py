@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -223,10 +223,32 @@ async def _load_prices_from_db(symbol: str, days: int):
         return [], []
 
 
+async def _dernier_jour_en_base() -> Dict[str, date]:
+    """Dernier jour de cours connu en base, par symbole (une seule requête)."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(AssetPriceHistory.symbol, func.max(AssetPriceHistory.price_date)).group_by(AssetPriceHistory.symbol)
+        )
+        return {row[0].upper(): row[1] for row in result.all()}
+
+
 async def _fetch_and_cache_all():
     """Fetch history for all assets and store in Redis + PostgreSQL."""
     redis = _get_redis()
     assets = await _get_all_crypto_symbols()
+
+    # La base est la copie durable : un symbole dont elle a déjà le cours du
+    # jour n'a rien à demander à CoinGecko. Sans ce test, chaque démarrage
+    # relançait un appel par actif — sept déploiements le 2026-09-15, 22 actifs,
+    # et des 429 CoinGecko dans les journaux — dès que Redis ne répondait plus,
+    # le seul cache consulté jusque-là. Une panne de la base vaut « rien en
+    # base » : on demande, comme avant.
+    try:
+        derniers_jours = await _dernier_jour_en_base()
+    except Exception as e:  # noqa: BLE001 — le pré-chargement ne doit pas tomber pour un test d'économie
+        logger.warning("Couverture de la base illisible, CoinGecko sera interrogé pour tout : %s", e)
+        derniers_jours = {}
+    aujourd_hui = datetime.now(timezone.utc).date()
 
     if not assets:
         logger.info("No assets to cache history for")
@@ -253,6 +275,11 @@ async def _fetch_and_cache_all():
                         continue
                 except (json.JSONDecodeError, KeyError):
                     pass
+
+            if derniers_jours.get(symbol.upper()) == aujourd_hui:
+                logger.debug("Skipping %s — cours du jour déjà en base", symbol)
+                cached_count += 1
+                continue
 
             try:
                 dates, prices = await fetcher.get_history(symbol, asset_type, days=days)
