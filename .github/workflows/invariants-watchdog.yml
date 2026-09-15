@@ -29,13 +29,17 @@ jobs:
           [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
           total=$(jq -r '.result.total_violations' /tmp/resp.json)
           echo "total=$total" | tee -a "$GITHUB_OUTPUT"
+          # `// 0` : une API encore sur l'ancienne version ne renvoie pas ce champ.
+          material=$(jq -r '.result.material_violations // 0' /tmp/resp.json)
+          echo "material=$material" | tee -a "$GITHUB_OUTPUT"
 
       - name: Decide if we alert
         id: gate
         run: |
           total="${{ steps.call.outputs.total }}"
+          material="${{ steps.call.outputs.material }}"
           base="${{ env.BASELINE }}"
-          if [ "$total" -gt "$base" ]; then
+          if [ "$material" -gt 0 ] || [ "$total" -gt "$base" ]; then
             echo "alert=true" >> "$GITHUB_OUTPUT"
           else
             echo "alert=false" >> "$GITHUB_OUTPUT"
@@ -49,11 +53,13 @@ jobs:
             const fs = require('fs');
             const payload = JSON.parse(fs.readFileSync('/tmp/resp.json', 'utf8'));
             const total = payload.result.total_violations;
+            const material = payload.result.material_violations ?? 0;
             const baseline = "${{ env.BASELINE }}";
             const counts = payload.result.counts;
             const details = payload.result.details;
-            const title = `Invariants watchdog: ${total} violations (baseline ${baseline})`;
+            const title = `Invariants watchdog: ${material} material / ${total} violations (baseline ${baseline})`;
             const body = [
+              `Material violations: **${material}** — the run fails while this is above 0.`,
               `Total violations: **${total}** (baseline: ${baseline}).`,
               '',
               '### Per invariant',
@@ -102,3 +108,14 @@ jobs:
                 issue_number: issue.number, state: 'closed',
               });
             }
+
+      # Un run vert passait inaperçu : le ticket #224 a été rafraîchi chaque
+      # semaine depuis juin sans que personne ne soit prévenu (NEW-80). Un
+      # échec déclenche la notification GitHub. Seules les violations
+      # matérielles comptent — mêmes critères que scripts/check_invariants.py —
+      # pour que le run ne rougisse pas chaque semaine sur des arrondis.
+      - name: Fail on material violations
+        if: steps.call.outputs.material != '0'
+        run: |
+          echo "::error::${{ steps.call.outputs.material }} violation(s) matérielle(s) d'invariants — voir le ticket invariants-watchdog."
+          exit 1

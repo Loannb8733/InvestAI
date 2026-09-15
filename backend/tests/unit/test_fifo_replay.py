@@ -430,6 +430,53 @@ class TestConversions:
         assert ev.cost_removed == D("0")  # empty pool, nothing seeded
         assert res.fifo[("ETH", "Kraken")][0]["unit_cost"] == D("0")  # zero-cost dest
 
+    @staticmethod
+    def _conversion_au_dela_du_pool():
+        """40 USDC connus, 100 convertis sans prix enregistré côté destination.
+
+        Cas mesuré en base (NEW-80) : il manque des entrées d'USDC dans
+        l'historique, et une conversion vide plus que le pool n'en tient.
+        """
+        return [
+            _tx(TxType.BUY, 40, D("0.9"), asset="a3", exchange="Kraken"),
+            _tx(
+                TxType.CONVERSION_OUT,
+                100,
+                1,
+                asset="a3",
+                exchange="Kraken",
+                notes="trade_id:convert_sell_S2",
+                executed_at=T0 + timedelta(days=1),
+            ),
+            _tx(
+                TxType.CONVERSION_IN,
+                D("0.05"),
+                0,
+                asset="a2",
+                exchange="Kraken",
+                notes="trade_id:convert_buy_S2",
+                executed_at=T0 + timedelta(days=1),
+            ),
+        ]
+
+    def test_un_pool_partiel_est_complete_au_prix_d_ancrage(self):
+        """Seul un pool *vide* était amorcé : les 60 USDC en excès partaient à
+        coût nul, et la crypto reçue sans prix enregistré héritait d'un coût
+        amputé (36 € au lieu de 90 €)."""
+        res = replay(self._conversion_au_dela_du_pool(), SYMS, METRICS_CFG, usd_to_portfolio=D("0.9"))
+
+        ev = [e for e in res.events if e.kind == "CONVERSION_OUT"][0]
+        assert ev.cost_removed == D("90")  # 40 connus à 0,9 + 60 amorcés à 0,9
+        assert res.fifo[("ETH", "Kraken")][0]["unit_cost"] == D("1800")  # 90 € / 0,05 ETH
+        assert not [w for w in res.warnings if "Over-conversion" in w]
+
+    def test_un_pool_partiel_reste_sans_amorcage_pour_l_impot(self):
+        res = replay(self._conversion_au_dela_du_pool(), SYMS, TAX_CFG, usd_to_portfolio=D("0.9"))
+
+        ev = [e for e in res.events if e.kind == "CONVERSION_OUT"][0]
+        assert ev.cost_removed == D("36")  # seuls les 40 USDC connus
+        assert [w for w in res.warnings if "Over-conversion" in w]
+
 
 # ---------------------------------------------------------------------------
 # CONVERSION_IN fees & dividends
