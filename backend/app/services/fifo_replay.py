@@ -558,9 +558,12 @@ def replay(
             pool = fifo.get(key, [])
             pool_qty = sum(ly["qty"] for ly in pool)
 
-            if dest_sym is not None and pool_qty == _ZERO and config.seed_stablecoin_layers and is_stablecoin(sym):
-                # Stablecoin with no tracked history: seed a synthetic at-peg
-                # layer so basis propagates (e.g. USDC bought off-platform).
+            if dest_sym is not None and qty > pool_qty and config.seed_stablecoin_layers and is_stablecoin(sym):
+                # Stablecoin with missing history: seed a synthetic at-peg layer
+                # for the shortfall so basis propagates (e.g. USDC bought
+                # off-platform). A *partial* pool gets the same treatment:
+                # seeding only an empty one let the excess leave at zero cost.
+                manque = qty - pool_qty
                 if STABLECOIN_PEGS.get(sym) == "EUR":
                     per_unit = _ONE
                     layer_ccy = "EUR"
@@ -571,7 +574,7 @@ def replay(
                     layer_fx = per_unit
                 fifo.setdefault(key, []).append(
                     {
-                        "qty": qty,
+                        "qty": manque,
                         "unit_cost": per_unit,
                         "unit_cost_base": _ONE,
                         "currency": layer_ccy,
@@ -587,7 +590,7 @@ def replay(
                     layer_ccy,
                     sym,
                     exch,
-                    qty,
+                    manque,
                     per_unit,
                     tx.id,
                 )

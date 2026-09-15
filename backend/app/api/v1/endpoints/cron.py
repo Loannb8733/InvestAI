@@ -111,9 +111,12 @@ async def cron_invariants_check() -> dict:
     Mirrors ``scripts/check_invariants.py`` but inside the API process, so a
     GitHub Actions cron can call it weekly and parse the JSON.
     """
+    from decimal import Decimal
+
     from sqlalchemy import text
 
     from app.core.database import engine
+    from app.services.materialite_invariants import classify_holdings_gap
 
     invariants: dict[str, list[dict]] = {}
     async with engine.connect() as conn:
@@ -123,7 +126,7 @@ async def cron_invariants_check() -> dict:
                     text(
                         """
                 SELECT a.id::text AS aid, a.symbol, a.exchange,
-                       a.quantity AS stored,
+                       a.quantity AS stored, a.avg_buy_price AS pru,
                        COALESCE(SUM(CASE
                            WHEN t.transaction_type IN ('BUY','TRANSFER_IN','CONVERSION_IN','AIRDROP','STAKING_REWARD')
                                THEN t.quantity
@@ -133,7 +136,7 @@ async def cron_invariants_check() -> dict:
                 FROM assets a
                 LEFT JOIN transactions t ON t.asset_id = a.id
                 WHERE a.asset_type != 'CROWDFUNDING'
-                GROUP BY a.id, a.symbol, a.exchange, a.quantity
+                GROUP BY a.id, a.symbol, a.exchange, a.quantity, a.avg_buy_price
 """
                     )
                 )
@@ -141,18 +144,27 @@ async def cron_invariants_check() -> dict:
             .mappings()
             .all()
         )
-        invariants["holdings"] = [
-            {
-                "asset_id": r["aid"],
-                "symbol": r["symbol"],
-                "exchange": r["exchange"],
-                "stored": float(r["stored"] or 0),
-                "computed": float(r["computed"] or 0),
-                "diff": float((r["stored"] or 0) - (r["computed"] or 0)),
-            }
-            for r in rows
-            if abs(float((r["stored"] or 0) - (r["computed"] or 0))) > 1e-8
-        ]
+        invariants["holdings"] = []
+        for r in rows:
+            stored = Decimal(str(r["stored"] or 0))
+            computed = Decimal(str(r["computed"] or 0))
+            if abs(stored - computed) <= Decimal("0.00000001"):
+                continue
+            # Même jugement que scripts/check_invariants.py : seul un écart
+            # matériel doit faire échouer le watchdog.
+            immaterial, raison = classify_holdings_gap(stored, computed, Decimal(str(r["pru"] or 0)))
+            invariants["holdings"].append(
+                {
+                    "asset_id": r["aid"],
+                    "symbol": r["symbol"],
+                    "exchange": r["exchange"],
+                    "stored": float(stored),
+                    "computed": float(computed),
+                    "diff": float(stored - computed),
+                    "material": not immaterial,
+                    "reason": raison,
+                }
+            )
 
         rows = (
             (
@@ -195,10 +207,14 @@ async def cron_invariants_check() -> dict:
         invariants["snapshots"] = [dict(r) for r in rows]
 
     total = sum(len(v) for v in invariants.values())
+    # Sévérités du script local : un écart de holdings matériel et un doublon de
+    # snapshot sont des erreurs ; un taux de change manquant reste un avertissement.
+    material = sum(1 for h in invariants["holdings"] if h["material"]) + len(invariants["snapshots"])
     return {
         "task": "invariants-check",
         "result": {
             "total_violations": total,
+            "material_violations": material,
             "counts": {k: len(v) for k, v in invariants.items()},
             "details": {k: v[:50] for k, v in invariants.items()},
         },
