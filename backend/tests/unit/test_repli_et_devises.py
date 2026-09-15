@@ -32,14 +32,16 @@ from app.tasks import history_cache
 
 class TestRepliPostgres:
     def test_le_repli_n_utilise_plus_run_async(self):
-        source = inspect.getsource(history_cache.get_cached_history)
+        # La lecture unitaire délègue à la lecture groupée, où vit le repli.
+        source = inspect.getsource(history_cache.get_cached_histories)
         assert "run_async" not in source, (
             "`run_async` dans une fonction synchrone appelée depuis des services web : "
             "impossible de démarrer une boucle dans une boucle, le repli reste muet"
         )
 
     def test_le_repli_lit_bien_postgres(self):
-        source = inspect.getsource(history_cache.get_cached_history)
+        # La lecture unitaire délègue à la lecture groupée, où vit le repli.
+        source = inspect.getsource(history_cache.get_cached_histories)
         assert "_charger_prix_depuis_db_sync" in source, (
             "le dernier recours PostgreSQL a disparu : un Redis vide rendrait "
             "une série vide alors que la base a l'historique"

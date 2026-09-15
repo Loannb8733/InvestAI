@@ -336,7 +336,7 @@ class SnapshotService(SnapshotRiskMixin):
         from app.core.config import settings
         from app.ml.historical_data import HistoricalDataFetcher
         from app.models.asset_price_history import AssetPriceHistory
-        from app.tasks.history_cache import get_cached_history
+        from app.tasks.history_cache import get_cached_histories
 
         price_series: Dict[str, Dict[str, float]] = {}
 
@@ -416,8 +416,10 @@ class SnapshotService(SnapshotRiskMixin):
 
         # 3. Check Redis cache for remaining symbols
         symbols_need_api: Dict[str, str] = {}
+        # Une seule commande Redis pour tous les symboles (quota Upstash, NEW-81).
+        historiques = get_cached_histories(list(symbols_need_redis), days)
         for symbol_upper, asset_type in symbols_need_redis.items():
-            dates, prices = get_cached_history(symbol_upper, days)
+            dates, prices = historiques[symbol_upper]
             if dates and prices:
                 series = {}
                 for d, p in zip(dates, prices):

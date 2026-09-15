@@ -4,6 +4,7 @@ Covers: get_crypto_price, get_stock_price, caching behavior, error handling,
 stablecoin detection, forex rate fetching, and CoinGecko ID search.
 """
 
+import json
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,11 +22,9 @@ from app.services.price_service import PriceService
 def mock_redis():
     """Create a mock async Redis client (matches core.redis_client._get_redis_txt)."""
     redis = MagicMock()
-    redis.hgetall = AsyncMock(return_value={})
     redis.get = AsyncMock(return_value=None)
+    redis.mget = AsyncMock(side_effect=lambda cles: [None] * len(cles))
     redis.setex = AsyncMock()
-    redis.hset = AsyncMock()
-    redis.expire = AsyncMock()
     return redis
 
 
@@ -83,11 +82,11 @@ class TestCacheKey:
 
     def test_crypto_cache_key(self, price_service):
         key = price_service._get_cache_key("crypto", "btc")
-        assert key == "price:crypto:BTC"
+        assert key == "price:v2:crypto:BTC"
 
     def test_stock_cache_key(self, price_service):
         key = price_service._get_cache_key("stock", "aapl")
-        assert key == "price:stock:AAPL"
+        assert key == "price:v2:stock:AAPL"
 
 
 # ---------------------------------------------------------------------------
@@ -98,14 +97,16 @@ class TestCacheBehavior:
 
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_data(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {
-            "price": "45000.50",
-            "change_24h": "500.0",
-            "change_percent_24h": "1.12",
-            "volume_24h": "1000000",
-            "market_cap": "850000000000",
-            "last_updated": "2026-01-01T00:00:00",
-        }
+        mock_redis.get.return_value = json.dumps(
+            {
+                "price": "45000.50",
+                "change_24h": "500.0",
+                "change_percent_24h": "1.12",
+                "volume_24h": "1000000",
+                "market_cap": "850000000000",
+                "last_updated": "2026-01-01T00:00:00",
+            }
+        )
 
         result = await price_service._get_cached_price("crypto", "BTC")
 
@@ -116,13 +117,12 @@ class TestCacheBehavior:
 
     @pytest.mark.asyncio
     async def test_cache_miss_returns_none(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {}
         result = await price_service._get_cached_price("crypto", "BTC")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_cache_redis_error_returns_none(self, price_service, mock_redis):
-        mock_redis.hgetall.side_effect = Exception("Redis connection error")
+        mock_redis.get.side_effect = Exception("Redis connection error")
         result = await price_service._get_cached_price("crypto", "BTC")
         assert result is None
 
@@ -137,13 +137,47 @@ class TestCacheBehavior:
         }
         await price_service._cache_price("crypto", "BTC", data, 60)
 
-        mock_redis.hset.assert_called_once()
-        mock_redis.expire.assert_called_once_with("price:crypto:BTC", 60)
+        # Une seule commande : valeur et expiration ensemble.
+        mock_redis.setex.assert_called_once()
+        cle, ttl, valeur = mock_redis.setex.call_args.args
+        assert (cle, ttl) == ("price:v2:crypto:BTC", 60)
+        assert json.loads(valeur)["price"] == "45000.50"
+
+    @pytest.mark.asyncio
+    async def test_plusieurs_cours_sont_lus_en_une_commande(self, price_service, mock_redis):
+        """Upstash facture chaque commande : un HGETALL par symbole coûtait 14 des
+        commandes d'un tableau de bord recalculé (NEW-81)."""
+        en_cache = {
+            "price:v2:crypto:BTC": json.dumps({"price": "45000", "last_updated": "2026-01-01T00:00:00"}),
+            "price:v2:crypto:ETH": json.dumps({"price": "2000", "last_updated": "2026-01-01T00:00:00"}),
+        }
+        mock_redis.mget.side_effect = lambda cles: [en_cache.get(cle) for cle in cles]
+        price_service.http_client = AsyncMock()
+
+        resultat = await price_service.get_multiple_crypto_prices(["BTC", "ETH"])
+
+        assert mock_redis.mget.await_count == 1
+        mock_redis.get.assert_not_awaited()
+        price_service.http_client.get.assert_not_awaited()
+        assert resultat["BTC"]["price"] == Decimal("45000")
+        assert resultat["ETH"]["price"] == Decimal("2000")
+
+    @pytest.mark.asyncio
+    async def test_une_entree_illisible_ne_masque_pas_les_autres(self, price_service, mock_redis):
+        en_cache = {
+            "price:v2:crypto:BTC": "pas du json",
+            "price:v2:crypto:ETH": json.dumps({"price": "2000", "last_updated": "2026-01-01T00:00:00"}),
+        }
+        mock_redis.mget.side_effect = lambda cles: [en_cache.get(cle) for cle in cles]
+
+        trouves = await price_service._get_cached_prices("crypto", ["BTC", "ETH"])
+
+        assert list(trouves) == ["ETH"]
 
     @pytest.mark.asyncio
     async def test_cache_price_redis_error_no_raise(self, price_service, mock_redis):
         """Cache write failures should be silently ignored."""
-        mock_redis.hset.side_effect = Exception("Redis write error")
+        mock_redis.setex.side_effect = Exception("Redis write error")
         data = {
             "price": Decimal("100"),
             "change_24h": 0,
@@ -163,14 +197,16 @@ class TestGetCryptoPrice:
 
     @pytest.mark.asyncio
     async def test_returns_cached_result_if_available(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {
-            "price": "45000.00",
-            "change_24h": "100",
-            "change_percent_24h": "0.5",
-            "volume_24h": "999",
-            "market_cap": "800000",
-            "last_updated": "2026-01-01T00:00:00",
-        }
+        mock_redis.get.return_value = json.dumps(
+            {
+                "price": "45000.00",
+                "change_24h": "100",
+                "change_percent_24h": "0.5",
+                "volume_24h": "999",
+                "market_cap": "800000",
+                "last_updated": "2026-01-01T00:00:00",
+            }
+        )
 
         result = await price_service.get_crypto_price("BTC")
         assert result is not None
@@ -178,8 +214,6 @@ class TestGetCryptoPrice:
 
     @pytest.mark.asyncio
     async def test_fetches_from_coingecko(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {}
-
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
@@ -202,8 +236,6 @@ class TestGetCryptoPrice:
     @pytest.mark.asyncio
     async def test_fallback_to_cryptocompare(self, price_service, mock_redis):
         """When CoinGecko fails, should fall back to CryptoCompare."""
-        mock_redis.hgetall.return_value = {}
-
         coingecko_response = MagicMock()
         coingecko_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "429", request=MagicMock(), response=MagicMock()
@@ -246,8 +278,6 @@ class TestGetCryptoPrice:
     @pytest.mark.asyncio
     async def test_stablecoin_fallback_when_apis_fail(self, price_service, mock_redis):
         """Stablecoins should fall back to forex rate when APIs fail."""
-        mock_redis.hgetall.return_value = {}
-
         error_response = MagicMock()
         error_response.raise_for_status.side_effect = Exception("API error")
 
@@ -264,8 +294,6 @@ class TestGetCryptoPrice:
     @pytest.mark.asyncio
     async def test_returns_none_for_unknown_symbol_when_all_fail(self, price_service, mock_redis):
         """Non-stablecoin with all API failures should return None."""
-        mock_redis.hgetall.return_value = {}
-
         error_response = MagicMock()
         error_response.raise_for_status.side_effect = Exception("API error")
 
@@ -285,14 +313,16 @@ class TestGetStockPrice:
 
     @pytest.mark.asyncio
     async def test_returns_cached_result(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {
-            "price": "175.50",
-            "change_24h": "2.5",
-            "change_percent_24h": "1.44",
-            "volume_24h": "50000000",
-            "market_cap": "0",
-            "last_updated": "2026-01-01T00:00:00",
-        }
+        mock_redis.get.return_value = json.dumps(
+            {
+                "price": "175.50",
+                "change_24h": "2.5",
+                "change_percent_24h": "1.44",
+                "volume_24h": "50000000",
+                "market_cap": "0",
+                "last_updated": "2026-01-01T00:00:00",
+            }
+        )
 
         result = await price_service.get_stock_price("AAPL")
         assert result is not None
@@ -300,8 +330,6 @@ class TestGetStockPrice:
 
     @pytest.mark.asyncio
     async def test_fetches_from_yahoo_finance(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {}
-
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
@@ -330,8 +358,6 @@ class TestGetStockPrice:
 
     @pytest.mark.asyncio
     async def test_api_error_returns_none(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {}
-
         price_service.http_client = AsyncMock()
         price_service.http_client.get = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
 
@@ -340,8 +366,6 @@ class TestGetStockPrice:
 
     @pytest.mark.asyncio
     async def test_invalid_symbol_returns_none(self, price_service, mock_redis):
-        mock_redis.hgetall.return_value = {}
-
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "404", request=MagicMock(), response=MagicMock()

@@ -1072,7 +1072,7 @@ class MetricsService:
 
         Returns {SYMBOL: change_percent}.
         """
-        from app.tasks.history_cache import get_cached_history
+        from app.tasks.history_cache import get_cached_histories
 
         changes: Dict[str, float] = {}
         uncached_crypto: list[str] = []
@@ -1083,9 +1083,15 @@ class MetricsService:
         for syms in symbols_by_type.values():
             all_symbols.extend(syms)
 
+        # Une seule commande Redis pour tous les symboles (quota Upstash, NEW-81).
+        try:
+            historiques = get_cached_histories([s.upper() for s in all_symbols], days=max(days, 2))
+        except Exception as exc:  # noqa: BLE001 — chaque symbole retombe sur les sources suivantes
+            logger.warning("Historique groupé indisponible, variations recalculées en direct : %s", exc)
+            historiques = {}
         for symbol in all_symbols:
             try:
-                _dates, prices = get_cached_history(symbol.upper(), days=max(days, 2))
+                _dates, prices = historiques[symbol.upper()]
             except Exception:
                 # Sans historique, aucune variation n'est publiée pour ce
                 # symbole — le test `if prices and len(prices) >= 2` en aval

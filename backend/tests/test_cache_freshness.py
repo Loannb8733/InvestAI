@@ -9,6 +9,7 @@ Usage (inside Docker):
 Exit code 1 if any price data is stale.
 """
 
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -56,7 +57,14 @@ def main():
         if "historical" in key:
             continue
 
-        data = r.hgetall(key)
+        # `price:v2:` stocke le cours en JSON (une commande au lieu de deux) ;
+        # les anciens hashs `price:<type>:` expirent d'eux-mêmes.
+        genre_redis = r.type(key)  # commande TYPE de Redis, pas type() de Python
+        if genre_redis == "hash":
+            data = r.hgetall(key)
+        else:
+            brut = r.get(key)
+            data = json.loads(brut) if brut else {}
         if not data:
             continue
 

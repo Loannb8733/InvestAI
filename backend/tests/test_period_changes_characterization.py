@@ -27,20 +27,18 @@ from app.services.metrics_service import metrics_service
 def _cache(reponses):
     """Fige l'historique en cache. `reponses` : {SYMBOLE: [prix, ...]}."""
 
-    def faux_cache(symbol, days=2):
-        prix = reponses.get(symbol.upper())
-        if prix is None:
-            raise KeyError(symbol)
-        return ([], prix)
+    def faux_cache(symbols, days=2):
+        # Lecture groupée : un symbole sans historique est absent du résultat.
+        return {s: ([], reponses[s.upper()]) for s in symbols if s.upper() in reponses}
 
-    return patch("app.tasks.history_cache.get_cached_history", side_effect=faux_cache)
+    return patch("app.tasks.history_cache.get_cached_histories", side_effect=faux_cache)
 
 
 def _replis_muets():
     """Neutralise les étapes 2 à 4, pour n'observer que le cache.
 
     Les trois points d'injection diffèrent, et c'est ce qui rend ces tests
-    fragiles à écrire : `get_cached_history` est importé **dans** la fonction,
+    fragiles à écrire : `get_cached_histories` est importé **dans** la fonction,
     `AsyncSessionLocal` aussi, mais `HistoricalDataFetcher` l'est **en tête du
     module** — le patcher à sa source d'origine n'a donc aucun effet. Une
     première version laissait passer de vrais appels à CoinGecko, et un test

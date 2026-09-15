@@ -1,6 +1,7 @@
 """Price fetching service for various asset types."""
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -137,51 +138,87 @@ class PriceService:
         return None
 
     def _get_cache_key(self, asset_type: str, symbol: str) -> str:
-        """Generate cache key for price."""
-        return f"price:{asset_type}:{symbol.upper()}"
+        """Generate cache key for price.
+
+        ``v2`` : le cours est stocké en JSON (SETEX) et non plus en hash
+        (HSET + EXPIRE). Un préfixe neuf évite les WRONGTYPE sur les anciens
+        hashs encore en cache, qui expirent d'eux-mêmes.
+        """
+        return f"price:v2:{asset_type}:{symbol.upper()}"
 
     # Maximum acceptable cache age before forcing a refresh (seconds)
     MAX_CACHE_AGE = 300  # 5 minutes
 
+    def _lire_cours_en_cache(self, asset_type: str, symbol: str, brut: Optional[str]) -> Optional[Dict]:
+        """Décode une entrée du cache de cours. None si absente ou périmée (> MAX_CACHE_AGE)."""
+        if not brut:
+            return None
+        data = json.loads(brut)
+        # Freshness guard: reject entries older than MAX_CACHE_AGE
+        last_updated_str = data.get("last_updated")
+        if last_updated_str:
+            try:
+                last_updated = datetime.fromisoformat(last_updated_str)
+                age = (datetime.now(timezone.utc) - last_updated).total_seconds()
+                if age > self.MAX_CACHE_AGE:
+                    logger.info(
+                        "Price cache stale for %s (%s): age=%.0fs > %ds, forcing refresh",
+                        symbol,
+                        asset_type,
+                        age,
+                        self.MAX_CACHE_AGE,
+                    )
+                    return None
+            except (ValueError, TypeError):
+                pass  # If timestamp is invalid, use the data anyway
+
+        return {
+            "price": Decimal(data["price"]),
+            "change_24h": float(data.get("change_24h", 0)),
+            "change_percent_24h": float(data.get("change_percent_24h", 0)),
+            "volume_24h": float(data.get("volume_24h", 0)),
+            "market_cap": float(data.get("market_cap", 0)),
+            "last_updated": last_updated_str,
+        }
+
     async def _get_cached_price(self, asset_type: str, symbol: str) -> Optional[Dict]:
         """Get price from Redis cache. Returns None if stale (> MAX_CACHE_AGE)."""
         try:
-            key = self._get_cache_key(asset_type, symbol)
             redis = await _get_redis_txt()
-            data = await redis.hgetall(key)
-            if data:
-                # Freshness guard: reject entries older than MAX_CACHE_AGE
-                last_updated_str = data.get("last_updated")
-                if last_updated_str:
-                    try:
-                        last_updated = datetime.fromisoformat(last_updated_str)
-                        age = (datetime.now(timezone.utc) - last_updated).total_seconds()
-                        if age > self.MAX_CACHE_AGE:
-                            logger.info(
-                                "Price cache stale for %s (%s): age=%.0fs > %ds, forcing refresh",
-                                symbol,
-                                asset_type,
-                                age,
-                                self.MAX_CACHE_AGE,
-                            )
-                            return None
-                    except (ValueError, TypeError):
-                        pass  # If timestamp is invalid, use the data anyway
-
-                return {
-                    "price": Decimal(data["price"]),
-                    "change_24h": float(data.get("change_24h", 0)),
-                    "change_percent_24h": float(data.get("change_percent_24h", 0)),
-                    "volume_24h": float(data.get("volume_24h", 0)),
-                    "market_cap": float(data.get("market_cap", 0)),
-                    "last_updated": last_updated_str,
-                }
+            brut = await redis.get(self._get_cache_key(asset_type, symbol))
+            return self._lire_cours_en_cache(asset_type, symbol, brut)
         except Exception as e:
             logger.warning(f"Redis cache read error for {symbol}: {e}")
         return None
 
+    async def _get_cached_prices(self, asset_type: str, symbols: List[str]) -> Dict[str, Dict]:
+        """Lit les cours de plusieurs symboles en **une seule** commande (MGET).
+
+        Upstash facture chaque commande : un HGETALL par symbole coûtait 14 des
+        commandes d'un tableau de bord recalculé. Renvoie ``{SYMBOLE: cours}``
+        pour les seuls symboles trouvés et frais.
+        """
+        if not symbols:
+            return {}
+        try:
+            redis = await _get_redis_txt()
+            bruts = await redis.mget([self._get_cache_key(asset_type, s) for s in symbols])
+        except Exception as e:
+            logger.warning("Redis cache read error for %d symbols: %s", len(symbols), e)
+            return {}
+        trouves: Dict[str, Dict] = {}
+        for symbole, brut in zip(symbols, bruts):
+            try:
+                cours = self._lire_cours_en_cache(asset_type, symbole, brut)
+            except (json.JSONDecodeError, KeyError, ArithmeticError) as e:
+                logger.warning("Entrée de cache de cours illisible pour %s : %s", symbole, e)
+                cours = None
+            if cours:
+                trouves[symbole.upper()] = cours
+        return trouves
+
     async def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
-        """Cache price in Redis."""
+        """Cache price in Redis (one SETEX: value and expiry in a single command)."""
         try:
             key = self._get_cache_key(asset_type, symbol)
             cache_data = {
@@ -193,8 +230,7 @@ class PriceService:
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
             redis = await _get_redis_txt()
-            await redis.hset(key, mapping=cache_data)
-            await redis.expire(key, ttl)
+            await redis.setex(key, ttl, json.dumps(cache_data))
         except Exception as e:
             logger.warning(f"Redis cache write error for {symbol}: {e}")
 
@@ -477,14 +513,9 @@ class PriceService:
         """Fetch multiple cryptocurrency prices at once."""
         results = {}
 
-        # Check cache first
-        uncached_symbols = []
-        for symbol in symbols:
-            cached = await self._get_cached_price("crypto", symbol)
-            if cached:
-                results[symbol.upper()] = cached
-            else:
-                uncached_symbols.append(symbol)
+        # Check cache first — une seule commande pour tous les symboles
+        results.update(await self._get_cached_prices("crypto", symbols))
+        uncached_symbols = [symbol for symbol in symbols if symbol.upper() not in results]
 
         if not uncached_symbols:
             return results
