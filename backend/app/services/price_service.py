@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
@@ -39,6 +40,12 @@ class PriceService:
     CACHE_TTL_CRYPTO = 120  # 2 minutes
     CACHE_TTL_STOCK = 300  # 5 minutes
     CACHE_TTL_FOREX = 3600  # 1 hour
+    FOREX_MEMO_TTL = 300  # 5 min en mémoire, avant de relire Redis
+    # Taux de change lus récemment : {(de, vers): (instant monotone, taux)}.
+    # Partagé par la classe, pas par l'instance : le tableau de bord crée un
+    # PriceService par requête (dashboard.py, snapshot_service.py), et un mémo
+    # d'instance laissait relire le même taux trois fois dans une requête.
+    _forex_memo: Dict[tuple, tuple] = {}
 
     # Unified symbol map for CoinGecko IDs (single source of truth)
     SYMBOL_MAP = COINGECKO_SYMBOL_MAP
@@ -630,12 +637,23 @@ class PriceService:
                 )
                 return None
 
-        cache_key = f"forex:{from_currency}:{to_currency}"
+        memo = self._forex_memo.get((from_currency, to_currency))
+        if memo and time.monotonic() - memo[0] < self.FOREX_MEMO_TTL:
+            return memo[1]
+
+        # `forex:spot:` et non `forex:` : cette dernière clé appartient au cache
+        # « dernier taux connu » de redis_client, qui y range du JSON. Partagée,
+        # chaque lecture échouait sur le format de l'autre — ici en rappelant
+        # exchangerate-api à chaque fois, là-bas en rendant un float au lieu
+        # d'un dictionnaire.
+        cache_key = f"forex:spot:{from_currency}:{to_currency}"
         try:
             redis = await _get_redis_txt()
             cached = await redis.get(cache_key)
             if cached:
-                return Decimal(cached)
+                taux = Decimal(cached)
+                self._forex_memo[(from_currency, to_currency)] = (time.monotonic(), taux)
+                return taux
         except Exception as e:
             logger.warning(f"Redis cache read error for forex: {e}")
 
@@ -651,7 +669,9 @@ class PriceService:
                     await redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
                 except Exception as e:
                     logger.warning(f"Redis cache write error for forex: {e}")
-                return Decimal(str(rate))
+                taux = Decimal(str(rate))
+                self._forex_memo[(from_currency, to_currency)] = (time.monotonic(), taux)
+                return taux
 
         except Exception as e:
             logger.error(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")

@@ -160,20 +160,43 @@ _FOREX_CACHE_TTL = 86400  # 24 hours
 _FOREX_KEY_PREFIX = "forex:"
 
 
+# Dernière écriture de chaque taux par ce processus : (instant monotone, taux).
+# Le tableau de bord réécrivait le même taux à chaque recalcul, alors que la clé
+# vit 24 h — une commande Upstash facturée pour rien.
+_forex_ecrits: Dict[tuple, tuple] = {}
+_FOREX_REECRITURE_S = 3600
+
+
 async def get_cached_forex_rate(from_ccy: str, to_ccy: str) -> Optional[dict]:
     """Get cached forex rate. Returns {"rate": float, "cached_at": ISO timestamp} or None."""
     try:
         r = await _get_redis_txt()
         data = await r.get(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}")
         if data:
-            return json.loads(data)
+            valeur = json.loads(data)
+            # Tant que price_service écrivait sa valeur brute (« 0.866 ») sous
+            # la même clé, json.loads rendait un nombre : l'appelant faisait
+            # alors `.get("rate")` sur un float et levait AttributeError.
+            if isinstance(valeur, dict):
+                return valeur
+            logger.warning("Cache de change %s→%s illisible (%r), ignoré", from_ccy, to_ccy, data)
     except Exception as e:
         logger.debug("Redis forex cache miss %s→%s: %s", from_ccy, to_ccy, e)
     return None
 
 
 async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
-    """Cache a forex rate with 24h TTL and timestamp."""
+    """Cache a forex rate with 24h TTL and timestamp.
+
+    Un taux identique déjà écrit par ce processus depuis moins d'une heure n'est
+    pas réécrit : la clé vit 24 h, la réécriture ne changeait rien.
+    """
+    import time
+
+    cle = (from_ccy, to_ccy)
+    precedent = _forex_ecrits.get(cle)
+    if precedent and precedent[1] == rate and time.monotonic() - precedent[0] < _FOREX_REECRITURE_S:
+        return
     try:
         from datetime import datetime, timezone
 
@@ -185,6 +208,7 @@ async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
             }
         )
         await r.setex(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}", _FOREX_CACHE_TTL, payload)
+        _forex_ecrits[cle] = (time.monotonic(), rate)
     except Exception as e:
         logger.warning("Failed to cache forex rate %s→%s: %s", from_ccy, to_ccy, e)
 
