@@ -4,7 +4,7 @@ from slowapi import Limiter
 from starlette.requests import Request
 
 from app.core.config import settings
-from app.core.redis_client import redis_async_url, redis_ssl_kwargs
+from app.core.redis_client import redis_async_url, redis_client_kwargs
 
 
 def _get_real_client_ip(request: Request) -> str:
@@ -41,8 +41,13 @@ def _limiter_storage_uri() -> str:
 
 
 def _limiter_storage_options() -> dict:
-    """Return SSL kwargs for the synchronous limits Redis connection."""
-    return redis_ssl_kwargs()
+    """Return SSL kwargs and network timeouts for the synchronous limits Redis connection.
+
+    The limits storage is a *synchronous* client called from async routes: a
+    silent Redis without timeouts would freeze the whole event loop, not just
+    one request.
+    """
+    return redis_client_kwargs()
 
 
 # Create limiter instance.
