@@ -534,11 +534,14 @@ class MetricsService:
                     cost_by_key[fkey] += layer["qty"] * layer["unit_cost"]
                     if layer["is_paid"]:
                         paid_qty_by_key[fkey] += layer["qty"]
-                # DEBUG: log final BTC layers per key
+                # Diagnostic (issue #228) : couches BTC finales par clé. En DEBUG,
+                # pas en WARNING — à chaque recalcul, six lignes dont une de 4 Ko
+                # (54 couches Tangem) inondaient les journaux Render, et un
+                # avertissement qui tombe toutes les deux minutes n'alerte plus.
                 if fkey[0] == "BTC":
                     _tot_qty = sum(ly["qty"] for ly in layers)
                     _tot_cost = sum(ly["qty"] * ly["unit_cost"] for ly in layers)
-                    logger.warning(
+                    logger.debug(
                         "[FIFO_DEBUG] BTC final %s qty=%s cost=%s layers=%s detail=%s",
                         fkey[1],
                         _tot_qty,
@@ -763,9 +766,9 @@ class MetricsService:
                 )
                 asset_buy_pra = buy_pra_by_sym.get(asset.symbol.upper()) if asset_fkey_check in fifo_seen_keys else None
                 asset_cump_pru = cump_pru_by_fkey.get(asset_fkey_check)
-                # DEBUG: log per-asset inputs for BTC
+                # Diagnostic (issue #228), en DEBUG — voir plus haut.
                 if asset.symbol.upper() == "BTC":
-                    logger.warning(
+                    logger.debug(
                         "[FIFO_DEBUG] BTC asset_inputs exchange=%s qty=%s avg_buy=%s "
                         "asset_invested=%s asset_buy_pra=%s asset_cump_pru=%s",
                         asset.exchange,
@@ -779,7 +782,7 @@ class MetricsService:
                     asset, current_price, asset_invested, asset_buy_pra, asset_cump_pru
                 )
                 if asset.symbol.upper() == "BTC":
-                    logger.warning(
+                    logger.debug(
                         "[FIFO_DEBUG] BTC metrics_output exchange=%s total_invested=%s "
                         "current_value=%s avg_buy_price=%s gain_loss=%s",
                         asset.exchange,
