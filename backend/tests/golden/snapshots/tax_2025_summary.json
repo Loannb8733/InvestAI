@@ -1,0 +1,14 @@
+{
+  "body": {
+    "flat_tax_30": 0.0,
+    "ir_12_8": 0.0,
+    "nb_cessions": 2,
+    "net_plus_value": -1823.85,
+    "ps_17_2": 0.0,
+    "total_cessions": 3355.0,
+    "total_moins_values": -1823.85,
+    "total_plus_values": 0,
+    "year": 2025
+  },
+  "status": 200
+}
