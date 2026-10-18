@@ -1142,69 +1142,6 @@ class BinanceService(BaseExchangeService):
 
         return orders
 
-    async def get_simple_earn_history(
-        self,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
-        limit: int = 100,
-    ) -> list[ExchangeFiatOrder]:
-        """Get Simple Earn (flexible/locked savings) purchase history."""
-        orders = []
-
-        async with self._get_http_client() as client:
-            try:
-                params = {
-                    "size": min(limit, 100),
-                    "current": 1,
-                }
-
-                if start_time:
-                    params["startTime"] = int(start_time.timestamp() * 1000)
-                if end_time:
-                    params["endTime"] = int(end_time.timestamp() * 1000)
-
-                params = self._sign_request(params)
-                response = await self._api_get(
-                    client,
-                    f"{self.BASE_URL}/sapi/v1/simple-earn/flexible/history/subscriptionRecord",
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30.0,
-                )
-
-                if response.status_code != 200:
-                    return orders
-
-                data = response.json()
-                rows = data.get("rows", [])
-
-                if rows:
-                    logger.info(f"Simple earn subscriptions: {len(rows)} found")
-
-                for row in rows:
-                    if row.get("status") != "SUCCESS":
-                        continue
-
-                    orders.append(
-                        ExchangeFiatOrder(
-                            order_id=f"earn_{row.get('id', '')}",
-                            crypto_symbol=row.get("asset", ""),
-                            fiat_currency="EUR",
-                            side="buy",
-                            crypto_amount=Decimal(str(row.get("amount", 0))),
-                            fiat_amount=Decimal("0"),  # Already owned, just moved to earn
-                            price=Decimal("0"),
-                            fee=Decimal("0"),
-                            status="Completed",
-                            timestamp=datetime.fromtimestamp(row.get("time", 0) / 1000, tz=UTC),
-                        )
-                    )
-
-            except Exception as e:
-                logger.error(f"Error fetching simple earn history: {e}")
-
-        return orders
-
     async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs) -> list[ExchangeTrade]:
         """Get Simple Earn interest/rewards history from Binance.
 

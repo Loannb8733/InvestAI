@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 
 from app.services.analytics_scoring import (
-    _build_portfolio_var_parametric,
     _calc_beta,
     _diversification_rating,
     _diversification_score,
@@ -578,26 +577,3 @@ class TestEmptyAnalytics:
 # ---------------------------------------------------------------------------
 # _build_portfolio_var_parametric
 # ---------------------------------------------------------------------------
-class TestBuildPortfolioVarParametric:
-    """Tests for _build_portfolio_var_parametric."""
-
-    def test_with_sufficient_data(self):
-        np.random.seed(42)
-        port_returns = np.random.normal(-0.001, 0.02, 200)
-        result = _build_portfolio_var_parametric(port_returns, 100000.0)
-
-        assert "var_95_historical_pct" in result
-        assert "var_95_parametric_pct" in result
-        assert "var_95_historical_eur" in result
-        assert "var_95_parametric_eur" in result
-        assert "cvar_95_pct" in result
-        assert "cvar_95_eur" in result
-        # VaR in EUR should be proportional to total value
-        assert result["var_95_historical_eur"] > 0
-        assert result["var_95_parametric_eur"] > 0
-
-    def test_with_insufficient_data(self):
-        port_returns = np.array([0.01, 0.02])
-        result = _build_portfolio_var_parametric(port_returns, 100000.0)
-        assert result["var_95_historical_pct"] == 0.0
-        assert result["var_95_parametric_pct"] == 0.0

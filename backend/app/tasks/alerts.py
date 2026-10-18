@@ -30,29 +30,6 @@ def check_all_alerts():
     return result
 
 
-@celery_app.task(name="app.tasks.alerts.check_user_alerts")
-def check_user_alerts(user_id: str):
-    """Check alerts for a specific user."""
-    logger.info(f"Checking alerts for user {user_id}...")
-
-    async def _check_user():
-        async with AsyncSessionLocal() as db:
-            triggered = await alert_service.check_alerts(db, user_id)
-            return [
-                {
-                    "alert_id": str(t.alert_id),
-                    "alert_name": t.alert_name,
-                    "symbol": t.symbol,
-                    "message": t.message,
-                }
-                for t in triggered
-            ]
-
-    result = run_async(_check_user())
-    logger.info(f"User {user_id}: {len(result)} alerts triggered")
-    return result
-
-
 @celery_app.task(name="app.tasks.alerts.seed_risk_weight_snapshots")
 def seed_risk_weight_snapshots():
     """Pre-seed daily risk weight snapshots for all users' assets.

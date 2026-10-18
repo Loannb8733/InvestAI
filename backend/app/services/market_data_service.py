@@ -395,62 +395,6 @@ class MarketDataService:
 
         return results
 
-    async def get_stock_price_eur(self, ticker: str, forex_rate_fn=None) -> dict | None:
-        """Fetch stock price and convert to EUR.
-
-        Args:
-            ticker: Yahoo Finance ticker
-            forex_rate_fn: Async callable(from_ccy, to_ccy) -> Decimal
-                           If None, returns price in quote currency.
-
-        Returns:
-            Price data with price_eur field added.
-        """
-        data = await self.get_stock_price(ticker)
-        if not data:
-            return None
-
-        quote_ccy = data["quote_currency"]
-        if quote_ccy == "EUR":
-            data["price_eur"] = data["price"]
-            return data
-
-        if forex_rate_fn:
-            try:
-                rate = await forex_rate_fn(quote_ccy, "EUR")
-                if rate:
-                    data["price_eur"] = data["price"] * Decimal(str(rate))
-                    return data
-            except Exception:
-                logger.warning("Forex conversion %s→EUR failed for %s", quote_ccy, ticker)
-
-        # Fallback: mark as unconverted
-        data["price_eur"] = None
-        return data
-
-    def get_staleness_info(self, ticker: str, last_update: datetime) -> dict:
-        """Get human-readable staleness information for a stock price.
-
-        Returns dict with:
-            age_hours: float
-            is_fresh: bool
-            reason: str (e.g. "market closed", "within trading hours")
-        """
-        age_hours, acceptable = price_staleness_hours(ticker, last_update)
-
-        if is_market_closed_today(ticker):
-            reason = "market closed (weekend/holiday)"
-        elif is_market_open(ticker):
-            reason = "market open"
-        else:
-            reason = "market closed (after hours)"
-
-        return {
-            "age_hours": round(age_hours, 1),
-            "is_fresh": acceptable,
-            "reason": reason,
-        }
-
 
 # Singleton instance
 market_data_service = MarketDataService()

@@ -135,7 +135,6 @@ comments	backend/app/tasks/cleanup.py
 comments	backend/app/tasks/emails.py
 comments	backend/app/tasks/fx_rates.py
 comments	backend/app/tasks/history_cache.py
-comments	backend/app/tasks/import_history.py
 comments	backend/app/tasks/monitor_delays.py
 comments	backend/app/tasks/predictions.py
 comments	backend/app/tasks/price_updates.py

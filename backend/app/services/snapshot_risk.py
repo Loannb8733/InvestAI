@@ -272,60 +272,6 @@ class SnapshotRiskMixin:
             "confidence_level": confidence_level,
         }
 
-    async def calculate_beta(
-        self,
-        portfolio_returns: list[float],
-        benchmark_returns: list[float],
-    ) -> float:
-        """
-        Calculate Beta - measure of portfolio's volatility relative to the market.
-        Beta > 1: More volatile than market
-        Beta < 1: Less volatile than market
-        Beta = 1: Same volatility as market
-        """
-        if len(portfolio_returns) < 2 or len(benchmark_returns) < 2:
-            return 1.0
-
-        # Ensure same length
-        min_len = min(len(portfolio_returns), len(benchmark_returns))
-        portfolio_returns = portfolio_returns[:min_len]
-        benchmark_returns = benchmark_returns[:min_len]
-
-        # Calculate means
-        port_mean = sum(portfolio_returns) / len(portfolio_returns)
-        bench_mean = sum(benchmark_returns) / len(benchmark_returns)
-
-        # Calculate covariance and variance (unbiased, ddof=1, consistent with Sharpe/Volatility)
-        n = len(portfolio_returns)
-        covariance = sum((p - port_mean) * (b - bench_mean) for p, b in zip(portfolio_returns, benchmark_returns)) / (
-            n - 1
-        )
-
-        bench_variance = sum((b - bench_mean) ** 2 for b in benchmark_returns) / (n - 1)
-
-        if bench_variance == 0:
-            return 1.0
-
-        beta = covariance / bench_variance
-        return round(beta, 2)
-
-    async def calculate_alpha(
-        self,
-        portfolio_return: float,
-        benchmark_return: float,
-        beta: float,
-        risk_free_rate: float = RISK_FREE_RATE,
-    ) -> float:
-        """
-        Calculate Alpha - excess return compared to benchmark.
-        Alpha > 0: Outperforming the benchmark
-        Alpha < 0: Underperforming the benchmark
-        """
-        # Jensen's Alpha = Portfolio Return - [Risk Free Rate + Beta * (Benchmark Return - Risk Free Rate)]
-        expected_return = risk_free_rate + beta * (benchmark_return - risk_free_rate)
-        alpha = portfolio_return - expected_return
-        return round(alpha * 100, 2)  # Return as percentage
-
     def calculate_hhi(self, allocations: list[dict]) -> dict:
         """
         Calculate Herfindahl-Hirschman Index (HHI) for portfolio concentration.

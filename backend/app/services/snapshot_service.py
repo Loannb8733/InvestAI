@@ -7,8 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import and_, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset
@@ -103,40 +102,6 @@ class SnapshotService(SnapshotRiskMixin):
             total_invested=Decimal(str(metrics["total_invested"])),
             currency=currency,
         )
-
-    async def create_user_snapshot_if_missing(
-        self, db: AsyncSession, user_id: str, currency: str = "EUR"
-    ) -> PortfolioSnapshot | None:
-        """Create today's global snapshot iff one doesn't exist yet.
-
-        The existence check is a fast happy path; the partial UNIQUE index
-        ``uq_portfolio_snapshots_user_day_global`` (migration n5i6j7k8l9m0)
-        enforces the actual at-most-one-per-day invariant. The earlier
-        check-then-insert was a true TOCTOU — two concurrent callers (cron +
-        manual refresh) both saw 0 and both inserted. We now catch the
-        IntegrityError that the constraint raises in the race window.
-        """
-        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-        existing = await db.execute(
-            select(func.count())
-            .select_from(PortfolioSnapshot)
-            .where(
-                and_(
-                    PortfolioSnapshot.user_id == user_id,
-                    PortfolioSnapshot.snapshot_date >= today_start,
-                    PortfolioSnapshot.portfolio_id.is_(None),
-                )
-            )
-        )
-        if existing.scalar() > 0:
-            return None
-        try:
-            return await self.create_user_snapshot(db, user_id, currency)
-        except IntegrityError:
-            # Race against a concurrent creator — the partial UNIQUE prevented
-            # the duplicate, treat it as "already exists".
-            await db.rollback()
-            return None
 
     def _format_date_for_period(self, date: datetime, days: int) -> str:
         """Format date label based on the period length."""

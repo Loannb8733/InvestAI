@@ -12,7 +12,6 @@ sortir les rend lisibles et vérifiables une à une.
 import numpy as np
 
 from app.ml import adaptive_thresholds as adaptive_th
-from app.services.analytics_math import _cvar_historical, _var_historical, _var_parametric
 
 
 def _hhi(allocation: dict[str, float]) -> float:
@@ -68,22 +67,6 @@ def _interpret_beta(beta: float | None) -> str:
         "inverse": "Inversement corrélé — se comporte à l'inverse du marché",
     }
     return labels.get(category, "Données insuffisantes")
-
-
-def _build_portfolio_var_parametric(port_returns: np.ndarray, total_value: float) -> dict:
-    """Compute parametric VaR alongside historical VaR for comparison."""
-    var_hist = _var_historical(port_returns) if len(port_returns) >= 5 else 0.0
-    var_param = _var_parametric(port_returns) if len(port_returns) >= 5 else 0.0
-    cvar = _cvar_historical(port_returns) if len(port_returns) >= 5 else 0.0
-
-    return {
-        "var_95_historical_pct": round(var_hist, 2),
-        "var_95_parametric_pct": round(var_param, 2),
-        "var_95_historical_eur": round(total_value * var_hist / 100, 2),
-        "var_95_parametric_eur": round(total_value * var_param / 100, 2),
-        "cvar_95_pct": round(cvar, 2),
-        "cvar_95_eur": round(total_value * cvar / 100, 2),
-    }
 
 
 def _build_interpretations(

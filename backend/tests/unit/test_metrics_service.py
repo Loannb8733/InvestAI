@@ -302,91 +302,9 @@ class TestGetAssetMetrics:
 # ---------------------------------------------------------------------------
 # ROI calculation
 # ---------------------------------------------------------------------------
-class TestCalculateROI:
-    """Tests for calculate_roi."""
-
-    @pytest.mark.asyncio
-    async def test_positive_roi(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("1000"), Decimal("1500"))
-        assert pytest.approx(roi) == 50.0
-
-    @pytest.mark.asyncio
-    async def test_negative_roi(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("1000"), Decimal("800"))
-        assert pytest.approx(roi) == -20.0
-
-    @pytest.mark.asyncio
-    async def test_zero_invested_returns_zero(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("0"), Decimal("500"))
-        assert roi == 0.0
-
-    @pytest.mark.asyncio
-    async def test_negative_invested_returns_zero(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("-100"), Decimal("200"))
-        assert roi == 0.0
-
-    @pytest.mark.asyncio
-    async def test_breakeven_roi(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("1000"), Decimal("1000"))
-        assert roi == 0.0
-
-    @pytest.mark.asyncio
-    async def test_double_value_roi(self, metrics_service):
-        roi = await metrics_service.calculate_roi(Decimal("1000"), Decimal("2000"))
-        assert pytest.approx(roi) == 100.0
-
-
 # ---------------------------------------------------------------------------
 # CAGR calculation
 # ---------------------------------------------------------------------------
-class TestCalculateCAGR:
-    """Tests for calculate_cagr."""
-
-    @pytest.mark.asyncio
-    async def test_positive_cagr(self, metrics_service):
-        # 1000 -> 1100 over 1 year => 10%
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1100"), 1.0)
-        assert pytest.approx(cagr, abs=0.01) == 10.0
-
-    @pytest.mark.asyncio
-    async def test_multi_year_cagr(self, metrics_service):
-        # 1000 -> 2000 over 2 years => ~41.42%
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("2000"), 2.0)
-        expected = (pow(2.0, 0.5) - 1) * 100
-        assert pytest.approx(cagr, abs=0.01) == expected
-
-    @pytest.mark.asyncio
-    async def test_zero_initial_returns_zero(self, metrics_service):
-        cagr = await metrics_service.calculate_cagr(Decimal("0"), Decimal("1000"), 2.0)
-        assert cagr == 0.0
-
-    @pytest.mark.asyncio
-    async def test_zero_years_returns_zero(self, metrics_service):
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1500"), 0.0)
-        assert cagr == 0.0
-
-    @pytest.mark.asyncio
-    async def test_negative_initial_returns_zero(self, metrics_service):
-        cagr = await metrics_service.calculate_cagr(Decimal("-100"), Decimal("200"), 1.0)
-        assert cagr == 0.0
-
-    @pytest.mark.asyncio
-    async def test_negative_years_returns_zero(self, metrics_service):
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1500"), -1.0)
-        assert cagr == 0.0
-
-    @pytest.mark.asyncio
-    async def test_same_value_zero_cagr(self, metrics_service):
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1000"), 5.0)
-        assert cagr == 0.0
-
-    @pytest.mark.asyncio
-    async def test_fractional_year(self, metrics_service):
-        # 6 months
-        cagr = await metrics_service.calculate_cagr(Decimal("1000"), Decimal("1050"), 0.5)
-        assert cagr > 0
-
-
 # ---------------------------------------------------------------------------
 # CUMP PRU computation
 # ---------------------------------------------------------------------------

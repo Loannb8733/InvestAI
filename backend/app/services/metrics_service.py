@@ -1874,21 +1874,6 @@ class MetricsService:
             "sold_assets": sold_assets,
         }
 
-    async def calculate_roi(self, total_invested: Decimal, current_value: Decimal) -> float:
-        """Calculate Return on Investment."""
-        if total_invested <= 0:
-            return 0.0
-        return float((current_value - total_invested) / total_invested * 100)
-
-    async def calculate_cagr(
-        self,
-        initial_value: Decimal,
-        final_value: Decimal,
-        years: float,
-    ) -> float:
-        """Calculate Compound Annual Growth Rate (clamped -99% to +999%)."""
-        return annualized_return_pct(float(initial_value), float(final_value), years)
-
 
 # Singleton instance
 metrics_service = MetricsService()

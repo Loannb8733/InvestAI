@@ -20,7 +20,7 @@ tested deterministically. The DB-backed loader lives in ``FxHistoryService``.
 from __future__ import annotations
 
 import bisect
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 
@@ -45,19 +45,3 @@ def resolve_rate(
     if idx < 0:
         return None
     return sorted_rates[idx][1]
-
-
-def build_sorted_rates(rates_by_date: Mapping[date, Decimal]) -> list[tuple[date, Decimal]]:
-    """Normalize a ``{date: rate}`` mapping into an ascending ``[(date, rate)]`` list."""
-    return sorted(((d, Decimal(str(r))) for d, r in rates_by_date.items()), key=lambda x: x[0])
-
-
-def invert_rate(rate: Decimal) -> Decimal:
-    """Invert a quote so EUR/USD (USD per EUR) becomes USD->EUR (EUR per USD).
-
-    ECB/Frankfurter publishes EUR/USD as "USD per 1 EUR" (≈ 1.09). The engine wants
-    "EUR per 1 USD" (≈ 0.92). Guards against division by zero.
-    """
-    if rate is None or rate == 0:
-        raise ValueError("cannot invert a zero/None FX rate")
-    return Decimal("1") / Decimal(str(rate))

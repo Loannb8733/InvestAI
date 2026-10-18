@@ -103,11 +103,6 @@ def quote_fx_currency(quote: str | None) -> str | None:
     return None
 
 
-def is_crypto_quote(quote: str | None) -> bool:
-    """True if the quote is a crypto asset (BTC/ETH/BNB), not a fiat anchor."""
-    return bool(quote) and quote.strip().upper() in CRYPTO_QUOTES
-
-
 def fee_currency_quote_anchor(fee_currency: str | None, asset_symbol: str | None) -> str | None:
     """Infer a trade's fiat anchor from the fee currency of an already-stored row.
 

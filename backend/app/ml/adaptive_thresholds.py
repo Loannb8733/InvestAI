@@ -217,14 +217,6 @@ def ci_widening_factor(
     return float(base * vol_factor)
 
 
-def xgboost_decay(ctx: MarketContext) -> float:
-    """Return XGBoost prediction decay factor.
-
-    Instead of hardcoded 0.95.  More conservative in high-vol markets.
-    """
-    return float(0.90 + 0.05 * (1 - ctx.vol_percentile / 100))
-
-
 def ci_floor(ctx: MarketContext, horizon_days: int) -> float:
     """Return minimum CI half-width as fraction of price.
 
@@ -233,15 +225,6 @@ def ci_floor(ctx: MarketContext, horizon_days: int) -> float:
     """
     base = {"crypto": 0.03, "stock": 0.01, "etf": 0.008}.get(ctx.asset_type, 0.015)
     return base * math.sqrt(max(1, horizon_days))
-
-
-def ci_safety_margin(ctx: MarketContext) -> float:
-    """Return CI safety margin (fractional widening).
-
-    Instead of hardcoded 0.05.  Wider for fat-tailed distributions.
-    """
-    kurt_factor = min(1.0, max(0, ctx.kurtosis) / 10)
-    return float(0.02 + 0.06 * kurt_factor)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -399,14 +382,6 @@ def volatility_warning_thresholds(
 def var_warning_thresholds() -> tuple[float, float]:
     """Return (warning, critical) VaR thresholds as decimal."""
     return 0.10, 0.15
-
-
-def sentiment_significance_threshold(ctx: MarketContext) -> float:
-    """Return % change to classify an asset as bullish/bearish for sentiment.
-
-    Instead of hardcoded ±1%.  Uses half of the trend significance threshold.
-    """
-    return trend_significance_threshold(ctx, 1) * 0.5
 
 
 # ═══════════════════════════════════════════════════════════════════════════

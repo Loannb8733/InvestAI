@@ -6,7 +6,7 @@ real trade currency instead of the hard-coded ``EUR``. Pure functions: no DB/HTT
 
 import pytest
 
-from app.services.exchanges.pair_utils import is_crypto_quote, quote_fx_currency, split_pair
+from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 
 
 class TestSplitPair:
@@ -72,13 +72,3 @@ class TestQuoteFxCurrency:
     def test_none_and_unknown(self):
         assert quote_fx_currency(None) is None
         assert quote_fx_currency("WAT") is None
-
-
-class TestIsCryptoQuote:
-    @pytest.mark.parametrize("crypto", ["BTC", "ETH", "BNB", "btc"])
-    def test_true_for_crypto(self, crypto):
-        assert is_crypto_quote(crypto) is True
-
-    @pytest.mark.parametrize("notcrypto", ["USDT", "USD", "EUR", None, ""])
-    def test_false_otherwise(self, notcrypto):
-        assert is_crypto_quote(notcrypto) is False

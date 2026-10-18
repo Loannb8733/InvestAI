@@ -1,6 +1,5 @@
 """Price fetching service for various asset types."""
 
-import asyncio
 import json
 import logging
 import time
@@ -732,30 +731,6 @@ class PriceService:
             logger.error(f"Error fetching historical price for {symbol} on {date_str}: {e}")
 
         return None
-
-    async def get_multiple_historical_prices(
-        self, requests: list[tuple[str, datetime]], currency: str = "eur"
-    ) -> dict[str, Decimal]:
-        """Fetch multiple historical prices with rate limiting.
-
-        Args:
-            requests: List of (symbol, date) tuples
-            currency: Target currency
-
-        Returns:
-            Dict mapping "symbol_date" to price
-        """
-        results = {}
-
-        for symbol, date in requests:
-            key = f"{symbol}_{date.strftime('%Y-%m-%d')}"
-            price = await self.get_historical_crypto_price(symbol, date, currency)
-            if price:
-                results[key] = price
-            # Small delay to avoid rate limiting (50 req/min = ~1.2s between requests)
-            await asyncio.sleep(1.5)
-
-        return results
 
 
 # Singleton instance

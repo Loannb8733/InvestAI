@@ -46,11 +46,6 @@ def is_stablecoin(symbol: str) -> bool:
     return symbol.upper() in STABLECOIN_SYMBOLS
 
 
-def stablecoin_peg(symbol: str) -> str | None:
-    """Return the fiat currency a stablecoin tracks ("USD"/"EUR"), or None."""
-    return STABLECOIN_PEGS.get(symbol.upper())
-
-
 def is_cash_like(symbol: str) -> bool:
     return is_fiat(symbol) or is_stablecoin(symbol)
 

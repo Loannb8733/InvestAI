@@ -197,34 +197,6 @@ async def _maj_actions():
     return {"updated": updated_count, "symbols": all_symbols[:20]}
 
 
-async def _maj_taux_change():
-    # Common currency pairs
-    currencies = ["USD", "GBP", "CHF", "JPY", "CAD", "AUD"]
-    base_currency = "EUR"
-
-    updated_count = 0
-    for currency in currencies:
-        try:
-            # `get_exchange_rate` n'a jamais existé : la méthode s'appelle
-            # `get_forex_rate`. L'AttributeError était rattrapé par le `except`
-            # ci-dessous, si bien que la tâche rapportait « 0 mis à jour » sans
-            # jamais rien tenter — et personne ne l'a vu, car elle n'est pas
-            # planifiée et son seul appelant plantait avant d'y arriver (NEW-14).
-            rate = await price_service.get_forex_rate(base_currency, currency)
-            if rate:
-                updated_count += 1
-                logger.debug(f"Updated {base_currency}/{currency}: {rate}")
-        except Exception as e:
-            logger.warning(f"Error fetching exchange rate {base_currency}/{currency}: {e}")
-
-    logger.info(f"Exchange rate update complete: {updated_count} rates updated")
-    return {
-        "updated": updated_count,
-        "base": base_currency,
-        "currencies": currencies,
-    }
-
-
 @celery_app.task(name="app.tasks.price_updates.update_crypto_prices")
 def update_crypto_prices():
     """Update cryptocurrency prices from CoinGecko and publish to pub/sub."""
@@ -239,36 +211,3 @@ def update_stock_prices():
     logger.info("Starting stock/ETF price update...")
 
     return run_async(_maj_actions())
-
-
-@celery_app.task(name="app.tasks.price_updates.update_exchange_rates")
-def update_exchange_rates():
-    """Update currency exchange rates."""
-    logger.info("Starting exchange rate update...")
-
-    return run_async(_maj_taux_change())
-
-
-@celery_app.task(name="app.tasks.price_updates.update_all_prices")
-def update_all_prices():
-    """Met à jour tous les prix (crypto, actions, changes) en une seule boucle.
-
-    Appeler les trois tâches en direct créait trois boucles successives, alors
-    que l'engine SQLAlchemy async garde ses connexions attachées à la première :
-    la deuxième échouait sur « Task attached to a different loop ». Le défaut
-    était latent — seules `update_crypto_prices` et `update_stock_prices` sont
-    planifiées, séparément, donc chacune avait bien sa propre boucle — mais il
-    piégeait quiconque déclenchait celle-ci à la main.
-    """
-    logger.info("Starting full price update...")
-
-    async def _tout():
-        return {
-            "crypto": await _maj_crypto(),
-            "stocks": await _maj_actions(),
-            "forex": await _maj_taux_change(),
-        }
-
-    results = run_async(_tout())
-    logger.info(f"Full price update complete: {results}")
-    return results

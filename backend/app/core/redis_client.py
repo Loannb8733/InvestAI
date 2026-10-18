@@ -109,10 +109,6 @@ async def _get_redis_txt() -> aioredis.Redis:
 
 
 # Keep backward compat alias (binary client)
-async def get_redis() -> aioredis.Redis:
-    return await _get_redis_bin()
-
-
 # ── Cross-worker single-flight lock ──────────────────────────────────
 # A best-effort distributed lock so that, across multiple web workers, only one
 # recomputes an expensive cached value at a time. Every path is fail-OPEN: if
@@ -317,18 +313,6 @@ async def cache_prediction(symbol: str, days: int, result: dict, ttl: int = 1800
         logger.warning("Failed to cache prediction: %s", e)
 
 
-async def get_cached_hyperparams(symbol: str, model_name: str) -> dict | None:
-    """Get cached optimal hyperparameters."""
-    try:
-        r = await _get_redis_txt()
-        data = await r.get(f"hparams:{symbol}:{model_name}")
-        if data:
-            return json.loads(data)
-    except Exception as exc:
-        logger.debug("Redis hyperparams cache miss for %s:%s: %s", symbol, model_name, exc)
-    return None
-
-
 async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int = 604800):
     """Cache hyperparameters (default 7 days TTL)."""
     try:
@@ -427,27 +411,6 @@ async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, t
         )
     except Exception as e:
         logger.warning("Failed to cache ensemble: %s", e)
-
-
-async def get_cached_reliability(symbol: str, days: int) -> dict | None:
-    """Get cached reliability scores."""
-    try:
-        r = await _get_redis_txt()
-        data = await r.get(f"reliability:{symbol}:{days}")
-        if data:
-            return json.loads(data)
-    except Exception as exc:
-        logger.debug("Redis reliability cache miss for %s: %s", symbol, exc)
-    return None
-
-
-async def cache_reliability(symbol: str, days: int, result: dict, ttl: int = 86400):
-    """Cache reliability scores (default 24h TTL)."""
-    try:
-        r = await _get_redis_txt()
-        await r.setex(f"reliability:{symbol}:{days}", ttl, json.dumps(result))
-    except Exception as e:
-        logger.warning("Failed to cache reliability: %s", e)
 
 
 # ── Binary caches (use binary client for pickle) ─────────────────────

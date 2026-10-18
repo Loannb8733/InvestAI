@@ -53,33 +53,6 @@ async def _run_daily_predictions():
         )
 
 
-@celery_app.task(name="app.tasks.predictions.predict_price")
-def predict_price(symbol: str, asset_type: str, horizon_days: int = 7):
-    """Generate price prediction for a specific asset."""
-    from app.models.asset import AssetType
-
-    type_map = {
-        "crypto": AssetType.CRYPTO,
-        "stock": AssetType.STOCK,
-        "etf": AssetType.ETF,
-    }
-
-    at = type_map.get(asset_type)
-    if not at:
-        logger.error("Unknown asset type: %s", asset_type)
-        return None
-
-    result = run_async(prediction_service.get_price_prediction(symbol, at, horizon_days))
-
-    return {
-        "symbol": result.symbol,
-        "trend": result.trend,
-        "trend_strength": result.trend_strength,
-        "model_used": result.model_used,
-        "predictions_count": len(result.predictions),
-    }
-
-
 @celery_app.task(name="app.tasks.predictions.detect_anomalies")
 def detect_anomalies():
     """Detect price anomalies across all users' assets."""
