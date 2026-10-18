@@ -101,8 +101,6 @@ temp/
 # Vercel
 .vercel/
 
-# Railway
-.railway/
 *openapi.json
 .claude/
 .mypy_cache/
