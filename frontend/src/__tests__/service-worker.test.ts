@@ -50,8 +50,8 @@ async function servir(handlers: Record<string, Handler>, request: Request): Prom
 
 describe('service worker', () => {
   let enCache: Map<string, Response>
-  let put: Mock<[Request, Response], Promise<void>>
-  let fetchImpl: Mock<[Request], Promise<Response>>
+  let put: Mock<(request: Request, response: Response) => Promise<void>>
+  let fetchImpl: Mock<(request: Request) => Promise<Response>>
   let handlers: Record<string, Handler>
 
   beforeEach(() => {
