@@ -28,9 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 
-COPY . .
 
-RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
+RUN adduser --disabled-password --gecos '' appuser
+COPY --chown=appuser . .
 USER appuser
 
 EXPOSE 8000

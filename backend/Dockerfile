@@ -22,10 +22,10 @@ RUN python -m cmdstanpy.install_cmdstan --version 2.38.0 --cores 2 --dir /opt/cm
 ENV CMDSTAN=/opt/cmdstan/cmdstan-2.38.0
 
 # Copy application code
-COPY . .
 
 # Create non-root user
-RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
+RUN adduser --disabled-password --gecos '' appuser
+COPY --chown=appuser . .
 USER appuser
 
 EXPOSE 8000
