@@ -4,6 +4,7 @@ import os
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL, make_url
 
 # Environnements servis en clair (http://) : un cookie `secure` n'y est jamais
 # renvoyé par le client, donc toute la mécanique qui en dépend est intestable.
@@ -130,18 +131,21 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL_SYNC(self) -> str:
-        """Build sync database URL for Alembic."""
+        """URL synchrone (Alembic, scripts) avec le pilote psycopg2 explicite."""
         external = os.environ.get("DATABASE_URL", "")
-        if external:
-            url = external.replace("postgresql+asyncpg://", "postgresql://")
-            # Ensure we have plain postgresql:// for psycopg2
-            if not url.startswith("postgresql://"):
-                url = url.replace("postgres://", "postgresql://")
-            return url
-        return (
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        url = (
+            make_url(external)
+            if external
+            else URL.create(
+                "postgresql",
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+                host=self.POSTGRES_HOST,
+                port=self.POSTGRES_PORT,
+                database=self.POSTGRES_DB,
+            )
         )
+        return url.set(drivername="postgresql+psycopg2").render_as_string(hide_password=False)
 
     # Redis
     REDIS_HOST: str = "localhost"

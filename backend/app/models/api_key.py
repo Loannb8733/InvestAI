@@ -40,7 +40,6 @@ class APIKey(Base):
             APIKeyStatus,
             name="apikeystatus",
             values_callable=lambda x: [e.value for e in x],
-            create_type=False,
         ),
         nullable=False,
         server_default="active",

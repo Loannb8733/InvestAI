@@ -31,7 +31,7 @@ jobs:
       - name: Install lint tools
         run: |
           pip install --upgrade pip
-          grep -E '^(ruff|mypy|types-redis|sqlalchemy\[mypy\]|bandit\[toml\])==' backend/requirements-dev.txt > /tmp/lint-tools.txt
+          grep -E '^(ruff|mypy|bandit\[toml\])==' backend/requirements-dev.txt > /tmp/lint-tools.txt
           pip install -r /tmp/lint-tools.txt
 
       - name: Lint (ruff)

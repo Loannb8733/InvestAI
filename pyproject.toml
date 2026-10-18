@@ -24,12 +24,10 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 check_untyped_defs = true
-plugins = ["sqlalchemy.ext.mypy.plugin"]
 exclude = ["backend/alembic/", "backend/tests/"]
 
 [[tool.mypy.overrides]]
 module = [
-    "redis.*",
     "celery.*",
     "prophet.*",
     "xgboost.*",
