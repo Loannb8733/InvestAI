@@ -19,7 +19,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vitest/globals", "node"],
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

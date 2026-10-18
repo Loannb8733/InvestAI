@@ -2,10 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-import CrowdfundingPerformancePage, {
-  SERIES_GRAPHIQUE,
-  LARGEUR_ITEM_LEGENDE,
-} from './CrowdfundingPerformancePage'
+import CrowdfundingPerformancePage from './CrowdfundingPerformancePage'
+import { INTEREST_CHART_SERIES, LEGEND_ITEM_WIDTH } from './crowdfunding-performance-chart'
 
 // `vi.mock` est remonté au-dessus des déclarations du module : les données du
 // projet fictif vivent donc dans la factory, pas à côté.
@@ -68,25 +66,25 @@ describe('Graphique « Intérêts Projetés vs Perçus » — légende', () => {
   const largeurApprox = (texte: string) => texte.length * 5.6 + 16
 
   it('chaque libellé tient dans la largeur allouée', () => {
-    for (const serie of SERIES_GRAPHIQUE) {
-      expect(largeurApprox(serie.libelle), serie.libelle).toBeLessThanOrEqual(LARGEUR_ITEM_LEGENDE)
+    for (const serie of INTEREST_CHART_SERIES) {
+      expect(largeurApprox(serie.label), serie.label).toBeLessThanOrEqual(LEGEND_ITEM_WIDTH)
     }
   })
 
   it('les clés, elles, ne tiendraient pas — le tooltip les porte', () => {
     // C'est bien le défaut d'origine : afficher `cle` dans la légende déborde.
-    const laPlusLongue = SERIES_GRAPHIQUE.reduce((a, b) => (a.cle.length >= b.cle.length ? a : b))
-    expect(largeurApprox(laPlusLongue.cle)).toBeGreaterThan(LARGEUR_ITEM_LEGENDE)
+    const laPlusLongue = INTEREST_CHART_SERIES.reduce((a, b) => (a.key.length >= b.key.length ? a : b))
+    expect(largeurApprox(laPlusLongue.key)).toBeGreaterThan(LEGEND_ITEM_WIDTH)
   })
 
   it('distingue les deux séries sans libellés identiques', () => {
-    const libelles = SERIES_GRAPHIQUE.map((s) => s.libelle)
+    const libelles = INTEREST_CHART_SERIES.map((s) => s.label)
     expect(new Set(libelles).size).toBe(libelles.length)
   })
 
   it('garde des clés explicites pour le tooltip', () => {
-    for (const serie of SERIES_GRAPHIQUE) {
-      expect(serie.cle).toMatch(/Intérêts/)
+    for (const serie of INTEREST_CHART_SERIES) {
+      expect(serie.key).toMatch(/Intérêts/)
     }
   })
 })

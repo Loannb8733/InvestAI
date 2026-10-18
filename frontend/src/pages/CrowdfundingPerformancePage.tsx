@@ -26,28 +26,7 @@ import { TrendingUp, AlertTriangle, CheckCircle2, Percent } from 'lucide-react'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import type { CrowdfundingPerformanceItem, CrowdfundingTaxReport } from '@/types/crowdfunding'
-
-/**
- * Séries du graphique « Intérêts Projetés vs Perçus ».
- *
- * `cle` nomme la donnée et s'affiche dans le tooltip, qui a la place de la
- * porter en entier. `libelle` est ce que lit la légende, où la place est
- * comptée : Nivo aligne les entrées sur `LARGEUR_ITEM_LEGENDE` pixels et ne
- * renvoie jamais à la ligne. « Intérêts projetés (bruts) » y mesurait 131 px
- * pour 70 alloués — les deux entrées se chevauchaient de 61 px, mesurés à
- * l'écran. Élargir n'aurait fait que déplacer le problème sur un écran étroit.
- *
- * Le titre de la carte dit déjà « Intérêts Projetés vs Perçus » et son
- * sous-titre « montants bruts de fiscalité » : la légende n'a qu'à distinguer
- * les deux séries.
- */
-export const SERIES_GRAPHIQUE = [
-  { cle: 'Intérêts projetés (bruts)', libelle: 'Projetés' },
-  { cle: 'Intérêts perçus', libelle: 'Perçus' },
-] as const
-
-/** Largeur allouée à chaque entrée de légende, en pixels. */
-export const LARGEUR_ITEM_LEGENDE = 84
+import { INTEREST_CHART_SERIES, LEGEND_ITEM_WIDTH } from './crowdfunding-performance-chart'
 
 /** Format FR d'un pourcentage : « 8,42 % ». */
 const formatPercent = (n: number) => `${n.toFixed(2).replace('.', ',')} %`
@@ -240,7 +219,7 @@ export default function CrowdfundingPerformancePage() {
             <div className="h-[300px]">
               <ResponsiveBar
                 data={chartData}
-                keys={SERIES_GRAPHIQUE.map((s) => s.cle)}
+                keys={INTEREST_CHART_SERIES.map((s) => s.key)}
                 indexBy="name"
                 groupMode="grouped"
                 theme={theme}
@@ -248,7 +227,7 @@ export default function CrowdfundingPerformancePage() {
                 padding={0.25}
                 innerPadding={4}
                 colors={({ id }) =>
-                  id === SERIES_GRAPHIQUE[0].cle ? color('--primary', 0.3) : color('--chart-3')
+                  id === INTEREST_CHART_SERIES[0].key ? color('--primary', 0.3) : color('--chart-3')
                 }
                 borderRadius={4}
                 enableLabel={false}
@@ -276,7 +255,7 @@ export default function CrowdfundingPerformancePage() {
                     anchor: 'top-right',
                     direction: 'row',
                     translateY: -22,
-                    itemWidth: LARGEUR_ITEM_LEGENDE,
+                    itemWidth: LEGEND_ITEM_WIDTH,
                     itemHeight: 18,
                     symbolSize: 10,
                     symbolShape: 'circle',
@@ -298,9 +277,9 @@ export default function CrowdfundingPerformancePage() {
                     // Perçus », et son sous-titre « montants bruts de
                     // fiscalité » : la légende n'a qu'à distinguer les deux
                     // séries.
-                    data: SERIES_GRAPHIQUE.map((serie, i) => ({
-                      id: serie.cle,
-                      label: serie.libelle,
+                    data: INTEREST_CHART_SERIES.map((serie, i) => ({
+                      id: serie.key,
+                      label: serie.label,
                       color: i === 0 ? color('--primary', 0.3) : color('--chart-3'),
                     })),
                   },
