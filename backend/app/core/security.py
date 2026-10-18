@@ -37,17 +37,22 @@ def compute_token_fingerprint(user_agent: str) -> str:
     return hashlib.sha256(user_agent.encode()).hexdigest()[:16]
 
 
+BCRYPT_MAX_BYTES = 72
+
+
+def _bcrypt_input(password: str) -> bytes:
+    return password.encode("utf-8")[:BCRYPT_MAX_BYTES]
+
+
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
+    """Hache un mot de passe avec bcrypt ; seuls les 72 premiers octets comptent."""
     salt = bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)
-    hashed: str = bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-    return hashed
+    return bcrypt.hashpw(_bcrypt_input(password), salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    result: bool = bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-    return result
+    """Vérifie un mot de passe contre son hachage bcrypt."""
+    return bcrypt.checkpw(_bcrypt_input(plain_password), hashed_password.encode("utf-8"))
 
 
 # JWT tokens

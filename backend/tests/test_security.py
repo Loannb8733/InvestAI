@@ -61,3 +61,20 @@ def test_password_hash_uniqueness():
     assert hash1 != hash2
     assert verify_password("samepassword", hash1)
     assert verify_password("samepassword", hash2)
+
+
+LONG_PASSWORD = "long-passphrase-" * 5
+BCRYPT4_HASH_OF_LONG_PASSWORD = "$2b$04$l8JyJOkV0D97aD8JfWAr2uHAB2UxY8ZCazbQtNX6D2d3ezljgdtUm"
+
+
+def test_long_password_hashed_by_bcrypt4_still_verifies():
+    assert verify_password(LONG_PASSWORD, BCRYPT4_HASH_OF_LONG_PASSWORD) is True
+
+
+def test_only_the_first_72_bytes_count_as_with_bcrypt4():
+    assert verify_password(LONG_PASSWORD[:72] + "anything", BCRYPT4_HASH_OF_LONG_PASSWORD) is True
+    assert verify_password(LONG_PASSWORD[:71], BCRYPT4_HASH_OF_LONG_PASSWORD) is False
+
+
+def test_long_password_can_be_hashed_and_verified():
+    assert verify_password(LONG_PASSWORD, hash_password(LONG_PASSWORD)) is True
