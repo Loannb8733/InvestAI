@@ -1,7 +1,7 @@
 import { Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router'
 import { useAuthStore } from '@/stores/authStore'
-import { MotionConfig } from 'framer-motion'
+import { MotionConfig } from 'motion/react'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ErrorBoundary'

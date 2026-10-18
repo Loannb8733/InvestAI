@@ -28,7 +28,7 @@ export default defineConfig({
           // qui protégeait déjà `PortfolioAreaChart`.
           if (/[\\/]node_modules[\\/](@nivo|d3-)/.test(id)) return 'charts-nivo'
           if (/[\\/]node_modules[\\/]lightweight-charts/.test(id)) return 'charts-timeseries'
-          if (id.includes('framer-motion')) return 'motion'
+          if (/[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/.test(id)) return 'motion'
           if (id.includes('@radix-ui')) return 'radix'
           return undefined
         },
@@ -73,7 +73,7 @@ export default defineConfig({
       'class-variance-authority',
       'clsx',
       'cmdk',
-      'framer-motion',
+      'motion/react',
       'lightweight-charts',
       'lucide-react',
       'react',

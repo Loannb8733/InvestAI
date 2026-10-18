@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 
 const registerSchema = z.object({
-  email: z.string().email('Email invalide'),
+  email: z.email('Email invalide'),
   password: z.string()
     .min(10, 'Minimum 10 caractères')
     .regex(/[A-Z]/, 'Au moins une majuscule')
@@ -33,10 +33,10 @@ const registerSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   acceptTerms: z.boolean().refine(val => val === true, {
-    message: 'Vous devez accepter les conditions d\'utilisation',
+    error: 'Vous devez accepter les conditions d\'utilisation',
   }),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: 'Les mots de passe ne correspondent pas',
+  error: 'Les mots de passe ne correspondent pas',
   path: ['confirmPassword'],
 })
 

@@ -64,7 +64,8 @@ const schema = z.object({
   notes: z.string().max(500).optional(),
 })
 
-type FormData = z.infer<typeof schema>
+type FormInput = z.input<typeof schema>
+type FormData = z.output<typeof schema>
 
 interface Asset {
   id: string
@@ -161,7 +162,7 @@ export default function AddTransactionForm({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormData>({
+  } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       asset_id: assetId || '',

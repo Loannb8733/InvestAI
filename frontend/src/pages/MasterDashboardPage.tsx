@@ -20,7 +20,7 @@ import AnimatedNumber from '@/components/ui/animated-number'
 import EmptyState from '@/components/ui/empty-state'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   TrendingUp,
   TrendingDown,
