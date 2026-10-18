@@ -57,7 +57,7 @@
     "cash_from_fiat": 0.0,
     "cash_from_stablecoins": 0.0,
     "fiat_assets": [],
-    "forex_stale": false,
+    "forex_stale": true,
     "stablecoins": [],
     "total_dividend_income": 0.0,
     "total_gain_loss": 0.0,

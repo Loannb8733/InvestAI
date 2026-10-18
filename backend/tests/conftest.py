@@ -10,6 +10,11 @@ os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_123456789
 os.environ.setdefault("FERNET_KEY", "icQAqvAxUzGIr5HCiFPkDICQtKw_tIwRDbCnZW0HW6M=")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
+_redis_auth = f":{os.environ['REDIS_PASSWORD']}@" if os.environ.get("REDIS_PASSWORD") else ""
+os.environ.setdefault(
+    "REDIS_URL",
+    f"redis://{_redis_auth}{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', '6379')}/15",
+)
 
 import pytest
 import pytest_asyncio

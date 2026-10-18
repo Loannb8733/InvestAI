@@ -1,13 +1,17 @@
 import json
 import os
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+import time_machine
 from httpx import AsyncClient
+from redis import asyncio as aioredis
 
+from app.core.redis_client import redis_async_url
 from app.core.security import create_access_token
 from app.models.user import User
 
@@ -15,6 +19,7 @@ SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 VOLATILE_KEYS = frozenset({"created_at", "updated_at", "last_updated"})
+FROZEN_NOW = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 
 TRANSACTIONS = [
     ("GLDCOIN", "buy", "2.0", "1000", "5", "2024-01-15T10:00:00Z"),
@@ -46,6 +51,15 @@ def _normalize(value: Any, ids: dict[str, str]) -> Any:
     if isinstance(value, float):
         return round(value, 6)
     return value
+
+
+@pytest.fixture
+async def empty_test_redis() -> None:
+    url = redis_async_url()
+    assert url.endswith("/15"), f"refusing to flush a non-test Redis database: {url}"
+    client = aioredis.from_url(url)
+    await client.flushdb()
+    await client.aclose()
 
 
 @pytest.fixture
@@ -99,9 +113,15 @@ async def _seed(client: AsyncClient, headers: dict[str, str]) -> str:
     return portfolio_id
 
 
-@pytest.mark.usefixtures("offline")
+@pytest.mark.usefixtures("empty_test_redis", "offline")
 async def test_api_responses_match_golden_snapshots(client: AsyncClient, regular_user: User) -> None:
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    with time_machine.travel(FROZEN_NOW, tick=False):
+        mismatches = await _compare_with_snapshots(client, regular_user)
+    assert not mismatches, f"golden mismatch: {mismatches} (GOLDEN_UPDATE=1 to accept)"
+
+
+async def _compare_with_snapshots(client: AsyncClient, user: User) -> list[str]:
+    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
     portfolio_id = await _seed(client, headers)
     ids: dict[str, str] = {}
     mismatches: list[str] = []
@@ -116,4 +136,4 @@ async def test_api_responses_match_golden_snapshots(client: AsyncClient, regular
             continue
         if path.read_text(encoding="utf-8") != rendered:
             mismatches.append(name)
-    assert not mismatches, f"golden mismatch: {mismatches} (GOLDEN_UPDATE=1 to accept)"
+    return mismatches

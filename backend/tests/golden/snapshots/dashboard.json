@@ -93,7 +93,7 @@
     "daily_change": 0.0,
     "daily_change_percent": 0.0,
     "earn_summary": null,
-    "forex_stale": false,
+    "forex_stale": true,
     "historical_data": [
       {
         "date": "17 Sep",
