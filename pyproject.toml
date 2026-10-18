@@ -41,7 +41,6 @@ module = [
     "openpyxl.*",
     "aiohttp.*",
     "slowapi.*",
-    "jose.*",
     "pyotp.*",
     "qrcode.*",
     "sentry_sdk.*",

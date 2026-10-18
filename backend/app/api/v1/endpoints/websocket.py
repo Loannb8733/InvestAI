@@ -10,9 +10,9 @@ import asyncio
 import json
 
 import aiohttp
+import jwt
 import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -64,7 +64,7 @@ async def verify_ws_token(token: str) -> bool:
         if payload.get("type") != "access":
             return False
         return True
-    except JWTError:
+    except jwt.InvalidTokenError:
         return False
 
 

@@ -360,11 +360,11 @@ class TestPorteeDesSessions:
         jamais changé depuis : ils passent tant que rien n'a bougé, et tombent
         au premier changement, avec les autres.
         """
-        from jose import jwt as jose_jwt
+        import jwt
 
         from app.core.config import settings
 
-        ancien_style = jose_jwt.encode(
+        ancien_style = jwt.encode(
             {
                 "sub": str(compte.id),
                 "exp": datetime.now(UTC) + timedelta(minutes=15),

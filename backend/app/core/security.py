@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
+import jwt
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
-from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -112,7 +112,7 @@ def decode_token(token: str) -> dict[str, Any] | None:
     try:
         payload: dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except jwt.InvalidTokenError:
         return None
 
 
