@@ -601,7 +601,7 @@ export default function CrowdfundingAuditLabPage() {
                 {analyzeMutation.isError && (
                   <div className="mt-3 p-3 bg-loss dark:bg-loss/20 border border-loss dark:border-loss rounded-lg">
                     <p className="text-sm text-loss dark:text-loss flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
                       {analyzeErrorMessage}
                     </p>
                   </div>

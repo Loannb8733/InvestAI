@@ -273,7 +273,7 @@ export default function ImportCSVForm({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           aria-label="Sélectionner un fichier CSV à importer"
-          className="w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
+          className="w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary transition-colors"
         >
           {selectedFile ? (
             <div className="flex items-center justify-center gap-2">

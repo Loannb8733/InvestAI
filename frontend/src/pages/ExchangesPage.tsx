@@ -651,7 +651,7 @@ export default function ExchangesPage() {
                       className="flex items-start gap-2 text-sm text-loss bg-loss/10 p-2 rounded-md"
                       title={apiKey.last_error}
                     >
-                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                       <span className="line-clamp-2">
                         Dernière sync en échec :{' '}
                         {apiKey.last_error.length > 120

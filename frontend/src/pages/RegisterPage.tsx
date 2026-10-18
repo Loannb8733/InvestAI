@@ -399,7 +399,7 @@ export default function RegisterPage() {
                   key={index}
                   className="flex items-center gap-4 p-4 rounded-lg bg-primary-foreground/5 border border-primary-foreground/10"
                 >
-                  <div className="h-10 w-10 rounded-lg bg-primary-foreground/10 flex items-center justify-center flex-shrink-0">
+                  <div className="h-10 w-10 rounded-lg bg-primary-foreground/10 flex items-center justify-center shrink-0">
                     <benefit.icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
                   <span className="font-medium">{benefit.text}</span>
