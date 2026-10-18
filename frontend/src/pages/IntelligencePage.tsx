@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2 } from 'lucide-react'
 import RegimeHeader from '@/components/intelligence/RegimeHeader'

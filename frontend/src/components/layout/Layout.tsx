@@ -1,5 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router'
 import NavRail from './NavRail'
 import Header from './Header'
 import { FilDArianeProvider } from './FilDArianeProvider'

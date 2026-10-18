@@ -17,7 +17,7 @@ export default defineConfig({
         // the entry bundle (and the login page) no longer ships charts/motion.
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id))
             return 'react-vendor'
           if (id.includes('@tanstack')) return 'query'
           // Deux librairies de graphiques cohabitent (ADR-010) : Nivo pour les
@@ -81,7 +81,7 @@ export default defineConfig({
       'react-dom/client',
       'react-dropzone',
       'react-hook-form',
-      'react-router-dom',
+      'react-router',
       'react/jsx-runtime',
       'tailwind-merge',
       'zod',

@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router'
 import { useAuthStore } from '@/stores/authStore'
 import { MotionConfig } from 'framer-motion'
 import { ThemeProvider } from '@/components/theme-provider'

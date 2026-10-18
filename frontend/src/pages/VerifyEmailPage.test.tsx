@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import VerifyEmailPage from './VerifyEmailPage'
 
 /**
@@ -34,8 +34,8 @@ vi.mock('@/components/ui/aurora-canvas', () => ({ default: () => null }))
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ setTokens: poserJetons, fetchUser: chargerUtilisateur }),
 }))
-vi.mock('react-router-dom', async () => {
-  const reel = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+vi.mock('react-router', async () => {
+  const reel = await vi.importActual<typeof import('react-router')>('react-router')
   return { ...reel, useNavigate: () => naviguer, useSearchParams: () => [parametresUrl, vi.fn()] }
 })
 

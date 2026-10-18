@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, type ReactNode } from 'react'
 import type { PnLBreakdown } from '@/types'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useRealtimePrices } from '@/hooks/useRealtimePrices'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

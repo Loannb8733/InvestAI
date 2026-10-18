@@ -18,7 +18,7 @@ vi.mock('@/stores/authStore', () => ({
     selector({ user: { preferredCurrency: 'EUR' } }),
 }))
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }))
+vi.mock('react-router', () => ({ useNavigate: () => vi.fn() }))
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
