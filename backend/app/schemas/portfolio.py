@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PortfolioBase(BaseModel):
@@ -46,8 +46,7 @@ class PortfolioResponse(PortfolioBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioWithAssets(PortfolioResponse):
@@ -70,8 +69,7 @@ class AssetSummary(BaseModel):
     gain_loss: float
     gain_loss_percent: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Update forward reference

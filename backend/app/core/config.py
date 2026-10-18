@@ -3,7 +3,7 @@
 import os
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Environnements servis en clair (http://) : un cookie `secure` n'y est jamais
 # renvoyé par le client, donc toute la mécanique qui en dépend est intestable.
@@ -265,9 +265,7 @@ class Settings(BaseSettings):
         """Check if running in production mode."""
         return self.APP_ENV == "production" and not self.DEBUG
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 
 settings = Settings()

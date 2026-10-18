@@ -285,7 +285,7 @@ async def get_diversification_analysis(
 
 @router.get("/performance", response_model=PerformanceSummaryResponse)
 async def get_performance_summary(
-    period: str = Query("30d", regex="^(1d|7d|30d|90d|1y|all)$"),
+    period: str = Query("30d", pattern="^(1d|7d|30d|90d|1y|all)$"),
     portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -539,7 +539,7 @@ async def get_rebalance_orders(
 
 @router.get("/optimize", response_model=OptimizationResponse)
 async def optimize_portfolio(
-    objective: str = Query("max_sharpe", regex="^(max_sharpe|min_volatility)$"),
+    objective: str = Query("max_sharpe", pattern="^(max_sharpe|min_volatility)$"),
     days: int = Query(90, ge=30, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

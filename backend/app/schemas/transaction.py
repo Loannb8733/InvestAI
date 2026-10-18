@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.transaction import TransactionType
 from app.schemas._money import Money
@@ -67,8 +67,7 @@ class TransactionResponse(BaseModel):
     external_id: str | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionWithAsset(TransactionResponse):

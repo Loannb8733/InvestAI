@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.crowdfunding_project import ProjectStatus, RepaymentType
 from app.models.crowdfunding_repayment import PaymentType
@@ -75,8 +75,7 @@ class RepaymentResponse(BaseModel):
     notes: str | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------- Response schemas ----------
@@ -90,8 +89,7 @@ class ProjectDocumentResponse(BaseModel):
     audit_id: UUID | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentScheduleEntryResponse(BaseModel):
@@ -105,8 +103,7 @@ class PaymentScheduleEntryResponse(BaseModel):
     repayment_id: UUID | None = None
     status: str = "pending"  # "paid" | "pending" | "overdue"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CrowdfundingProjectResponse(BaseModel):
@@ -142,8 +139,7 @@ class CrowdfundingProjectResponse(BaseModel):
     repayments: list[RepaymentResponse] = []
     schedule: list[PaymentScheduleEntryResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CrowdfundingDashboardResponse(BaseModel):
@@ -333,8 +329,7 @@ class ProjectAuditResponse(BaseModel):
             "roi_net_percent": round((net_interest / invest) * 100, 2) if invest > 0 else 0,
         }
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------- Stress Test schemas ----------
