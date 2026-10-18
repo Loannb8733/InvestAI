@@ -45,12 +45,6 @@ class NotificationCountResponse(BaseModel):
     unread_count: int
 
 
-class MarkReadRequest(BaseModel):
-    """Request to mark notification as read."""
-
-    notification_id: UUID
-
-
 @router.get("", response_model=list[NotificationResponse])
 async def list_notifications(
     unread_only: bool = False,

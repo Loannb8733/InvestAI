@@ -10,7 +10,6 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.ml import adaptive_thresholds as at
-from app.models.asset import AssetType
 from app.models.user import User
 from app.services.prediction_service import prediction_service
 
@@ -40,24 +39,6 @@ class RegimeInfo(BaseModel):
     liquidity_warning: str | None = None
     regime_price_adjustment: bool | None = None
     adjustment_factor: float | None = None
-
-
-class AssetPredictionResponse(BaseModel):
-    """Asset prediction response."""
-
-    model_config = {"protected_namespaces": ()}
-
-    symbol: str
-    current_price: float
-    predictions: list[PredictionPoint]
-    trend: str
-    trend_strength: float
-    support_level: float
-    resistance_level: float
-    recommendation: str
-    model_used: str
-    regime_info: RegimeInfo | None = None
-    display_thresholds: dict | None = None
 
 
 class AnomalyResponse(BaseModel):
@@ -158,42 +139,6 @@ class PortfolioPredictionResponse(BaseModel):
     predictions: list[PortfolioAssetPrediction]
     summary: PortfolioPredictionSummary
     display_thresholds: dict | None = None
-
-
-@router.get("/asset/{symbol}", response_model=AssetPredictionResponse)
-async def get_asset_prediction(
-    symbol: str,
-    asset_type: str = Query("crypto", regex="^(crypto|stock|etf)$"),
-    days: int = Query(7, ge=1, le=30),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> AssetPredictionResponse:
-    """Get price predictions for a specific asset."""
-    type_map = {
-        "crypto": AssetType.CRYPTO,
-        "stock": AssetType.STOCK,
-        "etf": AssetType.ETF,
-    }
-
-    prediction = await prediction_service.get_price_prediction(
-        symbol.upper(),
-        type_map[asset_type],
-        days,
-    )
-
-    return AssetPredictionResponse(
-        symbol=prediction.symbol,
-        current_price=prediction.current_price,
-        predictions=[PredictionPoint(**p) for p in prediction.predictions],
-        trend=prediction.trend,
-        trend_strength=prediction.trend_strength,
-        support_level=prediction.support_level,
-        resistance_level=prediction.resistance_level,
-        recommendation=prediction.recommendation,
-        model_used=prediction.model_used,
-        regime_info=RegimeInfo(**prediction.regime_info) if prediction.regime_info else None,
-        display_thresholds=prediction.display_thresholds,
-    )
 
 
 @router.get("/portfolio", response_model=PortfolioPredictionResponse)

@@ -869,48 +869,7 @@ async def list_audits(
     return list(result.scalars().all())
 
 
-@router.get("/audits/{audit_id}", response_model=ProjectAuditResponse)
-@limiter.limit("30/minute")
-async def get_audit(
-    request: Request,
-    audit_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a specific audit by ID."""
-    result = await db.execute(
-        select(ProjectAudit).where(
-            ProjectAudit.id == audit_id,
-            ProjectAudit.user_id == current_user.id,
-        )
-    )
-    audit = result.scalar_one_or_none()
-    if not audit:
-        raise HTTPException(404, "Audit non trouvé")
-    return audit
-
-
 # ──────────────────── Payment Schedule ────────────────────
-
-
-@router.get("/{project_id}/schedule", response_model=list[PaymentScheduleEntryResponse])
-@limiter.limit("30/minute")
-async def get_schedule(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get the contractual payment schedule for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    entries = await reconciliation_service.get_schedule_for_project(db, project_id)
-
-    result = []
-    for e in entries:
-        resp = PaymentScheduleEntryResponse.model_validate(e)
-        resp.status = _compute_schedule_status(e)
-        result.append(resp)
-    return result
 
 
 # ──────────────────── Repayments ────────────────────
@@ -963,24 +922,6 @@ async def create_repayment(
     await db.commit()
     await db.refresh(repayment)
     return repayment
-
-
-@router.get("/{project_id}/repayments", response_model=list[RepaymentResponse])
-@limiter.limit("30/minute")
-async def list_repayments(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """List all repayments for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    result = await db.execute(
-        select(CrowdfundingRepayment)
-        .where(CrowdfundingRepayment.project_id == project_id)
-        .order_by(CrowdfundingRepayment.payment_date.desc())
-    )
-    return list(result.scalars().all())
 
 
 @router.delete("/{project_id}/repayments/{repayment_id}", status_code=204)
@@ -1128,25 +1069,6 @@ async def upload_documents(
         await db.refresh(doc)
 
     return docs
-
-
-@router.get("/{project_id}/documents", response_model=list[ProjectDocumentResponse])
-@limiter.limit("30/minute")
-async def list_project_documents(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """List all documents for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    result = await db.execute(
-        select(ProjectDocument)
-        .options(defer(ProjectDocument.file_data))  # skip binary content in listing
-        .where(ProjectDocument.project_id == project_id)
-        .order_by(ProjectDocument.created_at.desc())
-    )
-    return list(result.scalars().all())
 
 
 # ──────────────────── Stress Test ────────────────────

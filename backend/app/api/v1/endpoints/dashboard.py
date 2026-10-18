@@ -1313,35 +1313,6 @@ async def get_portfolio_sparklines(
     return sparklines
 
 
-@router.get("/recent-transactions", response_model=list[RecentTransaction])
-async def get_recent_transactions(
-    limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[RecentTransaction]:
-    """Get recent transactions."""
-    return await get_recent_transactions_internal(db, current_user, limit)
-
-
-@router.get("/active-alerts", response_model=list[ActiveAlert])
-async def get_active_alerts(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[ActiveAlert]:
-    """Get active alerts."""
-    return await get_active_alerts_internal(db, current_user)
-
-
-@router.get("/upcoming-events", response_model=list[UpcomingEvent])
-async def get_upcoming_events(
-    days: int = Query(30, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[UpcomingEvent]:
-    """Get upcoming calendar events."""
-    return await get_upcoming_events_internal(db, current_user, days)
-
-
 @router.get("/historical-data", response_model=list[HistoricalDataPoint])
 async def get_historical_data(
     days: int = Query(30, ge=0, le=3650),
@@ -1454,54 +1425,3 @@ async def get_benchmark_data(
 
 
 # ============== Backfill Endpoints ==============
-
-
-@router.post("/backfill-prices")
-async def trigger_price_backfill(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-):
-    """Trigger a backfill of historical prices for all assets.
-
-    Runs inline as a FastAPI background task (no Celery worker needed).
-    Falls back to Celery if available.
-    """
-    from app.tasks.history_cache import _fetch_and_cache_all
-
-    async def _run_backfill():
-        try:
-            count = await _fetch_and_cache_all()
-            logger.info("Backfill complete: %d assets cached", count)
-        except Exception as e:
-            logger.warning("Backfill failed: %s", e)
-
-    background_tasks.add_task(_run_backfill)
-    return {"status": "started", "message": "Backfill running in background"}
-
-
-@router.get("/backfill-status")
-async def get_backfill_status(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Check the status of historical price data coverage."""
-    from app.models.asset_price_history import AssetPriceHistory
-
-    # Count total price points in DB
-    count_result = await db.execute(select(func.count()).select_from(AssetPriceHistory))
-    total_points = count_result.scalar() or 0
-
-    # Count unique symbols with data
-    symbols_result = await db.execute(select(func.count(func.distinct(AssetPriceHistory.symbol))))
-    symbols_covered = symbols_result.scalar() or 0
-
-    # Count total active symbols
-    active_result = await db.execute(select(func.count(func.distinct(Asset.symbol))).where(Asset.quantity > 0))
-    total_active = active_result.scalar() or 0
-
-    return {
-        "total_price_points": total_points,
-        "symbols_covered": symbols_covered,
-        "total_active_symbols": total_active,
-        "is_complete": total_points > 0 and symbols_covered >= total_active,
-    }

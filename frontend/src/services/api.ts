@@ -243,34 +243,9 @@ export const dashboardApi = {
     return response.data
   },
 
-  getRecentTransactions: async (limit: number = 10) => {
-    const response = await api.get('/dashboard/recent-transactions', { params: { limit } })
-    return response.data
-  },
-
-  getActiveAlerts: async () => {
-    const response = await api.get('/dashboard/active-alerts')
-    return response.data
-  },
-
-  getUpcomingEvents: async (days: number = 30) => {
-    const response = await api.get('/dashboard/upcoming-events', { params: { days } })
-    return response.data
-  },
-
   getBenchmarks: async (days: number = 90) => {
     const response = await api.get('/dashboard/benchmarks', { params: { days } })
     return response.data
-  },
-
-  triggerBackfill: async () => {
-    const response = await api.post('/dashboard/backfill-prices')
-    return response.data
-  },
-
-  getBackfillStatus: async () => {
-    const response = await api.get('/dashboard/backfill-status')
-    return response.data as { total_price_points: number; symbols_covered: number; total_active_symbols: number; is_complete: boolean }
   },
 
   getMunitions: async (monthlyDca: number = 300, profile: string = 'moderate') => {
@@ -601,11 +576,6 @@ export const analyticsApi = {
     return response.data
   },
 
-  getRiskMetrics: async () => {
-    const response = await api.get('/analytics/risk-metrics', { timeout: ANALYTICS_TIMEOUT })
-    return response.data
-  },
-
   getMonteCarlo: async (
     horizon: number = 90,
     portfolioId?: string,
@@ -738,13 +708,6 @@ export const apiKeysApi = {
     return response.data
   },
 
-  importHistory: async (id: string) => {
-    const response = await api.post(`/api-keys/${id}/import-history`, {}, {
-      timeout: 300000, // 5 minutes timeout for import
-    })
-    return response.data
-  },
-
   importHistoryAsync: async (id: string) => {
     const response = await api.post(`/api-keys/${id}/import-async`)
     return response.data as { task_id: string; status: string; message: string }
@@ -794,12 +757,6 @@ export const coldWalletsApi = {
 
 // Predictions API
 export const predictionsApi = {
-  getAssetPrediction: async (symbol: string, assetType: string = 'crypto', days: number = 7) => {
-    const response = await api.get(`/predictions/asset/${symbol}`, {
-      params: { asset_type: assetType, days },
-    })
-    return response.data
-  },
 
   getPortfolioPredictions: async (days: number = 7) => {
     const response = await api.get('/predictions/portfolio', { params: { days } })
@@ -1132,11 +1089,6 @@ export const notesApi = {
     return response.data
   },
 
-  getTags: async () => {
-    const response = await api.get('/notes/tags')
-    return response.data
-  },
-
   list: async (params?: { tag?: string; asset_id?: string; search?: string; skip?: number; limit?: number }) => {
     const response = await api.get('/notes', { params })
     return response.data
@@ -1253,24 +1205,6 @@ export const calendarApi = {
 
 // Simulations API
 export const simulationsApi = {
-  getTypes: async () => {
-    const response = await api.get('/simulations/types')
-    return response.data
-  },
-
-  calculateFIRE: async (data: {
-    current_portfolio_value: number
-    monthly_contribution: number
-    monthly_expenses: number
-    expected_annual_return?: number
-    expense_ratio?: number
-    inflation_rate?: number
-    withdrawal_rate?: number
-    target_years?: number
-  }) => {
-    const response = await api.post('/simulations/fire', data)
-    return response.data
-  },
 
   // FIRE probabiliste (Monte Carlo) — taux en DÉCIMAL (0.04 = 4 %).
   // Les champs omis sont pré-remplis côté backend (portefeuille live,
@@ -1311,16 +1245,6 @@ export const simulationsApi = {
     expected_return?: number
   }) => {
     const response = await api.post('/simulations/dca', data)
-    return response.data
-  },
-
-  simulateWhatIf: async (data: {
-    scenario_type: string
-    asset_changes?: Record<string, number>
-    withdrawal_amount?: number
-    contribution_amount?: number
-  }) => {
-    const response = await api.post('/simulations/what-if', data)
     return response.data
   },
 
@@ -1430,11 +1354,6 @@ export const profileApi = {
 export const smartInsightsApi = {
   getHealth: async (days: number = 30) => {
     const response = await api.get('/smart-insights/health', { params: { days }, timeout: ANALYTICS_TIMEOUT })
-    return response.data
-  },
-
-  getRebalancing: async () => {
-    const response = await api.get('/smart-insights/rebalancing', { timeout: ANALYTICS_TIMEOUT })
     return response.data
   },
 
@@ -1574,11 +1493,6 @@ export const crowdfundingApi = {
     return response.data
   },
 
-  getAudit: async (id: string) => {
-    const response = await api.get(`/crowdfunding/audits/${id}`)
-    return response.data
-  },
-
   uploadDocuments: async (projectId: string, files: File[]) => {
     const formData = new FormData()
     files.forEach((f) => formData.append('files', f))
@@ -1586,11 +1500,6 @@ export const crowdfundingApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 120000,
     })
-    return response.data
-  },
-
-  listDocuments: async (projectId: string) => {
-    const response = await api.get(`/crowdfunding/${projectId}/documents`)
     return response.data
   },
 
@@ -1614,18 +1523,8 @@ export const crowdfundingApi = {
     return response.data
   },
 
-  listRepayments: async (projectId: string) => {
-    const response = await api.get(`/crowdfunding/${projectId}/repayments`)
-    return response.data
-  },
-
   deleteRepayment: async (projectId: string, repaymentId: string) => {
     await api.delete(`/crowdfunding/${projectId}/repayments/${repaymentId}`)
-  },
-
-  getSchedule: async (projectId: string) => {
-    const response = await api.get(`/crowdfunding/${projectId}/schedule`)
-    return response.data
   },
 
   getStressTest: async (projectId: string, delayMonths: number) => {

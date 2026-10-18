@@ -331,34 +331,6 @@ async def get_dashboard_summary(
     )
 
 
-@router.get("/rebalancing", response_model=list[RebalancingOrderResponse])
-async def get_rebalancing_suggestions(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[RebalancingOrderResponse]:
-    """
-    Suggestions de rééquilibrage basées sur l'optimisation MPT (Markowitz).
-
-    Retourne les ordres d'achat/vente suggérés pour maximiser le ratio de Sharpe.
-    """
-    report = await smart_insights_service.get_portfolio_health(db, str(current_user.id), days=30)
-
-    return [
-        RebalancingOrderResponse(
-            symbol=o.symbol,
-            name=o.name,
-            action=o.action,
-            current_weight=o.current_weight,
-            target_weight=o.target_weight,
-            current_value_eur=o.current_value_eur,
-            target_value_eur=o.target_value_eur,
-            amount_eur=o.amount_eur,
-            reason=o.reason,
-        )
-        for o in report.rebalancing_orders
-    ]
-
-
 @router.get("/anomalies-impact", response_model=list[AnomalyImpactResponse])
 async def get_anomalies_with_impact(
     current_user: User = Depends(get_current_user),

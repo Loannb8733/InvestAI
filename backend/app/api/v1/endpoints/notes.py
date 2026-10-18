@@ -204,31 +204,6 @@ async def get_notes_summary(
     )
 
 
-@router.get("/tags", response_model=list[str])
-async def list_tags(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[str]:
-    """List all unique tags used in notes."""
-    result = await db.execute(
-        select(Note.tags).where(
-            Note.user_id == current_user.id,
-            Note.tags.isnot(None),
-        )
-    )
-    tags_list = result.scalars().all()
-
-    all_tags = set()
-    for tags in tags_list:
-        if tags:
-            for tag in tags.split(","):
-                tag = tag.strip()
-                if tag:
-                    all_tags.add(tag)
-
-    return sorted(list(all_tags))
-
-
 @router.get("/scorecard", response_model=ScorecardResponse)
 @limiter.limit("30/minute")  # endpoint calculé (lecture lourde) — aligné sur les autres endpoints agrégés
 async def get_notes_scorecard(

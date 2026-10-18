@@ -87,12 +87,7 @@ GET  /api/v1/dashboard?days={0|1|7|30|90|365}
 GET  /api/v1/dashboard/benchmarks?days=
 GET  /api/v1/dashboard/portfolio/{id}
 GET  /api/v1/dashboard/portfolio/{id}/history
-GET  /api/v1/dashboard/recent-transactions
-GET  /api/v1/dashboard/active-alerts
-GET  /api/v1/dashboard/upcoming-events
 GET  /api/v1/dashboard/historical-data
-POST /api/v1/dashboard/backfill-prices
-GET  /api/v1/dashboard/backfill-status
 WS   /api/v1/ws/prices (WebSocket temps réel)
 ```
 
@@ -266,7 +261,6 @@ GET  /api/v1/analytics/portfolio/{id}           (par portefeuille)
 GET  /api/v1/analytics/correlation              (matrice corrélation)
 GET  /api/v1/analytics/diversification          (HHI + recommandations)
 GET  /api/v1/analytics/performance              (1d/7d/30d/90d/1y/all)
-GET  /api/v1/analytics/risk-metrics             (profil risque complet)
 GET  /api/v1/analytics/stress-test              (scénarios historiques)
 GET  /api/v1/analytics/beta                     (beta vs BTC, SPY)
 GET  /api/v1/analytics/monte-carlo?horizon=&simulations=
@@ -327,7 +321,6 @@ POST /api/v1/analytics/rebalance                (ordres rebalancing)
 
 #### Endpoints Backend
 ```
-GET  /api/v1/predictions/asset/{symbol}?days=    (prédiction par asset)
 GET  /api/v1/predictions/portfolio?days=          (prédictions portefeuille)
 GET  /api/v1/predictions/anomalies               (détection anomalies)
 GET  /api/v1/predictions/sentiment               (sentiment marché)
@@ -398,11 +391,8 @@ GET  /api/v1/predictions/track-record/{symbol}    (historique précision)
 
 #### Endpoints Backend
 ```
-POST /api/v1/simulations/fire       (calcul FIRE)
 POST /api/v1/simulations/project    (projection portefeuille)
 POST /api/v1/simulations/dca        (simulation DCA)
-POST /api/v1/simulations/what-if    (scénario what-if)
-GET  /api/v1/simulations/types      (types disponibles)
 GET/POST/DELETE /api/v1/simulations  (sauvegarder/charger simulations)
 ```
 
@@ -468,7 +458,6 @@ GET /api/v1/insights/backtest-dca        (backtest DCA)
 #### Endpoints Backend
 ```
 GET /api/v1/smart-insights/health?days=     (rapport santé complet)
-GET /api/v1/smart-insights/rebalancing      (suggestions rebalancing)
 GET /api/v1/smart-insights/anomalies-impact (anomalies + impact EUR)
 ```
 
@@ -580,7 +569,6 @@ POST   /api/v1/alerts/check         (vérification manuelle)
 #### Endpoints Backend
 ```
 GET    /api/v1/notes/summary    (statistiques)
-GET    /api/v1/notes/tags       (liste des tags)
 GET/POST/PATCH/DELETE /api/v1/notes
 ```
 
