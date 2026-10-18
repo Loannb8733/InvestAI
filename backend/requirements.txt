@@ -6,7 +6,7 @@ celery==5.3.6
 cryptography==43.0.3
 email-validator==2.1.0
 fastapi==0.109.0
-httpx==0.26.0
+httpx==0.28.1
 numpy==1.26.3
 openpyxl==3.1.2
 optuna==3.5.0

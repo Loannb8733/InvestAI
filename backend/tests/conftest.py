@@ -1,9 +1,8 @@
 """Pytest configuration and fixtures."""
 
-import asyncio
 import os
 import pathlib
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 
 # Set test env vars before any app import
 os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_1234567890")
@@ -18,7 +17,7 @@ os.environ.setdefault(
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -88,14 +87,6 @@ def pytest_configure(config: pytest.Config) -> None:
     config._investai_verrou = descripteur
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(autouse=True)
 async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
     """Flush slowapi's rate-limit buckets before every test.
@@ -154,7 +145,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     # declared with an empty path ("") are reachable ONLY at the no-slash URL
     # (e.g. "/api/v1/portfolios", not ".../portfolios/"). Tests must match that
     # exactly — there is no 307 to follow.
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
