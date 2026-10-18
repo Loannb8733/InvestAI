@@ -12,9 +12,9 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 ARG INSTALL_DEV=false
-COPY requirements.txt requirements-dev.txt ./
-RUN if [ "$INSTALL_DEV" = "true" ]; then REQ=requirements-dev.txt; else REQ=requirements.txt; fi && \
-    pip install --no-cache-dir --timeout=120 -r "$REQ"
+COPY requirements.txt requirements-prophet.txt requirements-dev.txt ./
+RUN if [ "$INSTALL_DEV" = "true" ]; then REQ=requirements-dev.txt; else REQ=requirements-prophet.txt; fi && \
+    pip install --no-cache-dir --timeout=120 -r requirements.txt -r "$REQ"
 
 # Install CmdStan for Prophet (pinned version for reproducibility)
 RUN python -m cmdstanpy.install_cmdstan --version 2.38.0 --cores 2 --dir /opt/cmdstan && \

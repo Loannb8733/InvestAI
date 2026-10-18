@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-render.txt requirements.txt
+COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # --- Runtime stage ---
@@ -24,9 +24,6 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    gir1.2-gdkpixbuf-2.0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
