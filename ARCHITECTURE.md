@@ -111,7 +111,6 @@ WS   /api/v1/ws/prices (WebSocket temps réel)
 - Données réelles (6220 prix en PostgreSQL)
 - `is_data_estimated: false` sur tous les points
 - Bandeau "Données estimées" supprimé
-- 20/20 tests de cohérence (`verify_dashboard_math.py`)
 
 ---
 
