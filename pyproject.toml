@@ -1,15 +1,23 @@
-[tool.black]
+[tool.ruff]
 line-length = 120
-target-version = ["py311"]
-include = '\.pyi?$'
+target-version = "py312"
+src = ["backend"]
+extend-exclude = ["backend/alembic"]
 
-[tool.isort]
-profile = "black"
-line_length = 120
-src_paths = ["backend/app"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "N", "UP", "B", "SIM", "RUF", "BLE", "C901", "PLR0915"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"!backend/app/domains/**" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 ignore_missing_imports = true
 no_strict_optional = true
 warn_return_any = false
