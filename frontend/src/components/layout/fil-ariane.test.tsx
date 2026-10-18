@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -13,7 +14,7 @@ vi.mock('@/stores/authStore', () => ({
     selector({ user: { role: 'user' }, logout: vi.fn() }),
 }))
 
-function renderHeader(url: string, Page?: () => JSX.Element | null) {
+function renderHeader(url: string, Page?: () => ReactElement | null) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
