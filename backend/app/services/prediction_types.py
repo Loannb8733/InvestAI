@@ -6,7 +6,6 @@ without pulling in the whole service. ``prediction_service`` re-exports them.
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
 
 # History window for ML predictions (days). Shared by prediction_service and its
 # extracted mixins so there is a single source of truth (and no import cycle).
@@ -19,19 +18,19 @@ class PricePrediction:
 
     symbol: str
     current_price: float
-    predictions: List[Dict]  # [{date, price, confidence_low, confidence_high}]
+    predictions: list[dict]  # [{date, price, confidence_low, confidence_high}]
     trend: str  # "bullish", "bearish", "neutral"
     trend_strength: float  # 0-100
     support_level: float
     resistance_level: float
     recommendation: str
     model_used: str
-    models_detail: List[Dict] = None  # [{name, weight_pct, mape, trend}]
-    explanations: List[Dict] = None  # SHAP explanations from XGBoost
-    regime_info: Optional[Dict] = None  # {dominant_regime, confidence, probabilities}
-    display_thresholds: Optional[Dict] = None  # adaptive thresholds for frontend
-    _history_dates: List = None  # internal: cached for accuracy calc
-    _history_prices: List[float] = None  # internal: cached for accuracy calc
+    models_detail: list[dict] = None  # [{name, weight_pct, mape, trend}]
+    explanations: list[dict] = None  # SHAP explanations from XGBoost
+    regime_info: dict | None = None  # {dominant_regime, confidence, probabilities}
+    display_thresholds: dict | None = None  # adaptive thresholds for frontend
+    _history_dates: list = None  # internal: cached for accuracy calc
+    _history_prices: list[float] = None  # internal: cached for accuracy calc
 
 
 @dataclass
@@ -40,7 +39,7 @@ class AnomalyDetection:
 
     symbol: str
     is_anomaly: bool
-    anomaly_type: Optional[str]
+    anomaly_type: str | None
     severity: str
     description: str
     detected_at: datetime
@@ -55,4 +54,4 @@ class MarketSentiment:
     sentiment_score: float
     fear_greed_index: int
     market_phase: str
-    signals: List[Dict]
+    signals: list[dict]

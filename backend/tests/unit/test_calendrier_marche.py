@@ -10,7 +10,7 @@ de combien, plutôt que de le supposer juste : ils épinglent le comportement
 réelle.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -26,7 +26,7 @@ from app.services.market_data_service import (
 
 
 def utc(annee, mois, jour, heure=12, minute=0):
-    return datetime(annee, mois, jour, heure, minute, tzinfo=timezone.utc)
+    return datetime(annee, mois, jour, heure, minute, tzinfo=UTC)
 
 
 class TestDetectionDeLaBourse:
@@ -167,7 +167,7 @@ class TestFraicheurDesPrix:
 
     def test_marche_ouvert_la_tolerance_est_de_quinze_minutes(self, monkeypatch):
         self._figer(monkeypatch, ferme_aujourdhui=False, ouvert=True)
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
 
         _, frais = price_staleness_hours("AAPL", maintenant - timedelta(minutes=10))
         _, perime = price_staleness_hours("AAPL", maintenant - timedelta(minutes=20))
@@ -177,7 +177,7 @@ class TestFraicheurDesPrix:
 
     def test_hors_seance_un_jour_ouvre_la_tolerance_monte_a_dix_huit_heures(self, monkeypatch):
         self._figer(monkeypatch, ferme_aujourdhui=False, ouvert=False)
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
 
         _, frais = price_staleness_hours("AAPL", maintenant - timedelta(hours=17))
         _, perime = price_staleness_hours("AAPL", maintenant - timedelta(hours=19))
@@ -188,7 +188,7 @@ class TestFraicheurDesPrix:
     def test_marche_ferme_pour_la_journee_la_tolerance_monte_a_soixante_douze_heures(self, monkeypatch):
         # Le seuil couvre un long week-end : vendredi soir à lundi matin.
         self._figer(monkeypatch, ferme_aujourdhui=True, ouvert=False)
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
 
         _, frais = price_staleness_hours("AAPL", maintenant - timedelta(hours=70))
         _, perime = price_staleness_hours("AAPL", maintenant - timedelta(hours=74))
@@ -198,7 +198,7 @@ class TestFraicheurDesPrix:
 
     def test_l_age_brut_est_rendu_quel_que_soit_le_verdict(self, monkeypatch):
         self._figer(monkeypatch, ferme_aujourdhui=False, ouvert=True)
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
 
         age, acceptable = price_staleness_hours("AAPL", maintenant - timedelta(hours=5))
 

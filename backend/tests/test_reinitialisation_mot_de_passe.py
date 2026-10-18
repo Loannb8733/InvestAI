@@ -10,7 +10,7 @@ et refus d'énumérer les comptes) et **ce qui ne protège pas** : deux constats
 sont commentés là où ils apparaissent (NEW-65 et NEW-66).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -60,7 +60,7 @@ class TestDemandeDeReinitialisation:
         compte = await _recharger(db_session, compte)
         assert compte.password_reset_token
         assert len(compte.password_reset_token) >= 40, "un jeton court serait devinable"
-        delai = compte.password_reset_expires - datetime.now(timezone.utc)
+        delai = compte.password_reset_expires - datetime.now(UTC)
         assert timedelta(minutes=55) < delai <= timedelta(hours=1)
 
     async def test_le_lien_envoye_porte_le_jeton(self, client, db_session, compte, monkeypatch):
@@ -166,7 +166,7 @@ class TestReinitialisation:
 
     async def test_un_jeton_expire_est_refuse_et_efface(self, client, db_session, compte, monkeypatch):
         jeton = await self._jeton(client, db_session, compte, monkeypatch)
-        compte.password_reset_expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        compte.password_reset_expires = datetime.now(UTC) - timedelta(minutes=1)
         await db_session.commit()
 
         reponse = await client.post(
@@ -367,7 +367,7 @@ class TestPorteeDesSessions:
         ancien_style = jose_jwt.encode(
             {
                 "sub": str(compte.id),
-                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+                "exp": datetime.now(UTC) + timedelta(minutes=15),
                 "type": "access",
                 "jti": "sans-generation",
             },

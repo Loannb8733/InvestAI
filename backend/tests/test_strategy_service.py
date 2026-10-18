@@ -1,6 +1,5 @@
 """Tests for strategy service — deployment capacity and munitions logic."""
 
-
 from app.services.strategy_service import PROFILE_ALLOCATION, DeploymentCapacity
 
 

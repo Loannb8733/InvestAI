@@ -4,9 +4,8 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ class BybitService(BaseExchangeService):
     def __init__(self, api_key: str, secret_key: str, passphrase: str = None):
         super().__init__(api_key, secret_key, passphrase)
         # Will be resolved on first successful call
-        self._base_url: Optional[str] = None
+        self._base_url: str | None = None
 
     @property
     def exchange_name(self) -> str:
@@ -112,7 +111,7 @@ class BybitService(BaseExchangeService):
             logger.error(f"Bybit test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bybit."""
         balances = []
         try:
@@ -159,11 +158,11 @@ class BybitService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Bybit using cursor-based pagination."""
         all_trades = []
         try:
@@ -217,7 +216,7 @@ class BybitService(BaseExchangeService):
                                 price=Decimal(trade.get("execPrice", "0")),
                                 fee=Decimal(trade.get("execFee", "0")),
                                 fee_currency=trade.get("feeCurrency", ""),
-                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000, tz=UTC),
                             )
                         )
                         fetched += 1
@@ -236,10 +235,10 @@ class BybitService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Bybit."""
         deposits = []
         try:
@@ -287,7 +286,7 @@ class BybitService(BaseExchangeService):
                             symbol=deposit.get("coin", ""),
                             amount=Decimal(deposit.get("amount", "0")),
                             timestamp=(
-                                datetime.fromtimestamp(int(success_time) / 1000, tz=timezone.utc)
+                                datetime.fromtimestamp(int(success_time) / 1000, tz=UTC)
                                 if int(success_time) > 0
                                 else datetime.now()
                             ),
@@ -303,10 +302,10 @@ class BybitService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bybit."""
         withdrawals = []
         try:
@@ -357,7 +356,7 @@ class BybitService(BaseExchangeService):
                             amount=Decimal(withdrawal.get("amount", "0")),
                             fee=Decimal(withdrawal.get("withdrawFee", "0")),
                             timestamp=(
-                                datetime.fromtimestamp(int(create_time) / 1000, tz=timezone.utc)
+                                datetime.fromtimestamp(int(create_time) / 1000, tz=UTC)
                                 if int(create_time) > 0
                                 else datetime.now()
                             ),

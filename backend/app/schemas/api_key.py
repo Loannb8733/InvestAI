@@ -1,7 +1,6 @@
 """API Key schemas."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -11,25 +10,25 @@ class APIKeyBase(BaseModel):
     """Base API key schema."""
 
     exchange: str = Field(..., max_length=50)
-    label: Optional[str] = Field(None, max_length=100)
+    label: str | None = Field(None, max_length=100)
 
 
 class APIKeyCreate(APIKeyBase):
     """Schema for creating an API key."""
 
     api_key: str = Field(..., min_length=1)
-    secret_key: Optional[str] = None
-    passphrase: Optional[str] = None
+    secret_key: str | None = None
+    passphrase: str | None = None
 
 
 class APIKeyUpdate(BaseModel):
     """Schema for updating an API key."""
 
-    label: Optional[str] = Field(None, max_length=100)
-    api_key: Optional[str] = None
-    secret_key: Optional[str] = None
-    passphrase: Optional[str] = None
-    is_active: Optional[bool] = None
+    label: str | None = Field(None, max_length=100)
+    api_key: str | None = None
+    secret_key: str | None = None
+    passphrase: str | None = None
+    is_active: bool | None = None
 
 
 class APIKeyResponse(APIKeyBase):
@@ -39,8 +38,8 @@ class APIKeyResponse(APIKeyBase):
     is_active: bool
     status: str = "active"
     error_count: int = 0
-    last_sync_at: Optional[datetime]
-    last_error: Optional[str]
+    last_sync_at: datetime | None
+    last_error: str | None
     created_at: datetime
 
     class Config:
@@ -52,7 +51,7 @@ class APIKeyTestResult(BaseModel):
 
     success: bool
     message: str
-    balance: Optional[dict] = None
+    balance: dict | None = None
 
 
 class ExchangeInfo(BaseModel):

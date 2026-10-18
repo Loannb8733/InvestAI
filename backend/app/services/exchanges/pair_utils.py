@@ -20,8 +20,6 @@ Sign / mapping conventions:
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 # Quote currencies an exchange pair can be denominated in, ordered LONGEST-FIRST so
 # that e.g. "USDT" matches before "USD" and "FDUSD" before "USD". Order within a length
 # is irrelevant. Keep stablecoins explicit so we never strip a real base asset.
@@ -62,7 +60,7 @@ _EUR_PEGGED = {"EUR", "EURT", "EURC"}
 CRYPTO_QUOTES = {"BTC", "ETH", "BNB"}
 
 
-def split_pair(symbol: str) -> Tuple[Optional[str], Optional[str]]:
+def split_pair(symbol: str) -> tuple[str | None, str | None]:
     """Split a pair symbol into ``(base, quote)`` using a known-quote suffix match.
 
     Returns ``(None, None)`` for empty input, and ``(symbol, None)`` when no known
@@ -86,7 +84,7 @@ def split_pair(symbol: str) -> Tuple[Optional[str], Optional[str]]:
     return (s, None)
 
 
-def quote_fx_currency(quote: Optional[str]) -> Optional[str]:
+def quote_fx_currency(quote: str | None) -> str | None:
     """Map a pair's quote currency to the fiat anchor used for FX conversion.
 
     USD-pegged stablecoins collapse to ``"USD"``; EUR-pegged to ``"EUR"``. Returns the
@@ -105,12 +103,12 @@ def quote_fx_currency(quote: Optional[str]) -> Optional[str]:
     return None
 
 
-def is_crypto_quote(quote: Optional[str]) -> bool:
+def is_crypto_quote(quote: str | None) -> bool:
     """True if the quote is a crypto asset (BTC/ETH/BNB), not a fiat anchor."""
     return bool(quote) and quote.strip().upper() in CRYPTO_QUOTES
 
 
-def fee_currency_quote_anchor(fee_currency: Optional[str], asset_symbol: Optional[str]) -> Optional[str]:
+def fee_currency_quote_anchor(fee_currency: str | None, asset_symbol: str | None) -> str | None:
     """Infer a trade's fiat anchor from the fee currency of an already-stored row.
 
     Used by the historical backfill, where the pair symbol is *not* available: the

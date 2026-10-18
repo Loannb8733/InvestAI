@@ -108,6 +108,5 @@ def test_le_proprietaire_est_enregistre_a_la_creation():
 def test_l_identifiant_du_proprietaire_ne_fuit_pas_dans_la_reponse():
     src = ast.unparse(_fonction(_KEYS, "get_import_status"))
     assert "!= 'user_id'" in src or '!= "user_id"' in src, (
-        "le user_id stocké doit être retiré de la réponse, sinon la route "
-        "expose l'identifiant interne du propriétaire"
+        "le user_id stocké doit être retiré de la réponse, sinon la route expose l'identifiant interne du propriétaire"
     )

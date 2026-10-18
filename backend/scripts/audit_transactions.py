@@ -106,7 +106,7 @@ async def main():
             )
         )
         dup_hashes = r.scalar()
-        print(f"\n=== RESUME ===")
+        print("\n=== RESUME ===")
         print(f"  Total transactions: {total}")
         print(f"  Sans hash: {no_hash}")
         print(f"  Hash en doublon: {dup_hashes}")

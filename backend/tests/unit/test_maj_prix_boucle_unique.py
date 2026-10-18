@@ -44,9 +44,9 @@ class TestBoucleUnique:
     def test_les_coroutines_sont_accessibles_au_niveau_module(self):
         """Imbriquées, elles ne pouvaient pas être enchaînées par un appelant."""
         for nom in ("_maj_crypto", "_maj_actions", "_maj_taux_change"):
-            assert inspect.iscoroutinefunction(
-                getattr(price_updates, nom, None)
-            ), f"{nom} n'est pas une coroutine de module : la tâche globale ne peut pas l'appeler"
+            assert inspect.iscoroutinefunction(getattr(price_updates, nom, None)), (
+                f"{nom} n'est pas une coroutine de module : la tâche globale ne peut pas l'appeler"
+            )
 
     def test_chaque_tache_garde_sa_propre_boucle(self):
         """Lancées séparément par le planificateur, elles doivent rester autonomes."""

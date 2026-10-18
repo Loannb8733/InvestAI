@@ -30,12 +30,14 @@ def environnement():
     fetcher = MagicMock()
     fetcher.get_history = AsyncMock(return_value=(_DATES, _PRIX))
     fetcher.close = AsyncMock()
-    with patch.object(history_cache, "_get_redis", return_value=_RedisVide()), patch.object(
-        history_cache, "HistoricalDataFetcher", return_value=fetcher
-    ), patch.object(history_cache, "_persist_prices_to_db", new=AsyncMock()), patch.object(
-        history_cache, "_get_all_crypto_symbols", new=AsyncMock(return_value=[("BTC", "crypto"), ("ETH", "crypto")])
-    ), patch.object(
-        history_cache.asyncio, "sleep", new=AsyncMock()
+    with (
+        patch.object(history_cache, "_get_redis", return_value=_RedisVide()),
+        patch.object(history_cache, "HistoricalDataFetcher", return_value=fetcher),
+        patch.object(history_cache, "_persist_prices_to_db", new=AsyncMock()),
+        patch.object(
+            history_cache, "_get_all_crypto_symbols", new=AsyncMock(return_value=[("BTC", "crypto"), ("ETH", "crypto")])
+        ),
+        patch.object(history_cache.asyncio, "sleep", new=AsyncMock()),
     ):
         yield fetcher
 

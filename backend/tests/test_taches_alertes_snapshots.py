@@ -12,7 +12,7 @@ place de `AsyncSessionLocal`.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -89,7 +89,7 @@ class TestSnapshotsQuotidiens:
         assert second["success"] == 0
 
     async def test_la_purge_respecte_l_anciennete_demandee(self, session_snapshots, regular_user):
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
         for jours in (400, 10):
             session_snapshots.add(
                 PortfolioSnapshot(
@@ -110,7 +110,7 @@ class TestSnapshotsQuotidiens:
         session_snapshots.add(
             PortfolioSnapshot(
                 user_id=regular_user.id,
-                snapshot_date=datetime.now(timezone.utc),
+                snapshot_date=datetime.now(UTC),
                 total_value=Decimal("100"),
                 total_invested=Decimal("100"),
                 total_gain_loss=Decimal("0"),

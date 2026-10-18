@@ -1,7 +1,6 @@
 """Analytics endpoints for portfolio analysis."""
 
 import logging
-from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -57,19 +56,19 @@ class PortfolioAnalyticsResponse(BaseModel):
     diversification_score: float
     concentration_risk: float
     asset_count: int
-    allocation_by_type: Dict[str, float]
-    allocation_by_asset: Dict[str, float]
-    assets: List[AssetPerformanceResponse]
-    best_performer: Optional[str]
-    worst_performer: Optional[str]
-    interpretations: Dict[str, str] = {}
+    allocation_by_type: dict[str, float]
+    allocation_by_asset: dict[str, float]
+    assets: list[AssetPerformanceResponse]
+    best_performer: str | None
+    worst_performer: str | None
+    interpretations: dict[str, str] = {}
 
 
 class CorrelationResponse(BaseModel):
-    symbols: List[str]
-    matrix: List[List[float]]
-    strongly_correlated: List[tuple]
-    negatively_correlated: List[tuple]
+    symbols: list[str]
+    matrix: list[list[float]]
+    strongly_correlated: list[tuple]
+    negatively_correlated: list[tuple]
 
 
 class RecommendationResponse(BaseModel):
@@ -84,13 +83,13 @@ class DiversificationResponse(BaseModel):
     concentration_risk: float
     asset_count: int
     type_count: int
-    allocation_by_type: Dict[str, float]
-    recommendations: List[RecommendationResponse]
+    allocation_by_type: dict[str, float]
+    recommendations: list[RecommendationResponse]
     rating: str
 
 
 class MonteCarloResponse(BaseModel):
-    percentiles: Dict[str, float]
+    percentiles: dict[str, float]
     expected_return: float
     prob_positive: float
     prob_loss_10: float
@@ -113,7 +112,7 @@ class RebalanceOrderResponse(BaseModel):
 
 
 class OptimizationResponse(BaseModel):
-    weights: Dict[str, float]
+    weights: dict[str, float]
     expected_return: float
     expected_volatility: float
     sharpe_ratio: float
@@ -123,10 +122,10 @@ class PerformanceSummaryItem(BaseModel):
     symbol: str
     name: str
     asset_type: str
-    gain_loss_percent: Optional[float] = None
-    current_value: Optional[float] = None
-    weight: Optional[float] = None
-    volatility: Optional[float] = None
+    gain_loss_percent: float | None = None
+    current_value: float | None = None
+    weight: float | None = None
+    volatility: float | None = None
 
 
 class PerformanceSummaryMetrics(BaseModel):
@@ -144,18 +143,18 @@ class PerformanceSummaryMetrics(BaseModel):
 class PerformanceSummaryResponse(BaseModel):
     period: str
     summary: PerformanceSummaryMetrics
-    top_gainers: List[PerformanceSummaryItem]
-    top_losers: List[PerformanceSummaryItem]
-    largest_positions: List[PerformanceSummaryItem]
-    most_volatile: List[PerformanceSummaryItem]
+    top_gainers: list[PerformanceSummaryItem]
+    top_losers: list[PerformanceSummaryItem]
+    largest_positions: list[PerformanceSummaryItem]
+    most_volatile: list[PerformanceSummaryItem]
 
 
 class RebalanceResponse(BaseModel):
-    orders: List[Dict]
+    orders: list[dict]
 
 
 class XIRRResponse(BaseModel):
-    xirr: Optional[float]
+    xirr: float | None
     currency: str = "EUR"
     description: str
 
@@ -245,7 +244,7 @@ async def get_portfolio_analytics(
 
 @router.get("/correlation", response_model=CorrelationResponse)
 async def get_correlation_matrix(
-    portfolio_id: Optional[str] = Query(None),
+    portfolio_id: str | None = Query(None),
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -263,7 +262,7 @@ async def get_correlation_matrix(
 
 @router.get("/diversification", response_model=DiversificationResponse)
 async def get_diversification_analysis(
-    portfolio_id: Optional[str] = Query(None),
+    portfolio_id: str | None = Query(None),
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -287,7 +286,7 @@ async def get_diversification_analysis(
 @router.get("/performance", response_model=PerformanceSummaryResponse)
 async def get_performance_summary(
     period: str = Query("30d", regex="^(1d|7d|30d|90d|1y|all)$"),
-    portfolio_id: Optional[str] = Query(None),
+    portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -443,8 +442,8 @@ async def get_risk_metrics(
 
 @router.get("/stress-test", response_model=dict)
 async def get_stress_test(
-    portfolio_id: Optional[str] = Query(None),
-    scenario_ids: Optional[str] = Query(None, description="Comma-separated scenario IDs to filter"),
+    portfolio_id: str | None = Query(None),
+    scenario_ids: str | None = Query(None, description="Comma-separated scenario IDs to filter"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -463,7 +462,7 @@ async def get_stress_test(
 @router.get("/beta", response_model=dict)
 async def get_beta(
     days: int = Query(90, ge=30, le=365),
-    portfolio_id: Optional[str] = Query(None),
+    portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -476,7 +475,7 @@ async def get_monte_carlo(
     background_tasks: BackgroundTasks,
     horizon: int = Query(90, ge=7, le=365),
     simulations: int = Query(5000, ge=1000, le=20000),
-    portfolio_id: Optional[str] = Query(None),
+    portfolio_id: str | None = Query(None),
     annual_withdrawal_rate: float = Query(
         0.0, ge=0, le=100, description="Annual withdrawal rate (%) — proportional mode"
     ),
@@ -588,7 +587,7 @@ async def get_xirr(
 
 @router.post("/rebalance", response_model=RebalanceResponse)
 async def get_rebalance_orders(
-    target_weights: Dict[str, float],
+    target_weights: dict[str, float],
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -646,7 +645,7 @@ async def optimize_portfolio(
 # ── Platform distribution ────────────────────────────────────────────
 
 
-PLATFORM_TRUST_SCORES: Dict[str, int] = {
+PLATFORM_TRUST_SCORES: dict[str, int] = {
     "tangem": 10,
     "ledger": 10,
     "trezor": 10,
@@ -676,7 +675,7 @@ class PlatformDistributionItem(BaseModel):
     trust_score: int
 
 
-@router.get("/distribution/platforms", response_model=List[PlatformDistributionItem])
+@router.get("/distribution/platforms", response_model=list[PlatformDistributionItem])
 async def get_platform_distribution(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

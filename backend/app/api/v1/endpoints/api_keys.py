@@ -1,8 +1,7 @@
 """API Keys endpoints for exchange connections."""
 
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import List
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -91,17 +90,17 @@ def earn_positions_to_close(net_rows, still_staked, epsilon: float = 0.0001):
 router = APIRouter()
 
 
-@router.get("/exchanges", response_model=List[ExchangeInfo])
-async def list_supported_exchanges() -> List[ExchangeInfo]:
+@router.get("/exchanges", response_model=list[ExchangeInfo])
+async def list_supported_exchanges() -> list[ExchangeInfo]:
     """List all supported exchanges."""
     return [ExchangeInfo(**exchange) for exchange in SUPPORTED_EXCHANGES]
 
 
-@router.get("", response_model=List[APIKeyResponse])
+@router.get("", response_model=list[APIKeyResponse])
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[APIKeyResponse]:
+) -> list[APIKeyResponse]:
     """List all API keys for the current user."""
     result = await db.execute(select(APIKey).where(APIKey.user_id == current_user.id))
     api_keys = result.scalars().all()
@@ -276,7 +275,7 @@ async def test_api_key(
             balance_dict = {b.symbol: float(b.total) for b in balances[:10]}
 
             # Update last sync
-            api_key.last_sync_at = datetime.now(timezone.utc)
+            api_key.last_sync_at = datetime.now(UTC)
             api_key.last_error = None
             await db.commit()
 
@@ -1159,7 +1158,7 @@ async def import_trade_history(
                 price=0,
                 fee=0,
                 currency="EUR",
-                executed_at=datetime.now(timezone.utc),
+                executed_at=datetime.now(UTC),
                 exchange=service.exchange_name,
                 notes=f"Auto: {staked_qty:.8f} {base_sym} in Earn/Staking",
             )
@@ -1214,7 +1213,7 @@ async def import_trade_history(
                     price=0,
                     fee=0,
                     currency="EUR",
-                    executed_at=datetime.now(timezone.utc),
+                    executed_at=datetime.now(UTC),
                     exchange=service.exchange_name,
                     notes=f"Auto: sortie d'Earn/Staking ({net_qty:.8f} {symbol})",
                 )
@@ -1325,7 +1324,7 @@ async def import_trade_history(
             logger.info(f"Reconciled {reconciled_count} assets with API balances")
 
         # Update last sync time
-        api_key.last_sync_at = datetime.now(timezone.utc)
+        api_key.last_sync_at = datetime.now(UTC)
         api_key.mark_success()
 
         await db.commit()
@@ -1497,7 +1496,7 @@ async def sync_exchange(
                 synced_count += 1
 
         # Update last sync time
-        api_key.last_sync_at = datetime.now(timezone.utc)
+        api_key.last_sync_at = datetime.now(UTC)
         api_key.mark_success()
 
         await db.commit()

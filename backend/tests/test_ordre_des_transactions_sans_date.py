@@ -22,7 +22,7 @@ concernées : l'ordre n'y change rien. Ce filet porte sur les endroits où
 l'ordre décide de ce que l'utilisateur voit.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -35,7 +35,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 @pytest.fixture

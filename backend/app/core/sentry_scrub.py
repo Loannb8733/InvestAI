@@ -19,7 +19,8 @@ debugging — losing a noisy field is fine, leaking a credential is not.
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, MutableMapping, Optional
+from collections.abc import Mapping, MutableMapping
+from typing import Any
 
 _REDACTED = "[redacted]"
 _MAX_STR_LEN = 1024
@@ -101,7 +102,7 @@ def _scrub(value: Any, depth: int = 0) -> Any:
     return value
 
 
-def scrub_event(event: Optional[dict], _hint: Optional[dict] = None) -> Optional[dict]:
+def scrub_event(event: dict | None, _hint: dict | None = None) -> dict | None:
     """Sentry ``before_send`` callback: redact secrets in-place before sending."""
     if event is None:
         return None

@@ -54,7 +54,7 @@ class TestGraineParDefaut:
         horloges = {a for a in appels if a.endswith(".time") or a in {"time", "monotonic"}}
 
         assert not horloges, (
-            f"la graine repart de l'horloge ({horloges}) : la projection " "changera de nouveau à chaque seconde"
+            f"la graine repart de l'horloge ({horloges}) : la projection changera de nouveau à chaque seconde"
         )
 
     def test_elle_ne_depend_pas_de_l_utilisateur(self):

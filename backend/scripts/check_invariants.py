@@ -45,7 +45,6 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import List
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -96,7 +95,7 @@ async def _fetchall(conn, sql: str, **params):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def check_holdings_qty(conn) -> List[Issue]:
+async def check_holdings_qty(conn) -> list[Issue]:
     """A. asset.quantity must equal the signed sum of its transactions.
 
     CROWDFUNDING assets are excluded — they represent off-chain real-estate
@@ -124,7 +123,7 @@ async def check_holdings_qty(conn) -> List[Issue]:
         GROUP BY a.id, a.symbol, a.quantity, p.user_id
         """,
     )
-    issues: List[Issue] = []
+    issues: list[Issue] = []
     for r in rows:
         stored = Decimal(str(r["stored_qty"] or 0))
         computed = Decimal(str(r["computed_qty"] or 0))
@@ -133,7 +132,7 @@ async def check_holdings_qty(conn) -> List[Issue]:
             pru = Decimal(str(r["pru"] or 0))
             immaterial, raison = classify_holdings_gap(stored, computed, pru)
             detail = (
-                f"asset={r['symbol']}({r['asset_id']}) stored={stored} " f"computed={computed} diff={stored - computed}"
+                f"asset={r['symbol']}({r['asset_id']}) stored={stored} computed={computed} diff={stored - computed}"
             )
             if immaterial:
                 detail += f" [{raison}]"
@@ -148,7 +147,7 @@ async def check_holdings_qty(conn) -> List[Issue]:
     return issues
 
 
-async def check_fee_currency_sanity(conn) -> List[Issue]:
+async def check_fee_currency_sanity(conn) -> list[Issue]:
     """G. Des frais libellés dans l'actif ne peuvent pas dépasser la quantité achetée.
 
     Une transaction Bitstack portait ``fee = 0,29`` avec ``fee_currency = 'BTC'`` sur
@@ -186,7 +185,7 @@ async def check_fee_currency_sanity(conn) -> List[Issue]:
     ]
 
 
-async def check_negative_qty(conn) -> List[Issue]:
+async def check_negative_qty(conn) -> list[Issue]:
     """D. asset.quantity must never be negative."""
     rows = await _fetchall(
         conn,
@@ -207,7 +206,7 @@ async def check_negative_qty(conn) -> List[Issue]:
     ]
 
 
-async def check_fx_consistency(conn) -> List[Issue]:
+async def check_fx_consistency(conn) -> list[Issue]:
     """E. Non-portfolio-currency trades must carry conversion_rate > 0."""
     rows = await _fetchall(
         conn,
@@ -232,7 +231,7 @@ async def check_fx_consistency(conn) -> List[Issue]:
     ]
 
 
-async def check_snapshot_uniqueness(conn) -> List[Issue]:
+async def check_snapshot_uniqueness(conn) -> list[Issue]:
     """F. Partial UNIQUE indexes from wave 3 #199 must hold in the DB."""
     rows = await _fetchall(
         conn,
@@ -257,7 +256,7 @@ async def check_snapshot_uniqueness(conn) -> List[Issue]:
     ]
 
 
-async def check_index_present(conn) -> List[Issue]:
+async def check_index_present(conn) -> list[Issue]:
     """Sanity: the two partial UNIQUE indexes from wave 3 #199 exist."""
     expected = (
         "uq_portfolio_snapshots_user_day_global",
@@ -278,7 +277,7 @@ async def check_index_present(conn) -> List[Issue]:
     return [Issue("ERROR", "schema", "-", f"missing UNIQUE index: {n}") for n in missing]
 
 
-async def check_uniq_transaction_hash(conn) -> List[Issue]:
+async def check_uniq_transaction_hash(conn) -> list[Issue]:
     """Sanity: uq_transactions_internal_hash (wave 3 #198 race fix) exists."""
     rows = await _fetchall(
         conn,
@@ -299,7 +298,7 @@ async def main() -> int:
     engine = create_async_engine(url, echo=False)
 
     print(f"Connected: {url.split('@')[-1]}\n")
-    all_issues: List[Issue] = []
+    all_issues: list[Issue] = []
 
     async with engine.connect() as conn:
         for fn in (

@@ -1,7 +1,7 @@
 """Strategy endpoints — CRUD + AI suggestions."""
 
 import logging
-from typing import List
+from datetime import UTC
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -59,7 +59,7 @@ async def _enrich(db: AsyncSession, strategy: Strategy) -> dict:
     }
 
 
-@router.get("", response_model=List[StrategyResponse])
+@router.get("", response_model=list[StrategyResponse])
 @limiter.limit("30/minute")
 async def list_strategies(
     request: Request,
@@ -171,7 +171,7 @@ async def delete_strategy(
     await db.commit()
 
 
-@router.post("/ai-suggest", response_model=List[StrategyResponse])
+@router.post("/ai-suggest", response_model=list[StrategyResponse])
 @limiter.limit("5/minute")
 async def ai_suggest_strategies(
     request: Request,
@@ -312,9 +312,9 @@ async def update_action_status(
     if data.status is not None:
         action.status = ActionStatus(data.status)
         if data.status == "EXECUTED":
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            action.executed_at = datetime.now(timezone.utc)
+            action.executed_at = datetime.now(UTC)
 
     await db.commit()
     return {

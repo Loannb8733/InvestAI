@@ -4,7 +4,6 @@ import json
 import logging
 import uuid
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -555,7 +554,7 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         db: AsyncSession,
         file_contents: list[tuple[str, bytes]],
         user_id: uuid.UUID,
-        project_id: Optional[uuid.UUID] = None,
+        project_id: uuid.UUID | None = None,
         munitions: float = 0.0,
         total_capital: float = 0.0,
     ) -> ProjectAudit:

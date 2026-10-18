@@ -13,7 +13,7 @@ sur le réseau. Ce qu'il laisse s'exécuter : la base de test, et **toutes** les
 décisions propres à cette fonction — c'est précisément ce qu'on vient éprouver.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -27,7 +27,7 @@ from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 def actif_agrege(symbole: str, valeur: float, quantite: float, *, investi: float | None = None) -> dict:
@@ -405,7 +405,7 @@ class TestInstantaneQuotidien:
             PortfolioSnapshot(
                 user_id=regular_user.id,
                 portfolio_id=None,
-                snapshot_date=datetime.now(timezone.utc),
+                snapshot_date=datetime.now(UTC),
                 total_value=4900,
                 total_invested=4000,
                 total_gain_loss=900,
@@ -512,7 +512,7 @@ class TestInstantaneQuotidien:
         """
         from sqlalchemy.exc import IntegrityError
 
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
         for _ in range(2):
             db_session.add(
                 PortfolioSnapshot(

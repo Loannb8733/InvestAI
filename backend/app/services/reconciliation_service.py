@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from dateutil.relativedelta import relativedelta
@@ -241,7 +241,7 @@ class ReconciliationService:
 
         closest = min(entries, key=lambda e: self.score_rapprochement(e, payment_date, amount))
         closest.is_completed = True
-        closest.completed_at = datetime.now(timezone.utc)
+        closest.completed_at = datetime.now(UTC)
         closest.repayment_id = repayment_id
 
         return closest

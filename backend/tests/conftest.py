@@ -3,7 +3,7 @@
 import asyncio
 import os
 import pathlib
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 # Set test env vars before any app import
 os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_1234567890")

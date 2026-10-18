@@ -12,7 +12,6 @@ alternative. Découpage à l'identique — aucune ligne de logique modifiée.
 
 import logging
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import select
@@ -24,8 +23,8 @@ from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
-from app.services.prediction_types import _HISTORY_DAYS  # noqa: F401 — re-exported
 from app.services.prediction_types import (  # noqa: F401 — re-exported for compatibility
+    _HISTORY_DAYS,  # noqa: F401 — re-exported
     AnomalyDetection,
     MarketSentiment,
     PricePrediction,
@@ -42,7 +41,7 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Detect the asset with the highest short-term alpha potential.
 
         Scores each held asset (quantity > 0) on 3 axes:
@@ -68,9 +67,9 @@ class PredictionAlphaMixin:
         raw_assets = result.scalars().all()
 
         # Deduplicate by symbol (Decimal precision)
-        asset_map: Dict[str, object] = {}
-        qty_map: Dict[str, Decimal] = {}
-        cash_like_qty: Dict[str, Decimal] = {}
+        asset_map: dict[str, object] = {}
+        qty_map: dict[str, Decimal] = {}
+        cash_like_qty: dict[str, Decimal] = {}
         for a in raw_assets:
             sym = a.symbol
             qty = Decimal(str(a.quantity))
@@ -87,7 +86,7 @@ class PredictionAlphaMixin:
             return {"found": False, "total_portfolio_value": 0.0}
 
         # ── Fetch BTC prices for correlation baseline ──
-        btc_prices: List[float] = []
+        btc_prices: list[float] = []
         try:
             cached = await get_cached_history("BTC", "crypto", 90)
             if cached and cached.get("prices"):
@@ -108,12 +107,12 @@ class PredictionAlphaMixin:
         btc_returns = np.diff(np.log(np.array(btc_prices, dtype=float))) if len(btc_prices) > 10 else np.array([])
 
         # ── Fetch Fear & Greed for regime detection ──
-        fear_greed: Optional[int] = await fetch_fear_greed_index()
+        fear_greed: int | None = await fetch_fear_greed_index()
 
         # ── Batch-fetch prices (same source as Dashboard for parity) ──
         crypto_symbols = [s for s, a in asset_map.items() if a.asset_type == AssetType.CRYPTO]
         stock_symbols = [s for s, a in asset_map.items() if a.asset_type in (AssetType.STOCK, AssetType.ETF)]
-        price_map: Dict[str, float] = {}
+        price_map: dict[str, float] = {}
 
         if crypto_symbols:
             try:
@@ -163,12 +162,12 @@ class PredictionAlphaMixin:
 
         _items = list(asset_map.items())[:_MAX_ASSETS]
         history_results = await _aio.gather(*[_fetch_history(s, a.asset_type.value) for s, a in _items])
-        history_map: Dict[str, List[float]] = {sym: prices for sym, prices in history_results}
+        history_map: dict[str, list[float]] = {sym: prices for sym, prices in history_results}
 
         # ── Pre-fetch 7d predictions in batches to limit memory ──
         import gc
 
-        _prediction_cache: Dict[str, Optional[PricePrediction]] = {}
+        _prediction_cache: dict[str, PricePrediction | None] = {}
 
         async def _fetch_prediction(sym: str, atype: AssetType) -> tuple:
             try:
@@ -190,7 +189,7 @@ class PredictionAlphaMixin:
         # ── Score each asset ──
         scored_assets = []
         total_value = Decimal("0")
-        value_map: Dict[str, float] = {}
+        value_map: dict[str, float] = {}
 
         for symbol, asset in _items:
             try:
@@ -248,7 +247,7 @@ class PredictionAlphaMixin:
                             }
                         )
                         logger.info(
-                            "Divergence %s CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f " "ET RSI(T-7)=%.2f < RSI(T)=%.2f",
+                            "Divergence %s CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f ET RSI(T-7)=%.2f < RSI(T)=%.2f",
                             symbol,
                             price_t7,
                             price_t,
@@ -590,7 +589,7 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Build a strategy decision table crossing Alpha scores with Cycle phase.
 
         Calls get_top_alpha_asset() and get_market_cycle() then merges
@@ -611,12 +610,12 @@ class PredictionAlphaMixin:
         fear_greed = cycle_data.get("fear_greed")
 
         # Build regime lookup by symbol
-        regime_map: Dict[str, Dict] = {}
+        regime_map: dict[str, dict] = {}
         for a in per_asset_cycle:
             regime_map[a["symbol"]] = a
 
         # Merge: for each scored asset, cross with its cycle regime
-        strategy_rows: List[Dict] = []
+        strategy_rows: list[dict] = []
         summary_buys = 0
         summary_sells = 0
         summary_holds = 0
@@ -721,8 +720,8 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-        scenarios: List[Dict],
-    ) -> Dict:
+        scenarios: list[dict],
+    ) -> dict:
         """Simulate what-if scenarios on the portfolio."""
         result = await db.execute(
             select(Portfolio).where(
@@ -749,8 +748,8 @@ class PredictionAlphaMixin:
         raw_assets = result.scalars().all()
 
         # Deduplicate by symbol (Decimal precision)
-        wi_asset_map: Dict[str, object] = {}
-        wi_qty_map: Dict[str, Decimal] = {}
+        wi_asset_map: dict[str, object] = {}
+        wi_qty_map: dict[str, Decimal] = {}
         for a in raw_assets:
             if a.symbol not in wi_asset_map:
                 wi_asset_map[a.symbol] = a

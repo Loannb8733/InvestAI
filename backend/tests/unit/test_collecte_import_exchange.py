@@ -5,13 +5,13 @@ de soldes et un appariement approximatif — et vivaient au milieu d'un bloc de
 1 121 lignes, donc sans le moindre test.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.services.exchange_import_collection import dedupliquer_convert_contre_fiat, normaliser_balances_earn
 from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder
 
-QUAND = datetime(2026, 3, 15, 10, 30, 0, tzinfo=timezone.utc)
+QUAND = datetime(2026, 3, 15, 10, 30, 0, tzinfo=UTC)
 
 
 def _solde(symbole, total, libre=None, bloque="0"):

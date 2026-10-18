@@ -4,9 +4,8 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,7 @@ class GateIOService(BaseExchangeService):
             logger.error(f"Gate.io test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Gate.io."""
         balances = []
 
@@ -124,11 +123,11 @@ class GateIOService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Gate.io.
 
         If no symbol is provided, fetches trades for all currency pairs
@@ -160,7 +159,7 @@ class GateIOService(BaseExchangeService):
         logger.info(f"Gate.io: Total trades found: {len(trades)}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)[:limit]
 
-    async def _get_trading_pairs_from_balances(self) -> List[str]:
+    async def _get_trading_pairs_from_balances(self) -> list[str]:
         """Build list of trading pairs from current balances."""
         pairs = []
         quote_currencies = ["USDT", "USD", "BTC", "ETH"]
@@ -183,10 +182,10 @@ class GateIOService(BaseExchangeService):
         self,
         client: httpx.AsyncClient,
         currency_pair: str,
-        start_time: Optional[datetime],
-        end_time: Optional[datetime],
+        start_time: datetime | None,
+        end_time: datetime | None,
         limit: int,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Fetch trades for a single currency pair with pagination."""
         trades = []
         page = 1
@@ -237,7 +236,7 @@ class GateIOService(BaseExchangeService):
                             price=Decimal(str(trade.get("price", "0"))),
                             fee=Decimal(str(trade.get("fee", "0"))),
                             fee_currency=trade.get("fee_currency", ""),
-                            timestamp=datetime.fromtimestamp(int(trade.get("create_time", 0)), tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(int(trade.get("create_time", 0)), tz=UTC),
                         )
                     )
 
@@ -255,10 +254,10 @@ class GateIOService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Gate.io."""
         deposits = []
 
@@ -304,7 +303,7 @@ class GateIOService(BaseExchangeService):
                             deposit_id=str(deposit.get("id", "")),
                             symbol=deposit.get("currency", ""),
                             amount=Decimal(str(deposit.get("amount", "0"))),
-                            timestamp=datetime.fromtimestamp(int(deposit.get("timestamp", 0)), tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(int(deposit.get("timestamp", 0)), tz=UTC),
                             status=status_map.get(deposit.get("status", ""), "unknown"),
                             tx_id=deposit.get("txid"),
                         )
@@ -317,10 +316,10 @@ class GateIOService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Gate.io."""
         withdrawals = []
 
@@ -374,7 +373,7 @@ class GateIOService(BaseExchangeService):
                             symbol=withdrawal.get("currency", ""),
                             amount=Decimal(str(withdrawal.get("amount", "0"))),
                             fee=Decimal(str(withdrawal.get("fee", "0"))),
-                            timestamp=datetime.fromtimestamp(int(withdrawal.get("timestamp", 0)), tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(int(withdrawal.get("timestamp", 0)), tz=UTC),
                             status=status_map.get(withdrawal.get("status", ""), "unknown"),
                             tx_id=withdrawal.get("txid"),
                             address=withdrawal.get("address"),

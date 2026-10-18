@@ -170,9 +170,10 @@ class TestCheckAndAlert:
         mock_user.id = "user-123"
         mock_user.telegram_chat_id = "12345"
 
-        with patch("app.services.regime_alert_service.AsyncSessionLocal") as mock_session_cls, patch(
-            "app.services.regime_alert_service.telegram_service"
-        ) as mock_tg:
+        with (
+            patch("app.services.regime_alert_service.AsyncSessionLocal") as mock_session_cls,
+            patch("app.services.regime_alert_service.telegram_service") as mock_tg,
+        ):
             # Setup async context manager
             mock_db = AsyncMock()
             mock_result = MagicMock()

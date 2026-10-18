@@ -40,8 +40,9 @@ class TestMemoireDuRegime:
         que le silence — l'alerte de régime sert à signaler un basculement, pas
         à signaler qu'on a oublié le précédent.
         """
-        with _redis_en_panne("app.services.regime_alert_service._get_redis_txt"), patch.object(
-            regime_alert_service, "_get_current_regime", new=AsyncMock(return_value="bearish")
+        with (
+            _redis_en_panne("app.services.regime_alert_service._get_redis_txt"),
+            patch.object(regime_alert_service, "_get_current_regime", new=AsyncMock(return_value="bearish")),
         ):
             resultat = await regime_alert_service.check_and_alert()
 

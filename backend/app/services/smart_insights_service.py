@@ -2,8 +2,7 @@
 
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,7 +81,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         days: int = 30,
     ) -> PortfolioHealthReport:
         """Generate complete portfolio health report with insights and recommendations."""
-        insights: List[SmartInsight] = []
+        insights: list[SmartInsight] = []
 
         # Get portfolio analytics
         try:
@@ -103,7 +102,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 rebalancing_orders=[],
                 anomaly_impacts=[],
                 metrics_summary={},
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
             )
 
         # Extract key metrics from PortfolioAnalytics dataclass (sanitize NaN/Inf)
@@ -233,7 +232,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
 
         # === CORRELATION ANALYSIS (risk clusters & diversification penalty) ===
         avg_top5_corr = 0.0
-        risk_clusters: List[Dict] = []
+        risk_clusters: list[dict] = []
         try:
             corr_data = await self.analytics_service.get_correlation_matrix(db, user_id, days=days)
             corr_insights, avg_top5_corr, risk_clusters = self._analyze_correlation(corr_data, top_holdings)
@@ -291,7 +290,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             anomaly_impacts=anomaly_impacts,
             metrics_summary=metrics_summary,
             market_regime=market_regime,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
         )
 
     async def _get_rebalancing_suggestions(
@@ -299,9 +298,9 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         db: AsyncSession,
         user_id: str,
         total_value: float,
-        market_regime: Optional[MarketRegime] = None,
+        market_regime: MarketRegime | None = None,
         days: int = 30,
-    ) -> List[RebalancingOrder]:
+    ) -> list[RebalancingOrder]:
         """Get concrete rebalancing orders based on MPT optimization.
 
         In bearish regimes with high confidence, reduces rebalancing urgency
@@ -370,7 +369,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 if is_bear_market and action == "sell" and regime_confidence > 0.6:
                     reason = (
                         f"Marché baissier — vente différée. "
-                        f"Poids actuel {current_weight*100:.1f}% vs optimal {target_weight*100:.1f}%. "
+                        f"Poids actuel {current_weight * 100:.1f}% vs optimal {target_weight * 100:.1f}%. "
                         f"Attendre une amélioration du régime avant de rééquilibrer."
                     )
                     orders.append(
@@ -390,11 +389,9 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
 
                 reason = ""
                 if action == "buy":
-                    reason = (
-                        f"Augmenter de {current_weight*100:.1f}% → {target_weight*100:.1f}% pour optimiser le Sharpe"
-                    )
+                    reason = f"Augmenter de {current_weight * 100:.1f}% → {target_weight * 100:.1f}% pour optimiser le Sharpe"
                 else:
-                    reason = f"Réduire de {current_weight*100:.1f}% → {target_weight*100:.1f}% (surpondéré)"
+                    reason = f"Réduire de {current_weight * 100:.1f}% → {target_weight * 100:.1f}% (surpondéré)"
 
                 orders.append(
                     RebalancingOrder(
@@ -426,8 +423,8 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                     target_value_eur=cash_amount,
                     amount_eur=cash_amount,
                     reason=(
-                        f"Marché baissier (confiance {regime_confidence*100:.0f}%) — "
-                        f"Constituez une réserve cash de {cash_reserve_pct*100:.0f}% "
+                        f"Marché baissier (confiance {regime_confidence * 100:.0f}%) — "
+                        f"Constituez une réserve cash de {cash_reserve_pct * 100:.0f}% "
                         f"({cash_amount:,.0f}€) pour accumuler au creux."
                     ),
                 ),
@@ -442,7 +439,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> List[AnomalyImpact]:
+    ) -> list[AnomalyImpact]:
         """Get anomalies with calculated EUR impact."""
         try:
             anomalies = await self.prediction_service.detect_anomalies(db, user_id)
@@ -531,16 +528,16 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         self,
         db: AsyncSession,
         user_id: str,
-        top_holdings: List[Dict],
+        top_holdings: list[dict],
         days: int = 30,
-    ) -> Optional[MarketRegime]:
+    ) -> MarketRegime | None:
         """Detect market regime for BTC (proxy) and top holdings."""
         # Minimum 90 jours pour que les indicateurs techniques fonctionnent (SMA50, Bollinger 20, etc.)
         regime_days = max(days, 90)
         try:
             # Fetch Fear & Greed Index
-            fear_greed: Optional[int] = await fetch_fear_greed_index(timeout=10.0)
-            vix_value: Optional[float] = None
+            fear_greed: int | None = await fetch_fear_greed_index(timeout=10.0)
+            vix_value: float | None = None
 
             # Fetch VIX (CBOE Volatility Index) for TradFi sentiment
             try:
@@ -595,7 +592,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             logger.error("Failed to detect market regime: %s", e)
             return None
 
-    def _regime_to_insight(self, regime: RegimeResult) -> Optional[SmartInsight]:
+    def _regime_to_insight(self, regime: RegimeResult) -> SmartInsight | None:
         """Convert a regime result into an insight/recommendation."""
         dominant = regime.dominant_regime
         prob = regime.probabilities.get(dominant, 0)
@@ -630,7 +627,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 severity=severity,
                 title="Marche baissier confirme" if prob > 0.55 else "Tendance baissiere detectee",
                 message=(
-                    f"Le marche est en regime baissier ({prob*100:.0f}% de probabilite). "
+                    f"Le marche est en regime baissier ({prob * 100:.0f}% de probabilite). "
                     f"Reduisez l'exposition aux actifs risques, "
                     f"constituez une reserve de liquidites (20-30% du portefeuille), "
                     f"evitez le levier et les achats impulsifs. "
@@ -647,7 +644,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 severity=InsightSeverity.INFO,
                 title="Creux potentiel detecte",
                 message=(
-                    f"Le marche montre des signes de creux ({prob*100:.0f}%). "
+                    f"Le marche montre des signes de creux ({prob * 100:.0f}%). "
                     f"Cela pourrait etre une zone d'accumulation si votre horizon est long terme. "
                     f"DCA recommande — ne tentez pas de timer le bottom exact."
                 ),
@@ -668,7 +665,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 severity=InsightSeverity.INFO,
                 title="Marche haussier",
                 message=(
-                    f"Le marche est en tendance haussiere ({prob*100:.0f}%). "
+                    f"Le marche est en tendance haussiere ({prob * 100:.0f}%). "
                     f"Conditions favorables pour vos positions. "
                     f"Preparez vos niveaux de prise de profits."
                 ),
@@ -684,7 +681,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 severity=severity,
                 title="Sommet potentiel detecte",
                 message=(
-                    f"Le marche montre des signes de surchauffe ({prob*100:.0f}%). "
+                    f"Le marche montre des signes de surchauffe ({prob * 100:.0f}%). "
                     f"Prenez des profits partiels (20-30%), "
                     f"renforcez vos stop-loss et evitez les achats impulsifs."
                 ),
@@ -711,9 +708,9 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         db: AsyncSession,
         user_id: str,
         total_value: float,
-        market_regime: Optional[MarketRegime],
-        metrics_summary: Dict,
-    ) -> Tuple[float, Optional[float], Optional[str]]:
+        market_regime: MarketRegime | None,
+        metrics_summary: dict,
+    ) -> tuple[float, float | None, str | None]:
         """Analyze gold/safe-haven exposure and compute Beta vs BTC.
 
         Returns (gold_exposure_fraction, gold_beta, badge_or_none).
@@ -749,8 +746,8 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         metrics_summary["gold_exposure"] = round(gold_exposure, 4)
 
         # Compute Beta vs BTC if gold found
-        gold_beta: Optional[float] = None
-        badge: Optional[str] = None
+        gold_beta: float | None = None
+        badge: str | None = None
         if gold_symbol:
             try:
                 _, btc_prices = get_cached_history("BTC", days=90)
@@ -777,10 +774,10 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         self,
         db: AsyncSession,
         user_id: str,
-        top_holdings: List[Dict],
-        metrics_summary: Dict,
-        market_regime: Optional[MarketRegime],
-    ) -> List[SmartInsight]:
+        top_holdings: list[dict],
+        metrics_summary: dict,
+        market_regime: MarketRegime | None,
+    ) -> list[SmartInsight]:
         """CIO Advisor: Analyze cross-asset correlations for strategic insights.
 
         Produces actionable insights like a Chief Investment Officer would:
@@ -789,7 +786,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         - Highlights natural hedges (e.g. Gold decorrelation)
         - Warns about simultaneous exposure to correlated macro factors
         """
-        insights: List[SmartInsight] = []
+        insights: list[SmartInsight] = []
 
         try:
             corr_data = await self.analytics_service.get_correlation_matrix(db, user_id, days=60)
@@ -925,13 +922,13 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         sharpe: float,
         volatility: float,
         var_95: float,
-        hhi: Optional[float],
+        hhi: float | None,
         anomaly_count: int,
         max_drawdown: float = 0.0,
         gold_exposure: float = 0.0,
-        market_regime: Optional[MarketRegime] = None,
+        market_regime: MarketRegime | None = None,
         avg_top5_corr: float = 0.0,
-    ) -> Tuple[int, str]:
+    ) -> tuple[int, str]:
         """Calculate overall portfolio health score (0-100)."""
         score = 100
         s_exc, s_good, s_fair, s_poor = adaptive_th.sharpe_classification()
@@ -1025,7 +1022,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-    ) -> Dict:
+    ) -> dict:
         """Lightweight summary for the dashboard IA widget.
 
         Returns health score, top insight, breakeven distance,

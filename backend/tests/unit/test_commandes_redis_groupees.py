@@ -54,8 +54,9 @@ class TestLectureGroupee:
         client.mget.side_effect = lambda cles: [stockees.get(cle) for cle in cles]
         base = MagicMock(return_value=([], []))
 
-        with patch.object(history_cache, "_get_redis", return_value=client), patch.object(
-            history_cache, "_charger_prix_depuis_db_sync", base
+        with (
+            patch.object(history_cache, "_get_redis", return_value=client),
+            patch.object(history_cache, "_charger_prix_depuis_db_sync", base),
         ):
             resultats = get_cached_histories(["BTC", "ETH", "SOL"], 30)
 

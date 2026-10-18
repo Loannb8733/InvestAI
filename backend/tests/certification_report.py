@@ -13,7 +13,7 @@ Usage:
 import importlib
 import inspect
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 CHECKS = []
 
@@ -150,7 +150,7 @@ def audit_parity_test():
 
 
 def main():
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     print("=" * 70)
     print("INVESTAI — SYSTEM CERTIFICATION REPORT")

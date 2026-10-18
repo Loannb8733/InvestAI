@@ -25,8 +25,7 @@ def check_all_alerts():
 
     result = run_async(_check_alerts())
     logger.info(
-        f"Alert check completed: {result['users_checked']} users checked, "
-        f"{result['alerts_triggered']} alerts triggered"
+        f"Alert check completed: {result['users_checked']} users checked, {result['alerts_triggered']} alerts triggered"
     )
     return result
 

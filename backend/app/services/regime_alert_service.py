@@ -7,7 +7,6 @@ trading parameters (risk_multiplier, alpha_threshold, gold shield status).
 """
 
 import logging
-from typing import Optional
 
 from sqlalchemy import select
 
@@ -32,7 +31,7 @@ class RegimeAlertService:
     def __init__(self) -> None:
         self.detector = MarketRegimeDetector()
 
-    async def _get_current_regime(self) -> Optional[str]:
+    async def _get_current_regime(self) -> str | None:
         """Detect current global regime via BTC prices (90-day window)."""
         try:
             from app.services.data_fetcher import get_cached_history
@@ -55,7 +54,7 @@ class RegimeAlertService:
                 return None
 
             # Fetch Fear & Greed for better accuracy
-            fear_greed: Optional[int] = await fetch_fear_greed_index(timeout=10.0)
+            fear_greed: int | None = await fetch_fear_greed_index(timeout=10.0)
 
             result = self.detector.detect(btc_prices, "BTC", fear_greed)
             return result.dominant_regime
@@ -85,7 +84,7 @@ class RegimeAlertService:
             logger.warning("Yahoo BTC fallback failed for regime detection: %s", e)
             return []
 
-    async def _get_last_regime(self) -> Optional[str]:
+    async def _get_last_regime(self) -> str | None:
         """Read last known regime from Redis.
 
         Rend ``None`` quand Redis est injoignable — la même valeur qu'à la

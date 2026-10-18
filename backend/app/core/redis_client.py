@@ -5,7 +5,8 @@ import hmac
 import json
 import logging
 import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization  # noqa: S403
-from typing import Any, Dict, Optional
+from datetime import UTC
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -29,7 +30,7 @@ def redis_async_url() -> str:
     return url
 
 
-def redis_ssl_kwargs() -> Dict[str, Any]:
+def redis_ssl_kwargs() -> dict[str, Any]:
     """Return extra kwargs needed for TLS connections (Upstash).
 
     ssl_cert_reqs="required" : redis-py valide le certificat du broker
@@ -51,7 +52,7 @@ def redis_ssl_kwargs() -> Dict[str, Any]:
 REDIS_DELAI_RESEAU = 3.0
 
 
-def redis_client_kwargs() -> Dict[str, Any]:
+def redis_client_kwargs() -> dict[str, Any]:
     """Options de connexion de tout client Redis applicatif : TLS et délais réseau.
 
     À utiliser pour chaque client qui exécute des commandes à réponse immédiate.
@@ -77,8 +78,8 @@ _HMAC_KEY: bytes = settings.SECRET_KEY.encode() if isinstance(settings.SECRET_KE
 logger = logging.getLogger(__name__)
 
 # Two async Redis clients: one for binary (pickle), one for text (JSON)
-_redis_bin: Optional[aioredis.Redis] = None
-_redis_txt: Optional[aioredis.Redis] = None
+_redis_bin: aioredis.Redis | None = None
+_redis_txt: aioredis.Redis | None = None
 
 
 async def _get_redis_bin() -> aioredis.Redis:
@@ -169,11 +170,11 @@ _FOREX_KEY_PREFIX = "forex:"
 # Dernière écriture de chaque taux par ce processus : (instant monotone, taux).
 # Le tableau de bord réécrivait le même taux à chaque recalcul, alors que la clé
 # vit 24 h — une commande Upstash facturée pour rien.
-_forex_ecrits: Dict[tuple, tuple] = {}
+_forex_ecrits: dict[tuple, tuple] = {}
 _FOREX_REECRITURE_S = 3600
 
 
-async def get_cached_forex_rate(from_ccy: str, to_ccy: str) -> Optional[dict]:
+async def get_cached_forex_rate(from_ccy: str, to_ccy: str) -> dict | None:
     """Get cached forex rate. Returns {"rate": float, "cached_at": ISO timestamp} or None."""
     try:
         r = await _get_redis_txt()
@@ -204,13 +205,13 @@ async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
     if precedent and precedent[1] == rate and time.monotonic() - precedent[0] < _FOREX_REECRITURE_S:
         return
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         r = await _get_redis_txt()
         payload = json.dumps(
             {
                 "rate": rate,
-                "cached_at": datetime.now(timezone.utc).isoformat(),
+                "cached_at": datetime.now(UTC).isoformat(),
             }
         )
         await r.setex(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}", _FOREX_CACHE_TTL, payload)
@@ -233,7 +234,7 @@ def _dashboard_key(user_id: str, days: int, currency: str) -> str:
     return f"{_DASHBOARD_KEY_PREFIX}{user_id}:{days}:{currency}"
 
 
-async def get_cached_dashboard(user_id: str, days: int, currency: str) -> Optional[dict]:
+async def get_cached_dashboard(user_id: str, days: int, currency: str) -> dict | None:
     """Get cached dashboard response dict, or None on miss/error."""
     try:
         r = await _get_redis_txt()
@@ -280,7 +281,7 @@ CONTRARIAN_STATS_KEY = "contrarian_stats:btc:fng"
 CONTRARIAN_STATS_TTL = 691200  # 8 days
 
 
-async def get_cached_contrarian_stats() -> Optional[dict]:
+async def get_cached_contrarian_stats() -> dict | None:
     """Get cached contrarian backtest stats dict, or None on miss/error."""
     try:
         r = await _get_redis_txt()
@@ -295,7 +296,7 @@ async def get_cached_contrarian_stats() -> Optional[dict]:
 # ── JSON-based caches (use text client) ──────────────────────────────
 
 
-async def get_cached_prediction(symbol: str, days: int) -> Optional[dict]:
+async def get_cached_prediction(symbol: str, days: int) -> dict | None:
     """Get cached prediction result."""
     try:
         r = await _get_redis_txt()
@@ -316,7 +317,7 @@ async def cache_prediction(symbol: str, days: int, result: dict, ttl: int = 1800
         logger.warning("Failed to cache prediction: %s", e)
 
 
-async def get_cached_hyperparams(symbol: str, model_name: str) -> Optional[dict]:
+async def get_cached_hyperparams(symbol: str, model_name: str) -> dict | None:
     """Get cached optimal hyperparameters."""
     try:
         r = await _get_redis_txt()
@@ -343,7 +344,7 @@ async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int
 _JOURS_CACHE_TACHE = 365
 
 
-async def get_cached_history(symbol: str, asset_type: str, days: int) -> Optional[dict]:
+async def get_cached_history(symbol: str, asset_type: str, days: int) -> dict | None:
     """Historique en cache, en lisant aussi ce qu'écrit la tâche périodique.
 
     Deux caches d'historique coexistaient sans se connaître :
@@ -403,7 +404,7 @@ async def cache_history(symbol: str, asset_type: str, days: int, result: dict, t
         logger.warning("Failed to cache history: %s", e)
 
 
-async def get_cached_ensemble(symbol: str, data_hash: str, days: int) -> Optional[dict]:
+async def get_cached_ensemble(symbol: str, data_hash: str, days: int) -> dict | None:
     """Get cached ensemble forecast result."""
     try:
         r = await _get_redis_txt()
@@ -428,7 +429,7 @@ async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, t
         logger.warning("Failed to cache ensemble: %s", e)
 
 
-async def get_cached_reliability(symbol: str, days: int) -> Optional[dict]:
+async def get_cached_reliability(symbol: str, days: int) -> dict | None:
     """Get cached reliability scores."""
     try:
         r = await _get_redis_txt()
@@ -462,7 +463,7 @@ def _sign_payload(data: bytes) -> bytes:
     return sig + data
 
 
-def _verify_and_extract(data: bytes) -> Optional[bytes]:
+def _verify_and_extract(data: bytes) -> bytes | None:
     """Verify HMAC signature and return raw pickle payload, or None if invalid."""
     if len(data) <= _HMAC_SIG_LEN:
         return None
@@ -474,7 +475,7 @@ def _verify_and_extract(data: bytes) -> Optional[bytes]:
     return None
 
 
-async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> Optional[object]:
+async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> object | None:
     """Get cached fitted model from Redis (HMAC-verified before deserialization)."""
     try:
         r = await _get_redis_bin()

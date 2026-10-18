@@ -1,7 +1,6 @@
 """API dependencies."""
 
 import logging
-from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -50,7 +49,7 @@ def jeton_perime_par_un_changement(payload: dict, user: User) -> bool:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Get current authenticated user from JWT token (header or cookie)."""
@@ -207,9 +206,9 @@ async def get_current_admin_user(
 
 async def get_optional_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
     db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
+) -> User | None:
     """Get current user if authenticated, None otherwise.
 
     Unlike get_current_user, this does not raise exceptions for invalid tokens.

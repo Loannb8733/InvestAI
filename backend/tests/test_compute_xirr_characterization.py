@@ -16,7 +16,7 @@ Ces tests épinglent ce qu'elle fait aujourd'hui, avant tout découpage. Ils ne
 disent pas ce qu'elle devrait faire.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -26,7 +26,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.analytics_service import AnalyticsService
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 @pytest.fixture
@@ -241,8 +241,9 @@ class TestDevise:
         """Le service de change peut tomber ; le TRI reste calculé à taux 1."""
         await _portefeuille_avec_achat(db_session, regular_user)
 
-        with _valeur_courante(20000.0), patch.object(
-            service.price_service, "get_forex_rate", AsyncMock(side_effect=Exception("réseau"))
+        with (
+            _valeur_courante(20000.0),
+            patch.object(service.price_service, "get_forex_rate", AsyncMock(side_effect=Exception("réseau"))),
         ):
             taux = await service.compute_xirr(db_session, regular_user.id, currency="USD")
 
@@ -255,11 +256,13 @@ class TestRepliSurLesPrixDesActifs:
         actif. Le TRI est rendu quand même, plutôt que perdu."""
         await _portefeuille_avec_achat(db_session, regular_user, quantite="1", prix="10000")
 
-        with patch(
-            "app.services.metrics_service.metrics_service.get_user_dashboard_metrics",
-            new=AsyncMock(side_effect=Exception("indisponible")),
-        ), patch.object(service, "_get_asset_price", new=AsyncMock(return_value=20000.0)), patch.object(
-            service.price_service, "get_forex_rate", new=AsyncMock(return_value=1.0)
+        with (
+            patch(
+                "app.services.metrics_service.metrics_service.get_user_dashboard_metrics",
+                new=AsyncMock(side_effect=Exception("indisponible")),
+            ),
+            patch.object(service, "_get_asset_price", new=AsyncMock(return_value=20000.0)),
+            patch.object(service.price_service, "get_forex_rate", new=AsyncMock(return_value=1.0)),
         ):
             taux = await service.compute_xirr(db_session, regular_user.id)
 

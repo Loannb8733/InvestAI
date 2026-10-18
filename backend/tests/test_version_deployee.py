@@ -93,6 +93,7 @@ class TestVersionDeSchema:
         """
         from alembic.config import Config
         from alembic.script import ScriptDirectory
+
         from app.main import _REVISION_ATTENDUE
 
         script = ScriptDirectory.from_config(Config("alembic.ini"))

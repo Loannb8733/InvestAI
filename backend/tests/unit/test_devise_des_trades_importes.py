@@ -16,14 +16,14 @@ taux implicite de 1 — un prix en dollars compté comme des euros, soit exactem
 l'écart que FIN-01 a corrigé.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
 from app.tasks.sync_exchanges import _resolve_trade_fx
 
-QUAND = datetime(2026, 3, 15, tzinfo=timezone.utc)
+QUAND = datetime(2026, 3, 15, tzinfo=UTC)
 
 
 class ServiceDeChange:
@@ -100,7 +100,7 @@ class TestConversion:
         # Un taux d'aujourd'hui appliqué à un achat de 2024 fausserait le prix de
         # revient de tout l'écart de change accumulé depuis.
         fx = ServiceDeChange(Decimal("0.88"))
-        ancien = datetime(2024, 6, 1, 14, 30, tzinfo=timezone.utc)
+        ancien = datetime(2024, 6, 1, 14, 30, tzinfo=UTC)
 
         await _resolve_trade_fx(fx, "USDT", ancien)
 

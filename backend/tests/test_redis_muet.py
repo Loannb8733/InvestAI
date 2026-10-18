@@ -60,7 +60,7 @@ async def test_une_requete_authentifiee_aboutit_malgre_un_redis_muet(
     debut = time.monotonic()
     try:
         reponse = await asyncio.wait_for(client.get("/api/v1/portfolios", headers=entetes), _DELAI_DE_GARDE)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.fail(f"requête toujours suspendue après {_DELAI_DE_GARDE:.0f} s : Redis muet bloque l'API")
     duree = time.monotonic() - debut
 

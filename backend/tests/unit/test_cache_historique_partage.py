@@ -30,9 +30,9 @@ class TestConventionsDeCles:
     def test_le_lecteur_connait_le_format_de_la_tache(self):
         source = Path(redis_client.__file__).read_text(encoding="utf-8")
         # La clé de la tâche est `hist:<SYM>_<jours>` : le lecteur doit la construire.
-        assert (
-            "_{days}" in source or "_{_JOURS_CACHE_TACHE}" in source
-        ), "get_cached_history ne cherche pas les clés écrites par la tâche périodique"
+        assert "_{days}" in source or "_{_JOURS_CACHE_TACHE}" in source, (
+            "get_cached_history ne cherche pas les clés écrites par la tâche périodique"
+        )
 
     def test_la_couverture_annuelle_est_alignee_sur_la_tache(self):
         assert redis_client._JOURS_CACHE_TACHE == history_cache.DEFAULT_CACHE_DAYS, (
@@ -47,9 +47,9 @@ class TestConventionsDeCles:
         entrees = [c for c in planning.values() if "history_cache" in c.get("task", "")]
         assert entrees, "la tâche de pré-chargement n'est plus planifiée : le cache ne serait plus alimenté"
         # Le TTL Redis est d'1 h : passer au-delà laisserait des trous.
-        assert (
-            min(e["schedule"] for e in entrees) <= history_cache.REDIS_HISTORY_TTL
-        ), "la tâche passe moins souvent que le TTL du cache : des trous apparaîtraient"
+        assert min(e["schedule"] for e in entrees) <= history_cache.REDIS_HISTORY_TTL, (
+            "la tâche passe moins souvent que le TTL du cache : des trous apparaîtraient"
+        )
 
 
 class TestLectureReconciliee:

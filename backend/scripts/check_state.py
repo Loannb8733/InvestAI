@@ -1,4 +1,5 @@
 """Quick state check."""
+
 import asyncio
 import sys
 

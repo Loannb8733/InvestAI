@@ -10,7 +10,7 @@ No real DB/HTTP: the session, FX service and exchange service are faked. Only th
 instant-buys + (empty) trades branches run; every other branch is hasattr-gated off.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -19,7 +19,7 @@ import pytest
 import app.tasks.sync_exchanges as sync_mod
 from app.tasks.sync_exchanges import _sync_detailed_transactions
 
-_TS = datetime(2024, 1, 17, 12, 0, tzinfo=timezone.utc)
+_TS = datetime(2024, 1, 17, 12, 0, tzinfo=UTC)
 
 
 class _FakeResult:

@@ -1,7 +1,5 @@
 """System administration endpoints."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +22,7 @@ class MessageResponse(BaseModel):
 class EmailTestRequest(BaseModel):
     """Request to send a test email."""
 
-    to_email: Optional[EmailStr] = None
+    to_email: EmailStr | None = None
 
 
 class EmailTestResponse(BaseModel):
@@ -33,7 +31,7 @@ class EmailTestResponse(BaseModel):
     success: bool
     message: str
     email_configured: bool
-    smtp_host: Optional[str] = None
+    smtp_host: str | None = None
 
 
 class SystemStatusResponse(BaseModel):
@@ -109,7 +107,7 @@ async def test_email(
     <ul>
         <li>Host: {settings.SMTP_HOST}</li>
         <li>Port: {settings.SMTP_PORT}</li>
-        <li>TLS: {'Oui' if settings.SMTP_TLS else 'Non'}</li>
+        <li>TLS: {"Oui" if settings.SMTP_TLS else "Non"}</li>
         <li>From: {settings.SMTP_FROM_EMAIL}</li>
     </ul>
     """

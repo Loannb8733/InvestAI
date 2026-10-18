@@ -77,9 +77,9 @@ async def create_admin():
         session.add(admin)
         await session.commit()
 
-        print(f"\n✅ Admin créé avec succès!")
+        print("\n✅ Admin créé avec succès!")
         print(f"   Email: {email}")
-        print(f"   Rôle: admin")
+        print("   Rôle: admin")
 
     await engine.dispose()
 

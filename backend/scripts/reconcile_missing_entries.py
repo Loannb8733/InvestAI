@@ -44,7 +44,7 @@ import argparse
 import asyncio
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -132,7 +132,7 @@ async def reconcile(commit: bool) -> int:
                     price=pru,
                     fee=0,
                     currency="EUR",
-                    executed_at=datetime.now(timezone.utc),
+                    executed_at=datetime.now(UTC),
                     exchange=asset.exchange,
                     notes=f"Réconciliation : {reason}",
                 )

@@ -106,7 +106,7 @@ class TestBTCCrashGoldResilient:
 
         # Gold portfolio loses less
         assert loss_with_gold > loss_all_btc, (
-            f"Gold hedge should reduce loss: all-BTC={loss_all_btc:.2f}, " f"with-gold={loss_with_gold:.2f}"
+            f"Gold hedge should reduce loss: all-BTC={loss_all_btc:.2f}, with-gold={loss_with_gold:.2f}"
         )
         # The dampening should be at least 1 EUR on a 1000 EUR portfolio
         dampening = loss_with_gold - loss_all_btc

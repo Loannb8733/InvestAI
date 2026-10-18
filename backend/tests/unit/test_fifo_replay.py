@@ -5,7 +5,7 @@ behaviour the two legacy replays (metrics_service / report_service tax 2086)
 exhibited before unification.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -22,7 +22,7 @@ from app.services.fifo_replay import (
 )
 
 D = Decimal
-T0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+T0 = datetime(2024, 1, 1, tzinfo=UTC)
 
 _seq = iter(range(1, 10_000))
 

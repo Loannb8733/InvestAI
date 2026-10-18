@@ -112,6 +112,6 @@ class TestComportement:
         cle = CleFactice()
         with caplog.at_level(logging.ERROR):
             classify_and_mark_error(cle, Exception("panne"))
-        assert any(
-            "sync error" in m for m in caplog.messages
-        ), "une erreur générique sans trace laisse un incident indiagnosticable"
+        assert any("sync error" in m for m in caplog.messages), (
+            "une erreur générique sans trace laisse un incident indiagnosticable"
+        )

@@ -1,7 +1,6 @@
 """Application configuration."""
 
 import os
-from typing import List, Optional, Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -34,7 +33,7 @@ class Settings(BaseSettings):
 
     # Encryption for API keys - Required for production
     FERNET_KEY: str  # Required - no default
-    FERNET_OLD_KEYS: Optional[str] = None  # Comma-separated old keys for rotation
+    FERNET_OLD_KEYS: str | None = None  # Comma-separated old keys for rotation
 
     # Shared secret for cron-triggered task endpoints (/api/v1/cron/*). When empty,
     # those endpoints are disabled (503). Set to a long random value in prod and in
@@ -46,7 +45,7 @@ class Settings(BaseSettings):
     CELERY_WORKER_AVAILABLE: bool = False
 
     # Cookie settings
-    COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
+    COOKIE_DOMAIN: str | None = None  # None = current domain only
     COOKIE_SECURE: bool = True  # Secure by default; overridden to False in dev via .env
 
     @field_validator("COOKIE_SECURE", mode="before")
@@ -171,9 +170,9 @@ class Settings(BaseSettings):
 
     # CORS - Restricted methods and headers
     # Override with comma-separated env var: CORS_ORIGINS=https://mysite.com,https://www.mysite.com
-    CORS_ORIGINS: Union[
-        str, List[str]
-    ] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    CORS_ORIGINS: str | list[str] = (
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -182,7 +181,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
-    CORS_ALLOWED_METHODS: List[str] = [
+    CORS_ALLOWED_METHODS: list[str] = [
         "GET",
         "POST",
         "PUT",
@@ -190,7 +189,7 @@ class Settings(BaseSettings):
         "DELETE",
         "OPTIONS",
     ]
-    CORS_ALLOWED_HEADERS: List[str] = [
+    CORS_ALLOWED_HEADERS: list[str] = [
         "Authorization",
         "Content-Type",
         "Accept",

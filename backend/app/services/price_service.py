@@ -4,9 +4,8 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ class PriceService:
     CRYPTOCOMPARE_BASE_URL = "https://min-api.cryptocompare.com/data"
 
     @staticmethod
-    def _entetes_cryptocompare() -> Dict[str, str]:
+    def _entetes_cryptocompare() -> dict[str, str]:
         """En-tête d'authentification CryptoCompare.
 
         Sans lui, une clé configurée resterait lettre morte : l'API attend
@@ -45,7 +44,7 @@ class PriceService:
     # Partagé par la classe, pas par l'instance : le tableau de bord crée un
     # PriceService par requête (dashboard.py, snapshot_service.py), et un mémo
     # d'instance laissait relire le même taux trois fois dans une requête.
-    _forex_memo: Dict[tuple, tuple] = {}
+    _forex_memo: dict[tuple, tuple] = {}
 
     # Unified symbol map for CoinGecko IDs (single source of truth)
     SYMBOL_MAP = COINGECKO_SYMBOL_MAP
@@ -68,7 +67,7 @@ class PriceService:
         self.http_client = httpx.AsyncClient(timeout=3.0, headers=headers)
 
         # Dynamic symbol cache (discovered from API)
-        self._dynamic_symbol_cache: Dict[str, str] = {}
+        self._dynamic_symbol_cache: dict[str, str] = {}
 
     def _handle_401(self):
         """Handle invalid CoinGecko API key — strip it and retry without."""
@@ -81,7 +80,7 @@ class PriceService:
         """Close HTTP client."""
         await self.http_client.aclose()
 
-    async def _search_coingecko_id(self, symbol: str) -> Optional[str]:
+    async def _search_coingecko_id(self, symbol: str) -> str | None:
         """Search CoinGecko for the correct coin ID by symbol."""
         symbol_upper = symbol.upper()
 
@@ -156,7 +155,7 @@ class PriceService:
     # Maximum acceptable cache age before forcing a refresh (seconds)
     MAX_CACHE_AGE = 300  # 5 minutes
 
-    def _lire_cours_en_cache(self, asset_type: str, symbol: str, brut: Optional[str]) -> Optional[Dict]:
+    def _lire_cours_en_cache(self, asset_type: str, symbol: str, brut: str | None) -> dict | None:
         """Décode une entrée du cache de cours. None si absente ou périmée (> MAX_CACHE_AGE)."""
         if not brut:
             return None
@@ -166,7 +165,7 @@ class PriceService:
         if last_updated_str:
             try:
                 last_updated = datetime.fromisoformat(last_updated_str)
-                age = (datetime.now(timezone.utc) - last_updated).total_seconds()
+                age = (datetime.now(UTC) - last_updated).total_seconds()
                 if age > self.MAX_CACHE_AGE:
                     logger.info(
                         "Price cache stale for %s (%s): age=%.0fs > %ds, forcing refresh",
@@ -188,7 +187,7 @@ class PriceService:
             "last_updated": last_updated_str,
         }
 
-    async def _get_cached_price(self, asset_type: str, symbol: str) -> Optional[Dict]:
+    async def _get_cached_price(self, asset_type: str, symbol: str) -> dict | None:
         """Get price from Redis cache. Returns None if stale (> MAX_CACHE_AGE)."""
         try:
             redis = await _get_redis_txt()
@@ -198,7 +197,7 @@ class PriceService:
             logger.warning(f"Redis cache read error for {symbol}: {e}")
         return None
 
-    async def _get_cached_prices(self, asset_type: str, symbols: List[str]) -> Dict[str, Dict]:
+    async def _get_cached_prices(self, asset_type: str, symbols: list[str]) -> dict[str, dict]:
         """Lit les cours de plusieurs symboles en **une seule** commande (MGET).
 
         Upstash facture chaque commande : un HGETALL par symbole coûtait 14 des
@@ -213,7 +212,7 @@ class PriceService:
         except Exception as e:
             logger.warning("Redis cache read error for %d symbols: %s", len(symbols), e)
             return {}
-        trouves: Dict[str, Dict] = {}
+        trouves: dict[str, dict] = {}
         for symbole, brut in zip(symbols, bruts):
             try:
                 cours = self._lire_cours_en_cache(asset_type, symbole, brut)
@@ -224,7 +223,7 @@ class PriceService:
                 trouves[symbole.upper()] = cours
         return trouves
 
-    async def _cache_price(self, asset_type: str, symbol: str, data: Dict, ttl: int):
+    async def _cache_price(self, asset_type: str, symbol: str, data: dict, ttl: int):
         """Cache price in Redis (one SETEX: value and expiry in a single command)."""
         try:
             key = self._get_cache_key(asset_type, symbol)
@@ -234,7 +233,7 @@ class PriceService:
                 "change_percent_24h": str(data.get("change_percent_24h", 0)),
                 "volume_24h": str(data.get("volume_24h", 0)),
                 "market_cap": str(data.get("market_cap", 0)),
-                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             }
             redis = await _get_redis_txt()
             await redis.setex(key, ttl, json.dumps(cache_data))
@@ -246,7 +245,7 @@ class PriceService:
     STABLECOINS = STABLECOIN_PEGS
 
     # Cached EUR/USD rate (refreshed via get_forex_rate)
-    _eur_usd_rate: Optional[Decimal] = None
+    _eur_usd_rate: Decimal | None = None
     _eur_usd_rate_ts: float = 0.0
 
     @classmethod
@@ -286,7 +285,7 @@ class PriceService:
         rate = await self._get_eur_usd_rate()
         return rate  # 1 USD stablecoin = rate EUR
 
-    async def get_crypto_price(self, symbol: str, currency: str = "eur") -> Optional[Dict]:
+    async def get_crypto_price(self, symbol: str, currency: str = "eur") -> dict | None:
         """Fetch cryptocurrency price from CoinGecko or CryptoCompare fallback."""
         symbol_upper = symbol.upper()
         is_stablecoin = symbol_upper in self.STABLECOINS
@@ -404,7 +403,7 @@ class PriceService:
 
         return None
 
-    async def get_stock_price(self, symbol: str) -> Optional[Dict]:
+    async def get_stock_price(self, symbol: str) -> dict | None:
         """Fetch stock/ETF price from Yahoo Finance."""
         # Check cache first
         cached = await self._get_cached_price("stock", symbol)
@@ -449,7 +448,7 @@ class PriceService:
 
         return None
 
-    async def get_real_estate_price(self, symbol: str) -> Optional[Dict]:
+    async def get_real_estate_price(self, symbol: str) -> dict | None:
         """Get real estate price estimate.
 
         Uses EPRA Eurozone REIT ETF as a market proxy, or returns None
@@ -462,7 +461,7 @@ class PriceService:
                 return result
         return None
 
-    async def get_price(self, symbol: str, asset_type: str, currency: str = "eur") -> Optional[Dict]:
+    async def get_price(self, symbol: str, asset_type: str, currency: str = "eur") -> dict | None:
         """Get price for any asset type."""
         if asset_type == "crypto":
             return await self.get_crypto_price(symbol, currency)
@@ -472,13 +471,13 @@ class PriceService:
             return await self.get_real_estate_price(symbol)
         return None
 
-    async def _fetch_from_cryptocompare(self, symbols: List[str], currency: str = "EUR") -> Dict[str, Dict]:
+    async def _fetch_from_cryptocompare(self, symbols: list[str], currency: str = "EUR") -> dict[str, dict]:
         """Repli CryptoCompare. Sans clé configurée, l'appel n'est pas tenté.
 
         L'API répond 401 à toute requête anonyme : le repli échouait donc
         systématiquement, en consommant une latence à chaque tentative.
         """
-        results: Dict[str, Dict] = {}
+        results: dict[str, dict] = {}
         if not settings.CRYPTOCOMPARE_API_KEY:
             logger.debug("Repli CryptoCompare ignoré : aucune clé configurée")
             return results
@@ -516,7 +515,7 @@ class PriceService:
 
         return results
 
-    async def get_multiple_crypto_prices(self, symbols: List[str], currency: str = "eur") -> Dict[str, Dict]:
+    async def get_multiple_crypto_prices(self, symbols: list[str], currency: str = "eur") -> dict[str, dict]:
         """Fetch multiple cryptocurrency prices at once."""
         results = {}
 
@@ -625,7 +624,7 @@ class PriceService:
     #: alors qu'un symbole crypto oublié repartirait en appel inutile.
     DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK", "PLN", "CZK"})
 
-    async def get_forex_rate(self, from_currency: str, to_currency: str) -> Optional[Decimal]:
+    async def get_forex_rate(self, from_currency: str, to_currency: str) -> Decimal | None:
         """Taux de change entre deux monnaies. `None` si l'un des codes n'en est pas une."""
         for code in (from_currency, to_currency):
             if code.upper() not in self.DEVISES_FIAT:
@@ -678,9 +677,7 @@ class PriceService:
 
         return None
 
-    async def get_historical_crypto_price(
-        self, symbol: str, date: datetime, currency: str = "eur"
-    ) -> Optional[Decimal]:
+    async def get_historical_crypto_price(self, symbol: str, date: datetime, currency: str = "eur") -> Decimal | None:
         """Fetch historical cryptocurrency price from CoinGecko.
 
         Args:

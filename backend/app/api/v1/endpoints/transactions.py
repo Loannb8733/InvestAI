@@ -4,9 +4,8 @@ import asyncio
 import csv
 import io
 import logging
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from typing import List, Optional, Union
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -240,8 +239,8 @@ class CSVImportResult(BaseModel):
     success_count: int
     error_count: int
     skipped_count: int = 0
-    errors: List[str]
-    created_transactions: List[UUID]
+    errors: list[str]
+    created_transactions: list[UUID]
 
 
 class CSVRowError(BaseModel):
@@ -254,32 +253,32 @@ class CSVRowError(BaseModel):
 class TransactionListPage(BaseModel):
     """Paginated transaction list with the total matching the applied filters."""
 
-    items: List[TransactionWithAsset]
+    items: list[TransactionWithAsset]
     total: int
 
 
 @router.get("", response_model=None)
 async def list_transactions(
-    asset_id: Optional[UUID] = None,
-    portfolio_id: Optional[UUID] = None,
-    transaction_type: Optional[str] = Query(
+    asset_id: UUID | None = None,
+    portfolio_id: UUID | None = None,
+    transaction_type: str | None = Query(
         None,
         max_length=30,
         description="Filtre par type de transaction (valeur de l'enum, ex. 'buy') ou alias 'conversions'",
     ),
-    exchange: Optional[str] = Query(
+    exchange: str | None = Query(
         None,
         max_length=50,
         description="Filtre par plateforme (insensible à la casse). 'Manuel' cible les transactions sans plateforme.",
     ),
-    asset_symbol: Optional[str] = Query(
+    asset_symbol: str | None = Query(
         None,
         max_length=30,
         description="Filtre par symbole d'actif exact (insensible à la casse)",
     ),
-    date_from: Optional[date] = Query(None, description="Transactions exécutées à partir de cette date (incluse)"),
-    date_to: Optional[date] = Query(None, description="Transactions exécutées jusqu'à cette date (incluse)"),
-    search: Optional[str] = Query(
+    date_from: date | None = Query(None, description="Transactions exécutées à partir de cette date (incluse)"),
+    date_to: date | None = Query(None, description="Transactions exécutées jusqu'à cette date (incluse)"),
+    search: str | None = Query(
         None,
         max_length=100,
         description="Recherche partielle (ILIKE) sur le symbole de l'actif et les notes",
@@ -292,7 +291,7 @@ async def list_transactions(
     limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Union[List[TransactionWithAsset], TransactionListPage]:
+) -> list[TransactionWithAsset] | TransactionListPage:
     """List transactions for the current user with asset details.
 
     All filters are applied in SQL so they cover the full history, not only
@@ -300,7 +299,7 @@ async def list_transactions(
     ``{items, total}`` where ``total`` is the filtered count.
     """
 
-    def _empty() -> Union[List[TransactionWithAsset], TransactionListPage]:
+    def _empty() -> list[TransactionWithAsset] | TransactionListPage:
         return TransactionListPage(items=[], total=0) if include_total else []
 
     # Get user's portfolio IDs
@@ -359,9 +358,9 @@ async def list_transactions(
         query = query.where(Transaction.transaction_type.in_(tx_types))
 
     if date_from:
-        query = query.where(Transaction.executed_at >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
+        query = query.where(Transaction.executed_at >= datetime.combine(date_from, time.min, tzinfo=UTC))
     if date_to:
-        query = query.where(Transaction.executed_at <= datetime.combine(date_to, time.max, tzinfo=timezone.utc))
+        query = query.where(Transaction.executed_at <= datetime.combine(date_to, time.max, tzinfo=UTC))
 
     # Join Asset only when a filter needs it (keeps the base query index-friendly)
     search_term = search.strip() if search else ""
@@ -500,9 +499,9 @@ async def list_balance_gaps(
         .all()
     )
 
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     gaps = []
     for r in rows:
         stored = Decimal(str(r["stored"] or 0))
@@ -560,7 +559,7 @@ async def credit_balance_gaps(
     row per gap (price = current market, executed_at = now). Idempotent
     via external_id ``auto_credit_gap_{asset_id}_{date}``.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from sqlalchemy import text
 
@@ -570,7 +569,7 @@ async def credit_balance_gaps(
     if not gaps:
         return {"credited": 0, "skipped": 0, "details": []}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     today_tag = now.strftime("%Y_%m_%d")
     credited = []
     skipped = []
@@ -857,7 +856,7 @@ async def get_user_platforms(
 
 @router.get("/export-csv")
 async def export_transactions_csv(
-    portfolio_id: Optional[UUID] = None,
+    portfolio_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1122,7 +1121,7 @@ async def delete_all_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     delete_assets: bool = Query(False, description="Also delete all assets"),
-    portfolio_id: Optional[str] = Query(None, description="Restrict deletion to a specific portfolio"),
+    portfolio_id: str | None = Query(None, description="Restrict deletion to a specific portfolio"),
 ) -> DeleteAllResult:
     """Delete all transactions for the current user and reset asset quantities."""
     from sqlalchemy import delete as sql_delete
@@ -1303,9 +1302,9 @@ async def delete_transaction(
 async def import_transactions_csv(
     request: Request,
     file: UploadFile = File(...),
-    portfolio_id: Optional[UUID] = Query(None),
-    platform: Optional[str] = Query(None),
-    destination_exchange: Optional[str] = Query(
+    portfolio_id: UUID | None = Query(None),
+    platform: str | None = Query(None),
+    destination_exchange: str | None = Query(
         None,
         description="Destination platform for transfer_out (e.g. cold wallet name)",
     ),

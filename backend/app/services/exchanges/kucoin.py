@@ -5,9 +5,8 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ class KuCoinService(BaseExchangeService):
             logger.error(f"KuCoin test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from KuCoin.
 
         Filters to 'trade' account type and returns only non-zero balances.
@@ -134,11 +133,11 @@ class KuCoinService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history (fills) from KuCoin.
 
         Uses page-based pagination (currentPage, pageSize).
@@ -201,7 +200,7 @@ class KuCoinService(BaseExchangeService):
                                 price=Decimal(fill.get("price", "0")),
                                 fee=Decimal(fill.get("fee", "0")),
                                 fee_currency=fee_currency,
-                                timestamp=datetime.fromtimestamp(int(fill.get("createdAt", 0)) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(int(fill.get("createdAt", 0)) / 1000, tz=UTC),
                             )
                         )
 
@@ -220,10 +219,10 @@ class KuCoinService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from KuCoin."""
         deposits = []
 
@@ -278,9 +277,7 @@ class KuCoinService(BaseExchangeService):
                                 deposit_id=deposit.get("id", ""),
                                 symbol=deposit.get("currency", ""),
                                 amount=Decimal(deposit.get("amount", "0")),
-                                timestamp=datetime.fromtimestamp(
-                                    int(deposit.get("createdAt", 0)) / 1000, tz=timezone.utc
-                                ),
+                                timestamp=datetime.fromtimestamp(int(deposit.get("createdAt", 0)) / 1000, tz=UTC),
                                 status=status_map.get(deposit.get("status", ""), "unknown"),
                                 tx_id=deposit.get("walletTxId"),
                             )
@@ -300,10 +297,10 @@ class KuCoinService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from KuCoin."""
         withdrawals = []
 
@@ -360,9 +357,7 @@ class KuCoinService(BaseExchangeService):
                                 symbol=withdrawal.get("currency", ""),
                                 amount=Decimal(withdrawal.get("amount", "0")),
                                 fee=Decimal(withdrawal.get("fee", "0")),
-                                timestamp=datetime.fromtimestamp(
-                                    int(withdrawal.get("createdAt", 0)) / 1000, tz=timezone.utc
-                                ),
+                                timestamp=datetime.fromtimestamp(int(withdrawal.get("createdAt", 0)) / 1000, tz=UTC),
                                 status=status_map.get(withdrawal.get("status", ""), "unknown"),
                                 tx_id=withdrawal.get("walletTxId"),
                                 address=withdrawal.get("address"),

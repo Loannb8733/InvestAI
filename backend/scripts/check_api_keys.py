@@ -1,4 +1,5 @@
 """Check available API keys for re-sync."""
+
 import asyncio
 import sys
 

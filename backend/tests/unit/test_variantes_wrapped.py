@@ -45,8 +45,7 @@ class TestCryptosCommencantParW:
     def test_elles_ne_sont_jamais_alterees(self, symbole):
         """Ce sont des jetons à part entière, pas des enveloppes."""
         assert _normalize_earn_variant(symbole) == symbole, (
-            f"{symbole} altéré : l'actif serait enregistré sous un autre symbole, "
-            "avec le prix d'un jeton sans rapport"
+            f"{symbole} altéré : l'actif serait enregistré sous un autre symbole, avec le prix d'un jeton sans rapport"
         )
 
 
@@ -87,18 +86,18 @@ class TestJetonsAuxSuffixesTrompeurs:
         ],
     )
     def test_ils_ne_sont_jamais_ramenes_a_leur_prefixe(self, symbole, confondu_avec):
-        assert (
-            _normalize_earn_variant(symbole) == symbole
-        ), f"{symbole} confondu avec {confondu_avec} : les deux positions seraient fusionnées"
+        assert _normalize_earn_variant(symbole) == symbole, (
+            f"{symbole} confondu avec {confondu_avec} : les deux positions seraient fusionnées"
+        )
 
     def test_la_liste_des_suffixes_est_explicite(self):
         import inspect
 
         source = inspect.getsource(_normalize_earn_variant)
         assert "SUFFIXES_EARN" in source, "la liste explicite a disparu"
-        assert (
-            "len(suffix) <= 2" not in source
-        ), "la règle de longueur est revenue : elle confondrait à nouveau ETHFI avec ETH"
+        assert "len(suffix) <= 2" not in source, (
+            "la règle de longueur est revenue : elle confondrait à nouveau ETHFI avec ETH"
+        )
 
 
 class TestFormeDeLaRegle:
@@ -108,5 +107,5 @@ class TestFormeDeLaRegle:
         source = inspect.getsource(_normalize_earn_variant)
         assert "variantes_wrapped" in source, "la table explicite a disparu"
         assert '"W"' not in source.split("variantes_wrapped")[0], (
-            "le préfixe « W » est revenu dans la liste des préfixes : " "il mutilerait à nouveau WAVES, WAXP, WEMIX…"
+            "le préfixe « W » est revenu dans la liste des préfixes : il mutilerait à nouveau WAVES, WAXP, WEMIX…"
         )

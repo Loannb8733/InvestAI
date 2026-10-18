@@ -66,10 +66,12 @@ async def test_le_prechargement_unitaire_persiste_malgre_redis(redis_en_panne, c
 @pytest.mark.asyncio
 async def test_le_prechargement_de_demarrage_persiste_chaque_symbole(redis_en_panne, coingecko, base, caplog):
     caplog.set_level(logging.WARNING, logger="app.tasks.history_cache")
-    with patch.object(
-        history_cache, "_get_all_crypto_symbols", new=AsyncMock(return_value=[("BTC", "crypto"), ("ETH", "crypto")])
-    ), patch.object(history_cache.asyncio, "sleep", new=AsyncMock()), patch.object(
-        history_cache, "_dernier_jour_en_base", new=AsyncMock(return_value={})
+    with (
+        patch.object(
+            history_cache, "_get_all_crypto_symbols", new=AsyncMock(return_value=[("BTC", "crypto"), ("ETH", "crypto")])
+        ),
+        patch.object(history_cache.asyncio, "sleep", new=AsyncMock()),
+        patch.object(history_cache, "_dernier_jour_en_base", new=AsyncMock(return_value={})),
     ):
         assert await history_cache._fetch_and_cache_all() == 2
 

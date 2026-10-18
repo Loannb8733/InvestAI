@@ -4,10 +4,10 @@ import base64
 import json
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from typing import Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -55,16 +55,16 @@ class UserProfileResponse(BaseModel):
     id: str
     email: str
     role: str
-    first_name: Optional[str]
-    last_name: Optional[str]
+    first_name: str | None
+    last_name: str | None
     preferred_currency: str
     mfa_enabled: bool
-    telegram_chat_id: Optional[str] = None
+    telegram_chat_id: str | None = None
     telegram_enabled: bool = False
     # Profil investisseur (paramètres financiers) — NULL = non renseigné
-    tmi_rate: Optional[float] = None
-    risk_profile: Optional[str] = None
-    monthly_dca_eur: Optional[float] = None
+    tmi_rate: float | None = None
+    risk_profile: str | None = None
+    monthly_dca_eur: float | None = None
     created_at: str
 
 
@@ -212,19 +212,19 @@ _TMI_ALLOWED = (0.0, 0.11, 0.30, 0.41, 0.45)
 class UserProfileUpdate(BaseModel):
     """Request to update user profile."""
 
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    preferred_currency: Optional[str] = Field(None, pattern=r"^(EUR|USD|CHF|GBP)$")
-    telegram_chat_id: Optional[str] = Field(None, max_length=100, pattern=r"^-?\d+$")
-    telegram_enabled: Optional[bool] = None
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
+    preferred_currency: str | None = Field(None, pattern=r"^(EUR|USD|CHF|GBP)$")
+    telegram_chat_id: str | None = Field(None, max_length=100, pattern=r"^-?\d+$")
+    telegram_enabled: bool | None = None
     # Profil investisseur — envoyer null pour effacer une valeur
-    tmi_rate: Optional[float] = None
-    risk_profile: Optional[Literal["conservative", "moderate", "aggressive"]] = None
-    monthly_dca_eur: Optional[float] = Field(None, ge=0, le=99_999_999.99)
+    tmi_rate: float | None = None
+    risk_profile: Literal["conservative", "moderate", "aggressive"] | None = None
+    monthly_dca_eur: float | None = Field(None, ge=0, le=99_999_999.99)
 
     @field_validator("tmi_rate")
     @classmethod
-    def check_tmi_rate(cls, v: Optional[float]) -> Optional[float]:
+    def check_tmi_rate(cls, v: float | None) -> float | None:
         if v is None:
             return v
         # Comparaison avec tolérance : 0.30 peut arriver en 0.30000000000000004
@@ -254,8 +254,8 @@ async def verify_email(
     if user.email_verification_expires:
         expires = user.email_verification_expires
         if hasattr(expires, "tzinfo") and expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expires:
+            expires = expires.replace(tzinfo=UTC)
+        if datetime.now(UTC) > expires:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Lien de vérification expiré. Veuillez vous réinscrire.",
@@ -297,7 +297,7 @@ async def resend_verification(
         # Generate new token
         verification_token = secrets.token_urlsafe(48)
         user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+        user.email_verification_expires = datetime.now(UTC) + timedelta(hours=24)
         await db.commit()
 
         # Send verification email
@@ -499,7 +499,7 @@ async def login(
 async def refresh_token(
     request: Request,
     response: Response,
-    refresh_data: Optional[RefreshTokenRequest] = None,
+    refresh_data: RefreshTokenRequest | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> Token:
     """Refresh access token using refresh token (from body or cookie)."""
@@ -606,7 +606,7 @@ async def logout(request: Request, response: Response) -> dict:
                 r = await _get_redis_txt()
                 # TTL = remaining token lifetime (exp - now), capped at 7 days
                 exp = payload.get("exp", 0)
-                ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
+                ttl = max(1, int(exp - datetime.now(UTC).timestamp()))
                 ttl = min(ttl, 7 * 86400)
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
         except Exception as exc:  # noqa: BLE001
@@ -631,7 +631,7 @@ async def logout(request: Request, response: Response) -> dict:
 
                 r = await _get_redis_txt()
                 exp = payload.get("exp", 0)
-                ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
+                ttl = max(1, int(exp - datetime.now(UTC).timestamp()))
                 ttl = min(ttl, 3600)  # access tokens are short-lived
                 await r.setex(f"token_blocklist:{payload['jti']}", ttl, "1")
         except Exception as exc:  # noqa: BLE001
@@ -924,7 +924,7 @@ async def forgot_password(
         # Generate secure token
         token = secrets.token_urlsafe(48)
         user.password_reset_token = token
-        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
         await db.commit()
 
         # Send email
@@ -986,9 +986,7 @@ async def reset_password(
     # peut donc venir que d'une écriture partielle ou d'une reprise de données,
     # et rien ne permet alors de dire son âge.
     expires = user.password_reset_expires
-    if expires is None or datetime.now(timezone.utc) > (
-        expires.replace(tzinfo=timezone.utc) if expires.tzinfo is None else expires
-    ):
+    if expires is None or datetime.now(UTC) > (expires.replace(tzinfo=UTC) if expires.tzinfo is None else expires):
         user.password_reset_token = None
         user.password_reset_expires = None
         await db.commit()

@@ -86,9 +86,9 @@ def test_l_endpoint_admin_de_mirroring_reste_supprime():
 
 def test_les_soldes_destination_sont_incrementes():
     for section in _mirror_sections():
-        assert (
-            "UPDATE assets SET quantity = COALESCE(quantity, 0) + :add" in section
-        ), "le mirroring doit incrémenter la destination du montant miroité"
+        assert "UPDATE assets SET quantity = COALESCE(quantity, 0) + :add" in section, (
+            "le mirroring doit incrémenter la destination du montant miroité"
+        )
 
 
 def test_aucune_affectation_de_solde_dans_le_mirroring():

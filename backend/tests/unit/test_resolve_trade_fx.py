@@ -5,7 +5,7 @@ unless a valid historical EUR rate exists. The fallback is always ("EUR", None),
 "never worse than" the legacy hardcoded behaviour. No DB/HTTP: the FX service is faked.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -25,7 +25,7 @@ class _FakeFx:
         return self._rates.get((from_ccy, to_ccy))
 
 
-_TS = datetime(2024, 1, 17, 12, 0, tzinfo=timezone.utc)
+_TS = datetime(2024, 1, 17, 12, 0, tzinfo=UTC)
 
 
 class TestResolveTradeFx:

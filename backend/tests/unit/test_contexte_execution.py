@@ -70,9 +70,9 @@ class TestConduiteSurLe429:
             "Retry-After, soit une dizaine de secondes devant l'utilisateur"
         )
         # Le renoncement doit précéder l'attente, sinon il ne sert à rien.
-        assert bloc.index("un_humain_attend()") < bloc.index(
-            "sleep"
-        ), "le contexte est consulté après l'attente : l'utilisateur patiente quand même"
+        assert bloc.index("un_humain_attend()") < bloc.index("sleep"), (
+            "le contexte est consulté après l'attente : l'utilisateur patiente quand même"
+        )
 
     def test_une_tache_de_fond_respecte_le_retry_after(self):
         bloc = self._bloc_429()

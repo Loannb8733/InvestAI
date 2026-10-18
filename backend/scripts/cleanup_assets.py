@@ -18,7 +18,7 @@ from decimal import Decimal
 
 sys.path.insert(0, "/app")
 
-from sqlalchemy import and_, delete, func, select, text
+from sqlalchemy import delete, func, select
 
 from app.core.database import AsyncSessionLocal
 from app.models.asset import Asset, AssetType

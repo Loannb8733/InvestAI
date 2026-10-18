@@ -1,8 +1,7 @@
 """Advanced analysis service: fees, tax-loss harvesting, passive income, DCA backtest."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,8 +25,8 @@ def convertir_frais_en_devise_portefeuille(
     symbole_actif: str,
     prix_transaction: float,
     devise_transaction: str,
-    taux_conversion: Optional[float],
-    cours_par_jeton: Optional[Dict[str, float]] = None,
+    taux_conversion: float | None,
+    cours_par_jeton: dict[str, float] | None = None,
 ) -> tuple[float, bool]:
     """Ramène des frais dans la devise du portefeuille. Rend (montant, converti).
 
@@ -126,10 +125,10 @@ class InsightsService:
         txns = result.scalars().all()
 
         total_fees = 0.0
-        by_exchange: Dict[str, float] = {}
-        by_asset: Dict[str, float] = {}
-        by_type: Dict[str, float] = {}
-        by_month: Dict[str, float] = {}
+        by_exchange: dict[str, float] = {}
+        by_asset: dict[str, float] = {}
+        by_type: dict[str, float] = {}
+        by_month: dict[str, float] = {}
         fee_list = []
 
         # Cours des jetons dans lesquels des frais ont été prélevés sans que la
@@ -142,7 +141,7 @@ class InsightsService:
             and (tx.fee_currency or "").upper()
             != (asset_map.get(str(tx.asset_id)).symbol.upper() if asset_map.get(str(tx.asset_id)) else "")
         }
-        cours_par_jeton: Dict[str, float] = {}
+        cours_par_jeton: dict[str, float] = {}
         for jeton in jetons_a_coter:
             if not jeton:
                 continue
@@ -295,7 +294,7 @@ class InsightsService:
     # Passive Income Tracker
     # ------------------------------------------------------------------
 
-    async def get_passive_income(self, db: AsyncSession, user_id: str, year: Optional[int] = None) -> dict:
+    async def get_passive_income(self, db: AsyncSession, user_id: str, year: int | None = None) -> dict:
         """Track dividends, staking rewards, interest — by month and by asset."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
@@ -322,9 +321,9 @@ class InsightsService:
         txns = result.scalars().all()
 
         total = 0.0
-        by_type: Dict[str, float] = {}
-        by_asset: Dict[str, float] = {}
-        by_month: Dict[str, float] = {}
+        by_type: dict[str, float] = {}
+        by_asset: dict[str, float] = {}
+        by_month: dict[str, float] = {}
         history = []
 
         for tx in txns:
@@ -394,7 +393,7 @@ class InsightsService:
 
         fetcher = HistoricalDataFetcher(coingecko_api_key=getattr(settings, "COINGECKO_API_KEY", None))
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start_date = datetime(start_year, start_month, 1)
         total_months = (now.year - start_date.year) * 12 + (now.month - start_date.month)
 

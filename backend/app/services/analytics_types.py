@@ -7,7 +7,6 @@ créer un cycle dès qu'il en rendait une.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -53,19 +52,19 @@ class PortfolioAnalytics:
     asset_count: int
 
     # Allocation
-    allocation_by_type: Dict[str, float]
-    allocation_by_asset: Dict[str, float]
+    allocation_by_type: dict[str, float]
+    allocation_by_asset: dict[str, float]
 
     # Performance
-    assets: List[AssetPerformance]
-    best_performer: Optional[str]
-    worst_performer: Optional[str]
+    assets: list[AssetPerformance]
+    best_performer: str | None
+    worst_performer: str | None
 
     # Human-readable VaR explanation (P12)
     var_95_description: str = ""
 
     # Contextual interpretations for ratios
-    interpretations: Dict[str, str] = None  # type: ignore[assignment]
+    interpretations: dict[str, str] = None  # type: ignore[assignment]
 
     def __post_init__(self):
         if self.interpretations is None:
@@ -76,13 +75,13 @@ class PortfolioAnalytics:
 class CorrelationData:
     """Correlation matrix data."""
 
-    symbols: List[str]
-    matrix: List[List[float]]
-    strongly_correlated: List[Tuple[str, str, float]]
-    negatively_correlated: List[Tuple[str, str, float]]
+    symbols: list[str]
+    matrix: list[list[float]]
+    strongly_correlated: list[tuple[str, str, float]]
+    negatively_correlated: list[tuple[str, str, float]]
     # Cross-asset analysis (P1)
-    benchmark_correlations: Optional[Dict[str, Dict[str, float]]] = None  # {benchmark: {symbol: corr}}
-    portfolio_beta: Optional[float] = None  # vs S&P500
+    benchmark_correlations: dict[str, dict[str, float]] | None = None  # {benchmark: {symbol: corr}}
+    portfolio_beta: float | None = None  # vs S&P500
     is_beta_heavy: bool = False  # True if portfolio is overly correlated with market
 
 
@@ -90,7 +89,7 @@ class CorrelationData:
 class MonteCarloResult:
     """Monte Carlo simulation result."""
 
-    percentiles: Dict[str, float]  # p5, p25, p50, p75, p95
+    percentiles: dict[str, float]  # p5, p25, p50, p75, p95
     expected_return: float
     prob_positive: float  # probability of positive return
     prob_loss_10: float  # probability of >10% loss
@@ -119,7 +118,7 @@ class RebalanceOrder:
 class OptimizationResult:
     """Portfolio optimization (MPT) result."""
 
-    weights: Dict[str, float]
+    weights: dict[str, float]
     expected_return: float
     expected_volatility: float
     sharpe_ratio: float

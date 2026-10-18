@@ -91,8 +91,9 @@ class TestProvenance:
         monkeypatch.setattr(settings, "GROQ_API_KEY", "cle-de-test", raising=False)
         monkeypatch.setattr(settings, "GEMINI_API_KEY", "cle-de-test", raising=False)
 
-        with patch.object(analyseur, "_call_groq", new=AsyncMock(side_effect=RuntimeError("429"))), patch.object(
-            analyseur, "_call_gemini", new=AsyncMock(return_value='{"verdict": "VIGILANCE"}')
+        with (
+            patch.object(analyseur, "_call_groq", new=AsyncMock(side_effect=RuntimeError("429"))),
+            patch.object(analyseur, "_call_gemini", new=AsyncMock(return_value='{"verdict": "VIGILANCE"}')),
         ):
             audit = await analyseur.analyze_documents(db_session, pdf_minimal, regular_user.id, None)
 

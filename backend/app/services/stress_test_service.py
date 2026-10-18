@@ -3,7 +3,6 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from dateutil.relativedelta import relativedelta
 
@@ -27,8 +26,8 @@ class StressTestCashflow:
 
 @dataclass
 class StressTestResult:
-    base_irr: Optional[float]  # percentage, e.g. 8.5
-    stressed_irr: Optional[float]
+    base_irr: float | None  # percentage, e.g. 8.5
+    stressed_irr: float | None
     delay_months: int
     cashflows: list[StressTestCashflow]
 

@@ -6,7 +6,6 @@ import logging
 import time
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ class CoinbaseService(BaseExchangeService):
             logger.error(f"Coinbase test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Coinbase.
 
         Paginates through all accounts using the cursor-based pagination.
@@ -125,11 +124,11 @@ class CoinbaseService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history (fills) from Coinbase.
 
         Uses the historical fills endpoint with cursor-based pagination.
@@ -205,10 +204,10 @@ class CoinbaseService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Coinbase.
 
         Uses the transaction_summary or account transactions to retrieve deposits.
@@ -285,10 +284,10 @@ class CoinbaseService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Coinbase.
 
         Uses account-level transaction listing to retrieve withdrawals.
@@ -368,7 +367,7 @@ class CoinbaseService(BaseExchangeService):
 
         return withdrawals
 
-    async def _get_account_ids(self, symbol: Optional[str] = None) -> List[tuple]:
+    async def _get_account_ids(self, symbol: str | None = None) -> list[tuple]:
         """Get account UUIDs from Coinbase.
 
         Returns list of (account_id, currency) tuples.

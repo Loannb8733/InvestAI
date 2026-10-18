@@ -4,8 +4,7 @@ import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 import numpy as np
 
@@ -15,7 +14,7 @@ from app.ml.market_context import MarketContext
 logger = logging.getLogger(__name__)
 
 
-def _returns_hash(prices: List[float]) -> str:
+def _returns_hash(prices: list[float]) -> str:
     """Hash price data to detect staleness for model caching.
 
     Samples 10 evenly-spaced points plus extremes so that two series with
@@ -42,7 +41,7 @@ class Anomaly:
 
     symbol: str
     is_anomaly: bool
-    anomaly_type: Optional[str]  # price_spike, price_drop, volatility_spike
+    anomaly_type: str | None  # price_spike, price_drop, volatility_spike
     severity: str  # low, medium, high
     description: str
     detected_at: datetime
@@ -70,12 +69,12 @@ class AnomalyDetector:
     def detect(
         self,
         symbol: str,
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         avg_buy_price: float,
         asset_type: str = "crypto",
-        market_context: Optional[MarketContext] = None,
-    ) -> Optional[Anomaly]:
+        market_context: MarketContext | None = None,
+    ) -> Anomaly | None:
         """Detect anomalies in price data.
 
         Uses Isolation Forest when enough data is available,
@@ -110,10 +109,10 @@ class AnomalyDetector:
     def _isolation_forest_detect(
         self,
         symbol: str,
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         asset_type: str,
-    ) -> Optional[Anomaly]:
+    ) -> Anomaly | None:
         """Detect anomalies using Isolation Forest on log returns."""
         from sklearn.ensemble import IsolationForest
 
@@ -167,7 +166,7 @@ class AnomalyDetector:
                     f"{'hausse' if pct_change > 0 else 'baisse'} de {abs(pct_change):.1f}% "
                     f"(score anomalie: {score:.2f})"
                 ),
-                detected_at=datetime.now(timezone.utc),
+                detected_at=datetime.now(UTC),
                 price_change_percent=round(pct_change, 2),
                 z_score=round(float(-score * 10), 2),
             )
@@ -177,11 +176,11 @@ class AnomalyDetector:
     def _zscore_detect(
         self,
         symbol: str,
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         asset_type: str,
-        ctx: Optional[MarketContext] = None,
-    ) -> Optional[Anomaly]:
+        ctx: MarketContext | None = None,
+    ) -> Anomaly | None:
         """Detect anomalies using Z-score on returns with adaptive threshold."""
         arr = np.array(prices, dtype=float)
         returns = np.diff(arr) / arr[:-1]
@@ -219,7 +218,7 @@ class AnomalyDetector:
                     f"{'hausse' if pct_change > 0 else 'baisse'} de {abs(pct_change):.1f}% "
                     f"vs moyenne {mean_return * 100:.2f}%"
                 ),
-                detected_at=datetime.now(timezone.utc),
+                detected_at=datetime.now(UTC),
                 price_change_percent=round(pct_change, 2),
                 z_score=round(float(z), 2),
             )
@@ -267,8 +266,8 @@ class AnomalyDetector:
         current_price: float,
         avg_buy_price: float,
         asset_type: str,
-        ctx: Optional[MarketContext] = None,
-    ) -> Optional[Anomaly]:
+        ctx: MarketContext | None = None,
+    ) -> Anomaly | None:
         """Threshold-based anomaly detection using adaptive price threshold."""
         if avg_buy_price == 0:
             return None
@@ -290,7 +289,7 @@ class AnomalyDetector:
                     f"{'Hausse' if pct_change > 0 else 'Baisse'} significative "
                     f"de {abs(pct_change):.1f}% par rapport au prix d'achat moyen"
                 ),
-                detected_at=datetime.now(timezone.utc),
+                detected_at=datetime.now(UTC),
                 price_change_percent=round(pct_change, 2),
                 z_score=0.0,
             )

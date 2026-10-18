@@ -6,7 +6,7 @@ them to the cold wallet. These tests pin the pure helpers:
 - ``_to_aware_utc`` always yields a comparable UTC datetime (naive == UTC).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.tasks.sync_exchanges import _SUCCESSFUL_DEPOSIT_STATUSES, _SUCCESSFUL_WITHDRAWAL_STATUSES, _to_aware_utc
 
@@ -37,13 +37,13 @@ class TestToAwareUtc:
         naive = datetime(2026, 6, 1, 10, 0, 0)
         aware = _to_aware_utc(naive)
         assert aware.tzinfo is not None
-        assert aware == datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
+        assert aware == datetime(2026, 6, 1, 10, 0, 0, tzinfo=UTC)
 
     def test_aware_is_converted_to_utc(self):
-        aware_in = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        aware_in = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
         assert _to_aware_utc(aware_in) == aware_in
 
     def test_comparison_naive_vs_aware_does_not_raise(self):
-        cutoff = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+        cutoff = datetime(2026, 6, 1, 0, 0, 0, tzinfo=UTC)
         ts = _to_aware_utc(datetime(2026, 6, 2, 0, 0, 0))  # naive → UTC
         assert ts > cutoff

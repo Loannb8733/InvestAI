@@ -17,7 +17,6 @@ aurait bien voulu rapatrier.
 Cette tâche coupe la dépendance : les taux se tiennent à jour d'eux-mêmes.
 """
 
-
 import logging
 from datetime import date
 

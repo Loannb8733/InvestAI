@@ -4,7 +4,6 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -28,11 +27,11 @@ class NotificationService:
         title: str,
         message: str,
         priority: NotificationPriority = NotificationPriority.NORMAL,
-        reference_type: Optional[str] = None,
-        reference_id: Optional[UUID] = None,
+        reference_type: str | None = None,
+        reference_id: UUID | None = None,
         send_email: bool = True,
         send_in_app: bool = True,
-    ) -> Optional[Notification]:
+    ) -> Notification | None:
         """Send a notification to a user."""
         notification = None
 
@@ -74,7 +73,7 @@ class NotificationService:
         notify_email: bool = True,
         notify_in_app: bool = True,
         priority: NotificationPriority = NotificationPriority.HIGH,
-    ) -> Optional[Notification]:
+    ) -> Notification | None:
         """Send an alert triggered notification."""
         title = f"Alerte: {alert_name}"
 
@@ -98,7 +97,7 @@ class NotificationService:
         unread_only: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Notification]:
+    ) -> list[Notification]:
         """Get notifications for a user."""
         query = select(Notification).where(Notification.user_id == user_id)
 
@@ -169,8 +168,8 @@ class NotificationService:
         title: str,
         message: str,
         priority: NotificationPriority,
-        reference_type: Optional[str] = None,
-        reference_id: Optional[UUID] = None,
+        reference_type: str | None = None,
+        reference_id: UUID | None = None,
     ) -> Notification:
         """Create an in-app notification."""
         notification = Notification(
@@ -197,7 +196,7 @@ class NotificationService:
 
         return notification
 
-    async def _get_user(self, db: AsyncSession, user_id: UUID) -> Optional[User]:
+    async def _get_user(self, db: AsyncSession, user_id: UUID) -> User | None:
         """Get user by ID."""
         result = await db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()

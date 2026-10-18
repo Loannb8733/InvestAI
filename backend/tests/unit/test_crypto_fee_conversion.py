@@ -30,7 +30,7 @@ class TestConversionCrypto:
     def test_un_prix_de_marche_n_est_pas_marque_perime(self):
         bloc = _SRC.split("crypto_rate = await _crypto_unit_price")[1][:400]
         assert "return crypto_rate, False" in bloc, (
-            "un prix crypto temps réel est une donnée fraîche : le marquer stale " "rendrait le flag inutilisable"
+            "un prix crypto temps réel est une donnée fraîche : le marquer stale rendrait le flag inutilisable"
         )
 
     def test_le_helper_degrade_sans_bruit(self):
@@ -61,6 +61,6 @@ class TestOrdreDeResolution:
 
     def test_la_constante_reste_marquee_perimee(self):
         fin = _SRC.split("_HARDCODED_FALLBACK_RATES.get(from_ccy")[1][:400]
-        assert (
-            "return fallback, True" in fin
-        ), "une valeur devinée doit rester signalée, sinon l'UI la présente comme un vrai cours"
+        assert "return fallback, True" in fin, (
+            "une valeur devinée doit rester signalée, sinon l'UI la présente comme un vrai cours"
+        )

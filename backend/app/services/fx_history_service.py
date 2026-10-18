@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 import httpx
 from sqlalchemy import func, select
@@ -58,7 +57,7 @@ class FxHistoryService:
         self._cache[key] = sorted_rates
         return sorted_rates
 
-    async def get_rate(self, rate_date: date, from_ccy: str, to_ccy: str) -> Optional[Decimal]:
+    async def get_rate(self, rate_date: date, from_ccy: str, to_ccy: str) -> Decimal | None:
         """Return ``to_ccy`` per 1 ``from_ccy`` on ``rate_date`` (forward-filled).
 
         Same currency returns 1. Returns ``None`` when no rate at/<= the date exists
@@ -76,7 +75,7 @@ class FxHistoryService:
         start: date,
         end: date,
         *,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
     ) -> int:
         """Fetch the daily series for ``from_ccy->to_ccy`` and upsert missing dates.
 
@@ -136,7 +135,7 @@ class FxHistoryService:
         to_ccy: str,
         earliest: date,
         *,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
     ) -> int:
         """Seed full history on first run, then only top up the tail to today.
 

@@ -9,7 +9,6 @@ timeout/URL/parsing change only has to be made once.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import httpx
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 _FNG_URL = "https://api.alternative.me/fng/?limit=1"
 
 
-async def fetch_fear_greed_index(*, timeout: float = 5.0) -> Optional[int]:
+async def fetch_fear_greed_index(*, timeout: float = 5.0) -> int | None:
     """Return the current Fear & Greed Index (0-100), or ``None`` on any failure.
 
     Behaviour-preserving replacement for the inline fetch blocks: all errors are

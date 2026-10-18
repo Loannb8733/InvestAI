@@ -7,7 +7,6 @@ import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +142,7 @@ class BitstampService(BaseExchangeService):
             logger.error(f"Bitstamp test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bitstamp.
 
         The balance endpoint returns a flat dict with keys like:
@@ -255,11 +254,11 @@ class BitstampService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Bitstamp.
 
         Trades are extracted from user_transactions where type=2.
@@ -309,7 +308,7 @@ class BitstampService(BaseExchangeService):
         logger.info(f"Bitstamp: Total trades found: {len(trades)}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
-    def _parse_trade_from_transaction(self, tx: dict, tx_datetime: datetime) -> Optional[ExchangeTrade]:
+    def _parse_trade_from_transaction(self, tx: dict, tx_datetime: datetime) -> ExchangeTrade | None:
         """Parse a trade from a Bitstamp user transaction.
 
         In a trade transaction, one currency amount is positive (bought)
@@ -370,10 +369,10 @@ class BitstampService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Bitstamp.
 
         Deposits are extracted from user_transactions where type=0.
@@ -446,10 +445,10 @@ class BitstampService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bitstamp.
 
         Withdrawals are extracted from user_transactions where type=1.

@@ -48,10 +48,9 @@ class TestAucunAppelReseauPourLHistorique:
             if any(motif in appel for motif in _RESEAU_HISTORIQUE):
                 fautifs.append(f"ligne {n.lineno} : {appel[:90]}")
 
-        assert (
-            not fautifs
-        ), "appel réseau d'historique réintroduit dans le chemin HTTP — " "utiliser `prix_locaux()` : " + " | ".join(
-            fautifs
+        assert not fautifs, (
+            "appel réseau d'historique réintroduit dans le chemin HTTP — "
+            "utiliser `prix_locaux()` : " + " | ".join(fautifs)
         )
 
     def test_l_historique_passe_par_les_sources_locales(self):
@@ -80,7 +79,7 @@ class TestSourcesLocales:
 
         for interdit in ("httpx", "requests", "aiohttp", "urllib"):
             assert interdit not in modules, (
-                f"`{interdit}` importé dans le module de lecture locale : " "il ne doit faire aucun appel sortant"
+                f"`{interdit}` importé dans le module de lecture locale : il ne doit faire aucun appel sortant"
             )
 
         code = ast.unparse(arbre)
@@ -99,6 +98,6 @@ class TestSourcesLocales:
         import app.services.price_history_store as store
 
         src = inspect.getsource(store.prix_locaux)
-        assert src.index("get_cached_history") < src.index(
-            "charger_depuis_postgres"
-        ), "PostgreSQL avant Redis : on paierait une requête SQL là où le cache suffit"
+        assert src.index("get_cached_history") < src.index("charger_depuis_postgres"), (
+            "PostgreSQL avant Redis : on paierait une requête SQL là où le cache suffit"
+        )

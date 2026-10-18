@@ -1,7 +1,6 @@
 """Asset endpoints."""
 
 import logging
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("", response_model=List[AssetResponse])
+@router.get("", response_model=list[AssetResponse])
 @limiter.limit(RATE_LIMITS["api_read"])
 async def list_assets(
     request: Request,
@@ -30,7 +29,7 @@ async def list_assets(
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[AssetResponse]:
+) -> list[AssetResponse]:
     """List all assets for the current user, optionally filtered by portfolio."""
     # Get user's portfolio IDs
     portfolio_result = await db.execute(

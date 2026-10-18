@@ -3,7 +3,6 @@
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import or_, select
@@ -93,7 +92,7 @@ router = APIRouter()
 _XIRR_MIN_SPAN_DAYS = 30
 
 
-def compute_xirr(flows: list[tuple[date, float]]) -> Optional[float]:
+def compute_xirr(flows: list[tuple[date, float]]) -> float | None:
     """XIRR (taux annualisé) qui annule la NPV de flux réels datés.
 
     Convention de signe : négatif = sortie de cash (investissement),
@@ -126,8 +125,8 @@ def compute_xirr(flows: list[tuple[date, float]]) -> Optional[float]:
 
 def _realized_xirr(
     project: CrowdfundingProject,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
-) -> Optional[float]:
+    repayments: list[CrowdfundingRepayment] | None = None,
+) -> float | None:
     """XIRR réalisé d'un projet (décimal), à partir des flux réellement datés.
 
     Flux construits :
@@ -182,7 +181,7 @@ def _compute_schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
 
 def _interest_earned(
     project: CrowdfundingProject,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
+    repayments: list[CrowdfundingRepayment] | None = None,
 ) -> float:
     """Real interest earned to date.
 
@@ -205,9 +204,9 @@ def _interest_earned(
 
 def _enrich(
     project: CrowdfundingProject,
-    documents: Optional[list[ProjectDocument]] = None,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
-    schedule: Optional[list[CrowdfundingPaymentSchedule]] = None,
+    documents: list[ProjectDocument] | None = None,
+    repayments: list[CrowdfundingRepayment] | None = None,
+    schedule: list[CrowdfundingPaymentSchedule] | None = None,
 ) -> CrowdfundingProjectResponse:
     """Add computed fields to a project response."""
     invested = float(project.invested_amount)
@@ -682,7 +681,7 @@ async def get_cashflow_schedule(
 @limiter.limit("30/minute")
 async def get_tax_report(
     request: Request,
-    year: Optional[int] = Query(None, ge=2000, le=2100),
+    year: int | None = Query(None, ge=2000, le=2100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -783,8 +782,8 @@ _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 async def analyze_documents(
     request: Request,
     files: list[UploadFile] = File(...),
-    project_id: Optional[uuid.UUID] = Query(None),
-    project_id_form: Optional[uuid.UUID] = Form(None, alias="project_id"),
+    project_id: uuid.UUID | None = Query(None),
+    project_id_form: uuid.UUID | None = Form(None, alias="project_id"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

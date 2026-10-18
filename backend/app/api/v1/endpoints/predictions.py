@@ -1,7 +1,6 @@
 """Predictions endpoints for ML-based forecasting."""
 
 import logging
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from pydantic import BaseModel, Field
@@ -34,13 +33,13 @@ class RegimeInfo(BaseModel):
 
     dominant_regime: str
     confidence: float
-    probabilities: Dict[str, float] = {}
+    probabilities: dict[str, float] = {}
     timeframe_alignment: str = "unknown"
-    weekly_regime: Optional[str] = None
+    weekly_regime: str | None = None
     note: str = ""
-    liquidity_warning: Optional[str] = None
-    regime_price_adjustment: Optional[bool] = None
-    adjustment_factor: Optional[float] = None
+    liquidity_warning: str | None = None
+    regime_price_adjustment: bool | None = None
+    adjustment_factor: float | None = None
 
 
 class AssetPredictionResponse(BaseModel):
@@ -50,15 +49,15 @@ class AssetPredictionResponse(BaseModel):
 
     symbol: str
     current_price: float
-    predictions: List[PredictionPoint]
+    predictions: list[PredictionPoint]
     trend: str
     trend_strength: float
     support_level: float
     resistance_level: float
     recommendation: str
     model_used: str
-    regime_info: Optional[RegimeInfo] = None
-    display_thresholds: Optional[Dict] = None
+    regime_info: RegimeInfo | None = None
+    display_thresholds: dict | None = None
 
 
 class AnomalyResponse(BaseModel):
@@ -66,7 +65,7 @@ class AnomalyResponse(BaseModel):
 
     symbol: str
     is_anomaly: bool
-    anomaly_type: Optional[str]
+    anomaly_type: str | None
     severity: str
     description: str
     detected_at: str
@@ -88,8 +87,8 @@ class MarketSentimentResponse(BaseModel):
     sentiment_score: float
     fear_greed_index: int
     market_phase: str
-    signals: List[SignalResponse]
-    display_thresholds: Optional[Dict] = None
+    signals: list[SignalResponse]
+    display_thresholds: dict | None = None
 
 
 class ModelDetail(BaseModel):
@@ -98,7 +97,7 @@ class ModelDetail(BaseModel):
     name: str
     weight_pct: float
     trend: str
-    mape: Optional[float] = None
+    mape: float | None = None
 
 
 class FeatureExplanation(BaseModel):
@@ -124,7 +123,7 @@ class PortfolioAssetPrediction(BaseModel):
     trend_strength: float
     recommendation: str
     model_used: str
-    predictions: List[PredictionPoint]
+    predictions: list[PredictionPoint]
     support_level: float
     resistance_level: float
     # New scoring fields (replaces old accuracy/consensus_score)
@@ -135,9 +134,9 @@ class PortfolioAssetPrediction(BaseModel):
     reliability_score: float = 50.0
     model_confidence: str = "uncertain"
     models_agree: bool = True
-    models_detail: Optional[List[ModelDetail]] = None
-    explanations: List[FeatureExplanation] = Field(default_factory=list)
-    regime_info: Optional[RegimeInfo] = None
+    models_detail: list[ModelDetail] | None = None
+    explanations: list[FeatureExplanation] = Field(default_factory=list)
+    regime_info: RegimeInfo | None = None
 
 
 class PortfolioPredictionSummary(BaseModel):
@@ -156,9 +155,9 @@ class PortfolioPredictionSummary(BaseModel):
 class PortfolioPredictionResponse(BaseModel):
     """Portfolio predictions response."""
 
-    predictions: List[PortfolioAssetPrediction]
+    predictions: list[PortfolioAssetPrediction]
     summary: PortfolioPredictionSummary
-    display_thresholds: Optional[Dict] = None
+    display_thresholds: dict | None = None
 
 
 @router.get("/asset/{symbol}", response_model=AssetPredictionResponse)
@@ -213,11 +212,11 @@ async def get_portfolio_predictions(
     )
 
 
-@router.get("/anomalies", response_model=List[AnomalyResponse])
+@router.get("/anomalies", response_model=list[AnomalyResponse])
 async def get_anomalies(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[AnomalyResponse]:
+) -> list[AnomalyResponse]:
     """Detect anomalies in user's portfolio assets."""
     anomalies = await prediction_service.detect_anomalies(db, str(current_user.id))
 
@@ -263,7 +262,7 @@ class WhatIfScenario(BaseModel):
 class WhatIfRequest(BaseModel):
     """What-if request body."""
 
-    scenarios: List[WhatIfScenario]
+    scenarios: list[WhatIfScenario]
 
 
 @router.post("/what-if", response_model=dict)
@@ -330,7 +329,7 @@ async def _send_cycle_alert(
     user_id: str,
     advice: dict,
     regime: str,
-    fear_greed: Optional[int],
+    fear_greed: int | None,
 ) -> None:
     """Send Telegram alert for actionable cycle insight."""
     try:
@@ -579,7 +578,7 @@ async def _send_reconciliation_report(
     top: dict,
     total_value: float,
     regime: str,
-    fear_greed: Optional[int],
+    fear_greed: int | None,
     ecart: float = 0.0,
 ) -> None:
     """Send Telegram reconciliation summary."""
@@ -635,8 +634,8 @@ async def validate_signal(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    symbol: Optional[str] = Query(None),
-    action: Optional[str] = Query(None),
+    symbol: str | None = Query(None),
+    action: str | None = Query(None),
 ):
     """Validate the top Alpha signal with Monte Carlo risk impact analysis.
 
@@ -863,9 +862,7 @@ async def _send_signal_report(
         # Rebalance suggestion
         rebal = result.get("rebalance_suggestion")
         if rebal:
-            message += (
-                f"\n\n💡 Suggestion : {rebal['reason']}" f" (−{rebal['trim_eur']:.2f} € sur {rebal['trim_symbol']})"
-            )
+            message += f"\n\n💡 Suggestion : {rebal['reason']} (−{rebal['trim_eur']:.2f} € sur {rebal['trim_symbol']})"
 
         await telegram_service.send_smart_alert(
             message=message,
@@ -1027,7 +1024,7 @@ class PlannedOrderCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]{1,20}$")
     side: str = Field(pattern="^(buy|sell)$")
     amount_eur: float = Field(gt=0, le=10_000_000)
-    notes: Optional[str] = Field(None, max_length=1000)
+    notes: str | None = Field(None, max_length=1000)
     source: str = Field("frontend", pattern="^(frontend|telegram)$")
 
 

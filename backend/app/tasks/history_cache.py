@@ -10,9 +10,8 @@ import json
 import logging
 import os
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 from redis import Redis
 from sqlalchemy import func, select
@@ -41,8 +40,8 @@ DEFAULT_CACHE_DAYS = 365
 # 30 des 120 commandes d'un tableau de bord recalculé (mesuré le 2026-09-15).
 # Le PID garde la réutilisation sûre après un fork (worker Celery prefork) :
 # un processus enfant ne partage jamais la connexion de son parent.
-_client: Optional[Redis] = None
-_client_pid: Optional[int] = None
+_client: Redis | None = None
+_client_pid: int | None = None
 
 
 def _get_redis() -> Redis:
@@ -59,7 +58,7 @@ def _cache_key(symbol: str, days: int) -> str:
     return f"{REDIS_HISTORY_PREFIX}{symbol.upper()}_{days}"
 
 
-def _lire_cache(redis: Redis, key: str) -> Optional[str]:
+def _lire_cache(redis: Redis, key: str) -> str | None:
     """Lit une clé du cache ; une panne Redis vaut « pas en cache »."""
     try:
         return redis.get(key)
@@ -164,7 +163,7 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
                 ),
                 {
                     "px": latest["price_eur"],
-                    "upd": datetime.now(timezone.utc),
+                    "upd": datetime.now(UTC),
                     "sym": symbol.upper(),
                 },
             )
@@ -189,7 +188,7 @@ def _charger_prix_depuis_db_sync(symbol: str, days: int):
 
     moteur = create_engine(settings.DATABASE_URL_SYNC, pool_pre_ping=True)
     try:
-        limite = datetime.now(timezone.utc).date() - timedelta(days=days)
+        limite = datetime.now(UTC).date() - timedelta(days=days)
         with moteur.connect() as conn:
             lignes = conn.execute(
                 text(
@@ -215,7 +214,7 @@ def _charger_prix_depuis_db_sync(symbol: str, days: int):
 async def _load_prices_from_db(symbol: str, days: int):
     """Load price history from PostgreSQL. Returns (dates, prices) or ([], [])."""
     try:
-        cutoff = datetime.now(timezone.utc).date() - timedelta(days=days)
+        cutoff = datetime.now(UTC).date() - timedelta(days=days)
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
@@ -236,7 +235,7 @@ async def _load_prices_from_db(symbol: str, days: int):
         return [], []
 
 
-async def _dernier_jour_en_base() -> Dict[str, date]:
+async def _dernier_jour_en_base() -> dict[str, date]:
     """Dernier jour de cours connu en base, par symbole (une seule requête)."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -261,7 +260,7 @@ async def _fetch_and_cache_all():
     except Exception as e:  # noqa: BLE001 — le pré-chargement ne doit pas tomber pour un test d'économie
         logger.warning("Couverture de la base illisible, CoinGecko sera interrogé pour tout : %s", e)
         derniers_jours = {}
-    aujourd_hui = datetime.now(timezone.utc).date()
+    aujourd_hui = datetime.now(UTC).date()
 
     if not assets:
         logger.info("No assets to cache history for")
@@ -282,7 +281,7 @@ async def _fetch_and_cache_all():
                 try:
                     data = json.loads(existing)
                     # Check if data is recent enough (< 50 min old)
-                    if data.get("fetched_at", 0) > datetime.now(timezone.utc).timestamp() - 3000:
+                    if data.get("fetched_at", 0) > datetime.now(UTC).timestamp() - 3000:
                         logger.debug("Skipping %s — still fresh in cache", symbol)
                         cached_count += 1
                         continue
@@ -301,7 +300,7 @@ async def _fetch_and_cache_all():
                         {
                             "dates": [d.isoformat() for d in dates],
                             "prices": prices,
-                            "fetched_at": datetime.now(timezone.utc).timestamp(),
+                            "fetched_at": datetime.now(UTC).timestamp(),
                         }
                     )
                     # Persist to PostgreSQL first (durable), then cache best-effort
@@ -351,7 +350,7 @@ async def _cache_single(symbol: str, asset_type: str, days: int = DEFAULT_CACHE_
                 {
                     "dates": [d.isoformat() for d in dates],
                     "prices": prices,
-                    "fetched_at": datetime.now(timezone.utc).timestamp(),
+                    "fetched_at": datetime.now(UTC).timestamp(),
                 }
             )
             await _persist_prices_to_db(symbol, dates, prices)
@@ -380,8 +379,8 @@ def cache_single_asset(symbol: str, asset_type: str):
 # en cours par symbole, pour ne pas la lancer deux fois, et l'instant du dernier
 # essai, pour ne pas réinterroger CoinGecko à chaque recalcul pour un symbole
 # qui n'a pas d'historique.
-_prechargements_en_cours: Dict[str, "asyncio.Task"] = {}
-_dernier_essai: Dict[str, float] = {}
+_prechargements_en_cours: dict[str, "asyncio.Task"] = {}
+_dernier_essai: dict[str, float] = {}
 _DELAI_ENTRE_ESSAIS = 3600.0
 
 
@@ -516,7 +515,7 @@ async def _deep_backfill_all():
                 first_tx = first_tx.replace(tzinfo=None)
 
             existing_count = coverage_map.get(symbol, 0)
-            today = datetime.now(timezone.utc)
+            today = datetime.now(UTC)
             total_days_needed = (today - first_tx).days + 1
 
             # If we already have >80% of needed data, just fetch the last 365 days
@@ -701,7 +700,7 @@ def deep_backfill_prices():
     return {"filled": result}
 
 
-def _cles_candidates(symbol: str, days: int) -> List[str]:
+def _cles_candidates(symbol: str, days: int) -> list[str]:
     """Clés à essayer pour un symbole, par ordre de préférence.
 
     Clé exacte → 365 jours (tronquée ensuite) → ancienne clé 90 jours, chacune
@@ -719,7 +718,7 @@ def _cles_candidates(symbol: str, days: int) -> List[str]:
     return cles
 
 
-def get_cached_histories(symbols: List[str], days: int = 90) -> Dict[str, Tuple[list, list]]:
+def get_cached_histories(symbols: list[str], days: int = 90) -> dict[str, tuple[list, list]]:
     """Lit l'historique de plusieurs symboles en **une seule** commande Redis.
 
     Renvoie ``{symbole: (dates, prices)}`` pour chaque symbole demandé, avec
@@ -733,7 +732,7 @@ def get_cached_histories(symbols: List[str], days: int = 90) -> Dict[str, Tuple[
     demandes = list(dict.fromkeys(symbols))
     candidates = {symbole: _cles_candidates(symbole, days) for symbole in demandes}
     toutes = [cle for cles in candidates.values() for cle in cles]
-    valeurs: Dict[str, Optional[str]] = {}
+    valeurs: dict[str, str | None] = {}
 
     # Toute la lecture Redis sous une même garde. Sans elle, une base
     # injoignable levait ici — et le repli PostgreSQL annoncé par la docstring
@@ -751,7 +750,7 @@ def get_cached_histories(symbols: List[str], days: int = 90) -> Dict[str, Tuple[
             for symbole in demandes:
                 logger.warning("Cache Redis injoignable pour %s (repli sur PostgreSQL) : %s", symbole, e)
 
-    resultats: Dict[str, Tuple[list, list]] = {}
+    resultats: dict[str, tuple[list, list]] = {}
     for symbole in demandes:
         raw = next((valeurs[cle] for cle in candidates[symbole] if valeurs.get(cle)), None)
         if raw:

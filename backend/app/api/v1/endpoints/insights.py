@@ -1,7 +1,5 @@
 """Insights endpoints: fee analysis, tax-loss harvesting, passive income, DCA backtest."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +31,7 @@ async def get_tax_loss_harvesting(
 
 @router.get("/passive-income", response_model=dict)
 async def get_passive_income(
-    year: Optional[int] = Query(None),
+    year: int | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

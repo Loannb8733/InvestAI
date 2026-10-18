@@ -67,9 +67,9 @@ class TestDaysZeroEstUnCasPrevu:
         # FastAPI range les contraintes dans `metadata` (annotated-types), pas en
         # attributs directs : `query.ge` n'existe pas.
         bornes = {type(c).__name__: getattr(c, type(c).__name__.lower(), None) for c in query.metadata}
-        assert (
-            bornes.get("Ge") == 0
-        ), f"days=0 doit rester accepté — c'est l'option « Tout » du sélecteur de période ; bornes : {bornes}"
+        assert bornes.get("Ge") == 0, (
+            f"days=0 doit rester accepté — c'est l'option « Tout » du sélecteur de période ; bornes : {bornes}"
+        )
 
     def test_la_semantique_de_days_zero_est_documentee(self):
         doc = inspect.getdoc(module_dashboard.get_dashboard) or ""

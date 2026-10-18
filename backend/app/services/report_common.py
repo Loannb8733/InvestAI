@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Tuple
 from zoneinfo import ZoneInfo
 
 from openpyxl.styles import Border, Font, PatternFill, Side
@@ -16,7 +15,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 
-CRYPTO_ASSET_CLASSES: Dict[str, str] = {
+CRYPTO_ASSET_CLASSES: dict[str, str] = {
     # Layer 1
     "BTC": "L1",
     "ETH": "L1",
@@ -89,7 +88,7 @@ CRYPTO_ASSET_CLASSES: Dict[str, str] = {
     "BRETT": "Meme",
 }
 
-CRYPTO_CLASS_LABELS: Dict[str, str] = {
+CRYPTO_CLASS_LABELS: dict[str, str] = {
     "L1": "Layer 1",
     "L2": "Layer 2",
     "DeFi": "DeFi",
@@ -148,7 +147,7 @@ _PARIS_TZ = ZoneInfo("Europe/Paris")
 _ZERO = Decimal("0")
 
 # FIFO layer key type
-FifoKey = Tuple[str, str]
+FifoKey = tuple[str, str]
 
 
 def _now_paris() -> datetime:

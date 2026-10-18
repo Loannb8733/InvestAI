@@ -7,8 +7,8 @@ whatever is most appropriate based on market conditions and portfolio state.
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +37,7 @@ class AIStrategyService:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Analyze portfolio and propose strategies."""
         from app.services.prediction_service import prediction_service
         from app.services.strategy_service import strategy_service
@@ -63,7 +63,7 @@ class AIStrategyService:
         regime_name = strategy_map.get("market_regime", "unknown") or "unknown"
         fear_greed = strategy_map.get("fear_greed")
         regime_confidence = (fear_greed / 100.0) if fear_greed and isinstance(fear_greed, (int, float)) else 0.5
-        strategies: List[Dict[str, Any]] = []
+        strategies: list[dict[str, Any]] = []
 
         # Classify assets by signal
         buy_assets = [a for a in assets if "ACHAT" in a.get("action", "") or a.get("action") == "DCA"]
@@ -242,14 +242,14 @@ class AIStrategyService:
 
     def _build_vca_strategy(
         self,
-        buy_assets: List[Dict],
-        all_assets: List[Dict],
+        buy_assets: list[dict],
+        all_assets: list[dict],
         regime: str,
         confidence: float,
         liquidity: float,
         total_value: float,
         has_high_volatility: bool,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """VCA — invest more when prices are low, less when high.
 
         Best in volatile/accumulation markets where price swings create
@@ -324,12 +324,12 @@ class AIStrategyService:
 
     def _build_dca_strategy(
         self,
-        buy_assets: List[Dict],
+        buy_assets: list[dict],
         regime: str,
         confidence: float,
         liquidity: float,
         has_high_volatility: bool,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """DCA — fixed amount at regular intervals. Best in trending markets."""
         if not buy_assets:
             return None
@@ -365,7 +365,7 @@ class AIStrategyService:
         else:
             intensity = "Sélectif"
             pct = 0.03
-            reasoning = f"Marché en phase '{regime}'. " "DCA uniquement sur les assets avec les meilleurs scores alpha."
+            reasoning = f"Marché en phase '{regime}'. DCA uniquement sur les assets avec les meilleurs scores alpha."
 
         if liquidity <= 0:
             return None  # Pas de munitions = pas de DCA
@@ -406,10 +406,10 @@ class AIStrategyService:
 
     def _build_profit_taking_strategy(
         self,
-        sell_assets: List[Dict],
+        sell_assets: list[dict],
         regime: str,
         confidence: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Profit-taking from sell signals."""
         actions = []
         for asset in sell_assets[:5]:
@@ -420,7 +420,7 @@ class AIStrategyService:
                     "amount": round(abs(asset.get("impact_eur", 0)), 2),
                     "currency": "EUR",
                     "reason": (
-                        f"Alpha {asset.get('alpha_score', 0)}/100 — " f"{asset.get('description', 'Signal de vente')}"
+                        f"Alpha {asset.get('alpha_score', 0)}/100 — {asset.get('description', 'Signal de vente')}"
                     ),
                 }
             )
@@ -447,12 +447,12 @@ class AIStrategyService:
 
     def _build_rotation_strategy(
         self,
-        buy_assets: List[Dict],
-        sell_assets: List[Dict],
+        buy_assets: list[dict],
+        sell_assets: list[dict],
         regime: str,
         confidence: float,
         total_value: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Rotation — sell weak performers, rotate into strong ones.
 
         Triggered when we have both buy AND sell signals simultaneously.
@@ -516,12 +516,12 @@ class AIStrategyService:
 
     def _build_swing_strategy(
         self,
-        assets: List[Dict],
+        assets: list[dict],
         regime: str,
         confidence: float,
         has_high_volatility: bool,
         liquidity: float = 0.0,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Swing trading — exploit short-term price oscillations.
 
         Best in sideways/volatile markets where prices oscillate in a range.
@@ -600,12 +600,12 @@ class AIStrategyService:
 
     def _build_stablecoin_yield_strategy(
         self,
-        assets: List[Dict],
+        assets: list[dict],
         regime: str,
         confidence: float,
         liquidity: float,
         total_value: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Park idle cash in stablecoins for yield during uncertain markets."""
         if total_value <= 0:
             return None
@@ -671,11 +671,11 @@ class AIStrategyService:
 
     def _build_rebalance_strategy(
         self,
-        assets: List[Dict],
+        assets: list[dict],
         regime: str,
         confidence: float,
         total_value: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Rebalancing if portfolio is significantly skewed."""
         if not assets or total_value <= 0:
             return None
@@ -759,14 +759,14 @@ class AIStrategyService:
 
     def _build_conviction_buy_strategy(
         self,
-        buy_assets: List[Dict],
-        all_assets: List[Dict],
+        buy_assets: list[dict],
+        all_assets: list[dict],
         regime: str,
         confidence: float,
-        fear_greed: Optional[int],
+        fear_greed: int | None,
         liquidity: float,
-        contrarian_stats: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        contrarian_stats: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Conviction buy — extreme fear is the strongest buy signal.
 
         Only triggers when Fear & Greed < 25 AND market is in bear/bottom.
@@ -831,11 +831,11 @@ class AIStrategyService:
 
     def _build_progressive_profit_plan(
         self,
-        sell_assets: List[Dict],
-        hold_assets: List[Dict],
+        sell_assets: list[dict],
+        hold_assets: list[dict],
         regime: str,
         confidence: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Progressive profit-taking plan — staged exits in bull market.
 
         Instead of selling everything at once, plan 3-stage profit taking.
@@ -901,11 +901,11 @@ class AIStrategyService:
         self,
         db: AsyncSession,
         user_id: str,
-        suggestions: List[Dict[str, Any]],
-    ) -> List[Strategy]:
+        suggestions: list[dict[str, Any]],
+    ) -> list[Strategy]:
         """Persist AI suggestions as Strategy + StrategyAction rows."""
-        saved: List[Strategy] = []
-        now = datetime.now(timezone.utc)
+        saved: list[Strategy] = []
+        now = datetime.now(UTC)
 
         for s in suggestions:
             strategy = Strategy(

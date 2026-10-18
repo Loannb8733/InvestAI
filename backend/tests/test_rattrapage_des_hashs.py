@@ -22,7 +22,7 @@ accumulés en trois mois, la déduplication cessant d'y protéger des doublons.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -34,7 +34,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType, compute_transaction_hash
 from app.models.user import User
 
-QUAND = datetime(2026, 3, 25, 0, 7, 0, tzinfo=timezone.utc)
+QUAND = datetime(2026, 3, 25, 0, 7, 0, tzinfo=UTC)
 
 
 def _hash_attendu(tx: Transaction) -> str:
@@ -164,7 +164,7 @@ class TestCollisionLegitime:
             actif,
             hash_pose="autre_hash_perime",
             quantite="777",
-            quand=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            quand=datetime(2026, 4, 1, tzinfo=UTC),
         )
 
         await _rattraper(db_session)

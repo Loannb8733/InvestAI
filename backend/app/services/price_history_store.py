@@ -21,8 +21,7 @@ Une série absente est une série absente : l'appelant dégrade son analyse.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -33,10 +32,10 @@ from app.models.asset_price_history import AssetPriceHistory
 logger = logging.getLogger(__name__)
 
 
-async def charger_depuis_postgres(symbol: str, days: int) -> Tuple[List[datetime], List[float]]:
+async def charger_depuis_postgres(symbol: str, days: int) -> tuple[list[datetime], list[float]]:
     """Historique persistant en base. Retourne ([], []) si rien n'est connu."""
     try:
-        limite = datetime.now(timezone.utc).date() - timedelta(days=days)
+        limite = datetime.now(UTC).date() - timedelta(days=days)
         async with AsyncSessionLocal() as db:
             resultat = await db.execute(
                 select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
@@ -58,7 +57,7 @@ async def charger_depuis_postgres(symbol: str, days: int) -> Tuple[List[datetime
         return [], []
 
 
-async def prix_locaux(symbol: str, asset_type: str, days: int) -> Optional[List[float]]:
+async def prix_locaux(symbol: str, asset_type: str, days: int) -> list[float] | None:
     """Série de prix depuis Redis puis PostgreSQL, sans jamais toucher au réseau.
 
     Retourne ``None`` quand aucune source locale ne connaît ce symbole — à

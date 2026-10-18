@@ -1,6 +1,5 @@
 """Tests for prediction service helper methods."""
 
-
 import pytest
 
 from app.services.prediction_service import PredictionService, PricePrediction

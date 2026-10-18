@@ -1,6 +1,5 @@
 """Portfolio endpoints."""
 
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -17,7 +16,7 @@ from app.schemas.portfolio import CashBalanceUpdate, PortfolioCreate, PortfolioR
 router = APIRouter()
 
 
-@router.get("", response_model=List[PortfolioResponse])
+@router.get("", response_model=list[PortfolioResponse])
 @limiter.limit(RATE_LIMITS["api_read"])
 async def list_portfolios(
     request: Request,
@@ -25,7 +24,7 @@ async def list_portfolios(
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[PortfolioResponse]:
+) -> list[PortfolioResponse]:
     """List all portfolios for the current user."""
     result = await db.execute(
         select(Portfolio)

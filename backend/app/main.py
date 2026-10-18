@@ -8,10 +8,10 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -385,9 +385,7 @@ def _create_missing_transfer_mirrors():
                 key = (str(r.portfolio_id), r.symbol, DEFAULT_DESTINATION)
                 if key not in asset_cache:
                     existing = conn.execute(
-                        text(
-                            "SELECT id FROM assets WHERE portfolio_id = :pid" " AND symbol = :sym AND exchange = :exc"
-                        ),
+                        text("SELECT id FROM assets WHERE portfolio_id = :pid AND symbol = :sym AND exchange = :exc"),
                         {
                             "pid": r.portfolio_id,
                             "sym": r.symbol,
@@ -530,10 +528,10 @@ def _run_alembic_upgrade():
     stamp it at the last schema migration so only data-fix migrations run.
     """
     try:
+        from alembic.config import Config
         from sqlalchemy import create_engine, inspect, text
 
         from alembic import command
-        from alembic.config import Config
         from app.core.config import settings
 
         alembic_cfg = Config("alembic.ini")
@@ -1053,7 +1051,7 @@ def resoudre_revision_attendue() -> str:
 
 _COMMIT_DEPLOYE = resoudre_commit()
 _REVISION_ATTENDUE = resoudre_revision_attendue()
-_DEMARRE_A = datetime.now(timezone.utc).isoformat(timespec="seconds")
+_DEMARRE_A = datetime.now(UTC).isoformat(timespec="seconds")
 
 
 @app.get("/health")

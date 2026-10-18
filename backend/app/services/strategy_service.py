@@ -9,9 +9,9 @@ decision loop: AI proposes → user executes → we verify.
 
 import logging
 from bisect import bisect_right
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,12 +37,12 @@ class DeploymentCapacity:
     invested_pct: float  # % of portfolio that is invested (risky)
 
     # Next alpha signal
-    next_signal_symbol: Optional[str] = None
-    next_signal_action: Optional[str] = None
+    next_signal_symbol: str | None = None
+    next_signal_action: str | None = None
     next_signal_amount: float = 0.0
     can_execute: bool = True
     shortfall: float = 0.0
-    message: Optional[str] = None
+    message: str | None = None
 
     # Deployment suggestion based on profile
     profile: str = "moderate"
@@ -58,7 +58,7 @@ _BUY_KEYWORDS = ("BUY", "ACHAT", "DCA", "RENFORCER", "ACCUMULER")
 _SELL_KEYWORDS = ("SELL", "VENDRE", "ALLÉGER", "ALLEGER", "PROFITS")
 
 
-def classify_action_direction(action: Optional[str]) -> Optional[str]:
+def classify_action_direction(action: str | None) -> str | None:
     """Map a free-form action label to "buy" / "sell", or None if undecidable.
 
     HOLD / OBSERVER / SWAP and unknown labels return None (not evaluable):
@@ -79,7 +79,7 @@ def compute_action_performance(
     amount_eur: float,
     price_at_execution: float,
     current_price: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute the realized impact of one executed action (pure function).
 
     For a BUY: pnl = amount × (current/exec − 1) — a true unrealized P&L on
@@ -121,12 +121,12 @@ def compute_action_performance(
 
 
 def aggregate_strategy_performance(
-    evaluated: Sequence[Dict],
+    evaluated: Sequence[dict],
     executed_count: int,
     skipped_count: int,
     pending_count: int,
     non_evaluable_count: int,
-) -> Dict:
+) -> dict:
     """Aggregate per-action results into strategy-level totals (pure function).
 
     - total_impact_eur: sum of per-action pnl/impact.
@@ -242,7 +242,7 @@ class StrategyService:
             keep_in_reserve=keep_reserve,
         )
 
-    async def get_strategy_performance(self, db: AsyncSession, actions: Sequence) -> Dict:
+    async def get_strategy_performance(self, db: AsyncSession, actions: Sequence) -> dict:
         """Measure what EXECUTED actions of a strategy actually returned.
 
         Prices come from AssetPriceHistory (daily closes persisted by the
@@ -264,7 +264,7 @@ class StrategyService:
 
         # Split executed actions into candidates vs immediately non-evaluable
         candidates = []
-        non_evaluable: List[Dict] = []
+        non_evaluable: list[dict] = []
         for a in executed:
             direction = classify_action_direction(a.action)
             amount = float(a.amount) if a.amount is not None else 0.0
@@ -282,7 +282,7 @@ class StrategyService:
                 candidates.append((a, direction, amount))
 
         # Batch-load daily closes for all involved symbols
-        prices_by_symbol: Dict[str, List[Tuple[date, float]]] = {}
+        prices_by_symbol: dict[str, list[tuple[date, float]]] = {}
         if candidates:
             symbols = {a.symbol.upper() for a, _, _ in candidates}
             min_exec = min(a.executed_at.date() for a, _, _ in candidates)
@@ -302,7 +302,7 @@ class StrategyService:
             for sym, pdate, price in result.all():
                 prices_by_symbol.setdefault(sym.upper(), []).append((pdate, float(price)))
 
-        evaluated: List[Dict] = []
+        evaluated: list[dict] = []
         for a, direction, amount in candidates:
             sym = a.symbol.upper()
             series = prices_by_symbol.get(sym, [])
@@ -351,7 +351,7 @@ class StrategyService:
         }
 
     @staticmethod
-    def _ne(action, reason: str) -> Dict:
+    def _ne(action, reason: str) -> dict:
         """Build a non-evaluable entry."""
         return {
             "action_id": str(action.id),
@@ -361,7 +361,7 @@ class StrategyService:
         }
 
     @staticmethod
-    def _price_at(series: List[Tuple[date, float]], target: date) -> Tuple[Optional[float], Optional[date]]:
+    def _price_at(series: list[tuple[date, float]], target: date) -> tuple[float | None, date | None]:
         """Last daily close ≤ target within the tolerance window (series sorted by date)."""
         if not series:
             return None, None

@@ -1,6 +1,5 @@
 """Notification endpoints."""
 
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -52,14 +51,14 @@ class MarkReadRequest(BaseModel):
     notification_id: UUID
 
 
-@router.get("", response_model=List[NotificationResponse])
+@router.get("", response_model=list[NotificationResponse])
 async def list_notifications(
     unread_only: bool = False,
     limit: int = 50,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[NotificationResponse]:
+) -> list[NotificationResponse]:
     """List notifications for current user."""
     notifications = await notification_service.get_user_notifications(
         db=db,

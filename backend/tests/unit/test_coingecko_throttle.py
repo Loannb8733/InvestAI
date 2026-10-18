@@ -48,9 +48,9 @@ class TestVerrou:
 
     def test_le_delai_minimum_couvre_le_palier_gratuit(self):
         # 50 requêtes/minute = 1,2 s entre deux appels.
-        assert (
-            hd._COINGECKO_MIN_DELAY >= 1.2
-        ), f"délai de {hd._COINGECKO_MIN_DELAY}s : au-delà de 50 req/min, CoinGecko répond 429"
+        assert hd._COINGECKO_MIN_DELAY >= 1.2, (
+            f"délai de {hd._COINGECKO_MIN_DELAY}s : au-delà de 50 req/min, CoinGecko répond 429"
+        )
 
     def test_le_throttle_prend_le_verrou(self):
         src = inspect.getsource(hd._coingecko_throttle)
@@ -98,7 +98,7 @@ class TestAttenteBornee:
 
     def test_retry_after_est_respecte(self):
         assert "Retry-After" in _SOURCE, (
-            "quand l'API indique combien de temps patienter, deviner à sa place est " "à la fois impoli et moins juste"
+            "quand l'API indique combien de temps patienter, deviner à sa place est à la fois impoli et moins juste"
         )
 
 
@@ -111,6 +111,6 @@ class TestBudgetGlobal:
         source = Path(pc.__file__).read_text(encoding="utf-8")
         assert "_BUDGET_APPELS_EXTERNES" in source, "aucun budget de temps sur les données externes"
         assert "wait_for" in source, "le budget n'est pas appliqué : il faut un wait_for"
-        assert (
-            0 < pc._BUDGET_APPELS_EXTERNES <= 20
-        ), f"budget de {pc._BUDGET_APPELS_EXTERNES}s : au-delà, l'écran reste figé trop longtemps"
+        assert 0 < pc._BUDGET_APPELS_EXTERNES <= 20, (
+            f"budget de {pc._BUDGET_APPELS_EXTERNES}s : au-delà, l'écran reste figé trop longtemps"
+        )

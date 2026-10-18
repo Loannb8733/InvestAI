@@ -1,9 +1,8 @@
 """Notes endpoints for investment journal."""
 
 import bisect
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -40,24 +39,24 @@ class NoteCreate(BaseModel):
     """Schema for creating a note."""
 
     title: str = Field(..., min_length=1, max_length=200)
-    content: Optional[str] = None
-    tags: Optional[str] = Field(None, max_length=500)
-    asset_id: Optional[UUID] = None
-    transaction_ids: Optional[str] = None  # Comma-separated UUIDs
-    attachments: Optional[str] = None  # JSON array
-    sentiment: Optional[str] = Field(None, pattern="^(bullish|bearish|neutral)$")
+    content: str | None = None
+    tags: str | None = Field(None, max_length=500)
+    asset_id: UUID | None = None
+    transaction_ids: str | None = None  # Comma-separated UUIDs
+    attachments: str | None = None  # JSON array
+    sentiment: str | None = Field(None, pattern="^(bullish|bearish|neutral)$")
 
 
 class NoteUpdate(BaseModel):
     """Schema for updating a note."""
 
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    content: Optional[str] = None
-    tags: Optional[str] = Field(None, max_length=500)
-    asset_id: Optional[UUID] = None
-    transaction_ids: Optional[str] = None
-    attachments: Optional[str] = None
-    sentiment: Optional[str] = Field(None, pattern="^(bullish|bearish|neutral)$")
+    title: str | None = Field(None, min_length=1, max_length=200)
+    content: str | None = None
+    tags: str | None = Field(None, max_length=500)
+    asset_id: UUID | None = None
+    transaction_ids: str | None = None
+    attachments: str | None = None
+    sentiment: str | None = Field(None, pattern="^(bullish|bearish|neutral)$")
 
 
 class NoteResponse(BaseModel):
@@ -65,14 +64,14 @@ class NoteResponse(BaseModel):
 
     id: UUID
     title: str
-    content: Optional[str]
-    tags: Optional[str]
-    asset_id: Optional[UUID]
-    asset_symbol: Optional[str] = None
-    asset_name: Optional[str] = None
-    transaction_ids: Optional[str] = None
-    attachments: Optional[str] = None
-    sentiment: Optional[str] = None
+    content: str | None
+    tags: str | None
+    asset_id: UUID | None
+    asset_symbol: str | None = None
+    asset_name: str | None = None
+    transaction_ids: str | None = None
+    attachments: str | None = None
+    sentiment: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -82,7 +81,7 @@ class NoteSummaryResponse(BaseModel):
 
     total_notes: int
     notes_this_month: int
-    unique_tags: List[str]
+    unique_tags: list[str]
 
 
 class ScorecardEntry(BaseModel):
@@ -93,8 +92,8 @@ class ScorecardEntry(BaseModel):
     symbol: str
     sentiment: str
     note_date: date
-    perf_30d: Optional[float] = None
-    perf_90d: Optional[float] = None
+    perf_30d: float | None = None
+    perf_90d: float | None = None
     verdict_30d: str  # correct | incorrect | pending
     verdict_90d: str  # correct | incorrect | pending
 
@@ -103,7 +102,7 @@ class ScorecardSentimentStats(BaseModel):
     """Per-sentiment aggregate."""
 
     n: int
-    hit_rate: Optional[float] = None
+    hit_rate: float | None = None
 
 
 class ScorecardSummary(BaseModel):
@@ -111,23 +110,23 @@ class ScorecardSummary(BaseModel):
 
     total_scored: int
     unscorable: int
-    hit_rate_30d: Optional[float] = None
-    hit_rate_90d: Optional[float] = None
-    by_sentiment: Dict[str, ScorecardSentimentStats]
+    hit_rate_30d: float | None = None
+    hit_rate_90d: float | None = None
+    by_sentiment: dict[str, ScorecardSentimentStats]
 
 
 class ScorecardResponse(BaseModel):
     """Scorecard response: sentiment recorded vs realized performance."""
 
-    entries: List[ScorecardEntry]
+    entries: list[ScorecardEntry]
     summary: ScorecardSummary
 
 
 def _nearest_price(
-    dates: List[date],
-    prices: List[Decimal],
+    dates: list[date],
+    prices: list[Decimal],
     target: date,
-) -> Optional[Decimal]:
+) -> Decimal | None:
     """Return the price closest to ``target`` within ±SCORECARD_PRICE_TOLERANCE_DAYS.
 
     ``dates`` must be sorted ascending and aligned with ``prices``.
@@ -135,8 +134,8 @@ def _nearest_price(
     if not dates:
         return None
     i = bisect.bisect_left(dates, target)
-    best: Optional[Decimal] = None
-    best_delta: Optional[int] = None
+    best: Decimal | None = None
+    best_delta: int | None = None
     for j in (i - 1, i):
         if 0 <= j < len(dates):
             delta = abs((dates[j] - target).days)
@@ -146,7 +145,7 @@ def _nearest_price(
     return best
 
 
-def _sentiment_verdict(sentiment: str, perf_pct: Optional[float], matured: bool) -> str:
+def _sentiment_verdict(sentiment: str, perf_pct: float | None, matured: bool) -> str:
     """Verdict for one note/horizon.
 
     Thresholds (documented on module constants):
@@ -164,7 +163,7 @@ def _sentiment_verdict(sentiment: str, perf_pct: Optional[float], matured: bool)
     return "correct" if abs(perf_pct) <= SCORECARD_NEUTRAL_BAND_PCT else "incorrect"
 
 
-def _hit_rate(verdicts: List[str]) -> Optional[float]:
+def _hit_rate(verdicts: list[str]) -> float | None:
     """Hit rate (%) over decided verdicts only; None if nothing is decided yet."""
     decided = [v for v in verdicts if v in ("correct", "incorrect")]
     if not decided:
@@ -186,7 +185,7 @@ async def get_notes_summary(
     notes = result.scalars().all()
 
     # Count notes this month
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     notes_this_month = sum(1 for n in notes if n.created_at.year == now.year and n.created_at.month == now.month)
 
     # Collect unique tags
@@ -205,11 +204,11 @@ async def get_notes_summary(
     )
 
 
-@router.get("/tags", response_model=List[str])
+@router.get("/tags", response_model=list[str])
 async def list_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[str]:
+) -> list[str]:
     """List all unique tags used in notes."""
     result = await db.execute(
         select(Note.tags).where(
@@ -261,14 +260,14 @@ async def get_notes_scorecard(
     )
     notes = result.scalars().all()
 
-    by_sentiment_verdicts: Dict[str, List[str]] = {"bullish": [], "bearish": [], "neutral": []}
-    by_sentiment_n: Dict[str, int] = {"bullish": 0, "bearish": 0, "neutral": 0}
+    by_sentiment_verdicts: dict[str, list[str]] = {"bullish": [], "bearish": [], "neutral": []}
+    by_sentiment_n: dict[str, int] = {"bullish": 0, "bearish": 0, "neutral": 0}
 
     def _build_summary(
-        entries: List[ScorecardEntry],
+        entries: list[ScorecardEntry],
         unscorable: int,
-        verdicts_30: List[str],
-        verdicts_90: List[str],
+        verdicts_30: list[str],
+        verdicts_90: list[str],
     ) -> ScorecardSummary:
         return ScorecardSummary(
             total_scored=len(entries),
@@ -287,7 +286,7 @@ async def get_notes_scorecard(
     # Batch load des actifs liés (mêmes garanties que list_notes : l'appartenance
     # de l'actif a été vérifiée à la création/mise à jour de la note).
     asset_ids = {n.asset_id for n in notes if n.asset_id}
-    assets_by_id: Dict[UUID, Asset] = {}
+    assets_by_id: dict[UUID, Asset] = {}
     asset_result = await db.execute(select(Asset).where(Asset.id.in_(asset_ids)))
     for asset in asset_result.scalars().all():
         assets_by_id[asset.id] = asset
@@ -297,7 +296,7 @@ async def get_notes_scorecard(
 
     # Historique de prix chargé en une requête, indexé par symbole
     # (listes triées par date pour recherche dichotomique).
-    history: Dict[str, Tuple[List[date], List[Decimal]]] = {}
+    history: dict[str, tuple[list[date], list[Decimal]]] = {}
     if symbols:
         ph_result = await db.execute(
             select(
@@ -316,10 +315,10 @@ async def get_notes_scorecard(
             dates.append(price_date)
             prices.append(price_eur)
 
-    today = datetime.now(timezone.utc).date()
-    entries: List[ScorecardEntry] = []
-    verdicts_30: List[str] = []
-    verdicts_90: List[str] = []
+    today = datetime.now(UTC).date()
+    entries: list[ScorecardEntry] = []
+    verdicts_30: list[str] = []
+    verdicts_90: list[str] = []
     unscorable = 0
 
     for note in notes:
@@ -336,8 +335,8 @@ async def get_notes_scorecard(
             unscorable += 1
             continue
 
-        perfs: Dict[int, Optional[float]] = {}
-        verdicts: Dict[int, str] = {}
+        perfs: dict[int, float | None] = {}
+        verdicts: dict[int, str] = {}
         for horizon in SCORECARD_HORIZONS:
             target = note_date + timedelta(days=horizon)
             matured = target <= today
@@ -374,16 +373,16 @@ async def get_notes_scorecard(
     )
 
 
-@router.get("", response_model=List[NoteResponse])
+@router.get("", response_model=list[NoteResponse])
 async def list_notes(
-    tag: Optional[str] = None,
-    asset_id: Optional[UUID] = None,
-    search: Optional[str] = None,
+    tag: str | None = None,
+    asset_id: UUID | None = None,
+    search: str | None = None,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[NoteResponse]:
+) -> list[NoteResponse]:
     """List all notes for the current user."""
     query = select(Note).where(Note.user_id == current_user.id)
 

@@ -182,9 +182,9 @@ class TestGoldBonusSuppressedInBull:
         """In bullish regime, gold exposure should NOT add bonus points."""
         score_no_gold = self._score_with_gold("bullish", gold_exposure=0.0)
         score_with_gold = self._score_with_gold("bullish", gold_exposure=0.20)
-        assert (
-            score_with_gold == score_no_gold
-        ), f"Gold bonus should be 0 in bull: no_gold={score_no_gold}, with_gold={score_with_gold}"
+        assert score_with_gold == score_no_gold, (
+            f"Gold bonus should be 0 in bull: no_gold={score_no_gold}, with_gold={score_with_gold}"
+        )
 
     def test_no_gold_bonus_in_markup(self):
         score_no_gold = self._score_with_gold("markup", gold_exposure=0.0)
@@ -195,9 +195,9 @@ class TestGoldBonusSuppressedInBull:
         """In bearish regime, gold exposure SHOULD add bonus points."""
         score_no_gold = self._score_with_gold("bearish", gold_exposure=0.0)
         score_with_gold = self._score_with_gold("bearish", gold_exposure=0.20)
-        assert (
-            score_with_gold > score_no_gold
-        ), f"Gold bonus should apply in bear: no_gold={score_no_gold}, with_gold={score_with_gold}"
+        assert score_with_gold > score_no_gold, (
+            f"Gold bonus should apply in bear: no_gold={score_no_gold}, with_gold={score_with_gold}"
+        )
 
     def test_gold_bonus_applies_in_markdown(self):
         score_no_gold = self._score_with_gold("markdown", gold_exposure=0.0)
@@ -251,9 +251,9 @@ class TestTelegramAlertTone:
             regime="bottoming",
             description="Alpha élevé + Bottoming",
         )
-        assert (
-            "creux" in msg.lower() or "bottom" in msg.lower() or "sécuris" in msg.lower()
-        ), f"Bear alert should mention creux/sécurisé: {msg}"
+        assert "creux" in msg.lower() or "bottom" in msg.lower() or "sécuris" in msg.lower(), (
+            f"Bear alert should mention creux/sécurisé: {msg}"
+        )
 
     def test_format_regime_alert_bull(self):
         """Bull regime → tone should mention 'momentum' or 'expansion'."""
@@ -263,9 +263,9 @@ class TestTelegramAlertTone:
             regime="markup",
             description="Alpha élevé + Mark-up",
         )
-        assert (
-            "momentum" in msg.lower() or "expansion" in msg.lower() or "mark-up" in msg.lower()
-        ), f"Bull alert should mention momentum/expansion: {msg}"
+        assert "momentum" in msg.lower() or "expansion" in msg.lower() or "mark-up" in msg.lower(), (
+            f"Bull alert should mention momentum/expansion: {msg}"
+        )
 
     def test_format_regime_alert_top(self):
         """Top regime → tone should mention 'profits' or 'prudence'."""

@@ -12,7 +12,7 @@ Exit code 1 if any price data is stale.
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import redis
 
@@ -47,7 +47,7 @@ def main():
 
     print(f"\nFound {len(price_keys)} cached price entries.\n")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stale = []
     fresh = []
     no_timestamp = []
@@ -77,7 +77,7 @@ def main():
             # Parse ISO timestamp (may or may not have timezone)
             last_updated = datetime.fromisoformat(last_updated_str)
             if last_updated.tzinfo is None:
-                last_updated = last_updated.replace(tzinfo=timezone.utc)
+                last_updated = last_updated.replace(tzinfo=UTC)
             age = (now - last_updated).total_seconds()
         except (ValueError, TypeError):
             no_timestamp.append(key)
@@ -111,9 +111,9 @@ def main():
             print(f"  ... and {len(fresh) - 20} more")
 
     if stale:
-        print(f"\n{'!'*60}")
+        print(f"\n{'!' * 60}")
         print("STALE ENTRIES (age > 5 minutes):")
-        print(f"{'!'*60}")
+        print(f"{'!' * 60}")
         print(f"\n{'Key':40s} {'Age':>8s} {'TTL':>6s}")
         print("-" * 56)
         for e in stale:

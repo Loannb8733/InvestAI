@@ -5,8 +5,6 @@ SmartInsightsService for call-site compatibility)."""
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
-
 from app.ml import adaptive_thresholds as adaptive_th
 from app.services.smart_insights_types import InsightCategory, InsightSeverity, SmartInsight
 
@@ -14,7 +12,7 @@ from app.services.smart_insights_types import InsightCategory, InsightSeverity, 
 class SmartInsightAnalyzersMixin:
     """Mixed into SmartInsightsService — the rule-based insight analyzers."""
 
-    def _analyze_sharpe(self, sharpe: float, sortino: float) -> List[SmartInsight]:
+    def _analyze_sharpe(self, sharpe: float, sortino: float) -> list[SmartInsight]:
         """Analyze Sharpe and Sortino ratios."""
         insights = []
         s_exc, s_good, s_fair, s_poor = adaptive_th.sharpe_classification()
@@ -71,7 +69,7 @@ class SmartInsightAnalyzersMixin:
 
         return insights
 
-    def _analyze_risk(self, volatility: float, var_95: float, max_drawdown: float) -> List[SmartInsight]:
+    def _analyze_risk(self, volatility: float, var_95: float, max_drawdown: float) -> list[SmartInsight]:
         """Analyze risk metrics."""
         insights = []
         vol_high, vol_extreme = adaptive_th.volatility_warning_thresholds()
@@ -85,7 +83,7 @@ class SmartInsightAnalyzersMixin:
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.CRITICAL,
                     title="Volatilité extrême",
-                    message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. C'est très risqué.",
+                    message=f"Votre portfolio a une volatilité de {volatility * 100:.0f}%. C'est très risqué.",
                     metric_name="volatility",
                     current_value=volatility,
                     target_value=0.30,
@@ -98,7 +96,7 @@ class SmartInsightAnalyzersMixin:
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.WARNING,
                     title="Volatilité élevée",
-                    message=f"Votre portfolio a une volatilité de {volatility*100:.0f}%. Préparez-vous à des variations importantes.",
+                    message=f"Votre portfolio a une volatilité de {volatility * 100:.0f}%. Préparez-vous à des variations importantes.",
                     metric_name="volatility",
                     current_value=volatility,
                     target_value=0.30,
@@ -112,7 +110,7 @@ class SmartInsightAnalyzersMixin:
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.CRITICAL,
                     title="Risque de perte élevé",
-                    message=f"Votre VaR 95% est de {var_95*100:.1f}%. Vous pouvez perdre cette proportion en une journée (5% de chance).",
+                    message=f"Votre VaR 95% est de {var_95 * 100:.1f}%. Vous pouvez perdre cette proportion en une journée (5% de chance).",
                     metric_name="var_95",
                     current_value=var_95,
                     target_value=0.05,
@@ -124,7 +122,7 @@ class SmartInsightAnalyzersMixin:
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.WARNING,
                     title="VaR à surveiller",
-                    message=f"Votre VaR 95% est de {var_95*100:.1f}%. Le risque journalier est notable.",
+                    message=f"Votre VaR 95% est de {var_95 * 100:.1f}%. Le risque journalier est notable.",
                     metric_name="var_95",
                     current_value=var_95,
                 )
@@ -138,7 +136,7 @@ class SmartInsightAnalyzersMixin:
                     severity=InsightSeverity.CRITICAL,
                     title="Drawdown severe",
                     message=(
-                        f"Votre portfolio a subi une baisse de {max_drawdown*100:.0f}% depuis son pic. "
+                        f"Votre portfolio a subi une baisse de {max_drawdown * 100:.0f}% depuis son pic. "
                         f"Reduisez l'exposition aux actifs les plus volatils et "
                         f"constituez une reserve de liquidites."
                     ),
@@ -154,7 +152,7 @@ class SmartInsightAnalyzersMixin:
                     category=InsightCategory.RISK,
                     severity=InsightSeverity.WARNING,
                     title="Drawdown important",
-                    message=f"Votre portfolio a subi une baisse de {max_drawdown*100:.0f}% depuis son pic.",
+                    message=f"Votre portfolio a subi une baisse de {max_drawdown * 100:.0f}% depuis son pic.",
                     metric_name="max_drawdown",
                     current_value=max_drawdown,
                     target_value=0.10,
@@ -163,7 +161,7 @@ class SmartInsightAnalyzersMixin:
 
         return insights
 
-    def _analyze_diversification(self, hhi: Optional[float], top_holdings: List[Dict]) -> List[SmartInsight]:
+    def _analyze_diversification(self, hhi: float | None, top_holdings: list[dict]) -> list[SmartInsight]:
         """Analyze portfolio diversification.
 
         `hhi=None` signifie que la mesure n'a pas pu être obtenue. Aucun verdict
@@ -186,11 +184,11 @@ class SmartInsightAnalyzersMixin:
                         category=InsightCategory.DIVERSIFICATION,
                         severity=InsightSeverity.CRITICAL,
                         title="Concentration excessive",
-                        message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio. C'est trop concentré.",
+                        message=f"{top_symbol} représente {top_weight * 100:.0f}% de votre portfolio. C'est trop concentré.",
                         metric_name="top_holding_weight",
                         current_value=top_weight,
                         target_value=conc_warn,
-                        potential_improvement=f"Réduisez {top_symbol} à max {conc_warn*100:.0f}% et diversifiez.",
+                        potential_improvement=f"Réduisez {top_symbol} à max {conc_warn * 100:.0f}% et diversifiez.",
                         actions=[
                             {
                                 "type": "sell",
@@ -206,7 +204,7 @@ class SmartInsightAnalyzersMixin:
                         category=InsightCategory.DIVERSIFICATION,
                         severity=InsightSeverity.WARNING,
                         title="Concentration élevée",
-                        message=f"{top_symbol} représente {top_weight*100:.0f}% de votre portfolio.",
+                        message=f"{top_symbol} représente {top_weight * 100:.0f}% de votre portfolio.",
                         metric_name="top_holding_weight",
                         current_value=top_weight,
                         target_value=conc_warn,
@@ -246,15 +244,15 @@ class SmartInsightAnalyzersMixin:
     def _analyze_correlation(
         self,
         corr_data,
-        top_holdings: List[Dict],
-    ) -> Tuple[List[SmartInsight], float, List[Dict]]:
+        top_holdings: list[dict],
+    ) -> tuple[list[SmartInsight], float, list[dict]]:
         """Analyze correlation matrix for risk clusters and diversification illusions.
 
         Returns (insights, avg_top5_correlation, risk_clusters).
         risk_clusters format: [{"assets": ["BTC", "ETH"], "avg_corr": 0.91}, ...]
         """
-        insights: List[SmartInsight] = []
-        risk_clusters: List[Dict] = []
+        insights: list[SmartInsight] = []
+        risk_clusters: list[dict] = []
 
         symbols = corr_data.symbols
         matrix = corr_data.matrix
@@ -278,7 +276,7 @@ class SmartInsightAnalyzersMixin:
 
         # 2. Build risk clusters (assets with corr > 0.85)
         cluster_threshold = 0.85
-        cluster_map: Dict[str, set] = {}
+        cluster_map: dict[str, set] = {}
         for s1, s2, corr in strongly_correlated:
             if corr >= cluster_threshold:
                 # Merge into existing cluster or create new
@@ -301,7 +299,7 @@ class SmartInsightAnalyzersMixin:
                     cluster_map[s2] = new_cluster
 
         # Deduplicate clusters
-        seen_clusters: List[frozenset] = []
+        seen_clusters: list[frozenset] = []
         for cluster_set in cluster_map.values():
             fs = frozenset(cluster_set)
             if fs not in seen_clusters:

@@ -18,7 +18,7 @@ recevoir une : le filet la remplace par celle du test, sans quoi elles
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -80,7 +80,7 @@ def _tx(asset, *, type_tx=TransactionType.BUY, quantite="1", externe=None, quand
         price=Decimal("100"),
         fee=Decimal("0"),
         external_id=externe,
-        executed_at=quand or datetime(2026, 1, 1, tzinfo=timezone.utc),
+        executed_at=quand or datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 
@@ -226,7 +226,7 @@ class TestPurgesParAnciennete:
                 asset_type="crypto",
                 model_name="test",
                 prediction_data={},
-                created_at=datetime.now(timezone.utc) - timedelta(days=jours),
+                created_at=datetime.now(UTC) - timedelta(days=jours),
             )
 
         vieille = _log("BTC", 200)

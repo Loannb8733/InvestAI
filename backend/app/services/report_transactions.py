@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class TransactionsReportMixin:
     """Mixed into ReportService."""
 
-    def generate_transactions_pdf(self, data: Dict[str, Any]) -> bytes:
+    def generate_transactions_pdf(self, data: dict[str, Any]) -> bytes:
         """Generate a dedicated PDF with all transactions."""
         transactions = data.get("transactions", [])
 
@@ -167,7 +167,7 @@ class TransactionsReportMixin:
 
     # ── Transactions Excel ───────────────────────────────────────────
 
-    def generate_transactions_excel(self, data: Dict[str, Any]) -> bytes:
+    def generate_transactions_excel(self, data: dict[str, Any]) -> bytes:
         """Generate an Excel file with full transaction history."""
         transactions = data.get("transactions", [])
         wb = Workbook()
@@ -244,7 +244,7 @@ class TransactionsReportMixin:
         """
         return f"{valeur:.{decimales}f}".replace(".", ",")
 
-    def generate_transactions_csv(self, data: Dict[str, Any]) -> bytes:
+    def generate_transactions_csv(self, data: dict[str, Any]) -> bytes:
         """Generate a CSV file with full transaction history."""
         import csv
 

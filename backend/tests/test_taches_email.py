@@ -12,7 +12,7 @@ est parcouru pour de vrai.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
@@ -137,7 +137,7 @@ class TestAvecDestinataires:
                 type=NotificationType.SYSTEM,
                 title="ancienne",
                 message="…",
-                created_at=datetime.now(timezone.utc) - timedelta(days=30),
+                created_at=datetime.now(UTC) - timedelta(days=30),
             )
         )
         await session_de_test.flush()

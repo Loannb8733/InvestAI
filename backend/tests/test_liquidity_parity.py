@@ -87,7 +87,7 @@ class TestParityValidation:
         ]
         total, risky, liquid = self._compute_partition(assets)
         assert abs(total - (risky + liquid)) < 0.01, (
-            f"Parity violation: {total} != {risky} + {liquid} " f"(écart = {abs(total - risky - liquid):.2f}€)"
+            f"Parity violation: {total} != {risky} + {liquid} (écart = {abs(total - risky - liquid):.2f}€)"
         )
 
     def test_parity_with_stablecoins_and_fiat(self):
@@ -114,9 +114,9 @@ class TestLiquidityExclusionFromAlpha:
     @pytest.mark.parametrize("symbol", ["EUR", "USDT", "USDC", "DAI", "USD"])
     def test_liquidity_excluded_from_predictions(self, symbol: str):
         """is_cash_like used in prediction_service to skip these symbols."""
-        assert (
-            is_cash_like(symbol) is True
-        ), f"{symbol} should be classified as cash-like and excluded from alpha scoring"
+        assert is_cash_like(symbol) is True, (
+            f"{symbol} should be classified as cash-like and excluded from alpha scoring"
+        )
 
     @pytest.mark.parametrize("symbol", ["BTC", "ETH", "SOL", "AAPL", "MSFT"])
     def test_risky_included_in_predictions(self, symbol: str):

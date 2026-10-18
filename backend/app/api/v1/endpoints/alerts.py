@@ -1,7 +1,6 @@
 """Alerts endpoints for price and performance notifications."""
 
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -32,7 +31,7 @@ PORTFOLIO_CONDITIONS = {
 class AlertCreate(BaseModel):
     """Schema for creating an alert."""
 
-    asset_id: Optional[UUID] = None
+    asset_id: UUID | None = None
     name: str = Field(..., min_length=1, max_length=100)
     condition: AlertCondition
     threshold: float = Field(default=0, ge=0)
@@ -61,30 +60,30 @@ class AlertCreate(BaseModel):
 class AlertUpdate(BaseModel):
     """Schema for updating an alert."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    threshold: Optional[float] = Field(None, gt=0)
-    is_active: Optional[bool] = None
-    notify_email: Optional[bool] = None
-    notify_in_app: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    threshold: float | None = Field(None, gt=0)
+    is_active: bool | None = None
+    notify_email: bool | None = None
+    notify_in_app: bool | None = None
 
 
 class AlertResponse(BaseModel):
     """Alert response schema."""
 
     id: UUID
-    asset_id: Optional[UUID]
+    asset_id: UUID | None
     name: str
     condition: str
     threshold: float
     currency: str
     is_active: bool
-    triggered_at: Optional[str]
+    triggered_at: str | None
     triggered_count: int
     notify_email: bool
     notify_in_app: bool
     created_at: datetime
-    asset_symbol: Optional[str] = None
-    asset_name: Optional[str] = None
+    asset_symbol: str | None = None
+    asset_name: str | None = None
 
 
 class AlertTriggerResponse(BaseModel):
@@ -118,11 +117,11 @@ class AlertConditionInfo(BaseModel):
     # True = condition au niveau portefeuille (pas de sélecteur d'actif).
     is_portfolio: bool = False
     # Unité/placeholder du seuil pour l'UI (ex "%", "0-1", "pts").
-    threshold_unit: Optional[str] = None
+    threshold_unit: str | None = None
 
 
-@router.get("/conditions", response_model=List[AlertConditionInfo])
-async def list_alert_conditions() -> List[AlertConditionInfo]:
+@router.get("/conditions", response_model=list[AlertConditionInfo])
+async def list_alert_conditions() -> list[AlertConditionInfo]:
     """List all available alert conditions."""
     conditions = [
         {
@@ -200,14 +199,14 @@ async def get_alert_summary(
     return AlertSummaryResponse(**summary)
 
 
-@router.get("", response_model=List[AlertResponse])
+@router.get("", response_model=list[AlertResponse])
 async def list_alerts(
     active_only: bool = False,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[AlertResponse]:
+) -> list[AlertResponse]:
     """List all alerts for the current user."""
     query = select(Alert).where(Alert.user_id == current_user.id)
 
@@ -453,13 +452,13 @@ async def delete_alert(
     await db.commit()
 
 
-@router.post("/check", response_model=List[AlertTriggerResponse])
+@router.post("/check", response_model=list[AlertTriggerResponse])
 @limiter.limit("3/minute")
 async def check_alerts(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[AlertTriggerResponse]:
+) -> list[AlertTriggerResponse]:
     """Manually check all alerts and return triggered ones."""
     triggered = await alert_service.check_alerts(db, str(current_user.id))
 

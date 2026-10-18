@@ -2,8 +2,7 @@
 
 import logging
 import uuid
-from datetime import date, datetime, time, timezone
-from typing import List
+from datetime import UTC, date, datetime, time
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import delete, select
@@ -20,7 +19,7 @@ _MAX_EVENT_MONTHS = 60
 
 def _date_to_utc(d: date) -> datetime:
     """Convert a plain date to a timezone-aware UTC datetime at 09:00."""
-    return datetime.combine(d, time(9, 0), tzinfo=timezone.utc)
+    return datetime.combine(d, time(9, 0), tzinfo=UTC)
 
 
 class CrowdfundingCalendarService:
@@ -42,7 +41,7 @@ class CrowdfundingCalendarService:
             logger.warning("Project %s has no start_date, skipping calendar sync", project.id)
             return 0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Delete future uncompleted events for this project
         await db.execute(
@@ -75,7 +74,7 @@ class CrowdfundingCalendarService:
         project_id: uuid.UUID,
     ) -> int:
         """Delete future uncompleted events when project is completed/defaulted."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await db.execute(
             delete(CalendarEvent)
             .where(
@@ -94,12 +93,12 @@ class CrowdfundingCalendarService:
         db: AsyncSession,
         user_id: uuid.UUID,
         months_ahead: int = 12,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Return upcoming coupon income grouped by month offset.
 
         Returns list of {month_offset: int, amount: float}.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now + relativedelta(months=months_ahead)
 
         result = await db.execute(
@@ -116,7 +115,7 @@ class CrowdfundingCalendarService:
         )
         rows = result.all()
 
-        income: List[dict] = []
+        income: list[dict] = []
         for event_date, amount in rows:
             if amount is None or float(amount) <= 0:
                 continue
@@ -149,7 +148,7 @@ class CrowdfundingCalendarService:
         event = result.scalar_one_or_none()
         if event:
             event.is_completed = True
-            event.completed_at = datetime.now(timezone.utc)
+            event.completed_at = datetime.now(UTC)
             logger.info(
                 "Marked calendar event %s as completed for project %s",
                 event.id,
@@ -162,7 +161,7 @@ class CrowdfundingCalendarService:
         self,
         project: CrowdfundingProject,
         user_id: uuid.UUID,
-    ) -> List[CalendarEvent]:
+    ) -> list[CalendarEvent]:
         """IN_FINE: single event at maturity with capital + all interest."""
         if not project.estimated_end_date:
             return []
@@ -200,7 +199,7 @@ class CrowdfundingCalendarService:
         self,
         project: CrowdfundingProject,
         user_id: uuid.UUID,
-    ) -> List[CalendarEvent]:
+    ) -> list[CalendarEvent]:
         """AMORTIZABLE: monthly interest events + capital return at end."""
         if not project.start_date:
             return []
@@ -211,7 +210,7 @@ class CrowdfundingCalendarService:
         monthly_interest = round(invested * rate / 12, 2)
 
         name = (project.project_name or project.platform)[:150]
-        events: List[CalendarEvent] = []
+        events: list[CalendarEvent] = []
 
         for m in range(1, months + 1):
             event_date = project.start_date + relativedelta(months=m)

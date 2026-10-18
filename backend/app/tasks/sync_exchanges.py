@@ -2,9 +2,9 @@
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta, timezone
+from collections.abc import Iterable
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 
 
 async def _resolve_trade_fx(
-    fx_svc: Optional[FxHistoryService],
-    quote: Optional[str],
+    fx_svc: FxHistoryService | None,
+    quote: str | None,
     executed_at: datetime,
-) -> Tuple[str, Optional[Decimal]]:
+) -> tuple[str, Decimal | None]:
     """Resolve the (currency, conversion_rate) to store on a trade.
 
     The cost-basis engine reads ``conversion_rate`` = EUR per 1 unit of ``currency``.
@@ -122,7 +122,7 @@ _WITHDRAWAL_DEDUP_DAYS = 1
 _WITHDRAWAL_DEDUP_REL = 0.01  # 1% quantity tolerance
 
 
-def _resolve_cold_wallet_destination(address: Optional[str], wallet_map: Dict[str, str]) -> str:
+def _resolve_cold_wallet_destination(address: str | None, wallet_map: dict[str, str]) -> str:
     """Map a withdrawal address to its named cold wallet, else the default.
 
     ``wallet_map`` keys are normalised (stripped + lowercased) addresses.
@@ -134,13 +134,13 @@ def _resolve_cold_wallet_destination(address: Optional[str], wallet_map: Dict[st
     return COLD_WALLET_DESTINATION
 
 
-def _to_aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def _to_aware_utc(dt: datetime | None) -> datetime | None:
     """Return a timezone-aware UTC datetime (naive values are assumed UTC)."""
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 async def _has_recent_transfer_out(db: AsyncSession, asset_id, when: datetime, qty: float) -> bool:
@@ -215,10 +215,10 @@ def contradicts_recent_trade(diff: float, recent_quantities, tolerance: float = 
 
 async def _heal_transaction_fx(
     db: AsyncSession,
-    external_ids: List[str],
+    external_ids: list[str],
     raw_price: float,
     tx_currency: str,
-    tx_rate: Optional[Decimal],
+    tx_rate: Decimal | None,
 ) -> bool:
     """Repair an already-imported transaction's FX fields in place (FIN-01 heal).
 
@@ -261,7 +261,7 @@ async def _heal_transaction_fx(
 
 
 # Global price service instance (reused across sync operations)
-_price_service: Optional[PriceService] = None
+_price_service: PriceService | None = None
 
 
 async def _get_current_price(symbol: str, repli: float = 0.0) -> float:
@@ -307,7 +307,7 @@ async def _get_or_create_asset(
     db: AsyncSession,
     portfolio_id: str,
     symbol: str,
-    existing_assets: Dict[str, Asset],
+    existing_assets: dict[str, Asset],
     exchange: str = "",
 ) -> Asset:
     """Get or create an asset in the portfolio."""
@@ -343,7 +343,7 @@ async def _get_or_create_asset(
     return asset
 
 
-def _normalize_earn_variant(symbol: str) -> Optional[str]:
+def _normalize_earn_variant(symbol: str) -> str | None:
     """
     Normalize Binance Earn variant names to base asset symbol.
     e.g., ADAU -> ADA, SUIU -> SUI, LDBTC -> BTC, BFUSD -> USD (skip)
@@ -441,7 +441,7 @@ def _is_earn_variant(symbol: str) -> bool:
     return normalized != symbol
 
 
-def _extract_base_asset(symbol: str, known_symbols: Iterable[str]) -> Optional[str]:
+def _extract_base_asset(symbol: str, known_symbols: Iterable[str]) -> str | None:
     """Extract the base asset of a crypto-to-crypto conversion symbol ("DOGEPEPE" -> "DOGE").
 
     A conversion pair has no fiat quote to split on, so ``pair_utils.split_pair`` does not
@@ -488,11 +488,11 @@ async def _sync_detailed_transactions(
     db: AsyncSession,
     service,
     portfolio: Portfolio,
-    existing_assets: Dict[str, Asset],
+    existing_assets: dict[str, Asset],
     heal_fx: bool = False,
-    withdrawal_cutoff: Optional[datetime] = None,
-    cold_wallet_map: Optional[Dict[str, str]] = None,
-) -> Tuple[int, int]:
+    withdrawal_cutoff: datetime | None = None,
+    cold_wallet_map: dict[str, str] | None = None,
+) -> tuple[int, int]:
     """Sync detailed transactions: trades, conversions, rewards, withdrawals.
 
     When ``heal_fx`` is True, trades that already exist are NOT skipped: their stored
@@ -514,12 +514,12 @@ async def _sync_detailed_transactions(
             Transaction.external_id.isnot(None),
         )
     )
-    existing_external_ids: Set[str] = {row[0] for row in existing_result.fetchall()}
+    existing_external_ids: set[str] = {row[0] for row in existing_result.fetchall()}
 
     # FX resolution (FIN-01): seed the USD->EUR daily series once, then resolve each
     # trade's rate at its execution date. Seeding failure must not block the sync —
     # _resolve_trade_fx falls back to EUR when no rate is available.
-    fx_svc: Optional[FxHistoryService] = FxHistoryService(db)
+    fx_svc: FxHistoryService | None = FxHistoryService(db)
     try:
         await fx_svc.ensure_seeded("USD", "EUR", _FX_EARLIEST)
     except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
@@ -1108,7 +1108,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             balances = await service.get_balances()
 
             if not balances:
-                api_key.last_sync_at = datetime.now(timezone.utc)
+                api_key.last_sync_at = datetime.now(UTC)
                 api_key.mark_success()
                 await db.commit()
                 return {"success": True, "synced": 0}
@@ -1134,9 +1134,9 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             # Capture the previous sync time BEFORE it is refreshed below: it is the
             # go-forward cutoff for withdrawals (only those since the last sync are
             # mirrored). First-ever sync (None) → now, so all history is skipped.
-            withdrawal_cutoff = api_key.last_sync_at or datetime.now(timezone.utc)
+            withdrawal_cutoff = api_key.last_sync_at or datetime.now(UTC)
             if withdrawal_cutoff.tzinfo is None:
-                withdrawal_cutoff = withdrawal_cutoff.replace(tzinfo=timezone.utc)
+                withdrawal_cutoff = withdrawal_cutoff.replace(tzinfo=UTC)
 
             # Cold-wallet address → label map (1f): route withdrawals to the
             # right named wallet. Keys normalised (stripped + lowercased).
@@ -1162,7 +1162,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             # NOT run the balance reconciliation (which would create adjustment transactions).
             if heal_fx:
                 logger.info(f"FX heal: corrected {healed} transactions for {service.exchange_name}")
-                api_key.last_sync_at = datetime.now(timezone.utc)
+                api_key.last_sync_at = datetime.now(UTC)
                 api_key.mark_success()
                 await db.commit()
                 invalidate_dashboard_cache(str(api_key.user_id))
@@ -1187,7 +1187,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
             # ADA) instead of being dropped. Funds parked in Earn would
             # otherwise never reach the base asset quantity, making them vanish
             # from the portfolio (e.g. a Stablecoins card stuck at 0).
-            aggregated_balances: Dict[str, float] = {}
+            aggregated_balances: dict[str, float] = {}
             for balance in balances:
                 if balance.symbol in fiat_currencies:
                     continue
@@ -1231,7 +1231,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                                 await db.execute(
                                     select(Transaction.quantity).where(
                                         Transaction.asset_id == asset.id,
-                                        Transaction.executed_at >= datetime.now(timezone.utc) - timedelta(days=2),
+                                        Transaction.executed_at >= datetime.now(UTC) - timedelta(days=2),
                                     )
                                 )
                             )
@@ -1240,8 +1240,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         )
                         if contradicts_recent_trade(diff, recent):
                             logger.warning(
-                                "%s: ajustement de %.8f ignoré — il annulerait un mouvement "
-                                "déjà enregistré (FIN-03)",
+                                "%s: ajustement de %.8f ignoré — il annulerait un mouvement déjà enregistré (FIN-03)",
                                 symbol,
                                 diff,
                             )
@@ -1260,7 +1259,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         if trans_type == TransactionType.TRANSFER_IN:
                             current_price = await _get_current_price(symbol, repli=float(asset.current_price or 0))
 
-                        sync_ts = int(datetime.now(timezone.utc).timestamp())
+                        sync_ts = int(datetime.now(UTC).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=trans_type,
@@ -1275,7 +1274,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                             # divergent, et l'écart se lit comme un « historique
                             # incomplet ». On date l'ajustement au moment où il est
                             # constaté. (FIN-03)
-                            executed_at=datetime.now(timezone.utc),
+                            executed_at=datetime.now(UTC),
                             external_id=f"{service.exchange_name}_sync_{symbol}_{sync_ts}",
                             notes=f"Ajustement balance {service.exchange_name}",
                         )
@@ -1324,7 +1323,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
 
                     # Create initial transfer transaction with market price
                     if exchange_quantity > 0:
-                        init_ts = int(datetime.now(timezone.utc).timestamp())
+                        init_ts = int(datetime.now(UTC).timestamp())
                         transaction = Transaction(
                             asset_id=asset.id,
                             transaction_type=TransactionType.TRANSFER_IN,
@@ -1333,7 +1332,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                             fee=0,
                             currency="EUR",
                             # Daté : cf. FIN-03 sur l'ajustement de balance.
-                            executed_at=datetime.now(timezone.utc),
+                            executed_at=datetime.now(UTC),
                             external_id=f"{service.exchange_name}_init_{symbol}_{init_ts}",
                             notes=f"Import initial depuis {service.exchange_name}",
                         )
@@ -1356,7 +1355,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                     logger.info(
                         f"Asset {symbol} no longer on {service.exchange_name} (balance=0), zeroing quantity from {asset.quantity}"
                     )
-                    sync_ts = int(datetime.now(timezone.utc).timestamp())
+                    sync_ts = int(datetime.now(UTC).timestamp())
                     # Price the zeroing TRANSFER_OUT at cost (avg_buy_price) rather
                     # than 0, so it reads as a neutral transfer-at-cost instead of a
                     # giveaway — keeps cost-basis/realized-P&L coherent. Genuine
@@ -1369,7 +1368,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                         fee=0,
                         currency="EUR",
                         # Daté : cf. FIN-03 sur l'ajustement de balance.
-                        executed_at=datetime.now(timezone.utc),
+                        executed_at=datetime.now(UTC),
                         external_id=f"{service.exchange_name}_zero_{symbol}_{sync_ts}",
                         notes=f"Solde zéro sur {service.exchange_name} (vendu/converti)",
                     )
@@ -1378,7 +1377,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
                     synced_count += 1
 
             # Update last sync time
-            api_key.last_sync_at = datetime.now(timezone.utc)
+            api_key.last_sync_at = datetime.now(UTC)
             api_key.mark_success()
 
             await db.commit()

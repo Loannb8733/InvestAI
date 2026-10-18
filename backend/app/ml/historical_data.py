@@ -3,8 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import numpy as np
@@ -56,9 +55,9 @@ async def _coingecko_throttle():
 class HistoricalDataResult:
     """Extended historical data with optional volume."""
 
-    dates: List[datetime]
-    prices: List[float]
-    volumes: Optional[List[float]] = None
+    dates: list[datetime]
+    prices: list[float]
+    volumes: list[float] | None = None
 
 
 class HistoricalDataFetcher:
@@ -68,9 +67,9 @@ class HistoricalDataFetcher:
     YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
     # Unified symbol map (single source of truth in app.core.symbol_map)
-    SYMBOL_MAP: Dict[str, str] = COINGECKO_SYMBOL_MAP
+    SYMBOL_MAP: dict[str, str] = COINGECKO_SYMBOL_MAP
 
-    def __init__(self, coingecko_api_key: Optional[str] = None):
+    def __init__(self, coingecko_api_key: str | None = None):
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
@@ -91,7 +90,7 @@ class HistoricalDataFetcher:
         symbol: str,
         max_retries: int = 3,
         fast: bool = False,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """CoinGecko GET with rate-limiting, retry + exponential backoff."""
         global _refus_coingecko_jusqua
         for attempt in range(max_retries):
@@ -172,7 +171,7 @@ class HistoricalDataFetcher:
         days: int = 90,
         currency: str = "eur",
         fast: bool = False,
-    ) -> Tuple[List[datetime], List[float]]:
+    ) -> tuple[list[datetime], list[float]]:
         """Fetch historical crypto prices from CoinGecko.
 
         Returns:
@@ -194,7 +193,7 @@ class HistoricalDataFetcher:
         if not prices_data:
             return [], []
 
-        dates = [datetime.fromtimestamp(p[0] / 1000, tz=timezone.utc).replace(tzinfo=None) for p in prices_data]
+        dates = [datetime.fromtimestamp(p[0] / 1000, tz=UTC).replace(tzinfo=None) for p in prices_data]
         prices = [p[1] for p in prices_data]
 
         logger.info("Fetched %d data points for %s from CoinGecko", len(prices), symbol)
@@ -204,7 +203,7 @@ class HistoricalDataFetcher:
         self,
         symbol: str,
         days: int = 90,
-    ) -> Tuple[List[datetime], List[float]]:
+    ) -> tuple[list[datetime], list[float]]:
         """Fetch historical stock/ETF prices from Yahoo Finance.
 
         Returns:
@@ -244,7 +243,7 @@ class HistoricalDataFetcher:
             if not timestamps or not closes:
                 return [], []
 
-            dates = [datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None) for ts in timestamps]
+            dates = [datetime.fromtimestamp(ts, tz=UTC).replace(tzinfo=None) for ts in timestamps]
             prices = [float(c) for c in closes if c is not None]
             dates = dates[: len(prices)]
 
@@ -259,8 +258,8 @@ class HistoricalDataFetcher:
         self,
         symbol: str,
         days: int = 90,
-        purchase_price: Optional[float] = None,
-    ) -> Tuple[List[datetime], List[float]]:
+        purchase_price: float | None = None,
+    ) -> tuple[list[datetime], list[float]]:
         """Generate synthetic real estate historical prices.
 
         Physical real estate (France residential) has fundamentally different
@@ -270,7 +269,7 @@ class HistoricalDataFetcher:
         completely distort risk metrics (VaR, correlation, Markowitz weights).
         """
         logger.info("Generating synthetic real estate history for %s", symbol)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # France residential real estate parameters
         annual_return = 0.03
         annual_vol = 0.03
@@ -320,7 +319,7 @@ class HistoricalDataFetcher:
         if not prices_data:
             return HistoricalDataResult([], [], None)
 
-        dates = [datetime.fromtimestamp(p[0] / 1000, tz=timezone.utc).replace(tzinfo=None) for p in prices_data]
+        dates = [datetime.fromtimestamp(p[0] / 1000, tz=UTC).replace(tzinfo=None) for p in prices_data]
         prices = [p[1] for p in prices_data]
 
         volumes = None
@@ -381,7 +380,7 @@ class HistoricalDataFetcher:
             if not valid:
                 return HistoricalDataResult([], [], None)
 
-            dates = [datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None) for ts, _, _ in valid]
+            dates = [datetime.fromtimestamp(ts, tz=UTC).replace(tzinfo=None) for ts, _, _ in valid]
             prices = [float(c) for _, c, _ in valid]
             volumes = [float(v) if v is not None else 0.0 for _, _, v in valid]
 
@@ -402,7 +401,7 @@ class HistoricalDataFetcher:
         asset_type: str,
         days: int = 90,
         fast: bool = False,
-    ) -> Tuple[List[datetime], List[float]]:
+    ) -> tuple[list[datetime], list[float]]:
         """Fetch historical data for any asset type."""
         if asset_type == "crypto":
             return await self.get_crypto_history(symbol, days, fast=fast)
@@ -435,7 +434,7 @@ class HistoricalDataFetcher:
         from_date: datetime,
         to_date: datetime,
         currency: str = "eur",
-    ) -> Tuple[List[datetime], List[float]]:
+    ) -> tuple[list[datetime], list[float]]:
         """Fetch historical crypto prices for a specific date range via CoinGecko /market_chart/range.
 
         This endpoint returns daily data for ranges > 90 days, which makes it
@@ -458,7 +457,7 @@ class HistoricalDataFetcher:
         if not prices_data:
             return [], []
 
-        dates = [datetime.fromtimestamp(p[0] / 1000, tz=timezone.utc).replace(tzinfo=None) for p in prices_data]
+        dates = [datetime.fromtimestamp(p[0] / 1000, tz=UTC).replace(tzinfo=None) for p in prices_data]
         prices = [p[1] for p in prices_data]
 
         logger.info(
@@ -475,7 +474,7 @@ class HistoricalDataFetcher:
         symbol: str,
         date: datetime,
         currency: str = "eur",
-    ) -> Optional[float]:
+    ) -> float | None:
         """Fetch the price of a coin on a specific historical date.
 
         Uses CoinGecko /coins/{id}/history?date={dd-mm-yyyy} endpoint.
@@ -501,7 +500,7 @@ class HistoricalDataFetcher:
             pass
         return None
 
-    async def get_btc_dominance(self) -> Optional[float]:
+    async def get_btc_dominance(self) -> float | None:
         """Fetch BTC dominance percentage from CoinGecko /global."""
         data = await self._coingecko_get(f"{self.COINGECKO_BASE_URL}/global", {}, "BTC_DOMINANCE")
         if data:

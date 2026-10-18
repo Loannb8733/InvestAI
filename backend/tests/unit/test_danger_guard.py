@@ -78,9 +78,9 @@ class TestScriptsReellementArmes:
 
         # Et il doit précéder les imports applicatifs, sinon un import qui échoue le
         # court-circuite : le script sort en erreur sans expliquer pourquoi.
-        assert src.index("require_consent(") < src.index(
-            "from app."
-        ), f"{nom} : le garde s'exécute après les imports applicatifs"
+        assert src.index("require_consent(") < src.index("from app."), (
+            f"{nom} : le garde s'exécute après les imports applicatifs"
+        )
 
     @pytest.mark.parametrize("nom", ["recalc_avg_price.py", "recalculate_quantities.py"])
     def test_execution_sans_drapeau_sort_en_erreur(self, nom):

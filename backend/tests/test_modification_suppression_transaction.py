@@ -230,9 +230,9 @@ class TestPortee:
         bloc = source.split("_PATCHABLE = {")[1].split("}")[0]
         liste_blanche = {ligne.strip().strip('",') for ligne in bloc.splitlines() if ligne.strip()}
 
-        assert liste_blanche <= set(
-            TransactionUpdate.model_fields
-        ), "la liste blanche cite un champ que le schéma ne déclare pas"
+        assert liste_blanche <= set(TransactionUpdate.model_fields), (
+            "la liste blanche cite un champ que le schéma ne déclare pas"
+        )
         assert "asset_id" not in liste_blanche and "internal_hash" not in liste_blanche
 
 

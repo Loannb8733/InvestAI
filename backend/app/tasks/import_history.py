@@ -1,6 +1,5 @@
 """Async import history task — runs exchange imports in background via Celery."""
 
-
 import logging
 import traceback
 

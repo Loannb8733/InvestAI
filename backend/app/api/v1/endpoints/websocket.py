@@ -8,7 +8,6 @@ Supports all asset types via Redis pub/sub integration:
 
 import asyncio
 import json
-from typing import Dict, Optional, Set
 
 import aiohttp
 import redis.asyncio as aioredis
@@ -23,7 +22,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Active connections: ws -> set of symbols
-active_connections: Dict[WebSocket, Set[str]] = {}
+active_connections: dict[WebSocket, set[str]] = {}
 
 BINANCE_WS_URL = "wss://stream.binance.com:9443/ws"
 
@@ -34,8 +33,8 @@ PRICE_UPDATES_CHANNEL = "price_updates"
 HEARTBEAT_INTERVAL = 30
 
 # Redis pub/sub subscriber singleton
-_pubsub_task: Optional[asyncio.Task] = None
-_pubsub_redis: Optional[aioredis.Redis] = None
+_pubsub_task: asyncio.Task | None = None
+_pubsub_redis: aioredis.Redis | None = None
 
 
 async def get_pubsub_redis() -> aioredis.Redis:
@@ -148,7 +147,7 @@ async def ensure_pubsub_listener() -> None:
 # ============== Binance WS Stream (crypto-specific) ==============
 
 
-async def binance_price_stream(symbols: Set[str]) -> None:
+async def binance_price_stream(symbols: set[str]) -> None:
     """Connect to Binance WS and broadcast prices to all connected clients."""
     if not symbols:
         return
@@ -180,11 +179,11 @@ async def binance_price_stream(symbols: Set[str]) -> None:
 
 
 # Background task reference for Binance stream
-_stream_task: Optional[asyncio.Task] = None
-_current_symbols: Set[str] = set()
+_stream_task: asyncio.Task | None = None
+_current_symbols: set[str] = set()
 
 
-async def ensure_stream(symbols: Set[str]) -> None:
+async def ensure_stream(symbols: set[str]) -> None:
     """Start or restart the Binance stream if symbols changed."""
     global _stream_task, _current_symbols
 
@@ -205,9 +204,9 @@ async def ensure_stream(symbols: Set[str]) -> None:
         _stream_task = asyncio.create_task(binance_price_stream(_current_symbols))
 
 
-def get_all_watched_symbols() -> Set[str]:
+def get_all_watched_symbols() -> set[str]:
     """Collect all symbols watched by any client."""
-    result: Set[str] = set()
+    result: set[str] = set()
     for symbols in active_connections.values():
         result.update(symbols)
     return result
@@ -263,7 +262,7 @@ async def websocket_prices(
             await websocket.close(code=4001, reason="Unauthorized")
             return
         await websocket.send_text(json.dumps({"type": "auth", "status": "ok"}))
-    except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
+    except (TimeoutError, json.JSONDecodeError, Exception):
         await websocket.close(code=4001, reason="Auth timeout or invalid")
         return
     active_connections[websocket] = set()

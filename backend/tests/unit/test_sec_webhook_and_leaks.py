@@ -23,9 +23,9 @@ _API_KEYS = (_ENDPOINTS / "api_keys.py").read_text(encoding="utf-8")
 
 class TestWebhookTelegram:
     def test_l_absence_de_secret_ferme_le_webhook(self):
-        assert (
-            "if not settings.TELEGRAM_WEBHOOK_SECRET:" in _WEBHOOK
-        ), "sans secret, le webhook doit refuser — pas ignorer la vérification"
+        assert "if not settings.TELEGRAM_WEBHOOK_SECRET:" in _WEBHOOK, (
+            "sans secret, le webhook doit refuser — pas ignorer la vérification"
+        )
 
     def test_le_refus_precede_tout_traitement(self):
         # Le contrôle doit venir avant la lecture du corps de la requête.
@@ -51,7 +51,7 @@ class TestPasDeFuiteAuClient:
         for morceau in bloc[1:]:
             entete = morceau[:300]
             assert "type(e).__name__" not in entete, (
-                "le détail de l'exception ne doit pas atterrir dans un statut " "consultable par le client"
+                "le détail de l'exception ne doit pas atterrir dans un statut consultable par le client"
             )
 
     def test_le_detail_reste_journalise_cote_serveur(self):

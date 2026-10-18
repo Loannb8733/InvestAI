@@ -15,7 +15,6 @@ import os
 import sys
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 import httpx
 
@@ -29,10 +28,10 @@ TOLERANCE_CROSS_PCT = 1.0  # 1% for cross-source (dashboard vs predictions)
 @dataclass
 class EndpointResult:
     name: str
-    total_value: Optional[float] = None
+    total_value: float | None = None
     status_code: int = 0
     elapsed_ms: float = 0
-    error: Optional[str] = None
+    error: str | None = None
     source_function: str = ""
 
 
@@ -47,7 +46,7 @@ async def _fetch(
     client: httpx.AsyncClient,
     name: str,
     url: str,
-    params: Optional[dict] = None,
+    params: dict | None = None,
     source_function: str = "",
 ) -> EndpointResult:
     """Fetch an endpoint and extract total_value."""
@@ -140,7 +139,7 @@ async def run_parity_check() -> bool:
 
     async with httpx.AsyncClient() as client:
         tasks = [_fetch(client, name, url, params, src) for name, url, params, src in endpoints]
-        results: List[EndpointResult] = await asyncio.gather(*tasks)
+        results: list[EndpointResult] = await asyncio.gather(*tasks)
 
     # ── Display results ──
     for r in results:
@@ -156,7 +155,7 @@ async def run_parity_check() -> bool:
     print("-" * 70)
 
     # Collect endpoints that returned a value
-    valued: Dict[str, EndpointResult] = {}
+    valued: dict[str, EndpointResult] = {}
     for r in results:
         if r.total_value is not None and r.status_code == 200:
             valued[r.name] = r
@@ -165,8 +164,8 @@ async def run_parity_check() -> bool:
         print("\n  SKIP: fewer than 2 endpoints returned a total_value")
         return True
 
-    checks: List[tuple] = []  # (name, passed, detail)
-    culprits: List[str] = []
+    checks: list[tuple] = []  # (name, passed, detail)
+    culprits: list[str] = []
 
     def _check(label: str, a_name: str, b_name: str, tolerance_eur: float):
         if a_name not in valued or b_name not in valued:

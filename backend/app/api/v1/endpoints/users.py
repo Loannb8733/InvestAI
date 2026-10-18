@@ -1,6 +1,5 @@
 """User management endpoints (admin only)."""
 
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,14 +15,14 @@ from app.schemas.user import UserCreate, UserResponse, UserUpdate
 router = APIRouter()
 
 
-@router.get("", response_model=List[UserResponse])
+@router.get("", response_model=list[UserResponse])
 async def list_users(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = Query(True, description="Inclure uniquement les utilisateurs actifs"),
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
-) -> List[UserResponse]:
+) -> list[UserResponse]:
     """List all users (admin only)."""
     query = select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
     if active_only:

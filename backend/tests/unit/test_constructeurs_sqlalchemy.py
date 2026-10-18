@@ -65,10 +65,9 @@ def _fautes() -> list[str]:
 def test_aucun_constructeur_sql_pris_sur_func():
     fautes = _fautes()
 
-    assert (
-        fautes == []
-    ), "Ces expressions doivent être importées du module `sqlalchemy`, non " "prises sur `func` :\n  " + "\n  ".join(
-        fautes
+    assert fautes == [], (
+        "Ces expressions doivent être importées du module `sqlalchemy`, non "
+        "prises sur `func` :\n  " + "\n  ".join(fautes)
     )
 
 

@@ -2,8 +2,7 @@
 
 import calendar
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
@@ -27,27 +26,27 @@ class EventCreate(BaseModel):
     """Schema for creating a calendar event."""
 
     title: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     event_type: EventType
     event_date: datetime
     is_recurring: bool = False
-    recurrence_rule: Optional[str] = Field(None, max_length=100)
-    amount: Optional[float] = None
+    recurrence_rule: str | None = Field(None, max_length=100)
+    amount: float | None = None
     currency: str = Field(default="EUR", max_length=10)
 
 
 class EventUpdate(BaseModel):
     """Schema for updating a calendar event."""
 
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    event_type: Optional[EventType] = None
-    event_date: Optional[datetime] = None
-    is_recurring: Optional[bool] = None
-    recurrence_rule: Optional[str] = Field(None, max_length=100)
-    amount: Optional[float] = None
-    currency: Optional[str] = Field(None, max_length=10)
-    is_completed: Optional[bool] = None
+    title: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    event_type: EventType | None = None
+    event_date: datetime | None = None
+    is_recurring: bool | None = None
+    recurrence_rule: str | None = Field(None, max_length=100)
+    amount: float | None = None
+    currency: str | None = Field(None, max_length=10)
+    is_completed: bool | None = None
 
 
 class EventResponse(BaseModel):
@@ -55,17 +54,17 @@ class EventResponse(BaseModel):
 
     id: UUID
     title: str
-    description: Optional[str]
+    description: str | None
     event_type: str
     event_date: datetime
     is_recurring: bool
-    recurrence_rule: Optional[str]
-    amount: Optional[float]
+    recurrence_rule: str | None
+    amount: float | None
     currency: str
     is_completed: bool
-    completed_at: Optional[datetime]
+    completed_at: datetime | None
     created_at: datetime
-    source_project_id: Optional[UUID] = None
+    source_project_id: UUID | None = None
 
 
 class EventTypeInfo(BaseModel):
@@ -105,7 +104,7 @@ class PassiveIncomeResponse(BaseModel):
     """Revenus passifs projetés sur les 12 prochains mois."""
 
     total_12m: float
-    monthly: List[MonthlyPassiveIncome]
+    monthly: list[MonthlyPassiveIncome]
     sources: PassiveIncomeSources
 
 
@@ -136,8 +135,8 @@ def _event_response(e: CalendarEvent) -> EventResponse:
     )
 
 
-@router.get("/event-types", response_model=List[EventTypeInfo])
-async def list_event_types() -> List[EventTypeInfo]:
+@router.get("/event-types", response_model=list[EventTypeInfo])
+async def list_event_types() -> list[EventTypeInfo]:
     """List all available event types."""
     types = [
         {"value": "dividend", "label": "Dividende", "color": "#22c55e"},
@@ -158,7 +157,7 @@ async def get_calendar_summary(
     db: AsyncSession = Depends(get_db),
 ) -> CalendarSummaryResponse:
     """Get summary of user's calendar events."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = (month_start + timedelta(days=32)).replace(day=1)
     income_types = [EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]
@@ -231,16 +230,16 @@ async def get_calendar_summary(
     )
 
 
-@router.get("/upcoming", response_model=List[EventResponse])
+@router.get("/upcoming", response_model=list[EventResponse])
 async def list_upcoming_events(
     days: int = 30,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[EventResponse]:
+) -> list[EventResponse]:
     """List upcoming events in the next N days."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
@@ -271,12 +270,12 @@ async def get_passive_income(
     complétés — récurrences dépliées sur la fenêtre — et (b) les coupons
     crowdfunding via le service dédié. Montants convertis en EUR comme le summary.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now + relativedelta(months=12)
     income_types = [EventType.DIVIDEND, EventType.RENT, EventType.INTEREST]
 
     # 12 seaux mensuels ("YYYY-MM"), à partir du mois courant
-    month_keys: List[str] = []
+    month_keys: list[str] = []
     buckets: dict = {}
     for offset in range(12):
         d = now + relativedelta(months=offset)
@@ -287,7 +286,7 @@ async def get_passive_income(
     # Devise -> EUR (même logique que le summary), avec cache de taux par requête
     rate_cache: dict = {}
 
-    async def _to_eur(amount: float, ccy: Optional[str]) -> float:
+    async def _to_eur(amount: float, ccy: str | None) -> float:
         ccy = (ccy or "EUR").upper()
         if not amount:
             return 0.0
@@ -326,9 +325,9 @@ async def get_passive_income(
 
         occurrence = event.event_date
         if occurrence.tzinfo is None:
-            occurrence = occurrence.replace(tzinfo=timezone.utc)
+            occurrence = occurrence.replace(tzinfo=UTC)
 
-        occurrences: List[datetime] = []
+        occurrences: list[datetime] = []
         if event.is_recurring and event.recurrence_rule:
             rule_upper = event.recurrence_rule.upper()
             # Avance rapide pour les règles courtes dont la date de base est passée
@@ -347,7 +346,7 @@ async def get_passive_income(
                 if not next_date or next_date <= occurrence:
                     break
                 if next_date.tzinfo is None:
-                    next_date = next_date.replace(tzinfo=timezone.utc)
+                    next_date = next_date.replace(tzinfo=UTC)
                 occurrence = next_date
                 guard += 1
         elif occurrence >= now:
@@ -380,7 +379,7 @@ async def get_passive_income(
     )
 
 
-def _french_tax_events_for_year(year: int) -> List[dict]:
+def _french_tax_events_for_year(year: int) -> list[dict]:
     """Échéances fiscales françaises indicatives pour une année donnée.
 
     Dates approximatives — le calendrier exact est publié chaque année par la
@@ -394,17 +393,17 @@ def _french_tax_events_for_year(year: int) -> List[dict]:
     return [
         {
             "title": f"Ouverture de la déclaration des revenus {year}",
-            "date": datetime(year, 4, 1, 9, 0, tzinfo=timezone.utc),
+            "date": datetime(year, 4, 1, 9, 0, tzinfo=UTC),
             "description": f"Ouverture du service de déclaration en ligne (généralement début avril). {note}",
         },
         {
             "title": f"Date limite de déclaration en ligne {year} (départements 50 et +)",
-            "date": datetime(year, 6, 8, 9, 0, tzinfo=timezone.utc),
+            "date": datetime(year, 6, 8, 9, 0, tzinfo=UTC),
             "description": f"Date limite de la déclaration en ligne pour les départements 50 à 976. {note}",
         },
         {
             "title": f"Solde de l'impôt sur le revenu {year}",
-            "date": datetime(year, 9, 15, 9, 0, tzinfo=timezone.utc),
+            "date": datetime(year, 9, 15, 9, 0, tzinfo=UTC),
             "description": f"Prélèvement du solde de l'impôt sur le revenu (généralement mi-septembre). {note}",
         },
     ]
@@ -420,7 +419,7 @@ async def seed_tax_events(
     Idempotent : l'existence est vérifiée par titre (qui inclut l'année) avant
     insertion. Les échéances déjà passées ne sont pas créées.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     existing_result = await db.execute(
         select(CalendarEvent.title).where(
@@ -463,18 +462,18 @@ async def seed_tax_events(
     return SeedTaxEventsResponse(created=created, skipped=skipped, message=message)
 
 
-@router.get("", response_model=List[EventResponse])
+@router.get("", response_model=list[EventResponse])
 async def list_events(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    event_type: Optional[EventType] = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    event_type: EventType | None = None,
     show_completed: bool = True,
     income_only: bool = False,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[EventResponse]:
+) -> list[EventResponse]:
     """List all calendar events for the current user."""
     query = select(CalendarEvent).where(CalendarEvent.user_id == current_user.id)
 
@@ -587,7 +586,7 @@ async def update_event(
     if event_in.is_completed is not None:
         event.is_completed = event_in.is_completed
         if event_in.is_completed:
-            event.completed_at = datetime.now(timezone.utc)
+            event.completed_at = datetime.now(UTC)
         else:
             event.completed_at = None
 
@@ -619,7 +618,7 @@ async def complete_event(
         )
 
     event.is_completed = True
-    event.completed_at = datetime.now(timezone.utc)
+    event.completed_at = datetime.now(UTC)
 
     # If recurring, create next occurrence
     if event.is_recurring and event.recurrence_rule:
@@ -670,7 +669,7 @@ async def delete_event(
     await db.commit()
 
 
-def _get_next_occurrence(current_date: datetime, rule: str) -> Optional[datetime]:
+def _get_next_occurrence(current_date: datetime, rule: str) -> datetime | None:
     """Calculate the next occurrence based on recurrence rule."""
     rule = rule.upper()
 

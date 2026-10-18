@@ -1,6 +1,5 @@
 """Celery task to detect overdue crowdfunding payment schedules."""
 
-
 import logging
 
 from app.tasks.async_runner import run_async

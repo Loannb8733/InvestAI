@@ -12,7 +12,7 @@ rate 0.92 must yield 92 EUR invested, NOT 100. If the BUY layer forgets to apply
 ``fx_rate`` (the bug FIN-01 surfaced), invested comes out at 100 and this test fails.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -67,7 +67,7 @@ async def _make_asset(db_session, portfolio, *, symbol, qty, current_price, exch
     return asset
 
 
-def _buy(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 1, 15, tzinfo=timezone.utc)):
+def _buy(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 1, 15, tzinfo=UTC)):
     return Transaction(
         asset_id=asset.id,
         transaction_type=TransactionType.BUY,
@@ -82,7 +82,7 @@ def _buy(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 1, 15, t
     )
 
 
-def _sell(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 6, 15, tzinfo=timezone.utc)):
+def _sell(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 6, 15, tzinfo=UTC)):
     return Transaction(
         asset_id=asset.id,
         transaction_type=TransactionType.SELL,
@@ -97,7 +97,7 @@ def _sell(asset, *, qty, price, currency, rate, ext, when=datetime(2024, 6, 15, 
     )
 
 
-def _transfer_in(asset, *, qty, price=0, ext, when=datetime(2024, 3, 1, tzinfo=timezone.utc)):
+def _transfer_in(asset, *, qty, price=0, ext, when=datetime(2024, 3, 1, tzinfo=UTC)):
     return Transaction(
         asset_id=asset.id,
         transaction_type=TransactionType.TRANSFER_IN,

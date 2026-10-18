@@ -15,7 +15,7 @@ testable seul.
 from __future__ import annotations
 
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 CONSENT_FLAG = "--i-know-what-im-doing"
 

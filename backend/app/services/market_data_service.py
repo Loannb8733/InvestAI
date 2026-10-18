@@ -9,10 +9,9 @@ Provides:
 
 import asyncio
 import logging
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import httpx
 
@@ -35,7 +34,7 @@ class MarketExchange(str, Enum):
 
 # Trading hours (local time) and UTC offsets for each exchange
 # Format: (open_hour, open_min, close_hour, close_min, utc_offset_winter, utc_offset_summer)
-_EXCHANGE_HOURS: Dict[MarketExchange, Tuple[int, int, int, int, int, int]] = {
+_EXCHANGE_HOURS: dict[MarketExchange, tuple[int, int, int, int, int, int]] = {
     MarketExchange.NYSE: (9, 30, 16, 0, -5, -4),
     MarketExchange.NASDAQ: (9, 30, 16, 0, -5, -4),
     MarketExchange.EURONEXT: (9, 0, 17, 30, 1, 2),
@@ -142,7 +141,7 @@ def _is_dst(dt: datetime, exchange: MarketExchange) -> bool:
         return False
 
 
-def is_market_open(ticker: str, dt: Optional[datetime] = None) -> bool:
+def is_market_open(ticker: str, dt: datetime | None = None) -> bool:
     """Check if the market for a given ticker is currently open.
 
     Args:
@@ -153,7 +152,7 @@ def is_market_open(ticker: str, dt: Optional[datetime] = None) -> bool:
         True if the market is open at the given time.
     """
     if dt is None:
-        dt = datetime.now(timezone.utc)
+        dt = datetime.now(UTC)
 
     exchange = _detect_exchange(ticker)
     hours = _EXCHANGE_HOURS.get(exchange)
@@ -184,14 +183,14 @@ def is_market_open(ticker: str, dt: Optional[datetime] = None) -> bool:
     return market_open <= local_time <= market_close
 
 
-def is_market_closed_today(ticker: str, dt: Optional[datetime] = None) -> bool:
+def is_market_closed_today(ticker: str, dt: datetime | None = None) -> bool:
     """Check if the market is closed for the entire day (weekend or holiday).
 
     Different from is_market_open: returns True on weekends/holidays
     regardless of time. Used to avoid marking prices as stale.
     """
     if dt is None:
-        dt = datetime.now(timezone.utc)
+        dt = datetime.now(UTC)
 
     if dt.weekday() in _WEEKEND:
         return True
@@ -202,14 +201,14 @@ def is_market_closed_today(ticker: str, dt: Optional[datetime] = None) -> bool:
     return date_str in holidays
 
 
-def price_staleness_hours(ticker: str, last_update: datetime) -> Tuple[float, bool]:
+def price_staleness_hours(ticker: str, last_update: datetime) -> tuple[float, bool]:
     """Compute effective staleness in trading hours, respecting market calendar.
 
     Returns:
         (staleness_hours, is_acceptable): staleness in hours and whether
         the price is considered acceptably fresh given market hours.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     raw_age_hours = (now - last_update).total_seconds() / 3600
 
     # If market is currently closed for the day, price from last trading
@@ -252,7 +251,7 @@ class MarketDataService:
     def _cache_key(self, ticker: str) -> str:
         return f"mkt:stock:{ticker.upper()}"
 
-    async def _get_cached(self, ticker: str) -> Optional[Dict]:
+    async def _get_cached(self, ticker: str) -> dict | None:
         """Get cached stock price data."""
         try:
             key = self._cache_key(ticker)
@@ -285,7 +284,7 @@ class MarketDataService:
             logger.warning("Cache read error for %s: %s", ticker, e)
         return None
 
-    async def _cache_set(self, ticker: str, data: Dict):
+    async def _cache_set(self, ticker: str, data: dict):
         """Cache stock price data with market-aware TTL."""
         try:
             key = self._cache_key(ticker)
@@ -297,7 +296,7 @@ class MarketDataService:
                 "volume": str(data.get("volume", 0)),
                 "quote_currency": data.get("quote_currency", "USD"),
                 "exchange": data.get("exchange", ""),
-                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             }
             redis = await _get_redis_txt()
             await redis.hset(key, mapping=cache_data)
@@ -305,7 +304,7 @@ class MarketDataService:
         except Exception as e:
             logger.warning("Cache write error for %s: %s", ticker, e)
 
-    async def get_stock_price(self, ticker: str) -> Optional[Dict]:
+    async def get_stock_price(self, ticker: str) -> dict | None:
         """Fetch stock/ETF price from Yahoo Finance with caching.
 
         Returns dict with: price, change_24h, change_percent_24h,
@@ -353,7 +352,7 @@ class MarketDataService:
             logger.error("Error fetching stock price for %s: %s", ticker, e)
             return None
 
-    async def get_multiple_stock_prices(self, tickers: List[str], max_concurrent: int = 10) -> Dict[str, Dict]:
+    async def get_multiple_stock_prices(self, tickers: list[str], max_concurrent: int = 10) -> dict[str, dict]:
         """Fetch multiple stock prices concurrently.
 
         Args:
@@ -363,7 +362,7 @@ class MarketDataService:
         Returns:
             Dict mapping ticker -> price data
         """
-        results: Dict[str, Dict] = {}
+        results: dict[str, dict] = {}
 
         # Check cache first
         uncached = []
@@ -396,7 +395,7 @@ class MarketDataService:
 
         return results
 
-    async def get_stock_price_eur(self, ticker: str, forex_rate_fn=None) -> Optional[Dict]:
+    async def get_stock_price_eur(self, ticker: str, forex_rate_fn=None) -> dict | None:
         """Fetch stock price and convert to EUR.
 
         Args:
@@ -429,7 +428,7 @@ class MarketDataService:
         data["price_eur"] = None
         return data
 
-    def get_staleness_info(self, ticker: str, last_update: datetime) -> Dict:
+    def get_staleness_info(self, ticker: str, last_update: datetime) -> dict:
         """Get human-readable staleness information for a stock price.
 
         Returns dict with:

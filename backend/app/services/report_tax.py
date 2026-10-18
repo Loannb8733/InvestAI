@@ -12,11 +12,9 @@ from __future__ import annotations
 import logging
 from collections import defaultdict as _defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from datetime import date as _date
-from datetime import datetime
-from datetime import timezone as _tz
 from decimal import Decimal
-from typing import Dict, List, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +28,7 @@ from app.services import fifo_replay
 logger = logging.getLogger(__name__)
 
 _ZERO = Decimal("0")
-FifoKey = Tuple[str, str]
+FifoKey = tuple[str, str]
 
 
 @dataclass
@@ -67,7 +65,7 @@ class TaxSummary2086:
     flat_tax_30: float  # PFU total
     ir_12_8: float  # Impôt sur le revenu (12.8%)
     ps_17_2: float  # Prélèvements sociaux (17.2%)
-    events: List[TaxEvent2086] = field(default_factory=list)
+    events: list[TaxEvent2086] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -82,7 +80,7 @@ class _TaxMode:
     divergences differ.
     """
 
-    config: "fifo_replay.ReplayConfig"
+    config: fifo_replay.ReplayConfig
     canonical_sort: bool
 
 
@@ -131,9 +129,9 @@ class TaxComputeMixin:
     async def _get_historical_prices(
         self,
         db: AsyncSession,
-        symbols: List[str],
+        symbols: list[str],
         price_date: _date,
-    ) -> Dict[str, Decimal]:
+    ) -> dict[str, Decimal]:
         """Fetch historical EUR prices from asset_price_history for a set of
         symbols on a given date. Falls back to the nearest earlier date within
         7 days if an exact match is missing.
@@ -150,7 +148,7 @@ class TaxComputeMixin:
                 AssetPriceHistory.price_date == price_date,
             )
         )
-        prices: Dict[str, Decimal] = {row[0].upper(): Decimal(str(row[1])) for row in result.all()}
+        prices: dict[str, Decimal] = {row[0].upper(): Decimal(str(row[1])) for row in result.all()}
 
         # For missing symbols, look back up to 7 days
         missing = [s for s in symbols if s.upper() not in prices]
@@ -233,7 +231,7 @@ class TaxComputeMixin:
             return empty
 
         asset_map = {a.id: a for a in crypto_assets}
-        aid_to_symbol: Dict[str, str] = {str(a.id): a.symbol.upper() for a in crypto_assets}
+        aid_to_symbol: dict[str, str] = {str(a.id): a.symbol.upper() for a in crypto_assets}
 
         # 2. Get ALL transactions (all years) chronologically
         trans_result = await db.execute(
@@ -253,9 +251,9 @@ class TaxComputeMixin:
         # construction stay in this module via the on_event callback.
         total_acquisition_cost = _ZERO
 
-        year_start = datetime(year, 1, 1, tzinfo=_tz.utc)
-        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=_tz.utc)
-        events: List[TaxEvent2086] = []
+        year_start = datetime(year, 1, 1, tzinfo=UTC)
+        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC)
+        events: list[TaxEvent2086] = []
         cession_dates: set = set()
 
         TxType = TransactionType
@@ -317,7 +315,7 @@ class TaxComputeMixin:
         all_symbols_ever = set(aid_to_symbol.values())
 
         # Fetch historical prices for all cession dates in batch
-        price_cache: Dict[_date, Dict[str, Decimal]] = {}
+        price_cache: dict[_date, dict[str, Decimal]] = {}
         for d in cession_dates:
             price_cache[d] = await self._get_historical_prices(
                 db,
@@ -327,7 +325,7 @@ class TaxComputeMixin:
 
         # Replay holdings to get state at each cession date, then fill events.
         # We need to re-walk transactions to snapshot holdings at each event.
-        holdings_replay: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+        holdings_replay: dict[str, Decimal] = _defaultdict(lambda: _ZERO)
         event_idx = 0
 
         for tx in replay_txs:  # same order as pass 1 so event matching aligns
@@ -340,7 +338,7 @@ class TaxComputeMixin:
             ttype = tx.transaction_type
             tx_dt = tx.executed_at
             if tx_dt.tzinfo is None:
-                tx_dt = tx_dt.replace(tzinfo=_tz.utc)
+                tx_dt = tx_dt.replace(tzinfo=UTC)
 
             # Update replay holdings
             if ttype in (

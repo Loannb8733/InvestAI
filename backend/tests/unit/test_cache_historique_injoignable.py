@@ -31,8 +31,9 @@ class TestRedisInjoignable:
     def test_la_lecture_ne_leve_pas(self):
         """Le point exact du défaut : l'appelant ne doit rien recevoir d'autre
         qu'un couple de listes, même quand Redis est mort."""
-        with self._redis_en_panne(), patch(
-            "app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=([], [])
+        with (
+            self._redis_en_panne(),
+            patch("app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=([], [])),
         ):
             assert get_cached_history("BTC", 30) == ([], [])
 
@@ -47,8 +48,9 @@ class TestRedisInjoignable:
         dates = [datetime(2026, 9, 1), datetime(2026, 9, 2)]
         prix = [50000.0, 51000.0]
 
-        with self._redis_en_panne(), patch(
-            "app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=(dates, prix)
+        with (
+            self._redis_en_panne(),
+            patch("app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=(dates, prix)),
         ):
             assert get_cached_history("BTC", 30) == (dates, prix)
 
@@ -58,8 +60,9 @@ class TestRedisInjoignable:
         client = MagicMock()
         client.mget.side_effect = ConnectionError("connexion perdue")
 
-        with patch("app.tasks.history_cache._get_redis", return_value=client), patch(
-            "app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=([], [])
+        with (
+            patch("app.tasks.history_cache._get_redis", return_value=client),
+            patch("app.tasks.history_cache._charger_prix_depuis_db_sync", return_value=([], [])),
         ):
             assert get_cached_history("ETH", 90) == ([], [])
 
@@ -78,8 +81,9 @@ class TestRedisInjoignable:
         client.mget.side_effect = lambda cles: [charge] + [None] * (len(cles) - 1)
         base = MagicMock()
 
-        with patch("app.tasks.history_cache._get_redis", return_value=client), patch(
-            "app.tasks.history_cache._charger_prix_depuis_db_sync", new=base
+        with (
+            patch("app.tasks.history_cache._get_redis", return_value=client),
+            patch("app.tasks.history_cache._charger_prix_depuis_db_sync", new=base),
         ):
             dates, prix = get_cached_history("BTC", 30)
 

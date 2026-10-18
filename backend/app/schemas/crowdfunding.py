@@ -2,7 +2,6 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, computed_field, field_validator
@@ -15,40 +14,40 @@ from app.schemas._money import Money
 
 
 class CrowdfundingProjectCreate(BaseModel):
-    portfolio_id: Optional[UUID] = None
+    portfolio_id: UUID | None = None
     platform: str = Field(..., max_length=100)
     project_name: str = Field(..., max_length=300)
-    description: Optional[str] = None
-    project_url: Optional[str] = Field(None, max_length=500)
+    description: str | None = None
+    project_url: str | None = Field(None, max_length=500)
     invested_amount: Money = Field(..., ge=0)
     annual_rate: Money = Field(..., ge=0, le=100)
     duration_months: int = Field(..., ge=1, le=360)
     repayment_type: RepaymentType = RepaymentType.IN_FINE
-    start_date: Optional[date] = None
-    estimated_end_date: Optional[date] = None
-    interest_frequency: Optional[str] = Field("at_maturity", max_length=20)
+    start_date: date | None = None
+    estimated_end_date: date | None = None
+    interest_frequency: str | None = Field("at_maturity", max_length=20)
     tax_rate: Money = Field(Decimal("30.00"), ge=0, le=100)
     delay_months: int = Field(0, ge=0, le=120)
     status: ProjectStatus = ProjectStatus.ACTIVE
 
 
 class CrowdfundingProjectUpdate(BaseModel):
-    project_name: Optional[str] = Field(None, max_length=300)
-    description: Optional[str] = None
-    project_url: Optional[str] = Field(None, max_length=500)
-    platform: Optional[str] = Field(None, max_length=100)
-    invested_amount: Optional[Money] = Field(None, gt=0)
-    annual_rate: Optional[Money] = Field(None, ge=0, le=100)
-    duration_months: Optional[int] = Field(None, ge=1, le=360)
-    repayment_type: Optional[RepaymentType] = None
-    start_date: Optional[date] = None
-    estimated_end_date: Optional[date] = None
-    actual_end_date: Optional[date] = None
-    status: Optional[ProjectStatus] = None
-    interest_frequency: Optional[str] = Field(None, max_length=20)
-    tax_rate: Optional[Money] = Field(None, ge=0, le=100)
-    delay_months: Optional[int] = Field(None, ge=0, le=120)
-    total_received: Optional[Money] = Field(None, ge=0)
+    project_name: str | None = Field(None, max_length=300)
+    description: str | None = None
+    project_url: str | None = Field(None, max_length=500)
+    platform: str | None = Field(None, max_length=100)
+    invested_amount: Money | None = Field(None, gt=0)
+    annual_rate: Money | None = Field(None, ge=0, le=100)
+    duration_months: int | None = Field(None, ge=1, le=360)
+    repayment_type: RepaymentType | None = None
+    start_date: date | None = None
+    estimated_end_date: date | None = None
+    actual_end_date: date | None = None
+    status: ProjectStatus | None = None
+    interest_frequency: str | None = Field(None, max_length=20)
+    tax_rate: Money | None = Field(None, ge=0, le=100)
+    delay_months: int | None = Field(None, ge=0, le=120)
+    total_received: Money | None = Field(None, ge=0)
 
 
 # ---------- Repayment schemas ----------
@@ -58,10 +57,10 @@ class RepaymentCreate(BaseModel):
     payment_date: date
     amount: Money = Field(..., gt=0)
     payment_type: PaymentType
-    interest_amount: Optional[Money] = Field(None, ge=0)
-    capital_amount: Optional[Money] = Field(None, ge=0)
-    tax_amount: Optional[Money] = Field(None, ge=0)
-    notes: Optional[str] = None
+    interest_amount: Money | None = Field(None, ge=0)
+    capital_amount: Money | None = Field(None, ge=0)
+    tax_amount: Money | None = Field(None, ge=0)
+    notes: str | None = None
 
 
 class RepaymentResponse(BaseModel):
@@ -70,10 +69,10 @@ class RepaymentResponse(BaseModel):
     payment_date: date
     amount: Money
     payment_type: PaymentType
-    interest_amount: Optional[Money] = None
-    capital_amount: Optional[Money] = None
-    tax_amount: Optional[Money] = None
-    notes: Optional[str] = None
+    interest_amount: Money | None = None
+    capital_amount: Money | None = None
+    tax_amount: Money | None = None
+    notes: str | None = None
     created_at: datetime
 
     class Config:
@@ -88,7 +87,7 @@ class ProjectDocumentResponse(BaseModel):
     project_id: UUID
     file_name: str
     file_size: int
-    audit_id: Optional[UUID] = None
+    audit_id: UUID | None = None
     created_at: datetime
 
     class Config:
@@ -102,8 +101,8 @@ class PaymentScheduleEntryResponse(BaseModel):
     expected_capital: Money
     expected_interest: Money
     is_completed: bool
-    completed_at: Optional[datetime] = None
-    repayment_id: Optional[UUID] = None
+    completed_at: datetime | None = None
+    repayment_id: UUID | None = None
     status: str = "pending"  # "paid" | "pending" | "overdue"
 
     class Config:
@@ -114,31 +113,31 @@ class CrowdfundingProjectResponse(BaseModel):
     id: UUID
     asset_id: UUID
     platform: str
-    project_name: Optional[str] = None
-    description: Optional[str] = None
-    project_url: Optional[str] = None
+    project_name: str | None = None
+    description: str | None = None
+    project_url: str | None = None
     invested_amount: Money
     annual_rate: Money
     duration_months: int
     repayment_type: RepaymentType
-    interest_frequency: Optional[str] = "at_maturity"
+    interest_frequency: str | None = "at_maturity"
     tax_rate: Money = Decimal("30.00")
     delay_months: int = 0
-    start_date: Optional[date] = None
-    estimated_end_date: Optional[date] = None
-    actual_end_date: Optional[date] = None
+    start_date: date | None = None
+    estimated_end_date: date | None = None
+    actual_end_date: date | None = None
     status: ProjectStatus
     total_received: Money
     created_at: datetime
     updated_at: datetime
 
     # Computed
-    projected_total_interest: Optional[float] = None
+    projected_total_interest: float | None = None
     # Intérêts projetés BRUTS de fiscalité (invested × rate × months/12) —
     # permet des ratios homogènes brut/brut face à interest_earned (brut).
-    projected_interest_gross: Optional[float] = None
-    interest_earned: Optional[float] = None
-    progress_percent: Optional[float] = None
+    projected_interest_gross: float | None = None
+    interest_earned: float | None = None
+    progress_percent: float | None = None
     documents: list[ProjectDocumentResponse] = []
     repayments: list[RepaymentResponse] = []
     schedule: list[PaymentScheduleEntryResponse] = []
@@ -169,7 +168,7 @@ class CrowdfundingDashboardResponse(BaseModel):
     delayed_count: int
     defaulted_count: int
     funding_count: int
-    next_maturity: Optional[date] = None
+    next_maturity: date | None = None
     platform_breakdown: dict[str, float]
     # Exposition par plateforme au capital restant dû (projets en défaut
     # exclus) — un projet remboursé à 80 % ne pèse plus que 20 %.
@@ -250,47 +249,47 @@ class CrowdfundingTaxReportResponse(BaseModel):
 
 class GuaranteeInfo(BaseModel):
     type: str
-    rank: Optional[str] = None
+    rank: str | None = None
     description: str
     strength: str  # "forte", "moyenne", "faible"
 
 
 class ProjectAuditResponse(BaseModel):
     id: UUID
-    project_id: Optional[UUID] = None
+    project_id: UUID | None = None
     file_names: list[str]
-    document_type: Optional[str] = None
-    project_name: Optional[str] = None
-    operator: Optional[str] = None
-    location: Optional[str] = None
-    tri: Optional[float] = None
-    duration_min: Optional[int] = None
-    duration_max: Optional[int] = None
-    collection_amount: Optional[float] = None
-    margin_percent: Optional[float] = None
-    ltv: Optional[float] = None
-    ltc: Optional[float] = None
-    pre_sales_percent: Optional[float] = None
-    equity_contribution: Optional[float] = None
+    document_type: str | None = None
+    project_name: str | None = None
+    operator: str | None = None
+    location: str | None = None
+    tri: float | None = None
+    duration_min: int | None = None
+    duration_max: int | None = None
+    collection_amount: float | None = None
+    margin_percent: float | None = None
+    ltv: float | None = None
+    ltc: float | None = None
+    pre_sales_percent: float | None = None
+    equity_contribution: float | None = None
     guarantees: list[GuaranteeInfo] = []
-    admin_status: Optional[str] = None
-    score_operator: Optional[int] = None
-    score_location: Optional[int] = None
-    score_guarantees: Optional[int] = None
-    score_risk_return: Optional[int] = None
-    score_admin: Optional[int] = None
-    risk_score: Optional[int] = None
+    admin_status: str | None = None
+    score_operator: int | None = None
+    score_location: int | None = None
+    score_guarantees: int | None = None
+    score_risk_return: int | None = None
+    score_admin: int | None = None
+    risk_score: int | None = None
     points_forts: list[str] = []
     points_vigilance: list[str] = []
     red_flags: list[str] = []
     verdict: str = "VIGILANCE"
-    suggested_investment: Optional[float] = None
-    diversification_impact: Optional[str] = None
-    correlation_score: Optional[float] = None
-    portfolio_concentration: Optional[dict] = None
+    suggested_investment: float | None = None
+    diversification_impact: str | None = None
+    correlation_score: float | None = None
+    portfolio_concentration: dict | None = None
     # Ce qui a produit l'analyse : un fournisseur nommé, ou "statique" quand
     # aucun n'a répondu et que les chiffres sortent d'expressions régulières.
-    analysis_source: Optional[str] = None
+    analysis_source: str | None = None
     created_at: datetime
 
     @field_validator("guarantees", "points_forts", "points_vigilance", "red_flags", mode="before")
@@ -305,7 +304,7 @@ class ProjectAuditResponse(BaseModel):
 
     @computed_field  # type: ignore[misc]
     @property
-    def investment_simulation(self) -> Optional[dict]:
+    def investment_simulation(self) -> dict | None:
         """Compute investment simulation from audit data."""
         if self.suggested_investment is None or self.tri is None:
             return None
@@ -352,7 +351,7 @@ class StressTestCashflowSchema(BaseModel):
 class StressTestResponse(BaseModel):
     project_id: UUID
     delay_months: int
-    base_irr: Optional[float] = None
-    stressed_irr: Optional[float] = None
-    irr_delta: Optional[float] = None
+    base_irr: float | None = None
+    stressed_irr: float | None = None
+    irr_delta: float | None = None
     cashflows: list[StressTestCashflowSchema]

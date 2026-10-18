@@ -59,8 +59,8 @@ def fetch_btc_daily() -> pd.DataFrame:
     resp = httpx.get(
         "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
         params={
-            "period1": int(dt.datetime(2017, 8, 1, tzinfo=dt.timezone.utc).timestamp()),
-            "period2": int(dt.datetime.now(dt.timezone.utc).timestamp()),
+            "period1": int(dt.datetime(2017, 8, 1, tzinfo=dt.UTC).timestamp()),
+            "period2": int(dt.datetime.now(dt.UTC).timestamp()),
             "interval": "1d",
         },
         headers={"User-Agent": "Mozilla/5.0"},  # Yahoo rejects the default httpx UA

@@ -3,9 +3,9 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
@@ -24,19 +24,19 @@ logger = logging.getLogger(__name__)
 # Replay ordering for same-day transactions: apply IN/BUY before OUT/SELL so a
 # same-timestamp OUT cannot clamp holdings to 0 before its matching IN (2b).
 # Python's sort is stable, so executed_at order is preserved within each group.
-_TX_REPLAY_ORDER: Dict[TransactionType, int] = {
+_TX_REPLAY_ORDER: dict[TransactionType, int] = {
     TransactionType.SELL: 1,
     TransactionType.TRANSFER_OUT: 1,
     TransactionType.CONVERSION_OUT: 1,
 }
 
 # In-memory price cache: {(symbol, days): (timestamp, {date_str: price})}
-_price_cache: Dict[Tuple[str, int], Tuple[float, Dict[str, float]]] = {}
+_price_cache: dict[tuple[str, int], tuple[float, dict[str, float]]] = {}
 _PRICE_CACHE_TTL = 1800  # 30 minutes — historical daily prices don't change
 _MAX_PRICE_CACHE = 500  # max entries before eviction
 
 # In-memory cache for full portfolio value series: {(user_id, days): (timestamp, result)}
-_series_cache: Dict[Tuple[str, int], Tuple[float, List[Dict]]] = {}
+_series_cache: dict[tuple[str, int], tuple[float, list[dict]]] = {}
 _SERIES_CACHE_TTL = 120  # 2 minutes — caches the entire computed series
 _MAX_SERIES_CACHE = 200  # max entries before eviction
 
@@ -44,7 +44,7 @@ _MAX_SERIES_CACHE = 200  # max entries before eviction
 # several requests miss the series cache at once (cold start / TTL expiry), only
 # the first replays the history + fetches prices; the rest await that same result
 # instead of stampeding the DB and price APIs.
-_series_inflight: Dict[Tuple, "asyncio.Future"] = {}
+_series_inflight: dict[tuple, "asyncio.Future"] = {}
 
 
 def _cache_put(cache: dict, key, value, max_size: int) -> None:
@@ -65,7 +65,7 @@ class SnapshotService(SnapshotRiskMixin):
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         total_value: Decimal = Decimal("0"),
         total_invested: Decimal = Decimal("0"),
         currency: str = "EUR",
@@ -74,7 +74,7 @@ class SnapshotService(SnapshotRiskMixin):
         snapshot = PortfolioSnapshot(
             user_id=user_id,
             portfolio_id=portfolio_id,
-            snapshot_date=datetime.now(timezone.utc),
+            snapshot_date=datetime.now(UTC),
             total_value=total_value,
             total_invested=total_invested,
             total_gain_loss=total_value - total_invested,
@@ -87,7 +87,7 @@ class SnapshotService(SnapshotRiskMixin):
 
     async def create_user_snapshot(
         self, db: AsyncSession, user_id: str, currency: str = "EUR"
-    ) -> Optional[PortfolioSnapshot]:
+    ) -> PortfolioSnapshot | None:
         """Create a snapshot of user's total portfolio value."""
         # Get current metrics
         metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency)
@@ -106,7 +106,7 @@ class SnapshotService(SnapshotRiskMixin):
 
     async def create_user_snapshot_if_missing(
         self, db: AsyncSession, user_id: str, currency: str = "EUR"
-    ) -> Optional[PortfolioSnapshot]:
+    ) -> PortfolioSnapshot | None:
         """Create today's global snapshot iff one doesn't exist yet.
 
         The existence check is a fast happy path; the partial UNIQUE index
@@ -116,7 +116,7 @@ class SnapshotService(SnapshotRiskMixin):
         manual refresh) both saw 0 and both inserted. We now catch the
         IntegrityError that the constraint raises in the race window.
         """
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         existing = await db.execute(
             select(func.count())
             .select_from(PortfolioSnapshot)
@@ -176,8 +176,8 @@ class SnapshotService(SnapshotRiskMixin):
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
-    ) -> List[Tuple]:
+        portfolio_id: str | None = None,
+    ) -> list[tuple]:
         """Fetch all user transactions with asset symbol and type, ordered by date."""
         if portfolio_id:
             portfolio_ids = [portfolio_id]
@@ -217,10 +217,10 @@ class SnapshotService(SnapshotRiskMixin):
 
     def _replay_transactions_to_daily_holdings(
         self,
-        transactions: List[Tuple],
+        transactions: list[tuple],
         start_date: datetime,
         end_date: datetime,
-    ) -> Tuple[Dict[str, Dict[str, float]], Dict[str, float], Dict[str, float], Dict[str, str]]:
+    ) -> tuple[dict[str, dict[str, float]], dict[str, float], dict[str, float], dict[str, str]]:
         """
         Replay transactions chronologically to build daily holdings map.
 
@@ -230,13 +230,13 @@ class SnapshotService(SnapshotRiskMixin):
             - daily_net_capital: Dict[date_str, net_capital]
             - asset_types: Dict[symbol, asset_type_str]
         """
-        holdings: Dict[str, float] = {}  # symbol -> quantity
+        holdings: dict[str, float] = {}  # symbol -> quantity
         cumulative_invested = 0.0
         cumulative_net_capital = 0.0
-        asset_types: Dict[str, str] = {}
+        asset_types: dict[str, str] = {}
 
         # Group transactions by date
-        tx_by_date: Dict[str, List] = {}
+        tx_by_date: dict[str, list] = {}
         for tx in transactions:
             executed_at = tx.executed_at or tx.created_at
             if executed_at is None:
@@ -253,9 +253,9 @@ class SnapshotService(SnapshotRiskMixin):
                 asset_types[symbol] = tx.asset_type.value if hasattr(tx.asset_type, "value") else str(tx.asset_type)
 
         # Iterate day by day
-        daily_holdings: Dict[str, Dict[str, float]] = {}
-        daily_invested: Dict[str, float] = {}
-        daily_net_capital: Dict[str, float] = {}
+        daily_holdings: dict[str, dict[str, float]] = {}
+        daily_invested: dict[str, float] = {}
+        daily_net_capital: dict[str, float] = {}
 
         current = start_date
         while current <= end_date:
@@ -322,10 +322,10 @@ class SnapshotService(SnapshotRiskMixin):
 
     async def _fetch_all_price_series(
         self,
-        symbols_with_types: Dict[str, str],
+        symbols_with_types: dict[str, str],
         days: int,
         db: Optional["AsyncSession"] = None,
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> dict[str, dict[str, float]]:
         """
         Fetch historical prices for all symbols.
         Returns: Dict[symbol, Dict[date_str, price_eur]]
@@ -338,14 +338,14 @@ class SnapshotService(SnapshotRiskMixin):
         from app.models.asset_price_history import AssetPriceHistory
         from app.tasks.history_cache import get_cached_histories
 
-        price_series: Dict[str, Dict[str, float]] = {}
+        price_series: dict[str, dict[str, float]] = {}
 
         # Stablecoins carry no price history; they're valued at their peg in the
         # value series (USD-pegged -> live USD/EUR rate, EUR-pegged -> ~1 EUR).
         STABLECOINS = STABLECOIN_SYMBOLS
 
         now = time.time()
-        symbols_to_fetch: Dict[str, str] = {}
+        symbols_to_fetch: dict[str, str] = {}
 
         # 1. Check in-memory cache first (avoids DB/API entirely)
         for symbol, asset_type in symbols_with_types.items():
@@ -363,17 +363,17 @@ class SnapshotService(SnapshotRiskMixin):
 
         # 2. Check PostgreSQL first (persistent, complete after backfill).
         # One batched query (WHERE symbol IN ...) instead of one SELECT per symbol.
-        symbols_need_redis: Dict[str, str] = {}
+        symbols_need_redis: dict[str, str] = {}
         if db is not None:
-            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
-            non_stable: Dict[str, str] = {}
+            cutoff_date = (datetime.now(UTC) - timedelta(days=days + 5)).date()
+            non_stable: dict[str, str] = {}
             for symbol_upper, asset_type in symbols_to_fetch.items():
                 if symbol_upper in STABLECOINS:
                     price_series[symbol_upper] = {}
                 else:
                     non_stable[symbol_upper] = asset_type
 
-            rows_by_symbol: Dict[str, Dict[str, float]] = {}
+            rows_by_symbol: dict[str, dict[str, float]] = {}
             if non_stable:
                 try:
                     result = await db.execute(
@@ -415,7 +415,7 @@ class SnapshotService(SnapshotRiskMixin):
             return price_series
 
         # 3. Check Redis cache for remaining symbols
-        symbols_need_api: Dict[str, str] = {}
+        symbols_need_api: dict[str, str] = {}
         # Une seule commande Redis pour tous les symboles (quota Upstash, NEW-81).
         historiques = get_cached_histories(list(symbols_need_redis), days)
         for symbol_upper, asset_type in symbols_need_redis.items():
@@ -449,7 +449,7 @@ class SnapshotService(SnapshotRiskMixin):
         # Limit to 3 concurrent API calls to respect rate limits
         _api_semaphore = _asyncio.Semaphore(3)
 
-        async def _fetch_one(sym: str, at: str) -> Tuple[str, Optional[Tuple]]:
+        async def _fetch_one(sym: str, at: str) -> tuple[str, tuple | None]:
             async with _api_semaphore:
                 try:
                     result = await fetcher.get_history(sym, at, days, fast=True)
@@ -510,8 +510,8 @@ class SnapshotService(SnapshotRiskMixin):
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        portfolio_id: Optional[str] = None,
-    ) -> List[Dict]:
+        portfolio_id: str | None = None,
+    ) -> list[dict]:
         """Cached, single-flight daily portfolio value series.
 
         The 2-minute series cache is fronted by a per-key single-flight guard so
@@ -529,7 +529,7 @@ class SnapshotService(SnapshotRiskMixin):
         if inflight is not None:
             return await inflight
 
-        fut: "asyncio.Future" = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future = asyncio.get_event_loop().create_future()
         _series_inflight[cache_key] = fut
         try:
             result = await self._compute_portfolio_value_series(db, user_id, days, portfolio_id)
@@ -549,15 +549,15 @@ class SnapshotService(SnapshotRiskMixin):
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        portfolio_id: Optional[str] = None,
-    ) -> List[Dict]:
+        portfolio_id: str | None = None,
+    ) -> list[dict]:
         """Full (uncached) value-series computation. Fronted by build_portfolio_value_series."""
         transactions = await self._get_user_transactions_with_assets(db, user_id, portfolio_id)
 
         if not transactions:
             return []
 
-        today = datetime.now(timezone.utc)
+        today = datetime.now(UTC)
         today_naive = today.replace(tzinfo=None)  # naive UTC for all Python-side date comparisons
         first_tx_date = transactions[0].executed_at or transactions[0].created_at
         if first_tx_date is None:
@@ -582,7 +582,7 @@ class SnapshotService(SnapshotRiskMixin):
         ) = self._replay_transactions_to_daily_holdings(transactions, replay_start, today_naive)
 
         # Collect all symbols that were ever held
-        all_symbols: Dict[str, str] = {}
+        all_symbols: dict[str, str] = {}
         for date_holdings in daily_holdings.values():
             for symbol in date_holdings:
                 if symbol not in all_symbols and symbol in asset_types:
@@ -655,7 +655,7 @@ class SnapshotService(SnapshotRiskMixin):
                 ]
 
         # Build value series for the display period
-        result: List[Dict] = []
+        result: list[dict] = []
         interval = self._get_data_point_interval(days)
 
         # Only output data for the requested period
@@ -669,7 +669,7 @@ class SnapshotService(SnapshotRiskMixin):
             return []
 
         # Track last known prices for LOCF (Last Observation Carried Forward)
-        last_known_prices: Dict[str, float] = {}
+        last_known_prices: dict[str, float] = {}
 
         for i, date_str in enumerate(period_dates):
             # Only include points at the interval (or always include first/last)

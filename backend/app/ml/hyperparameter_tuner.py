@@ -1,14 +1,13 @@
 """Hyperparameter tuning for ML models using Optuna."""
 
 import logging
-from typing import Dict, List
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
-def tune_xgboost(prices: List[float], n_trials: int = 30) -> Dict:
+def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict:
     """Tune XGBoost hyperparameters using Optuna with walk-forward validation."""
     try:
         import optuna
@@ -87,7 +86,7 @@ def tune_xgboost(prices: List[float], n_trials: int = 30) -> Dict:
     return best
 
 
-def tune_prophet(prices: List[float], dates: list, n_trials: int = 15) -> Dict:
+def tune_prophet(prices: list[float], dates: list, n_trials: int = 15) -> dict:
     """Tune Prophet hyperparameters."""
     try:
         import optuna

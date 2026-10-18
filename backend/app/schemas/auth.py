@@ -1,7 +1,6 @@
 """Authentication schemas."""
 
 import re
-from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -22,8 +21,8 @@ class RegisterRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(..., min_length=10)
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: str | None = None
+    last_name: str | None = None
 
     @field_validator("password")
     @classmethod
@@ -36,7 +35,7 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str
-    mfa_code: Optional[str] = Field(None, min_length=6, max_length=8)
+    mfa_code: str | None = Field(None, min_length=6, max_length=8)
     remember_me: bool = False
 
 
@@ -59,7 +58,7 @@ class TokenPayload(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Schema for refresh token request."""
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class MFASetupResponse(BaseModel):
@@ -67,7 +66,7 @@ class MFASetupResponse(BaseModel):
 
     secret: str
     qr_code: str  # Base64 encoded QR code image
-    backup_codes: List[str]
+    backup_codes: list[str]
 
 
 class MFAVerifyRequest(BaseModel):

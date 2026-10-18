@@ -10,6 +10,8 @@ doublé pour que le test décrive une composition connue plutôt que celle du jo
 Comportement actuel épinglé, pas spécification approuvée.
 """
 
+from datetime import UTC
+
 import pytest
 
 from app.services import report_rebalancing as module_rebal
@@ -249,7 +251,7 @@ class TestFiscalite:
         La plus-value latente correspondante et l'impôt au PFU sont estimés à
         partir des couches FIFO réelles, pas d'une moyenne.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         from decimal import Decimal
 
         from app.models.asset import Asset, AssetType
@@ -277,7 +279,7 @@ class TestFiscalite:
                 quantity=Decimal("1"),
                 price=Decimal("20000"),
                 fee=Decimal("0"),
-                executed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                executed_at=datetime(2026, 1, 1, tzinfo=UTC),
             )
         )
         await db_session.commit()
@@ -431,7 +433,7 @@ class TestQuantiteAgregee:
         clé ne dit rien de ce cumul : les deux canaris qui figent la valeur à
         zéro ou suppriment l'accumulation passaient inaperçus.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         from decimal import Decimal
 
         from app.models.asset import Asset, AssetType
@@ -462,7 +464,7 @@ class TestQuantiteAgregee:
                 price=Decimal("150"),
                 fee=Decimal("0"),
                 currency="EUR",
-                executed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                executed_at=datetime(2026, 1, 1, tzinfo=UTC),
             )
         )
         db_session.add(
@@ -473,7 +475,7 @@ class TestQuantiteAgregee:
                 price=Decimal("2.5"),
                 fee=Decimal("0"),
                 currency="EUR",
-                executed_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+                executed_at=datetime(2026, 6, 1, tzinfo=UTC),
             )
         )
         await db_session.commit()

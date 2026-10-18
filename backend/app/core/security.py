@@ -2,8 +2,8 @@
 
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import bcrypt
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -53,17 +53,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # JWT tokens
 def create_access_token(
     subject: str | Any,
-    expires_delta: Optional[timedelta] = None,
-    fingerprint: Optional[str] = None,
+    expires_delta: timedelta | None = None,
+    fingerprint: str | None = None,
     token_version: int = 0,
 ) -> str:
     """Create a JWT access token."""
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode: Dict[str, Any] = {
+    to_encode: dict[str, Any] = {
         "sub": str(subject),
         "exp": expire,
         # Génération de jetons qui l'a vu naître : un changement de mot de passe
@@ -81,17 +81,17 @@ def create_access_token(
 
 def create_refresh_token(
     subject: str | Any,
-    expires_delta: Optional[timedelta] = None,
-    fingerprint: Optional[str] = None,
+    expires_delta: timedelta | None = None,
+    fingerprint: str | None = None,
     token_version: int = 0,
 ) -> str:
     """Create a JWT refresh token with a unique jti for revocation support."""
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    to_encode: Dict[str, Any] = {
+    to_encode: dict[str, Any] = {
         "sub": str(subject),
         "exp": expire,
         # Génération de jetons qui l'a vu naître : un changement de mot de passe
@@ -107,22 +107,22 @@ def create_refresh_token(
     return encoded
 
 
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_token(token: str) -> dict[str, Any] | None:
     """Decode and validate a JWT token."""
     try:
-        payload: Dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload: dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError:
         return None
 
 
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_access_token(token: str) -> dict[str, Any] | None:
     """Decode an access token. Alias for decode_token used by Sentry middleware."""
     return decode_token(token)
 
 
 # Fernet encryption for API keys
-def _build_fernet() -> Optional[MultiFernet]:
+def _build_fernet() -> MultiFernet | None:
     """Build MultiFernet instance with key rotation support.
 
     Uses FERNET_KEY as the primary key and FERNET_OLD_KEYS (comma-separated)
@@ -141,7 +141,7 @@ def _build_fernet() -> Optional[MultiFernet]:
     return MultiFernet(keys)
 
 
-def get_fernet() -> Optional[MultiFernet]:
+def get_fernet() -> MultiFernet | None:
     """Get MultiFernet instance for encryption with key rotation support."""
     return _build_fernet()
 
@@ -164,7 +164,7 @@ def decrypt_api_key(encrypted_key: str) -> str:
     return decrypted
 
 
-def decrypt_mfa_secret(stored: Optional[str]) -> Optional[str]:
+def decrypt_mfa_secret(stored: str | None) -> str | None:
     """Decrypt a stored TOTP secret, tolerating legacy plaintext.
 
     MFA secrets used to be stored in plaintext. To avoid locking out users

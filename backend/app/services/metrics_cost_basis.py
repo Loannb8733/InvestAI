@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +59,9 @@ def _ci_price_in_portfolio_ccy(price, conversion_rate) -> Decimal:
 
 def compute_cump_pru(
     all_txs: list,
-    aid_to_symbol: Dict[str, str],
-    aid_to_exchange: Dict[str, str],
-) -> Dict[Tuple[str, str], Decimal]:
+    aid_to_symbol: dict[str, str],
+    aid_to_exchange: dict[str, str],
+) -> dict[tuple[str, str], Decimal]:
     """Compute CUMP (Weighted Average Cost) PRU per (symbol, exchange).
 
     Rules:
@@ -73,7 +72,7 @@ def compute_cump_pru(
     from app.models.transaction import TransactionType as TxType
 
     _ZERO = Decimal("0")
-    state: Dict[Tuple[str, str], Dict] = {}
+    state: dict[tuple[str, str], dict] = {}
 
     for tx in all_txs:
         aid = str(tx.asset_id)

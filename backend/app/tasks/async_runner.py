@@ -20,12 +20,11 @@ d'en écrire une.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Coroutine, TypeVar
+from collections.abc import Coroutine
+from typing import Any
 
-T = TypeVar("T")
 
-
-def run_async(coro: Coroutine[Any, Any, T]) -> T:
+def run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     """Exécute ``coro`` dans une boucle neuve, dédiée à cet appel.
 
     La boucle est installée comme boucle courante (``set_event_loop``) avant

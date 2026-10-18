@@ -3,9 +3,8 @@
 import asyncio
 import logging
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from sqlalchemy import select
@@ -32,8 +31,8 @@ from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_alpha import PredictionAlphaMixin
 from app.services.prediction_cycles import PredictionCyclesMixin
 from app.services.prediction_metrics import PredictionMetricsMixin
-from app.services.prediction_types import _HISTORY_DAYS  # noqa: F401 — re-exported
 from app.services.prediction_types import (  # noqa: F401 — re-exported for compatibility
+    _HISTORY_DAYS,  # noqa: F401 — re-exported
     AnomalyDetection,
     MarketSentiment,
     PricePrediction,
@@ -144,7 +143,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
         # ── Compute MarketContext once for the entire pipeline ──────
-        ctx: Optional[MarketContext] = None
+        ctx: MarketContext | None = None
         if prices and len(prices) >= 30:
             ctx = compute_market_context(prices, symbol, asset_type.value, fear_greed)
 
@@ -217,7 +216,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                 ensemble_change_pct = (final_price - current_price) / current_price * 100
                 if abs(ensemble_change_pct) > 50:
                     logger.warning(
-                        "SANITY CHECK: %s ensemble prediction unrealistic " "(%.1f%% in %dd). Falling back to EMA-20.",
+                        "SANITY CHECK: %s ensemble prediction unrealistic (%.1f%% in %dd). Falling back to EMA-20.",
                         symbol,
                         ensemble_change_pct,
                         days_ahead,
@@ -556,7 +555,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> List[AnomalyDetection]:
+    ) -> list[AnomalyDetection]:
         """Detect anomalies using Isolation Forest and Z-score."""
         anomalies = []
 
@@ -785,7 +784,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         db: AsyncSession,
         user_id: str,
         days_ahead: int = 7,
-    ) -> Dict:
+    ) -> dict:
         """Get predictions for all assets in user's portfolio."""
         result = await db.execute(
             select(Portfolio).where(
@@ -836,8 +835,8 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             }
 
         # Deduplicate by symbol: aggregate quantities (Decimal precision)
-        asset_map: Dict[str, object] = {}
-        quantity_map: Dict[str, Decimal] = {}
+        asset_map: dict[str, object] = {}
+        quantity_map: dict[str, Decimal] = {}
         for a in raw_assets:
             key = a.symbol
             if key not in asset_map:
@@ -971,11 +970,11 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
     # Top Alpha detection
     # ------------------------------------------------------------------
 
-    async def get_market_events(self) -> List[Dict]:
+    async def get_market_events(self) -> list[dict]:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC; all evt_date constructions are also naive
+        now = datetime.now(UTC).replace(tzinfo=None)  # naive UTC; all evt_date constructions are also naive
         current_year = now.year
         events = []
 
@@ -1056,7 +1055,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             # The page groups by year, find the current/next year sections
             for year in [current_year, current_year + 1]:
                 # Find meeting date patterns like "January 27-28" or "March 17-18*"
-                pattern = rf'({"|".join(month_map.keys())})\s+(\d{{1,2}})-(\d{{1,2}})\*?'
+                pattern = rf"({'|'.join(month_map.keys())})\s+(\d{{1,2}})-(\d{{1,2}})\*?"
                 year_section_match = re.search(rf'class="[^"]*"[^>]*>\s*{year}\s*<', html, re.IGNORECASE)
                 if not year_section_match:
                     continue
@@ -1212,7 +1211,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         unique.sort(key=lambda x: x["days_until"])
         return unique[:15]
 
-    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> Dict:
+    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> dict:
         """Get historical prediction track record for a symbol.
 
         Returns past predictions with actual outcomes for transparency.
@@ -1302,7 +1301,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                 },
             }
 
-    async def get_portfolio_backtest(self, db: AsyncSession, user_id: str, days: int = 7) -> Dict:
+    async def get_portfolio_backtest(self, db: AsyncSession, user_id: str, days: int = 7) -> dict:
         """Aggregate backtest across all portfolio assets.
 
         Compares predictions made *days* ago with actual prices recorded
@@ -1352,12 +1351,12 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         logs = result.scalars().all()
 
         # Group by symbol
-        by_symbol: Dict[str, list] = {}
+        by_symbol: dict[str, list] = {}
         for log in logs:
             by_symbol.setdefault(log.symbol, []).append(log)
 
         asset_results = []
-        all_mapes: List[float] = []
+        all_mapes: list[float] = []
         dir_hits = 0
         dir_total = 0
 
@@ -1453,7 +1452,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         support: float,
         resistance: float,
-        regime_info: Optional[Dict] = None,
+        regime_info: dict | None = None,
     ) -> str:
         """Observational regime/trend context, always suffixed with the non-advice disclaimer.
 
@@ -1474,7 +1473,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         support: float,
         resistance: float,
-        regime_info: Optional[Dict] = None,
+        regime_info: dict | None = None,
     ) -> str:
         """Observational regime/trend context in French (no prescriptive orders)."""
         regime = regime_info.get("dominant_regime") if regime_info else None
@@ -1519,7 +1518,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                         "Tendance haussière forte. Le risque de retournement tend à "
                         f"augmenter à mesure que le mouvement s'étend ; résistance à surveiller : {resistance:.0f}."
                     )
-                return "Marché haussier : la dynamique reste positive. " f"Résistance à surveiller : {resistance:.0f}."
+                return f"Marché haussier : la dynamique reste positive. Résistance à surveiller : {resistance:.0f}."
 
         # Fallback: trend-based observation
         if trend == "bullish" and trend_strength > 50:
@@ -1534,11 +1533,11 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
     @staticmethod
     def _ema20_fallback(
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         days_ahead: int,
         smart_round,
-    ) -> Tuple[List[Dict], str, float]:
+    ) -> tuple[list[dict], str, float]:
         """EMA-20 slope extrapolation — used as sanity fallback when ensemble is unrealistic.
 
         Returns (predictions_list, trend, trend_strength).
@@ -1563,7 +1562,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         predictions = []
         for day in range(1, days_ahead + 1):
-            date = (datetime.now(timezone.utc) + timedelta(days=day)).strftime("%Y-%m-%d")
+            date = (datetime.now(UTC) + timedelta(days=day)).strftime("%Y-%m-%d")
             predicted = current_price * (1 + daily_slope * day)
             predicted = max(0.0, predicted)
             # Conservative CI: ±3% * sqrt(day)
@@ -1585,7 +1584,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         asset_type: AssetType,
         days_ahead: int,
-    ) -> Tuple[List[Dict], str, float]:
+    ) -> tuple[list[dict], str, float]:
         """Deterministic fallback when no historical data available (FIX3).
 
         Uses observed momentum from cached prices if available,
@@ -1616,7 +1615,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             return round(v, 2)
 
         for day in range(1, days_ahead + 1):
-            date = datetime.now(timezone.utc) + timedelta(days=day)
+            date = datetime.now(UTC) + timedelta(days=day)
             # FIX3: linear projection instead of cumulative random chain
             predicted_price = base_price * (1 + trend_factor * day)
             predicted_price = max(0.0, predicted_price)

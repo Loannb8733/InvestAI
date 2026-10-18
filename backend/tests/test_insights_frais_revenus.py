@@ -10,7 +10,7 @@ Comportement actuel épinglé, pas spécification approuvée — et deux écarts
 mesurés y sont nommés sans être corrigés.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -66,7 +66,7 @@ def mouvement(
         fee=Decimal(frais),
         fee_currency=devise_frais,
         exchange=exchange,
-        executed_at=datetime.fromisoformat(quand).replace(tzinfo=timezone.utc),
+        executed_at=datetime.fromisoformat(quand).replace(tzinfo=UTC),
     )
 
 

@@ -24,7 +24,7 @@ l'import sur un ``ValueError: not enough values to unpack`` — c'est la premiè
 chose que cette exploration a révélée, et elle venait du double, pas du code.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -40,7 +40,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 def _trade(trade_id, symbol, side, quantite, prix, frais="0", quand=None, devise_frais="EUR"):
@@ -205,12 +205,15 @@ async def _importer(client, db_session, utilisateur, service):
     # Le double est injecté à la frontière `construire_service_exchange`, qui rend
     # une **instance** (l'ancien `get_exchange_service` rendait une classe). C'est
     # le point d'injection qui a changé avec l'extraction, pas le comportement.
-    with patch(
-        "app.api.v1.endpoints.api_keys.construire_service_exchange",
-        return_value=service(),
-    ), patch(
-        "app.services.price_service.price_service.get_historical_crypto_price",
-        new=AsyncMock(return_value=50000.0),
+    with (
+        patch(
+            "app.api.v1.endpoints.api_keys.construire_service_exchange",
+            return_value=service(),
+        ),
+        patch(
+            "app.services.price_service.price_service.get_historical_crypto_price",
+            new=AsyncMock(return_value=50000.0),
+        ),
     ):
         reponse = await client.post(
             f"/api/v1/api-keys/{cle.id}/import-history",

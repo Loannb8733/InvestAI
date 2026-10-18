@@ -1,7 +1,6 @@
 """Portfolio schemas."""
 
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -11,7 +10,7 @@ class PortfolioBase(BaseModel):
     """Base portfolio schema."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
 
 
 class PortfolioCreate(PortfolioBase):
@@ -21,9 +20,9 @@ class PortfolioCreate(PortfolioBase):
 class PortfolioUpdate(BaseModel):
     """Schema for updating a portfolio."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    cash_balances: Optional[dict[str, float]] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    cash_balances: dict[str, float] | None = None
 
 
 class CashBalanceUpdate(BaseModel):
@@ -42,7 +41,7 @@ class PortfolioResponse(PortfolioBase):
     # pour écarter celui du crowdfunding, qui a sa propre page — il le
     # reconnaissait auparavant à son nom, ce qu'un simple renommage suffisait à
     # défaire (NEW-68).
-    kind: Optional[str] = None
+    kind: str | None = None
     cash_balances: dict[str, float] = {}
     created_at: datetime
     updated_at: datetime
@@ -54,7 +53,7 @@ class PortfolioResponse(PortfolioBase):
 class PortfolioWithAssets(PortfolioResponse):
     """Schema for portfolio with assets."""
 
-    assets: List["AssetSummary"] = []
+    assets: list["AssetSummary"] = []
     total_value: float = 0
     total_gain_loss: float = 0
     total_gain_loss_percent: float = 0
@@ -65,7 +64,7 @@ class AssetSummary(BaseModel):
 
     id: UUID
     symbol: str
-    name: Optional[str]
+    name: str | None
     quantity: float
     current_value: float
     gain_loss: float

@@ -92,7 +92,7 @@ class TestDevisesReelles:
         """Une liste noire laisserait passer tout symbole crypto non prévu."""
         source = inspect.getsource(PriceService.get_forex_rate)
         assert "DEVISES_FIAT" in source and "not in" in source, (
-            "la garde doit vérifier l'appartenance à la liste des monnaies, " "pas l'absence d'une liste de cryptos"
+            "la garde doit vérifier l'appartenance à la liste des monnaies, pas l'absence d'une liste de cryptos"
         )
 
 
@@ -128,6 +128,6 @@ class TestRepliCryptoCompare:
     def test_le_reglage_existe_et_est_vide_par_defaut(self):
         from app.core.config import Settings
 
-        assert (
-            "CRYPTOCOMPARE_API_KEY" in Settings.model_fields
-        ), "sans réglage déclaré, la clé ne peut pas être fournie par l'environnement"
+        assert "CRYPTOCOMPARE_API_KEY" in Settings.model_fields, (
+            "sans réglage déclaré, la clé ne peut pas être fournie par l'environnement"
+        )

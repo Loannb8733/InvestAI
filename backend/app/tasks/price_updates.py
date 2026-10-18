@@ -5,10 +5,8 @@ to the Redis pub/sub channel ``price_updates`` so that the WebSocket endpoint
 can broadcast them to connected clients in real time.
 """
 
-
 import json
 import logging
-from typing import Dict, Optional, Set
 
 from redis import Redis
 from sqlalchemy import select
@@ -44,7 +42,7 @@ def _get_sync_redis() -> Redis:
 # le fork du worker, jamais partagé entre processus). Une connexion neuve par
 # cours coûtait CLIENT SETINFO ×2 + PUBLISH + fermeture : quatre commandes au
 # lieu d'une, facturées une à une par Upstash.
-_client_de_publication: Optional[Redis] = None
+_client_de_publication: Redis | None = None
 
 
 def _publieur() -> Redis:
@@ -83,7 +81,7 @@ def publish_price_update(
         logger.debug("Failed to publish price update for %s: %s", symbol, e)
 
 
-async def get_unique_symbols_by_type() -> Dict[str, Set[str]]:
+async def get_unique_symbols_by_type() -> dict[str, set[str]]:
     """Get unique asset symbols grouped by type from database."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -95,7 +93,7 @@ async def get_unique_symbols_by_type() -> Dict[str, Set[str]]:
         )
         rows = result.all()
 
-        symbols_by_type: Dict[str, Set[str]] = {
+        symbols_by_type: dict[str, set[str]] = {
             "crypto": set(),
             "stock": set(),
             "etf": set(),

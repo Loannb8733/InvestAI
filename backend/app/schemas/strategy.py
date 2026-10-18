@@ -1,7 +1,7 @@
 """Pydantic schemas for strategies."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -11,37 +11,37 @@ from pydantic import BaseModel, Field
 
 class StrategyActionCreate(BaseModel):
     action: str = Field(..., min_length=1, max_length=100)
-    symbol: Optional[str] = None
-    amount: Optional[float] = None
+    symbol: str | None = None
+    amount: float | None = None
     currency: str = "EUR"
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class StrategyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
-    params: Dict[str, Any] = Field(default_factory=dict)
-    actions: List[StrategyActionCreate] = Field(default_factory=list)
+    description: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    actions: list[StrategyActionCreate] = Field(default_factory=list)
 
 
 class StrategyUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    status: Optional[str] = None
-    params: Optional[Dict[str, Any]] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    status: str | None = None
+    params: dict[str, Any] | None = None
 
 
 class StrategyActionResponse(BaseModel):
     id: UUID
     strategy_id: UUID
     action: str
-    symbol: Optional[str] = None
-    amount: Optional[float] = None
+    symbol: str | None = None
+    amount: float | None = None
     currency: str
-    reason: Optional[str] = None
+    reason: str | None = None
     status: str
-    scheduled_at: Optional[datetime] = None
-    executed_at: Optional[datetime] = None
+    scheduled_at: datetime | None = None
+    executed_at: datetime | None = None
     created_at: datetime
 
     class Config:
@@ -52,14 +52,14 @@ class StrategyResponse(BaseModel):
     id: UUID
     user_id: UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     source: str
     status: str
-    params: Dict[str, Any]
-    ai_reasoning: Optional[str] = None
-    market_regime: Optional[str] = None
-    confidence: Optional[float] = None
-    actions: List[StrategyActionResponse] = []
+    params: dict[str, Any]
+    ai_reasoning: str | None = None
+    market_regime: str | None = None
+    confidence: float | None = None
+    actions: list[StrategyActionResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -68,5 +68,5 @@ class StrategyResponse(BaseModel):
 
 
 class StrategyActionUpdate(BaseModel):
-    status: Optional[str] = None  # EXECUTED or SKIPPED
-    amount: Optional[float] = None  # Allow user to override AI-proposed amount
+    status: str | None = None  # EXECUTED or SKIPPED
+    amount: float | None = None  # Allow user to override AI-proposed amount

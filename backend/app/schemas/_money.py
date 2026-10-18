@@ -15,12 +15,12 @@ Using ``Money`` instead of ``Decimal`` in schema annotations keeps the rich
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import PlainSerializer
 
 
-def _to_float(value: Optional[Decimal]) -> Optional[float]:
+def _to_float(value: Decimal | None) -> float | None:
     if value is None:
         return None
     return float(value)

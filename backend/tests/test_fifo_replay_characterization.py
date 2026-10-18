@@ -38,7 +38,7 @@ Conventions copied from the existing goldens
   * conversion_rate = EUR per 1 unit of the trade currency.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -132,7 +132,7 @@ def _tx(
 
 
 def _dt(y, m, d, hh=12, mm=0):
-    return datetime(y, m, d, hh, mm, tzinfo=timezone.utc)
+    return datetime(y, m, d, hh, mm, tzinfo=UTC)
 
 
 def _asset_entry(result, symbol, exchange):

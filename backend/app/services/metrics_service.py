@@ -5,9 +5,8 @@ import logging
 import math
 import time
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +39,7 @@ from app.services.price_service import price_service
 logger = logging.getLogger(__name__)
 
 # In-memory cache for dashboard metrics: {(user_id, days): (timestamp, result)}
-_dashboard_cache: Dict[Tuple[str, int], Tuple[float, Dict]] = {}
+_dashboard_cache: dict[tuple[str, int], tuple[float, dict]] = {}
 _DASHBOARD_CACHE_TTL = 120  # 2 minutes
 _MAX_DASHBOARD_CACHE = 200  # max entries before eviction
 
@@ -48,10 +47,10 @@ _MAX_DASHBOARD_CACHE = 200  # max entries before eviction
 # requests miss the cache at once (typically right after the TTL expires), only
 # the first recomputes; the rest await that same future instead of stampeding the
 # DB/CPU with N identical full-FIFO recomputes.
-_dashboard_inflight: Dict[Tuple, "asyncio.Future"] = {}
+_dashboard_inflight: dict[tuple, "asyncio.Future"] = {}
 
 
-def _cache_put_dashboard(key: Tuple, value: Tuple) -> None:
+def _cache_put_dashboard(key: tuple, value: tuple) -> None:
     """Insert into bounded dashboard cache, evicting oldest entries if full."""
     if len(_dashboard_cache) >= _MAX_DASHBOARD_CACHE:
         evict_count = max(1, _MAX_DASHBOARD_CACHE // 4)
@@ -91,11 +90,11 @@ class MetricsService:
     async def get_asset_metrics(
         self,
         asset: Asset,
-        current_price: Optional[Decimal] = None,
-        actual_invested: Optional[Decimal] = None,
-        buy_pra: Optional[Decimal] = None,
-        cump_pru: Optional[Decimal] = None,
-    ) -> Dict:
+        current_price: Decimal | None = None,
+        actual_invested: Decimal | None = None,
+        buy_pra: Decimal | None = None,
+        cump_pru: Decimal | None = None,
+    ) -> dict:
         """Calculate metrics for a single asset.
 
         Args:
@@ -156,18 +155,18 @@ class MetricsService:
     async def _compute_risk_weights(
         self,
         db: AsyncSession,
-        symbols: List[str],
-        symbol_values: Dict[str, float],
+        symbols: list[str],
+        symbol_values: dict[str, float],
         total_value: float,
         days: int = 90,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute risk weight per symbol based on historical volatility contribution."""
         if not symbols or total_value <= 0:
             return {}
 
         from app.models.asset_price_history import AssetPriceHistory
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).date()
 
         result = await db.execute(
             select(
@@ -184,12 +183,12 @@ class MetricsService:
         rows = result.all()
 
         # Group prices by symbol
-        symbol_prices: Dict[str, List[float]] = defaultdict(list)
+        symbol_prices: dict[str, list[float]] = defaultdict(list)
         for row in rows:
             symbol_prices[row[0]].append(float(row[2]))
 
         # Compute annualized volatility per symbol
-        volatilities: Dict[str, float] = {}
+        volatilities: dict[str, float] = {}
         for symbol, prices in symbol_prices.items():
             if len(prices) < 10:
                 volatilities[symbol] = 0.0
@@ -206,7 +205,7 @@ class MetricsService:
 
         # Weighted risk contributions
         total_weighted = 0.0
-        weighted_vols: Dict[str, float] = {}
+        weighted_vols: dict[str, float] = {}
         for symbol in symbols:
             s = symbol.upper()
             weight = symbol_values.get(s, 0) / total_value if total_value > 0 else 0
@@ -215,7 +214,7 @@ class MetricsService:
             total_weighted += wv
 
         # Normalize to percentages
-        risk_weights: Dict[str, float] = {}
+        risk_weights: dict[str, float] = {}
         for symbol, wv in weighted_vols.items():
             risk_weights[symbol] = round((wv / total_weighted * 100) if total_weighted > 0 else 0, 2)
 
@@ -228,7 +227,7 @@ class MetricsService:
         currency: str = "EUR",
         include_zero_quantity: bool = False,
         min_value_eur: float = 0.10,  # Filter out dust positions worth less than this
-    ) -> Dict:
+    ) -> dict:
         """Calculate metrics for an entire portfolio."""
         # Get all assets in portfolio
         query = select(Asset).where(
@@ -280,14 +279,14 @@ class MetricsService:
 
         # Batch-fetch total fees, actual invested, and first buy date per asset
         inv_asset_ids = [a.id for a in investment_assets]
-        fees_map: Dict[str, float] = {}
-        invested_map: Dict[str, Decimal] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
-        buy_pra_by_sym: Dict[str, Decimal] = {}  # undiluted PRA per symbol
-        sym_to_aids: Dict[str, list] = {}  # symbol -> list of Asset objects
-        cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total cost basis
-        cost_qty_by_sym: Dict[str, Decimal] = {}  # symbol -> cost-bearing qty
-        buy_cost_by_sym: Dict[str, Decimal] = {}  # symbol -> total buy cost
-        first_buy_map: Dict[str, datetime] = {}  # first transaction date per asset
+        fees_map: dict[str, float] = {}
+        invested_map: dict[str, Decimal] = {}  # actual cost basis per asset (BUY+CONV_IN+TRANSFER_IN)
+        buy_pra_by_sym: dict[str, Decimal] = {}  # undiluted PRA per symbol
+        sym_to_aids: dict[str, list] = {}  # symbol -> list of Asset objects
+        cost_by_sym: dict[str, Decimal] = {}  # symbol -> total cost basis
+        cost_qty_by_sym: dict[str, Decimal] = {}  # symbol -> cost-bearing qty
+        buy_cost_by_sym: dict[str, Decimal] = {}  # symbol -> total buy cost
+        first_buy_map: dict[str, datetime] = {}  # first transaction date per asset
         # Fees/dividends needing currency conversion: entries are either
         #   (fkey: Tuple[str,str], amount: Decimal, ccy: str)  for fees
         #   (str starting "__div__", amount: Decimal, ccy: str) for dividends
@@ -311,7 +310,7 @@ class MetricsService:
         forex_stale = False
         _fx_hist = FxHistoryService(db)
 
-        async def _fx_last_known(from_ccy: str, to_ccy: str) -> Optional[float]:
+        async def _fx_last_known(from_ccy: str, to_ccy: str) -> float | None:
             """Last-known real rate from the persisted ECB daily table (forward-filled).
 
             Tries the direct pair, then the inverse, so we fall back to a *real*
@@ -329,7 +328,7 @@ class MetricsService:
                 logger.warning("FX history fallback failed for %s->%s: %s", from_ccy, to_ccy, e)
             return None
 
-        async def _crypto_unit_price(symbol: str, to_ccy: str) -> Optional[float]:
+        async def _crypto_unit_price(symbol: str, to_ccy: str) -> float | None:
             """Prix d'une unité de crypto dans la devise cible, ou None si inconnue.
 
             Sert à convertir des frais réglés en crypto. Renvoie None sans bruit quand
@@ -344,7 +343,7 @@ class MetricsService:
                 logger.debug("Prix crypto indisponible pour %s->%s: %s", symbol, to_ccy, exc)
             return None
 
-        async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> Tuple[float, bool]:
+        async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> tuple[float, bool]:
             """Resolve an FX rate as (rate, stale).
 
             Order: live API → Redis cache → persisted ECB last-known → constant.
@@ -457,13 +456,13 @@ class MetricsService:
             all_assets_full = all_assets_full_result.scalars().all()
 
             # Build symbol + exchange lookups for each asset_id
-            aid_to_symbol: Dict[str, str] = {}
-            aid_to_exchange: Dict[str, str] = {}
+            aid_to_symbol: dict[str, str] = {}
+            aid_to_exchange: dict[str, str] = {}
             # F-06: stored average buy price per asset and (symbol-wide), used as the
             # cost-basis proxy for unmatched/zero-price TRANSFER_IN rows so they don't
             # land at zero cost and inflate latent P&L.
-            aid_to_avg_price: Dict[str, Decimal] = {}
-            sym_avg_price: Dict[str, Decimal] = {}
+            aid_to_avg_price: dict[str, Decimal] = {}
+            sym_avg_price: dict[str, Decimal] = {}
             for a in all_assets_full:
                 aid_to_symbol[str(a.id)] = a.symbol.upper()
                 aid_to_exchange[str(a.id)] = (a.exchange or "").strip()
@@ -474,12 +473,12 @@ class MetricsService:
                     sym_avg_price[_sym] = _avg
 
             # Compute CUMP PRU from transaction history (fee-inclusive, follows 3 rules)
-            cump_pru_by_fkey: Dict[Tuple[str, str], Decimal] = compute_cump_pru(all_txs, aid_to_symbol, aid_to_exchange)
+            cump_pru_by_fkey: dict[tuple[str, str], Decimal] = compute_cump_pru(all_txs, aid_to_symbol, aid_to_exchange)
 
             from collections import defaultdict as _defaultdict
 
             _ZERO = Decimal("0")
-            FifoKey = Tuple[str, str]  # (symbol, exchange)
+            FifoKey = tuple[str, str]  # (symbol, exchange)
 
             # ---- Unified FIFO replay (app.services.fifo_replay) ----
             # Display/P&L semantics: every ReplayConfig default IS the display
@@ -518,13 +517,13 @@ class MetricsService:
 
             # ---- Derive per-asset invested_map from FIFO layers ----
             # Each asset_id maps to (symbol, exchange) via aid_to_symbol/aid_to_exchange
-            sym_to_aids: Dict[str, list] = _defaultdict(list)
+            sym_to_aids: dict[str, list] = _defaultdict(list)
             for a in investment_assets:
                 sym_to_aids[a.symbol.upper()].append(a)
 
             # Aggregate cost by (symbol, exchange) from remaining FIFO layers
-            cost_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
-            paid_qty_by_key: Dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            cost_by_key: dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
+            paid_qty_by_key: dict[FifoKey, Decimal] = _defaultdict(lambda: _ZERO)
             fifo_seen_keys: set = set()  # tracks all keys touched by FIFO (incl. zero-cost)
             # (orphan transit pools are isolated in _replay_res.orphan_transit
             # by the engine and logged right after the replay call above)
@@ -558,9 +557,9 @@ class MetricsService:
                     )
 
             # Also build symbol-level aggregates for PRA and downstream compatibility
-            cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            cost_qty_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
-            buy_cost_by_sym: Dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            cost_by_sym: dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            cost_qty_by_sym: dict[str, Decimal] = _defaultdict(lambda: _ZERO)
+            buy_cost_by_sym: dict[str, Decimal] = _defaultdict(lambda: _ZERO)
             for fkey, cost in cost_by_key.items():
                 sym = fkey[0]
                 cost_by_sym[sym] += cost
@@ -568,7 +567,7 @@ class MetricsService:
                 cost_qty_by_sym[sym] += paid_qty_by_key.get(fkey, _ZERO)
 
             # Compute undiluted PRA per symbol: cost / cost-bearing qty
-            buy_pra_by_sym: Dict[str, Decimal] = {}
+            buy_pra_by_sym: dict[str, Decimal] = {}
             for sym in cost_by_sym:
                 cq = cost_qty_by_sym.get(sym, _ZERO)
                 if cq > 0 and cost_by_sym[sym] > 0:
@@ -590,7 +589,7 @@ class MetricsService:
             # For each layer, FX gain = qty * unit_cost_base * (current_fx - purchase_fx)
             # This is computed later once current forex rates are available.
             # Store the base-currency cost for decomposition.
-            fx_base_cost_by_key: Dict[FifoKey, list] = _defaultdict(list)
+            fx_base_cost_by_key: dict[FifoKey, list] = _defaultdict(list)
             for fkey, layers in fifo.items():
                 for layer in layers:
                     if layer.get("is_paid") and layer.get("currency") and layer["currency"] != currency.upper():
@@ -665,7 +664,7 @@ class MetricsService:
                 for symbol, data in crypto_prices.items():
                     prices[symbol.upper()] = data["price"]
                     price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
-            except (asyncio.TimeoutError, Exception) as e:
+            except (TimeoutError, Exception) as e:
                 logger.warning(
                     "Crypto price fetch failed (%s), using DB fallback",
                     type(e).__name__,
@@ -697,7 +696,7 @@ class MetricsService:
                             )
                     prices[symbol.upper()] = stock_price
                     price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
-            except (asyncio.TimeoutError, Exception) as e:
+            except (TimeoutError, Exception) as e:
                 logger.warning("Stock price fetch failed (%s), using DB fallback", type(e).__name__)
 
         # Fill missing prices from DB fallback
@@ -824,8 +823,8 @@ class MetricsService:
             # Holding duration and annualized return
             first_date = first_buy_map.get(str(asset.id))
             if first_date and hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
-                first_date = first_date.replace(tzinfo=timezone.utc)
-            holding_days = (datetime.now(timezone.utc) - first_date).days if first_date else None
+                first_date = first_date.replace(tzinfo=UTC)
+            holding_days = (datetime.now(UTC) - first_date).days if first_date else None
             annualized_return = None
             if holding_days and holding_days >= 7 and metrics["total_invested"] > 0 and metrics["current_value"] > 0:
                 years = holding_days / 365.25
@@ -867,8 +866,8 @@ class MetricsService:
         # For assets bought in foreign currency, split total G/L into:
         #   fx_gain = qty * unit_cost_base * (current_fx - purchase_fx)
         #   asset_gain = total_gain_loss - fx_gain
-        fx_gain_by_key: Dict[Tuple[str, str], float] = {}
-        _fx_rate_cache: Dict[str, float] = {"USD": usd_to_target, target: 1.0}
+        fx_gain_by_key: dict[tuple[str, str], float] = {}
+        _fx_rate_cache: dict[str, float] = {"USD": usd_to_target, target: 1.0}
         if target != "EUR":
             _fx_rate_cache["EUR"] = eur_to_target
         if inv_asset_ids:
@@ -929,7 +928,7 @@ class MetricsService:
 
         # Batch-fetch live stablecoin prices from CoinGecko
         stablecoin_symbols = [a.symbol for a in stablecoin_assets]
-        stablecoin_live_prices: Dict[str, float] = {}
+        stablecoin_live_prices: dict[str, float] = {}
         if stablecoin_symbols:
             try:
                 sc_prices = await asyncio.wait_for(
@@ -1017,7 +1016,7 @@ class MetricsService:
         asset_metrics.sort(key=lambda x: x["current_value"], reverse=True)
 
         # Compute risk weights (volatility contribution per symbol)
-        symbol_values: Dict[str, float] = {}
+        symbol_values: dict[str, float] = {}
         for am in asset_metrics:
             s = am["symbol"].upper()
             symbol_values[s] = symbol_values.get(s, 0) + am["current_value"]
@@ -1065,7 +1064,7 @@ class MetricsService:
 
         return result
 
-    async def _fetch_period_changes(self, symbols_by_type: Dict[str, List[str]], days: int) -> Dict[str, float]:
+    async def _fetch_period_changes(self, symbols_by_type: dict[str, list[str]], days: int) -> dict[str, float]:
         """Fetch price change percentage over a period for each symbol.
 
         Strategy (prioritized):
@@ -1077,7 +1076,7 @@ class MetricsService:
         """
         from app.tasks.history_cache import get_cached_histories
 
-        changes: Dict[str, float] = {}
+        changes: dict[str, float] = {}
         uncached_crypto: list[str] = []
         uncached_stocks: list[str] = []
 
@@ -1173,7 +1172,7 @@ class MetricsService:
                 from app.core.database import AsyncSessionLocal
                 from app.models.asset_price_history import AssetPriceHistory
 
-                cutoff = (datetime.now(timezone.utc) - timedelta(days=days + 5)).date()
+                cutoff = (datetime.now(UTC) - timedelta(days=days + 5)).date()
                 sym_uppers = [s.upper() for s in remaining]
                 async with AsyncSessionLocal() as _db:
                     # One batched query (WHERE symbol IN ...) instead of one SELECT
@@ -1186,7 +1185,7 @@ class MetricsService:
                         )
                         .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
                     )
-                    prices_by_sym: Dict[str, list] = {}
+                    prices_by_sym: dict[str, list] = {}
                     for sym, px in result.all():
                         prices_by_sym.setdefault(sym, []).append(float(px))
                     for sym_upper, prices in prices_by_sym.items():
@@ -1223,7 +1222,7 @@ class MetricsService:
         user_id: str,
         currency: str = "EUR",
         days: int = 30,
-    ) -> Dict:
+    ) -> dict:
         """Cached, single-flight dashboard metrics for a user's entire portfolio.
 
         The 2-minute in-memory cache is fronted by a per-key single-flight guard:
@@ -1246,7 +1245,7 @@ class MetricsService:
         if inflight is not None:
             return await inflight
 
-        fut: "asyncio.Future" = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future = asyncio.get_event_loop().create_future()
         _dashboard_inflight[cache_key] = fut
         try:
             # L2 — shared Redis cache (cross-worker): a result computed by any
@@ -1277,7 +1276,7 @@ class MetricsService:
         user_id: str,
         currency: str,
         days: int,
-    ) -> Dict:
+    ) -> dict:
         """Compute the dashboard under a cross-worker Redis lock.
 
         Only one worker computes a given key at a time; the others poll the shared
@@ -1309,7 +1308,7 @@ class MetricsService:
         user_id: str,
         currency: str = "EUR",
         days: int = 30,
-    ) -> Dict:
+    ) -> dict:
         """Full (uncached) dashboard computation. Fronted by get_user_dashboard_metrics."""
         # Get all user portfolios
         result = await db.execute(
@@ -1435,7 +1434,7 @@ class MetricsService:
         allocation_list.sort(key=lambda x: x["value"], reverse=True)
 
         # Aggregate assets by symbol (merge duplicates across portfolios)
-        symbol_agg: Dict[str, Dict] = {}
+        symbol_agg: dict[str, dict] = {}
         for a in all_assets:
             sym = a["symbol"]
             if sym not in symbol_agg:
@@ -1453,7 +1452,7 @@ class MetricsService:
             symbol_agg[sym]["total_quantity"] += a.get("quantity", 0)
 
         # Fetch period change percentages (batch API call)
-        symbols_by_type: Dict[str, List[str]] = {}
+        symbols_by_type: dict[str, list[str]] = {}
         for data in symbol_agg.values():
             at = data["asset_type"]
             symbols_by_type.setdefault(at, []).append(data["symbol"])
@@ -1610,7 +1609,7 @@ class MetricsService:
 
         return result
 
-    async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> Dict:
+    async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> dict:
         """
         Calculate historical investment metrics for a portfolio.
         Includes all assets (even those with 0 quantity) and calculates

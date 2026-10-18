@@ -13,7 +13,7 @@ Un trou est épinglé là où il apparaît : la somme des transactions ignore qu
 types de mouvement (NEW-62).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -25,7 +25,7 @@ from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 @pytest.fixture

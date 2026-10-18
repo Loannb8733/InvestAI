@@ -2,7 +2,6 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -15,7 +14,7 @@ class AssetBase(BaseModel):
     """Base asset schema."""
 
     symbol: str = Field(..., min_length=1, max_length=20)
-    name: Optional[str] = Field(None, max_length=200)
+    name: str | None = Field(None, max_length=200)
     asset_type: AssetType
     currency: str = Field(default="EUR", max_length=10)
 
@@ -26,25 +25,25 @@ class AssetCreate(AssetBase):
     portfolio_id: UUID
     quantity: Money = Field(default=Decimal("0"), ge=0)
     avg_buy_price: Money = Field(default=Decimal("0"), ge=0)
-    exchange: Optional[str] = Field(None, max_length=50)
+    exchange: str | None = Field(None, max_length=50)
     # Crowdfunding fields
-    interest_rate: Optional[Money] = Field(None, ge=0, le=100)
-    maturity_date: Optional[date] = None
-    project_status: Optional[str] = Field(None, max_length=20)
-    invested_amount: Optional[Money] = Field(None, ge=0)
+    interest_rate: Money | None = Field(None, ge=0, le=100)
+    maturity_date: date | None = None
+    project_status: str | None = Field(None, max_length=20)
+    invested_amount: Money | None = Field(None, ge=0)
 
 
 class AssetUpdate(BaseModel):
     """Schema for updating an asset."""
 
-    name: Optional[str] = Field(None, max_length=200)
-    quantity: Optional[Money] = Field(None, ge=0)
-    avg_buy_price: Optional[Money] = Field(None, ge=0)
-    exchange: Optional[str] = Field(None, max_length=50)
-    interest_rate: Optional[Money] = Field(None, ge=0, le=100)
-    maturity_date: Optional[date] = None
-    project_status: Optional[str] = Field(None, max_length=20)
-    invested_amount: Optional[Money] = Field(None, ge=0)
+    name: str | None = Field(None, max_length=200)
+    quantity: Money | None = Field(None, ge=0)
+    avg_buy_price: Money | None = Field(None, ge=0)
+    exchange: str | None = Field(None, max_length=50)
+    interest_rate: Money | None = Field(None, ge=0, le=100)
+    maturity_date: date | None = None
+    project_status: str | None = Field(None, max_length=20)
+    invested_amount: Money | None = Field(None, ge=0)
 
 
 class AssetResponse(AssetBase):
@@ -54,11 +53,11 @@ class AssetResponse(AssetBase):
     portfolio_id: UUID
     quantity: Money
     avg_buy_price: Money
-    exchange: Optional[str]
-    interest_rate: Optional[Money] = None
-    maturity_date: Optional[date] = None
-    project_status: Optional[str] = None
-    invested_amount: Optional[Money] = None
+    exchange: str | None
+    interest_rate: Money | None = None
+    maturity_date: date | None = None
+    project_status: str | None = None
+    invested_amount: Money | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -69,9 +68,9 @@ class AssetResponse(AssetBase):
 class AssetWithMetrics(AssetResponse):
     """Schema for asset with calculated metrics."""
 
-    current_price: Optional[Money] = None
-    current_value: Optional[Money] = None
-    total_invested: Optional[Money] = None
-    gain_loss: Optional[Money] = None
-    gain_loss_percent: Optional[float] = None
-    last_price_update: Optional[datetime] = None
+    current_price: Money | None = None
+    current_value: Money | None = None
+    total_invested: Money | None = None
+    gain_loss: Money | None = None
+    gain_loss_percent: float | None = None
+    last_price_update: datetime | None = None

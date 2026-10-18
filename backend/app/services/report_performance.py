@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class PerformanceReportMixin:
     """Mixed into ReportService."""
 
-    def generate_performance_pdf(self, data: Dict[str, Any]) -> bytes:
+    def generate_performance_pdf(self, data: dict[str, Any]) -> bytes:
         buffer = io.BytesIO()
         doc = _build_doc_with_footer(
             buffer,
@@ -290,7 +290,7 @@ class PerformanceReportMixin:
 
     # ── Performance Excel ───────────────────────────────────────────
 
-    def generate_performance_excel(self, data: Dict[str, Any]) -> bytes:
+    def generate_performance_excel(self, data: dict[str, Any]) -> bytes:
         wb = Workbook()
 
         # ── Résumé sheet ─────────────────────────────────────────────

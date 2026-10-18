@@ -24,7 +24,7 @@ comportement. Elle est ici sous son propre nom, appelée explicitement.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -63,7 +63,7 @@ def construire_service_exchange(api_key: Any) -> Any:
 async def resoudre_portefeuille_crypto(
     db: AsyncSession,
     user_id: UUID,
-    nom_exchange: Optional[str] = None,
+    nom_exchange: str | None = None,
 ) -> Portfolio:
     """Rend le portefeuille « Crypto » de l'utilisateur, en le créant au besoin.
 

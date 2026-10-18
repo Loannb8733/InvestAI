@@ -20,15 +20,15 @@ tested deterministically. The DB-backed loader lives in ``FxHistoryService``.
 from __future__ import annotations
 
 import bisect
+from collections.abc import Mapping, Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Mapping, Optional, Sequence, Tuple
 
 
 def resolve_rate(
     target: date,
-    sorted_rates: Sequence[Tuple[date, Decimal]],
-) -> Optional[Decimal]:
+    sorted_rates: Sequence[tuple[date, Decimal]],
+) -> Decimal | None:
     """Return the rate effective on ``target`` via forward-fill.
 
     ``sorted_rates`` must be a sequence of ``(date, rate)`` sorted ascending by date.
@@ -47,7 +47,7 @@ def resolve_rate(
     return sorted_rates[idx][1]
 
 
-def build_sorted_rates(rates_by_date: Mapping[date, Decimal]) -> list[Tuple[date, Decimal]]:
+def build_sorted_rates(rates_by_date: Mapping[date, Decimal]) -> list[tuple[date, Decimal]]:
     """Normalize a ``{date: rate}`` mapping into an ascending ``[(date, rate)]`` list."""
     return sorted(((d, Decimal(str(r))) for d, r in rates_by_date.items()), key=lambda x: x[0])
 

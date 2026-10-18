@@ -7,7 +7,7 @@ depuis juin sans que personne ne soit prévenu (NEW-80). Pour qu'il puisse
 chaque écart exactement comme ``scripts/check_invariants.py``.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -43,7 +43,7 @@ async def _actif(db, portefeuille, symbole, stocke, achete, pru) -> Asset:
             transaction_type=TransactionType.BUY,
             quantity=Decimal(achete),
             price=Decimal(pru),
-            executed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            executed_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
     )
     await db.flush()

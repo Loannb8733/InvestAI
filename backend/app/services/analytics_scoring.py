@@ -9,15 +9,13 @@ que « Moyen », qu'un bêta est « défensif » — sont des décisions produit
 sortir les rend lisibles et vérifiables une à une.
 """
 
-from typing import Dict, Optional
-
 import numpy as np
 
 from app.ml import adaptive_thresholds as adaptive_th
 from app.services.analytics_math import _cvar_historical, _var_historical, _var_parametric
 
 
-def _hhi(allocation: Dict[str, float]) -> float:
+def _hhi(allocation: dict[str, float]) -> float:
     if not allocation:
         return 0
     return round(sum((w / 100) ** 2 for w in allocation.values()), 4)
@@ -42,7 +40,7 @@ def _diversification_rating(score: float) -> str:
     return "Très faible"
 
 
-def _calc_beta(asset_returns: np.ndarray, bench_returns: np.ndarray) -> Optional[float]:
+def _calc_beta(asset_returns: np.ndarray, bench_returns: np.ndarray) -> float | None:
     """Compute beta = Cov(asset, bench) / Var(bench)."""
     if len(asset_returns) < 10 or len(bench_returns) < 10:
         return None
@@ -56,7 +54,7 @@ def _calc_beta(asset_returns: np.ndarray, bench_returns: np.ndarray) -> Optional
     return cov / var_b
 
 
-def _interpret_beta(beta: Optional[float]) -> str:
+def _interpret_beta(beta: float | None) -> str:
     """Interpret beta value in French using centralized classification."""
     if beta is None:
         return "Données insuffisantes"
@@ -95,9 +93,9 @@ def _build_interpretations(
     volatility: float,
     max_dd: float,
     asset_data: list,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Build contextual, human-readable interpretations for portfolio ratios."""
-    interp: Dict[str, str] = {}
+    interp: dict[str, str] = {}
 
     # Detect actual data depth (min data points across non-stablecoin assets)
     data_lengths = [

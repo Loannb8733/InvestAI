@@ -234,9 +234,7 @@ class TestBinanceCSVParser:
         assert len(errors) == 0
 
     def test_parse_csv_with_errors(self, parser):
-        csv_content = (
-            "UTC_Time,Operation,Coin,Change\n" "2025-01-15 10:00:00,Buy,BTC,0.5\n" "invalid-date,Buy,ETH,1.0\n"
-        )
+        csv_content = "UTC_Time,Operation,Coin,Change\n2025-01-15 10:00:00,Buy,BTC,0.5\ninvalid-date,Buy,ETH,1.0\n"
         txs, errors = parser.parse_csv(csv_content)
         assert len(txs) == 1
         assert len(errors) == 1
@@ -926,7 +924,7 @@ class TestMalformedCSV:
 
     def test_extra_columns_ignored(self):
         parser = GenericCSVParser()
-        csv_content = "symbol,type,quantity,price,extra_col1,extra_col2\n" "BTC,buy,1,50000,foo,bar\n"
+        csv_content = "symbol,type,quantity,price,extra_col1,extra_col2\nBTC,buy,1,50000,foo,bar\n"
         txs, errors = parser.parse_csv(csv_content)
         assert len(txs) == 1
         assert len(errors) == 0

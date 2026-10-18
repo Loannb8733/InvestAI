@@ -2,7 +2,6 @@
 
 import io
 from datetime import datetime
-from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -19,7 +18,7 @@ from app.services.report_service import report_service
 class RebalancingRequest(BaseModel):
     """Request body for rebalancing report."""
 
-    target_allocations: Dict[str, float] = Field(
+    target_allocations: dict[str, float] = Field(
         ...,
         description="Target allocation per crypto class. Keys: L1, L2, DeFi, Stable, Meme, Other. Values: 0.0–1.0.",
         examples=[{"L1": 0.50, "Stable": 0.20, "DeFi": 0.20, "Meme": 0.10}],
@@ -27,7 +26,7 @@ class RebalancingRequest(BaseModel):
 
     @field_validator("target_allocations")
     @classmethod
-    def validate_allocations(cls, v: Dict[str, float]) -> Dict[str, float]:
+    def validate_allocations(cls, v: dict[str, float]) -> dict[str, float]:
         valid_keys = {"L1", "L2", "DeFi", "Stable", "Meme", "Other"}
         for key in v:
             if key not in valid_keys:
@@ -196,7 +195,7 @@ async def get_securities_tax_report_excel(
 @limiter.limit("10/minute")
 async def get_transactions_report_pdf(
     request: Request,
-    year: Optional[int] = None,
+    year: int | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -219,7 +218,7 @@ async def get_transactions_report_pdf(
 @limiter.limit("10/minute")
 async def get_transactions_report_excel(
     request: Request,
-    year: Optional[int] = None,
+    year: int | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -242,7 +241,7 @@ async def get_transactions_report_excel(
 @limiter.limit("10/minute")
 async def get_transactions_report_csv(
     request: Request,
-    year: Optional[int] = None,
+    year: int | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
