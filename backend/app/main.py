@@ -51,14 +51,14 @@ if settings.sentry_enabled:
             environment=settings.APP_ENV,
             release="investai@1.0.0",
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            profile_session_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            profile_lifecycle="trace",
             integrations=[
                 FastApiIntegration(transaction_style="endpoint"),
                 SqlalchemyIntegration(),
                 CeleryIntegration(),
                 RedisIntegration(),
             ],
-            send_default_pii=False,
             # Scrub Authorization/Cookie headers and any payload field whose
             # name matches password/secret/token/api_key/mfa/totp/… before
             # events leave the process. FastApiIntegration would otherwise

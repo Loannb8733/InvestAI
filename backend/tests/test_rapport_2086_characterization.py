@@ -18,7 +18,7 @@ PDF valide mais vide passerait le premier contrôle ; il ne passe pas ceux-ci.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import fitz  # PyMuPDF
+import pymupdf
 
 from app.services.report_service import ReportService
 from app.services.report_tax import TaxEvent2086, TaxSummary2086
@@ -73,7 +73,7 @@ async def _generer(db_session, resume):
 
 def _texte(pdf: bytes) -> str:
     """Texte du document, pages concaténées, espaces normalisés."""
-    with fitz.open(stream=pdf, filetype="pdf") as doc:
+    with pymupdf.open(stream=pdf, filetype="pdf") as doc:
         brut = "\n".join(page.get_text() for page in doc)
     return " ".join(brut.split())
 

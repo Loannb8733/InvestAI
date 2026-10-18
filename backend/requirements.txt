@@ -1,4 +1,4 @@
-aiohttp==3.10.11
+aiohttp==3.14.5
 alembic==1.20.0
 asyncpg==0.32.0
 bcrypt==5.0.0
@@ -8,7 +8,7 @@ email-validator==2.3.0
 fastapi==0.144.0
 httpx==0.28.1
 numpy==2.5.4
-openpyxl==3.1.2
+openpyxl==3.1.5
 optuna==5.0.0
 pandas==3.0.6
 pmdarima==2.1.1
@@ -16,16 +16,16 @@ psycopg2-binary==2.9.13
 pydantic-settings==2.16.0
 pydantic==2.14.1
 PyJWT==2.15.1
-PyMuPDF>=1.24.0
+PyMuPDF==1.28.2
 pyotp==2.10.0
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 qrcode==8.2
 redis==8.1.0
-reportlab==4.0.8
+reportlab==5.0.1
 scikit-learn==1.9.1
 scipy==1.18.1
-sentry-sdk[fastapi]==1.40.0
+sentry-sdk[fastapi]==2.72.0
 shap==0.54.1
 slowapi==0.1.10
 sqlalchemy==2.1.5

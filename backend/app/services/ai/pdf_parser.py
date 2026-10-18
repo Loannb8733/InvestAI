@@ -4,7 +4,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-import fitz  # PyMuPDF
+import pymupdf
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class PDFParser:
 
     def extract_text(self, file_bytes: bytes) -> str:
         """Extract full text from PDF with cleanup."""
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         pages = []
         for page in doc:
             text = page.get_text()
@@ -118,7 +118,7 @@ class PDFParser:
 
     def extract_tables(self, file_bytes: bytes) -> list[str]:
         """Extract text blocks that look like tables (lines with numbers)."""
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         tables = []
         for page in doc:
             blocks = page.get_text("blocks")

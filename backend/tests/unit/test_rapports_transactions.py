@@ -13,7 +13,7 @@ import io
 from datetime import date
 from types import SimpleNamespace
 
-import fitz
+import pymupdf
 import pytest
 from openpyxl import load_workbook
 
@@ -35,7 +35,7 @@ def tx(**surcharges):
 
 
 def texte_pdf(octets: bytes) -> str:
-    with fitz.open(stream=octets, filetype="pdf") as doc:
+    with pymupdf.open(stream=octets, filetype="pdf") as doc:
         return "\n".join(page.get_text() for page in doc)
 
 

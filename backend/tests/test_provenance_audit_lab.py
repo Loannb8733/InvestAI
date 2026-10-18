@@ -32,9 +32,9 @@ def pdf_minimal():
     sur une erreur de format, bien avant d'atteindre la cascade de fournisseurs
     que ces tests visent.
     """
-    import fitz
+    import pymupdf
 
-    doc = fitz.open()
+    doc = pymupdf.open()
     page = doc.new_page()
     page.insert_text((72, 72), "Projet test — TRI 9 % — collecte 500 000 EUR")
     octets = doc.tobytes()
