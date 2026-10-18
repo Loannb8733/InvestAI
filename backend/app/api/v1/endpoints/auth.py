@@ -760,49 +760,6 @@ async def disable_mfa(
     return {"message": "MFA désactivé avec succès"}
 
 
-@router.get("/mfa/backup-codes-count")
-async def get_backup_codes_count(
-    current_user: User = Depends(get_current_user),
-):
-    """Get the number of remaining MFA backup codes."""
-    if not current_user.mfa_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA non activé",
-        )
-    codes = json.loads(current_user.mfa_backup_codes or "[]")
-    return {"remaining_codes": len(codes)}
-
-
-@router.post("/mfa/regenerate-backup-codes")
-async def regenerate_backup_codes(
-    request: MFAVerifyRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Regenerate MFA backup codes. Requires a valid TOTP code."""
-    if not current_user.mfa_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA non activé",
-        )
-
-    totp = pyotp.TOTP(decrypt_mfa_secret(current_user.mfa_secret))
-    if not totp.verify(request.code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Code MFA invalide",
-        )
-
-    # Generate new codes
-    plain_codes = [secrets.token_hex(4) for _ in range(10)]
-    hashed_codes = [hash_password(code) for code in plain_codes]
-    current_user.mfa_backup_codes = json.dumps(hashed_codes)
-    await db.commit()
-
-    return {"backup_codes": plain_codes, "message": "New backup codes generated"}
-
-
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),

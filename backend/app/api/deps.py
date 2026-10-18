@@ -18,16 +18,6 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 
-def require_debug_enabled() -> None:
-    """Guard for debug-only endpoints.
-
-    Returns 404 in production so internal diagnostics (FIFO traces, raw metrics)
-    are never reachable on the public surface — they are development tools only.
-    """
-    if settings.is_production:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
-
-
 security_optional = HTTPBearer(auto_error=False)
 
 

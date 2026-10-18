@@ -700,8 +700,6 @@ POST  /api/v1/auth/change-password
 POST  /api/v1/auth/mfa/setup
 POST  /api/v1/auth/mfa/verify
 POST  /api/v1/auth/mfa/disable
-GET   /api/v1/auth/mfa/backup-codes-count
-POST  /api/v1/auth/mfa/regenerate-backup-codes
 ```
 
 #### État : ✅ 100% fonctionnel
@@ -724,8 +722,6 @@ POST  /api/v1/auth/mfa/regenerate-backup-codes
 #### Endpoints Backend
 ```
 GET/POST/PATCH/DELETE /api/v1/users    (admin only)
-POST /api/v1/system/test-email         (test SMTP)
-POST /api/v1/system/trigger-weekly-report
 GET  /api/v1/system/status
 ```
 
