@@ -18,15 +18,19 @@ os.environ.setdefault(
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.core.db.metadata import metadata
 from app.core.db.session import get_session
+from app.core.redis_client import redis_async_url
 from app.core.security import hash_password
 from app.main import app
 from app.models.user import User, UserRole
+from tests.http_stubs import HttpStub
+from tests.http_stubs import install as install_http_stub
 
 # Test database URL — only swap the database name in the path, never the username.
 # (A naive str.replace of the DB name corrupts the user when they share a substring,
@@ -117,6 +121,25 @@ def _vider_memo_de_change():
     PriceService._forex_memo.clear()
     yield
     PriceService._forex_memo.clear()
+
+
+@pytest.fixture
+def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
+    return install_http_stub(monkeypatch)
+
+
+@pytest.fixture
+def offline(http_stub: HttpStub) -> HttpStub:
+    return http_stub
+
+
+@pytest_asyncio.fixture
+async def empty_test_redis() -> None:
+    url = redis_async_url()
+    assert url.endswith("/15"), f"refusing to flush a non-test Redis database: {url}"
+    client = aioredis.from_url(url)
+    await client.flushdb()
+    await client.aclose()
 
 
 @pytest_asyncio.fixture(scope="function")

@@ -5,13 +5,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import httpx
 import pytest
 import time_machine
 from httpx import AsyncClient
-from redis import asyncio as aioredis
 
-from app.core.redis_client import redis_async_url
 from app.core.security import create_access_token
 from app.models.user import User
 
@@ -51,27 +48,6 @@ def _normalize(value: Any, ids: dict[str, str]) -> Any:
     if isinstance(value, float):
         return round(value, 6)
     return value
-
-
-@pytest.fixture
-async def empty_test_redis() -> None:
-    url = redis_async_url()
-    assert url.endswith("/15"), f"refusing to flush a non-test Redis database: {url}"
-    client = aioredis.from_url(url)
-    await client.flushdb()
-    await client.aclose()
-
-
-@pytest.fixture
-def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def refuse_async(*_: Any, **__: Any) -> httpx.Response:
-        raise httpx.ConnectError("golden tests run offline")
-
-    def refuse_sync(*_: Any, **__: Any) -> httpx.Response:
-        raise httpx.ConnectError("golden tests run offline")
-
-    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", refuse_async)
-    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", refuse_sync)
 
 
 async def _seed(client: AsyncClient, headers: dict[str, str]) -> str:
