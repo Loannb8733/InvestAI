@@ -84,9 +84,9 @@ class TestConduiteSurLe429:
 
 class TestPoseDuContexte:
     def test_le_middleware_marque_les_requetes_http(self):
-        import app.main as main
+        from app.core.http.request_logging import RequestLoggingMiddleware
 
-        source = inspect.getsource(main.RequestLoggingMiddleware.dispatch)
+        source = inspect.getsource(RequestLoggingMiddleware.dispatch)
         assert "sert_une_requete_http.set(True)" in source, (
             "sans ce marquage, aucune requête HTTP n'est reconnue comme telle "
             "et le renoncement au 429 ne se déclenche jamais"

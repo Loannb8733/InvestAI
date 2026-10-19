@@ -14,7 +14,7 @@ known-first-party = ["app"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"!backend/app/{domains/**,core/db/**,core/errors.py,core/error_handlers.py}" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
+"!backend/app/{domains/**,core/db/**,core/http/**,core/errors.py,core/error_handlers.py,core/health.py,core/sentry.py,core/openapi.py,core/startup/migrations.py,core/startup/lifespan.py,main.py}" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -31,7 +31,19 @@ module = ["app.*"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ["app.domains.*", "app.core.db.*", "app.core.errors", "app.core.error_handlers"]
+module = [
+    "app.domains.*",
+    "app.core.db.*",
+    "app.core.http.*",
+    "app.core.errors",
+    "app.core.error_handlers",
+    "app.core.health",
+    "app.core.sentry",
+    "app.core.openapi",
+    "app.core.startup.migrations",
+    "app.core.startup.lifespan",
+    "app.main",
+]
 ignore_errors = false
 strict_optional = true
 disallow_untyped_defs = true

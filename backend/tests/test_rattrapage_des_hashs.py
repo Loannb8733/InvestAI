@@ -1,6 +1,6 @@
 """Le rattrapage des hashs de déduplication doit aboutir, et le dire.
 
-`_rehash_transactions_internal_hash` recalcule `internal_hash` sur toutes les
+`rehash_transactions_internal_hash` recalcule `internal_hash` sur toutes les
 transactions à chaque démarrage. Il **échouait à chaque fois** depuis le
 2026-06-06, et son échec était invisible.
 
@@ -28,7 +28,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.main import _rehash_transactions_internal_hash
+from app.core.startup.rehash import rehash_transactions_internal_hash
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType, compute_transaction_hash
@@ -96,7 +96,7 @@ async def _rattraper(db_session):
     async def _fabrique():
         yield db_session
 
-    await _rehash_transactions_internal_hash(session_factory=_fabrique)
+    await rehash_transactions_internal_hash(factory=_fabrique)
 
 
 async def _relire(db_session, actif) -> list[Transaction]:

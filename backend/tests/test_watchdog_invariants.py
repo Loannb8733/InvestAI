@@ -13,8 +13,8 @@ from decimal import Decimal
 import pytest
 from httpx import AsyncClient
 
-from app.core import database
 from app.core.config import settings
+from app.core.db import session as db_session_module
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -55,7 +55,7 @@ def watchdog(monkeypatch):
     monkeypatch.setattr(settings, "CRON_SECRET", _JETON)
     # L'endpoint lit le moteur de l'application : sans substitution, il
     # interrogerait la base de développement au lieu de la base de test.
-    monkeypatch.setattr(database, "engine", test_engine)
+    monkeypatch.setattr(db_session_module, "engine", test_engine)
 
 
 async def _controler(client: AsyncClient) -> dict:

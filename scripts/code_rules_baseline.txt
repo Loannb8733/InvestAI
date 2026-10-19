@@ -29,7 +29,6 @@ comments	backend/app/core/security.py
 comments	backend/app/core/sentry_scrub.py
 comments	backend/app/core/symbol_map.py
 comments	backend/app/core/timeframe.py
-comments	backend/app/main.py
 comments	backend/app/ml/adaptive_thresholds.py
 comments	backend/app/ml/anomaly_detector.py
 comments	backend/app/ml/drift_detector.py
@@ -281,7 +280,6 @@ too-long	backend/app/api/v1/endpoints/telegram_webhook.py
 too-long	backend/app/api/v1/endpoints/transactions.py
 too-long	backend/app/api/v1/endpoints/websocket.py
 too-long	backend/app/core/redis_client.py
-too-long	backend/app/main.py
 too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
 too-long	backend/app/ml/historical_data.py

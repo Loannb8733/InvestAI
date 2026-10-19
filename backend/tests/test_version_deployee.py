@@ -10,34 +10,34 @@ import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.main import health_check, resoudre_commit
+from app.core.health import health_check, resolve_commit
 
 
 class TestResolutionDuCommit:
     def test_lit_la_variable_de_render(self):
-        assert resoudre_commit({"RENDER_GIT_COMMIT": "429d948f0e1c2b3a4d5e6f7"}) == "429d948"
+        assert resolve_commit({"RENDER_GIT_COMMIT": "429d948f0e1c2b3a4d5e6f7"}) == "429d948"
 
     def test_repli_sur_git_commit(self):
         """Pour les autres hébergeurs et Docker local."""
-        assert resoudre_commit({"GIT_COMMIT": "abcdef1234567"}) == "abcdef1"
+        assert resolve_commit({"GIT_COMMIT": "abcdef1234567"}) == "abcdef1"
 
     def test_render_prime_sur_le_repli(self):
         env = {"RENDER_GIT_COMMIT": "1111111aaaa", "GIT_COMMIT": "2222222bbbb"}
-        assert resoudre_commit(env) == "1111111"
+        assert resolve_commit(env) == "1111111"
 
     def test_sans_variable_le_marqueur_est_explicite(self):
         """« inconnu » plutôt qu'une chaîne vide : l'absence doit se lire."""
-        assert resoudre_commit({}) == "inconnu"
+        assert resolve_commit({}) == "inconnu"
 
     def test_variable_vide_traitee_comme_absente(self):
-        assert resoudre_commit({"RENDER_GIT_COMMIT": "   "}) == "inconnu"
+        assert resolve_commit({"RENDER_GIT_COMMIT": "   "}) == "inconnu"
 
     def test_sha_tronque_a_sept_caracteres(self):
         """Assez pour identifier une version, pas plus que ce que dit `git log`."""
-        assert len(resoudre_commit({"GIT_COMMIT": "0123456789abcdef"})) == 7
+        assert len(resolve_commit({"GIT_COMMIT": "0123456789abcdef"})) == 7
 
     def test_sha_deja_court_conserve(self):
-        assert resoudre_commit({"GIT_COMMIT": "abc12"}) == "abc12"
+        assert resolve_commit({"GIT_COMMIT": "abc12"}) == "abc12"
 
 
 class TestSondeDeVivacite:
@@ -94,11 +94,11 @@ class TestVersionDeSchema:
         from alembic.config import Config
         from alembic.script import ScriptDirectory
 
-        from app.main import _REVISION_ATTENDUE
+        from app.core.health import EXPECTED_REVISION
 
         script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-        assert script.get_heads() == [_REVISION_ATTENDUE]
+        assert script.get_heads() == [EXPECTED_REVISION]
 
     async def test_la_sonde_annonce_toujours_la_revision_attendue(self, client):
         """Même quand la base ne peut rien confirmer.
@@ -132,7 +132,7 @@ class TestVersionDeSchema:
         connexion.execute = AsyncMock(return_value=MagicMock(scalar=lambda: revision))
         moteur.connect.return_value.__aenter__ = AsyncMock(return_value=connexion)
         moteur.connect.return_value.__aexit__ = AsyncMock(return_value=False)
-        return patch("app.main.engine", moteur)
+        return patch("app.core.health.engine", moteur)
 
     async def test_la_revision_attendue_survit_a_une_base_illisible(self, client):
         """Le défaut exact, et la raison pour laquelle il a échappé au local.
@@ -147,7 +147,7 @@ class TestVersionDeSchema:
         Le test force l'échec de lecture au lieu de dépendre de ce que la base
         locale contient ce jour-là.
         """
-        with patch("app.main.engine") as moteur:
+        with patch("app.core.health.engine") as moteur:
             moteur.connect.side_effect = RuntimeError("base injoignable")
             reponse = await client.get("/health/ready")
 
@@ -156,9 +156,9 @@ class TestVersionDeSchema:
         assert corps["schema_attendu"], "l'information la plus utile disparaissait au pire moment"
 
     async def test_un_schema_lisible_et_concordant_rend_le_service_pret(self, client, monkeypatch):
-        from app import main
+        from app.core import health
 
-        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "abc123")
+        monkeypatch.setattr(health, "EXPECTED_REVISION", "abc123")
 
         with self._base_qui_annonce("abc123"):
             reponse = await client.get("/health/ready")
@@ -176,9 +176,9 @@ class TestVersionDeSchema:
         faire répondre **503**, pour qu'un déploiement dont la migration a
         échoué se voie de l'extérieur.
         """
-        from app import main
+        from app.core import health
 
-        monkeypatch.setattr(main, "_REVISION_ATTENDUE", "revision_attendue")
+        monkeypatch.setattr(health, "EXPECTED_REVISION", "revision_attendue")
 
         with self._base_qui_annonce("revision_plus_ancienne"):
             reponse = await client.get("/health/ready")
@@ -218,10 +218,12 @@ class TestRedisEnEchecDansLaSonde:
         assert "upstash" not in reponse.text
 
     async def test_le_detail_va_au_journal(self, client, caplog):
-        caplog.set_level(logging.DEBUG, logger="app.main")
+        caplog.set_level(logging.DEBUG, logger="app.core.health")
 
         with TestVersionDeSchema._base_qui_annonce("x"), self._redis_qui_refuse("max clients reached"):
             await client.get("/health/ready")
 
-        messages = [r.getMessage() for r in caplog.records if r.name == "app.main" and r.levelno >= logging.WARNING]
+        messages = [
+            r.getMessage() for r in caplog.records if r.name == "app.core.health" and r.levelno >= logging.WARNING
+        ]
         assert any("max clients reached" in m for m in messages), messages

@@ -19,9 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from app.main import INTERNAL_ADJUSTMENT_NOTE_PREFIXES, INTERNAL_NOTE_PATTERNS
+from app.core.startup.transfer_mirrors import INTERNAL_ADJUSTMENT_NOTE_PREFIXES, INTERNAL_NOTE_PATTERNS
 
-_MAIN_SRC = (Path(__file__).resolve().parents[2] / "app" / "main.py").read_text(encoding="utf-8")
+_MAIN_SRC = (Path(__file__).resolve().parents[2] / "app" / "core" / "startup" / "transfer_mirrors.py").read_text(
+    encoding="utf-8"
+)
 
 
 class TestLibellesCouverts:

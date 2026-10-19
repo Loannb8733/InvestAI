@@ -244,7 +244,7 @@ async def _dernier_jour_en_base() -> dict[str, date]:
         return {row[0].upper(): row[1] for row in result.all()}
 
 
-async def _fetch_and_cache_all():
+async def _fetch_and_cache_all() -> int:
     """Fetch history for all assets and store in Redis + PostgreSQL."""
     redis = _get_redis()
     assets = await _get_all_crypto_symbols()
