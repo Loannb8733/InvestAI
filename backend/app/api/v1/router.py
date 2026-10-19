@@ -15,7 +15,6 @@ from app.api.v1.endpoints import (
     dashboard,
     goals,
     insights,
-    notes,
     notifications,
     portfolios,
     predictions,
@@ -29,6 +28,7 @@ from app.api.v1.endpoints import (
     users,
     websocket,
 )
+from app.domains.journal.router import router as journal_router
 
 api_router = APIRouter()
 
@@ -46,7 +46,7 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytic
 api_router.include_router(predictions.router, prefix="/predictions", tags=["Predictions"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
-api_router.include_router(notes.router, prefix="/notes", tags=["Notes"])
+api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
 api_router.include_router(simulations.router, prefix="/simulations", tags=["Simulations"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])

@@ -27,23 +27,24 @@ check_untyped_defs = true
 exclude = ["backend/alembic/", "backend/tests/"]
 
 [[tool.mypy.overrides]]
-module = [
-    "celery.*",
-    "prophet.*",
-    "xgboost.*",
-    "pmdarima.*",
-    "statsmodels.*",
-    "optuna.*",
-    "shap.*",
-    "reportlab.*",
-    "openpyxl.*",
-    "aiohttp.*",
-    "slowapi.*",
-    "pyotp.*",
-    "qrcode.*",
-    "sentry_sdk.*",
-]
-ignore_missing_imports = true
+module = ["app.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["app.domains.*", "app.core.db.*", "app.core.errors", "app.core.error_handlers"]
+ignore_errors = false
+strict_optional = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
 
 [tool.bandit]
 exclude_dirs = ["backend/tests", "backend/alembic"]

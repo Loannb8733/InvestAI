@@ -45,7 +45,6 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy backend/app
-        continue-on-error: true
 
   # ──────────────────────────────────────────
   # Code rules: 300 lignes max, aucun commentaire
