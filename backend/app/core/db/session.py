@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
+from app.core.errors import DomainError
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         try:
             yield session
             await session.commit()
-        except HTTPException:
+        except (HTTPException, DomainError):
             await session.rollback()
             raise
         except Exception as exc:

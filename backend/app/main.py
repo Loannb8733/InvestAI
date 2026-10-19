@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.core.contexte_execution import sert_une_requete_http
 from app.core.db.metadata import metadata
 from app.core.db.session import engine
+from app.core.error_handlers import register_error_handlers
 from app.core.logging import get_logger, setup_logging
 from app.core.rate_limit import limiter
 
@@ -890,6 +891,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+register_error_handlers(app)
 
 # CORS middleware with restricted methods and headers
 # Production frontend origin (always allowed even if CORS_ORIGINS env is unset).
