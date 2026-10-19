@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.finance_constants import RISK_FREE_RATE
 from app.core.finance_constants import annualization_days as _trading_days
 from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
@@ -57,7 +58,7 @@ from app.services.analytics_types import (  # noqa: F401  (ré-export pour les a
     PortfolioAnalytics,
     RebalanceOrder,
 )
-from app.services.price_service import PriceService
+from app.services.asset_classification import is_stablecoin
 from app.tasks.history_cache import get_cached_history
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,6 @@ class AnalyticsService:
     _MAX_CACHE_ENTRIES = 200
 
     def __init__(self):
-        self.price_service = PriceService()
         # In-memory cache: key -> (timestamp, dates, prices) — bounded with LRU eviction
         self._history_cache: dict[str, tuple[float, list[datetime], list[float]]] = {}
         self._fetch_locks: dict[str, asyncio.Lock] = {}  # Per-symbol locks
@@ -203,18 +203,8 @@ class AnalyticsService:
 
     async def _get_asset_price(self, asset: Asset) -> float:
         """Get current price for an asset."""
-        try:
-            price_data = None
-            if asset.asset_type == AssetType.CRYPTO:
-                price_data = await self.price_service.get_crypto_price(asset.symbol)
-            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
-                price_data = await self.price_service.get_stock_price(asset.symbol)
-            if price_data and "price" in price_data:
-                return float(price_data["price"])
-            return float(asset.avg_buy_price)
-        except Exception as e:
-            logger.warning("Price fetch failed for %s: %s", asset.symbol, e)
-            return float(asset.avg_buy_price)
+        quote = await price_feed.quote(asset.symbol, asset.asset_type)
+        return float(quote.price) if quote is not None else float(asset.avg_buy_price)
 
     # ------------------------------------------------------------------
     # Shared: fetch user assets (filtered, deduplicated)
@@ -254,7 +244,7 @@ class AnalyticsService:
         filtered = []
         for a in assets:
             # Filter stablecoins
-            if exclude_stablecoins and PriceService.is_stablecoin(a.symbol):
+            if exclude_stablecoins and is_stablecoin(a.symbol):
                 continue
             # Filter dust by estimated value
             est_value = float(a.quantity) * float(a.avg_buy_price) if a.avg_buy_price else 0
@@ -296,7 +286,7 @@ class AnalyticsService:
             dd = _max_drawdown(hist_prices)
             dr = _daily_return_pct(hist_prices)
 
-            is_stable = PriceService.is_stablecoin(asset.symbol)
+            is_stable = is_stablecoin(asset.symbol)
 
             # Skip dust positions (value < $0.10)
             if current_value < 0.10:

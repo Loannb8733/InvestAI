@@ -275,15 +275,14 @@ async def create_goal(
 
     # Initial sync: set current_amount from actual portfolio value
     try:
+        from app.domains.market_data.prices.service import price_feed
         from app.models.asset import Asset
         from app.models.portfolio import Portfolio
-        from app.services.price_service import PriceService
 
         portfolios_result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
         portfolios = portfolios_result.scalars().all()
 
         total_value = Decimal("0")
-        price_service = PriceService()
         is_savings = goal.goal_type == GoalType.SAVINGS
         # Batch: one asset query for all portfolios (was one per portfolio), and
         # dedupe price lookups per symbol (same get_price → identical values).
@@ -297,10 +296,8 @@ async def create_goal(
                     continue
                 pkey = (asset.symbol, asset.asset_type.value)
                 if pkey not in price_cache:
-                    try:
-                        price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
-                    except Exception:
-                        price_cache[pkey] = 0
+                    quote = await price_feed.quote(asset.symbol, asset.asset_type)
+                    price_cache[pkey] = quote.price if quote is not None else Decimal(str(asset.avg_buy_price or 0))
                 total_value += asset.quantity * Decimal(str(price_cache[pkey]))
         if is_savings:
             for portfolio in portfolios:

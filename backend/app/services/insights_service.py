@@ -7,10 +7,10 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.fx.spot import FIAT_CURRENCIES
+from app.domains.market_data.prices.service import price_feed
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
 
@@ -141,12 +141,11 @@ class InsightsService:
         for jeton in jetons_a_coter:
             if not jeton:
                 continue
-            try:
-                donnees = await price_service.get_price(jeton, "crypto")
-                if donnees and donnees.get("price"):
-                    cours_par_jeton[jeton] = float(donnees["price"])
-            except Exception:
+            cours = await price_feed.quote(jeton, "crypto")
+            if cours is None:
                 logger.warning("Cours indisponible pour %s — frais laissés dans leur devise", jeton)
+            else:
+                cours_par_jeton[jeton] = float(cours.price)
 
         frais_non_convertis = 0
 
@@ -244,8 +243,8 @@ class InsightsService:
 
             # Get current price
             at = asset.asset_type.value if isinstance(asset.asset_type, AssetType) else str(asset.asset_type)
-            price_data = await price_service.get_price(asset.symbol, at)
-            current_price = float(price_data["price"]) if price_data and price_data.get("price") else avg_price
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            current_price = float(quote.price) if quote is not None else avg_price
 
             cost_basis = qty * avg_price
             current_value = qty * current_price

@@ -13,7 +13,6 @@ from app.services.exchange_import_valuation import (
     convertir_frais_en_eur,
     est_cote_en_usd,
     frais_a_convertir,
-    lire_prix_jeton,
 )
 
 
@@ -81,28 +80,6 @@ class TestConversionDesFrais:
 
     def test_montant_nul(self):
         assert convertir_frais_en_eur(0.0, "BNB", "PEPE", prix_actif_eur=1.0, prix_jeton_eur=1.0) == 0.0
-
-
-class TestLectureDuCoursDuJeton:
-    def test_cle_en_minuscules(self):
-        assert lire_prix_jeton({"bnb": {"price": 500.0}}, "BNB") == 500.0
-
-    def test_cle_en_majuscules(self):
-        assert lire_prix_jeton({"BNB": {"price": 500.0}}, "bnb") == 500.0
-
-    def test_jeton_absent(self):
-        assert lire_prix_jeton({"eth": {"price": 2000.0}}, "BNB") == 0.0
-
-    def test_reponse_vide(self):
-        assert lire_prix_jeton({}, "BNB") == 0.0
-
-    def test_reponse_sans_prix(self):
-        assert lire_prix_jeton({"bnb": {}}, "BNB") == 0.0
-
-    def test_reponse_malformee_ne_leve_pas(self):
-        """Une source qui rend autre chose qu'un dictionnaire ne doit pas faire
-        échouer tout l'import."""
-        assert lire_prix_jeton({"bnb": "500"}, "BNB") == 0.0
 
 
 class TestFraisApproximatifsVisibles:

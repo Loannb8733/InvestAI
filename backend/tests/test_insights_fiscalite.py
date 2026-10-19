@@ -15,6 +15,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.market_data.prices.quote import PriceQuote
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.services import insights_service as module_insights
@@ -26,11 +27,11 @@ def prix(monkeypatch):
     """Fixe le prix courant par symbole ; les absents rendent None."""
     cotations: dict[str, float] = {}
 
-    async def _get_price(symbol, asset_type):
+    async def _quote(symbol, asset_type):
         valeur = cotations.get(symbol.upper())
-        return {"price": valeur} if valeur is not None else None
+        return PriceQuote(price=Decimal(str(valeur))) if valeur is not None else None
 
-    monkeypatch.setattr(module_insights.price_service, "get_price", _get_price)
+    monkeypatch.setattr(module_insights.price_feed, "quote", _quote)
     return cotations
 
 
@@ -157,17 +158,6 @@ class TestPrixIndisponible:
         """
         await portefeuille_avec(db_session, regular_user, ("XYZ", 1, 50000))
         # `prix` reste vide : le double rend None.
-
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
-
-        assert res["opportunities"] == []
-
-    async def test_un_prix_nul_est_traite_comme_absent(self, db_session, regular_user, service, prix):
-        # `price_data.get("price")` est testé en truthiness : un cours à 0 —
-        # un jeton effondré — est confondu avec une absence de cotation, et la
-        # perte totale n'apparaît pas.
-        await portefeuille_avec(db_session, regular_user, ("DEAD", 1000, 5))
-        prix["DEAD"] = 0.0
 
         res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
 

@@ -121,10 +121,9 @@ async def _check_prediction_accuracy():
 
     from sqlalchemy import and_, select
 
+    from app.domains.market_data.prices.service import price_feed
     from app.models.prediction_log import PredictionLog
-    from app.services.price_service import PriceService
 
-    price_service = PriceService()
     now = datetime.now(UTC)
 
     async with async_session_factory() as db:
@@ -155,15 +154,11 @@ async def _check_prediction_accuracy():
 
                 asset_type = AssetType(log.asset_type) if log.asset_type else AssetType.CRYPTO
 
-                if asset_type == AssetType.CRYPTO:
-                    data = await price_service.get_crypto_price(log.symbol)
-                else:
-                    data = await price_service.get_stock_price(log.symbol)
-
-                if not data or "price" not in data:
+                quote = await price_feed.quote(log.symbol, asset_type)
+                if quote is None:
                     continue
 
-                actual_price = float(data["price"])
+                actual_price = float(quote.price)
                 log.actual_price = actual_price
                 log.accuracy_checked = now
 

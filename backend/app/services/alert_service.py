@@ -11,13 +11,13 @@ import redis.asyncio as aioredis
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.prices.service import price_feed
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset, AssetType
 from app.models.notification import NotificationPriority
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.notification_service import notification_service
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,6 @@ class AlertService:
     """Service for managing and checking alerts."""
 
     def __init__(self):
-        self.price_service = PriceService()
         self._redis: aioredis.Redis | None = None
 
     async def _get_redis(self) -> aioredis.Redis:
@@ -533,15 +532,9 @@ class AlertService:
     async def _get_daily_change(self, asset: Asset) -> float | None:
         """Get 24h price change percentage for an asset."""
         try:
-            if asset.asset_type == AssetType.CRYPTO:
-                prices = await self.price_service.get_multiple_crypto_prices([asset.symbol], "eur")
-                data = prices.get(asset.symbol.upper())
-                if data:
-                    return float(data.get("change_percent_24h", 0) or 0)
-            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
-                data = await self.price_service.get_stock_price(asset.symbol)
-                if data:
-                    return float(data.get("change_percent_24h", 0) or 0)
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            if quote is not None:
+                return quote.change_percent_24h
         except Exception as exc:
             logger.debug("24h change fetch failed for %s: %s", asset.symbol, exc)
         return None
@@ -565,18 +558,10 @@ class AlertService:
         """
         cote = asset.asset_type in self._TYPES_COTES
         try:
-            if asset.asset_type == AssetType.CRYPTO:
-                price = await self.price_service.get_crypto_price(asset.symbol)
-                if isinstance(price, dict):
-                    return float(price.get("price", 0) or price.get("eur", 0))
-                return float(price) if price else 0.0
-            elif asset.asset_type in (AssetType.STOCK, AssetType.ETF):
-                data = await self.price_service.get_stock_price(asset.symbol)
-                if isinstance(data, dict):
-                    return float(data.get("price", 0))
-                return float(data) if data else 0.0
-            else:
-                return float(asset.avg_buy_price)
+            if cote:
+                quote = await price_feed.quote(asset.symbol, asset.asset_type)
+                return float(quote.price) if quote is not None else 0.0
+            return float(asset.avg_buy_price)
         except Exception as exc:
             logger.warning(
                 "Cours indisponible pour %s (%s) : %s — alerte non évaluée",

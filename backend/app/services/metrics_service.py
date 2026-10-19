@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.finance_constants import TRADING_DAYS_PER_YEAR, annualized_return_pct
 from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.service import price_feed
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -35,7 +36,6 @@ from app.services.metrics_cost_basis import (  # noqa: F401 — compute_cump_pru
     _conversion_dest_unit_cost,
     compute_cump_pru,
 )
-from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
 
@@ -305,13 +305,8 @@ class MetricsService:
         fx_service = FxService(FxRateRepository(db))
 
         async def _crypto_unit_price(symbol: str, to_ccy: str) -> float | None:
-            try:
-                data = await price_service.get_price(symbol, "crypto", to_ccy.lower())
-                if data and data.get("price"):
-                    return float(data["price"])
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("Prix crypto indisponible pour %s->%s: %s", symbol, to_ccy, exc)
-            return None
+            quote = await price_feed.quote(symbol, "crypto", to_ccy)
+            return float(quote.price) if quote is not None else None
 
         async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> tuple[float, bool]:
             quote = await fx_service.latest(from_ccy, to_ccy)
@@ -596,47 +591,21 @@ class MetricsService:
 
         if crypto_symbols:
             try:
-                crypto_prices = await asyncio.wait_for(
-                    price_service.get_multiple_crypto_prices(crypto_symbols, currency.lower()),
-                    timeout=5.0,
-                )
-                for symbol, data in crypto_prices.items():
-                    prices[symbol.upper()] = data["price"]
-                    price_changes[symbol.upper()] = float(data.get("change_percent_24h", 0) or 0)
-            except (TimeoutError, Exception) as e:
-                logger.warning(
-                    "Crypto price fetch failed (%s), using DB fallback",
-                    type(e).__name__,
-                )
+                crypto_quotes = await asyncio.wait_for(price_feed.crypto(crypto_symbols, currency), timeout=5.0)
+                for symbol, quote in crypto_quotes.items():
+                    prices[symbol] = quote.price
+                    price_changes[symbol] = quote.change_percent_24h
+            except TimeoutError:
+                logger.warning("Crypto price fetch timed out, using DB fallback")
 
         if stock_symbols:
-            from app.services.market_data_service import market_data_service
-
             try:
-                stock_results = await asyncio.wait_for(
-                    market_data_service.get_multiple_stock_prices(stock_symbols),
-                    timeout=8.0,
-                )
-                for symbol, stock_data in stock_results.items():
-                    stock_price = stock_data["price"]
-                    quote_ccy = stock_data.get("quote_currency", "USD")
-                    target = currency.upper()
-                    if quote_ccy != target:
-                        try:
-                            rate = await spot_rates.get(quote_ccy, target)
-                            if rate:
-                                stock_price = stock_price * rate
-                        except Exception:
-                            logger.warning(
-                                "Forex %s→%s unavailable for stock %s",
-                                quote_ccy,
-                                target,
-                                symbol,
-                            )
-                    prices[symbol.upper()] = stock_price
-                    price_changes[symbol.upper()] = float(stock_data.get("change_percent_24h", 0) or 0)
-            except (TimeoutError, Exception) as e:
-                logger.warning("Stock price fetch failed (%s), using DB fallback", type(e).__name__)
+                stock_quotes = await asyncio.wait_for(price_feed.stocks(stock_symbols, currency), timeout=8.0)
+                for symbol, quote in stock_quotes.items():
+                    prices[symbol] = quote.price
+                    price_changes[symbol] = quote.change_percent_24h
+            except TimeoutError:
+                logger.warning("Stock price fetch timed out, using DB fallback")
 
         # Fill missing prices from DB fallback
         for sym, fallback_price in db_fallback_prices.items():
@@ -870,13 +839,10 @@ class MetricsService:
         stablecoin_live_prices: dict[str, float] = {}
         if stablecoin_symbols:
             try:
-                sc_prices = await asyncio.wait_for(
-                    price_service.get_multiple_crypto_prices(stablecoin_symbols, currency.lower()),
-                    timeout=5.0,
-                )
-                for sym, data in sc_prices.items():
-                    stablecoin_live_prices[sym.upper()] = float(data["price"])
-            except Exception as exc:
+                sc_quotes = await asyncio.wait_for(price_feed.crypto(stablecoin_symbols, currency), timeout=5.0)
+                for sym, quote in sc_quotes.items():
+                    stablecoin_live_prices[sym] = float(quote.price)
+            except TimeoutError as exc:
                 logger.debug("Live stablecoin price fetch failed, falling back to peg: %s", exc)
 
         for asset in stablecoin_assets:
@@ -1071,9 +1037,6 @@ class MetricsService:
                         "User-Agent": "Mozilla/5.0",
                         "Accept": "application/json",
                     }
-                    coingecko_key = getattr(price_service, "coingecko_api_key", None)
-                    if coingecko_key:
-                        headers["x-cg-demo-api-key"] = coingecko_key
 
                     async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
                         response = await client.get(

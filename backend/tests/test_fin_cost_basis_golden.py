@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.quote import PriceQuote
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -29,17 +30,22 @@ def _fake_price_service(crypto_prices: dict[str, float], forex: dict[tuple[str, 
     """Build an AsyncMock price service returning fixed current prices + forex rates."""
     ps = AsyncMock()
 
-    async def _get_multiple_crypto_prices(symbols, ccy):
+    async def _crypto(symbols, ccy="EUR"):
         return {
-            s.upper(): {"price": crypto_prices[s.upper()], "change_percent_24h": 0}
+            s.upper(): PriceQuote(price=Decimal(str(crypto_prices[s.upper()])))
             for s in symbols
             if s.upper() in crypto_prices
         }
 
+    async def _quote(symbol, asset_type, ccy="EUR"):
+        return (await _crypto([symbol], ccy)).get(symbol.upper()) if asset_type == "crypto" else None
+
     async def _get_forex_rate(from_ccy, to_ccy):
         return forex.get((from_ccy.upper(), to_ccy.upper()), 1.0)
 
-    ps.get_multiple_crypto_prices = AsyncMock(side_effect=_get_multiple_crypto_prices)
+    ps.crypto = AsyncMock(side_effect=_crypto)
+    ps.quote = AsyncMock(side_effect=_quote)
+    ps.stocks = AsyncMock(return_value={})
     ps.get_forex_rate = AsyncMock(side_effect=_get_forex_rate)
     return ps
 
@@ -122,7 +128,7 @@ async def test_usd_buy_cost_basis_converted_to_eur(db_session, regular_user):
     await db_session.commit()
 
     ps = _fake_price_service({"BTC": 100.0}, {("USD", "EUR"): 0.92})
-    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         result = await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR")
 
     assert result["total_invested"] == pytest.approx(92.0, abs=0.01)
@@ -142,7 +148,7 @@ async def test_eur_buy_no_conversion_is_unchanged(db_session, regular_user):
     await db_session.commit()
 
     ps = _fake_price_service({"BTC": 120.0}, {})
-    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         result = await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR")
 
     assert result["total_invested"] == pytest.approx(100.0, abs=0.01)
@@ -161,7 +167,7 @@ async def test_mixed_currency_portfolio_aggregates_in_eur(db_session, regular_us
     await db_session.commit()
 
     ps = _fake_price_service({"BTC": 100.0, "ETH": 50.0}, {("USD", "EUR"): 0.92})
-    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         result = await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR")
 
     # BTC invested 92 EUR + ETH invested 80 EUR = 172 ; value 100 + 100 = 200.
@@ -226,7 +232,7 @@ async def test_unmatched_transfer_in_uses_avg_buy_price_not_zero(db_session, reg
     await db_session.commit()
 
     ps = _fake_price_service({"BTC": 100.0}, {})
-    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         result = await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR")
 
     assert result["total_invested"] == pytest.approx(80.0, abs=0.01)

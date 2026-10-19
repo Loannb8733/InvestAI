@@ -16,6 +16,9 @@ from app.core.db.session import get_session
 from app.core.finance_constants import annualized_return_pct
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
+from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
+from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.service import price_feed
 from app.models.alert import Alert
 from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
@@ -24,7 +27,6 @@ from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.metrics_service import metrics_service
-from app.services.price_service import price_service
 from app.services.snapshot_service import snapshot_service
 
 router = APIRouter()
@@ -517,13 +519,7 @@ async def _get_dashboard_impl(
             asset_price_map[a["symbol"].upper()] = float(a["current_value"]) / float(qty)
 
     # Get real USD→EUR rate for stablecoin pricing
-    from app.services.price_service import PriceService
-
-    _price_svc = PriceService()
-    try:
-        usd_eur_rate = float(await _price_svc._get_eur_usd_rate())
-    except Exception:
-        usd_eur_rate = 0.92  # fallback
+    usd_eur_rate = float(await spot_rates.get("USD", "EUR") or COLD_START_USD_EUR)
 
     earn_assets: list[EarnAsset] = []
     total_staked_value = 0.0
@@ -1060,10 +1056,10 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> li
     if all_symbols:
         try:
             price_data = await asyncio.wait_for(
-                price_service.get_multiple_crypto_prices(all_symbols),
+                price_feed.crypto(all_symbols),
                 timeout=5.0,
             )
-            price_map = {sym.upper(): d["price"] for sym, d in price_data.items()}
+            price_map = {sym: quote.price for sym, quote in price_data.items()}
         except Exception as exc:
             logger.debug("Alert price batch fetch failed: %s", exc)
 
@@ -1133,7 +1129,7 @@ async def get_index_comparison(days: int = 30) -> list[IndexComparison]:
     try:
         # Fetch current prices with a tight timeout to avoid blocking dashboard
         all_data = await asyncio.wait_for(
-            price_service.get_multiple_crypto_prices([s for s, _ in index_symbols]),
+            price_feed.crypto([s for s, _ in index_symbols]),
             timeout=5.0,
         )
 
@@ -1145,13 +1141,13 @@ async def get_index_comparison(days: int = 30) -> list[IndexComparison]:
 
         for symbol, name in index_symbols:
             if symbol in all_data:
-                change = period_changes.get(symbol, all_data[symbol].get("change_percent_24h", 0))
+                change = period_changes.get(symbol, all_data[symbol].change_percent_24h)
                 indices.append(
                     IndexComparison(
                         name=name,
                         symbol=symbol,
                         change_percent=change,
-                        price=all_data[symbol]["price"],
+                        price=all_data[symbol].price,
                     )
                 )
     except Exception as exc:

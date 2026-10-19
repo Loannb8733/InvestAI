@@ -32,7 +32,7 @@ from app.services.price_history_store import prix_locaux
 # (12 s pour BTC, puis 12 s pour les autres actifs, et ainsi de suite), ce qui
 # ne bornait rien. Un unique compte à rebours partagé tient la promesse.
 _BUDGET_APPELS_EXTERNES = 12.0
-from app.services.price_service import PriceService
+from app.domains.market_data.prices.stablecoins import peg_quote
 
 logger = logging.getLogger(__name__)
 
@@ -156,15 +156,8 @@ class PredictionCyclesMixin:
             # Include cash-like value in total for accurate weight calculation
             for sym, qty in cash_like_qty.items():
                 try:
-                    if PriceService.is_stablecoin(sym):
-                        # Un stablecoin vaut ~1 € : si le cours tarde, l'approximation
-                        # coûte moins cher que l'attente (le repli ci-dessous).
-                        p = await asyncio.wait_for(
-                            self.price_service._stablecoin_price_eur(sym),
-                            timeout=min(3.0, budget_restant()),
-                        )
-                    else:
-                        p = Decimal("1")
+                    pegged = await asyncio.wait_for(peg_quote(sym.upper(), "EUR"), timeout=min(3.0, budget_restant()))
+                    p = pegged.price if pegged is not None else Decimal("1")
                     total_value += qty * p
                 except Exception:
                     total_value += qty
@@ -224,12 +217,12 @@ class PredictionCyclesMixin:
             )
 
             _hist_map: dict[str, list] = {sym: prices for sym, prices in _hist_results}
-            _price_map: dict[str, float] = {sym: price for sym, price in _price_results}
+            _price_map: dict[str, float | None] = {sym: price for sym, price in _price_results}
 
             for asset in _top_assets:
                 try:
-                    price = _price_map.get(asset.symbol, 0)
-                    if price == 0:
+                    price = _price_map.get(asset.symbol)
+                    if not price:
                         continue
                     price_dec = Decimal(str(price))
                     qty_dec = qty_map[asset.symbol]

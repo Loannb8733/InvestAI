@@ -27,7 +27,7 @@ from pathlib import Path
 import pytest
 
 from app.domains.market_data.fx.spot import FIAT_CURRENCIES, spot_rates
-from app.services.price_service import PriceService
+from app.domains.market_data.prices.cryptocompare import cryptocompare_quotes
 from app.tasks import history_cache
 
 
@@ -97,26 +97,21 @@ class TestRepliCryptoCompare:
     tout va mal — ajoutait une latence pour un échec certain.
     """
 
-    @pytest.mark.asyncio
-    async def test_aucun_appel_sans_cle(self, monkeypatch):
+    async def test_aucun_appel_sans_cle(self, monkeypatch, http_stub):
         from app.core.config import settings
 
         monkeypatch.setattr(settings, "CRYPTOCOMPARE_API_KEY", "", raising=False)
-        service = PriceService()
+        assert await cryptocompare_quotes(["BTC"], "EUR") == {}
+        assert not http_stub.requests
 
-        async def refuser(*a, **k):
-            pytest.fail("appel réseau tenté alors qu'aucune clé n'est configurée")
-
-        monkeypatch.setattr(service.http_client, "get", refuser)
-        assert await service._fetch_from_cryptocompare(["BTC"], "EUR") == {}
-
-    def test_la_cle_est_transmise_quand_elle_existe(self, monkeypatch):
+    async def test_la_cle_est_transmise_quand_elle_existe(self, monkeypatch, http_stub):
         """Sinon le réglage serait décoratif : l'API attend un en-tête précis."""
         from app.core.config import settings
 
         monkeypatch.setattr(settings, "CRYPTOCOMPARE_API_KEY", "abc123", raising=False)
-        entetes = PriceService._entetes_cryptocompare()
-        assert entetes["authorization"] == "Apikey abc123"
+        http_stub.json("min-api.cryptocompare.com", {"RAW": {"BTC": {"EUR": {"PRICE": 50000}}}})
+        assert (await cryptocompare_quotes(["BTC"], "EUR"))["BTC"].price == 50000
+        assert http_stub.requests[0].headers["authorization"] == "Apikey abc123"
 
     def test_le_reglage_existe_et_est_vide_par_defaut(self):
         from app.core.config import Settings

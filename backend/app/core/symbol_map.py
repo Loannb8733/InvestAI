@@ -1,6 +1,6 @@
 """Unified symbol-to-CoinGecko-ID mapping.
 
-Single source of truth used by PriceService and HistoricalDataFetcher.
+Single source of truth used by the price feed and HistoricalDataFetcher.
 """
 
 # Overrides for Yahoo Finance crypto tickers that don't follow the {SYMBOL}-EUR pattern.

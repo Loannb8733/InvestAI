@@ -104,20 +104,3 @@ def convertir_frais_en_eur(
         symbole_actif,
     )
     return 0.0
-
-
-def lire_prix_jeton(reponse_prix: dict, devise: str) -> float:
-    """Extrait le cours d'un jeton d'une réponse de `get_multiple_crypto_prices`.
-
-    La clé peut arriver en minuscules ou en majuscules selon la source ; les
-    deux sont essayées avant d'abandonner.
-    """
-    if not reponse_prix:
-        return 0.0
-    for cle in (devise.lower(), devise.upper()):
-        if cle in reponse_prix:
-            try:
-                return float(reponse_prix[cle].get("price", 0))
-            except (AttributeError, TypeError, ValueError):
-                return 0.0
-    return 0.0

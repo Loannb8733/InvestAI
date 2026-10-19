@@ -19,6 +19,7 @@ from app.core.redis_client import (
     get_cached_history,
     get_cached_prediction,
 )
+from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as at
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
@@ -27,6 +28,7 @@ from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
+from app.services.asset_classification import is_stablecoin
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_alpha import PredictionAlphaMixin
 from app.services.prediction_cycles import PredictionCyclesMixin
@@ -37,7 +39,6 @@ from app.services.prediction_types import (  # noqa: F401 — re-exported for co
     MarketSentiment,
     PricePrediction,
 )
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,10 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
     """Service for ML-based predictions and analysis."""
 
     def __init__(self):
-        self.price_service = PriceService()
         self.forecaster = PriceForecaster()
         self.anomaly_detector = AnomalyDetector()
         self.regime_detector = MarketRegimeDetector()
-        self.data_fetcher = HistoricalDataFetcher(
-            coingecko_api_key=getattr(self.price_service, "coingecko_api_key", None)
-        )
+        self.data_fetcher = HistoricalDataFetcher()
 
     async def get_price_prediction(
         self,
@@ -87,7 +85,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         current_price = await self._get_current_price(symbol, asset_type)
 
-        if current_price == 0:
+        if current_price is None:
             return self._empty_prediction(symbol)
 
         # Fetch historical data (365 days for better ML training)
@@ -581,7 +579,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         for asset in assets:
             try:
                 current_price = await self._get_current_price(asset.symbol, asset.asset_type)
-                if current_price == 0:
+                if current_price is None:
                     continue
 
                 # Fetch historical prices for ML-based detection (with cache)
@@ -676,9 +674,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
             if crypto_symbols:
                 try:
-                    crypto_prices = await self.price_service.get_multiple_crypto_prices(crypto_symbols)
-                    for sym, price_data in crypto_prices.items():
-                        change_pct = float(price_data.get("change_percent_24h", 0))
+                    crypto_quotes = await price_feed.crypto(crypto_symbols)
+                    for quote in crypto_quotes.values():
+                        change_pct = quote.change_percent_24h
                         total_change += change_pct
                         asset_count += 1
                         if change_pct > sig_threshold:
@@ -691,9 +689,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             # Fetch stock/ETF prices individually (usually fewer)
             for sym, atype in stock_symbols:
                 try:
-                    price_data = await self.price_service.get_price(sym, atype)
-                    if price_data:
-                        change_pct = float(price_data.get("change_percent_24h", 0))
+                    stock_quote = await price_feed.quote(sym, atype)
+                    if stock_quote is not None:
+                        change_pct = stock_quote.change_percent_24h
                         total_change += change_pct
                         asset_count += 1
                         if change_pct > sig_threshold:
@@ -854,7 +852,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         for asset in assets[:10]:
             # Skip stablecoins — their price is pegged, prediction is meaningless
-            if PriceService.is_stablecoin(asset.symbol):
+            if is_stablecoin(asset.symbol):
                 continue
 
             prediction = await self.get_price_prediction(asset.symbol, asset.asset_type, days_ahead)
@@ -1394,21 +1392,10 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
     # -- Private helpers --
 
-    async def _get_current_price(self, symbol: str, asset_type: AssetType) -> float:
-        """Get current price for an asset."""
-        try:
-            if asset_type == AssetType.CRYPTO:
-                data = await self.price_service.get_crypto_price(symbol)
-            elif asset_type in [AssetType.STOCK, AssetType.ETF]:
-                data = await self.price_service.get_stock_price(symbol)
-            else:
-                return 0.0
-
-            if data and "price" in data:
-                return float(data["price"])
-            return 0.0
-        except Exception:
-            return 0.0
+    async def _get_current_price(self, symbol: str, asset_type: AssetType) -> float | None:
+        """Cours courant en EUR, None s'il est inconnu."""
+        quote = await price_feed.quote(symbol, asset_type)
+        return float(quote.price) if quote is not None else None
 
     async def _get_daily_volatility(self, symbol: str, asset_type: AssetType) -> float:
         """Compute daily volatility from actual historical data."""

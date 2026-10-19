@@ -45,6 +45,7 @@ from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.core.security import encrypt_api_key
+from app.domains.market_data.prices.service import price_feed
 from app.models.api_key import APIKey
 from app.models.user import User
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse, APIKeyTestResult, APIKeyUpdate, ExchangeInfo
@@ -60,7 +61,6 @@ from app.services.exchange_import_valuation import (
     convertir_frais_en_eur,
     est_cote_en_usd,
     frais_a_convertir,
-    lire_prix_jeton,
 )
 from app.services.exchanges import SUPPORTED_EXCHANGES
 from app.services.metrics_service import invalidate_dashboard_cache
@@ -425,8 +425,6 @@ async def import_trade_history(
                 if rewards:
                     import asyncio
 
-                    from app.services.price_service import price_service
-
                     logger.info("Fetching historical prices for rewards (this may take a moment)...")
 
                     # Group rewards by symbol and date to minimize API calls
@@ -438,7 +436,7 @@ async def import_trade_history(
 
                         if date_key not in price_cache:
                             try:
-                                price = await price_service.get_historical_crypto_price(symbol, reward.timestamp, "eur")
+                                price = await price_feed.crypto_on(symbol, reward.timestamp.date())
                                 price_cache[date_key] = price
                                 if price:
                                     logger.debug(f"{symbol} @ {reward.timestamp.date()}: {float(price):.2f} EUR")
@@ -479,8 +477,6 @@ async def import_trade_history(
             if conversions:
                 import asyncio
 
-                from app.services.price_service import price_service
-
                 logger.info("Fetching historical EUR prices for conversions...")
 
                 price_cache = {}
@@ -496,7 +492,7 @@ async def import_trade_history(
 
                     if date_key not in price_cache:
                         try:
-                            price = await price_service.get_historical_crypto_price(symbol, conversion.timestamp, "eur")
+                            price = await price_feed.crypto_on(symbol, conversion.timestamp.date())
                             price_cache[date_key] = price
                             if price:
                                 logger.debug(f"{symbol} @ {conversion.timestamp.date()}: {float(price):.2f} EUR")
@@ -912,11 +908,9 @@ async def import_trade_history(
                 if frais_a_convertir(fee_currency, fee_amount):
                     prix_jeton_eur = 0.0
                     if fee_currency != symbol:
-                        try:
-                            reponse = await price_service.get_multiple_crypto_prices([fee_currency], "eur")
-                            prix_jeton_eur = lire_prix_jeton(reponse, fee_currency)
-                        except Exception as exc:  # noqa: BLE001
-                            logger.debug("Cours introuvable pour les frais en %s : %s", fee_currency, exc)
+                        cours_frais = await price_feed.quote(fee_currency, "crypto")
+                        if cours_frais is not None:
+                            prix_jeton_eur = float(cours_frais.price)
                     fee_amount = convertir_frais_en_eur(fee_amount, fee_currency, symbol, price_eur, prix_jeton_eur)
                     fee_currency = "EUR"
 

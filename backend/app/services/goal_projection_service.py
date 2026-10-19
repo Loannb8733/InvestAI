@@ -443,11 +443,11 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
 
     from sqlalchemy import select
 
+    from app.domains.market_data.prices.service import price_feed
     from app.models.asset import Asset
     from app.models.goal import Goal, GoalStatus, GoalType
     from app.models.portfolio import Portfolio
     from app.services.asset_classification import is_liquidity
-    from app.services.price_service import price_service
 
     conditions = [Goal.user_id == user_id, Goal.status == GoalStatus.ACTIVE]
     if only_goal_id is not None:
@@ -474,7 +474,8 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
             continue
         pkey = (asset.symbol, asset.asset_type.value)
         if pkey not in price_cache:
-            price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            price_cache[pkey] = quote.price if quote is not None else Decimal(str(asset.avg_buy_price or 0))
         value = asset.quantity * Decimal(str(price_cache[pkey]))
         total_value += value
         if is_liquidity(asset.symbol):

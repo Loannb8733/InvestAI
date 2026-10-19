@@ -32,7 +32,7 @@ Divergence index
 
 Conventions copied from the existing goldens
 (test_fin_cost_basis_golden.py / test_tax_2086_fx_golden.py):
-  * price_service is mocked for metrics runs; compute_tax_2086 needs no
+  * price_feed is mocked for metrics runs; compute_tax_2086 needs no
     mock (its portfolio_value comes from asset_price_history, which is
     empty in the test DB — pinned as such where it matters).
   * conversion_rate = EUR per 1 unit of the trade currency.
@@ -45,6 +45,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.quote import PriceQuote
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -62,17 +63,22 @@ def _fake_price_service(crypto_prices: dict[str, float], forex: dict[tuple[str, 
     """AsyncMock price service returning fixed current prices + forex rates."""
     ps = AsyncMock()
 
-    async def _get_multiple_crypto_prices(symbols, ccy):
+    async def _crypto(symbols, ccy="EUR"):
         return {
-            s.upper(): {"price": crypto_prices[s.upper()], "change_percent_24h": 0}
+            s.upper(): PriceQuote(price=Decimal(str(crypto_prices[s.upper()])))
             for s in symbols
             if s.upper() in crypto_prices
         }
 
+    async def _quote(symbol, asset_type, ccy="EUR"):
+        return (await _crypto([symbol], ccy)).get(symbol.upper()) if asset_type == "crypto" else None
+
     async def _get_forex_rate(from_ccy, to_ccy):
         return forex.get((from_ccy.upper(), to_ccy.upper()), 1.0)
 
-    ps.get_multiple_crypto_prices = AsyncMock(side_effect=_get_multiple_crypto_prices)
+    ps.crypto = AsyncMock(side_effect=_crypto)
+    ps.quote = AsyncMock(side_effect=_quote)
+    ps.stocks = AsyncMock(return_value={})
     ps.get_forex_rate = AsyncMock(side_effect=_get_forex_rate)
     return ps
 
@@ -145,7 +151,7 @@ def _asset_entry(result, symbol, exchange):
 
 async def _metrics(db_session, portfolio, crypto_prices, forex=None, **kwargs):
     ps = _fake_price_service(crypto_prices, forex or {})
-    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         return await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR", **kwargs)
 
 

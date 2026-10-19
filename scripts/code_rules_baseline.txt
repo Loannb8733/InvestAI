@@ -95,7 +95,6 @@ comments	backend/app/services/exchanges/pair_utils.py
 comments	backend/app/services/fifo_replay.py
 comments	backend/app/services/goal_projection_service.py
 comments	backend/app/services/insights_service.py
-comments	backend/app/services/market_data_service.py
 comments	backend/app/services/materialite_invariants.py
 comments	backend/app/services/metrics_cost_basis.py
 comments	backend/app/services/metrics_service.py
@@ -105,7 +104,6 @@ comments	backend/app/services/prediction_cycles.py
 comments	backend/app/services/prediction_metrics.py
 comments	backend/app/services/prediction_service.py
 comments	backend/app/services/prediction_types.py
-comments	backend/app/services/price_service.py
 comments	backend/app/services/reconciliation_service.py
 comments	backend/app/services/regime_alert_service.py
 comments	backend/app/services/report_common.py
@@ -300,12 +298,10 @@ too-long	backend/app/services/exchanges/okx.py
 too-long	backend/app/services/fifo_replay.py
 too-long	backend/app/services/goal_projection_service.py
 too-long	backend/app/services/insights_service.py
-too-long	backend/app/services/market_data_service.py
 too-long	backend/app/services/metrics_service.py
 too-long	backend/app/services/prediction_alpha.py
 too-long	backend/app/services/prediction_cycles.py
 too-long	backend/app/services/prediction_service.py
-too-long	backend/app/services/price_service.py
 too-long	backend/app/services/reconciliation_service.py
 too-long	backend/app/services/report_performance.py
 too-long	backend/app/services/report_rebalancing.py

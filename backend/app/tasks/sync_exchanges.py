@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db.session import session_factory
 from app.domains.market_data.fx.repository import FxRateRepository
 from app.domains.market_data.fx.service import FxService
+from app.domains.market_data.prices.service import price_feed
 from app.models.api_key import APIKey
 from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
@@ -22,7 +23,6 @@ from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.metrics_service import invalidate_dashboard_cache
-from app.services.price_service import PriceService
 from app.services.transfer_service import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.tasks.celery_app import celery_app
 
@@ -262,9 +262,6 @@ async def _heal_transaction_fx(
 
 
 # Global price service instance (reused across sync operations)
-_price_service: PriceService | None = None
-
-
 async def _get_current_price(symbol: str, repli: float = 0.0) -> float:
     """Cours en EUR d'une crypto, ou le meilleur repli disponible.
 
@@ -285,18 +282,10 @@ async def _get_current_price(symbol: str, repli: float = 0.0) -> float:
     « réessayer au passage suivant » ne convergerait jamais, et sa quantité ne
     serait plus jamais mise à jour.
     """
-    global _price_service
-    if _price_service is None:
-        _price_service = PriceService()
-
-    try:
-        result = await _price_service.get_price(symbol, "crypto", "eur")
-        if result and result.get("price"):
-            return float(result["price"])
-        motif = "aucun cours rendu"
-    except Exception as e:  # noqa: BLE001 — une panne de prix ne doit pas arrêter la synchronisation
-        motif = str(e)
-
+    quote = await price_feed.quote(symbol, "crypto")
+    if quote is not None:
+        return float(quote.price)
+    motif = "aucun cours rendu"
     if repli > 0:
         logger.warning("Cours de %s indisponible (%s) : dernier cours connu retenu (%s EUR)", symbol, motif, repli)
     else:

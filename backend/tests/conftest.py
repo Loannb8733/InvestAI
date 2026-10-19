@@ -115,12 +115,9 @@ async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
 @pytest.fixture(autouse=True)
 def _reset_fx_memory():
     from app.domains.market_data.fx.spot import spot_rates
-    from app.services.price_service import PriceService
 
     def reset() -> None:
         spot_rates.clear()
-        PriceService._eur_usd_rate = None
-        PriceService._eur_usd_rate_ts = 0.0
 
     reset()
     yield

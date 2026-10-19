@@ -22,6 +22,8 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.market_data.prices.service import price_feed
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -38,12 +40,12 @@ def cours(monkeypatch, service):
     """Cours renvoyé par le service de prix ; `None` simule une panne."""
     etat = {"valeur": None, "panne": False}
 
-    async def _crypto(symbol):
+    async def _quote(symbol, asset_type):
         if etat["panne"]:
             raise RuntimeError("fournisseur indisponible")
-        return etat["valeur"]
+        return PriceQuote(price=Decimal(str(etat["valeur"]))) if etat["valeur"] is not None else None
 
-    monkeypatch.setattr(service.price_service, "get_crypto_price", _crypto)
+    monkeypatch.setattr(price_feed, "quote", _quote)
     return etat
 
 

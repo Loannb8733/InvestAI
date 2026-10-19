@@ -18,6 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import cache_history, get_cached_history
+from app.domains.market_data.prices.service import price_feed
+from app.domains.market_data.prices.stablecoins import peg_quote
 from app.ml.regime_detector import RegimeConfig, _rsi
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -29,7 +31,6 @@ from app.services.prediction_types import (  # noqa: F401 — re-exported for co
     MarketSentiment,
     PricePrediction,
 )
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -116,18 +117,17 @@ class PredictionAlphaMixin:
 
         if crypto_symbols:
             try:
-                batch = await self.price_service.get_multiple_crypto_prices(crypto_symbols, "eur")
-                for sym, data in batch.items():
-                    p = data.get("price", 0)
-                    price_map[sym.upper()] = float(p) if p else 0.0
+                batch = await price_feed.crypto(crypto_symbols)
+                for sym, quote in batch.items():
+                    price_map[sym] = float(quote.price)
             except Exception as e:
                 logger.warning("Batch crypto price fetch failed: %s", e)
 
         for sym in stock_symbols:
             try:
-                data = await self.price_service.get_stock_price(sym)
-                if data and data.get("price"):
-                    price_map[sym.upper()] = float(data["price"])
+                stock_quote = (await price_feed.stocks([sym])).get(sym.upper())
+                if stock_quote is not None:
+                    price_map[sym.upper()] = float(stock_quote.price)
             except Exception as exc:
                 logger.debug("Stock price fetch failed for %s (alpha scoring): %s", sym, exc)
 
@@ -196,7 +196,7 @@ class PredictionAlphaMixin:
                 price = price_map.get(symbol.upper(), 0.0)
                 if price <= 0:
                     # Fallback to individual fetch
-                    price = await self._get_current_price(symbol, asset.asset_type)
+                    price = await self._get_current_price(symbol, asset.asset_type) or 0.0
                 if price <= 0:
                     logger.warning("Price fetch failed for %s (batch + fallback), skipping", symbol)
                     continue
@@ -402,8 +402,9 @@ class PredictionAlphaMixin:
         # Include cash-like assets in total for accurate weight calculation
         for sym, qty in cash_like_qty.items():
             try:
-                if PriceService.is_stablecoin(sym):
-                    p = await self.price_service._stablecoin_price_eur(sym)
+                pegged = await peg_quote(sym.upper(), "EUR")
+                if pegged is not None:
+                    p = pegged.price
                 else:
                     p = Decimal("1")  # fiat EUR=1, others approximated
                 total_value += qty * p
@@ -767,6 +768,8 @@ class PredictionAlphaMixin:
 
         for asset in assets[:15]:
             price = await self._get_current_price(asset.symbol, asset.asset_type)
+            if price is None:
+                continue
             price_dec = Decimal(str(price))
             qty_dec = wi_qty_map[asset.symbol]
             current_val = price_dec * qty_dec

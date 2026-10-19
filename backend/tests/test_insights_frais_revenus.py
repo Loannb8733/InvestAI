@@ -15,6 +15,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.market_data.prices.quote import PriceQuote
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -204,9 +205,9 @@ class TestAnalyseDesFrais:
         from app.services import insights_service as module
 
         async def cours(symbole, type_actif):
-            return {"price": 0.9} if symbole.upper() == "USDC" else None
+            return PriceQuote(price=Decimal("0.9")) if symbole.upper() == "USDC" else None
 
-        monkeypatch.setattr(module.price_service, "get_price", cours)
+        monkeypatch.setattr(module.price_feed, "quote", cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
@@ -234,7 +235,7 @@ class TestAnalyseDesFrais:
         async def aucun_cours(symbole, type_actif):
             return None
 
-        monkeypatch.setattr(module.price_service, "get_price", aucun_cours)
+        monkeypatch.setattr(module.price_feed, "quote", aucun_cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)

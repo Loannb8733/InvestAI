@@ -101,7 +101,7 @@ async def appeler(db_session, utilisateur, *, jours=30, mesures=None, historique
             new=AsyncMock(return_value=RISQUES),
         ),
         patch(
-            "app.services.price_service.PriceService._get_eur_usd_rate",
+            "app.api.v1.endpoints.dashboard.spot_rates.get",
             new=AsyncMock(return_value=taux_usd),
         ),
     ):
@@ -616,7 +616,7 @@ class TestResistanceDesBlocsSecondaires:
             "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series": AsyncMock(return_value=[]),
             "app.api.v1.endpoints.dashboard.get_index_comparison": AsyncMock(return_value=[]),
             "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics": AsyncMock(return_value=RISQUES),
-            "app.services.price_service.PriceService._get_eur_usd_rate": AsyncMock(return_value=0.92),
+            "app.api.v1.endpoints.dashboard.spot_rates.get": AsyncMock(return_value=0.92),
         }
         patches[cible] = AsyncMock(side_effect=RuntimeError("panne simulée"))
         contextes = [patch(nom, new=double) for nom, double in patches.items()]

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
@@ -16,7 +17,6 @@ from app.services.analytics_service import AnalyticsService
 from app.services.asset_classification import is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_service import PredictionService
-from app.services.price_service import price_service
 from app.services.smart_insights_analyzers import SmartInsightAnalyzersMixin
 from app.services.smart_insights_types import (  # noqa: F401 — re-exported
     AnomalyImpact,
@@ -484,9 +484,8 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                 if cached_prices:
                     current_price = cached_prices[-1]
                 else:
-                    current_price = await price_service.get_current_price(symbol, "crypto")
-                    if not current_price:
-                        current_price = await price_service.get_current_price(symbol, "stock")
+                    quote = await price_feed.quote(symbol, "crypto") or await price_feed.quote(symbol, "stock")
+                    current_price = float(quote.price) if quote is not None else asset_data.get("avg_buy_price", 0)
             except Exception:
                 # Le prix de revient approxime la valeur de la position. Mettre
                 # 0 afficherait « impact : 0 EUR », un faux zéro rassurant —
@@ -540,14 +539,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             vix_value: float | None = None
 
             # Fetch VIX (CBOE Volatility Index) for TradFi sentiment
-            try:
-                from app.services.price_service import price_service
-
-                vix_data = await price_service.get_stock_price("^VIX")
-                if vix_data and vix_data.get("price"):
-                    vix_value = float(vix_data["price"])
-            except Exception as e:
-                logger.debug("Failed to fetch VIX: %s", e)
+            vix_value = await price_feed.index_level("^VIX")
 
             # Market regime via BTC as proxy (prefer Redis cache)
             _, btc_prices = get_cached_history("BTC", days=regime_days)
@@ -736,8 +728,10 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         for a in assets:
             if is_safe_haven(a.symbol):
                 try:
-                    p = await price_service.get_current_price(a.symbol, a.asset_type.value)
-                    gold_value += float(a.quantity) * float(p)
+                    quote = await price_feed.quote(a.symbol, a.asset_type)
+                    if quote is None:
+                        continue
+                    gold_value += float(a.quantity) * float(quote.price)
                     gold_symbol = a.symbol
                 except Exception as exc:
                     logger.debug("Safe-haven price fetch failed for %s: %s", a.symbol, exc)

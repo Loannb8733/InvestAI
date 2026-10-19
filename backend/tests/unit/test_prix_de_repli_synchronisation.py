@@ -18,29 +18,30 @@ Même famille que NEW-35 : un repli présenté comme une vraie valeur.
 import ast
 import inspect
 import logging
+from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.market_data.prices.quote import PriceQuote
 from app.tasks import sync_exchanges
 from app.tasks.sync_exchanges import _get_current_price
 
 
-def _service_qui(**comportement):
-    service = AsyncMock()
-    service.get_price = AsyncMock(**comportement)
-    return patch.object(sync_exchanges, "_price_service", service)
+def _service_qui(cours: float | None):
+    quote = PriceQuote(price=Decimal(str(cours))) if cours is not None else None
+    return patch.object(sync_exchanges.price_feed, "quote", AsyncMock(return_value=quote))
 
 
 class TestCoursDisponible:
     async def test_le_cours_en_direct_est_retenu(self):
-        with _service_qui(return_value={"price": 2145.81}):
+        with _service_qui(2145.81):
             assert await _get_current_price("ETH", repli=2000.0) == pytest.approx(2145.81)
 
     async def test_le_repli_n_est_pas_utilise_quand_le_cours_repond(self, caplog):
         # Sans ce test, un correctif maladroit pourrait préférer le dernier
         # cours connu au cours en direct.
-        with _service_qui(return_value={"price": 87.93}), caplog.at_level(logging.WARNING):
+        with _service_qui(87.93), caplog.at_level(logging.WARNING):
             await _get_current_price("SOL", repli=80.0)
 
         assert "indisponible" not in caplog.text
@@ -53,13 +54,7 @@ class TestCoursIndisponible:
         Le dernier cours connu est une estimation — mais une estimation proche,
         là où zéro faisait de la position une quantité gratuite.
         """
-        with _service_qui(side_effect=TimeoutError("fournisseur muet")):
-            assert await _get_current_price("ETH", repli=2145.81) == pytest.approx(2145.81)
-
-    async def test_une_reponse_sans_cours_retient_aussi_le_repli(self):
-        # Le fournisseur répond, mais sans prix : même situation pour
-        # l'appelant, qui était jusqu'ici traitée en silence.
-        with _service_qui(return_value={"price": None}):
+        with _service_qui(None):
             assert await _get_current_price("ETH", repli=2145.81) == pytest.approx(2145.81)
 
     async def test_sans_cours_connu_le_prix_reste_nul(self):
@@ -68,14 +63,14 @@ class TestCoursIndisponible:
         C'est aussi pourquoi l'écriture n'est pas sautée : pour un tel jeton, un
         « réessayer au passage suivant » ne convergerait jamais.
         """
-        with _service_qui(side_effect=TimeoutError("fournisseur muet")):
+        with _service_qui(None):
             assert await _get_current_price("JETONOBSCUR") == 0.0
 
     @pytest.mark.parametrize("repli,attendu", [(2145.81, "dernier cours connu"), (0.0, "prix nul")])
     async def test_le_repli_se_voit_dans_le_journal(self, caplog, repli, attendu):
         # L'ancienne version ne disait rien quand le fournisseur répondait sans
         # prix : le zéro s'inscrivait sans trace.
-        with _service_qui(return_value={}), caplog.at_level(logging.WARNING, logger="app.tasks.sync_exchanges"):
+        with _service_qui(None), caplog.at_level(logging.WARNING, logger="app.tasks.sync_exchanges"):
             await _get_current_price("ETH", repli=repli)
 
         assert attendu in caplog.text

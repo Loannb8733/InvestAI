@@ -33,17 +33,10 @@ class TestConversionCrypto:
             "un prix crypto temps réel est une donnée fraîche : le marquer stale rendrait le flag inutilisable"
         )
 
-    def test_le_helper_degrade_sans_bruit(self):
-        # Un symbole inconnu ne doit ni lever ni polluer les logs d'avertissement :
-        # l'appelant poursuit son cheminement normal.
+    def test_il_demande_un_prix_crypto_a_la_facade(self):
         helper = _SRC.split("async def _crypto_unit_price")[1].split("async def _get_rate_with_cache")[0]
-        assert "return None" in helper
-        assert "except Exception" in helper
-        assert "logger.debug" in helper, "un symbole non-crypto est un cas normal, pas un avertissement"
-
-    def test_il_demande_bien_un_prix_crypto(self):
-        helper = _SRC.split("async def _crypto_unit_price")[1].split("async def _get_rate_with_cache")[0]
-        assert 'get_price(symbol, "crypto"' in helper
+        assert 'price_feed.quote(symbol, "crypto", to_ccy)' in helper
+        assert "return float(quote.price) if quote is not None else None" in helper
 
 
 class TestOrdreDeResolution:

@@ -13,15 +13,12 @@ from sqlalchemy import select
 
 from app.core.db.session import session_factory
 from app.core.redis_client import redis_async_url, redis_client_kwargs
+from app.domains.market_data.prices.service import price_feed
 from app.models.asset import Asset, AssetType
-from app.services.price_service import PriceService
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-# Initialize price service
-price_service = PriceService()
 
 # Redis pub/sub channel (must match the channel in websocket.py)
 PRICE_UPDATES_CHANNEL = "price_updates"
@@ -133,18 +130,16 @@ async def _maj_crypto():
     for i in range(0, len(crypto_symbols), batch_size):
         batch = crypto_symbols[i : i + batch_size]
         try:
-            prices = await price_service.get_multiple_crypto_prices(batch)
-            for symbol, price_data in prices.items():
-                if price_data is not None:
-                    updated_count += 1
-                    # Publish to Redis pub/sub for WebSocket broadcast
-                    publish_price_update(
-                        symbol=symbol,
-                        price=float(price_data.get("price", 0)),
-                        change_24h_percent=float(price_data.get("change_percent_24h", 0)),
-                        asset_type="crypto",
-                    )
-            logger.info(f"Batch {i // batch_size + 1}: Updated {len(prices)} prices")
+            quotes = await price_feed.crypto(batch)
+            for symbol, quote in quotes.items():
+                updated_count += 1
+                publish_price_update(
+                    symbol=symbol,
+                    price=float(quote.price),
+                    change_24h_percent=quote.change_percent_24h,
+                    asset_type="crypto",
+                )
+            logger.info(f"Batch {i // batch_size + 1}: Updated {len(quotes)} prices")
         except Exception as e:
             logger.error(f"Error fetching crypto prices batch: {e}")
 
@@ -167,13 +162,13 @@ async def _maj_actions():
     updated_count = 0
     for symbol in stock_symbols:
         try:
-            price_data = await price_service.get_stock_price(symbol)
-            if price_data:
+            stock_quote = (await price_feed.stocks([symbol])).get(symbol.upper())
+            if stock_quote is not None:
                 updated_count += 1
                 publish_price_update(
                     symbol=symbol,
-                    price=float(price_data.get("price", 0)),
-                    change_24h_percent=float(price_data.get("change_percent_24h", 0)),
+                    price=float(stock_quote.price),
+                    change_24h_percent=stock_quote.change_percent_24h,
                     asset_type="stock",
                 )
         except Exception as e:
@@ -181,13 +176,13 @@ async def _maj_actions():
 
     for symbol in etf_symbols:
         try:
-            price_data = await price_service.get_stock_price(symbol)
-            if price_data:
+            stock_quote = (await price_feed.stocks([symbol])).get(symbol.upper())
+            if stock_quote is not None:
                 updated_count += 1
                 publish_price_update(
                     symbol=symbol,
-                    price=float(price_data.get("price", 0)),
-                    change_24h_percent=float(price_data.get("change_percent_24h", 0)),
+                    price=float(stock_quote.price),
+                    change_24h_percent=stock_quote.change_percent_24h,
                     asset_type="etf",
                 )
         except Exception as e:

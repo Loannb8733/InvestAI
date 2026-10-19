@@ -193,7 +193,7 @@ async def _importer(client, db_session, utilisateur, service):
     """Lance l'import avec le double, et le cours historique figé.
 
     Le prix des récompenses et des conversions ne vient **pas** du service
-    d'exchange mais de `price_service.get_historical_crypto_price` — donc de
+    d'exchange mais de `price_feed.crypto_on` — donc de
     CoinGecko. Sans ce second patch, le test part sur le réseau, attend 1,5 s
     par prix, et son résultat dépend du cours du jour.
     """
@@ -208,7 +208,7 @@ async def _importer(client, db_session, utilisateur, service):
             return_value=service(),
         ),
         patch(
-            "app.services.price_service.price_service.get_historical_crypto_price",
+            "app.domains.market_data.prices.service.price_feed.crypto_on",
             new=AsyncMock(return_value=50000.0),
         ),
         patch("app.domains.market_data.fx.spot.spot_rates.get", new=AsyncMock(return_value=1.0)),
@@ -488,7 +488,7 @@ class TestRecompenses:
     ):
         """Une récompense arrive sans prix : il est reconstitué au cours du jour.
 
-        Le double fige `get_historical_crypto_price` à 50 000 € et le forex à 1.
+        Le double fige `price_feed.crypto_on` à 50 000 € et le forex à 1.
         """
         service_double.rewards = [_trade("reward_staking_1", "BTCEUR", "buy", "0.01", "0")]
 
