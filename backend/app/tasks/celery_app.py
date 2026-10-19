@@ -21,7 +21,7 @@ celery_app = Celery(
         "app.tasks.monitor_delays",
         "app.tasks.contrarian_stats",
         "app.tasks.regime_alerts",
-        "app.tasks.fx_rates",
+        "app.domains.market_data.fx.tasks",
     ],
 )
 
@@ -79,7 +79,7 @@ celery_app.conf.beat_schedule = {
         "schedule": 300.0,  # Every 5 minutes
     },
     "refresh-fx-rates": {
-        "task": "app.tasks.fx_rates.refresh_fx_rates",
+        "task": "app.domains.market_data.fx.tasks.refresh_fx_rates",
         # 16h05 UTC : la BCE publie ses taux vers 16h00 CET les jours ouvrés. Une
         # seule passe par jour suffit — ensure_seeded ne lit que la fenêtre manquante,
         # et rattrape donc tout seul les jours sautés.

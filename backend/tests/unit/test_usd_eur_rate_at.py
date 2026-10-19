@@ -17,14 +17,14 @@ from app.api.v1.endpoints.api_keys import _usd_eur_rate_at
 
 
 class _FakeFx:
-    """Stand-in for FxHistoryService.get_rate returning a preset map (or raising)."""
+    """Stand-in for FxService.rate_on returning a preset map (or raising)."""
 
     def __init__(self, rates=None, *, raises=False):
         self._rates = rates or {}
         self._raises = raises
         self.calls: list[tuple] = []
 
-    async def get_rate(self, rate_date, from_ccy, to_ccy):
+    async def rate_on(self, rate_date, from_ccy, to_ccy):
         self.calls.append((rate_date, from_ccy, to_ccy))
         if self._raises:
             raise RuntimeError("transient FX read error")

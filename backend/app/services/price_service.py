@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 import httpx
 
 from app.core.config import settings
-from app.core.finance_constants import COLD_START_USD_EUR
 from app.core.redis_client import _get_redis_txt
 from app.core.symbol_map import COINGECKO_SYMBOL_MAP
+from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
+from app.domains.market_data.fx.spot import spot_rates
 from app.services.asset_classification import STABLECOIN_PEGS
 
 
@@ -37,13 +38,6 @@ class PriceService:
     # Cache TTL in seconds
     CACHE_TTL_CRYPTO = 120  # 2 minutes
     CACHE_TTL_STOCK = 300  # 5 minutes
-    CACHE_TTL_FOREX = 3600  # 1 hour
-    FOREX_MEMO_TTL = 300  # 5 min en mémoire, avant de relire Redis
-    # Taux de change lus récemment : {(de, vers): (instant monotone, taux)}.
-    # Partagé par la classe, pas par l'instance : le tableau de bord crée un
-    # PriceService par requête (dashboard.py, snapshot_service.py), et un mémo
-    # d'instance laissait relire le même taux trois fois dans une requête.
-    _forex_memo: dict[tuple, tuple] = {}
 
     # Unified symbol map for CoinGecko IDs (single source of truth)
     SYMBOL_MAP = COINGECKO_SYMBOL_MAP
@@ -243,7 +237,7 @@ class PriceService:
     # Canonical peg map lives in asset_classification (single source of truth).
     STABLECOINS = STABLECOIN_PEGS
 
-    # Cached EUR/USD rate (refreshed via get_forex_rate)
+    # Cached EUR/USD rate (refreshed via spot_rates.get)
     _eur_usd_rate: Decimal | None = None
     _eur_usd_rate_ts: float = 0.0
 
@@ -257,14 +251,13 @@ class PriceService:
 
         Fallback order: fresh in-memory cache → live API → last-known in-memory rate
         (survives transient API outages) → last-resort constant on cold start only.
-        ``get_forex_rate`` itself already layers a Redis cache underneath the API call.
+        ``spot_rates.get`` itself already layers a Redis cache underneath the API call.
         """
-        import time
 
         now = time.time()
         if self._eur_usd_rate and now - self._eur_usd_rate_ts < 3600:
             return self._eur_usd_rate
-        rate = await self.get_forex_rate("USD", "EUR")
+        rate = await spot_rates.get("USD", "EUR")
         if rate:
             PriceService._eur_usd_rate = rate
             PriceService._eur_usd_rate_ts = now
@@ -610,71 +603,6 @@ class PriceService:
                     }
 
         return results
-
-    #: Monnaies acceptées par le service de change (ISO 4217).
-    #:
-    #: `fee_currency` contient légitimement des symboles crypto — payer ses frais
-    #: en PAXG ou en OM est courant sur un exchange. Sans cette garde, chaque
-    #: transaction de ce genre déclenchait un appel à
-    #: `exchangerate-api.com/v4/latest/PAXG`, qui répond 404 : une requête
-    #: réseau perdue à chaque calcul, et un avertissement dans les journaux.
-    #:
-    #: Liste blanche plutôt que liste noire : une devise oubliée se rajoute ici,
-    #: alors qu'un symbole crypto oublié repartirait en appel inutile.
-    DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK", "PLN", "CZK"})
-
-    async def get_forex_rate(self, from_currency: str, to_currency: str) -> Decimal | None:
-        """Taux de change entre deux monnaies. `None` si l'un des codes n'en est pas une."""
-        for code in (from_currency, to_currency):
-            if code.upper() not in self.DEVISES_FIAT:
-                logger.debug(
-                    "Taux de change non demandé pour %s→%s : %s n'est pas une monnaie",
-                    from_currency,
-                    to_currency,
-                    code,
-                )
-                return None
-
-        memo = self._forex_memo.get((from_currency, to_currency))
-        if memo and time.monotonic() - memo[0] < self.FOREX_MEMO_TTL:
-            return memo[1]
-
-        # `forex:spot:` et non `forex:` : cette dernière clé appartient au cache
-        # « dernier taux connu » de redis_client, qui y range du JSON. Partagée,
-        # chaque lecture échouait sur le format de l'autre — ici en rappelant
-        # exchangerate-api à chaque fois, là-bas en rendant un float au lieu
-        # d'un dictionnaire.
-        cache_key = f"forex:spot:{from_currency}:{to_currency}"
-        try:
-            redis = await _get_redis_txt()
-            cached = await redis.get(cache_key)
-            if cached:
-                taux = Decimal(cached)
-                self._forex_memo[(from_currency, to_currency)] = (time.monotonic(), taux)
-                return taux
-        except Exception as e:
-            logger.warning(f"Redis cache read error for forex: {e}")
-
-        try:
-            response = await self.http_client.get(f"https://api.exchangerate-api.com/v4/latest/{from_currency}")
-            response.raise_for_status()
-            data = response.json()
-
-            rate = data.get("rates", {}).get(to_currency)
-            if rate:
-                try:
-                    redis = await _get_redis_txt()
-                    await redis.setex(cache_key, self.CACHE_TTL_FOREX, str(rate))
-                except Exception as e:
-                    logger.warning(f"Redis cache write error for forex: {e}")
-                taux = Decimal(str(rate))
-                self._forex_memo[(from_currency, to_currency)] = (time.monotonic(), taux)
-                return taux
-
-        except Exception as e:
-            logger.error(f"Error fetching forex rate {from_currency}/{to_currency}: {e}")
-
-        return None
 
     async def get_historical_crypto_price(self, symbol: str, date: datetime, currency: str = "eur") -> Decimal | None:
         """Fetch historical cryptocurrency price from CoinGecko.

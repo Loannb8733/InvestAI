@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
-from app.models.fx_rate import FxDailyRate
+from app.domains.market_data.fx.models import FxDailyRate
 from app.models.user import User
 from tests.http_stubs import HttpStub
 

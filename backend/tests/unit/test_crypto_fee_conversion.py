@@ -48,19 +48,10 @@ class TestConversionCrypto:
 
 class TestOrdreDeResolution:
     def test_la_chaine_complete_est_respectee(self):
-        """live forex -> cache -> table ECB persistée -> prix crypto -> constante."""
+        """taux de change (comptant, BCE, démarrage) -> prix crypto -> montant non converti."""
         bloc = _SRC.split("async def _get_rate_with_cache")[1].split("if target != ")[0]
-        positions = [
-            bloc.index("get_forex_rate"),
-            bloc.index("get_cached_forex_rate"),
-            bloc.index("_fx_last_known"),
-            bloc.index("_crypto_unit_price"),
-            bloc.index("_HARDCODED_FALLBACK_RATES"),
-        ]
+        positions = [bloc.index("fx_service.latest"), bloc.index("_crypto_unit_price"), bloc.index("return 1.0, True")]
         assert positions == sorted(positions), "l'ordre de repli des taux a changé"
 
-    def test_la_constante_reste_marquee_perimee(self):
-        fin = _SRC.split("_HARDCODED_FALLBACK_RATES.get(from_ccy")[1][:400]
-        assert "return fallback, True" in fin, (
-            "une valeur devinée doit rester signalée, sinon l'UI la présente comme un vrai cours"
-        )
+    def test_l_absence_de_taux_reste_marquee_perimee(self):
+        assert "return 1.0, True" in _SRC.split("async def _get_rate_with_cache")[1].split("if target != ")[0]

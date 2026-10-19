@@ -43,7 +43,6 @@ comments	backend/app/models/asset.py
 comments	backend/app/models/cold_wallet_address.py
 comments	backend/app/models/crowdfunding_project.py
 comments	backend/app/models/crowdfunding_repayment.py
-comments	backend/app/models/fx_rate.py
 comments	backend/app/models/goal.py
 comments	backend/app/models/planned_order.py
 comments	backend/app/models/portfolio.py
@@ -94,8 +93,6 @@ comments	backend/app/services/exchanges/kucoin.py
 comments	backend/app/services/exchanges/okx.py
 comments	backend/app/services/exchanges/pair_utils.py
 comments	backend/app/services/fifo_replay.py
-comments	backend/app/services/fx_history.py
-comments	backend/app/services/fx_history_service.py
 comments	backend/app/services/goal_projection_service.py
 comments	backend/app/services/insights_service.py
 comments	backend/app/services/market_data_service.py
@@ -129,7 +126,6 @@ comments	backend/app/services/transfer_service.py
 comments	backend/app/tasks/celery_app.py
 comments	backend/app/tasks/cleanup.py
 comments	backend/app/tasks/emails.py
-comments	backend/app/tasks/fx_rates.py
 comments	backend/app/tasks/history_cache.py
 comments	backend/app/tasks/monitor_delays.py
 comments	backend/app/tasks/predictions.py

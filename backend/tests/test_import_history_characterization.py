@@ -151,9 +151,6 @@ class ServiceDouble:
     async def get_ledgers(self, **k):
         return []
 
-    async def get_forex_rate(self, *a, **k):
-        return 1.0
-
     async def get_historical_crypto_price(self, *a, **k):
         return 50000.0
 
@@ -214,6 +211,7 @@ async def _importer(client, db_session, utilisateur, service):
             "app.services.price_service.price_service.get_historical_crypto_price",
             new=AsyncMock(return_value=50000.0),
         ),
+        patch("app.domains.market_data.fx.spot.spot_rates.get", new=AsyncMock(return_value=1.0)),
     ):
         reponse = await client.post(
             f"/api/v1/api-keys/{cle.id}/import-history",

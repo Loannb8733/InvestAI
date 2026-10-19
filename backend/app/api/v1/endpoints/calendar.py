@@ -205,9 +205,9 @@ async def get_calendar_summary(
             ccy = (ccy or "EUR").upper()
             if ccy != "EUR" and amount:
                 try:
-                    from app.services.price_service import price_service
+                    from app.domains.market_data.fx.spot import spot_rates
 
-                    rate = await price_service.get_forex_rate(ccy, "EUR")
+                    rate = await spot_rates.get(ccy, "EUR")
                     amount = amount * float(rate) if rate else amount
                 except Exception as exc:  # noqa: BLE001 — best-effort, montant brut sinon
                     logger.debug("Conversion %s->EUR indisponible pour le résumé calendrier: %s", ccy, exc)
@@ -294,9 +294,9 @@ async def get_passive_income(
             return float(amount)
         if ccy not in rate_cache:
             try:
-                from app.services.price_service import price_service
+                from app.domains.market_data.fx.spot import spot_rates
 
-                rate_cache[ccy] = await price_service.get_forex_rate(ccy, "EUR")
+                rate_cache[ccy] = await spot_rates.get(ccy, "EUR")
             except Exception as exc:  # noqa: BLE001 — best-effort, montant brut sinon
                 logger.debug("Conversion %s->EUR indisponible pour les revenus passifs: %s", ccy, exc)
                 rate_cache[ccy] = None

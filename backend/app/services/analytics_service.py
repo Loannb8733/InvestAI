@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.finance_constants import RISK_FREE_RATE
 from app.core.finance_constants import annualization_days as _trading_days
+from app.domains.market_data.fx.spot import spot_rates
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
@@ -1121,7 +1122,7 @@ class AnalyticsService:
         eur_to_target = 1.0
         if target != "EUR":
             try:
-                rate = await self.price_service.get_forex_rate("EUR", target)
+                rate = await spot_rates.get("EUR", target)
                 eur_to_target = float(rate) if rate else 1.0
             except Exception as exc:  # noqa: BLE001 - degrade gracefully
                 logger.warning("Forex EUR→%s unavailable (%s), using 1.0", target, exc)
@@ -1151,7 +1152,7 @@ class AnalyticsService:
             usd_to_target = 1.0
             if target != "USD":
                 try:
-                    rate = await self.price_service.get_forex_rate("USD", target)
+                    rate = await spot_rates.get("USD", target)
                     usd_to_target = float(rate) if rate else 1.0
                 except Exception as fx_exc:  # noqa: BLE001
                     logger.warning("XIRR fallback forex USD→%s unavailable (%s)", target, fx_exc)

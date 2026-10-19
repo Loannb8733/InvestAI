@@ -33,7 +33,7 @@ class ServiceDeChange:
         self._taux = taux
         self.appels = []
 
-    async def get_rate(self, jour, depuis, vers):
+    async def rate_on(self, jour, depuis, vers):
         self.appels.append((jour, depuis, vers))
         return self._taux
 

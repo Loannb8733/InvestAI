@@ -5,13 +5,14 @@ import logging
 import math
 import time
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.finance_constants import COLD_START_USD_EUR, TRADING_DAYS_PER_YEAR, annualized_return_pct
+from app.core.finance_constants import TRADING_DAYS_PER_YEAR, annualized_return_pct
+from app.domains.market_data.fx.spot import spot_rates
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -294,95 +295,33 @@ class MetricsService:
 
         # Forex setup — must be available before FIFO so fees can be converted
         # immediately after the FIFO pass, before per-asset G/L is computed.
-        from app.core.redis_client import cache_forex_rate, get_cached_forex_rate
-        from app.services.fx_history_service import FxHistoryService
+        from app.domains.market_data.fx.repository import FxRateRepository
+        from app.domains.market_data.fx.service import FxService
 
         target = currency.upper()
         usd_to_target = 1.0
         eur_to_target = 1.0
-        # Last-resort constants, used ONLY when live, cached, AND the persisted ECB
-        # table all fail. They are always flagged stale so the UI never presents a
-        # guessed rate as a real quote.
-        _HARDCODED_FALLBACK_RATES = {
-            "EUR": {"USD": 1.09, "CHF": 0.94, "GBP": 0.86},
-            "USD": {"EUR": float(COLD_START_USD_EUR), "CHF": 0.86, "GBP": 0.79},
-        }
         forex_stale = False
-        _fx_hist = FxHistoryService(db)
-
-        async def _fx_last_known(from_ccy: str, to_ccy: str) -> float | None:
-            """Last-known real rate from the persisted ECB daily table (forward-filled).
-
-            Tries the direct pair, then the inverse, so we fall back to a *real*
-            reference rate (e.g. last business day's ECB fix) instead of a guess
-            whenever any history exists. Network-free (DB read only).
-            """
-            try:
-                direct = await _fx_hist.get_rate(date.today(), from_ccy, to_ccy)
-                if direct:
-                    return float(direct)
-                inverse = await _fx_hist.get_rate(date.today(), to_ccy, from_ccy)
-                if inverse and float(inverse) != 0:
-                    return 1.0 / float(inverse)
-            except Exception as e:  # noqa: BLE001 - DB fallback is best-effort
-                logger.warning("FX history fallback failed for %s->%s: %s", from_ccy, to_ccy, e)
-            return None
+        fx_service = FxService(FxRateRepository(db))
 
         async def _crypto_unit_price(symbol: str, to_ccy: str) -> float | None:
-            """Prix d'une unité de crypto dans la devise cible, ou None si inconnue.
-
-            Sert à convertir des frais réglés en crypto. Renvoie None sans bruit quand
-            le symbole n'est pas une crypto connue : l'appelant reprend alors son
-            cheminement normal.
-            """
             try:
                 data = await price_service.get_price(symbol, "crypto", to_ccy.lower())
                 if data and data.get("price"):
                     return float(data["price"])
-            except Exception as exc:  # noqa: BLE001 - jamais bloquant
+            except Exception as exc:  # noqa: BLE001
                 logger.debug("Prix crypto indisponible pour %s->%s: %s", symbol, to_ccy, exc)
             return None
 
         async def _get_rate_with_cache(from_ccy: str, to_ccy: str) -> tuple[float, bool]:
-            """Resolve an FX rate as (rate, stale).
-
-            Order: live API → Redis cache → persisted ECB last-known → constant.
-            ``stale`` is False only for a live or freshly-cached quote; any fallback
-            to the persisted table or the last-resort constant is flagged stale so
-            the API/UI can warn the conversion may not reflect the current market.
-            """
-            try:
-                rate = await price_service.get_forex_rate(from_ccy, to_ccy)
-                if rate:
-                    rate_f = float(rate)
-                    await cache_forex_rate(from_ccy, to_ccy, rate_f)
-                    return rate_f, False
-            except Exception as e:  # noqa: BLE001 - degrade gracefully, never raise
-                logger.warning("Live forex fetch failed for %s->%s: %s", from_ccy, to_ccy, e)
-            cached = await get_cached_forex_rate(from_ccy, to_ccy)
-            if cached and cached.get("rate"):
-                return cached["rate"], False
-            last_known = await _fx_last_known(from_ccy, to_ccy)
-            if last_known is not None:
-                return last_known, True
-            # `from_ccy` peut ne pas être une devise : les frais d'exchange sont
-            # souvent réglés en crypto (BTC, ETH, BNB…). Le convertisseur forex ne
-            # connaît que le fiat et renvoie None, ce qui faisait retomber sur la
-            # constante de dernier recours — soit 1,0, donc 0,0001 BTC compté 0,0001 €
-            # — tout en levant `forex_stale` en permanence. L'application sait
-            # pourtant valoriser une crypto : on le lui demande.
+            quote = await fx_service.latest(from_ccy, to_ccy)
+            if quote is not None:
+                return float(quote.rate), quote.stale
             crypto_rate = await _crypto_unit_price(from_ccy, to_ccy)
             if crypto_rate is not None:
-                # Prix de marché temps réel : ce n'est pas une valeur périmée.
                 return crypto_rate, False
-            fallback = _HARDCODED_FALLBACK_RATES.get(from_ccy, {}).get(to_ccy, 1.0)
-            logger.warning(
-                "No live/cached/persisted FX for %s->%s; using last-resort constant %s",
-                from_ccy,
-                to_ccy,
-                fallback,
-            )
-            return fallback, True
+            logger.warning("No FX rate for %s->%s; amounts kept unconverted", from_ccy, to_ccy)
+            return 1.0, True
 
         if target != "USD":
             usd_to_target, stale = await _get_rate_with_cache("USD", target)
@@ -684,7 +623,7 @@ class MetricsService:
                     target = currency.upper()
                     if quote_ccy != target:
                         try:
-                            rate = await price_service.get_forex_rate(quote_ccy, target)
+                            rate = await spot_rates.get(quote_ccy, target)
                             if rate:
                                 stock_price = stock_price * rate
                         except Exception:
@@ -993,7 +932,7 @@ class MetricsService:
         # Fetch additional rates for non-target fiat if needed
         for sym in {"GBP", "CHF"} - {target}:
             try:
-                rate = await price_service.get_forex_rate(sym, target)
+                rate = await spot_rates.get(sym, target)
                 if rate:
                     _fiat_rates[sym] = float(rate)
             except Exception as exc:

@@ -113,14 +113,18 @@ async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _vider_memo_de_change():
-    """Le mémo des taux de change est partagé par la classe PriceService : sans
-    remise à zéro, un taux mémorisé par un test fausserait le suivant."""
+def _reset_fx_memory():
+    from app.domains.market_data.fx.spot import spot_rates
     from app.services.price_service import PriceService
 
-    PriceService._forex_memo.clear()
+    def reset() -> None:
+        spot_rates.clear()
+        PriceService._eur_usd_rate = None
+        PriceService._eur_usd_rate_ts = 0.0
+
+    reset()
     yield
-    PriceService._forex_memo.clear()
+    reset()
 
 
 @pytest.fixture

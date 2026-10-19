@@ -10,6 +10,8 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
+from app.domains.market_data.fx.spot import spot_rates
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
@@ -564,11 +566,7 @@ class SnapshotService(SnapshotRiskMixin):
 
         # Fetch live USD→EUR rate for stablecoin pricing (cold-start fallback).
         try:
-            from app.core.finance_constants import COLD_START_USD_EUR
-            from app.services.price_service import PriceService
-
-            _ps = PriceService()
-            stablecoin_eur_rate = float(await _ps.get_forex_rate("USD", "EUR") or COLD_START_USD_EUR)
+            stablecoin_eur_rate = float(await spot_rates.get("USD", "EUR") or COLD_START_USD_EUR)
         except Exception:
             # Constante de démarrage à froid : un repli assumé et documenté,
             # mais qui gagne à laisser une trace s'il devient permanent.

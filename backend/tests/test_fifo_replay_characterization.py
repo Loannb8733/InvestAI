@@ -44,6 +44,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.market_data.fx.spot import spot_rates
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
@@ -144,7 +145,7 @@ def _asset_entry(result, symbol, exchange):
 
 async def _metrics(db_session, portfolio, crypto_prices, forex=None, **kwargs):
     ps = _fake_price_service(crypto_prices, forex or {})
-    with patch("app.services.metrics_service.price_service", ps):
+    with patch("app.services.metrics_service.price_service", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
         return await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR", **kwargs)
 
 

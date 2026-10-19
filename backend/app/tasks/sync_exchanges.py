@@ -11,6 +11,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import session_factory
+from app.domains.market_data.fx.repository import FxRateRepository
+from app.domains.market_data.fx.service import FxService
 from app.models.api_key import APIKey
 from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
@@ -19,7 +21,6 @@ from app.models.transaction import Transaction, TransactionType
 from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
-from app.services.fx_history_service import FxHistoryService
 from app.services.metrics_service import invalidate_dashboard_cache
 from app.services.price_service import PriceService
 from app.services.transfer_service import COLD_WALLET_DESTINATION, create_mirror_transfer_in
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _resolve_trade_fx(
-    fx_svc: FxHistoryService | None,
+    fx_svc: FxService | None,
     quote: str | None,
     executed_at: datetime,
 ) -> tuple[str, Decimal | None]:
@@ -55,7 +56,7 @@ async def _resolve_trade_fx(
     if fx_svc is None:
         logger.warning("No FX service available; storing %s trade as EUR fallback", anchor)
         return "EUR", None
-    rate = await fx_svc.get_rate(executed_at.date(), anchor, "EUR")
+    rate = await fx_svc.rate_on(executed_at.date(), anchor, "EUR")
     if rate is None:
         logger.warning(
             "No historical FX rate for %s->EUR on %s; storing as EUR fallback",
@@ -519,9 +520,9 @@ async def _sync_detailed_transactions(
     # FX resolution (FIN-01): seed the USD->EUR daily series once, then resolve each
     # trade's rate at its execution date. Seeding failure must not block the sync —
     # _resolve_trade_fx falls back to EUR when no rate is available.
-    fx_svc: FxHistoryService | None = FxHistoryService(db)
+    fx_svc: FxService | None = FxService(FxRateRepository(db))
     try:
-        await fx_svc.ensure_seeded("USD", "EUR", _FX_EARLIEST)
+        await fx_svc.refresh("USD", "EUR", _FX_EARLIEST)
     except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
         logger.warning("FX seeding failed (%s); trades will fall back to EUR", e)
         fx_svc = None

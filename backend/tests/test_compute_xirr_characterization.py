@@ -223,7 +223,7 @@ class TestDevise:
         await _portefeuille_avec_achat(db_session, regular_user)
         appels = AsyncMock(return_value=1.1)
 
-        with _valeur_courante(20000.0), patch.object(service.price_service, "get_forex_rate", appels):
+        with _valeur_courante(20000.0), patch("app.services.analytics_service.spot_rates.get", appels):
             await service.compute_xirr(db_session, regular_user.id, currency="EUR")
 
         appels.assert_not_called()
@@ -232,7 +232,7 @@ class TestDevise:
         await _portefeuille_avec_achat(db_session, regular_user)
         taux_change = AsyncMock(return_value=1.1)
 
-        with _valeur_courante(20000.0), patch.object(service.price_service, "get_forex_rate", taux_change):
+        with _valeur_courante(20000.0), patch("app.services.analytics_service.spot_rates.get", taux_change):
             await service.compute_xirr(db_session, regular_user.id, currency="USD")
 
         taux_change.assert_awaited_once_with("EUR", "USD")
@@ -243,7 +243,7 @@ class TestDevise:
 
         with (
             _valeur_courante(20000.0),
-            patch.object(service.price_service, "get_forex_rate", AsyncMock(side_effect=Exception("réseau"))),
+            patch("app.services.analytics_service.spot_rates.get", AsyncMock(side_effect=Exception("réseau"))),
         ):
             taux = await service.compute_xirr(db_session, regular_user.id, currency="USD")
 
@@ -262,7 +262,7 @@ class TestRepliSurLesPrixDesActifs:
                 new=AsyncMock(side_effect=Exception("indisponible")),
             ),
             patch.object(service, "_get_asset_price", new=AsyncMock(return_value=20000.0)),
-            patch.object(service.price_service, "get_forex_rate", new=AsyncMock(return_value=1.0)),
+            patch("app.services.analytics_service.spot_rates.get", new=AsyncMock(return_value=1.0)),
         ):
             taux = await service.compute_xirr(db_session, regular_user.id)
 

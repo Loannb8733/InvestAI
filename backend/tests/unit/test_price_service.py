@@ -470,43 +470,6 @@ class TestSearchCoingeckoId:
 # ---------------------------------------------------------------------------
 # Forex rate
 # ---------------------------------------------------------------------------
-class TestGetForexRate:
-    """Tests for get_forex_rate."""
-
-    @pytest.mark.asyncio
-    async def test_returns_cached_forex(self, price_service, mock_redis):
-        mock_redis.get.return_value = "0.92"
-        result = await price_service.get_forex_rate("USD", "EUR")
-        assert result == Decimal("0.92")
-
-    @pytest.mark.asyncio
-    async def test_fetches_live_rate(self, price_service, mock_redis):
-        mock_redis.get.return_value = None
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {"rates": {"EUR": 0.91}}
-
-        price_service.http_client = AsyncMock()
-        price_service.http_client.get = AsyncMock(return_value=mock_response)
-
-        result = await price_service.get_forex_rate("USD", "EUR")
-        assert result == Decimal("0.91")
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_error(self, price_service, mock_redis):
-        mock_redis.get.return_value = None
-        price_service.http_client = AsyncMock()
-        price_service.http_client.get = AsyncMock(side_effect=Exception("Network error"))
-
-        result = await price_service.get_forex_rate("USD", "EUR")
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Symbol map coverage
-# ---------------------------------------------------------------------------
 class TestSymbolMap:
     """Tests for the SYMBOL_MAP static data."""
 

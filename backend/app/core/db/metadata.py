@@ -1,5 +1,6 @@
 from app.core.db.base import Base
 from app.domains.journal import models as journal_models
+from app.domains.market_data.fx import models as fx_models
 from app.models import (
     alert,
     api_key,
@@ -11,7 +12,6 @@ from app.models import (
     crowdfunding_payment_schedule,
     crowdfunding_project,
     crowdfunding_repayment,
-    fx_rate,
     goal,
     notification,
     planned_order,
@@ -39,7 +39,7 @@ __all__ = [
     "crowdfunding_payment_schedule",
     "crowdfunding_project",
     "crowdfunding_repayment",
-    "fx_rate",
+    "fx_models",
     "goal",
     "journal_models",
     "metadata",

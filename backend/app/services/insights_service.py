@@ -6,17 +6,13 @@ from datetime import UTC, datetime
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.fx.spot import FIAT_CURRENCIES
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.price_service import price_service
 
 logger = logging.getLogger(__name__)
-
-
-# Devises dont le montant est déjà exploitable tel quel, ou converti par le
-# taux capté à l'exécution. Les autres sont des jetons : il leur faut un cours.
-DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CAD", "JPY", "CHF", "AUD"})
 
 
 def convertir_frais_en_devise_portefeuille(
@@ -59,7 +55,7 @@ def convertir_frais_en_devise_portefeuille(
 
     fx = float(taux_conversion) if taux_conversion else 1.0
 
-    if devise in DEVISES_FIAT:
+    if devise in FIAT_CURRENCIES:
         if devise == (devise_transaction or "EUR").upper():
             return montant * fx, True
         return montant, False
@@ -137,7 +133,7 @@ class InsightsService:
         jetons_a_coter = {
             (tx.fee_currency or "").upper()
             for tx in txns
-            if (tx.fee_currency or "EUR").upper() not in DEVISES_FIAT
+            if (tx.fee_currency or "EUR").upper() not in FIAT_CURRENCIES
             and (tx.fee_currency or "").upper()
             != (asset_map.get(str(tx.asset_id)).symbol.upper() if asset_map.get(str(tx.asset_id)) else "")
         }

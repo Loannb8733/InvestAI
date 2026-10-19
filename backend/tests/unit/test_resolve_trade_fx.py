@@ -14,13 +14,13 @@ from app.tasks.sync_exchanges import _resolve_trade_fx
 
 
 class _FakeFx:
-    """Stand-in for FxHistoryService.get_rate returning a preset map."""
+    """Stand-in for FxService.rate_on returning a preset map."""
 
     def __init__(self, rates: dict[tuple[str, str], Decimal | None]):
         self._rates = rates
         self.calls: list[tuple] = []
 
-    async def get_rate(self, rate_date, from_ccy, to_ccy):
+    async def rate_on(self, rate_date, from_ccy, to_ccy):
         self.calls.append((rate_date, from_ccy, to_ccy))
         return self._rates.get((from_ccy, to_ccy))
 

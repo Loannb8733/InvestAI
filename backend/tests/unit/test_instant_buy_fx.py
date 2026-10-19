@@ -61,15 +61,15 @@ class _FakeDB:
 
 
 class _FakeFx:
-    """Patched in for FxHistoryService(db): seeding is a no-op, rates are preset."""
+    """Patched in for FxService(repository): refresh is a no-op, rates are preset."""
 
-    def __init__(self, db=None):
+    def __init__(self, repository=None):
         pass
 
-    async def ensure_seeded(self, *args, **kwargs):
+    async def refresh(self, *args, **kwargs):
         return None
 
-    async def get_rate(self, rate_date, from_ccy, to_ccy):
+    async def rate_on(self, rate_date, from_ccy, to_ccy, **kwargs):
         if (from_ccy, to_ccy) == ("USD", "EUR"):
             return Decimal("0.91")
         return None
@@ -111,7 +111,7 @@ def _portfolio_and_assets():
 @pytest.mark.asyncio
 async def test_usd_instant_buy_gets_usd_currency_and_rate(monkeypatch):
     """A fresh USD-quoted instant buy must be stored as USD with a real rate."""
-    monkeypatch.setattr(sync_mod, "FxHistoryService", _FakeFx)
+    monkeypatch.setattr(sync_mod, "FxService", _FakeFx)
     db = _FakeDB()
     portfolio, assets = _portfolio_and_assets()
     service = _FakeService([_instant_buy("PAXGUSD", "INSTANT-USD-1")])
@@ -128,7 +128,7 @@ async def test_usd_instant_buy_gets_usd_currency_and_rate(monkeypatch):
 @pytest.mark.asyncio
 async def test_eur_instant_buy_stays_eur(monkeypatch):
     """An EUR-quoted instant buy stays EUR with no conversion rate (no regression)."""
-    monkeypatch.setattr(sync_mod, "FxHistoryService", _FakeFx)
+    monkeypatch.setattr(sync_mod, "FxService", _FakeFx)
     db = _FakeDB()
     portfolio, assets = _portfolio_and_assets()
     service = _FakeService([_instant_buy("PAXGEUR", "INSTANT-EUR-1")])
@@ -144,7 +144,7 @@ async def test_eur_instant_buy_stays_eur(monkeypatch):
 @pytest.mark.asyncio
 async def test_heal_repairs_existing_usd_instant_buy(monkeypatch):
     """In heal mode an already-imported USD instant buy is repaired in place, no new row."""
-    monkeypatch.setattr(sync_mod, "FxHistoryService", _FakeFx)
+    monkeypatch.setattr(sync_mod, "FxService", _FakeFx)
 
     legacy_row = SimpleNamespace(price=2000.0, currency="EUR", conversion_rate=None)
     db = _FakeDB(ext_ids=["INSTANT-USD-1"], heal_rows=[legacy_row])

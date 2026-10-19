@@ -26,6 +26,7 @@ from pathlib import Path
 
 import pytest
 
+from app.domains.market_data.fx.spot import FIAT_CURRENCIES, spot_rates
 from app.services.price_service import PriceService
 from app.tasks import history_cache
 
@@ -76,23 +77,15 @@ class TestRepliPostgres:
 class TestDevisesReelles:
     @pytest.mark.parametrize("code", ["PAXG", "OM", "BTC", "USDC", "PEPE", "SOL03"])
     @pytest.mark.asyncio
-    async def test_un_symbole_crypto_ne_declenche_aucun_appel(self, code):
-        # `SOL03` figure aussi en base : une valeur manifestement corrompue, que
-        # la liste blanche écarte au même titre.
-        assert await PriceService().get_forex_rate(code, "EUR") is None
+    async def test_un_symbole_crypto_ne_declenche_aucun_appel(self, code, http_stub):
+        assert await spot_rates.get(code, "EUR") is None
+        assert not http_stub.requests
 
     @pytest.mark.parametrize("code", ["EUR", "USD", "GBP", "CHF"])
     def test_les_monnaies_de_l_application_restent_acceptees(self, code):
-        assert code in PriceService.DEVISES_FIAT, (
+        assert code in FIAT_CURRENCIES, (
             f"{code} est proposée dans les préférences utilisateur : la retirer "
             "de la liste blanche couperait la conversion pour ces comptes"
-        )
-
-    def test_la_liste_est_blanche_et_non_noire(self):
-        """Une liste noire laisserait passer tout symbole crypto non prévu."""
-        source = inspect.getsource(PriceService.get_forex_rate)
-        assert "DEVISES_FIAT" in source and "not in" in source, (
-            "la garde doit vérifier l'appartenance à la liste des monnaies, pas l'absence d'une liste de cryptos"
         )
 
 

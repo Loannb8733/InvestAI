@@ -19,7 +19,7 @@ async def _usd_eur_rate_at(fx, trade_date: date, fallback: float) -> float:
     if fx is None:
         return fallback
     try:
-        rate = await fx.get_rate(trade_date, "USD", "EUR")
+        rate = await fx.rate_on(trade_date, "USD", "EUR")
         motif = "aucun taux historique"
     except Exception as exc:  # noqa: BLE001 - an FX read must never break the import
         rate = None
@@ -796,13 +796,14 @@ async def import_trade_history(
         # current spot rate is kept ONLY as a last-resort fallback when no historical rate
         # is available.
         from app.core.db.session import session_factory
-        from app.core.finance_constants import COLD_START_USD_EUR
-        from app.services.fx_history_service import FxHistoryService
-        from app.services.price_service import price_service
+        from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
+        from app.domains.market_data.fx.repository import FxRateRepository
+        from app.domains.market_data.fx.service import FxService
+        from app.domains.market_data.fx.spot import spot_rates
 
         usd_eur_rate = float(COLD_START_USD_EUR)
         try:
-            forex_rate = await price_service.get_forex_rate("USD", "EUR")
+            forex_rate = await spot_rates.get("USD", "EUR")
             if forex_rate:
                 usd_eur_rate = float(forex_rate)
         except Exception as exc:  # noqa: BLE001
@@ -810,11 +811,12 @@ async def import_trade_history(
 
         try:
             async with session_factory() as _fx_seed_db:
-                await FxHistoryService(_fx_seed_db).ensure_seeded("USD", "EUR", date(2017, 1, 1))
+                await FxService(FxRateRepository(_fx_seed_db)).refresh("USD", "EUR", date(2017, 1, 1))
+                await _fx_seed_db.commit()
         except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
             logger.warning("FX seeding failed (%s); USD trades fall back to current rate", e)
 
-        fx_read = FxHistoryService(db)
+        fx_read = FxService(FxRateRepository(db))
         _usd_eur_cache: dict = {}
 
         async def _usd_eur_at(d: date) -> float:
