@@ -226,3 +226,65 @@ Le jour où un worker existe en production, poser `CELERY_WORKER_AVAILABLE=true`
 le service web suffit ; le jour où une seconde instance web existe, poser
 `RATE_LIMIT_SHARED_STORAGE=true` sur toutes. Détail des mesures : `docs/audit/BACKLOG.md`,
 NEW-77 à NEW-87.
+
+
+## ADR-012 : Architecture par domaine, transaction par requête, démarrage découpé
+
+**Contexte :** la logique métier, les requêtes SQL et les commits vivaient dans les
+endpoints (84 commits dans `api/`), `main.py` faisait 1 130 lignes, et les fichiers de
+plus de 1 000 lignes se comptaient par dizaines. La refonte migre le backend domaine
+par domaine ; `journal` (les notes) est le domaine pilote.
+
+**Décision — structure d'un domaine** (`app/domains/<domaine>/`) :
+
+| Fichier | Rôle | Interdit |
+|---|---|---|
+| `router.py` | HTTP : valide, appelle le service, rend un schéma | requête SQL, commit, règle métier |
+| `schemas.py` | Pydantic d'entrée et de sortie | — |
+| `models.py` | SQLAlchemy typé (`Mapped[...]`) | — |
+| `repository.py` | toutes les requêtes du domaine | `commit` (au plus `flush`) |
+| `service.py` | cas d'usage, lève des `DomainError` | `commit`, `HTTPException` |
+| modules purs (ex. `scorecard.py`) | calcul sans I/O | accès base |
+
+Un domaine lit les données d'un autre par ses **tables** (`Model.__table__.c`) et les
+rend sous des types qui lui appartiennent (ex. `AssetRef`), jamais en manipulant les
+classes ORM de l'autre domaine.
+
+**Décision — transaction :** pas de classe `UnitOfWork`. La dépendance
+`core.db.session.get_session` ouvre la session, commit si la requête aboutit, rollback
+sinon (`HTTPException` et `DomainError` comprises). Une classe enveloppant la session
+n'apporterait rien ; une classe exposant les repositories de tous les domaines
+deviendrait un fourre-tout. `core.db.metadata.metadata` charge tous les modèles :
+`create_all` et Alembic l'utilisent.
+
+**Décision — erreurs :** les services lèvent `core.errors.DomainError` (et ses
+sous-classes, ajoutées quand un domaine en a besoin). `core.error_handlers` les rend en
+`{"detail": ...}`, la forme d'une `HTTPException`, et traite aussi les exceptions non
+gérées (500 journalisée, détail masqué en production) et le dépassement de quota.
+
+**Décision — démarrage :** `main.py` ne fait qu'assembler l'application
+(`create_app`). `core/http/` porte les middlewares (enregistrés dans le même ordre
+qu'avant : journalisation, GZip, CORS, en-têtes de sécurité, invalidation du cache du
+dashboard), `core/health.py` les sondes, `core/startup/` le verrou de démarrage,
+Alembic puis `create_all`, puis trois **auto-réparations idempotentes** :
+
+| Auto-réparation | Ce qu'elle répare | Chemins d'écriture qui produisent encore ces données (2026-10-19) |
+|---|---|---|
+| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | `PATCH /transactions/{id}` sur `exchange` (aucune nouvelle répartition) |
+| `transfer_mirrors` | `TRANSFER_OUT` sans miroir valide, hors notes d'ajustement interne (incident Tangem du 2026-06-07 : 5 positions fantômes) | sortie manuelle ou CSV sans destination ; échec du miroir pendant la synchro ; `PATCH` du type |
+| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` en libérant avant d'occuper (ordre des UPDATE, 2026-09-10) | import d'historique (`compute_hash` jamais appelé) ; `PATCH` des montants |
+
+Elles restent au démarrage tant que ces chemins existent : en faire des migrations à
+usage unique changerait le comportement. Elles disparaîtront quand les domaines
+`transactions` et `exchanges` corrigeront ces écritures à la source.
+
+**Conséquences connues, non traitées ici :**
+- 13 index créés par des migrations ne sont déclarés dans aucun modèle : une base neuve
+  (`create_all` puis marquage à la tête) ne les a pas. Chaque domaine déclare ses index
+  dans ses modèles lors de sa migration.
+- La première migration (`001`) suppose la table `users` : l'historique Alembic ne sait
+  pas créer une base vierge. Le chemin d'une base neuve reste `create_all` + marquage.
+- `c4e8f1a2b3d5` fait converger `transactions.quantity/price/fee` vers les précisions du
+  modèle (élargit seulement, jamais de réduction) et ajoute `fee_currency`, qu'aucune
+  migration ne créait ; elle remplace `scripts/migrate_fee_currency.py`, qui ramenait
+  `fee` en `NUMERIC(18, 8)` et aurait tronqué les frais.
