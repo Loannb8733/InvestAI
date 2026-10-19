@@ -14,7 +14,7 @@ known-first-party = ["app"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"!backend/app/domains/**" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
+"!backend/app/{domains/**,core/db/**,core/errors.py,core/error_handlers.py}" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
 
 [tool.mypy]
 python_version = "3.12"

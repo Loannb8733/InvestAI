@@ -12,7 +12,7 @@ raconte sept lignes de « réconciliation » qui ont dégradé le P&L affiché d
 214 €. Ces tests décrivent ce que les tâches font aujourd'hui, y compris les
 cas où elles s'abstiennent — c'est cette abstention qui protège.
 
-Les fonctions ouvrent leur propre session (`AsyncSessionLocal`) au lieu d'en
+Les fonctions ouvrent leur propre session (`session_factory`) au lieu d'en
 recevoir une : le filet la remplace par celle du test, sans quoi elles
 écriraient dans la vraie base.
 """
@@ -45,7 +45,7 @@ def session_de_test(db_session, monkeypatch):
     async def _flush_seulement():
         await db_session.flush()
 
-    monkeypatch.setattr(cleanup, "AsyncSessionLocal", _fabrique)
+    monkeypatch.setattr(cleanup, "session_factory", _fabrique)
     monkeypatch.setattr(db_session, "commit", _flush_seulement)
     return db_session
 

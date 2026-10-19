@@ -171,7 +171,7 @@ class TestCheckAndAlert:
         mock_user.telegram_chat_id = "12345"
 
         with (
-            patch("app.services.regime_alert_service.AsyncSessionLocal") as mock_session_cls,
+            patch("app.services.regime_alert_service.session_factory") as mock_session_cls,
             patch("app.services.regime_alert_service.telegram_service") as mock_tg,
         ):
             # Setup async context manager

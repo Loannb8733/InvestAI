@@ -7,11 +7,11 @@ sys.path.insert(0, "/app")
 
 from sqlalchemy import text
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 
 
 async def main():
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # 1. Quantité stockée vs calculée depuis transactions
         r = await db.execute(
             text(

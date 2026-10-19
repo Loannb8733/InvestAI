@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.user import User
 from app.services.report_service import report_service
@@ -48,7 +48,7 @@ router = APIRouter()
 async def get_performance_report_pdf(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download a PDF performance report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -69,7 +69,7 @@ async def get_performance_report_pdf(
 async def get_performance_report_excel(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download an Excel performance report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -91,7 +91,7 @@ async def get_tax_summary(
     request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Synthèse fiscale 2086 de l'année, en JSON (pour l'affichage in-app).
 
@@ -123,7 +123,7 @@ async def get_tax_report_pdf(
     request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download a PDF tax report (2086) for crypto assets."""
     if year < 2015 or year > datetime.now().year:
@@ -146,7 +146,7 @@ async def get_tax_report_excel(
     request: Request,
     year: int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download an Excel tax report for crypto assets."""
     if year < 2015 or year > datetime.now().year:
@@ -197,7 +197,7 @@ async def get_transactions_report_pdf(
     request: Request,
     year: int | None = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download a PDF transactions report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -220,7 +220,7 @@ async def get_transactions_report_excel(
     request: Request,
     year: int | None = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download an Excel transactions report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -243,7 +243,7 @@ async def get_transactions_report_csv(
     request: Request,
     year: int | None = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download a CSV transactions export."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -265,7 +265,7 @@ async def get_transactions_report_csv(
 async def get_available_years(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get list of years with transactions for reporting."""
     from sqlalchemy import distinct, extract, select
@@ -296,7 +296,7 @@ async def get_rebalancing_report(
     request: Request,
     body: RebalancingRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compute rebalancing report with tax impact estimation."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -350,7 +350,7 @@ async def save_rebalancing_targets(
     request: Request,
     body: RebalancingRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Persiste l'allocation cible (même validation que le rapport : somme = 1.0).
 
@@ -367,7 +367,7 @@ async def save_rebalancing_targets(
 async def get_rebalancing_drift(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Écart actuel vs allocation cible — version légère pour le dashboard.
 
@@ -401,7 +401,7 @@ async def get_rebalancing_report_pdf(
     request: Request,
     body: RebalancingRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Generate and download a PDF rebalancing report."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"

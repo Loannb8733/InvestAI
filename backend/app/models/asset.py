@@ -8,7 +8,7 @@ from sqlalchemy import CheckConstraint, Column, Date, DateTime, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from app.models import Base
+from app.core.db.base import Base
 
 
 class AssetType(str, enum.Enum):

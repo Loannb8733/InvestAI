@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.asset import Asset
 from app.models.asset_price_history import AssetPriceHistory
@@ -174,7 +174,7 @@ def _hit_rate(verdicts: list[str]) -> float | None:
 @router.get("/summary", response_model=NoteSummaryResponse)
 async def get_notes_summary(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> NoteSummaryResponse:
     """Get summary of user's notes."""
     result = await db.execute(
@@ -209,7 +209,7 @@ async def get_notes_summary(
 async def get_notes_scorecard(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> ScorecardResponse:
     """Scorecard du journal : sentiment enregistré vs performance réalisée.
 
@@ -356,7 +356,7 @@ async def list_notes(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[NoteResponse]:
     """List all notes for the current user."""
     query = select(Note).where(Note.user_id == current_user.id)
@@ -413,7 +413,7 @@ async def list_notes(
 async def create_note(
     note_in: NoteCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> NoteResponse:
     """Create a new note."""
     # Verify asset belongs to user if specified
@@ -480,7 +480,7 @@ async def create_note(
 async def get_note(
     note_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> NoteResponse:
     """Get a specific note."""
     result = await db.execute(
@@ -528,7 +528,7 @@ async def update_note(
     note_id: UUID,
     note_in: NoteUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> NoteResponse:
     """Update a note."""
     result = await db.execute(
@@ -619,7 +619,7 @@ async def update_note(
 async def delete_note(
     note_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a note."""
     result = await db.execute(

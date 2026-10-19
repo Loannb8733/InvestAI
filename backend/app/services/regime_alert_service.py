@@ -10,7 +10,7 @@ import logging
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.core.redis_client import _get_redis_txt
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig
 from app.models.user import User
@@ -195,7 +195,7 @@ class RegimeAlertService:
 
         # Send to all Telegram-enabled users
         sent_count = 0
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await db.execute(
                 select(User).where(
                     User.is_active == True,  # noqa: E712

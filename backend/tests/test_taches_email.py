@@ -30,7 +30,7 @@ def session_de_test(db_session, monkeypatch):
     async def _fabrique():
         yield db_session
 
-    monkeypatch.setattr(emails, "AsyncSessionLocal", _fabrique)
+    monkeypatch.setattr(emails, "session_factory", _fabrique)
     return db_session
 
 

@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.portfolio import Portfolio
 from app.models.simulation import Simulation, SimulationType
 from app.models.user import User
@@ -367,7 +367,7 @@ class SimulationResponse(BaseModel):
 async def calculate_fire_probabilistic(
     params: FIREProbabilisticParameters,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> FIREProbabilisticResult:
     """FIRE probabiliste : « X % de chances d'être FIRE en année Y » (Monte Carlo).
 
@@ -455,7 +455,7 @@ async def calculate_fire_probabilistic(
 async def project_portfolio(
     params: ProjectionParameters,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> ProjectionResult:
     """Project portfolio value over time using live reconciled values."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -639,7 +639,7 @@ async def list_simulations(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[SimulationResponse]:
     """List all saved simulations."""
     query = select(Simulation).where(Simulation.user_id == current_user.id)
@@ -668,7 +668,7 @@ async def list_simulations(
 async def save_simulation(
     sim_in: SimulationCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> SimulationResponse:
     """Save a simulation for later reference."""
     simulation = Simulation(
@@ -698,7 +698,7 @@ async def save_simulation(
 async def get_simulation(
     simulation_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> SimulationResponse:
     """Get a specific simulation."""
     result = await db.execute(
@@ -730,7 +730,7 @@ async def get_simulation(
 async def delete_simulation(
     simulation_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a simulation."""
     result = await db.execute(

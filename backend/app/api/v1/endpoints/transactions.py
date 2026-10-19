@@ -16,7 +16,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
@@ -118,7 +118,7 @@ async def list_transactions(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[TransactionWithAsset] | TransactionListPage:
     """List transactions for the current user with asset details.
 
@@ -267,7 +267,7 @@ async def list_transactions(
 async def list_balance_gaps(
     threshold_eur: float = 5.0,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> dict:
     """List assets where stored quantity exceeds the signed transaction sum.
 
@@ -379,7 +379,7 @@ async def list_balance_gaps(
 async def credit_balance_gaps(
     threshold_eur: float = 5.0,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> dict:
     """Auto-credit every detected balance gap as an AIRDROP transaction.
 
@@ -473,7 +473,7 @@ async def create_transaction(
     request: Request,
     transaction_in: TransactionCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> TransactionResponse:
     """Create a new transaction."""
     # Verify asset belongs to user
@@ -643,7 +643,7 @@ async def get_csv_platforms():
 async def get_user_platforms(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Return distinct exchange/platform names used by the current user."""
     from sqlalchemy import func as sqlfunc
@@ -686,7 +686,7 @@ async def get_user_platforms(
 async def export_transactions_csv(
     portfolio_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """
     Export transactions to a CSV file.
@@ -757,7 +757,7 @@ async def export_transactions_csv(
 async def get_transaction(
     transaction_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> TransactionResponse:
     """Get a specific transaction."""
     # Get user's asset IDs
@@ -790,7 +790,7 @@ async def update_transaction(
     transaction_id: UUID,
     transaction_update: TransactionUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> TransactionResponse:
     """Update a transaction (quantity, price, fee, notes, executed_at)."""
     # Get user's asset IDs
@@ -947,7 +947,7 @@ class DeleteAllResult(BaseModel):
 @router.delete("/all", response_model=DeleteAllResult)
 async def delete_all_transactions(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
     delete_assets: bool = Query(False, description="Also delete all assets"),
     portfolio_id: str | None = Query(None, description="Restrict deletion to a specific portfolio"),
 ) -> DeleteAllResult:
@@ -1006,7 +1006,7 @@ async def delete_transaction(
     request: Request,
     transaction_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a transaction (and revert asset quantity)."""
     # Get user's asset IDs
@@ -1137,7 +1137,7 @@ async def import_transactions_csv(
         description="Destination platform for transfer_out (e.g. cold wallet name)",
     ),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> CSVImportResult:
     """
     Import transactions from a CSV file.

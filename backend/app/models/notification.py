@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from app.models import Base
+from app.core.db.base import Base
 
 
 class NotificationType(str, enum.Enum):

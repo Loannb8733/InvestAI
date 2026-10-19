@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -23,7 +23,7 @@ async def list_portfolios(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[PortfolioResponse]:
     """List all portfolios for the current user."""
     result = await db.execute(
@@ -41,7 +41,7 @@ async def list_portfolios(
 async def create_portfolio(
     portfolio_in: PortfolioCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioResponse:
     """Create a new portfolio."""
     portfolio = Portfolio(
@@ -63,7 +63,7 @@ async def get_portfolio(
     request: Request,
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioResponse:
     """Get a specific portfolio."""
     result = await db.execute(
@@ -88,7 +88,7 @@ async def update_portfolio(
     portfolio_id: UUID,
     portfolio_in: PortfolioUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioResponse:
     """Update a portfolio."""
     result = await db.execute(
@@ -123,7 +123,7 @@ async def delete_portfolio(
     portfolio_id: UUID,
     delete_assets: bool = Query(True, description="Also delete associated assets and transactions"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a portfolio and optionally its associated assets and transactions."""
     from app.models.asset import Asset
@@ -175,7 +175,7 @@ async def update_cash_balance(
     portfolio_id: UUID,
     cash_update: CashBalanceUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioResponse:
     """Update cash balance for a specific exchange."""
     result = await db.execute(
@@ -211,7 +211,7 @@ async def delete_cash_balance(
     portfolio_id: UUID,
     exchange: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioResponse:
     """Remove cash balance for a specific exchange."""
     result = await db.execute(

@@ -25,10 +25,10 @@ from starlette.middleware.gzip import GZipMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.contexte_execution import sert_une_requete_http
-from app.core.database import engine
+from app.core.db.metadata import metadata
+from app.core.db.session import engine
 from app.core.logging import get_logger, setup_logging
 from app.core.rate_limit import limiter
-from app.models import Base
 
 # Setup structured logging
 setup_logging()
@@ -583,10 +583,10 @@ async def _rehash_transactions_internal_hash(session_factory=None):
     try:
         from sqlalchemy import select
 
-        from app.core.database import AsyncSessionLocal
+        from app.core.db.session import session_factory
         from app.models.transaction import Transaction, compute_transaction_hash
 
-        fabrique = session_factory or AsyncSessionLocal
+        fabrique = session_factory or session_factory
         async with fabrique() as db:
             result = await db.execute(select(Transaction))
             txs = result.scalars().all()
@@ -713,7 +713,7 @@ async def _run_startup_migrations():
         _create_missing_transfer_mirrors()
 
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(metadata.create_all)
             # Guard: add columns that may be missing when the DB was created via
             # create_all before the column existed (Alembic stamp-to-head skips them).
             await conn.execute(

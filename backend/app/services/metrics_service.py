@@ -1169,12 +1169,12 @@ class MetricsService:
         remaining = uncached_crypto + uncached_stocks
         if remaining:
             try:
-                from app.core.database import AsyncSessionLocal
+                from app.core.db.session import session_factory
                 from app.models.asset_price_history import AssetPriceHistory
 
                 cutoff = (datetime.now(UTC) - timedelta(days=days + 5)).date()
                 sym_uppers = [s.upper() for s in remaining]
-                async with AsyncSessionLocal() as _db:
+                async with session_factory() as _db:
                     # One batched query (WHERE symbol IN ...) instead of one SELECT
                     # per symbol; group the rows by symbol Python-side.
                     result = await _db.execute(

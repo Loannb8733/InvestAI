@@ -5,7 +5,7 @@ from datetime import UTC
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal as async_session_factory
+from app.core.db.session import session_factory as async_session_factory
 from app.models.asset import Asset
 from app.services.prediction_service import prediction_service
 from app.tasks.async_runner import run_async

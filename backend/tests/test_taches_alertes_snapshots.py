@@ -8,7 +8,7 @@ quotidien pendant des mois, perdu dans les journaux Celery.
 Ces tests parcourent le vrai chemin. Les tâches Celery elles-mêmes appellent
 `run_async`, qui ouvre sa propre boucle et tuerait celle de la suite : ce sont
 donc les coroutines internes qui sont exercées, avec la session du test à la
-place de `AsyncSessionLocal`.
+place de `session_factory`.
 """
 
 from contextlib import asynccontextmanager
@@ -32,7 +32,7 @@ def session_snapshots(db_session, monkeypatch):
     async def _flush_seulement():
         await db_session.flush()
 
-    monkeypatch.setattr(taches_snapshots, "AsyncSessionLocal", _fabrique)
+    monkeypatch.setattr(taches_snapshots, "session_factory", _fabrique)
     monkeypatch.setattr(db_session, "commit", _flush_seulement)
     return db_session
 

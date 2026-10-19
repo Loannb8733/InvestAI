@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.calendar_event import CalendarEvent, EventType
 from app.models.user import User
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
@@ -154,7 +154,7 @@ async def list_event_types() -> list[EventTypeInfo]:
 @router.get("/summary", response_model=CalendarSummaryResponse)
 async def get_calendar_summary(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> CalendarSummaryResponse:
     """Get summary of user's calendar events."""
     now = datetime.now(UTC)
@@ -236,7 +236,7 @@ async def list_upcoming_events(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[EventResponse]:
     """List upcoming events in the next N days."""
     now = datetime.now(UTC)
@@ -262,7 +262,7 @@ async def list_upcoming_events(
 @router.get("/passive-income", response_model=PassiveIncomeResponse)
 async def get_passive_income(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PassiveIncomeResponse:
     """Revenus passifs projetés sur les 12 prochains mois.
 
@@ -412,7 +412,7 @@ def _french_tax_events_for_year(year: int) -> list[dict]:
 @router.post("/seed-tax-events", response_model=SeedTaxEventsResponse)
 async def seed_tax_events(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> SeedTaxEventsResponse:
     """Crée les échéances fiscales françaises manquantes (année en cours + suivante).
 
@@ -472,7 +472,7 @@ async def list_events(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[EventResponse]:
     """List all calendar events for the current user."""
     query = select(CalendarEvent).where(CalendarEvent.user_id == current_user.id)
@@ -498,7 +498,7 @@ async def list_events(
 async def create_event(
     event_in: EventCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EventResponse:
     """Create a new calendar event."""
     event = CalendarEvent(
@@ -525,7 +525,7 @@ async def create_event(
 async def get_event(
     event_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EventResponse:
     """Get a specific calendar event."""
     result = await db.execute(
@@ -550,7 +550,7 @@ async def update_event(
     event_id: UUID,
     event_in: EventUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EventResponse:
     """Update a calendar event."""
     result = await db.execute(
@@ -600,7 +600,7 @@ async def update_event(
 async def complete_event(
     event_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EventResponse:
     """Mark a calendar event as completed."""
     result = await db.execute(
@@ -648,7 +648,7 @@ async def complete_event(
 async def delete_event(
     event_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a calendar event."""
     result = await db.execute(

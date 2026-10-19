@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
+from app.core.db.metadata import metadata
 from app.core.security import hash_password
-from app.models import Base
 from app.models.user import User, UserRole
 
 
@@ -24,7 +24,7 @@ async def create_admin():
 
     # Create tables if they don't exist
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
 
     async with AsyncSessionLocal() as session:
         # Check if admin already exists

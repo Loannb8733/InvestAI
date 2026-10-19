@@ -9,7 +9,7 @@ from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Inde
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from app.models import Base
+from app.core.db.base import Base
 
 
 def compute_transaction_hash(

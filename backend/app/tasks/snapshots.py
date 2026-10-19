@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.user import User
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 async def _create_all_snapshots_async() -> dict:
     """Create daily snapshots for all users with portfolios."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Get all users with at least one portfolio
         result = await db.execute(select(User.id).where(User.id.in_(select(Portfolio.user_id).distinct())))
         user_ids = [str(row[0]) for row in result.fetchall()]
@@ -133,7 +133,7 @@ async def _create_all_snapshots_async() -> dict:
 
 async def _cleanup_old_snapshots_async(days_to_keep: int = 365) -> dict:
     """Delete snapshots older than specified days."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         result = await db.execute(
@@ -168,7 +168,7 @@ def create_user_snapshot(user_id: str) -> dict:
     """Celery task: Create a snapshot for a specific user (on-demand)."""
 
     async def _create():
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             snapshot = await snapshot_service.create_user_snapshot(db, user_id)
             if snapshot:
                 return {

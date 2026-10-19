@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 # `else_` et lève `TypeError` avant même d'atteindre la base.
 from sqlalchemy import and_, case, delete, func, select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.notification import Notification
 from app.models.prediction_log import PredictionLog
 from app.tasks.async_runner import run_async
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
     """Delete read notifications older than specified days."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         # Count notifications to delete
@@ -50,7 +50,7 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
 
 async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
     """Delete old prediction records older than specified days."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         # Count predictions to delete
@@ -71,7 +71,7 @@ async def _cleanup_duplicate_transactions_async() -> dict:
     """Find and remove duplicate transactions (same external_id)."""
     from app.models.transaction import Transaction
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Find duplicate external_ids
         dup_query = (
             select(Transaction.external_id, func.count(Transaction.id).label("cnt"))
@@ -118,7 +118,7 @@ async def _validate_portfolio_consistency_async() -> dict:
     from app.models.transaction import Transaction, TransactionType
     from app.services.transfer_service import COLD_WALLET_DESTINATION
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Fetch Asset ORM objects (so we can heal in place) + their portfolio name.
         result = await db.execute(
             select(Asset, Portfolio.name.label("portfolio_name")).join(Portfolio, Asset.portfolio_id == Portfolio.id)

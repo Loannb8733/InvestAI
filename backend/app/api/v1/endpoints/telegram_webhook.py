@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.planned_order import PlannedOrder, PlannedOrderStatus
 from app.models.user import User
 from app.services.telegram_service import MC_CALLBACK_TTL, _get_redis, telegram_service
@@ -111,7 +111,7 @@ async def telegram_webhook(
         return JSONResponse({"ok": True})
 
     # Security: verify chat_id matches user
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         if not await _verify_chat_id(db, user_id, chat_id):
             logger.warning(
                 "Telegram callback rejected: chat_id %s doesn't match user %s",

@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.core.redis_client import get_cached_history
 from app.models.asset_price_history import AssetPriceHistory
 
@@ -36,7 +36,7 @@ async def charger_depuis_postgres(symbol: str, days: int) -> tuple[list[datetime
     """Historique persistant en base. Retourne ([], []) si rien n'est connu."""
     try:
         limite = datetime.now(UTC).date() - timedelta(days=days)
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             resultat = await db.execute(
                 select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
                 .where(

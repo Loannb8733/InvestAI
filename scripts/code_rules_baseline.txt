@@ -22,7 +22,6 @@ comments	backend/app/api/v1/endpoints/users.py
 comments	backend/app/api/v1/endpoints/websocket.py
 comments	backend/app/core/config.py
 comments	backend/app/core/contexte_execution.py
-comments	backend/app/core/database.py
 comments	backend/app/core/finance_constants.py
 comments	backend/app/core/logging.py
 comments	backend/app/core/rate_limit.py
@@ -40,7 +39,6 @@ comments	backend/app/ml/historical_data.py
 comments	backend/app/ml/hyperparameter_tuner.py
 comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
-comments	backend/app/models/__init__.py
 comments	backend/app/models/alert.py
 comments	backend/app/models/api_key.py
 comments	backend/app/models/asset.py

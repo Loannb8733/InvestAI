@@ -485,7 +485,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         # Log prediction for monitoring (with CI for calibration tracking)
         try:
-            from app.core.database import AsyncSessionLocal
+            from app.core.db.session import session_factory
             from app.models.prediction_log import PredictionLog
 
             if predictions:
@@ -510,7 +510,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                         "model_weights": models_detail.get("weights") if models_detail else None,
                     },
                 )
-                async with AsyncSessionLocal() as log_db:
+                async with session_factory() as log_db:
                     log_db.add(log_entry)
                     await log_db.commit()
         except Exception as e:
@@ -1216,11 +1216,11 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         Returns past predictions with actual outcomes for transparency.
         """
-        from app.core.database import AsyncSessionLocal
+        from app.core.db.session import session_factory
         from app.models.prediction_log import PredictionLog
 
         try:
-            async with AsyncSessionLocal() as db:
+            async with session_factory() as db:
                 filters = [
                     PredictionLog.symbol == symbol.upper(),
                     PredictionLog.accuracy_checked.isnot(None),

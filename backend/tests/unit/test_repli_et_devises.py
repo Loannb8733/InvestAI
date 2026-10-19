@@ -61,7 +61,7 @@ class TestRepliPostgres:
             corps.body = corps.body[1:]
 
         source = ast.unparse(arbre)
-        for interdit in ("asyncio", "run_async", "AsyncSessionLocal"):
+        for interdit in ("asyncio", "run_async", "session_factory"):
             assert interdit not in source, f"`{interdit}` réintroduit une dépendance à une boucle"
 
     def test_les_taches_celery_gardent_run_async(self):

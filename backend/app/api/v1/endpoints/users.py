@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -21,7 +21,7 @@ async def list_users(
     limit: int = 100,
     active_only: bool = Query(True, description="Inclure uniquement les utilisateurs actifs"),
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[UserResponse]:
     """List all users (admin only)."""
     query = select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
@@ -36,7 +36,7 @@ async def list_users(
 async def create_user(
     user_in: UserCreate,
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     """Create a new user (admin only)."""
     # Check if email already exists
@@ -69,7 +69,7 @@ async def create_user(
 async def get_user(
     user_id: UUID,
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     """Get a specific user (admin only)."""
     result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
@@ -89,7 +89,7 @@ async def update_user(
     user_id: UUID,
     user_in: UserUpdate,
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     """Update a user (admin only)."""
     result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
@@ -140,7 +140,7 @@ async def update_user(
 async def delete_user(
     user_id: UUID,
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a user (admin only)."""
     if user_id == current_user.id:

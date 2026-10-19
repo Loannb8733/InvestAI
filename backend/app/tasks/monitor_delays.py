@@ -14,13 +14,13 @@ def check_crowdfunding_delays():
     Sets project.status = DELAYED and creates a notification."""
 
     async def _check():
-        from app.core.database import AsyncSessionLocal
+        from app.core.db.session import session_factory
         from app.models.asset import Asset
         from app.models.notification import Notification, NotificationPriority, NotificationType
         from app.models.portfolio import Portfolio
         from app.services.reconciliation_service import reconciliation_service
 
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             rows = await reconciliation_service.get_overdue_entries(db, grace_days=5)
 
             # Group by project to avoid duplicate status updates

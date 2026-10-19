@@ -42,7 +42,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.core.security import encrypt_api_key
 from app.models.api_key import APIKey
@@ -99,7 +99,7 @@ async def list_supported_exchanges() -> list[ExchangeInfo]:
 @router.get("", response_model=list[APIKeyResponse])
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[APIKeyResponse]:
     """List all API keys for the current user."""
     result = await db.execute(select(APIKey).where(APIKey.user_id == current_user.id))
@@ -111,7 +111,7 @@ async def list_api_keys(
 async def create_api_key(
     api_key_in: APIKeyCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> APIKeyResponse:
     """Create a new API key for an exchange."""
     # Verify exchange is supported
@@ -155,7 +155,7 @@ async def create_api_key(
 async def get_api_key(
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> APIKeyResponse:
     """Get a specific API key."""
     result = await db.execute(
@@ -180,7 +180,7 @@ async def update_api_key(
     api_key_id: UUID,
     api_key_in: APIKeyUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> APIKeyResponse:
     """Update an API key."""
     result = await db.execute(
@@ -219,7 +219,7 @@ async def update_api_key(
 async def delete_api_key(
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete an API key."""
     result = await db.execute(
@@ -246,7 +246,7 @@ async def test_api_key(
     request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> APIKeyTestResult:
     """Test an API key connection."""
     result = await db.execute(
@@ -357,7 +357,7 @@ async def import_trade_history(
     request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Import full trade history from exchange with actual prices."""
     from collections import defaultdict
@@ -795,7 +795,7 @@ async def import_trade_history(
         # resolve each trade's rate by date via the read-only `fx_read` resolver below. The
         # current spot rate is kept ONLY as a last-resort fallback when no historical rate
         # is available.
-        from app.core.database import AsyncSessionLocal
+        from app.core.db.session import session_factory
         from app.core.finance_constants import COLD_START_USD_EUR
         from app.services.fx_history_service import FxHistoryService
         from app.services.price_service import price_service
@@ -809,7 +809,7 @@ async def import_trade_history(
             logger.warning("USD→EUR spot fetch failed; using default fallback rate: %s", exc)
 
         try:
-            async with AsyncSessionLocal() as _fx_seed_db:
+            async with session_factory() as _fx_seed_db:
                 await FxHistoryService(_fx_seed_db).ensure_seeded("USD", "EUR", date(2017, 1, 1))
         except Exception as e:  # noqa: BLE001 - seeding is best-effort, never fatal
             logger.warning("FX seeding failed (%s); USD trades fall back to current rate", e)
@@ -1376,7 +1376,7 @@ async def sync_exchange(
     request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Sync balances from an exchange to portfolio assets."""
     from app.models.asset import Asset, AssetType
@@ -1572,7 +1572,7 @@ async def import_history_async(
     request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Launch import-history as a FastAPI background task.
 
@@ -1615,7 +1615,7 @@ async def refresh_exchange_fx(
     request: Request,
     api_key_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Recompute historical FX (USD→EUR) on already-imported transactions (FIN-01 heal).
 

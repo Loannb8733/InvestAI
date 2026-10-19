@@ -51,7 +51,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select  # noqa: E402
 
-from app.core.database import AsyncSessionLocal  # noqa: E402
+from app.core.db.session import session_factory  # noqa: E402
 from app.models.asset import Asset  # noqa: E402
 from app.models.transaction import Transaction, TransactionType  # noqa: E402
 
@@ -101,7 +101,7 @@ def missing_entry(stored: Decimal, history: Decimal, pru: Decimal, dust: Decimal
 
 
 async def reconcile(commit: bool) -> int:
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         assets = (await db.execute(select(Asset).where(Asset.asset_type != "CROWDFUNDING"))).scalars().all()
         created = 0
         skipped = []

@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, Nu
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.sql import func
 
-from app.models import Base
+from app.core.db.base import Base
 
 
 class PredictionLog(Base):

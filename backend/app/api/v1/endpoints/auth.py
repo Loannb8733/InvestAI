@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, jeton_perime_par_un_changement
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.security import (
     compute_token_fingerprint,
@@ -141,7 +141,7 @@ class RegisterResponse(BaseModel):
 async def register(
     request: Request,
     register_data: RegisterRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> RegisterResponse:
     """Register a new user.
 
@@ -238,7 +238,7 @@ class UserProfileUpdate(BaseModel):
 async def verify_email(
     request: Request,
     data: VerifyEmailRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> Token:
     """Verify email address and activate account."""
     result = await db.execute(select(User).where(User.email_verification_token == data.token))
@@ -284,7 +284,7 @@ async def verify_email(
 async def resend_verification(
     request: Request,
     data: ForgotPasswordRequest,  # Reuses email-only schema
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Resend verification email."""
     from app.core.config import settings
@@ -339,7 +339,7 @@ async def login(
     request: Request,
     response: Response,
     login_data: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> Token:
     """Authenticate user and return tokens."""
     from app.core.redis_client import _get_redis_txt
@@ -500,7 +500,7 @@ async def refresh_token(
     request: Request,
     response: Response,
     refresh_data: RefreshTokenRequest | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> Token:
     """Refresh access token using refresh token (from body or cookie)."""
     # Try body first, then cookie
@@ -657,7 +657,7 @@ async def logout(request: Request, response: Response) -> dict:
 @router.post("/mfa/setup", response_model=MFASetupResponse)
 async def setup_mfa(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> MFASetupResponse:
     """Setup MFA for current user."""
     if current_user.mfa_enabled:
@@ -708,7 +708,7 @@ async def verify_mfa(
     request: Request,
     request_data: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Verify and enable MFA for current user."""
     if not current_user.mfa_secret:
@@ -736,7 +736,7 @@ async def disable_mfa(
     request: Request,
     request_data: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Disable MFA for current user."""
     if not current_user.mfa_enabled:
@@ -786,7 +786,7 @@ async def get_current_user_info(
 async def update_profile(
     data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update current user profile (identity, currency, investor profile)."""
     update_data = data.model_dump(exclude_unset=True)
@@ -838,7 +838,7 @@ async def change_password(
     response: Response,
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Change current user's password."""
     if not verify_password(password_data.current_password, current_user.password_hash):
@@ -871,7 +871,7 @@ async def change_password(
 async def forgot_password(
     request: Request,
     data: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Request a password reset link. Always returns success to avoid email enumeration."""
     result = await db.execute(select(User).where(User.email == data.email))
@@ -920,7 +920,7 @@ async def forgot_password(
 async def reset_password(
     request: Request,
     data: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Reset password using a token from the forgot-password email."""
     result = await db.execute(select(User).where(User.password_reset_token == data.token))

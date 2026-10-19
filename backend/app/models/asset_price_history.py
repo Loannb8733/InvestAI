@@ -10,7 +10,7 @@ from sqlalchemy import Column, Date, DateTime, Index, Numeric, String, UniqueCon
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from app.models import Base
+from app.core.db.base import Base
 
 
 class AssetPriceHistory(Base):

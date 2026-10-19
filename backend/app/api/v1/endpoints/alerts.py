@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset
@@ -192,7 +192,7 @@ async def list_alert_conditions() -> list[AlertConditionInfo]:
 @router.get("/summary", response_model=AlertSummaryResponse)
 async def get_alert_summary(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertSummaryResponse:
     """Get summary of user's alerts."""
     summary = await alert_service.get_alert_summary(db, str(current_user.id))
@@ -205,7 +205,7 @@ async def list_alerts(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[AlertResponse]:
     """List all alerts for the current user."""
     query = select(Alert).where(Alert.user_id == current_user.id)
@@ -253,7 +253,7 @@ async def list_alerts(
 async def create_alert(
     alert_in: AlertCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Create a new alert."""
     # Les alertes de portefeuille ne ciblent aucun actif — pas de vérif d'actif.
@@ -318,7 +318,7 @@ async def create_alert(
 async def get_alert(
     alert_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Get a specific alert."""
     result = await db.execute(
@@ -368,7 +368,7 @@ async def update_alert(
     alert_id: UUID,
     alert_in: AlertUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Update an alert."""
     result = await db.execute(
@@ -431,7 +431,7 @@ async def update_alert(
 async def delete_alert(
     alert_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete an alert."""
     result = await db.execute(
@@ -457,7 +457,7 @@ async def delete_alert(
 async def check_alerts(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[AlertTriggerResponse]:
     """Manually check all alerts and return triggered ones."""
     triggered = await alert_service.check_alerts(db, str(current_user.id))

@@ -20,7 +20,7 @@ Cette tâche coupe la dépendance : les taux se tiennent à jour d'eux-mêmes.
 import logging
 from datetime import date
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.services.fx_history_service import FxHistoryService
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -43,7 +43,7 @@ def refresh_fx_rates():
 
     async def _refresh():
         resultats: dict[str, int] = {}
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             svc = FxHistoryService(db)
             for base, quote in _PAIRS:
                 paire = f"{base}->{quote}"

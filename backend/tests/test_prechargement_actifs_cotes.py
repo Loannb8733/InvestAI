@@ -41,7 +41,7 @@ async def test_seuls_les_actifs_cotes_sont_precharges(db_session, regular_user: 
         )
     await db_session.commit()
     # La fonction ouvre sa propre session : elle doit viser la base de test.
-    monkeypatch.setattr(history_cache, "AsyncSessionLocal", TestSessionLocal)
+    monkeypatch.setattr(history_cache, "session_factory", TestSessionLocal)
 
     actifs = await history_cache._get_all_crypto_symbols()
 

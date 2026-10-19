@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.user import User
 from app.services.smart_insights_service import smart_insights_service
 
@@ -190,7 +190,7 @@ def _build_regime_response(regime) -> MarketRegimeResponse | None:
 async def get_portfolio_health(
     days: int = Query(30, ge=7, le=365, description="Période d'analyse en jours"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioHealthResponse:
     """
     Analyse complète de la santé du portfolio.
@@ -309,7 +309,7 @@ class DashboardSummaryResponse(BaseModel):
 async def get_dashboard_summary(
     days: int = Query(30, ge=7, le=365, description="Période d'analyse en jours"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> DashboardSummaryResponse:
     """
     Résumé IA léger pour le widget dashboard Bento.
@@ -334,7 +334,7 @@ async def get_dashboard_summary(
 @router.get("/anomalies-impact", response_model=list[AnomalyImpactResponse])
 async def get_anomalies_with_impact(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[AnomalyImpactResponse]:
     """
     Anomalies détectées avec calcul de l'impact en EUR.

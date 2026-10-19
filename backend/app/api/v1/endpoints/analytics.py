@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -212,7 +212,7 @@ def _analytics_to_response(a) -> PortfolioAnalyticsResponse:
 async def get_global_analytics(
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     if days == 0:
         days = 3650
@@ -225,7 +225,7 @@ async def get_portfolio_analytics(
     portfolio_id: UUID,
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     if days == 0:
         days = 3650
@@ -247,7 +247,7 @@ async def get_correlation_matrix(
     portfolio_id: str | None = Query(None),
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     if days == 0:
         days = 3650
@@ -265,7 +265,7 @@ async def get_diversification_analysis(
     portfolio_id: str | None = Query(None),
     days: int = Query(60, ge=0, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     if days == 0:
         days = 3650
@@ -288,7 +288,7 @@ async def get_performance_summary(
     period: str = Query("30d", pattern="^(1d|7d|30d|90d|1y|all)$"),
     portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     period_map = {"1d": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 0}
     days = period_map.get(period, 60)
@@ -362,7 +362,7 @@ async def get_stress_test(
     portfolio_id: str | None = Query(None),
     scenario_ids: str | None = Query(None, description="Comma-separated scenario IDs to filter"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Run stress tests simulating historical crash scenarios."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -381,7 +381,7 @@ async def get_beta(
     days: int = Query(90, ge=30, le=365),
     portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compute beta of each asset and portfolio vs benchmarks (BTC, SPY)."""
     return await analytics_service.compute_beta(db, str(current_user.id), days=days, portfolio_id=portfolio_id)
@@ -404,7 +404,7 @@ async def get_monte_carlo(
         description="Fixed monthly withdrawal (€) — absolute mode, overrides rate",
     ),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Monte Carlo simulation of future portfolio returns with optional withdrawals and fees."""
     # Derive vol_regime from current market regime for regime-aware volatility
@@ -490,7 +490,7 @@ async def _send_ruin_alert(
 @router.get("/xirr", response_model=XIRRResponse)
 async def get_xirr(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compute XIRR (time-weighted internal rate of return)."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -506,7 +506,7 @@ async def get_xirr(
 async def get_rebalance_orders(
     target_weights: dict[str, float],
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Calculate rebalancing orders for target allocation."""
     # Validate: weights must sum to ~100
@@ -542,7 +542,7 @@ async def optimize_portfolio(
     objective: str = Query("max_sharpe", pattern="^(max_sharpe|min_volatility)$"),
     days: int = Query(90, ge=30, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """MPT portfolio optimization — find optimal weights."""
     result = await analytics_service.optimize_portfolio(db, str(current_user.id), objective=objective, days=days)
@@ -595,7 +595,7 @@ class PlatformDistributionItem(BaseModel):
 @router.get("/distribution/platforms", response_model=list[PlatformDistributionItem])
 async def get_platform_distribution(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Aggregate current asset values grouped by exchange/platform."""
     from sqlalchemy import func as sqlfunc

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.ml import adaptive_thresholds as at
 from app.models.user import User
@@ -145,7 +145,7 @@ class PortfolioPredictionResponse(BaseModel):
 async def get_portfolio_predictions(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioPredictionResponse:
     """Get predictions for all assets in user's portfolio."""
     result = await prediction_service.get_portfolio_predictions(db, str(current_user.id), days)
@@ -160,7 +160,7 @@ async def get_portfolio_predictions(
 @router.get("/anomalies", response_model=list[AnomalyResponse])
 async def get_anomalies(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[AnomalyResponse]:
     """Detect anomalies in user's portfolio assets."""
     anomalies = await prediction_service.detect_anomalies(db, str(current_user.id))
@@ -182,7 +182,7 @@ async def get_anomalies(
 @router.get("/sentiment", response_model=MarketSentimentResponse)
 async def get_market_sentiment(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> MarketSentimentResponse:
     """Get market sentiment analysis."""
     sentiment = await prediction_service.get_market_sentiment(db, str(current_user.id))
@@ -214,7 +214,7 @@ class WhatIfRequest(BaseModel):
 async def what_if_simulation(
     request: WhatIfRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Simulate what-if scenarios on the portfolio."""
     result = await prediction_service.get_what_if(
@@ -229,7 +229,7 @@ async def what_if_simulation(
 async def get_market_cycle(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get market cycle analysis with regime detection for BTC and portfolio assets."""
     result = await prediction_service.get_market_cycle(db, str(current_user.id))
@@ -338,7 +338,7 @@ async def _send_euphoria_alert(
 async def get_top_alpha(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Detect the held asset with the highest short-term alpha potential."""
     result = await prediction_service.get_top_alpha_asset(db, str(current_user.id))
@@ -459,7 +459,7 @@ async def _send_concentration_alert(
 async def validate_signal(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
     symbol: str | None = Query(None),
     action: str | None = Query(None),
 ):
@@ -706,7 +706,7 @@ async def _send_signal_report(
 async def get_strategy_map(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Build a strategy decision table crossing Alpha scores with Cycle phases."""
     result = await prediction_service.get_strategy_map(db, str(current_user.id))
@@ -779,7 +779,7 @@ async def get_market_events(
 async def get_portfolio_backtest(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compare past predictions with actual prices across the portfolio.
 
@@ -808,7 +808,7 @@ async def get_track_record(
 @router.get("/planned-orders", response_model=list)
 async def list_planned_orders(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List pending planned orders for the current user."""
     from sqlalchemy import select
@@ -860,7 +860,7 @@ async def create_planned_order(
     request: Request,
     data: PlannedOrderCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a pending planned order for the current user.
 
@@ -899,7 +899,7 @@ async def update_planned_order(
     order_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a planned order status (executed/cancelled)."""
     from sqlalchemy import select

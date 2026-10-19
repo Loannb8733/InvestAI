@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.goal import Goal, GoalPriority, GoalStatus, GoalStrategy, GoalType
 from app.models.user import User
 
@@ -204,7 +204,7 @@ async def list_goals(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all goals for the current user."""
     result = await db.execute(
@@ -218,7 +218,7 @@ async def list_goals(
 async def create_goal(
     data: GoalCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a new financial goal."""
     import logging
@@ -323,7 +323,7 @@ async def create_goal(
 async def get_goal(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get a specific goal."""
     result = await db.execute(
@@ -343,7 +343,7 @@ async def update_goal(
     goal_id: UUID,
     data: GoalUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a goal."""
     result = await db.execute(
@@ -397,7 +397,7 @@ async def update_goal(
 async def sync_goal_with_portfolio(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Sync goal's current_amount with actual portfolio value.
 
@@ -425,7 +425,7 @@ async def sync_goal_with_portfolio(
 async def delete_goal(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a goal."""
     result = await db.execute(
@@ -447,7 +447,7 @@ async def get_goal_projection(
     goal_id: UUID,
     monthly_contribution: float = Query(0.0, ge=0, description="Monthly DCA contribution (€)"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Monte Carlo projection for a specific goal.
 

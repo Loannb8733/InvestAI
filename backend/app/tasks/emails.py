@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.notification import Notification
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -31,7 +31,7 @@ async def _send_alert_email_async(
     if not email_service.is_configured:
         return False
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
@@ -54,7 +54,7 @@ async def _send_weekly_reports_async() -> dict:
         logger.warning("Email not configured, skipping weekly reports")
         return {"sent": 0, "failed": 0, "skipped": "email_not_configured"}
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Get all users with portfolios
         result = await db.execute(select(User).where(User.id.in_(select(Portfolio.user_id).distinct())))
         users = result.scalars().all()
@@ -111,7 +111,7 @@ async def _send_monthly_reports_async() -> dict:
         logger.warning("Email not configured, skipping monthly reports")
         return {"sent": 0, "failed": 0, "skipped": "email_not_configured"}
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(select(User).where(User.id.in_(select(Portfolio.user_id).distinct())))
         users = result.scalars().all()
 
@@ -197,7 +197,7 @@ async def _send_daily_digest_async() -> dict:
     if not email_service.is_configured:
         return {"sent": 0, "failed": 0, "skipped": "email_not_configured"}
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         yesterday = datetime.now(UTC) - timedelta(days=1)
 
         # Get users with notifications in last 24h

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -28,7 +28,7 @@ async def list_assets(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[AssetResponse]:
     """List all assets for the current user, optionally filtered by portfolio."""
     # Get user's portfolio IDs
@@ -65,7 +65,7 @@ async def list_assets(
 async def create_asset(
     asset_in: AssetCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AssetResponse:
     """Create a new asset."""
     # Verify portfolio belongs to user
@@ -131,7 +131,7 @@ async def get_asset(
     request: Request,
     asset_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AssetResponse:
     """Get a specific asset."""
     # Get user's portfolio IDs
@@ -164,7 +164,7 @@ async def update_asset(
     asset_id: UUID,
     asset_in: AssetUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AssetResponse:
     """Update an asset."""
     # Get user's portfolio IDs
@@ -221,7 +221,7 @@ async def delete_asset(
     asset_id: UUID,
     delete_transactions: bool = Query(True, description="Also delete associated transactions"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete an asset (cascade handles associated transactions)."""
     # Get user's portfolio IDs

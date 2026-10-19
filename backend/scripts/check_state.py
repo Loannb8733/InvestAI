@@ -7,11 +7,11 @@ sys.path.insert(0, "/app")
 
 from sqlalchemy import text
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 
 
 async def main():
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         r = await db.execute(text("SELECT count(*) FROM assets"))
         print(f"Total assets: {r.scalar()}")
         r = await db.execute(text("SELECT count(*) FROM transactions"))

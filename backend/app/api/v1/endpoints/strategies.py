@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.strategy import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
 from app.models.user import User
@@ -64,7 +64,7 @@ async def _enrich(db: AsyncSession, strategy: Strategy) -> dict:
 async def list_strategies(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all strategies for the current user."""
     result = await db.execute(
@@ -80,7 +80,7 @@ async def create_strategy(
     request: Request,
     data: StrategyCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a user-defined strategy with optional actions."""
     strategy = Strategy(
@@ -118,7 +118,7 @@ async def update_strategy(
     strategy_id: UUID,
     data: StrategyUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a strategy (name, description, status, params)."""
     result = await db.execute(
@@ -151,7 +151,7 @@ async def delete_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a strategy and its actions."""
     result = await db.execute(
@@ -176,7 +176,7 @@ async def delete_strategy(
 async def ai_suggest_strategies(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Ask AI to analyze portfolio and suggest strategies.
 
@@ -197,7 +197,7 @@ async def accept_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Accept an AI-proposed strategy (changes status to ACTIVE)."""
     result = await db.execute(
@@ -222,7 +222,7 @@ async def reject_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Reject an AI-proposed strategy."""
     result = await db.execute(
@@ -247,7 +247,7 @@ async def get_strategy_performance(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Measure what the EXECUTED actions of this strategy actually returned.
 
@@ -291,7 +291,7 @@ async def update_action_status(
     action_id: UUID,
     data: StrategyActionUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Mark an action as EXECUTED or SKIPPED."""
     result = await db.execute(

@@ -39,14 +39,14 @@ def _replis_muets():
 
     Les trois points d'injection diffèrent, et c'est ce qui rend ces tests
     fragiles à écrire : `get_cached_histories` est importé **dans** la fonction,
-    `AsyncSessionLocal` aussi, mais `HistoricalDataFetcher` l'est **en tête du
+    `session_factory` aussi, mais `HistoricalDataFetcher` l'est **en tête du
     module** — le patcher à sa source d'origine n'a donc aucun effet. Une
     première version laissait passer de vrais appels à CoinGecko, et un test
     attendait 30 % là où le marché rendait 26,46 %.
     """
     return (
         patch("httpx.AsyncClient", side_effect=RuntimeError("étape 2 neutralisée")),
-        patch("app.core.database.AsyncSessionLocal", side_effect=RuntimeError("étape 3 neutralisée")),
+        patch("app.core.db.session.session_factory", side_effect=RuntimeError("étape 3 neutralisée")),
         patch("app.services.metrics_service.HistoricalDataFetcher", MagicMock()),
     )
 

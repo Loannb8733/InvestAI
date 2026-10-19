@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.finance_constants import annualized_return_pct
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
@@ -328,7 +328,7 @@ async def get_dashboard(
     request: Request,
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EnhancedDashboardResponse:
     """Get enhanced dashboard metrics for the current user.
 
@@ -941,7 +941,7 @@ async def get_munitions(
     monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
     profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get deployment capacity (munitions) for the current user."""
     from app.services.strategy_service import strategy_service
@@ -1169,7 +1169,7 @@ async def get_portfolio_dashboard(
     request: Request,
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get dashboard metrics for a specific portfolio."""
     portfolio_result = await db.execute(
@@ -1194,7 +1194,7 @@ async def get_portfolio_dashboard(
 async def get_portfolio_history(
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get historical investment metrics for a portfolio (including sold assets)."""
     portfolio_result = await db.execute(
@@ -1227,7 +1227,7 @@ async def get_portfolio_sparklines(
     background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[SparklineData]:
     """Get sparkline price data for all assets in a portfolio."""
     from collections import defaultdict
@@ -1317,7 +1317,7 @@ async def get_portfolio_sparklines(
 async def get_historical_data(
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[HistoricalDataPoint]:
     """Get historical portfolio values. days=0 means all time."""
     user_id = str(current_user.id)
@@ -1366,7 +1366,7 @@ class BenchmarkSeries(BaseModel):
 async def get_benchmark_data(
     days: int = Query(default=90, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get normalized benchmark data (base 100) for overlay on portfolio chart.
 

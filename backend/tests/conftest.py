@@ -22,10 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.db.metadata import metadata
+from app.core.db.session import get_session
 from app.core.security import hash_password
 from app.main import app
-from app.models import Base
 from app.models.user import User, UserRole
 
 # Test database URL — only swap the database name in the path, never the username.
@@ -123,13 +123,13 @@ def _vider_memo_de_change():
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
 
     async with TestSessionLocal() as session:
         yield session
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(metadata.drop_all)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -139,7 +139,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db():
         yield db_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session] = override_get_db
 
     # The app sets redirect_slashes=False (see app/main.py), so collection routes
     # declared with an empty path ("") are reachable ONLY at the no-slash URL

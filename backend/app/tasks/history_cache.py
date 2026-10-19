@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
@@ -97,7 +97,7 @@ _TYPES_COTES = (AssetType.CRYPTO, AssetType.STOCK, AssetType.ETF, AssetType.REAL
 
 async def _get_all_crypto_symbols() -> list:
     """Get all unique market-traded symbols (with a non-zero position) from DB."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(Asset.symbol, Asset.asset_type)
             .where(Asset.quantity > 0, Asset.asset_type.in_(_TYPES_COTES))
@@ -122,7 +122,7 @@ async def _persist_prices_to_db(symbol: str, dates: list, prices: list, source: 
     if not dates or not prices:
         return
     try:
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             # Deduplicate: keep last price for each date (most recent intraday value)
             seen: dict = {}
             for d, p in zip(dates, prices):
@@ -215,7 +215,7 @@ async def _load_prices_from_db(symbol: str, days: int):
     """Load price history from PostgreSQL. Returns (dates, prices) or ([], [])."""
     try:
         cutoff = datetime.now(UTC).date() - timedelta(days=days)
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await db.execute(
                 select(AssetPriceHistory.price_date, AssetPriceHistory.price_eur)
                 .where(
@@ -237,7 +237,7 @@ async def _load_prices_from_db(symbol: str, days: int):
 
 async def _dernier_jour_en_base() -> dict[str, date]:
     """Dernier jour de cours connu en base, par symbole (une seule requête)."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(AssetPriceHistory.symbol, func.max(AssetPriceHistory.price_date)).group_by(AssetPriceHistory.symbol)
         )
@@ -428,7 +428,7 @@ async def _find_missing_dates(symbol: str, start: datetime, end: datetime) -> li
     Returns a list of datetime objects for missing dates, limited to 50 per call
     to avoid overwhelming the per-date API.
     """
-    from app.core.database import AsyncSessionLocal as _ASL
+    from app.core.db.session import session_factory as _ASL
 
     try:
         async with _ASL() as db:
@@ -462,16 +462,16 @@ async def _deep_backfill_all():
     Uses /market_chart/range to go beyond the 365-day /market_chart limit.
     Persists everything to PostgreSQL so subsequent requests are instant.
     """
-    from app.core.database import engine as _engine
+    from app.core.db.session import engine as _engine
     from app.models.transaction import Transaction
 
     redis = _get_redis()
 
     # Dispose engine connections to avoid 'attached to different loop' errors
-    # when a previous Celery task used AsyncSessionLocal on a different event loop.
+    # when a previous Celery task used session_factory on a different event loop.
     await _engine.dispose()
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # 1. Get all unique symbols with their earliest transaction dates
         result = await db.execute(
             select(

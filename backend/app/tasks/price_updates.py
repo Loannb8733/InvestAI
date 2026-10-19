@@ -11,7 +11,7 @@ import logging
 from redis import Redis
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.models.asset import Asset, AssetType
 from app.services.price_service import PriceService
@@ -83,7 +83,7 @@ def publish_price_update(
 
 async def get_unique_symbols_by_type() -> dict[str, set[str]]:
     """Get unique asset symbols grouped by type from database."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(Asset.symbol, Asset.asset_type)
             .where(

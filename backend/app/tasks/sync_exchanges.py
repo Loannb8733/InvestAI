@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.api_key import APIKey
 from app.models.asset import Asset, AssetType
 from app.models.cold_wallet_address import ColdWalletAddress
@@ -1093,7 +1093,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
     transactions in place (FIN-01), without creating new rows or running the balance
     reconciliation step. Used by the "Recalculer les taux FX" action.
     """
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Get API key
         result = await db.execute(select(APIKey).where(APIKey.id == api_key_id))
         api_key = result.scalar_one_or_none()
@@ -1401,7 +1401,7 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
 
 async def _list_active_api_key_ids() -> list:
     """Return the ids of all active API keys (one short-lived session)."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(select(APIKey.id).where(APIKey.is_active == True))
         return [str(row[0]) for row in result.all()]
 
@@ -1415,7 +1415,7 @@ async def _sync_all_exchanges_async() -> dict:
     sequentially on purpose — two exchanges of the same user upsert the same
     "Crypto" portfolio, so concurrent syncs could race on get-or-create.
     """
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Get all active API keys
         result = await db.execute(select(APIKey).where(APIKey.is_active == True))
         api_keys = result.scalars().all()

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.models.cold_wallet_address import ColdWalletAddress
 from app.models.user import User
 
@@ -37,7 +37,7 @@ class ColdWalletResponse(BaseModel):
 @router.get("", response_model=list[ColdWalletResponse])
 async def list_cold_wallets(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> list[ColdWalletResponse]:
     """List the current user's cold-wallet address mappings."""
     result = await db.execute(
@@ -52,7 +52,7 @@ async def list_cold_wallets(
 async def upsert_cold_wallet(
     payload: ColdWalletCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> ColdWalletResponse:
     """Create or rename a cold-wallet address mapping (unique per user+address)."""
     address = payload.address.strip()
@@ -81,7 +81,7 @@ async def upsert_cold_wallet(
 async def delete_cold_wallet(
     wallet_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> None:
     """Delete a cold-wallet address mapping owned by the current user."""
     result = await db.execute(

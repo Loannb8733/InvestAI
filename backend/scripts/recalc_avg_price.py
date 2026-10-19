@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
 from sqlalchemy import select  # noqa: E402
 
-from app.core.database import AsyncSessionLocal  # noqa: E402
+from app.core.db.session import session_factory  # noqa: E402
 from app.models.asset import Asset, AssetType  # noqa: E402
 from app.models.transaction import Transaction, TransactionType  # noqa: E402
 
@@ -42,7 +42,7 @@ BUY_TYPES = [
 
 
 async def main():
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(Asset).where(
                 Asset.asset_type != AssetType.CROWDFUNDING,

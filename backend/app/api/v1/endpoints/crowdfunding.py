@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.models.asset import Asset, AssetType
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
@@ -353,7 +353,7 @@ async def _get_project_for_user(db: AsyncSession, project_id: uuid.UUID, user_id
 async def list_projects(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     pids = [p.id for p in projects]
@@ -369,7 +369,7 @@ async def create_project(
     request: Request,
     data: CrowdfundingProjectCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     # Resolve or auto-create a dedicated crowdfunding portfolio
     if data.portfolio_id:
@@ -435,7 +435,7 @@ async def create_project(
 async def get_dashboard(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     pids = [p.id for p in projects]
@@ -553,7 +553,7 @@ async def get_dashboard(
 async def get_performance(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     repayments_by_project = await _get_repayments_for_projects(db, [p.id for p in projects])
@@ -628,7 +628,7 @@ async def get_performance(
 async def get_cashflow_schedule(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Échéancier consolidé de cash-flows : « combien je reçois en septembre ».
 
@@ -683,7 +683,7 @@ async def get_tax_report(
     request: Request,
     year: int | None = Query(None, ge=2000, le=2100),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Rapport fiscal annuel : réconciliation des IFU (formulaire 2561).
 
@@ -757,7 +757,7 @@ async def get_tax_report(
 async def sync_calendar_events(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Regenerate calendar events for all active crowdfunding projects."""
     projects = await _get_user_projects(db, current_user.id)
@@ -785,7 +785,7 @@ async def analyze_documents(
     project_id: uuid.UUID | None = Query(None),
     project_id_form: uuid.UUID | None = Form(None, alias="project_id"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Upload PDFs and get an AI-powered risk analysis.
 
@@ -860,7 +860,7 @@ async def analyze_documents(
 async def list_audits(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all audits for the current user."""
     result = await db.execute(
@@ -882,7 +882,7 @@ async def create_repayment(
     project_id: uuid.UUID,
     data: RepaymentCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Log a payment received from a crowdfunding project."""
     project = await _get_project_for_user(db, project_id, current_user.id)
@@ -931,7 +931,7 @@ async def delete_repayment(
     project_id: uuid.UUID,
     repayment_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a repayment and decrement the project total."""
     project = await _get_project_for_user(db, project_id, current_user.id)
@@ -966,7 +966,7 @@ async def download_document(
     request: Request,
     doc_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Download a project document PDF."""
     import io
@@ -1001,7 +1001,7 @@ async def upload_documents(
     project_id: uuid.UUID,
     files: list[UploadFile] = File(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Upload PDFs to a project and auto-trigger audit analysis."""
     from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
@@ -1081,7 +1081,7 @@ async def get_stress_test(
     project_id: uuid.UUID,
     delay_months: int = Query(0, ge=0, le=24),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compute degraded IRR for a project with simulated payment delays."""
     if delay_months not in ALLOWED_DELAY_MONTHS:
@@ -1126,7 +1126,7 @@ async def get_project(
     request: Request,
     project_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
     docs_map = await _get_docs_for_projects(db, [project.id])
@@ -1147,7 +1147,7 @@ async def update_project(
     project_id: uuid.UUID,
     data: CrowdfundingProjectUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
 
@@ -1229,7 +1229,7 @@ async def delete_project(
     request: Request,
     project_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
 

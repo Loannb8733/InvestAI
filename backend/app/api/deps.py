@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.security import compute_token_fingerprint, decode_token
 from app.models.user import User, UserRole
 
@@ -40,7 +40,7 @@ def jeton_perime_par_un_changement(payload: dict, user: User) -> bool:
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> User:
     """Get current authenticated user from JWT token (header or cookie)."""
     token = None
