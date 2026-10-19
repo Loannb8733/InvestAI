@@ -16,9 +16,9 @@ _background_tasks: set[asyncio.Task[None]] = set()
 
 async def _startup_backfill() -> None:
     try:
-        from app.tasks.history_cache import _fetch_and_cache_all
+        from app.domains.market_data.history.tasks import refresh_all
 
-        count = await _fetch_and_cache_all()
+        count = await refresh_all()
         logger.info("Startup price backfill complete: %d assets cached", count)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Startup price backfill failed: %s", exc)

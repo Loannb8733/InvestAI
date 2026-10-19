@@ -13,17 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.redis_client import (
     _data_hash,
     cache_ensemble,
-    cache_history,
     cache_prediction,
     get_cached_ensemble,
-    get_cached_history,
     get_cached_prediction,
 )
+from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as at
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
-from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector
 from app.models.asset import Asset, AssetType
@@ -50,7 +48,6 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         self.forecaster = PriceForecaster()
         self.anomaly_detector = AnomalyDetector()
         self.regime_detector = MarketRegimeDetector()
-        self.data_fetcher = HistoricalDataFetcher()
 
     async def get_price_prediction(
         self,
@@ -88,47 +85,12 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         if current_price is None:
             return self._empty_prediction(symbol)
 
-        # Fetch historical data (365 days for better ML training)
-        cached_hist = await get_cached_history(symbol, asset_type.value, _HISTORY_DAYS)
-        if cached_hist:
-            dates = [datetime.fromisoformat(d) for d in cached_hist["dates"]]
-            prices = cached_hist["prices"]
-            volumes = cached_hist.get("volumes")
-        else:
-            hist_result = await self.data_fetcher.get_history_extended(symbol, asset_type.value, days=_HISTORY_DAYS)
-            dates, prices, volumes = (
-                hist_result.dates,
-                hist_result.prices,
-                hist_result.volumes,
-            )
-            if dates and prices:
-                cache_payload = {
-                    "dates": [d.isoformat() for d in dates],
-                    "prices": prices,
-                }
-                if volumes:
-                    cache_payload["volumes"] = volumes
-                await cache_history(symbol, asset_type.value, _HISTORY_DAYS, cache_payload)
+        history = await local_series(symbol, _HISTORY_DAYS)
+        dates, prices, volumes = history.dates, history.prices, history.volumes
 
-        # Fetch BTC prices for altcoin correlation (crypto only, not BTC itself)
         btc_prices = None
         if asset_type == AssetType.CRYPTO and symbol.upper() != "BTC":
-            btc_cached = await get_cached_history("BTC", "crypto", _HISTORY_DAYS)
-            if btc_cached:
-                btc_prices = btc_cached["prices"]
-            else:
-                btc_dates, btc_prices_raw = await self.data_fetcher.get_history("BTC", "crypto", days=_HISTORY_DAYS)
-                if btc_dates and btc_prices_raw:
-                    btc_prices = btc_prices_raw
-                    await cache_history(
-                        "BTC",
-                        "crypto",
-                        _HISTORY_DAYS,
-                        {
-                            "dates": [d.isoformat() for d in btc_dates],
-                            "prices": btc_prices_raw,
-                        },
-                    )
+            btc_prices = (await local_series("BTC", _HISTORY_DAYS)).prices or None
 
         # Fetch Fear & Greed Index
         fear_greed = await fetch_fear_greed_index()
@@ -136,7 +98,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         # Fetch BTC dominance
         btc_dominance = None
         try:
-            btc_dominance = await self.data_fetcher.get_btc_dominance()
+            btc_dominance = await price_feed.btc_dominance()
         except Exception as exc:
             logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
@@ -582,24 +544,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                 if current_price is None:
                     continue
 
-                # Fetch historical prices for ML-based detection (with cache)
-                cached_hist = await get_cached_history(asset.symbol, asset.asset_type.value, 30)
-                if cached_hist:
-                    prices = cached_hist["prices"]
-                else:
-                    hist_dates, prices = await self.data_fetcher.get_history(
-                        asset.symbol, asset.asset_type.value, days=30
-                    )
-                    if hist_dates and prices:
-                        await cache_history(
-                            asset.symbol,
-                            asset.asset_type.value,
-                            30,
-                            {
-                                "dates": [d.isoformat() for d in hist_dates],
-                                "prices": prices,
-                            },
-                        )
+                prices = (await local_series(asset.symbol, 30)).prices
 
                 anomaly = self.anomaly_detector.detect(
                     symbol=asset.symbol,
@@ -1400,21 +1345,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
     async def _get_daily_volatility(self, symbol: str, asset_type: AssetType) -> float:
         """Compute daily volatility from actual historical data."""
         try:
-            cached_hist = await get_cached_history(symbol, asset_type.value, 30)
-            if cached_hist:
-                prices = cached_hist["prices"]
-            else:
-                hist_dates, prices = await self.data_fetcher.get_history(symbol, asset_type.value, days=30)
-                if hist_dates and prices:
-                    await cache_history(
-                        symbol,
-                        asset_type.value,
-                        30,
-                        {
-                            "dates": [d.isoformat() for d in hist_dates],
-                            "prices": prices,
-                        },
-                    )
+            prices = (await local_series(symbol, 30)).prices
             if prices and len(prices) >= 5:
                 returns = [
                     (prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices)) if prices[i - 1] > 0
@@ -1582,9 +1513,8 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         # Try to get cached prices for momentum estimation
         trend_factor = 0.0
-        cached_hist = await get_cached_history(symbol, asset_type.value, 30)
-        if cached_hist and len(cached_hist.get("prices", [])) >= 2:
-            cached_prices = cached_hist["prices"]
+        cached_prices = (await local_series(symbol, 30)).prices
+        if len(cached_prices) >= 2:
             # Observed daily momentum from last 7 days (or available)
             window = cached_prices[-min(7, len(cached_prices)) :]
             if len(window) >= 2 and window[0] > 0:

@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.finance_constants import TRADING_DAYS_PER_YEAR, annualized_return_pct
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
-from app.ml.historical_data import HistoricalDataFetcher
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
@@ -165,7 +164,7 @@ class MetricsService:
         if not symbols or total_value <= 0:
             return {}
 
-        from app.models.asset_price_history import AssetPriceHistory
+        from app.domains.market_data.history.models import AssetPriceHistory
 
         cutoff = (datetime.now(UTC) - timedelta(days=days)).date()
 
@@ -970,152 +969,17 @@ class MetricsService:
         return result
 
     async def _fetch_period_changes(self, symbols_by_type: dict[str, list[str]], days: int) -> dict[str, float]:
-        """Fetch price change percentage over a period for each symbol.
+        """Variation en pourcentage de chaque symbole sur ``days`` jours, depuis l'historique en base.
 
-        Strategy (prioritized):
-        1. Cached historical data (Redis/PostgreSQL) — fast, no API calls
-        2. CoinGecko batch API for crypto — single call, pre-computed periods
-        3. Live historical fetch — last resort, one API call per symbol
-
-        Returns {SYMBOL: change_percent}.
+        Un symbole sans au moins deux cours connus est absent du résultat.
         """
-        from app.tasks.history_cache import get_cached_histories
+        from app.domains.market_data.history.reader import local_history
 
+        symbols = [s for syms in symbols_by_type.values() for s in syms]
         changes: dict[str, float] = {}
-        uncached_crypto: list[str] = []
-        uncached_stocks: list[str] = []
-
-        # ── Step 1: Try cached historical data first (no API calls) ──
-        all_symbols = []
-        for syms in symbols_by_type.values():
-            all_symbols.extend(syms)
-
-        # Une seule commande Redis pour tous les symboles (quota Upstash, NEW-81).
-        try:
-            historiques = get_cached_histories([s.upper() for s in all_symbols], days=max(days, 2))
-        except Exception as exc:  # noqa: BLE001 — chaque symbole retombe sur les sources suivantes
-            logger.warning("Historique groupé indisponible, variations recalculées en direct : %s", exc)
-            historiques = {}
-        for symbol in all_symbols:
-            try:
-                _dates, prices = historiques[symbol.upper()]
-            except Exception:
-                # Sans historique, aucune variation n'est publiée pour ce
-                # symbole — le test `if prices and len(prices) >= 2` en aval
-                # l'écarte proprement. Rien de faux n'est produit, mais un cache
-                # durablement cassé ne laissait aucune trace.
-                logger.warning("Historique indisponible pour %s — variation non calculée", symbol)
-                prices = []
-            if prices and len(prices) >= 2 and prices[0] != 0:
-                change = (prices[-1] - prices[0]) / prices[0] * 100
-                changes[symbol.upper()] = change
-            else:
-                # Track uncached symbols by type for live fallback
-                sym_upper = symbol.upper()
-                if sym_upper in [s.upper() for s in symbols_by_type.get("crypto", [])]:
-                    uncached_crypto.append(symbol)
-                else:
-                    uncached_stocks.append(symbol)
-
-        # If all symbols resolved from cache, return early
-        if not uncached_crypto and not uncached_stocks:
-            return changes
-
-        # ── Step 2: CoinGecko batch API for uncached crypto ──
-        if uncached_crypto:
-            import httpx
-
-            from app.core.timeframe import get_coingecko_period
-
-            cg_period, cg_key = get_coingecko_period(days)
-            if cg_period is not None:
-                try:
-                    from app.ml.historical_data import HistoricalDataFetcher as HDF
-
-                    coin_ids = [HDF.SYMBOL_MAP.get(s.upper(), s.lower()) for s in uncached_crypto]
-                    headers = {
-                        "User-Agent": "Mozilla/5.0",
-                        "Accept": "application/json",
-                    }
-
-                    async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
-                        response = await client.get(
-                            "https://api.coingecko.com/api/v3/coins/markets",
-                            params={
-                                "vs_currency": "eur",
-                                "ids": ",".join(coin_ids),
-                                "price_change_percentage": cg_period,
-                                "per_page": 250,
-                            },
-                        )
-                        response.raise_for_status()
-                        data = response.json()
-                        id_to_symbol = {v: k for k, v in HDF.SYMBOL_MAP.items()}
-                        for coin in data:
-                            coin_id = coin.get("id", "")
-                            symbol = id_to_symbol.get(coin_id, coin.get("symbol", "").upper())
-                            pct = coin.get(cg_key)
-                            if pct is None:
-                                continue
-                            if isinstance(pct, dict):
-                                pct = pct.get("eur")
-                                if pct is None:
-                                    continue
-                            changes[symbol.upper()] = float(pct)
-                            # Remove from uncached since we got data
-                            uncached_crypto = [s for s in uncached_crypto if s.upper() != symbol.upper()]
-                except Exception as e:
-                    logger.warning("Failed to fetch crypto period changes (batch): %s", e)
-
-        # ── Step 2b: Try PostgreSQL asset_price_history for remaining ──
-        remaining = uncached_crypto + uncached_stocks
-        if remaining:
-            try:
-                from app.core.db.session import session_factory
-                from app.models.asset_price_history import AssetPriceHistory
-
-                cutoff = (datetime.now(UTC) - timedelta(days=days + 5)).date()
-                sym_uppers = [s.upper() for s in remaining]
-                async with session_factory() as _db:
-                    # One batched query (WHERE symbol IN ...) instead of one SELECT
-                    # per symbol; group the rows by symbol Python-side.
-                    result = await _db.execute(
-                        select(AssetPriceHistory.symbol, AssetPriceHistory.price_eur)
-                        .where(
-                            AssetPriceHistory.symbol.in_(sym_uppers),
-                            AssetPriceHistory.price_date >= cutoff,
-                        )
-                        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
-                    )
-                    prices_by_sym: dict[str, list] = {}
-                    for sym, px in result.all():
-                        prices_by_sym.setdefault(sym, []).append(float(px))
-                    for sym_upper, prices in prices_by_sym.items():
-                        if len(prices) >= 2 and prices[0] != 0:
-                            changes[sym_upper] = (prices[-1] - prices[0]) / prices[0] * 100
-                    remaining = [s for s in remaining if s.upper() not in changes]
-            except Exception as e:
-                logger.warning("DB period change lookup failed: %s", e)
-
-        # ── Step 3: Live historical fetch for remaining uncached symbols (fast mode) ──
-        if remaining:
-            fetcher = HistoricalDataFetcher()
-            try:
-                for symbol in remaining:
-                    try:
-                        sym_upper = symbol.upper()
-                        if sym_upper in [s.upper() for s in symbols_by_type.get("crypto", [])]:
-                            _, prices = await fetcher.get_crypto_history(symbol, days=days, fast=True)
-                        else:
-                            _, prices = await fetcher.get_stock_history(symbol, days=days)
-                        if prices and len(prices) >= 2 and prices[0] != 0:
-                            change = (prices[-1] - prices[0]) / prices[0] * 100
-                            changes[sym_upper] = change
-                    except Exception as exc:
-                        logger.debug("Live period-change fetch failed for %s: %s", symbol, exc)
-            finally:
-                await fetcher.close()
-
+        for symbol, history in (await local_history(symbols, max(days, 2))).items():
+            if len(history.prices) >= 2 and history.prices[0] != 0:
+                changes[symbol] = (history.prices[-1] - history.prices[0]) / history.prices[0] * 100
         return changes
 
     async def get_user_dashboard_metrics(
@@ -1573,7 +1437,7 @@ class MetricsService:
 
         # Build historical price lookup for transactions with price=0
         # Collect (symbol, date) pairs that need pricing
-        from app.models.asset_price_history import AssetPriceHistory
+        from app.domains.market_data.history.models import AssetPriceHistory
 
         asset_id_to_symbol = {str(a.id): a.symbol.upper() for a in all_assets}
         price_lookup_needed: set = set()

@@ -255,7 +255,7 @@ class StrategyService:
         amount / non-EUR currency / undecidable direction) are excluded from
         the totals and reported in non_evaluable.
         """
-        from app.models.asset_price_history import AssetPriceHistory
+        from app.domains.market_data.history.models import AssetPriceHistory
         from app.models.strategy import ActionStatus
 
         executed = [a for a in actions if a.status == ActionStatus.EXECUTED]

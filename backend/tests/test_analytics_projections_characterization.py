@@ -46,12 +46,12 @@ def _actif(symbole, quantite, prix):
 
 
 def _figer_series(service, actifs, serie=SERIE_HAUSSIERE):
-    async def faux_historique(symbol, asset_type, days=60):
-        return ([float(i) for i in range(len(serie))], [float(p) for p in serie])
+    async def faux_historique(symbol, days=60):
+        return [float(p) for p in serie]
 
     return (
         patch.object(service, "_get_user_assets", new=AsyncMock(return_value=actifs)),
-        patch.object(service, "_fetch_history", side_effect=faux_historique),
+        patch.object(service, "_history_prices", side_effect=faux_historique),
     )
 
 

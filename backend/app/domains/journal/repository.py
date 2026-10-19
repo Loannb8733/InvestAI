@@ -8,8 +8,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.journal.models import Note
+from app.domains.market_data.history.models import AssetPriceHistory
 from app.models.asset import Asset
-from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 
 SCORED_SENTIMENTS = ("bullish", "bearish", "neutral")

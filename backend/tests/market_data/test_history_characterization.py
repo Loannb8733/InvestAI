@@ -1,17 +1,20 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
-import httpx
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
+from app.domains.market_data.fx.models import FxDailyRate
+from app.domains.market_data.history import tasks
+from app.domains.market_data.history.models import AssetPriceHistory
+from app.domains.market_data.history.repository import HistoryRepository
+from app.domains.market_data.history.series import PriceSeries
 from app.models.asset import Asset
-from app.models.asset_price_history import AssetPriceHistory
 from app.models.user import User
-from app.tasks import history_cache
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 
@@ -66,8 +69,8 @@ def background(monkeypatch: pytest.MonkeyPatch) -> None:
     async def no_sleep(_: float) -> None:
         return None
 
-    monkeypatch.setattr(history_cache, "session_factory", TestSessionLocal)
-    monkeypatch.setattr(history_cache.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(tasks, "session_factory", TestSessionLocal)
+    monkeypatch.setattr(tasks.asyncio, "sleep", no_sleep)
 
 
 async def _stored(db: AsyncSession, symbol: str) -> list[float]:
@@ -83,20 +86,24 @@ async def _stored(db: AsyncSession, symbol: str) -> list[float]:
 async def test_refresh_task_persists_history_and_mirrors_current_price(
     client: AsyncClient, db_session: AsyncSession, regular_user: User, http_stub: HttpStub
 ) -> None:
+    db_session.add(
+        FxDailyRate(rate_date=date(2020, 1, 1), base_currency="USD", quote_currency="EUR", rate=Decimal("0.5"))
+    )
+    await db_session.commit()
     http_stub.json(COINGECKO, _market_chart(100.0, 110.0, 120.0))
     http_stub.json(YAHOO, _yahoo_chart(10.0, None, 12.0))
     await _holding(client, regular_user, "BTC", "crypto")
     await _holding(client, regular_user, "SPY", "etf")
 
-    assert await history_cache._fetch_and_cache_all() == 2
+    assert await tasks.refresh_all() == 6
     assert await _stored(db_session, "BTC") == [100.0, 110.0, 120.0]
-    assert await _stored(db_session, "SPY") == [10.0, 12.0]
+    assert await _stored(db_session, "SPY") == [5.0, 6.0]
     btc = (await db_session.execute(select(Asset).where(Asset.symbol == "BTC"))).scalar_one()
     await db_session.refresh(btc)
     assert float(btc.current_price) == 120.0
 
     calls = len(http_stub.requests)
-    assert await history_cache._fetch_and_cache_all() == 2
+    assert await tasks.refresh_all() == 6
     assert len(http_stub.requests) == calls
 
 
@@ -106,26 +113,24 @@ async def test_sparklines_read_the_persisted_history(
 ) -> None:
     http_stub.json(COINGECKO, _market_chart(100.0, 150.0, 200.0))
     headers, portfolio_id = await _holding(client, regular_user, "ETH", "crypto")
-    await history_cache._fetch_and_cache_all()
+    await tasks.refresh_symbol("ETH", "crypto")
     http_stub.routes.clear()
 
     response = await client.get(f"/api/v1/dashboard/portfolio/{portfolio_id}/sparklines", headers=headers)
     assert response.json() == [{"symbol": "ETH", "prices": [0.0, 0.5, 1.0], "change_pct": 100.0}]
 
 
-async def test_benchmarks_are_fetched_during_the_request(
-    client: AsyncClient, regular_user: User, http_stub: HttpStub
+async def test_benchmarks_are_read_from_the_stored_history(
+    client: AsyncClient, db_session: AsyncSession, regular_user: User, http_stub: HttpStub
 ) -> None:
-    http_stub.json(COINGECKO, _market_chart(100.0, 200.0))
-
-    def yahoo(request: httpx.Request) -> httpx.Response:
-        closes = (50.0, 55.0) if request.url.path.endswith("/SPY") else (None, None)
-        return httpx.Response(200, json=_yahoo_chart(*closes), request=request)
-
-    http_stub.on(YAHOO, yahoo)
+    repository = HistoryRepository(db_session)
+    await repository.upsert("BTC", PriceSeries([_days_ago(1), _days_ago(0)], [100.0, 200.0]), "coingecko")
+    await repository.upsert("SPY", PriceSeries([_days_ago(1), _days_ago(0)], [50.0, 55.0]), "yahoo")
+    await db_session.commit()
     headers = {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
     body = (await client.get("/api/v1/dashboard/benchmarks?days=2", headers=headers)).json()
     assert [(s["symbol"], [p["value"] for p in s["data"]]) for s in body] == [
         ("BTC", [100.0, 200.0]),
         ("SPY", [100.0, 110.0]),
     ]
+    assert not http_stub.requests

@@ -383,10 +383,8 @@ class InsightsService:
 
         Returns what the portfolio would be worth today.
         """
-        from app.core.config import settings
-        from app.ml.historical_data import HistoricalDataFetcher
-
-        fetcher = HistoricalDataFetcher(coingecko_api_key=getattr(settings, "COINGECKO_API_KEY", None))
+        from app.domains.market_data.history.reader import local_series
+        from app.domains.market_data.history.tasks import schedule_refresh
 
         now = datetime.now(UTC)
         start_date = datetime(start_year, start_month, 1)
@@ -397,11 +395,11 @@ class InsightsService:
 
         # Fetch max historical data
         days = min(total_months * 31 + 30, 365 * 5)  # up to 5 years
-        dates, prices = await fetcher.get_history(symbol, asset_type, days=days)
-        await fetcher.close()
-
-        if not prices or len(prices) < 30:
-            return {"error": f"Pas assez d'historique pour {symbol}"}
+        history = await local_series(symbol, days)
+        dates, prices = history.dates, history.prices
+        if len(prices) < 30:
+            schedule_refresh(symbol, asset_type)
+            return {"error": f"Pas assez d'historique pour {symbol} : chargement en cours, réessayez plus tard"}
 
         # Build date->price lookup (use closest available date)
         date_price = {}

@@ -1,18 +1,4 @@
-"""Deux défauts trouvés en profilant le dashboard : un filet muet, des appels perdus.
-
-Le repli PostgreSQL ne fonctionnait dans aucun chemin web
----------------------------------------------------------
-`history_cache.get_cached_history` est synchrone et faisait
-`run_async(_load_prices_from_db(...))` pour son dernier recours. Or elle est
-appelée par `snapshot_service`, `metrics_service` et `analytics_service` — tous
-dans une boucle d'événements. On ne peut pas démarrer une boucle dans une
-boucle : l'exception était avalée par le `except` voisin, la coroutine jamais
-attendue, et le repli rendait `[], []` en silence.
-
-Mesuré avant correction : **91 prix depuis un script, 0 depuis un endpoint**.
-Un filet de sécurité qui ne se déclenche que là où on n'en a pas besoin.
-
-`fee_currency` n'est pas toujours une monnaie
+"""`fee_currency` n'est pas toujours une monnaie
 ----------------------------------------------
 Payer ses frais en PAXG ou en OM est courant sur un exchange, et la base en
 contient 65. Chacune déclenchait un appel à
@@ -20,58 +6,10 @@ contient 65. Chacune déclenchait un appel à
 chaque calcul de métriques.
 """
 
-import ast
-import inspect
-from pathlib import Path
-
 import pytest
 
 from app.domains.market_data.fx.spot import FIAT_CURRENCIES, spot_rates
 from app.domains.market_data.prices.cryptocompare import cryptocompare_quotes
-from app.tasks import history_cache
-
-
-class TestRepliPostgres:
-    def test_le_repli_n_utilise_plus_run_async(self):
-        # La lecture unitaire délègue à la lecture groupée, où vit le repli.
-        source = inspect.getsource(history_cache.get_cached_histories)
-        assert "run_async" not in source, (
-            "`run_async` dans une fonction synchrone appelée depuis des services web : "
-            "impossible de démarrer une boucle dans une boucle, le repli reste muet"
-        )
-
-    def test_le_repli_lit_bien_postgres(self):
-        # La lecture unitaire délègue à la lecture groupée, où vit le repli.
-        source = inspect.getsource(history_cache.get_cached_histories)
-        assert "_charger_prix_depuis_db_sync" in source, (
-            "le dernier recours PostgreSQL a disparu : un Redis vide rendrait "
-            "une série vide alors que la base a l'historique"
-        )
-
-    def test_la_lecture_synchrone_ne_cree_aucune_boucle(self):
-        arbre = ast.parse(inspect.getsource(history_cache._charger_prix_depuis_db_sync))
-        for noeud in ast.walk(arbre):
-            if isinstance(noeud, ast.Await):
-                pytest.fail("un `await` ici exigerait une boucle — c'est précisément le bug corrigé")
-        # Docstring retirée avant l'inspection : celle de la fonction cite
-        # `run_async` pour expliquer le bug qu'elle corrige, et la lire ferait
-        # échouer le test qu'elle documente. Cinquième occurrence du motif dans
-        # cette session — un contrôle statique doit porter sur le code exécuté.
-        corps = arbre.body[0]
-        if corps.body and isinstance(corps.body[0], ast.Expr) and isinstance(corps.body[0].value, ast.Constant):
-            corps.body = corps.body[1:]
-
-        source = ast.unparse(arbre)
-        for interdit in ("asyncio", "run_async", "session_factory"):
-            assert interdit not in source, f"`{interdit}` réintroduit une dépendance à une boucle"
-
-    def test_les_taches_celery_gardent_run_async(self):
-        """Les autres appels sont légitimes : une tâche Celery n'a pas de boucle."""
-        source = Path(history_cache.__file__).read_text(encoding="utf-8")
-        assert source.count("run_async(") >= 3, (
-            "les tâches Celery doivent continuer d'utiliser run_async : elles "
-            "s'exécutent hors boucle, c'est le cas prévu"
-        )
 
 
 class TestDevisesReelles:

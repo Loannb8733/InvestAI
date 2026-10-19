@@ -324,9 +324,9 @@ async def _get_or_create_asset(
 
     # Pre-cache historical data
     try:
-        from app.tasks.history_cache import planifier_cache_historique
+        from app.domains.market_data.history.tasks import schedule_refresh
 
-        planifier_cache_historique(symbol, "crypto")
+        schedule_refresh(symbol, "crypto")
     except Exception as exc:
         logger.debug("Best-effort history pre-cache dispatch failed for %s: %s", symbol, exc)
 
@@ -1301,9 +1301,9 @@ async def _sync_single_exchange(api_key_id: str, heal_fx: bool = False) -> dict:
 
                     # Pre-cache historical data for new asset
                     try:
-                        from app.tasks.history_cache import planifier_cache_historique
+                        from app.domains.market_data.history.tasks import schedule_refresh
 
-                        planifier_cache_historique(asset.symbol, asset.asset_type.value)
+                        schedule_refresh(asset.symbol, asset.asset_type.value)
                     except Exception as exc:
                         logger.debug(
                             "Best-effort history pre-cache dispatch failed for %s: %s",

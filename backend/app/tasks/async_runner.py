@@ -36,7 +36,7 @@ def run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     dans le ``finally`` paraissait plus propre — aucune boucle fermée ne restant
     courante — mais cela retire sa boucle à un appelant qui en avait une : 103 tests
     sont tombés sur « There is no current event loop » avant que ce comportement ne
-    soit abandonné. C'est celui qu'avait ``history_cache``, éprouvé en production.
+    soit abandonné. Éprouvé en production sur les tâches de préchargement.
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

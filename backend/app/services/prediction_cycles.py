@@ -14,7 +14,8 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import get_cached_history
+from app.domains.market_data.history.reader import local_series
+from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeResult, _rsi
@@ -23,7 +24,6 @@ from app.models.portfolio import Portfolio
 from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_types import _HISTORY_DAYS
-from app.services.price_history_store import prix_locaux
 
 # Temps maximal accordé aux données externes dans le chemin d'une requête HTTP.
 # Au-delà, mieux vaut une analyse partielle qu'un écran figé (NEW-13).
@@ -52,23 +52,9 @@ class PredictionCyclesMixin:
             return max(0.1, echeance - asyncio.get_event_loop().time())
 
         # ── 1. BTC as market reference ───────────────────────────────
-        btc_prices = None
-        for try_days in [_HISTORY_DAYS, 90]:
-            btc_hist = await get_cached_history("BTC", "crypto", try_days)
-            if btc_hist and btc_hist.get("prices"):
-                btc_prices = btc_hist["prices"]
-                break
+        btc_prices = (await local_series("BTC", _HISTORY_DAYS)).prices or None
         if not btc_prices:
-            # Sources locales uniquement (Redis puis PostgreSQL). Le réseau est
-            # le travail de `tasks.history_cache`, qui passe toutes les 30
-            # minutes : l'appeler ici exposait la requête HTTP au quota d'une
-            # API tierce, jusqu'à 65 s d'attente (NEW-13).
-            btc_prices = await prix_locaux("BTC", "crypto", _HISTORY_DAYS)
-            if not btc_prices:
-                logger.warning(
-                    "Historique BTC absent des sources locales — analyse rendue sans "
-                    "référence de marché ; la tâche de pré-chargement a-t-elle tourné ?"
-                )
+            logger.warning("Historique BTC absent de la base — analyse rendue sans référence de marché")
 
         # Fear & Greed — enrichissement optionnel, jamais bloquant.
         try:
@@ -80,9 +66,7 @@ class PredictionCyclesMixin:
         btc_dominance = None
         try:
             # Enrichissement facultatif : il ne doit jamais retarder l'analyse.
-            btc_dominance = await asyncio.wait_for(
-                self.data_fetcher.get_btc_dominance(), timeout=min(5.0, budget_restant())
-            )
+            btc_dominance = await asyncio.wait_for(price_feed.btc_dominance(), timeout=min(5.0, budget_restant()))
         except TimeoutError:
             logger.debug("Dominance BTC : délai dépassé, enrichissement ignoré")
         except Exception as exc:
@@ -167,22 +151,12 @@ class PredictionCyclesMixin:
             _top_assets = list(asset_map.values())[:7]
 
             async def _prefetch_history(a: object) -> tuple:
-                """Return (symbol, prices) — fetches from cache then network."""
+                """Return (symbol, prices) from the stored history."""
                 sym = a.symbol
-                atype = a.asset_type.value
                 if sym == "BTC" and btc_prices:
                     p = btc_prices[-90:] if len(btc_prices) > 90 else list(btc_prices)
                     return (sym, p)
-                for try_days in [_HISTORY_DAYS, 90]:
-                    cached = await get_cached_history(sym, atype, try_days)
-                    if cached and cached.get("prices"):
-                        p = cached["prices"]
-                        return (sym, p[-90:] if len(p) > 90 else p)
-                # Idem : sources locales seulement. Un symbole que la tâche
-                # n'a pas encore vu est simplement absent de l'analyse, ce qui
-                # coûte moins cher qu'une minute d'attente pour tout le monde.
-                locaux = await prix_locaux(sym, atype, 90)
-                return (sym, locaux or [])
+                return (sym, (await local_series(sym, 90)).prices)
 
             async def _prefetch_price(a: object) -> tuple:
                 """Return (symbol, price)."""
@@ -370,12 +344,7 @@ class PredictionCyclesMixin:
                 continue
             try:
                 # Fetch prices for this asset (check cache first)
-                a_prices_tb = None
-                for try_d in [_HISTORY_DAYS, 90]:
-                    cached_h = await get_cached_history(sym, asset_data.get("asset_type", "crypto"), try_d)
-                    if cached_h and cached_h.get("prices"):
-                        a_prices_tb = cached_h["prices"]
-                        break
+                a_prices_tb = (await local_series(sym, _HISTORY_DAYS)).prices or None
                 if a_prices_tb and len(a_prices_tb) >= 30:
                     a_current = float(a_prices_tb[-1])
                     a_regime = {
@@ -417,12 +386,7 @@ class PredictionCyclesMixin:
             sym = asset_data["symbol"]
             # Try to compute RSI for this asset
             rsi_val = None
-            a_prices_diag = None
-            for try_d in [_HISTORY_DAYS, 90]:
-                cached_h = await get_cached_history(sym, asset_data.get("asset_type", "crypto"), try_d)
-                if cached_h and cached_h.get("prices"):
-                    a_prices_diag = cached_h["prices"]
-                    break
+            a_prices_diag = (await local_series(sym, _HISTORY_DAYS)).prices or None
             if sym == "BTC" and btc_prices:
                 a_prices_diag = btc_prices
 

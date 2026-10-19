@@ -1,7 +1,7 @@
 """Signaux alpha, carte de stratégie et scénarios « what-if ».
 
 ``PredictionAlphaMixin`` est mixé dans ``PredictionService`` : ses méthodes appellent
-``self.get_price_prediction``, ``self.get_market_cycle``, ``self.data_fetcher`` et
+``self.get_price_prediction``, ``self.get_market_cycle`` et
 ``self.regime_detector``, fournis par la classe finale.
 
 Extrait de ``prediction_service.py`` (ARC-05), qui dépassait 2 400 lignes. Ce bloc en
@@ -17,7 +17,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import cache_history, get_cached_history
+from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.domains.market_data.prices.stablecoins import peg_quote
 from app.ml.regime_detector import RegimeConfig, _rsi
@@ -87,23 +87,7 @@ class PredictionAlphaMixin:
             return {"found": False, "total_portfolio_value": 0.0}
 
         # ── Fetch BTC prices for correlation baseline ──
-        btc_prices: list[float] = []
-        try:
-            cached = await get_cached_history("BTC", "crypto", 90)
-            if cached and cached.get("prices"):
-                btc_prices = cached["prices"]
-            else:
-                dates, prices = await self.data_fetcher.get_history("BTC", "crypto", days=90)
-                if dates and prices:
-                    btc_prices = prices
-                    await cache_history(
-                        "BTC",
-                        "crypto",
-                        90,
-                        {"dates": [d.isoformat() for d in dates], "prices": prices},
-                    )
-        except Exception:
-            logger.warning("Failed to fetch BTC history for alpha scoring")
+        btc_prices = (await local_series("BTC", 90)).prices
 
         btc_returns = np.diff(np.log(np.array(btc_prices, dtype=float))) if len(btc_prices) > 10 else np.array([])
 
@@ -135,26 +119,7 @@ class PredictionAlphaMixin:
         import asyncio as _aio
 
         async def _fetch_history(sym: str, atype: str) -> tuple:
-            """Fetch 90d history from cache or API."""
-            cached_hist = await get_cached_history(sym, atype, 90)
-            if cached_hist and cached_hist.get("prices"):
-                return (sym, cached_hist["prices"])
-            try:
-                a_dates, a_prices_raw = await self.data_fetcher.get_history(sym, atype, days=90)
-                if a_dates and a_prices_raw:
-                    await cache_history(
-                        sym,
-                        atype,
-                        90,
-                        {
-                            "dates": [d.isoformat() for d in a_dates],
-                            "prices": a_prices_raw,
-                        },
-                    )
-                    return (sym, a_prices_raw)
-            except Exception as exc:
-                logger.debug("90d history fetch failed for %s (alpha scoring): %s", sym, exc)
-            return (sym, [])
+            return (sym, (await local_series(sym, 90)).prices)
 
         # Limit assets to reduce memory usage on free-tier hosting (512 MB)
         _MAX_ASSETS = 7

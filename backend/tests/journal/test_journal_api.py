@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password
 from app.domains.journal.models import Note
+from app.domains.market_data.history.models import AssetPriceHistory
 from app.models.asset import Asset, AssetType
-from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserRole
 

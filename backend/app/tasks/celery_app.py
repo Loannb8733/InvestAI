@@ -14,7 +14,6 @@ celery_app = Celery(
         "app.tasks.sync_exchanges",
         "app.tasks.predictions",
         "app.tasks.alerts",
-        "app.tasks.history_cache",
         "app.tasks.snapshots",
         "app.tasks.emails",
         "app.tasks.cleanup",
@@ -22,6 +21,7 @@ celery_app = Celery(
         "app.tasks.contrarian_stats",
         "app.tasks.regime_alerts",
         "app.domains.market_data.fx.tasks",
+        "app.domains.market_data.history.tasks",
     ],
 )
 
@@ -93,12 +93,12 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.predictions.check_prediction_accuracy",
         "schedule": 86400.0,  # Every 24 hours
     },
-    "cache-historical-data": {
-        "task": "app.tasks.history_cache.cache_historical_data",
+    "refresh-history": {
+        "task": "app.domains.market_data.history.tasks.refresh_history",
         "schedule": 1800.0,  # Every 30 minutes
     },
-    "deep-backfill-prices": {
-        "task": "app.tasks.history_cache.deep_backfill_prices",
+    "backfill-history": {
+        "task": "app.domains.market_data.history.tasks.backfill_history",
         "schedule": 86400.0,  # Every 24 hours — fills gaps + refreshes recent data
     },
     "tune-hyperparameters": {

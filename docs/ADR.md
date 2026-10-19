@@ -288,3 +288,36 @@ usage unique changerait le comportement. Elles disparaîtront quand les domaines
   modèle (élargit seulement, jamais de réduction) et ajoute `fee_currency`, qu'aucune
   migration ne créait ; elle remplace `scripts/migrate_fee_currency.py`, qui ramenait
   `fee` en `NUMERIC(18, 8)` et aurait tronqué les frais.
+
+## ADR-013 : Historique de prix — la base seule, jamais de réseau pendant une requête
+
+**Statut :** accepté (2026-10-19)
+
+**Contexte :** trois caches d'historique coexistaient (`hist:<sym>:<type>:<jours>` en
+Redis asynchrone, `hist:<SYM>_<jours>` et sa copie `:fallback` en Redis synchrone,
+`asset_price_history` en base), lus dans des ordres différents selon l'appelant. Une
+partie des pages web appelait CoinGecko ou Yahoo pendant la requête (benchmarks,
+analytics, prédictions, variations de période), une autre l'interdisait : la cause des
+65 s de `/predictions/market-cycle` (NEW-13). Les cotations Yahoo des actions étaient
+enregistrées dans leur devise de cotation sous `price_eur`, et l'immobilier physique
+recevait un historique tiré au hasard, utilisé ensuite dans la VaR et les corrélations.
+
+**Décision :** `domains/market_data/history` :
+- `asset_price_history` est l'unique source d'historique (plus de cache Redis) ; une
+  colonne `volume` y conserve les volumes utilisés par les prédictions ;
+- `reader.local_history` / `local_series` lisent la base, sans réseau, pour tout le code
+  web ; un symbole absent rend une série vide et peut être programmé avec
+  `tasks.schedule_refresh` ;
+- seules les tâches (`refresh_history` toutes les 30 min, `backfill_history` chaque jour,
+  `refresh_one`, préchargement au démarrage) interrogent CoinGecko (un appel à la fois,
+  `Retry-After` respecté), puis Yahoo en repli (paire `<SYM>-EUR` pour une crypto) ;
+- toute cotation Yahoo est convertie en euros au taux BCE du jour ; un jour sans taux est
+  écarté ;
+- les références de marché (BTC, SPY, IWDA.AS, ^GSPC, ^IXIC, PAXG) sont rafraîchies avec
+  les actifs détenus ;
+- un actif sans cotation (immobilier, crowdfunding) n'a pas d'historique.
+
+**Conséquences :** une page dont l'historique n'a pas encore été chargé affiche une série
+incomplète au lieu d'attendre une API tierce. La migration `d5f9a3b4c6e7` ajoute
+`volume` et supprime les lignes d'actions et d'ETF, rechargées converties au passage
+suivant de la tâche.

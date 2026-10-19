@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.ml import adaptive_thresholds as adaptive_th
-from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
@@ -26,7 +26,6 @@ from app.services.smart_insights_types import (  # noqa: F401 — re-exported
     RebalancingOrder,
     SmartInsight,
 )
-from app.tasks.history_cache import get_cached_history
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,6 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         self.analytics_service = AnalyticsService()
         self.prediction_service = PredictionService()
         self.regime_detector = MarketRegimeDetector()
-        self.data_fetcher = HistoricalDataFetcher()
 
     async def get_portfolio_health(
         self,
@@ -480,7 +478,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             # Get current price (prefer Redis cache to avoid CoinGecko rate limits)
             current_price = 0
             try:
-                _, cached_prices = get_cached_history(symbol, days=7)
+                cached_prices = (await local_series(symbol, 7)).prices
                 if cached_prices:
                     current_price = cached_prices[-1]
                 else:
@@ -542,17 +540,9 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             vix_value = await price_feed.index_level("^VIX")
 
             # Market regime via BTC as proxy (prefer Redis cache)
-            _, btc_prices = get_cached_history("BTC", days=regime_days)
-            if not btc_prices:
-                try:
-                    _, btc_prices = await self.data_fetcher.get_crypto_history("BTC", days=regime_days)
-                except Exception:
-                    # L'appelant sort proprement (`len(btc_prices) < 7 → None`) :
-                    # rien de faux n'est publié. Seule la trace manquait.
-                    logger.warning("Historique BTC indisponible — régime de marché non calculé")
-                    btc_prices = []
-
+            btc_prices = (await local_series("BTC", regime_days)).prices
             if len(btc_prices) < 7:
+                logger.warning("Historique BTC indisponible — régime de marché non calculé")
                 return None
 
             market_result = self.regime_detector.detect(btc_prices, "BTC (Marche)", fear_greed, vix=vix_value)
@@ -566,9 +556,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
                     continue
                 symbols_done.add(symbol)
                 try:
-                    _, prices = get_cached_history(symbol, days=regime_days)
-                    if not prices:
-                        _, prices = await self.data_fetcher.get_crypto_history(symbol, days=regime_days)
+                    prices = (await local_series(symbol, regime_days)).prices
                     if len(prices) >= 7:
                         result = self.regime_detector.detect(prices, symbol, fear_greed, vix=vix_value)
                         per_asset.append(result)
@@ -744,8 +732,8 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         badge: str | None = None
         if gold_symbol:
             try:
-                _, btc_prices = get_cached_history("BTC", days=90)
-                _, gold_prices = get_cached_history(gold_symbol, days=90)
+                btc_prices = (await local_series("BTC", 90)).prices
+                gold_prices = (await local_series(gold_symbol, 90)).prices
                 if btc_prices and gold_prices and len(btc_prices) >= 20 and len(gold_prices) >= 20:
                     _min = min(len(btc_prices), len(gold_prices))
                     btc_r = np.diff(np.log(np.array(btc_prices[-_min:], dtype=float)))
@@ -1081,11 +1069,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         Returns 'stress', 'normal', or 'low'.
         """
         try:
-            from app.services.data_fetcher import get_cached_history
-
-            _, btc_prices = get_cached_history("BTC", days=90)
-            if not btc_prices:
-                _, btc_prices = await self.data_fetcher.get_crypto_history("BTC", days=90)
+            btc_prices = (await local_series("BTC", 90)).prices
             if len(btc_prices) < 7:
                 return "normal"
             result = self.regime_detector.detect(btc_prices, "BTC")

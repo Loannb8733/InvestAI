@@ -1,11 +1,11 @@
 from app.core.db.base import Base
 from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
+from app.domains.market_data.history import models as history_models
 from app.models import (
     alert,
     api_key,
     asset,
-    asset_price_history,
     audit_log,
     calendar_event,
     cold_wallet_address,
@@ -32,7 +32,6 @@ __all__ = [
     "alert",
     "api_key",
     "asset",
-    "asset_price_history",
     "audit_log",
     "calendar_event",
     "cold_wallet_address",
@@ -41,6 +40,7 @@ __all__ = [
     "crowdfunding_repayment",
     "fx_models",
     "goal",
+    "history_models",
     "journal_models",
     "metadata",
     "notification",

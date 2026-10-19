@@ -91,6 +91,10 @@ class PriceService:
         listed = await yahoo_quote(self._yahoo, ticker)
         return float(listed[0].price) if listed is not None else None
 
+    async def btc_dominance(self) -> float | None:
+        """Part du bitcoin dans la capitalisation totale des cryptomonnaies, en pourcentage."""
+        return await self._coingecko.btc_dominance()
+
     async def crypto_on(self, symbol: str, day: date, currency: str = "EUR") -> Decimal | None:
         """Cours d'une cryptomonnaie un jour passé."""
         return await self._coingecko.price_on(symbol.upper(), day, currency)

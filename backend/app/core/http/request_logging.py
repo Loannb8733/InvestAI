@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.core.config import settings
-from app.core.contexte_execution import sert_une_requete_http
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         start = time.perf_counter()
-        sert_une_requete_http.set(True)
         trace_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
         request.state.trace_id = trace_id
         if settings.sentry_enabled:

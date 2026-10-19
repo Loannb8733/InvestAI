@@ -1534,13 +1534,13 @@ async def import_transactions_csv(
     # Trigger historical price cache for imported assets (background Celery tasks)
     if success_count > 0:
         try:
-            from app.tasks.history_cache import planifier_cache_historique
+            from app.domains.market_data.history.tasks import schedule_refresh
 
             for (symbol, _exchange), asset in asset_map_by_platform.items():
                 asset_type_value = (
                     asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type)
                 )
-                planifier_cache_historique(symbol, asset_type_value)
+                schedule_refresh(symbol, asset_type_value)
             logger.info(f"Triggered history cache for {len(asset_map_by_platform)} assets")
         except Exception as e:
             # Non-critical: don't fail import if cache trigger fails

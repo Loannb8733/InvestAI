@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel, ValidationError
@@ -1220,15 +1220,13 @@ class SparklineData(BaseModel):
 async def get_portfolio_sparklines(
     request: Request,
     portfolio_id: str,
-    background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),
 ) -> list[SparklineData]:
     """Get sparkline price data for all assets in a portfolio."""
-    from collections import defaultdict
-
-    from app.models.asset_price_history import AssetPriceHistory
+    from app.domains.market_data.history.reader import local_history
+    from app.domains.market_data.history.tasks import schedule_refresh
     from app.services.asset_classification import is_cash_like
 
     # Verify ownership
@@ -1243,38 +1241,18 @@ async def get_portfolio_sparklines(
 
     # Get unique non-stablecoin symbols
     assets_result = await db.execute(
-        select(Asset.symbol).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0).distinct()
+        select(Asset.symbol, Asset.asset_type).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0).distinct()
     )
-    symbols = [row[0].upper() for row in assets_result.all() if not is_cash_like(row[0])]
-    if not symbols:
+    types = {symbol.upper(): kind.value for symbol, kind in assets_result.all() if not is_cash_like(symbol)}
+    if not types:
         return []
-
-    # Batch fetch from AssetPriceHistory
-    cutoff = (datetime.now(UTC) - timedelta(days=days)).date()
-    result = await db.execute(
-        select(
-            AssetPriceHistory.symbol,
-            AssetPriceHistory.price_date,
-            AssetPriceHistory.price_eur,
-        )
-        .where(
-            AssetPriceHistory.symbol.in_(symbols),
-            AssetPriceHistory.price_date >= cutoff,
-        )
-        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
-    )
-    rows = result.all()
-
-    symbol_data: dict[str, list[float]] = defaultdict(list)
-    for row in rows:
-        symbol_data[row[0]].append(float(row[2]))
+    histories = await local_history(types, days, db)
 
     sparklines = []
-    missing_symbols = []
-    for symbol in symbols:
-        prices = symbol_data.get(symbol, [])
+    for symbol, kind in types.items():
+        prices = histories[symbol].prices
         if len(prices) < 2:
-            missing_symbols.append(symbol)
+            schedule_refresh(symbol, kind)
             continue
         # Normalize to [0, 1] for consistent rendering
         min_p, max_p = min(prices), max(prices)
@@ -1289,22 +1267,6 @@ async def get_portfolio_sparklines(
                 change_pct=round(change, 2),
             )
         )
-
-    # Auto-backfill missing symbols in background (light: 30 days only)
-    if missing_symbols:
-
-        async def _fill_missing():
-            try:
-                from app.tasks.history_cache import _cache_single
-
-                for sym in missing_symbols:
-                    await _cache_single(sym, "crypto", days=30)
-                    await asyncio.sleep(8.0)
-                logger.info("On-demand sparkline backfill done for: %s", missing_symbols)
-            except Exception as e:
-                logger.warning("On-demand sparkline backfill failed: %s", e)
-
-        background_tasks.add_task(_fill_missing)
 
     return sparklines
 
@@ -1368,41 +1330,22 @@ async def get_benchmark_data(
 
     Returns BTC, SPY, MSCI World + portfolio performance, all normalized.
     """
-    from app.core.config import settings
-    from app.ml.historical_data import HistoricalDataFetcher
+    from app.domains.market_data.history.benchmarks import DASHBOARD_BENCHMARKS
+    from app.domains.market_data.history.reader import local_history
 
     user_id = current_user.id
-    coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
-    fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
-
-    benchmarks = [
-        ("Bitcoin", "BTC", "crypto"),
-        ("S&P 500", "SPY", "etf"),
-        ("MSCI World", "IWDA.AS", "etf"),
-    ]
-
+    histories = await local_history([symbol for _, symbol, _ in DASHBOARD_BENCHMARKS], days or 3650, db)
     result = []
-
-    try:
-        for name, symbol, asset_type in benchmarks:
-            try:
-                dates, prices = await fetcher.get_history(symbol, asset_type, days)
-                if dates and prices and len(dates) > 1:
-                    base = float(prices[0]) if prices[0] != 0 else 1
-                    points = []
-                    for d, price in zip(dates, prices):
-                        date_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
-                        points.append(
-                            BenchmarkDataPoint(
-                                date=date_str,
-                                value=round(float(price) / base * 100, 2),
-                            )
-                        )
-                    result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
-            except Exception as exc:
-                logger.debug("Benchmark series fetch failed for %s: %s", symbol, exc)
-    finally:
-        await fetcher.close()
+    for name, symbol, _ in DASHBOARD_BENCHMARKS:
+        history = histories[symbol]
+        if len(history.prices) < 2:
+            continue
+        base = history.prices[0] or 1
+        points = [
+            BenchmarkDataPoint(date=d.strftime("%Y-%m-%d"), value=round(price / base * 100, 2))
+            for d, price in zip(history.dates, history.prices, strict=True)
+        ]
+        result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
 
     # Portfolio performance normalized — use real price-based series
     historical_data = await snapshot_service.build_portfolio_value_series(db, str(user_id), days)

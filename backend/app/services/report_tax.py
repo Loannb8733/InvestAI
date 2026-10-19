@@ -19,8 +19,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.history.models import AssetPriceHistory
 from app.models.asset import Asset, AssetType
-from app.models.asset_price_history import AssetPriceHistory
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services import fifo_replay

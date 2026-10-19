@@ -389,8 +389,8 @@ class AlertService:
                     # Correlate with anomaly detector (best-effort)
                     anomaly_info = ""
                     try:
+                        from app.domains.market_data.history.models import AssetPriceHistory
                         from app.ml.anomaly_detector import AnomalyDetector
-                        from app.models.asset_price_history import AssetPriceHistory
 
                         cutoff = (datetime.now(UTC) - timedelta(days=30)).date()
                         hist_result = await db.execute(

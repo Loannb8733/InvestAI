@@ -20,7 +20,6 @@ comments	backend/app/api/v1/endpoints/transactions.py
 comments	backend/app/api/v1/endpoints/users.py
 comments	backend/app/api/v1/endpoints/websocket.py
 comments	backend/app/core/config.py
-comments	backend/app/core/contexte_execution.py
 comments	backend/app/core/finance_constants.py
 comments	backend/app/core/logging.py
 comments	backend/app/core/rate_limit.py
@@ -28,12 +27,10 @@ comments	backend/app/core/redis_client.py
 comments	backend/app/core/security.py
 comments	backend/app/core/sentry_scrub.py
 comments	backend/app/core/symbol_map.py
-comments	backend/app/core/timeframe.py
 comments	backend/app/ml/adaptive_thresholds.py
 comments	backend/app/ml/anomaly_detector.py
 comments	backend/app/ml/drift_detector.py
 comments	backend/app/ml/forecaster.py
-comments	backend/app/ml/historical_data.py
 comments	backend/app/ml/hyperparameter_tuner.py
 comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
@@ -124,7 +121,6 @@ comments	backend/app/services/transfer_service.py
 comments	backend/app/tasks/celery_app.py
 comments	backend/app/tasks/cleanup.py
 comments	backend/app/tasks/emails.py
-comments	backend/app/tasks/history_cache.py
 comments	backend/app/tasks/monitor_delays.py
 comments	backend/app/tasks/predictions.py
 comments	backend/app/tasks/price_updates.py
@@ -276,7 +272,6 @@ too-long	backend/app/api/v1/endpoints/websocket.py
 too-long	backend/app/core/redis_client.py
 too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
-too-long	backend/app/ml/historical_data.py
 too-long	backend/app/ml/regime_detector.py
 too-long	backend/app/schemas/crowdfunding.py
 too-long	backend/app/services/ai/crowdfunding_analyzer.py
@@ -314,7 +309,6 @@ too-long	backend/app/services/snapshot_service.py
 too-long	backend/app/services/strategy_service.py
 too-long	backend/app/services/telegram_service.py
 too-long	backend/app/tasks/emails.py
-too-long	backend/app/tasks/history_cache.py
 too-long	backend/app/tasks/predictions.py
 too-long	backend/app/tasks/sync_exchanges.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx

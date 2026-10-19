@@ -112,3 +112,13 @@ class CoinGecko:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Écriture du cache de cours historique impossible : %s", exc)
         return price
+
+    async def btc_dominance(self) -> float | None:
+        """Part du bitcoin dans la capitalisation totale, en pourcentage ; None si CoinGecko ne répond pas."""
+        try:
+            data = await self._get("/global", {})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Dominance BTC indisponible : %s", exc)
+            return None
+        value = data.get("data", {}).get("market_cap_percentage", {}).get("btc")
+        return float(value) if value is not None else None

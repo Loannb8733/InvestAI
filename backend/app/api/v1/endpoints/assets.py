@@ -115,9 +115,9 @@ async def create_asset(
 
     # Pre-cache historical data for this asset (background)
     try:
-        from app.tasks.history_cache import planifier_cache_historique
+        from app.domains.market_data.history.tasks import schedule_refresh
 
-        planifier_cache_historique(asset.symbol, asset.asset_type.value)
+        schedule_refresh(asset.symbol, asset.asset_type.value)
     except Exception as exc:
         # Non-critical: history pre-cache is a best-effort background dispatch.
         logger.debug("History pre-cache dispatch failed for %s: %s", asset.symbol, exc)

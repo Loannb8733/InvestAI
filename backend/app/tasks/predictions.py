@@ -218,10 +218,8 @@ async def _check_data_drift():
     """Compute PSI-based data drift for each tracked symbol."""
     import numpy as np
 
+    from app.domains.market_data.history.reader import local_series
     from app.ml.drift_detector import check_drift
-    from app.ml.historical_data import HistoricalDataFetcher
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -232,7 +230,7 @@ async def _check_data_drift():
 
     for symbol, asset_type in assets:
         try:
-            dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+            prices = (await local_series(symbol, 180)).prices
             if not prices or len(prices) < 60:
                 continue
 
@@ -271,10 +269,8 @@ def tune_hyperparameters():
 async def _tune_hyperparameters():
     """Async hyperparameter tuning."""
     from app.core.redis_client import cache_hyperparams
-    from app.ml.historical_data import HistoricalDataFetcher
+    from app.domains.market_data.history.reader import local_series
     from app.ml.hyperparameter_tuner import tune_prophet, tune_xgboost
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -284,7 +280,8 @@ async def _tune_hyperparameters():
 
     for symbol, asset_type in assets:
         try:
-            dates, prices = await fetcher.get_history(symbol, asset_type.value, days=90)
+            history = await local_series(symbol, 90)
+            dates, prices = history.dates, history.prices
             if not prices or len(prices) < 40:
                 continue
 
@@ -310,12 +307,10 @@ def check_bottom_zones():
 
 async def _check_bottom_zones():
     """Detect assets in bottom zone with confidence > 80% and alert via Telegram."""
-    from app.ml.historical_data import HistoricalDataFetcher
+    from app.domains.market_data.history.reader import local_series
     from app.models.portfolio import Portfolio
     from app.models.user import User
     from app.services.telegram_service import telegram_service
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -325,7 +320,7 @@ async def _check_bottom_zones():
 
         for symbol, asset_type in assets:
             try:
-                dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+                prices = (await local_series(symbol, 180)).prices
                 if not prices or len(prices) < 30:
                     continue
 

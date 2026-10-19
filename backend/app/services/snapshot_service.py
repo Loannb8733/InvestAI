@@ -297,13 +297,11 @@ class SnapshotService(SnapshotRiskMixin):
         Fetch historical prices for all symbols.
         Returns: Dict[symbol, Dict[date_str, price_eur]]
 
-        Priority: in-memory cache → PostgreSQL → Redis → CoinGecko/Yahoo API.
-        PostgreSQL is the primary persistent source after deep backfill.
+        Mémoire du processus, puis historique en base ; jamais de réseau. Un
+        symbole absent est rafraîchi en tâche de fond.
         """
-        from app.core.config import settings
-        from app.ml.historical_data import HistoricalDataFetcher
-        from app.models.asset_price_history import AssetPriceHistory
-        from app.tasks.history_cache import get_cached_histories
+        from app.domains.market_data.history.reader import local_history
+        from app.domains.market_data.history.tasks import schedule_refresh
 
         price_series: dict[str, dict[str, float]] = {}
 
@@ -328,147 +326,24 @@ class SnapshotService(SnapshotRiskMixin):
         if not symbols_to_fetch:
             return price_series
 
-        # 2. Check PostgreSQL first (persistent, complete after backfill).
-        # One batched query (WHERE symbol IN ...) instead of one SELECT per symbol.
-        symbols_need_redis: dict[str, str] = {}
-        if db is not None:
-            cutoff_date = (datetime.now(UTC) - timedelta(days=days + 5)).date()
-            non_stable: dict[str, str] = {}
-            for symbol_upper, asset_type in symbols_to_fetch.items():
-                if symbol_upper in STABLECOINS:
-                    price_series[symbol_upper] = {}
-                else:
-                    non_stable[symbol_upper] = asset_type
-
-            rows_by_symbol: dict[str, dict[str, float]] = {}
-            if non_stable:
-                try:
-                    result = await db.execute(
-                        select(
-                            AssetPriceHistory.symbol,
-                            AssetPriceHistory.price_date,
-                            AssetPriceHistory.price_eur,
-                        )
-                        .where(
-                            AssetPriceHistory.symbol.in_(list(non_stable)),
-                            AssetPriceHistory.price_date >= cutoff_date,
-                        )
-                        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
-                    )
-                    for sym, pdate, peur in result.all():
-                        rows_by_symbol.setdefault(sym, {})[pdate.strftime("%Y-%m-%d")] = float(peur)
-                except Exception as e:
-                    logger.warning("Batched DB price lookup failed: %s", e)
-
-            for symbol_upper, asset_type in non_stable.items():
-                series = rows_by_symbol.get(symbol_upper)
-                if series:
-                    price_series[symbol_upper] = series
-                    _cache_put(
-                        _price_cache,
-                        (symbol_upper, days),
-                        (time.time(), series),
-                        _MAX_PRICE_CACHE,
-                    )
-                else:
-                    symbols_need_redis[symbol_upper] = asset_type
-        else:
-            symbols_need_redis = {s: t for s, t in symbols_to_fetch.items() if s not in STABLECOINS}
-            for s in symbols_to_fetch:
-                if s in STABLECOINS:
-                    price_series[s] = {}
-
-        if not symbols_need_redis:
-            return price_series
-
-        # 3. Check Redis cache for remaining symbols
-        symbols_need_api: dict[str, str] = {}
-        # Une seule commande Redis pour tous les symboles (quota Upstash, NEW-81).
-        historiques = get_cached_histories(list(symbols_need_redis), days)
-        for symbol_upper, asset_type in symbols_need_redis.items():
-            dates, prices = historiques[symbol_upper]
-            if dates and prices:
-                series = {}
-                for d, p in zip(dates, prices):
-                    series[d.strftime("%Y-%m-%d")] = float(p)
-                price_series[symbol_upper] = series
-                _cache_put(
-                    _price_cache,
-                    (symbol_upper, days),
-                    (time.time(), series),
-                    _MAX_PRICE_CACHE,
-                )
+        quoted: dict[str, str] = {}
+        for symbol_upper, asset_type in symbols_to_fetch.items():
+            if symbol_upper in STABLECOINS:
+                price_series[symbol_upper] = {}
             else:
-                symbols_need_api[symbol_upper] = asset_type
-
-        if not symbols_need_api:
-            return price_series
-
-        # 4. Fetch missing symbols from API with concurrency limit
-        # Use a semaphore to avoid saturating CoinGecko (50 req/min free tier)
-        import asyncio as _asyncio
-
-        from app.tasks.history_cache import _persist_prices_to_db, planifier_cache_historique
-
-        coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
-        fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
-
-        # Limit to 3 concurrent API calls to respect rate limits
-        _api_semaphore = _asyncio.Semaphore(3)
-
-        async def _fetch_one(sym: str, at: str) -> tuple[str, tuple | None]:
-            async with _api_semaphore:
-                try:
-                    result = await fetcher.get_history(sym, at, days, fast=True)
-                    return (sym, result)
-                except Exception as e:
-                    logger.warning("Failed to fetch prices for %s: %s", sym, e)
-                    return (sym, None)
-
-        try:
-            tasks = [_fetch_one(sym, at) for sym, at in symbols_need_api.items()]
-            results = await _asyncio.gather(*tasks)
-
-            symbols_failed = []
-            for symbol_upper, result in results:
-                if result is None:
-                    symbols_failed.append(symbol_upper)
-                    continue
-                dates, prices = result
-                if dates and prices:
-                    series = {d.strftime("%Y-%m-%d"): float(p) for d, p in zip(dates, prices)}
-                    price_series[symbol_upper] = series
-                    _cache_put(
-                        _price_cache,
-                        (symbol_upper, days),
-                        (time.time(), series),
-                        _MAX_PRICE_CACHE,
-                    )
-                    # Persist to PostgreSQL for future requests
-                    try:
-                        await _persist_prices_to_db(symbol_upper, dates, prices)
-                    except Exception as exc:
-                        logger.debug("Failed to persist prices to DB for %s: %s", symbol_upper, exc)
-                else:
-                    symbols_failed.append(symbol_upper)
-
-            # Fallback for failed symbols: use stale in-memory cache if available
-            for symbol_upper in symbols_failed:
-                stale_key = (symbol_upper, days)
-                if stale_key in _price_cache:
-                    _, stale_series = _price_cache[stale_key]
-                    price_series[symbol_upper] = stale_series
-                    logger.info("Using stale cache for %s", symbol_upper)
-                else:
-                    logger.warning("No price data available for %s", symbol_upper)
-                # Trigger background deep backfill for this symbol
-                try:
-                    asset_type = symbols_need_api.get(symbol_upper, "crypto")
-                    planifier_cache_historique(symbol_upper, asset_type)
-                except Exception as exc:
-                    logger.debug("Failed to schedule deep backfill for %s: %s", symbol_upper, exc)
-        finally:
-            await fetcher.close()
+                quoted[symbol_upper] = asset_type
+        histories = await local_history(quoted, days + 5, db)
+        for symbol_upper, asset_type in quoted.items():
+            history = histories[symbol_upper]
+            if history.prices:
+                series = {d.strftime("%Y-%m-%d"): p for d, p in zip(history.dates, history.prices, strict=True)}
+                price_series[symbol_upper] = series
+                _cache_put(_price_cache, (symbol_upper, days), (time.time(), series), _MAX_PRICE_CACHE)
+                continue
+            stale = _price_cache.get((symbol_upper, days))
+            if stale is not None:
+                price_series[symbol_upper] = stale[1]
+            schedule_refresh(symbol_upper, asset_type)
 
         return price_series
 
