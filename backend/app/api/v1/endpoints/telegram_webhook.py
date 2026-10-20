@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db.session import session_factory
+from app.domains.identity.models import User
 from app.models.planned_order import PlannedOrder, PlannedOrderStatus
-from app.models.user import User
 from app.services.telegram_service import MC_CALLBACK_TTL, _get_redis, telegram_service
 
 logger = logging.getLogger(__name__)

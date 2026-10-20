@@ -3,14 +3,14 @@
 import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 
 @pytest.mark.asyncio
 async def test_create_portfolio(client: AsyncClient, regular_user: User):
     """Test creating a portfolio."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     response = await client.post(
         "/api/v1/portfolios",
         json={"name": "Mon Portfolio", "description": "Test portfolio"},
@@ -36,7 +36,7 @@ async def test_create_portfolio_no_auth(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_portfolios(client: AsyncClient, regular_user: User):
     """Test listing portfolios."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     # Create a portfolio first
@@ -56,7 +56,7 @@ async def test_list_portfolios(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_update_portfolio(client: AsyncClient, regular_user: User):
     """Test updating a portfolio."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     # Create
@@ -80,7 +80,7 @@ async def test_update_portfolio(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_delete_portfolio(client: AsyncClient, regular_user: User):
     """Test soft-deleting a portfolio."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     # Create
@@ -107,7 +107,7 @@ async def test_delete_portfolio(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_create_portfolio_validation(client: AsyncClient, regular_user: User):
     """Test portfolio creation validation."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     # Empty name

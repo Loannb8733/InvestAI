@@ -19,8 +19,8 @@ import redis.asyncio as aioredis
 from httpx import AsyncClient
 
 from app.core import redis_client
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 # Au-delà, la requête est considérée comme suspendue.
 _DELAI_DE_GARDE = 10.0
@@ -55,7 +55,7 @@ async def redis_muet(monkeypatch):
 async def test_une_requete_authentifiee_aboutit_malgre_un_redis_muet(
     client: AsyncClient, regular_user: User, redis_muet
 ):
-    entetes = {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    entetes = {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
 
     debut = time.monotonic()
     try:

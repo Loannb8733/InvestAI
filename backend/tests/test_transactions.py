@@ -3,8 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 
 async def _setup_asset(client: AsyncClient, token: str) -> tuple[str, str]:
@@ -36,7 +36,7 @@ async def _setup_asset(client: AsyncClient, token: str) -> tuple[str, str]:
 @pytest.mark.asyncio
 async def test_create_transaction(client: AsyncClient, regular_user: User):
     """Test creating a buy transaction."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     _, asset_id = await _setup_asset(client, token)
 
@@ -61,7 +61,7 @@ async def test_create_transaction(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_create_sell_transaction(client: AsyncClient, regular_user: User):
     """Test creating a sell transaction."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     _, asset_id = await _setup_asset(client, token)
 
@@ -83,7 +83,7 @@ async def test_create_sell_transaction(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_list_transactions(client: AsyncClient, regular_user: User):
     """Test listing transactions."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     _, asset_id = await _setup_asset(client, token)
 
@@ -108,7 +108,7 @@ async def test_list_transactions(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_delete_transaction(client: AsyncClient, regular_user: User):
     """Test soft-deleting a transaction."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     _, asset_id = await _setup_asset(client, token)
 
@@ -146,7 +146,7 @@ async def test_transaction_no_auth(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_transaction_validation(client: AsyncClient, regular_user: User):
     """Test transaction validation (negative quantity)."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     _, asset_id = await _setup_asset(client, token)
 

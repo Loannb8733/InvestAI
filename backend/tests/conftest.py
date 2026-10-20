@@ -21,14 +21,15 @@ from httpx import ASGITransport, AsyncClient
 from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.db.metadata import metadata
 from app.core.db.session import get_session
 from app.core.redis_client import redis_async_url
-from app.core.security import hash_password
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
 from app.main import app
-from app.models.user import User, UserRole
 from tests.http_stubs import HttpStub
 from tests.http_stubs import install as install_http_stub
 
@@ -39,7 +40,7 @@ _url_base, _url_db = settings.DATABASE_URL.rsplit("/", 1)
 TEST_DATABASE_URL = f"{_url_base}/{_url_db}_test"
 
 # Create test engine
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 
 # Create test session factory
 TestSessionLocal = sessionmaker(

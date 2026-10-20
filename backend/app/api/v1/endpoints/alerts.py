@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.alert import Alert, AlertCondition
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
-from app.models.user import User
 from app.services.alert_service import alert_service
 
 router = APIRouter()

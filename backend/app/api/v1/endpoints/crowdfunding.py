@@ -9,9 +9,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.asset import Asset, AssetType
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
@@ -19,7 +20,6 @@ from app.models.crowdfunding_repayment import CrowdfundingRepayment, PaymentType
 from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
 from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
-from app.models.user import User
 from app.schemas.crowdfunding import (
     CashflowMonthResponse,
     CashflowProjectAmount,

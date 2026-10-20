@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.api.deps import get_current_active_user
 from app.core.config import settings
-from app.models.user import User, UserRole
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User, UserRole
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ class SystemStatusResponse(BaseModel):
     celery_tasks: list
 
 
-def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Require admin role."""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(

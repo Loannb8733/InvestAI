@@ -18,7 +18,7 @@ GENERIC_ERROR_DETAIL = "An internal error occurred. Please try again later."
 async def _domain_error_response(_: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, DomainError):
         raise TypeError(f"unexpected exception type {type(exc).__name__}")
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message}, headers=exc.headers)
 
 
 async def _unhandled_error_response(request: Request, exc: Exception) -> JSONResponse:

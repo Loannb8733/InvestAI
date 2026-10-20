@@ -3,8 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 
 async def _create_portfolio(client: AsyncClient, token: str) -> str:
@@ -20,7 +20,7 @@ async def _create_portfolio(client: AsyncClient, token: str) -> str:
 @pytest.mark.asyncio
 async def test_create_asset(client: AsyncClient, regular_user: User):
     """Test creating an asset."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     portfolio_id = await _create_portfolio(client, token)
@@ -47,7 +47,7 @@ async def test_create_asset(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_create_duplicate_asset(client: AsyncClient, regular_user: User):
     """Test creating a duplicate asset in same portfolio."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
@@ -68,7 +68,7 @@ async def test_create_duplicate_asset(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_list_assets(client: AsyncClient, regular_user: User):
     """Test listing assets."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
@@ -93,7 +93,7 @@ async def test_list_assets(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_list_assets_filtered_by_portfolio(client: AsyncClient, regular_user: User):
     """Test listing assets filtered by portfolio ID."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
@@ -104,7 +104,7 @@ async def test_list_assets_filtered_by_portfolio(client: AsyncClient, regular_us
 @pytest.mark.asyncio
 async def test_update_asset(client: AsyncClient, regular_user: User):
     """Test updating an asset."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
@@ -133,7 +133,7 @@ async def test_update_asset(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_delete_asset(client: AsyncClient, regular_user: User):
     """Test soft-deleting an asset."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
     portfolio_id = await _create_portfolio(client, token)
 
@@ -161,7 +161,7 @@ async def test_delete_asset(client: AsyncClient, regular_user: User):
 @pytest.mark.asyncio
 async def test_get_nonexistent_asset(client: AsyncClient, regular_user: User):
     """Test getting a nonexistent asset."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     response = await client.get(

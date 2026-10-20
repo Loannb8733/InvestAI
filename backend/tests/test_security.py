@@ -1,6 +1,7 @@
 """Security module tests."""
 
-from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
+from app.domains.identity.passwords import hash_password, verify_password
+from app.domains.identity.tokens import create_token, decode_token
 
 
 def test_hash_password():
@@ -24,14 +25,14 @@ def test_verify_password_incorrect():
 
 def test_create_access_token():
     """Test access token creation."""
-    token = create_access_token(subject="user-123")
+    token = create_token("user-123")
     assert isinstance(token, str)
     assert len(token) > 0
 
 
 def test_decode_access_token():
     """Test decoding access token."""
-    token = create_access_token(subject="user-123")
+    token = create_token("user-123")
     payload = decode_token(token)
     assert payload is not None
     assert payload["sub"] == "user-123"
@@ -40,7 +41,7 @@ def test_decode_access_token():
 
 def test_create_refresh_token():
     """Test refresh token creation."""
-    token = create_refresh_token(subject="user-123")
+    token = create_token("user-123", "refresh")
     assert isinstance(token, str)
     payload = decode_token(token)
     assert payload is not None

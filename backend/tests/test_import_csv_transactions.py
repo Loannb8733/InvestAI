@@ -16,10 +16,10 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.models.asset import Asset
 from app.models.transaction import Transaction
-from app.models.user import User
 
 ENTETE_CSV = "symbol,type,quantity,price,fee,date,notes\n"
 
@@ -30,7 +30,7 @@ def csv(*lignes: str) -> bytes:
 
 @pytest.fixture
 def entetes(regular_user: User) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    return {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
 
 
 async def _portefeuille(client: AsyncClient, entetes: dict) -> str:
@@ -72,7 +72,7 @@ class TestRefus:
         assert reponse.status_code == 400
 
     async def test_le_portefeuille_d_un_autre_utilisateur_est_introuvable(self, client, entetes, admin_user):
-        autre = {"Authorization": f"Bearer {create_access_token(subject=str(admin_user.id))}"}
+        autre = {"Authorization": f"Bearer {create_token(str(admin_user.id))}"}
         portefeuille = await _portefeuille(client, autre)
 
         reponse = await _importer(client, entetes, portefeuille, csv("BTC,buy,1,30000,0,2026-01-15,"))

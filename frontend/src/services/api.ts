@@ -204,16 +204,6 @@ export const authApi = {
     const response = await api.post('/auth/mfa/disable', { code })
     return response.data
   },
-
-  verifyEmail: async (token: string) => {
-    const response = await api.post('/auth/verify-email', { token })
-    return response.data
-  },
-
-  resendVerification: async (email: string) => {
-    const response = await api.post('/auth/resend-verification', { email })
-    return response.data
-  },
 }
 
 // Dashboard API

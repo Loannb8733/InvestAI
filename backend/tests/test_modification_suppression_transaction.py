@@ -17,10 +17,10 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.models.asset import Asset
 from app.models.transaction import Transaction
-from app.models.user import User
 
 
 async def _portefeuille_avec_actif(client: AsyncClient, token: str, *, plateforme: str = "Kraken") -> tuple[str, str]:
@@ -59,7 +59,7 @@ async def _creer(client: AsyncClient, entetes: dict, actif_id: str, **champs) ->
 
 @pytest.fixture
 def entetes(regular_user: User) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    return {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
 
 
 async def _actif(db_session, actif_id) -> Asset:
@@ -177,7 +177,7 @@ class TestPrixDeRevient:
 class TestPortee:
     async def test_une_transaction_d_un_autre_utilisateur_est_introuvable(self, client, entetes, admin_user):
         """404, non 403 : l'existence même de la transaction n'est pas révélée."""
-        autre = {"Authorization": f"Bearer {create_access_token(subject=str(admin_user.id))}"}
+        autre = {"Authorization": f"Bearer {create_token(str(admin_user.id))}"}
         _, actif_id = await _portefeuille_avec_actif(client, autre["Authorization"].split()[1])
         transaction = await _creer(client, autre, actif_id)
 

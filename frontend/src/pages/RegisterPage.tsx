@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,7 +19,6 @@ import {
   Target,
   Bell,
   Brain,
-  Mail
 } from 'lucide-react'
 
 const registerSchema = z.object({
@@ -45,11 +43,8 @@ type RegisterFormData = z.infer<typeof registerSchema>
 export default function RegisterPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { setTokens, fetchUser } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [registrationSuccess, setRegistrationSuccess] = useState(false)
-  const [registeredEmail, setRegisteredEmail] = useState('')
 
   const {
     register,
@@ -78,33 +73,11 @@ export default function RegisterPage() {
         data.lastName
       )
 
-      // Check if email verification is required (new flow)
-      if (response.email_verification_required) {
-        setRegisteredEmail(data.email)
-        setRegistrationSuccess(true)
-        toast({
-          title: 'Inscription réussie',
-          description: 'Vérifiez votre email pour activer votre compte.',
-        })
-      } else if (response.access_token) {
-        // Old flow (fallback)
-        setTokens(response.access_token, response.refresh_token)
-        await fetchUser()
-        toast({
-          title: 'Inscription réussie',
-          description: 'Bienvenue sur InvestAI !',
-        })
-        navigate('/')
-      } else {
-        // Réponse neutre du backend : elle ne dit pas si l'adresse était libre
-        // (SEC-03, anti-énumération), donc pas d'auto-connexion possible. Sans
-        // cette branche l'écran restait muet — ni toast, ni redirection.
-        toast({
-          title: 'Inscription enregistrée',
-          description: response.message ?? 'Connectez-vous avec cette adresse.',
-        })
-        navigate('/login')
-      }
+      toast({
+        title: 'Inscription enregistrée',
+        description: response.message ?? 'Connectez-vous avec cette adresse.',
+      })
+      navigate('/login')
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message :
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
@@ -138,66 +111,6 @@ export default function RegisterPage() {
       text: 'Prédictions basées sur l\'IA',
     },
   ]
-
-  // Show success screen after registration
-  if (registrationSuccess) {
-    return (
-      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-8">
-        <AuroraCanvas className="opacity-40" />
-        <div className="relative z-10 w-full max-w-md text-center space-y-6">
-          <div className="mx-auto h-20 w-20 rounded-full bg-gain dark:bg-gain/30 flex items-center justify-center">
-            <Mail className="h-10 w-10 text-gain dark:text-gain" />
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-2xl font-serif font-medium">Vérifiez votre email</h2>
-            <p className="text-muted-foreground">
-              Nous avons envoyé un lien de vérification à
-            </p>
-            <p className="font-medium text-primary">{registeredEmail}</p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-            <p>Cliquez sur le lien dans l'email pour activer votre compte.</p>
-            <p className="mt-2">Le lien est valable 24 heures.</p>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate('/login')}
-            >
-              Aller à la connexion
-            </Button>
-            <p className="text-sm text-muted-foreground">
-              Pas reçu d'email ?{' '}
-              <button
-                className="text-primary hover:underline"
-                onClick={async () => {
-                  try {
-                    await authApi.resendVerification(registeredEmail)
-                    toast({
-                      title: 'Email envoyé',
-                      description: 'Un nouveau lien de vérification a été envoyé.',
-                    })
-                  } catch {
-                    toast({
-                      variant: 'destructive',
-                      title: 'Erreur',
-                      description: 'Impossible d\'envoyer l\'email. Réessayez plus tard.',
-                    })
-                  }
-                }}
-              >
-                Renvoyer le lien
-              </button>
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen flex">

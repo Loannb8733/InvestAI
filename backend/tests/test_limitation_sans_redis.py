@@ -18,7 +18,7 @@ from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES
 
 from app.core.rate_limit import RATE_LIMITS, limiter
-from app.models.user import User
+from app.domains.identity.models import User
 
 # Personne n'écoute sur ce port : la connexion est refusée tout de suite.
 _REDIS_INJOIGNABLE = "redis://127.0.0.1:6399/0"

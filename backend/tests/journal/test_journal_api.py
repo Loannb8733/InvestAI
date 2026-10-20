@@ -8,18 +8,19 @@ import time_machine
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token, hash_password
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
+from app.domains.identity.tokens import create_token
 from app.domains.journal.models import Note
 from app.domains.market_data.history.models import AssetPriceHistory
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
-from app.models.user import User, UserRole
 
 NOW = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 
 
 def _headers(user: User) -> dict[str, str]:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    return {"Authorization": f"Bearer {create_token(str(user.id))}"}
 
 
 async def _asset(db: AsyncSession, user: User, symbol: str = "JRNL", price: str = "120") -> Asset:

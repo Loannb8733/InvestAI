@@ -15,13 +15,13 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate, TransactionWithAsset
 from app.services.audit_service import log_audit
 from app.services.metrics_service import invalidate_dashboard_cache

@@ -61,7 +61,7 @@ def detect_anomalies():
 
 async def _detect_anomalies():
     """Async implementation of anomaly detection."""
-    from app.models.user import User
+    from app.domains.identity.models import User
 
     async with async_session_factory() as db:
         result = await db.execute(select(User).where(User.is_active.is_(True)))
@@ -307,9 +307,9 @@ def check_bottom_zones():
 
 async def _check_bottom_zones():
     """Detect assets in bottom zone with confidence > 80% and alert via Telegram."""
+    from app.domains.identity.models import User
     from app.domains.market_data.history.reader import local_series
     from app.models.portfolio import Portfolio
-    from app.models.user import User
     from app.services.telegram_service import telegram_service
 
     async with async_session_factory() as db:

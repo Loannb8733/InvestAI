@@ -8,10 +8,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
-from app.models.user import User
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.services.report_service import report_service
 
 

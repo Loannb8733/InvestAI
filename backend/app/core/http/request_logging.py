@@ -19,9 +19,9 @@ def _set_sentry_user(request: Request) -> None:
     if not auth_header.startswith("Bearer "):
         return
     try:
-        from app.core.security import decode_access_token
+        from app.domains.identity.tokens import decode_token
 
-        payload = decode_access_token(auth_header.split(" ")[1])
+        payload = decode_token(auth_header.split(" ")[1])
         if payload:
             import sentry_sdk
 

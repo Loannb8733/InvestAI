@@ -13,8 +13,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.core.db.metadata import metadata
-from app.core.security import hash_password
-from app.models.user import User, UserRole
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
 
 
 async def create_admin():

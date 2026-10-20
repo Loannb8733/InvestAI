@@ -7,14 +7,14 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.domains.market_data.fx.models import FxDailyRate
 from app.domains.market_data.history import tasks
 from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.market_data.history.repository import HistoryRepository
 from app.domains.market_data.history.series import PriceSeries
 from app.models.asset import Asset
-from app.models.user import User
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 
@@ -40,7 +40,7 @@ def _yahoo_chart(*closes: float | None) -> dict[str, Any]:
 
 
 async def _holding(client: AsyncClient, user: User, symbol: str, asset_type: str) -> tuple[dict[str, str], str]:
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(user.id))}"}
     portfolio_id = (await client.post("/api/v1/portfolios", json={"name": "H"}, headers=headers)).json()["id"]
     asset_id = (
         await client.post(
@@ -127,7 +127,7 @@ async def test_benchmarks_are_read_from_the_stored_history(
     await repository.upsert("BTC", PriceSeries([_days_ago(1), _days_ago(0)], [100.0, 200.0]), "coingecko")
     await repository.upsert("SPY", PriceSeries([_days_ago(1), _days_ago(0)], [50.0, 55.0]), "yahoo")
     await db_session.commit()
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
     body = (await client.get("/api/v1/dashboard/benchmarks?days=2", headers=headers)).json()
     assert [(s["symbol"], [p["value"] for p in s["data"]]) for s in body] == [
         ("BTC", [100.0, 200.0]),

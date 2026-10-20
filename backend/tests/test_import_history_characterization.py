@@ -32,12 +32,13 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.core.security import create_access_token, encrypt_api_key
+from app.core.security import encrypt_api_key
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.models.api_key import APIKey
 from app.models.asset import Asset
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
-from app.models.user import User
 from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
 
 MAINTENANT = datetime.now(UTC)
@@ -198,7 +199,7 @@ async def _importer(client, db_session, utilisateur, service):
     par prix, et son résultat dépend du cours du jour.
     """
     cle = await _cle_api(db_session, utilisateur)
-    token = create_access_token(subject=str(utilisateur.id))
+    token = create_token(str(utilisateur.id))
     # Le double est injecté à la frontière `construire_service_exchange`, qui rend
     # une **instance** (l'ancien `get_exchange_service` rendait une classe). C'est
     # le point d'injection qui a changé avec l'extraction, pas le comportement.
@@ -395,7 +396,7 @@ class TestIdempotence:
     ):
         service_double.trades = [_trade("t1", "BTCEUR", "buy", "0.5", "30000")]
         cle = await _cle_api(db_session, regular_user)
-        token = create_access_token(subject=str(regular_user.id))
+        token = create_token(str(regular_user.id))
 
         with patch(
             "app.api.v1.endpoints.api_keys.construire_service_exchange",
@@ -656,7 +657,7 @@ class TestAutorisation:
     async def test_cle_inexistante(self, client: AsyncClient, regular_user: User):
         from uuid import uuid4
 
-        token = create_access_token(subject=str(regular_user.id))
+        token = create_token(str(regular_user.id))
         reponse = await client.post(
             f"/api/v1/api-keys/{uuid4()}/import-history",
             headers={"Authorization": f"Bearer {token}"},

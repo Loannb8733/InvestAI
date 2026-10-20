@@ -6,11 +6,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.ml import adaptive_thresholds as at
-from app.models.user import User
 from app.services.prediction_service import prediction_service
 
 logger = logging.getLogger(__name__)

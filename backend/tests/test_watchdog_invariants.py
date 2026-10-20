@@ -15,10 +15,10 @@ from httpx import AsyncClient
 
 from app.core.config import settings
 from app.core.db import session as db_session_module
+from app.domains.identity.models import User
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
 from tests.conftest import test_engine
 
 _JETON = "jeton-de-test-du-watchdog"

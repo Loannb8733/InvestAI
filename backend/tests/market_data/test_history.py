@@ -10,7 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.domains.market_data.fx.models import FxDailyRate
 from app.domains.market_data.history import coingecko, reader, service, tasks
 from app.domains.market_data.history.models import AssetPriceHistory
@@ -19,7 +20,6 @@ from app.domains.market_data.history.repository import HistoryRepository
 from app.domains.market_data.history.series import PriceSeries
 from app.domains.market_data.prices.service import price_feed
 from app.models.asset import Asset
-from app.models.user import User
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 
@@ -64,7 +64,7 @@ def background(monkeypatch: pytest.MonkeyPatch) -> list[float]:
 
 
 async def _holding(client: AsyncClient, user: User, symbol: str, asset_type: str) -> None:
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(user.id))}"}
     portfolio_id = (await client.post("/api/v1/portfolios", json={"name": "H"}, headers=headers)).json()["id"]
     asset_id = (
         await client.post(

@@ -12,9 +12,10 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import select
 
-from app.core.security import encrypt_api_key, hash_password
+from app.core.security import encrypt_api_key
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
 from app.models.portfolio import Portfolio
-from app.models.user import User, UserRole
 from app.services.exchange_import_preparation import (
     construire_service_exchange,
     fusionner_portefeuilles_herites,

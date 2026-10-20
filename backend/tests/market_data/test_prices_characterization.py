@@ -4,8 +4,8 @@ import httpx
 import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from tests.http_stubs import HttpStub
 
 COINGECKO = "api.coingecko.com"
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.usefixtures("empty_test_redis")
 
 
 async def _holding(client: AsyncClient, user: User, symbol: str, asset_type: str) -> tuple[dict[str, str], str]:
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(user.id))}"}
     portfolio_id = (await client.post("/api/v1/portfolios", json={"name": "P"}, headers=headers)).json()["id"]
     asset_id = (
         await client.post(

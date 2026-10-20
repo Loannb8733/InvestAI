@@ -21,11 +21,11 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.v1.endpoints.dashboard import _get_dashboard_impl
+from app.domains.identity.models import User
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
 
 MAINTENANT = datetime.now(UTC)
 

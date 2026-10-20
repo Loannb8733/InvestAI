@@ -19,8 +19,8 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.v1.endpoints.crowdfunding import resoudre_portefeuille_crowdfunding
+from app.domains.identity.models import User
 from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
-from app.models.user import User
 
 
 @pytest.fixture

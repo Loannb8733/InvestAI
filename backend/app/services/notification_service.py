@@ -10,8 +10,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.domains.identity.models import User
 from app.models.notification import Notification, NotificationPriority, NotificationType
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 

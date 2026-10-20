@@ -8,9 +8,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.db.session import session_factory
+from app.domains.identity.models import User
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.user import User
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 from app.tasks.async_runner import run_async

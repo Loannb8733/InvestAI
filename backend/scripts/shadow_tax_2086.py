@@ -31,7 +31,7 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.user import User
+from app.domains.identity.models import User
 from app.services import report_service
 from app.services.report_service import ReportService
 

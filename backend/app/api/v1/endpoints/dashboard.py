@@ -11,11 +11,12 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.finance_constants import annualized_return_pct
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
@@ -25,7 +26,6 @@ from app.models.calendar_event import CalendarEvent
 from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
-from app.models.user import User
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 

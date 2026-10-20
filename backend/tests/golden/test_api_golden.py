@@ -9,8 +9,8 @@ import pytest
 import time_machine
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
@@ -97,7 +97,7 @@ async def test_api_responses_match_golden_snapshots(client: AsyncClient, regular
 
 
 async def _compare_with_snapshots(client: AsyncClient, user: User) -> list[str]:
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(user.id))}"}
     portfolio_id = await _seed(client, headers)
     ids: dict[str, str] = {}
     mismatches: list[str] = []

@@ -11,10 +11,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.calendar_event import CalendarEvent, EventType
-from app.models.user import User
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 
 logger = logging.getLogger(__name__)

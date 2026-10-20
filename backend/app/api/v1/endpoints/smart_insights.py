@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
-from app.models.user import User
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.services.smart_insights_service import smart_insights_service
 
 router = APIRouter()

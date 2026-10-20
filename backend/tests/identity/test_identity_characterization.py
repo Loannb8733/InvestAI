@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import _get_redis_txt
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 
@@ -16,7 +16,7 @@ USER = {"email": "user@test.com", "password": "userpassword"}
 
 
 def _bearer(user: User) -> dict[str, str]:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(user.id), token_version=user.token_version)}"}
+    return {"Authorization": f"Bearer {create_token(str(user.id), token_version=user.token_version)}"}
 
 
 async def _login(client: AsyncClient, **extra: object) -> tuple[int, dict[str, object]]:
@@ -151,14 +151,23 @@ class TestProfile:
             "tmi_rate": None,
         }
 
-    async def test_patch_rounds_amounts_and_ignores_telegram_fields(
+    async def test_patch_rounds_amounts_and_saves_telegram_settings(
         self, client: AsyncClient, db_session: AsyncSession, regular_user: User
     ) -> None:
-        payload = {"tmi_rate": 0.30000000000000004, "monthly_dca_eur": 150.456, "telegram_enabled": True}
+        payload = {
+            "tmi_rate": 0.30000000000000004,
+            "monthly_dca_eur": 150.456,
+            "telegram_chat_id": "42",
+            "telegram_enabled": True,
+        }
         body = (await client.patch("/api/v1/auth/me", json=payload, headers=_bearer(regular_user))).json()
-        assert (body["tmi_rate"], body["monthly_dca_eur"], body["telegram_enabled"]) == (0.3, 150.46, False)
+        assert (body["tmi_rate"], body["monthly_dca_eur"]) == (0.3, 150.46)
+        assert (body["telegram_chat_id"], body["telegram_enabled"]) == ("42", True)
 
-    @pytest.mark.parametrize("payload", [{"tmi_rate": 0.2}, {"preferred_currency": "JPY"}, {"monthly_dca_eur": -1}])
+    @pytest.mark.parametrize(
+        "payload",
+        [{"tmi_rate": 0.2}, {"preferred_currency": "JPY"}, {"monthly_dca_eur": -1}, {"telegram_chat_id": "abc"}],
+    )
     async def test_invalid_values_are_rejected(
         self, client: AsyncClient, regular_user: User, payload: dict[str, object]
     ) -> None:

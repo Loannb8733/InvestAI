@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
 from app.core.rate_limit import RATE_LIMITS, limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
-from app.models.user import User
 from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
 
 logger = logging.getLogger(__name__)

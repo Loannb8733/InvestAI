@@ -15,28 +15,20 @@ import RegisterPage from './RegisterPage'
  * - la règle de mot de passe, qui doit être **exactement** celle du serveur —
  *   dix caractères, une majuscule, un chiffre (NEW-67 a montré ce qu'un
  *   désaccord coûte) ;
- * - les **trois** réponses possibles du serveur. La troisième est née de
- *   l'anti-énumération : quand la réponse ne dit pas si l'adresse était libre,
- *   l'auto-connexion est impossible, et l'écran restait muet — ni message, ni
- *   redirection.
+ * - la réponse unique du serveur, qui ne dit pas si l'adresse était libre
+ *   (anti-énumération) : l'écran affiche le message et mène à la connexion.
  */
 
 const inscrire = vi.hoisted(() => vi.fn())
-const renvoyerVerification = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => vi.fn())
 const naviguer = vi.hoisted(() => vi.fn())
-const poserJetons = vi.hoisted(() => vi.fn())
-const chargerUtilisateur = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/api')>()),
-  authApi: { register: inscrire, resendVerification: renvoyerVerification },
+  authApi: { register: inscrire },
 }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/components/ui/aurora-canvas', () => ({ default: () => null }))
-vi.mock('@/stores/authStore', () => ({
-  useAuthStore: () => ({ setTokens: poserJetons, fetchUser: chargerUtilisateur }),
-}))
 vi.mock('react-router', async () => {
   const reel = await vi.importActual<typeof import('react-router')>('react-router')
   return { ...reel, useNavigate: () => naviguer }
@@ -72,7 +64,7 @@ async function sInscrire({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  inscrire.mockResolvedValue({ email_verification_required: true })
+  inscrire.mockResolvedValue({ message: 'Connectez-vous avec cette adresse.' })
 })
 
 describe('ce que le formulaire refuse avant d’appeler le serveur', () => {
@@ -133,34 +125,8 @@ describe('ce que le formulaire refuse avant d’appeler le serveur', () => {
   })
 })
 
-describe('les trois réponses possibles du serveur', () => {
-  it('invite à vérifier l’adresse quand un lien a été envoyé', async () => {
-    inscrire.mockResolvedValue({ email_verification_required: true })
-    afficher()
-
-    await sInscrire({ email: 'nouveau@test.com' })
-
-    expect(await screen.findByText(/Vérifiez votre email/i)).toBeInTheDocument()
-    expect(screen.getByText('nouveau@test.com')).toBeInTheDocument()
-    expect(screen.getByText(/valable 24 heures/i)).toBeInTheDocument()
-  })
-
-  it('connecte directement quand le serveur rend des jetons', async () => {
-    inscrire.mockResolvedValue({ access_token: 'jeton-acces', refresh_token: 'jeton-refraichissement' })
-    afficher()
-
-    await sInscrire()
-
-    await waitFor(() => expect(poserJetons).toHaveBeenCalledWith('jeton-acces', 'jeton-refraichissement'))
-    expect(chargerUtilisateur).toHaveBeenCalled()
-    expect(naviguer).toHaveBeenCalledWith('/')
-  })
-
-  it('ne laisse pas l’écran muet sur une réponse neutre', async () => {
-    // La réponse ne dit pas si l'adresse était libre (anti-énumération), donc
-    // ni jeton ni vérification. Sans cette branche, le formulaire ne répondait
-    // rien du tout et l'utilisateur restait devant un écran figé.
-    inscrire.mockResolvedValue({ message: 'Connectez-vous avec cette adresse.' })
+describe('la réponse du serveur', () => {
+  it('mène à la connexion avec le message du serveur, que l’adresse soit libre ou non', async () => {
     afficher()
 
     await sInscrire()
@@ -182,8 +148,6 @@ describe('les trois réponses possibles du serveur', () => {
   })
 
   it('reste utilisable après un échec', async () => {
-    // Le bouton doit se relâcher : sinon l'utilisateur ne peut pas corriger sa
-    // saisie et réessayer.
     inscrire.mockRejectedValue(new Error('réseau'))
     afficher()
 
@@ -192,30 +156,5 @@ describe('les trois réponses possibles du serveur', () => {
     await waitFor(() => expect(toastMock).toHaveBeenCalled())
     const bouton = screen.getByRole('button', { name: /Créer mon compte|S'inscrire/i })
     expect(bouton).not.toBeDisabled()
-  })
-})
-
-describe('l’écran d’attente de vérification', () => {
-  async function atteindre() {
-    afficher()
-    await sInscrire({ email: 'nouveau@test.com' })
-    await screen.findByText(/Vérifiez votre email/i)
-  }
-
-  it('permet de redemander le lien', async () => {
-    renvoyerVerification.mockResolvedValue({})
-    await atteindre()
-
-    fireEvent.click(screen.getByRole('button', { name: /Renvoyer le lien/i }))
-
-    await waitFor(() => expect(renvoyerVerification).toHaveBeenCalledWith('nouveau@test.com'))
-  })
-
-  it('mène à la connexion', async () => {
-    await atteindre()
-
-    fireEvent.click(screen.getByRole('button', { name: /Aller à la connexion/i }))
-
-    expect(naviguer).toHaveBeenCalledWith('/login')
   })
 })

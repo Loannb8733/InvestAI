@@ -5,9 +5,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.domains.market_data.fx.models import FxDailyRate
-from app.models.user import User
 from tests.http_stubs import HttpStub
 
 SPOT_HOST = "api.exchangerate-api.com"
@@ -16,7 +16,7 @@ SPOT_HOST = "api.exchangerate-api.com"
 async def _portfolio(client: AsyncClient, db: AsyncSession, user: User, currency: str) -> tuple[dict[str, str], str]:
     user.preferred_currency = currency
     await db.commit()
-    headers = {"Authorization": f"Bearer {create_access_token(subject=str(user.id))}"}
+    headers = {"Authorization": f"Bearer {create_token(str(user.id))}"}
     portfolio_id = (await client.post("/api/v1/portfolios", json={"name": "FX"}, headers=headers)).json()["id"]
     asset_id = (
         await client.post(

@@ -1,4 +1,5 @@
 from app.core.db.base import Base
+from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
 from app.domains.market_data.history import models as history_models
@@ -23,7 +24,6 @@ from app.models import (
     simulation,
     strategy,
     transaction,
-    user,
 )
 
 metadata = Base.metadata
@@ -41,6 +41,7 @@ __all__ = [
     "fx_models",
     "goal",
     "history_models",
+    "identity_models",
     "journal_models",
     "metadata",
     "notification",
@@ -53,5 +54,4 @@ __all__ = [
     "simulation",
     "strategy",
     "transaction",
-    "user",
 ]

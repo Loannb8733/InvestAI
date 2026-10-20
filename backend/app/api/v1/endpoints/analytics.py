@@ -8,11 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.asset import Asset, AssetType
 from app.models.portfolio import Portfolio
-from app.models.user import User
 from app.services.analytics_service import analytics_service
 from app.services.smart_insights_service import smart_insights_service
 

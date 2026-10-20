@@ -149,7 +149,7 @@ class AlertService:
         user_id: str,
     ) -> list[AlertTrigger]:
         """Check all active alerts for a user and return triggered ones."""
-        from app.models.user import User
+        from app.domains.identity.models import User
 
         triggered = []
 
@@ -228,7 +228,7 @@ class AlertService:
         db: AsyncSession,
     ) -> dict:
         """Check alerts for all users (for background task)."""
-        from app.models.user import User
+        from app.domains.identity.models import User
 
         result = await db.execute(select(User.id).where(User.is_active == True))
         user_ids = [str(uid) for uid in result.scalars().all()]
@@ -494,7 +494,7 @@ class AlertService:
 
         elif alert.condition == AlertCondition.ALLOCATION_DRIFT:
             # Écart max vs allocation cible persistée (en points de %).
-            from app.models.user import User
+            from app.domains.identity.models import User
             from app.services.report_service import report_service
 
             user_obj = (await db.execute(select(User).where(User.id == alert.user_id))).scalar_one_or_none()
