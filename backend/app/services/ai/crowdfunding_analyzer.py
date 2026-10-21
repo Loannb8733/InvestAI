@@ -9,9 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.crowdfunding_project import CrowdfundingProject
-from app.models.portfolio import Portfolio
 from app.models.project_audit import ProjectAudit
 from app.services.ai.pdf_parser import PDFParser
 

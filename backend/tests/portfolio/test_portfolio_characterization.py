@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from app.models.transaction import Transaction
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
@@ -146,7 +146,7 @@ class TestAssets:
         await db_session.refresh(remaining[0])
         assert [(str(t.asset_id), t.related_transaction_id) for t in remaining] == [(target["id"], None)]
 
-    async def test_the_list_stops_at_fifty(
+    async def test_the_list_returns_every_asset(
         self, client: AsyncClient, db_session: AsyncSession, regular_user: User
     ) -> None:
         portfolio_id = await _portfolio(client, regular_user)
@@ -154,4 +154,4 @@ class TestAssets:
             [Asset(portfolio_id=portfolio_id, symbol=f"T{i:02d}", asset_type="crypto", exchange="") for i in range(60)]
         )
         await db_session.commit()
-        assert len((await client.get("/api/v1/assets", headers=_bearer(regular_user))).json()) == 50
+        assert len((await client.get("/api/v1/assets", headers=_bearer(regular_user))).json()) == 60

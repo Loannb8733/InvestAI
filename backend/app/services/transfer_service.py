@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from app.models.transaction import Transaction, TransactionType
 
 logger = logging.getLogger(__name__)

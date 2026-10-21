@@ -223,12 +223,12 @@ async def create_goal(
     """Create a new financial goal."""
     import logging
 
-    from app.services.asset_classification import is_liquidity
+    from app.domains.portfolio.classification import is_cash_like
 
     logger = logging.getLogger(__name__)
 
     # Block goals named after liquidity symbols (EUR, USD, USDT, USDC, etc.)
-    if is_liquidity(data.name.strip().upper()):
+    if is_cash_like(data.name.strip().upper()):
         raise HTTPException(
             status_code=400,
             detail="La liquidité n'est pas un actif d'investissement. Utilisez un objectif de type 'Épargne de Sécurité'.",
@@ -276,8 +276,7 @@ async def create_goal(
     # Initial sync: set current_amount from actual portfolio value
     try:
         from app.domains.market_data.prices.service import price_feed
-        from app.models.asset import Asset
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Asset, Portfolio
 
         portfolios_result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
         portfolios = portfolios_result.scalars().all()
@@ -292,7 +291,7 @@ async def create_goal(
         price_cache: dict = {}
         for asset in assets:
             if float(asset.quantity) > 0:
-                if is_savings and not is_liquidity(asset.symbol):
+                if is_savings and not is_cash_like(asset.symbol):
                     continue
                 pkey = (asset.symbol, asset.asset_type.value)
                 if pkey not in price_cache:

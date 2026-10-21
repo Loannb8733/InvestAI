@@ -7,8 +7,8 @@ from sqlalchemy import and_, select
 
 from app.core.db.session import session_factory
 from app.domains.identity.models import User
+from app.domains.portfolio.models import Portfolio
 from app.models.notification import Notification
-from app.models.portfolio import Portfolio
 from app.services.email_service import email_service
 from app.services.metrics_service import metrics_service
 from app.services.report_service import report_service

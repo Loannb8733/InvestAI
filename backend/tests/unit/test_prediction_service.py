@@ -57,7 +57,7 @@ class TestGetDailyVolatility:
 
     @pytest.mark.asyncio
     async def test_crypto_highest_volatility(self, svc):
-        from app.models.asset import AssetType
+        from app.domains.portfolio.models import AssetType
 
         crypto = await svc._get_daily_volatility("BTC", AssetType.CRYPTO)
         stock = await svc._get_daily_volatility("AAPL", AssetType.STOCK)
@@ -80,7 +80,7 @@ class TestRandomWalkFallback:
 
     @pytest.mark.asyncio
     async def test_returns_correct_structure(self, svc):
-        from app.models.asset import AssetType
+        from app.domains.portfolio.models import AssetType
 
         predictions, trend, strength = await svc._random_walk_fallback("BTC", 100.0, AssetType.CRYPTO, 7)
         assert len(predictions) == 7
@@ -89,7 +89,7 @@ class TestRandomWalkFallback:
 
     @pytest.mark.asyncio
     async def test_predictions_have_required_keys(self, svc):
-        from app.models.asset import AssetType
+        from app.domains.portfolio.models import AssetType
 
         predictions, _, _ = await svc._random_walk_fallback("AAPL", 100.0, AssetType.STOCK, 3)
         for p in predictions:
@@ -100,7 +100,7 @@ class TestRandomWalkFallback:
 
     @pytest.mark.asyncio
     async def test_no_negative_prices(self, svc):
-        from app.models.asset import AssetType
+        from app.domains.portfolio.models import AssetType
 
         # Run multiple times to reduce randomness
         for _ in range(10):

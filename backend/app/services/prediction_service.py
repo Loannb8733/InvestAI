@@ -19,14 +19,13 @@ from app.core.redis_client import (
 )
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml import adaptive_thresholds as at
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.services.asset_classification import is_stablecoin
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_alpha import PredictionAlphaMixin
 from app.services.prediction_cycles import PredictionCyclesMixin

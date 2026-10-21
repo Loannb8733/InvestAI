@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core.security import encrypt_api_key
 from app.domains.identity.models import User, UserRole
 from app.domains.identity.passwords import hash_password
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Portfolio
 from app.services.exchange_import_preparation import (
     construire_service_exchange,
     fusionner_portefeuilles_herites,

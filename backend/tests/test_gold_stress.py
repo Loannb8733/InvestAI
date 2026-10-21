@@ -9,7 +9,7 @@ Tests:
 
 import numpy as np
 
-from app.services.metrics_service import is_safe_haven
+from app.domains.portfolio.classification import is_safe_haven
 
 # ── Helper: generate synthetic price series ──────────────────────
 

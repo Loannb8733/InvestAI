@@ -16,8 +16,7 @@ from decimal import Decimal
 import pytest
 
 from app.domains.market_data.prices.quote import PriceQuote
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.services import insights_service as module_insights
 from app.services.insights_service import InsightsService
 

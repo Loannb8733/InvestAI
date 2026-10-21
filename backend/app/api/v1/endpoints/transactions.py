@@ -19,8 +19,7 @@ from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate, TransactionWithAsset
 from app.services.audit_service import log_audit
@@ -1151,7 +1150,7 @@ async def import_transactions_csv(
     Platform is auto-detected if not specified.
     Assets are created automatically if they don't exist.
     """
-    from app.models.asset import AssetType
+    from app.domains.portfolio.models import AssetType
     from app.services.csv_parsers import detect_csv_format, get_parser_by_name
 
     logger.info(f"CSV Import: portfolio_id={portfolio_id}, platform={platform}, filename={file.filename}")

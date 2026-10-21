@@ -9,12 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_safe_haven
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml import adaptive_thresholds as adaptive_th
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
 from app.services.analytics_service import AnalyticsService
-from app.services.asset_classification import is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_service import PredictionService
 from app.services.smart_insights_analyzers import SmartInsightAnalyzersMixin

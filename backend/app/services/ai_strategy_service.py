@@ -13,8 +13,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import get_cached_contrarian_stats
+from app.domains.portfolio.classification import STABLECOIN_SYMBOLS
 from app.models.strategy import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
-from app.services.asset_classification import STABLECOIN_SYMBOLS
 from app.services.contrarian_stats_service import format_reasoning
 
 logger = logging.getLogger(__name__)

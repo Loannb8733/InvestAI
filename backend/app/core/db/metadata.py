@@ -3,10 +3,10 @@ from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
 from app.domains.market_data.history import models as history_models
+from app.domains.portfolio import models as portfolio_models
 from app.models import (
     alert,
     api_key,
-    asset,
     audit_log,
     calendar_event,
     cold_wallet_address,
@@ -16,7 +16,6 @@ from app.models import (
     goal,
     notification,
     planned_order,
-    portfolio,
     portfolio_snapshot,
     prediction_log,
     project_audit,
@@ -31,7 +30,6 @@ metadata = Base.metadata
 __all__ = [
     "alert",
     "api_key",
-    "asset",
     "audit_log",
     "calendar_event",
     "cold_wallet_address",
@@ -46,7 +44,7 @@ __all__ = [
     "metadata",
     "notification",
     "planned_order",
-    "portfolio",
+    "portfolio_models",
     "portfolio_snapshot",
     "prediction_log",
     "project_audit",

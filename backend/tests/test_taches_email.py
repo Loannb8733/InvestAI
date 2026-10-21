@@ -18,9 +18,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.notification import Notification, NotificationType
-from app.models.portfolio import Portfolio
 from app.tasks import emails
 
 

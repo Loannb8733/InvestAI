@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.market_data.history.series import PriceSeries
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import Asset, AssetType
 from app.models.transaction import Transaction
 
 _history = AssetPriceHistory.__table__

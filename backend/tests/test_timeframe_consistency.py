@@ -6,6 +6,7 @@ mathématiquement cohérentes sans dépendance à la base de données.
 
 import numpy as np
 
+from app.domains.portfolio.classification import is_safe_haven
 from app.services.analytics_service import (
     _annualized_return,
     _annualized_volatility,
@@ -13,7 +14,6 @@ from app.services.analytics_service import (
     _sharpe,
     _var_historical,
 )
-from app.services.metrics_service import is_safe_haven
 
 # ── Helpers ──────────────────────────────────────────────────────
 

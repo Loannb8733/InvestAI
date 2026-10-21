@@ -15,9 +15,8 @@ def check_crowdfunding_delays():
 
     async def _check():
         from app.core.db.session import session_factory
-        from app.models.asset import Asset
+        from app.domains.portfolio.models import Asset, Portfolio
         from app.models.notification import Notification, NotificationPriority, NotificationType
-        from app.models.portfolio import Portfolio
         from app.services.reconciliation_service import reconciliation_service
 
         async with session_factory() as db:

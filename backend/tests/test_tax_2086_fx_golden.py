@@ -15,8 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.report_service import ReportService
 

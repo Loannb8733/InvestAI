@@ -113,8 +113,7 @@ async def _validate_portfolio_consistency_async() -> dict:
     left report-only — STEP 2 of the sync reconciles those to the exchange balance,
     which is authoritative and may legitimately differ from the transaction sum.
     """
-    from app.models.asset import Asset
-    from app.models.portfolio import Portfolio
+    from app.domains.portfolio.models import Asset, Portfolio
     from app.models.transaction import Transaction, TransactionType
     from app.services.transfer_service import COLD_WALLET_DESTINATION
 

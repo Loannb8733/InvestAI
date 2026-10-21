@@ -14,7 +14,7 @@ from app.domains.market_data.history import tasks
 from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.market_data.history.repository import HistoryRepository
 from app.domains.market_data.history.series import PriceSeries
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 

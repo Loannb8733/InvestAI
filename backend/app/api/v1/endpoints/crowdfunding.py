@@ -13,11 +13,10 @@ from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import CROWDFUNDING_KIND, Asset, AssetType, Portfolio
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
 from app.models.crowdfunding_repayment import CrowdfundingRepayment, PaymentType
-from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
 from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
 from app.schemas.crowdfunding import (
@@ -60,20 +59,20 @@ async def resoudre_portefeuille_crowdfunding(db: AsyncSession, user_id) -> Portf
     resultat = await db.execute(
         select(Portfolio).where(
             Portfolio.user_id == user_id,
-            or_(Portfolio.kind == PORTEFEUILLE_CROWDFUNDING, Portfolio.name == "Crowdfunding"),
+            or_(Portfolio.kind == CROWDFUNDING_KIND, Portfolio.name == "Crowdfunding"),
         )
     )
     portefeuille = resultat.scalars().first()
     if portefeuille is not None:
-        if portefeuille.kind != PORTEFEUILLE_CROWDFUNDING:
-            portefeuille.kind = PORTEFEUILLE_CROWDFUNDING
+        if portefeuille.kind != CROWDFUNDING_KIND:
+            portefeuille.kind = CROWDFUNDING_KIND
         return portefeuille
 
     portefeuille = Portfolio(
         id=uuid.uuid4(),
         user_id=user_id,
         name="Crowdfunding",
-        kind=PORTEFEUILLE_CROWDFUNDING,
+        kind=CROWDFUNDING_KIND,
         description="Portefeuille dédié aux investissements crowdfunding",
     )
     db.add(portefeuille)

@@ -6,7 +6,7 @@ from datetime import UTC
 from sqlalchemy import select
 
 from app.core.db.session import session_factory as async_session_factory
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from app.services.prediction_service import prediction_service
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -150,7 +150,7 @@ async def _check_prediction_accuracy():
         for log in logs:
             try:
                 # Get actual price
-                from app.models.asset import AssetType
+                from app.domains.portfolio.models import AssetType
 
                 asset_type = AssetType(log.asset_type) if log.asset_type else AssetType.CRYPTO
 
@@ -309,7 +309,7 @@ async def _check_bottom_zones():
     """Detect assets in bottom zone with confidence > 80% and alert via Telegram."""
     from app.domains.identity.models import User
     from app.domains.market_data.history.reader import local_series
-    from app.models.portfolio import Portfolio
+    from app.domains.portfolio.models import Portfolio
     from app.services.telegram_service import telegram_service
 
     async with async_session_factory() as db:

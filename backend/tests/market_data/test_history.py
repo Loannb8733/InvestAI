@@ -19,7 +19,7 @@ from app.domains.market_data.history.reader import local_history
 from app.domains.market_data.history.repository import HistoryRepository
 from app.domains.market_data.history.series import PriceSeries
 from app.domains.market_data.prices.service import price_feed
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 

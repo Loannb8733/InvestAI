@@ -20,8 +20,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.services.analytics_service import AnalyticsService
 
 # Une série qui monte régulièrement, assez longue pour les calculs de volatilité.

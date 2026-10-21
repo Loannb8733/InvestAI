@@ -1,14 +1,12 @@
 comments	backend/app/api/v1/endpoints/alerts.py
 comments	backend/app/api/v1/endpoints/analytics.py
 comments	backend/app/api/v1/endpoints/api_keys.py
-comments	backend/app/api/v1/endpoints/assets.py
 comments	backend/app/api/v1/endpoints/calendar.py
 comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/crowdfunding.py
 comments	backend/app/api/v1/endpoints/dashboard.py
 comments	backend/app/api/v1/endpoints/goals.py
 comments	backend/app/api/v1/endpoints/notifications.py
-comments	backend/app/api/v1/endpoints/portfolios.py
 comments	backend/app/api/v1/endpoints/predictions.py
 comments	backend/app/api/v1/endpoints/reports.py
 comments	backend/app/api/v1/endpoints/simulations.py
@@ -32,13 +30,11 @@ comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
 comments	backend/app/models/alert.py
 comments	backend/app/models/api_key.py
-comments	backend/app/models/asset.py
 comments	backend/app/models/cold_wallet_address.py
 comments	backend/app/models/crowdfunding_project.py
 comments	backend/app/models/crowdfunding_repayment.py
 comments	backend/app/models/goal.py
 comments	backend/app/models/planned_order.py
-comments	backend/app/models/portfolio.py
 comments	backend/app/models/portfolio_snapshot.py
 comments	backend/app/models/prediction_log.py
 comments	backend/app/models/project_audit.py
@@ -46,9 +42,7 @@ comments	backend/app/models/project_document.py
 comments	backend/app/models/strategy.py
 comments	backend/app/models/transaction.py
 comments	backend/app/schemas/_money.py
-comments	backend/app/schemas/asset.py
 comments	backend/app/schemas/crowdfunding.py
-comments	backend/app/schemas/portfolio.py
 comments	backend/app/schemas/strategy.py
 comments	backend/app/schemas/transaction.py
 comments	backend/app/services/ai/crowdfunding_analyzer.py
@@ -60,7 +54,6 @@ comments	backend/app/services/analytics_scoring.py
 comments	backend/app/services/analytics_service.py
 comments	backend/app/services/analytics_simulation.py
 comments	backend/app/services/analytics_types.py
-comments	backend/app/services/asset_classification.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/crowdfunding_calendar_service.py
 comments	backend/app/services/csv_parsers.py

@@ -254,8 +254,7 @@ class TestFiscalite:
         from datetime import datetime
         from decimal import Decimal
 
-        from app.models.asset import Asset, AssetType
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Asset, AssetType, Portfolio
         from app.models.transaction import Transaction, TransactionType
 
         pf = Portfolio(user_id=regular_user.id, name="P")
@@ -352,8 +351,7 @@ class TestQuantiteAgregee:
         """
         from decimal import Decimal
 
-        from app.models.asset import Asset, AssetType
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Asset, AssetType, Portfolio
         from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")
@@ -394,8 +392,7 @@ class TestQuantiteAgregee:
         """
         from decimal import Decimal
 
-        from app.models.asset import Asset, AssetType
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Asset, AssetType, Portfolio
         from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")
@@ -436,8 +433,7 @@ class TestQuantiteAgregee:
         from datetime import datetime
         from decimal import Decimal
 
-        from app.models.asset import Asset, AssetType
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Asset, AssetType, Portfolio
         from app.models.transaction import Transaction, TransactionType
         from app.services.metrics_service import metrics_service
 

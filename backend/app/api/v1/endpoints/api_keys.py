@@ -362,7 +362,7 @@ async def import_trade_history(
     """Import full trade history from exchange with actual prices."""
     from collections import defaultdict
 
-    from app.models.asset import Asset, AssetType
+    from app.domains.portfolio.models import Asset, AssetType
     from app.models.transaction import Transaction, TransactionType
 
     result = await db.execute(
@@ -1375,7 +1375,7 @@ async def sync_exchange(
     db: AsyncSession = Depends(get_session),
 ):
     """Sync balances from an exchange to portfolio assets."""
-    from app.models.asset import Asset, AssetType
+    from app.domains.portfolio.models import Asset, AssetType
 
     result = await db.execute(
         select(APIKey).where(

@@ -31,7 +31,7 @@ if __name__ == "__main__":
 from sqlalchemy import select  # noqa: E402
 
 from app.core.db.session import session_factory  # noqa: E402
-from app.models.asset import Asset, AssetType  # noqa: E402
+from app.domains.portfolio.models import Asset, AssetType  # noqa: E402
 from app.models.transaction import Transaction, TransactionType  # noqa: E402
 
 BUY_TYPES = [

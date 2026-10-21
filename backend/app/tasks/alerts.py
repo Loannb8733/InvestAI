@@ -41,7 +41,7 @@ def seed_risk_weight_snapshots():
 
     async def _seed():
         from app.domains.identity.models import User
-        from app.models.portfolio import Portfolio
+        from app.domains.portfolio.models import Portfolio
         from app.services.metrics_service import metrics_service
 
         seeded = 0

@@ -21,8 +21,7 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction
 from app.services import fifo_replay
 from app.services.metrics_service import metrics_service

@@ -19,9 +19,9 @@ from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.history.benchmarks import ANALYTICS_BENCHMARKS
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml import adaptive_thresholds as adaptive_th
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
 
 # `_var_parametric` n'est plus appelé ici depuis l'extraction du scoring, mais
@@ -59,7 +59,6 @@ from app.services.analytics_types import (  # noqa: F401  (ré-export pour les a
     PortfolioAnalytics,
     RebalanceOrder,
 )
-from app.services.asset_classification import is_stablecoin
 
 logger = logging.getLogger(__name__)
 
@@ -736,7 +735,7 @@ class AnalyticsService:
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
-        from app.services.asset_classification import is_cash_like
+        from app.domains.portfolio.classification import is_cash_like
 
         # Get ALL user assets (including stablecoins/fiat for liquidity cushion)
         assets = await self._get_user_assets(

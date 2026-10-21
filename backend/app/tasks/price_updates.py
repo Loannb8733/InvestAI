@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.core.db.session import session_factory
 from app.core.redis_client import redis_async_url, redis_client_kwargs
 from app.domains.market_data.prices.service import price_feed
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import Asset, AssetType
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 

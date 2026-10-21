@@ -1,33 +1,29 @@
 """Parity validation tests for liquidity vs investment classification.
 
 Verifies: Total_Value = Sum(Risky Assets) + Sum(Liquidity), with 0.00€ discrepancy.
-Also tests is_liquidity alias, available_liquidity metric, and Monte Carlo liquidity cushion.
+Also tests is_cash_like, available_liquidity metric, and Monte Carlo liquidity cushion.
 """
 
 import pytest
 
-from app.services.metrics_service import is_cash_like, is_liquidity
+from app.domains.portfolio.classification import is_cash_like
 
 
 # ---------------------------------------------------------------------------
-# is_liquidity alias — must match is_cash_like exactly
+# is_cash_like : monnaies et stablecoins sont de la liquidité
 # ---------------------------------------------------------------------------
-class TestIsLiquidityAlias:
-    """Ensure is_liquidity is the same as is_cash_like."""
-
+class TestIsCashLike:
     @pytest.mark.parametrize("symbol", ["EUR", "USD", "CHF", "GBP"])
     def test_fiat_is_liquidity(self, symbol: str):
-        assert is_liquidity(symbol) is True
-        assert is_liquidity(symbol) == is_cash_like(symbol)
+        assert is_cash_like(symbol) is True
 
     @pytest.mark.parametrize("symbol", ["USDT", "USDC", "DAI", "PYUSD", "BUSD"])
     def test_stablecoin_is_liquidity(self, symbol: str):
-        assert is_liquidity(symbol) is True
-        assert is_liquidity(symbol) == is_cash_like(symbol)
+        assert is_cash_like(symbol) is True
 
     @pytest.mark.parametrize("symbol", ["BTC", "ETH", "SOL", "AAPL", "SPY"])
     def test_risky_not_liquidity(self, symbol: str):
-        assert is_liquidity(symbol) is False
+        assert is_cash_like(symbol) is False
 
 
 # ---------------------------------------------------------------------------
@@ -45,7 +41,7 @@ class TestParityValidation:
         for a in assets:
             val = a["quantity"] * a["price"]
             total += val
-            if is_liquidity(a["symbol"]):
+            if is_cash_like(a["symbol"]):
                 liquid += val
             else:
                 risky += val

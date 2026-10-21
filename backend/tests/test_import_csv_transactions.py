@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset
 from app.models.transaction import Transaction
 
 ENTETE_CSV = "symbol,type,quantity,price,fee,date,notes\n"

@@ -30,8 +30,7 @@ from sqlalchemy import select
 
 from app.core.startup.rehash import rehash_transactions_internal_hash
 from app.domains.identity.models import User
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction, TransactionType, compute_transaction_hash
 
 QUAND = datetime(2026, 3, 25, 0, 7, 0, tzinfo=UTC)

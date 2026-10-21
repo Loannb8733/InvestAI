@@ -85,7 +85,7 @@ class TestTradingDays:
         assert _trading_days("real_estate") == 365
 
     def test_enum_style_asset_type(self):
-        from app.models.asset import AssetType
+        from app.domains.portfolio.models import AssetType
 
         assert _trading_days(AssetType.STOCK) == 252
         assert _trading_days(AssetType.ETF) == 252

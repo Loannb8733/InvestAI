@@ -8,8 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.fx.spot import FIAT_CURRENCIES
 from app.domains.market_data.prices.service import price_feed
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction, TransactionType
 
 logger = logging.getLogger(__name__)

@@ -20,10 +20,9 @@ from app.domains.identity.models import User
 from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.alert import Alert
-from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
-from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.transaction import Transaction
 from app.services.metrics_service import metrics_service
@@ -468,8 +467,8 @@ async def _get_dashboard_impl(
     # doit pas pouvoir emporter l'écran entier.
     from sqlalchemy import case as sa_case
 
+    from app.domains.portfolio.classification import is_stablecoin
     from app.models.transaction import TransactionType
-    from app.services.asset_classification import is_stablecoin
 
     staked_result = await db.execute(
         select(
@@ -791,7 +790,7 @@ async def _get_dashboard_impl(
 
     # « crypto = USD » était trompeur pour le risque de change : l'or tokenisé
     # (PAXG…) est une exposition OR, les stablecoins EUR une exposition EUR.
-    from app.services.asset_classification import STABLECOIN_PEGS, is_safe_haven
+    from app.domains.portfolio.classification import STABLECOIN_PEGS, is_safe_haven
 
     ccy_totals: dict[str, float] = {}
     for a in metrics.get("assets", []):
@@ -1227,7 +1226,7 @@ async def get_portfolio_sparklines(
     """Get sparkline price data for all assets in a portfolio."""
     from app.domains.market_data.history.reader import local_history
     from app.domains.market_data.history.tasks import schedule_refresh
-    from app.services.asset_classification import is_cash_like
+    from app.domains.portfolio.classification import is_cash_like
 
     # Verify ownership
     portfolio_result = await db.execute(

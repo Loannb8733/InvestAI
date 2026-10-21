@@ -444,10 +444,9 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
     from sqlalchemy import select
 
     from app.domains.market_data.prices.service import price_feed
-    from app.models.asset import Asset
+    from app.domains.portfolio.classification import is_cash_like
+    from app.domains.portfolio.models import Asset, Portfolio
     from app.models.goal import Goal, GoalStatus, GoalType
-    from app.models.portfolio import Portfolio
-    from app.services.asset_classification import is_liquidity
 
     conditions = [Goal.user_id == user_id, Goal.status == GoalStatus.ACTIVE]
     if only_goal_id is not None:
@@ -478,7 +477,7 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
             price_cache[pkey] = quote.price if quote is not None else Decimal(str(asset.avg_buy_price or 0))
         value = asset.quantity * Decimal(str(price_cache[pkey]))
         total_value += value
-        if is_liquidity(asset.symbol):
+        if is_cash_like(asset.symbol):
             liquid_value += value
     cash_total = Decimal("0")
     for portfolio in portfolios:

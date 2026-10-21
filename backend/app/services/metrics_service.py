@@ -14,22 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.finance_constants import TRADING_DAYS_PER_YEAR, annualized_return_pct
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.classification import is_cash_like, is_fiat, is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction
 from app.services import fifo_replay
-
-# Re-exported for backwards compatibility — these classification helpers now live
-# in asset_classification so callers need not import the whole metrics module.
-from app.services.asset_classification import (  # noqa: F401
-    FIAT_SYMBOLS,
-    STABLECOIN_SYMBOLS,
-    is_cash_like,
-    is_fiat,
-    is_liquidity,
-    is_safe_haven,
-    is_stablecoin,
-)
 from app.services.metrics_cost_basis import (  # noqa: F401 — compute_cump_pru used; helpers re-exported for tests
     _ci_price_in_portfolio_ccy,
     _conversion_dest_unit_cost,

@@ -13,8 +13,7 @@ from app.domains.identity.passwords import hash_password
 from app.domains.identity.tokens import create_token
 from app.domains.journal.models import Note
 from app.domains.market_data.history.models import AssetPriceHistory
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 
 NOW = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 

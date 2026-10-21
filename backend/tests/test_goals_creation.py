@@ -192,16 +192,16 @@ class TestLiquidityFilter:
 
     @pytest.mark.parametrize("symbol", ["EUR", "USD", "USDT", "USDC", "eur", "Usdt"])
     def test_liquidity_names_rejected(self, symbol: str):
-        """GoalCreate itself doesn't block, but the endpoint does via is_liquidity."""
-        from app.services.metrics_service import is_liquidity
+        """GoalCreate itself doesn't block, but the endpoint does via is_cash_like."""
+        from app.domains.portfolio.classification import is_cash_like
 
-        assert is_liquidity(symbol.strip().upper()) is True
+        assert is_cash_like(symbol.strip().upper()) is True
 
     @pytest.mark.parametrize("name", ["Objectif 1500€", "BTC Accumulation", "Fonds d'urgence"])
     def test_normal_names_accepted(self, name: str):
-        from app.services.metrics_service import is_liquidity
+        from app.domains.portfolio.classification import is_cash_like
 
-        assert is_liquidity(name.strip().upper()) is False
+        assert is_cash_like(name.strip().upper()) is False
 
 
 class TestParityAfterGoalCreation:
@@ -213,7 +213,7 @@ class TestParityAfterGoalCreation:
 
     def test_parity_preserved_863_90(self):
         """After goal creation with 863.90€ portfolio, partition stays intact."""
-        from app.services.metrics_service import is_liquidity
+        from app.domains.portfolio.classification import is_cash_like
 
         assets = [
             {"symbol": "BTC", "quantity": 0.005, "price": 50000},  # 250
@@ -222,8 +222,8 @@ class TestParityAfterGoalCreation:
             {"symbol": "USDT", "quantity": 13.90, "price": 1.0},  # 13.90
         ]
         total = sum(a["quantity"] * a["price"] for a in assets)
-        invested = sum(a["quantity"] * a["price"] for a in assets if not is_liquidity(a["symbol"]))
-        munitions = sum(a["quantity"] * a["price"] for a in assets if is_liquidity(a["symbol"]))
+        invested = sum(a["quantity"] * a["price"] for a in assets if not is_cash_like(a["symbol"]))
+        munitions = sum(a["quantity"] * a["price"] for a in assets if is_cash_like(a["symbol"]))
 
         assert abs(total - 1863.90) < 0.01
         assert abs(invested + munitions - total) < 0.01, f"Parity broken: {invested} + {munitions} != {total}"
@@ -236,7 +236,7 @@ class TestParityAfterGoalCreation:
 
     def test_savings_goal_only_counts_munitions(self):
         """SAVINGS goal current_amount = munitions only."""
-        from app.services.metrics_service import is_liquidity
+        from app.domains.portfolio.classification import is_cash_like
 
         assets = [
             {"symbol": "BTC", "quantity": 0.005, "price": 50000},  # 250
@@ -244,8 +244,8 @@ class TestParityAfterGoalCreation:
             {"symbol": "USDC", "quantity": 113.90, "price": 1.0},  # 113.90
         ]
         total = sum(a["quantity"] * a["price"] for a in assets)
-        invested = sum(a["quantity"] * a["price"] for a in assets if not is_liquidity(a["symbol"]))
-        munitions = sum(a["quantity"] * a["price"] for a in assets if is_liquidity(a["symbol"]))
+        invested = sum(a["quantity"] * a["price"] for a in assets if not is_cash_like(a["symbol"]))
+        munitions = sum(a["quantity"] * a["price"] for a in assets if is_cash_like(a["symbol"]))
 
         savings_current = munitions  # SAVINGS goal only counts liquidity
         assert abs(savings_current - 613.90) < 0.01

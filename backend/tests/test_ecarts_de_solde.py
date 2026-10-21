@@ -21,8 +21,7 @@ from sqlalchemy import select
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction, TransactionType
 
 MAINTENANT = datetime.now(UTC)

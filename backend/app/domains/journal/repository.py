@@ -9,8 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.journal.models import Note
 from app.domains.market_data.history.models import AssetPriceHistory
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, Portfolio
 
 SCORED_SENTIMENTS = ("bullish", "bearish", "neutral")
 

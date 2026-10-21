@@ -12,10 +12,9 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset, AssetType
 from app.models.notification import NotificationPriority
-from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction, TransactionType
 from app.services.notification_service import notification_service
 

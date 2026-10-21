@@ -9,16 +9,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.domains.portfolio.classification import FIAT_SYMBOLS, STABLECOIN_SYMBOLS, is_cash_like, is_fiat, is_stablecoin
 from app.services.metrics_service import (
-    FIAT_SYMBOLS,
-    STABLECOIN_SYMBOLS,
     MetricsService,
     _ci_price_in_portfolio_ccy,
     _conversion_dest_unit_cost,
     compute_cump_pru,
-    is_cash_like,
-    is_fiat,
-    is_stablecoin,
 )
 
 
@@ -86,7 +82,7 @@ def metrics_service():
 
 def _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="30000.0", asset_type_val="crypto"):
     """Build a mock Asset object."""
-    from app.models.asset import AssetType
+    from app.domains.portfolio.models import AssetType
 
     asset = MagicMock()
     asset.symbol = symbol

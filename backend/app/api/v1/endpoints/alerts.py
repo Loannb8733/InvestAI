@@ -12,9 +12,8 @@ from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
 from app.services.alert_service import alert_service
 
 router = APIRouter()

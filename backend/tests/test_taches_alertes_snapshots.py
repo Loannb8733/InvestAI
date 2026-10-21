@@ -17,8 +17,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.tasks import snapshots as taches_snapshots
 

@@ -16,10 +16,9 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.classification import is_cash_like, is_safe_haven
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.transaction import Transaction
-from app.services.asset_classification import is_liquidity, is_safe_haven
 from app.services.metrics_service import metrics_service
 from app.services.report_common import (
     _BLUE,
@@ -298,7 +297,7 @@ class ReportService(
         }
         for ar in all_asset_reports:
             sym = ar.symbol.upper()
-            if is_liquidity(sym):
+            if is_cash_like(sym):
                 attribution["munitions"] += ar.current_value
             elif getattr(ar, "asset_type", "") == "crowdfunding":
                 attribution["fixed_income"] += ar.current_value

@@ -161,8 +161,13 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with database override."""
 
-    async def override_get_db():
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        """Comme get_session, une requête qui aboutit est validée.
+
+        Pas de rollback en cas d'erreur : il périmerait les objets des fixtures, partagés avec la session.
+        """
         yield db_session
+        await db_session.commit()
 
     app.dependency_overrides[get_session] = override_get_db
 

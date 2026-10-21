@@ -31,8 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, Portfolio
 from app.services.exchanges import get_exchange_service
 
 logger = logging.getLogger(__name__)

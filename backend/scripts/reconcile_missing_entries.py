@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select  # noqa: E402
 
 from app.core.db.session import session_factory  # noqa: E402
-from app.models.asset import Asset  # noqa: E402
+from app.domains.portfolio.models import Asset  # noqa: E402
 from app.models.transaction import Transaction, TransactionType  # noqa: E402
 
 _IN = (

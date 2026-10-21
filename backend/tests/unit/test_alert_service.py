@@ -13,8 +13,8 @@ import pytest
 
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, AssetType
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset, AssetType
 from app.services.alert_service import AlertService, AlertTrigger
 
 # ---------------------------------------------------------------------------

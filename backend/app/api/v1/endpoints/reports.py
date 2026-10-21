@@ -270,8 +270,7 @@ async def get_available_years(
     """Get list of years with transactions for reporting."""
     from sqlalchemy import distinct, extract, select
 
-    from app.models.asset import Asset
-    from app.models.portfolio import Portfolio
+    from app.domains.portfolio.models import Asset, Portfolio
     from app.models.transaction import Transaction
 
     # Single joined query instead of 3 sequential queries

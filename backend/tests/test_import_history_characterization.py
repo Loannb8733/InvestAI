@@ -35,9 +35,8 @@ from sqlalchemy import select
 from app.core.security import encrypt_api_key
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.api_key import APIKey
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
 from app.models.transaction import Transaction
 from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder, ExchangeTrade, ExchangeWithdrawal
 

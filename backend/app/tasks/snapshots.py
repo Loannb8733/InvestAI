@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.db.session import session_factory
 from app.domains.identity.models import User
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service

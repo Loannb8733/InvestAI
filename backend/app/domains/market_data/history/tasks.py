@@ -93,7 +93,11 @@ def schedule_refresh(symbol: str, asset_type: str) -> str:
     if asset_type not in QUOTED:
         return "ignore"
     if settings.CELERY_WORKER_AVAILABLE:
-        refresh_one.delay(symbol, asset_type)
+        try:
+            refresh_one.delay(symbol, asset_type)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Rafraîchissement de %s non mis en file : %s", symbol, exc)
+            return "ignore"
         return "file"
     key = symbol.upper()
     now = time.monotonic()

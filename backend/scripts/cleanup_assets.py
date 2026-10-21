@@ -21,8 +21,7 @@ sys.path.insert(0, "/app")
 from sqlalchemy import delete, func, select
 
 from app.core.db.session import session_factory
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.transaction import Transaction, TransactionType
 
 BUY_TYPES = [
