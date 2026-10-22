@@ -24,8 +24,8 @@ from decimal import Decimal
 import pytest
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
-from app.services.transfer_service import COLD_WALLET_DESTINATION
+from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
 from app.tasks import cleanup
 
 

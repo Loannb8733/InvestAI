@@ -21,8 +21,8 @@ from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.classification import is_stablecoin
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction
 from app.ml import adaptive_thresholds as adaptive_th
-from app.models.transaction import Transaction
 
 # `_var_parametric` n'est plus appelé ici depuis l'extraction du scoring, mais
 # reste ré-exporté : des tests l'importent depuis ce module.

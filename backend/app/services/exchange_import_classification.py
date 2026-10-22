@@ -18,7 +18,7 @@ se lit et se vérifie en quelques millisecondes.
 
 from dataclasses import dataclass
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 
 PREFIXE_RECOMPENSE = "reward_"
 PREFIXE_RECOMPENSE_STAKING = "reward_staking_"

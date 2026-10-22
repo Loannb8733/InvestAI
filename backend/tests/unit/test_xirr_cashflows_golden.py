@@ -15,7 +15,7 @@ Covered:
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 from app.services.analytics_service import _build_xirr_cashflows, _xirr
 
 

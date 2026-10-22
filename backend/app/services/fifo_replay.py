@@ -31,7 +31,7 @@ from decimal import Decimal
 from enum import Enum
 
 from app.domains.portfolio.classification import STABLECOIN_PEGS, is_stablecoin
-from app.models.transaction import TransactionType as TxType
+from app.domains.transactions.models import TransactionType as TxType
 from app.services.fifo import consume_fifo_with_dates, extract_fifo_layers
 
 logger = logging.getLogger(__name__)

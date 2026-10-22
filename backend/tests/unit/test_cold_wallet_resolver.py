@@ -4,7 +4,7 @@ A withdrawal address is mapped (case-insensitively) to a named cold wallet;
 unknown / missing addresses fall back to the default destination.
 """
 
-from app.services.transfer_service import COLD_WALLET_DESTINATION
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
 from app.tasks.sync_exchanges import _resolve_cold_wallet_destination
 
 

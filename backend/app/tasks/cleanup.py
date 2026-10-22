@@ -69,7 +69,7 @@ async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
 
 async def _cleanup_duplicate_transactions_async() -> dict:
     """Find and remove duplicate transactions (same external_id)."""
-    from app.models.transaction import Transaction
+    from app.domains.transactions.models import Transaction
 
     async with session_factory() as db:
         # Find duplicate external_ids
@@ -114,8 +114,8 @@ async def _validate_portfolio_consistency_async() -> dict:
     which is authoritative and may legitimately differ from the transaction sum.
     """
     from app.domains.portfolio.models import Asset, Portfolio
-    from app.models.transaction import Transaction, TransactionType
-    from app.services.transfer_service import COLD_WALLET_DESTINATION
+    from app.domains.transactions.models import Transaction, TransactionType
+    from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
 
     async with session_factory() as db:
         # Fetch Asset ORM objects (so we can heal in place) + their portfolio name.

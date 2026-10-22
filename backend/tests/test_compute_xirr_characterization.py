@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 from app.services.analytics_service import AnalyticsService
 
 MAINTENANT = datetime.now(UTC)

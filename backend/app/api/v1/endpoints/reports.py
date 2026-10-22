@@ -271,7 +271,7 @@ async def get_available_years(
     from sqlalchemy import distinct, extract, select
 
     from app.domains.portfolio.models import Asset, Portfolio
-    from app.models.transaction import Transaction
+    from app.domains.transactions.models import Transaction
 
     # Single joined query instead of 3 sequential queries
     years_result = await db.execute(

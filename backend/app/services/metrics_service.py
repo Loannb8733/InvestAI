@@ -16,7 +16,7 @@ from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.classification import is_cash_like, is_fiat, is_stablecoin
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction
+from app.domains.transactions.models import Transaction
 from app.services import fifo_replay
 from app.services.metrics_cost_basis import (  # noqa: F401 — compute_cump_pru used; helpers re-exported for tests
     _ci_price_in_portfolio_ccy,
@@ -324,7 +324,7 @@ class MetricsService:
             )
             first_buy_map = {str(r[0]): r[1] for r in first_tx_result.all() if r[1]}
         if inv_asset_ids:
-            from app.models.transaction import TransactionType as TxType
+            from app.domains.transactions.models import TransactionType as TxType
 
             fee_result = await db.execute(
                 select(

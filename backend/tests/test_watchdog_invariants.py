@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.db import session as db_session_module
 from app.domains.identity.models import User
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 from tests.conftest import test_engine
 
 _JETON = "jeton-de-test-du-watchdog"

@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.models.alert import Alert, AlertCondition
 from app.models.notification import NotificationPriority
-from app.models.transaction import Transaction, TransactionType
 from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)

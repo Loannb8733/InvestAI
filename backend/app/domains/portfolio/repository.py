@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import Select, select
@@ -49,6 +50,13 @@ class AssetRepository:
             query = query.where(Asset.portfolio_id == portfolio_id)
         return (await self._session.execute(query.order_by(Asset.symbol))).scalars().all()
 
+    async def listed_all(self, user_id: UUID, portfolio_id: UUID | None) -> Sequence[Asset]:
+        """Tous les actifs de l'utilisateur, crowdfunding compris."""
+        query = self._owned(user_id)
+        if portfolio_id is not None:
+            query = query.where(Asset.portfolio_id == portfolio_id)
+        return (await self._session.execute(query)).scalars().all()
+
     async def owned_one(self, user_id: UUID, asset_id: UUID) -> Asset | None:
         return (await self._session.execute(self._owned(user_id).where(Asset.id == asset_id))).scalar_one_or_none()
 
@@ -57,6 +65,31 @@ class AssetRepository:
             Asset.portfolio_id == portfolio_id, Asset.symbol == symbol, Asset.exchange == exchange
         )
         return (await self._session.execute(query)).first() is not None
+
+    async def on_platform(self, source: Asset, exchange: str) -> Asset:
+        """Actif du même symbole dans le même portefeuille sur ``exchange``, créé vide s'il n'existe pas."""
+        query = select(Asset).where(
+            Asset.portfolio_id == source.portfolio_id, Asset.symbol == source.symbol, Asset.exchange == exchange
+        )
+        existing = (await self._session.execute(query)).scalar_one_or_none()
+        if existing is not None:
+            return existing
+        created = Asset(
+            portfolio_id=source.portfolio_id,
+            symbol=source.symbol,
+            name=source.name,
+            asset_type=source.asset_type,
+            quantity=Decimal("0"),
+            avg_buy_price=Decimal("0"),
+            exchange=exchange,
+            currency=source.currency,
+        )
+        self._session.add(created)
+        await self._session.flush()
+        return created
+
+    async def by_id(self, asset_id: UUID) -> Asset:
+        return await self._session.get_one(Asset, asset_id)
 
     async def add(self, asset: Asset) -> Asset:
         self._session.add(asset)

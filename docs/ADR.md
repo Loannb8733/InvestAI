@@ -270,9 +270,9 @@ Alembic puis `create_all`, puis trois **auto-réparations idempotentes** :
 
 | Auto-réparation | Ce qu'elle répare | Chemins d'écriture qui produisent encore ces données (2026-10-19) |
 |---|---|---|
-| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | `PATCH /transactions/{id}` sur `exchange` (aucune nouvelle répartition) |
-| `transfer_mirrors` | `TRANSFER_OUT` sans miroir valide, hors notes d'ajustement interne (incident Tangem du 2026-06-07 : 5 positions fantômes) | sortie manuelle ou CSV sans destination ; échec du miroir pendant la synchro ; `PATCH` du type |
-| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` en libérant avant d'occuper (ordre des UPDATE, 2026-09-10) | import d'historique (`compute_hash` jamais appelé) ; `PATCH` des montants |
+| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | synchronisation d'un exchange, qui range ses transactions sur un actif sans plateforme (`sync_exchanges`) ; corrigé pour `PATCH` et l'import CSV le 2026-10-22 |
+| `transfer_mirrors` | `TRANSFER_OUT` sans miroir valide, hors notes d'ajustement interne (incident Tangem du 2026-06-07 : 5 positions fantômes) | sortie manuelle ou CSV sans destination ; échec du miroir pendant la synchro ; `PATCH` du type d'un transfert relié refusé depuis le 2026-10-22 |
+| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` en libérant avant d'occuper (ordre des UPDATE, 2026-09-10) | import d'historique (`compute_hash` jamais appelé) ; `PATCH` corrigé le 2026-10-22 (empreinte recalculée, 409 sur doublon) |
 
 Elles restent au démarrage tant que ces chemins existent : en faire des migrations à
 usage unique changerait le comportement. Elles disparaîtront quand les domaines

@@ -8,7 +8,7 @@ rangés au mauvais endroit, et la fiscalité avec eux.
 
 import pytest
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 from app.services.exchange_import_classification import (
     OrigineMouvement,
     classifier_origine,

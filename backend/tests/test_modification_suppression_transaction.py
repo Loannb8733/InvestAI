@@ -20,7 +20,7 @@ from sqlalchemy import select
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
-from app.models.transaction import Transaction
+from app.domains.transactions.models import Transaction
 
 
 async def _portefeuille_avec_actif(client: AsyncClient, token: str, *, plateforme: str = "Kraken") -> tuple[str, str]:
@@ -209,31 +209,12 @@ class TestPortee:
         assert reponse.json()["asset_id"] == actif_id
         assert reponse.json()["notes"] == "annotation"
 
-    def test_la_liste_blanche_de_la_route_ne_deborde_pas_du_schema(self):
-        """La liste blanche `_PATCHABLE` est une défense en profondeur — et,
-        telle quelle, **inerte** : elle énumère exactement les champs que
-        `TransactionUpdate` déclare, donc rien ne peut la franchir que Pydantic
-        n'ait déjà laissé passer. Un canari qui la retire ne fait échouer aucun
-        test comportemental, et c'est normal.
+    def test_le_schema_de_modification_n_expose_aucun_champ_de_relation(self):
+        """Le schéma est la liste blanche : un champ de relation ou d'audit ne doit jamais y entrer."""
+        from app.domains.transactions.schemas import TransactionUpdate
 
-        Ce qu'elle protège vraiment, c'est l'avenir : le jour où un champ est
-        ajouté au schéma, il n'atteindra la transaction que si quelqu'un l'a
-        aussi inscrit ici. Ce test surveille l'écart entre les deux listes,
-        seule chose qu'un test puisse observer d'une garde inerte.
-        """
-        import inspect
-
-        from app.api.v1.endpoints.transactions import update_transaction
-        from app.schemas.transaction import TransactionUpdate
-
-        source = inspect.getsource(update_transaction)
-        bloc = source.split("_PATCHABLE = {")[1].split("}")[0]
-        liste_blanche = {ligne.strip().strip('",') for ligne in bloc.splitlines() if ligne.strip()}
-
-        assert liste_blanche <= set(TransactionUpdate.model_fields), (
-            "la liste blanche cite un champ que le schéma ne déclare pas"
-        )
-        assert "asset_id" not in liste_blanche and "internal_hash" not in liste_blanche
+        interdits = {"id", "asset_id", "internal_hash", "related_transaction_id", "conversion_rate", "created_at"}
+        assert not interdits & set(TransactionUpdate.model_fields)
 
 
 class TestSuppression:

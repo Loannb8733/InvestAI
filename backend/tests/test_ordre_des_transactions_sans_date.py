@@ -32,7 +32,7 @@ from app.api.v1.endpoints.dashboard import get_recent_transactions_internal
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 
 MAINTENANT = datetime.now(UTC)
 

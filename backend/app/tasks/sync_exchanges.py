@@ -15,14 +15,14 @@ from app.domains.market_data.fx.repository import FxRateRepository
 from app.domains.market_data.fx.service import FxService
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.models.api_key import APIKey
 from app.models.cold_wallet_address import ColdWalletAddress
-from app.models.transaction import Transaction, TransactionType
 from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair
 from app.services.metrics_service import invalidate_dashboard_cache
-from app.services.transfer_service import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.tasks.celery_app import celery_app
 
 # Earliest plausible trade date for FX seeding. Frankfurter (ECB) data starts 1999;
@@ -117,7 +117,7 @@ _SUCCESSFUL_WITHDRAWAL_STATUSES = frozenset({"success", "completed", "complete",
 
 # Window used to detect a withdrawal already recorded manually as a TRANSFER_OUT
 # (so the scheduled sync does not create a duplicate). Mirrors the dedup logic in
-# transfer_service.create_mirror_transfer_in.
+# transfers.create_mirror_transfer_in.
 _WITHDRAWAL_DEDUP_DAYS = 1
 _WITHDRAWAL_DEDUP_REL = 0.01  # 1% quantity tolerance
 
@@ -1059,7 +1059,7 @@ async def _sync_detailed_transactions(
                 # Create the matching TRANSFER_IN on the cold wallet (cost basis).
                 # amount_is_net: the exchange API's withdrawal amount is already
                 # the net received on-chain (fee charged on top) — see
-                # transfer_service docstring.
+                # transactions.transfers docstring.
                 try:
                     await create_mirror_transfer_in(db, transaction, asset, destination, amount_is_net=True)
                 except Exception as mirror_err:  # noqa: BLE001 - mirror is best-effort

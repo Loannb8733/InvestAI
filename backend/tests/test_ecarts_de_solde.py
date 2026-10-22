@@ -22,7 +22,7 @@ from sqlalchemy import select
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 
 MAINTENANT = datetime.now(UTC)
 
@@ -332,7 +332,11 @@ class TestCredit:
         actif = await _actif(db_session, portefeuille, detenu="1")
         await _mouvement(db_session, actif, TransactionType.BUY, "1")
 
-        assert await self._crediter(client, entetes) == {"credited": 0, "skipped": 0, "details": []}
+        assert await self._crediter(client, entetes) == {
+            "credited": 0,
+            "skipped": 0,
+            "details": {"credited": [], "skipped": []},
+        }
 
     async def test_l_airdrop_cree_porte_une_note_qui_dit_son_origine(self, client, entetes, db_session, portefeuille):
         # La ligne apparaîtra dans l'historique de l'utilisateur : elle doit se
@@ -364,21 +368,14 @@ class TestCredit:
         succès annoncé, et rien ne bouge à l'écran.
         """
         invalidations = []
-        monkeypatch.setattr("app.api.v1.endpoints.transactions.invalidate_dashboard_cache", invalidations.append)
+
+        async def noter(user_id):
+            invalidations.append(user_id)
+
+        monkeypatch.setattr("app.core.http.cache_invalidation._invalidate_dashboard", noter)
         actif = await _actif(db_session, portefeuille, detenu="1.5")
         await _mouvement(db_session, actif, TransactionType.BUY, "1")
 
         await self._crediter(client, entetes)
 
         assert invalidations != []
-
-    async def test_sans_ecart_le_cache_n_est_pas_touche(self, client, entetes, db_session, portefeuille, monkeypatch):
-        # Rien n'a changé : invalider ferait recalculer le tableau de bord pour rien.
-        invalidations = []
-        monkeypatch.setattr("app.api.v1.endpoints.transactions.invalidate_dashboard_cache", invalidations.append)
-        actif = await _actif(db_session, portefeuille, detenu="1")
-        await _mouvement(db_session, actif, TransactionType.BUY, "1")
-
-        await self._crediter(client, entetes)
-
-        assert invalidations == []

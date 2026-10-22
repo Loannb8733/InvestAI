@@ -21,7 +21,7 @@ import pytest
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 from app.services.metrics_service import MetricsService
 
 

@@ -6,7 +6,7 @@ trades hashed identically and the second was dropped. The new formula hashes
 at full Numeric(12) precision via Decimal.
 """
 
-from app.models.transaction import _canonical_decimal, compute_transaction_hash
+from app.domains.transactions.models import _canonical_decimal, compute_transaction_hash
 
 ASSET = "11111111-1111-1111-1111-111111111111"
 DATE = "2026-06-01"

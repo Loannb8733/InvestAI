@@ -22,7 +22,7 @@ from sqlalchemy import delete, func, select
 
 from app.core.db.session import session_factory
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 
 BUY_TYPES = [
     TransactionType.BUY,

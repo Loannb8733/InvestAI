@@ -255,7 +255,7 @@ class TestFiscalite:
         from decimal import Decimal
 
         from app.domains.portfolio.models import Asset, AssetType, Portfolio
-        from app.models.transaction import Transaction, TransactionType
+        from app.domains.transactions.models import Transaction, TransactionType
 
         pf = Portfolio(user_id=regular_user.id, name="P")
         db_session.add(pf)
@@ -434,7 +434,7 @@ class TestQuantiteAgregee:
         from decimal import Decimal
 
         from app.domains.portfolio.models import Asset, AssetType, Portfolio
-        from app.models.transaction import Transaction, TransactionType
+        from app.domains.transactions.models import Transaction, TransactionType
         from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")

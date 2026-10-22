@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
-from app.models.transaction import TransactionType as TxType
+from app.domains.transactions.models import TransactionType as TxType
 from app.services.fifo_replay import (
     ConversionDestBasis,
     FeeHandling,

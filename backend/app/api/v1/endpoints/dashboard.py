@@ -21,10 +21,10 @@ from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.transactions.models import Transaction
 from app.models.alert import Alert
 from app.models.calendar_event import CalendarEvent
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.transaction import Transaction
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
@@ -468,7 +468,7 @@ async def _get_dashboard_impl(
     from sqlalchemy import case as sa_case
 
     from app.domains.portfolio.classification import is_stablecoin
-    from app.models.transaction import TransactionType
+    from app.domains.transactions.models import TransactionType
 
     staked_result = await db.execute(
         select(

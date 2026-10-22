@@ -10,7 +10,7 @@ async def rehash_transactions_internal_hash(factory: async_sessionmaker[AsyncSes
         from sqlalchemy import select
 
         from app.core.db.session import session_factory
-        from app.models.transaction import Transaction, compute_transaction_hash
+        from app.domains.transactions.models import Transaction, compute_transaction_hash
 
         fabrique = factory or session_factory
         async with fabrique() as db:

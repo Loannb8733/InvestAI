@@ -23,8 +23,8 @@ from sqlalchemy import func, select
 from app.api.v1.endpoints.dashboard import _get_dashboard_impl
 from app.domains.identity.models import User
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.transaction import Transaction, TransactionType
 
 MAINTENANT = datetime.now(UTC)
 

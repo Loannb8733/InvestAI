@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
-from app.models.transaction import Transaction
+from app.domains.transactions.models import Transaction
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 

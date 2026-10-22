@@ -21,13 +21,13 @@ from app.api.v1.endpoints import (
     strategies,
     system,
     telegram_webhook,
-    transactions,
     websocket,
 )
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
 from app.domains.journal.router import router as journal_router
 from app.domains.portfolio.router import assets_router, portfolios_router
+from app.domains.transactions.router import router as transactions_router
 
 api_router = APIRouter()
 
@@ -37,7 +37,7 @@ api_router.include_router(users_router, prefix="/users", tags=["Users"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(portfolios_router, prefix="/portfolios", tags=["Portfolios"])
 api_router.include_router(assets_router, prefix="/assets", tags=["Assets"])
-api_router.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
+api_router.include_router(transactions_router, prefix="/transactions", tags=["Transactions"])
 api_router.include_router(api_keys.router, prefix="/api-keys", tags=["API Keys"])
 api_router.include_router(cold_wallets.router, prefix="/cold-wallets", tags=["Cold Wallets"])
 api_router.include_router(cron.router, prefix="/cron", tags=["Cron"])

@@ -310,7 +310,7 @@ def _make_tx(asset_id, ttype, qty, price, fee=0.0, executed_at=None, currency="E
     """Build a mock Transaction object."""
     from datetime import datetime
 
-    from app.models.transaction import TransactionType
+    from app.domains.transactions.models import TransactionType
 
     tx = MagicMock()
     tx.asset_id = asset_id

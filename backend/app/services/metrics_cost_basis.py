@@ -69,7 +69,7 @@ def compute_cump_pru(
     2. Sells reduce qty but never change PRU
     3. Position reset: when qty falls to 0, the next buy starts a fresh average
     """
-    from app.models.transaction import TransactionType as TxType
+    from app.domains.transactions.models import TransactionType as TxType
 
     _ZERO = Decimal("0")
     state: dict[tuple[str, str], dict] = {}

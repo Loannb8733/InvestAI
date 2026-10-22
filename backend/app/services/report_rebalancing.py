@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.transaction import Transaction
+from app.domains.transactions.models import Transaction
 from app.services import fifo_replay
 from app.services.metrics_service import metrics_service
 from app.services.report_common import (

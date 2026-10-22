@@ -10,7 +10,7 @@ correct par le total des seules entrées connues — sur des données réelles, 
 actif soldé se retrouvait crédité de 109 529 unités inexistantes.
 
 Le miroir ajoute une quantité connue : on ajoute cette quantité, point. C'est ce
-que fait déjà ``create_mirror_transfer_in`` dans transfer_service.py.
+que fait déjà ``create_mirror_transfer_in`` dans domains/transactions/transfers.py.
 
 Test statique car la logique est du SQL brut au sein de fonctions de démarrage :
 aucun test d'exécution ne l'atteint, et une affectation de solde ne lève aucune

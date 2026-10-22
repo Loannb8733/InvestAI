@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
+from app.domains.transactions.models import Transaction
 from app.models.audit_log import AuditLog
-from app.models.transaction import Transaction
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 URL = "/api/v1/transactions"
@@ -131,7 +131,7 @@ class TestList:
         assert response.headers["content-disposition"] == "attachment; filename=transactions_export.csv"
         assert response.text.splitlines() == [
             "symbol;type;quantity;price;fee;date;exchange;notes",
-            "BTC;buy;1.000000000000;100.000000000000;0E-12;2025-01-10 10:00:00;Kraken;first",
+            "BTC;buy;1;100;0;2025-01-10 10:00:00;Kraken;first",
         ]
 
 
@@ -151,16 +151,22 @@ class TestDeleteAll:
         assert (await db_session.execute(select(func.count()).select_from(Asset))).scalar() == 0
 
 
-class TestCurrentBehaviourToBeFixed:
-    async def test_patching_the_platform_keeps_the_transaction_on_its_asset(
-        self, client: AsyncClient, headers: dict[str, str]
+class TestFixedByTheMigration:
+    async def test_patching_the_platform_moves_the_transaction_to_its_asset(
+        self, client: AsyncClient, headers: dict[str, str], db_session: AsyncSession
     ) -> None:
         asset_id = await _asset(client, headers, await _portfolio(client, headers))
         created = await _tx(client, headers, asset_id)
         patched = (await client.patch(f"{URL}/{created['id']}", json={"exchange": "Kraken"}, headers=headers)).json()
-        assert (patched["asset_id"], patched["exchange"]) == (asset_id, "Kraken")
+        assert patched["asset_id"] != asset_id and patched["exchange"] == "Kraken"
+        kraken = await _asset_row(db_session, patched["asset_id"])
+        assert (kraken.exchange, kraken.quantity, kraken.avg_buy_price) == ("Kraken", Decimal("1"), Decimal("100"))
+        assert (
+            (await _asset_row(db_session, asset_id)).quantity,
+            (await _asset_row(db_session, asset_id)).avg_buy_price,
+        ) == (0, 0)
 
-    async def test_csv_import_cost_basis_ignores_fees(
+    async def test_csv_import_cost_basis_includes_fees(
         self, client: AsyncClient, headers: dict[str, str], db_session: AsyncSession
     ) -> None:
         portfolio_id = await _portfolio(client, headers)
@@ -174,5 +180,33 @@ class TestCurrentBehaviourToBeFixed:
         assert response.json()["success_count"] == 1
         asset = (await db_session.execute(select(Asset).where(Asset.symbol == "SOL"))).scalar_one()
         await db_session.refresh(asset)
-        assert (asset.quantity, asset.avg_buy_price) == (Decimal("2"), Decimal("100"))
+        assert (asset.quantity, asset.avg_buy_price) == (Decimal("2"), Decimal("105"))
         assert (await db_session.execute(select(func.count()).select_from(Transaction))).scalar() == 1
+
+
+class TestPatchRules:
+    async def test_new_amounts_are_checked_against_duplicates(
+        self, client: AsyncClient, headers: dict[str, str]
+    ) -> None:
+        asset_id = await _asset(client, headers, await _portfolio(client, headers))
+        await _tx(client, headers, asset_id, quantity="1")
+        second = await _tx(client, headers, asset_id, quantity="2")
+        response = await client.patch(f"{URL}/{second['id']}", json={"quantity": "1"}, headers=headers)
+        assert response.status_code == 409
+
+    async def test_a_linked_transfer_keeps_its_type_and_resizes_its_mirror(
+        self, client: AsyncClient, headers: dict[str, str], db_session: AsyncSession
+    ) -> None:
+        asset_id = await _asset(client, headers, await _portfolio(client, headers), exchange="Kraken")
+        await _tx(client, headers, asset_id, quantity="5")
+        sent = await _tx(
+            client, headers, asset_id, transaction_type="transfer_out", quantity="2", destination_exchange="Ledger"
+        )
+        assert (
+            await client.patch(f"{URL}/{sent['id']}", json={"transaction_type": "sell"}, headers=headers)
+        ).status_code == 400
+        assert (await client.patch(f"{URL}/{sent['id']}", json={"quantity": "3"}, headers=headers)).status_code == 200
+        ledger = (await db_session.execute(select(Asset).where(Asset.exchange == "Ledger"))).scalar_one()
+        await db_session.refresh(ledger)
+        assert ledger.quantity == Decimal("3")
+        assert (await _asset_row(db_session, asset_id)).quantity == Decimal("2")

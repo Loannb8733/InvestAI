@@ -14,7 +14,7 @@ from scipy import optimize as sp_optimize
 
 from app.core.finance_constants import RISK_FREE_RATE
 from app.core.finance_constants import annualization_days as _trading_days
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 
 
 def _compute_returns(prices: list[float]) -> np.ndarray:

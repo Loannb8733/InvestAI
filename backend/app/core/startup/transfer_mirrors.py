@@ -23,7 +23,7 @@ def create_missing_transfer_mirrors() -> None:
         from sqlalchemy import create_engine, text
 
         from app.core.config import settings
-        from app.services.transfer_service import COLD_WALLET_DESTINATION as DEFAULT_DESTINATION
+        from app.domains.transactions.transfers import COLD_WALLET_DESTINATION as DEFAULT_DESTINATION
 
         sync_engine = create_engine(settings.DATABASE_URL_SYNC)
         with sync_engine.begin() as conn:

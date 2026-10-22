@@ -224,21 +224,21 @@ class TestCheckConstraints:
 
     def test_transaction_has_quantity_check(self):
         """Transaction model should have ck_transactions_quantity_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_quantity_positive" in constraint_names
 
     def test_transaction_has_price_check(self):
         """Transaction model should have ck_transactions_price_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_price_positive" in constraint_names
 
     def test_transaction_has_fee_check(self):
         """Transaction model should have ck_transactions_fee_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_fee_positive" in constraint_names
