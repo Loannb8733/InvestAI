@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -222,7 +222,7 @@ export default function NavRail({ isOpen = false, onClose }: NavRailProps) {
         aria-label="Navigation principale"
         tabIndex={-1}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 border-r border-border/60 bg-card outline-none transition-transform duration-300 ease-in-out lg:hidden',
+          'fixed inset-y-0 left-0 z-50 w-64 border-r border-border/60 bg-card outline-hidden transition-transform duration-300 ease-in-out lg:hidden',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

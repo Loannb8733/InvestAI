@@ -12,10 +12,10 @@ Covered:
   * sign convention negative=outflow (F-08)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 from app.services.analytics_service import _build_xirr_cashflows, _xirr
 
 
@@ -31,8 +31,8 @@ class _Tx:
         self.executed_at = when
 
 
-_T0 = datetime(2023, 1, 1, tzinfo=timezone.utc)
-_T1 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_T0 = datetime(2023, 1, 1, tzinfo=UTC)
+_T1 = datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def test_known_cashflows_yield_known_rate():
@@ -57,8 +57,8 @@ def test_matched_internal_transfers_do_not_affect_rate():
         _Tx(TransactionType.SELL, qty=1, price=11000, when=_T1),
     ]
     with_transfers = base + [
-        _Tx(TransactionType.TRANSFER_OUT, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=timezone.utc)),
-        _Tx(TransactionType.TRANSFER_IN, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=timezone.utc)),
+        _Tx(TransactionType.TRANSFER_OUT, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=UTC)),
+        _Tx(TransactionType.TRANSFER_IN, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=UTC)),
     ]
     cf_base, _ = _build_xirr_cashflows(base)
     cf_xfer, _ = _build_xirr_cashflows(with_transfers)
@@ -74,8 +74,8 @@ def test_dividends_and_interest_count_as_inflows():
         _Tx(TransactionType.SELL, qty=1, price=10000, when=_T1),
     ]
     with_income = without + [
-        _Tx(TransactionType.DIVIDEND, qty=1, price=300, when=datetime(2023, 7, 1, tzinfo=timezone.utc)),
-        _Tx(TransactionType.INTEREST, qty=1, price=200, when=datetime(2023, 7, 1, tzinfo=timezone.utc)),
+        _Tx(TransactionType.DIVIDEND, qty=1, price=300, when=datetime(2023, 7, 1, tzinfo=UTC)),
+        _Tx(TransactionType.INTEREST, qty=1, price=200, when=datetime(2023, 7, 1, tzinfo=UTC)),
     ]
     cf_without, _ = _build_xirr_cashflows(without)
     cf_with, _ = _build_xirr_cashflows(with_income)

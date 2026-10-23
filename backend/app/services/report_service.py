@@ -3,8 +3,8 @@
 import io
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -16,10 +16,9 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction
-from app.services.asset_classification import is_liquidity, is_safe_haven
+from app.domains.portfolio.classification import is_cash_like, is_safe_haven
+from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.transactions.models import Transaction
 from app.services.metrics_service import metrics_service
 from app.services.report_common import (
     _BLUE,
@@ -80,10 +79,10 @@ class AssetReport:
     current_value: float
     gain_loss: float
     gain_loss_percent: float
-    breakeven_price: Optional[float] = None
-    risk_weight: Optional[float] = None
+    breakeven_price: float | None = None
+    risk_weight: float | None = None
     total_fees: float = 0.0
-    exchange: Optional[str] = None
+    exchange: str | None = None
 
 
 @dataclass
@@ -95,7 +94,7 @@ class TaxTransaction:
     price: float
     total: float
     fee: float
-    gain_loss: Optional[float]
+    gain_loss: float | None
 
 
 # ── Crypto asset class mapping (server-side, mirrors frontend) ─────
@@ -118,9 +117,9 @@ class ReportService(
         self,
         db: AsyncSession,
         user_id: str,
-        year: Optional[int] = None,
+        year: int | None = None,
         currency: str = "EUR",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get comprehensive portfolio data for reports.
 
         Delegates ALL calculations to metrics_service and snapshot_service.
@@ -147,13 +146,13 @@ class ReportService(
                 "pnl_data": {},
                 "risk_metrics": {},
                 "platform_analysis": [],
-                "generated_at": datetime.now(timezone.utc),
+                "generated_at": datetime.now(UTC),
                 "year": year,
             }
 
-        portfolio_summaries: List[PortfolioSummary] = []
-        all_asset_reports: List[AssetReport] = []
-        all_asset_ids: List[str] = []
+        portfolio_summaries: list[PortfolioSummary] = []
+        all_asset_reports: list[AssetReport] = []
+        all_asset_ids: list[str] = []
 
         for portfolio in portfolios:
             pm = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), currency=currency)
@@ -196,7 +195,7 @@ class ReportService(
                 )
 
         # 3. Transaction list (direct query — metrics_service doesn't expose rows)
-        tax_transactions: List[TaxTransaction] = []
+        tax_transactions: list[TaxTransaction] = []
         if all_asset_ids:
             trans_query = select(Transaction).where(Transaction.asset_id.in_(all_asset_ids))
             if year:
@@ -233,7 +232,7 @@ class ReportService(
         # Use the same allocations as the Dashboard (filtered: current_value > 0)
         # and the same days resolution (days=0 → actual days since first tx)
         # to ensure HHI, VaR, etc. match exactly.
-        risk_metrics: Dict[str, Any] = {}
+        risk_metrics: dict[str, Any] = {}
         try:
             allocations = [
                 {"symbol": a["symbol"], "value": a["current_value"]} for a in dashboard.get("aggregated_assets", [])
@@ -246,7 +245,7 @@ class ReportService(
             if first_tx_date:
                 if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
                     first_tx_date = first_tx_date.replace(tzinfo=None)
-                risk_days = max((datetime.now(timezone.utc) - first_tx_date).days + 1, 7)
+                risk_days = max((datetime.now(UTC) - first_tx_date).days + 1, 7)
             else:
                 risk_days = 30
 
@@ -261,7 +260,7 @@ class ReportService(
             logger.warning("Failed to compute risk metrics for report", exc_info=True)
 
         # 5. Platform analysis (GROUP BY exchange)
-        platform_map: Dict[str, Dict[str, Any]] = {}
+        platform_map: dict[str, dict[str, Any]] = {}
         for ar in all_asset_reports:
             ex = ar.exchange or "Autre"
             if ex not in platform_map:
@@ -298,7 +297,7 @@ class ReportService(
         }
         for ar in all_asset_reports:
             sym = ar.symbol.upper()
-            if is_liquidity(sym):
+            if is_cash_like(sym):
                 attribution["munitions"] += ar.current_value
             elif getattr(ar, "asset_type", "") == "crowdfunding":
                 attribution["fixed_income"] += ar.current_value
@@ -339,7 +338,7 @@ class ReportService(
             "platform_analysis": platform_analysis,
             "attribution": attribution,
             "cash_flows": cash_flows,
-            "generated_at": datetime.now(timezone.utc),
+            "generated_at": datetime.now(UTC),
             "year": year,
         }
 

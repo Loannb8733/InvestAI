@@ -15,10 +15,10 @@ Ces tests lisent le texte du document produit, et non sa seule existence. Un
 PDF valide mais vide passerait le premier contrôle ; il ne passe pas ceux-ci.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import fitz  # PyMuPDF
+import pymupdf
 
 from app.services.report_service import ReportService
 from app.services.report_tax import TaxEvent2086, TaxSummary2086
@@ -26,7 +26,7 @@ from app.services.report_tax import TaxEvent2086, TaxSummary2086
 
 def _cession(symbole="BTC", quantite=0.5, prix_cession=15000.0, gain=5000.0, duree="long_terme"):
     return TaxEvent2086(
-        date=datetime(2026, 3, 15, tzinfo=timezone.utc),
+        date=datetime(2026, 3, 15, tzinfo=UTC),
         symbol=symbole,
         event_type="sell",
         quantity=quantite,
@@ -73,7 +73,7 @@ async def _generer(db_session, resume):
 
 def _texte(pdf: bytes) -> str:
     """Texte du document, pages concaténées, espaces normalisés."""
-    with fitz.open(stream=pdf, filetype="pdf") as doc:
+    with pymupdf.open(stream=pdf, filetype="pdf") as doc:
         brut = "\n".join(page.get_text() for page in doc)
     return " ".join(brut.split())
 

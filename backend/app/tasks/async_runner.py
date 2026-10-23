@@ -20,12 +20,11 @@ d'en écrire une.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Coroutine, TypeVar
+from collections.abc import Coroutine
+from typing import Any
 
-T = TypeVar("T")
 
-
-def run_async(coro: Coroutine[Any, Any, T]) -> T:
+def run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     """Exécute ``coro`` dans une boucle neuve, dédiée à cet appel.
 
     La boucle est installée comme boucle courante (``set_event_loop``) avant
@@ -37,7 +36,7 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
     dans le ``finally`` paraissait plus propre — aucune boucle fermée ne restant
     courante — mais cela retire sa boucle à un appelant qui en avait une : 103 tests
     sont tombés sur « There is no current event loop » avant que ce comportement ne
-    soit abandonné. C'est celui qu'avait ``history_cache``, éprouvé en production.
+    soit abandonné. Éprouvé en production sur les tâches de préchargement.
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict as _defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -21,9 +21,8 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction
 from app.services import fifo_replay
 from app.services.metrics_service import metrics_service
 from app.services.report_common import (
@@ -66,8 +65,8 @@ class RebalancingReport:
     """Full rebalancing report."""
 
     total_value: float
-    categories: List[Dict[str, Any]]  # current allocation per category
-    orders: List[RebalanceOrder]
+    categories: list[dict[str, Any]]  # current allocation per category
+    orders: list[RebalanceOrder]
     total_sell_amount: float = 0.0
     total_buy_amount: float = 0.0
     total_estimated_gain: float = 0.0
@@ -83,7 +82,7 @@ class RebalancingReportMixin:
         self,
         db: AsyncSession,
         user_id: str,
-        target_allocations: Dict[str, float],
+        target_allocations: dict[str, float],
         currency: str = "EUR",
         estimate_tax: bool = True,
     ) -> RebalancingReport:
@@ -115,8 +114,8 @@ class RebalancingReportMixin:
 
         # 2. Group crypto assets by class
         allocations = dashboard.get("aggregated_assets", [])
-        class_totals: Dict[str, float] = _defaultdict(float)
-        class_assets: Dict[str, List[Dict[str, Any]]] = _defaultdict(list)
+        class_totals: dict[str, float] = _defaultdict(float)
+        class_assets: dict[str, list[dict[str, Any]]] = _defaultdict(list)
 
         for a in allocations:
             if a.get("asset_type") != "crypto":
@@ -142,7 +141,7 @@ class RebalancingReportMixin:
 
         # 3. Build current allocation breakdown
         all_classes = set(list(target_allocations.keys()) + list(class_totals.keys()))
-        categories: List[Dict[str, Any]] = []
+        categories: list[dict[str, Any]] = []
         for cls in sorted(all_classes):
             current_val = class_totals.get(cls, 0.0)
             current_pct = (current_val / crypto_total * 100) if crypto_total > 0 else 0.0
@@ -160,7 +159,7 @@ class RebalancingReportMixin:
             )
 
         # 4. Compute rebalancing orders
-        orders: List[RebalanceOrder] = []
+        orders: list[RebalanceOrder] = []
         for cat in categories:
             drift_eur = cat["drift_eur"]
             if abs(drift_eur) < 1.0:  # ignore tiny drifts
@@ -217,8 +216,8 @@ class RebalancingReportMixin:
         self,
         db: AsyncSession,
         user_id: str,
-        orders: List[RebalanceOrder],
-        class_assets: Dict[str, List[Dict[str, Any]]],
+        orders: list[RebalanceOrder],
+        class_assets: dict[str, list[dict[str, Any]]],
         currency: str,
     ) -> None:
         """Estimate unrealized P&L and PFU tax for sell orders using FIFO layers.

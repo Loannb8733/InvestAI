@@ -11,7 +11,7 @@ import logging
 
 import pytest
 
-from app.models.transaction import TransactionType as TxType
+from app.domains.transactions.models import TransactionType as TxType
 from tests.test_fifo_replay_characterization import _dt, _make_asset, _make_portfolio, _metrics, _tx
 
 _JOURNAL = "app.services.metrics_service"

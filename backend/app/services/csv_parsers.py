@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import List, Optional, Tuple, Type
 
 
 @dataclass
@@ -20,9 +19,9 @@ class ParsedTransaction:
     fee: Decimal
     currency: str
     timestamp: datetime
-    notes: Optional[str] = None
-    to_symbol: Optional[str] = None  # For conversions
-    to_quantity: Optional[Decimal] = None  # For conversions
+    notes: str | None = None
+    to_symbol: str | None = None  # For conversions
+    to_quantity: Decimal | None = None  # For conversions
 
 
 _TIMESTAMP_FORMATS = [
@@ -52,19 +51,19 @@ class BaseCSVParser(ABC):
     """Base class for CSV parsers."""
 
     name: str = "Generic"
-    supported_headers: List[str] = []
+    supported_headers: list[str] = []
 
     @classmethod
-    def can_parse(cls, headers: List[str]) -> bool:
+    def can_parse(cls, headers: list[str]) -> bool:
         """Check if this parser can handle the CSV based on headers."""
         headers_lower = [h.lower().strip() for h in headers]
         return all(h.lower() in headers_lower for h in cls.supported_headers)
 
     @abstractmethod
-    def parse_row(self, row: dict) -> List[ParsedTransaction]:
+    def parse_row(self, row: dict) -> list[ParsedTransaction]:
         """Parse a single row and return list of transactions."""
 
-    def parse_csv(self, content: str) -> Tuple[List[ParsedTransaction], List[str]]:
+    def parse_csv(self, content: str) -> tuple[list[ParsedTransaction], list[str]]:
         """Parse entire CSV content and return transactions and errors."""
         transactions = []
         errors = []
@@ -129,7 +128,7 @@ class CryptoComCSVParser(BaseCSVParser):
         "supercharger_reward_to_app_credited": "staking_reward",
     }
 
-    def parse_row(self, row: dict) -> List[ParsedTransaction]:
+    def parse_row(self, row: dict) -> list[ParsedTransaction]:
         """Parse a Crypto.com CSV row."""
         transactions = []
 
@@ -403,7 +402,7 @@ class BinanceCSVParser(BaseCSVParser):
         "convert": "conversion",
     }
 
-    def parse_row(self, row: dict) -> List[ParsedTransaction]:
+    def parse_row(self, row: dict) -> list[ParsedTransaction]:
         """Parse a Binance CSV row."""
         transactions = []
 
@@ -491,7 +490,7 @@ class KrakenCSVParser(BaseCSVParser):
             return asset[1:]
         return asset
 
-    def parse_row(self, row: dict) -> List[ParsedTransaction]:
+    def parse_row(self, row: dict) -> list[ParsedTransaction]:
         """Parse a Kraken CSV row."""
         transactions = []
 
@@ -555,7 +554,7 @@ class GenericCSVParser(BaseCSVParser):
     name = "InvestAI / Generic"
     supported_headers = ["symbol", "type", "quantity", "price"]
 
-    def parse_row(self, row: dict) -> List[ParsedTransaction]:
+    def parse_row(self, row: dict) -> list[ParsedTransaction]:
         """Parse a generic CSV row."""
         transactions = []
 
@@ -646,7 +645,7 @@ class GenericCSVParser(BaseCSVParser):
 
 
 # List of available parsers (order matters - more specific first)
-AVAILABLE_PARSERS: List[Type[BaseCSVParser]] = [
+AVAILABLE_PARSERS: list[type[BaseCSVParser]] = [
     CryptoComCSVParser,
     BinanceCSVParser,
     KrakenCSVParser,
@@ -654,7 +653,7 @@ AVAILABLE_PARSERS: List[Type[BaseCSVParser]] = [
 ]
 
 
-def detect_csv_format(content: str) -> Optional[BaseCSVParser]:
+def detect_csv_format(content: str) -> BaseCSVParser | None:
     """Auto-detect the CSV format based on headers."""
     # Try different delimiters
     headers = []
@@ -678,7 +677,7 @@ def detect_csv_format(content: str) -> Optional[BaseCSVParser]:
     return None
 
 
-def get_parser_by_name(name: str) -> Optional[BaseCSVParser]:
+def get_parser_by_name(name: str) -> BaseCSVParser | None:
     """Get a parser by platform name."""
     name_lower = name.lower()
     for parser_class in AVAILABLE_PARSERS:
@@ -687,6 +686,6 @@ def get_parser_by_name(name: str) -> Optional[BaseCSVParser]:
     return None
 
 
-def get_available_platforms() -> List[str]:
+def get_available_platforms() -> list[str]:
     """Get list of available platform names."""
     return [p.name for p in AVAILABLE_PARSERS]

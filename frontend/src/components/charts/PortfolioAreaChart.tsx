@@ -9,7 +9,7 @@ import {
   type UTCTimestamp,
   type MouseEventParams,
 } from 'lightweight-charts'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'motion/react'
 import { useTheme } from '@/components/theme-provider'
 import { formatCurrency } from '@/lib/utils'
 import { resolveChartTheme } from './lightweight-theme'

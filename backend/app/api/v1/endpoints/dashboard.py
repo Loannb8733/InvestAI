@@ -2,36 +2,36 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.finance_constants import annualized_return_pct
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
+from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
+from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.transactions.models import Transaction
 from app.models.alert import Alert
-from app.models.asset import Asset
 from app.models.calendar_event import CalendarEvent
-from app.models.portfolio import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.transaction import Transaction
-from app.models.user import User
 from app.services.metrics_service import metrics_service
-from app.services.price_service import price_service
 from app.services.snapshot_service import snapshot_service
 
 router = APIRouter()
 
 
-def _compute_period_twr(points: list) -> Optional[float]:
+def _compute_period_twr(points: list) -> float | None:
     """TWR de la période depuis la série (value, net_capital) chronologique.
 
     r_i = (V_i − F_i) / V_{i−1} avec F_i = flux externe net de la sous-période
@@ -91,11 +91,11 @@ class HistoricalDataPoint(BaseModel):
     """Historical data point for charts."""
 
     date: str
-    full_date: Optional[str] = None
+    full_date: str | None = None
     value: float
-    invested: Optional[float] = None
-    net_capital: Optional[float] = None
-    gain_loss: Optional[float] = None
+    invested: float | None = None
+    net_capital: float | None = None
+    gain_loss: float | None = None
     is_estimated: bool = False
 
 
@@ -117,10 +117,10 @@ class ActiveAlert(BaseModel):
 
     id: str
     name: str
-    symbol: Optional[str]
+    symbol: str | None
     condition: str
     threshold: float
-    current_price: Optional[float] = None
+    current_price: float | None = None
 
 
 class UpcomingEvent(BaseModel):
@@ -130,20 +130,20 @@ class UpcomingEvent(BaseModel):
     title: str
     event_type: str
     event_date: str
-    amount: Optional[float] = None
+    amount: float | None = None
 
 
 class AssetAllocation(BaseModel):
     """Individual asset allocation."""
 
     symbol: str
-    name: Optional[str]
+    name: str | None
     asset_type: str
     value: float
     percentage: float
     gain_loss_percent: float
-    avg_buy_price: Optional[float] = None
-    staked_quantity: Optional[float] = None
+    avg_buy_price: float | None = None
+    staked_quantity: float | None = None
 
 
 class CurrencyExposure(BaseModel):
@@ -167,8 +167,8 @@ class EarnSummary(BaseModel):
 
     total_staked_value: float
     total_rewards: float
-    apr: Optional[float] = None
-    assets: List[EarnAsset]
+    apr: float | None = None
+    assets: list[EarnAsset]
 
 
 class IndexComparison(BaseModel):
@@ -184,10 +184,10 @@ class MaxDrawdown(BaseModel):
     """Maximum drawdown metrics."""
 
     max_drawdown_percent: float
-    peak_date: Optional[str] = None
-    trough_date: Optional[str] = None
-    peak_value: Optional[float] = None
-    trough_value: Optional[float] = None
+    peak_date: str | None = None
+    trough_date: str | None = None
+    peak_value: float | None = None
+    trough_value: float | None = None
 
 
 class ValueAtRisk(BaseModel):
@@ -204,8 +204,8 @@ class ConcentrationMetrics(BaseModel):
     hhi: float
     interpretation: str
     is_concentrated: bool
-    top_asset: Optional[str] = None
-    top_concentration: Optional[float] = None
+    top_asset: str | None = None
+    top_concentration: float | None = None
 
 
 class StressTest(BaseModel):
@@ -235,17 +235,17 @@ class RiskMetrics(BaseModel):
     sharpe_ratio: float
     max_drawdown: MaxDrawdown
     var_95: ValueAtRisk
-    beta: Optional[float] = None
-    alpha: Optional[float] = None
+    beta: float | None = None
+    alpha: float | None = None
 
 
 class AdvancedMetrics(BaseModel):
     """Advanced portfolio metrics."""
 
-    roi_annualized: Optional[float] = None
+    roi_annualized: float | None = None
     risk_metrics: RiskMetrics
     concentration: ConcentrationMetrics
-    stress_tests: List[StressTest]
+    stress_tests: list[StressTest]
     pnl_breakdown: PnLBreakdown
 
 
@@ -265,33 +265,33 @@ class EnhancedDashboardResponse(BaseModel):
     period_change: float = 0.0
     period_change_percent: float = 0.0
     # TWR de la période (performance nette des flux, comparable à un indice).
-    period_twr_percent: Optional[float] = None
+    period_twr_percent: float | None = None
     portfolios_count: int
     assets_count: int
 
     # Allocation
-    allocation: List[dict]
-    asset_allocation: List[AssetAllocation]
+    allocation: list[dict]
+    asset_allocation: list[AssetAllocation]
 
     # Performers
-    top_performers: List[dict]
-    worst_performers: List[dict]
+    top_performers: list[dict]
+    worst_performers: list[dict]
 
     # Historical data
-    historical_data: List[HistoricalDataPoint]
+    historical_data: list[HistoricalDataPoint]
     is_data_estimated: bool
 
     # Recent transactions
-    recent_transactions: List[RecentTransaction]
+    recent_transactions: list[RecentTransaction]
 
     # Alerts
-    active_alerts: List[ActiveAlert]
+    active_alerts: list[ActiveAlert]
 
     # Calendar
-    upcoming_events: List[UpcomingEvent]
+    upcoming_events: list[UpcomingEvent]
 
     # Index comparison
-    index_comparison: List[IndexComparison]
+    index_comparison: list[IndexComparison]
 
     # Advanced metrics (includes risk, concentration, stress tests, P&L breakdown)
     advanced_metrics: AdvancedMetrics
@@ -300,10 +300,10 @@ class EnhancedDashboardResponse(BaseModel):
     available_liquidity: float = 0.0
 
     # Earn / Staking
-    earn_summary: Optional[EarnSummary] = None
+    earn_summary: EarnSummary | None = None
 
     # Currency exposure
-    currency_exposure: List[CurrencyExposure] = []
+    currency_exposure: list[CurrencyExposure] = []
 
     # Total return (capital gain + dividends)
     total_dividend_income: float = 0.0
@@ -329,7 +329,7 @@ async def get_dashboard(
     request: Request,
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> EnhancedDashboardResponse:
     """Get enhanced dashboard metrics for the current user.
 
@@ -350,7 +350,7 @@ async def get_dashboard(
             # sélecteur de période, dont l'entrée avait survécu à une évolution
             # du schéma. Un cache périmé doit se comporter comme un cache absent.
             logger.warning(
-                "Dashboard : entrée de cache incompatible avec le schéma (user=%s, days=%s), " "recalcul — %s",
+                "Dashboard : entrée de cache incompatible avec le schéma (user=%s, days=%s), recalcul — %s",
                 user_id,
                 days,
                 exc.errors()[0].get("loc") if exc.errors() else exc,
@@ -400,11 +400,11 @@ async def _get_dashboard_impl(
     )
     _first_tx_date_cached = _first_tx_result.scalar()
     if _first_tx_date_cached and hasattr(_first_tx_date_cached, "tzinfo") and _first_tx_date_cached.tzinfo is None:
-        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=timezone.utc)
+        _first_tx_date_cached = _first_tx_date_cached.replace(tzinfo=UTC)
 
     if days == 0:
         if _first_tx_date_cached:
-            days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days + 1, 7)
+            days = max((datetime.now(UTC) - _first_tx_date_cached).days + 1, 7)
         else:
             days = 30
 
@@ -467,8 +467,8 @@ async def _get_dashboard_impl(
     # doit pas pouvoir emporter l'écran entier.
     from sqlalchemy import case as sa_case
 
-    from app.models.transaction import TransactionType
-    from app.services.asset_classification import is_stablecoin
+    from app.domains.portfolio.classification import is_stablecoin
+    from app.domains.transactions.models import TransactionType
 
     staked_result = await db.execute(
         select(
@@ -518,13 +518,7 @@ async def _get_dashboard_impl(
             asset_price_map[a["symbol"].upper()] = float(a["current_value"]) / float(qty)
 
     # Get real USD→EUR rate for stablecoin pricing
-    from app.services.price_service import PriceService
-
-    _price_svc = PriceService()
-    try:
-        usd_eur_rate = float(await _price_svc._get_eur_usd_rate())
-    except Exception:
-        usd_eur_rate = 0.92  # fallback
+    usd_eur_rate = float(await spot_rates.get("USD", "EUR") or COLD_START_USD_EUR)
 
     earn_assets: list[EarnAsset] = []
     total_staked_value = 0.0
@@ -568,10 +562,7 @@ async def _get_dashboard_impl(
         first_reward_date = first_staking_tx.scalar()
         if first_reward_date:
             days_earning = max(
-                (
-                    datetime.now(timezone.utc)
-                    - first_reward_date.replace(tzinfo=first_reward_date.tzinfo or timezone.utc)
-                ).days,
+                (datetime.now(UTC) - first_reward_date.replace(tzinfo=first_reward_date.tzinfo or UTC)).days,
                 1,
             )
             earn_apr = round((total_rewards / total_staked_value) * (365 / days_earning) * 100, 2)
@@ -613,7 +604,7 @@ async def _get_dashboard_impl(
     total_return = metrics["total_value"] + total_sold_value
     if cagr_base > 0 and total_return > 0:
         if _first_tx_date_cached:
-            actual_days = max((datetime.now(timezone.utc) - _first_tx_date_cached).days, 30)
+            actual_days = max((datetime.now(UTC) - _first_tx_date_cached).days, 30)
         else:
             actual_days = max(days, 30)
         if actual_days >= 180:
@@ -732,7 +723,7 @@ async def _get_dashboard_impl(
         try:
             from decimal import Decimal as _Dec
 
-            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
             existing = await db.execute(
                 select(func.count())
                 .select_from(PortfolioSnapshot)
@@ -766,7 +757,7 @@ async def _get_dashboard_impl(
                         id=uuid4(),
                         user_id=user_id,
                         portfolio_id=None,
-                        snapshot_date=datetime.now(timezone.utc),
+                        snapshot_date=datetime.now(UTC),
                         total_value=_Dec(str(metrics["total_value"])),
                         total_invested=_Dec(str(metrics["total_invested"])),
                         total_gain_loss=_Dec(str(metrics["total_gain_loss"])),
@@ -799,7 +790,7 @@ async def _get_dashboard_impl(
 
     # « crypto = USD » était trompeur pour le risque de change : l'or tokenisé
     # (PAXG…) est une exposition OR, les stablecoins EUR une exposition EUR.
-    from app.services.asset_classification import STABLECOIN_PEGS, is_safe_haven
+    from app.domains.portfolio.classification import STABLECOIN_PEGS, is_safe_haven
 
     ccy_totals: dict[str, float] = {}
     for a in metrics.get("assets", []):
@@ -913,7 +904,7 @@ def _batir_reponse(
         period_days=days,
         period_label=get_period_label_fr(original_days),
         forex_stale=metrics.get("forex_stale", False),
-        last_updated=datetime.now(timezone.utc).isoformat(),
+        last_updated=datetime.now(UTC).isoformat(),
     )
 
 
@@ -927,12 +918,12 @@ class MunitionsResponse(BaseModel):
     total_value: float
     liquidity_pct: float
     invested_pct: float
-    next_signal_symbol: Optional[str] = None
-    next_signal_action: Optional[str] = None
+    next_signal_symbol: str | None = None
+    next_signal_action: str | None = None
     next_signal_amount: float = 0.0
     can_execute: bool = True
     shortfall: float = 0.0
-    message: Optional[str] = None
+    message: str | None = None
     profile: str = "moderate"
     deploy_to_risk: float = 0.0
     keep_in_reserve: float = 0.0
@@ -945,7 +936,7 @@ async def get_munitions(
     monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
     profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get deployment capacity (munitions) for the current user."""
     from app.services.strategy_service import strategy_service
@@ -978,7 +969,7 @@ async def get_munitions(
 
 async def get_recent_transactions_internal(
     db: AsyncSession, current_user: User, limit: int = 5, days: int = 0
-) -> List[RecentTransaction]:
+) -> list[RecentTransaction]:
     """Get recent transactions for dashboard.
 
     Args:
@@ -1033,13 +1024,13 @@ async def get_recent_transactions_internal(
                 quantity=float(t.quantity),
                 price=price,
                 total=float(t.quantity) * price,
-                executed_at=(t.executed_at or t.created_at or datetime.now(timezone.utc)).isoformat(),
+                executed_at=(t.executed_at or t.created_at or datetime.now(UTC)).isoformat(),
             )
         )
     return result_list
 
 
-async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> List[ActiveAlert]:
+async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> list[ActiveAlert]:
     """Get active alerts for dashboard."""
     result = await db.execute(
         select(Alert)
@@ -1064,10 +1055,10 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
     if all_symbols:
         try:
             price_data = await asyncio.wait_for(
-                price_service.get_multiple_crypto_prices(all_symbols),
+                price_feed.crypto(all_symbols),
                 timeout=5.0,
             )
-            price_map = {sym.upper(): d["price"] for sym, d in price_data.items()}
+            price_map = {sym: quote.price for sym, quote in price_data.items()}
         except Exception as exc:
             logger.debug("Alert price batch fetch failed: %s", exc)
 
@@ -1095,9 +1086,9 @@ async def get_active_alerts_internal(db: AsyncSession, current_user: User) -> Li
     return active_alerts
 
 
-async def get_upcoming_events_internal(db: AsyncSession, current_user: User, days: int = 30) -> List[UpcomingEvent]:
+async def get_upcoming_events_internal(db: AsyncSession, current_user: User, days: int = 30) -> list[UpcomingEvent]:
     """Get upcoming calendar events for dashboard."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     end_date = now + timedelta(days=days)
 
     result = await db.execute(
@@ -1125,7 +1116,7 @@ async def get_upcoming_events_internal(db: AsyncSession, current_user: User, day
     ]
 
 
-async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
+async def get_index_comparison(days: int = 30) -> list[IndexComparison]:
     """Get comparison with major indices/assets over the selected period."""
     index_symbols = [
         ("BTC", "Bitcoin"),
@@ -1137,7 +1128,7 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
     try:
         # Fetch current prices with a tight timeout to avoid blocking dashboard
         all_data = await asyncio.wait_for(
-            price_service.get_multiple_crypto_prices([s for s, _ in index_symbols]),
+            price_feed.crypto([s for s, _ in index_symbols]),
             timeout=5.0,
         )
 
@@ -1149,13 +1140,13 @@ async def get_index_comparison(days: int = 30) -> List[IndexComparison]:
 
         for symbol, name in index_symbols:
             if symbol in all_data:
-                change = period_changes.get(symbol, all_data[symbol].get("change_percent_24h", 0))
+                change = period_changes.get(symbol, all_data[symbol].change_percent_24h)
                 indices.append(
                     IndexComparison(
                         name=name,
                         symbol=symbol,
                         change_percent=change,
-                        price=all_data[symbol]["price"],
+                        price=all_data[symbol].price,
                     )
                 )
     except Exception as exc:
@@ -1173,7 +1164,7 @@ async def get_portfolio_dashboard(
     request: Request,
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get dashboard metrics for a specific portfolio."""
     portfolio_result = await db.execute(
@@ -1198,7 +1189,7 @@ async def get_portfolio_dashboard(
 async def get_portfolio_history(
     portfolio_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get historical investment metrics for a portfolio (including sold assets)."""
     portfolio_result = await db.execute(
@@ -1219,25 +1210,23 @@ class SparklineData(BaseModel):
     """Sparkline price data for a single symbol."""
 
     symbol: str
-    prices: List[float]
+    prices: list[float]
     change_pct: float
 
 
-@router.get("/portfolio/{portfolio_id}/sparklines", response_model=List[SparklineData])
+@router.get("/portfolio/{portfolio_id}/sparklines", response_model=list[SparklineData])
 @limiter.limit(RATE_LIMITS["api_read"])
 async def get_portfolio_sparklines(
     request: Request,
     portfolio_id: str,
-    background_tasks: BackgroundTasks,
     days: int = Query(30, ge=7, le=90),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[SparklineData]:
+    db: AsyncSession = Depends(get_session),
+) -> list[SparklineData]:
     """Get sparkline price data for all assets in a portfolio."""
-    from collections import defaultdict
-
-    from app.models.asset_price_history import AssetPriceHistory
-    from app.services.asset_classification import is_cash_like
+    from app.domains.market_data.history.reader import local_history
+    from app.domains.market_data.history.tasks import schedule_refresh
+    from app.domains.portfolio.classification import is_cash_like
 
     # Verify ownership
     portfolio_result = await db.execute(
@@ -1251,38 +1240,18 @@ async def get_portfolio_sparklines(
 
     # Get unique non-stablecoin symbols
     assets_result = await db.execute(
-        select(Asset.symbol).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0).distinct()
+        select(Asset.symbol, Asset.asset_type).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0).distinct()
     )
-    symbols = [row[0].upper() for row in assets_result.all() if not is_cash_like(row[0])]
-    if not symbols:
+    types = {symbol.upper(): kind.value for symbol, kind in assets_result.all() if not is_cash_like(symbol)}
+    if not types:
         return []
-
-    # Batch fetch from AssetPriceHistory
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
-    result = await db.execute(
-        select(
-            AssetPriceHistory.symbol,
-            AssetPriceHistory.price_date,
-            AssetPriceHistory.price_eur,
-        )
-        .where(
-            AssetPriceHistory.symbol.in_(symbols),
-            AssetPriceHistory.price_date >= cutoff,
-        )
-        .order_by(AssetPriceHistory.symbol, AssetPriceHistory.price_date)
-    )
-    rows = result.all()
-
-    symbol_data: dict[str, list[float]] = defaultdict(list)
-    for row in rows:
-        symbol_data[row[0]].append(float(row[2]))
+    histories = await local_history(types, days, db)
 
     sparklines = []
-    missing_symbols = []
-    for symbol in symbols:
-        prices = symbol_data.get(symbol, [])
+    for symbol, kind in types.items():
+        prices = histories[symbol].prices
         if len(prices) < 2:
-            missing_symbols.append(symbol)
+            schedule_refresh(symbol, kind)
             continue
         # Normalize to [0, 1] for consistent rendering
         min_p, max_p = min(prices), max(prices)
@@ -1298,60 +1267,15 @@ async def get_portfolio_sparklines(
             )
         )
 
-    # Auto-backfill missing symbols in background (light: 30 days only)
-    if missing_symbols:
-
-        async def _fill_missing():
-            try:
-                from app.tasks.history_cache import _cache_single
-
-                for sym in missing_symbols:
-                    await _cache_single(sym, "crypto", days=30)
-                    await asyncio.sleep(8.0)
-                logger.info("On-demand sparkline backfill done for: %s", missing_symbols)
-            except Exception as e:
-                logger.warning("On-demand sparkline backfill failed: %s", e)
-
-        background_tasks.add_task(_fill_missing)
-
     return sparklines
 
 
-@router.get("/recent-transactions", response_model=List[RecentTransaction])
-async def get_recent_transactions(
-    limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[RecentTransaction]:
-    """Get recent transactions."""
-    return await get_recent_transactions_internal(db, current_user, limit)
-
-
-@router.get("/active-alerts", response_model=List[ActiveAlert])
-async def get_active_alerts(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[ActiveAlert]:
-    """Get active alerts."""
-    return await get_active_alerts_internal(db, current_user)
-
-
-@router.get("/upcoming-events", response_model=List[UpcomingEvent])
-async def get_upcoming_events(
-    days: int = Query(30, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[UpcomingEvent]:
-    """Get upcoming calendar events."""
-    return await get_upcoming_events_internal(db, current_user, days)
-
-
-@router.get("/historical-data", response_model=List[HistoricalDataPoint])
+@router.get("/historical-data", response_model=list[HistoricalDataPoint])
 async def get_historical_data(
     days: int = Query(30, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[HistoricalDataPoint]:
+    db: AsyncSession = Depends(get_session),
+) -> list[HistoricalDataPoint]:
     """Get historical portfolio values. days=0 means all time."""
     user_id = str(current_user.id)
 
@@ -1366,8 +1290,8 @@ async def get_historical_data(
         first_date = first_tx.scalar()
         if first_date:
             if hasattr(first_date, "tzinfo") and first_date.tzinfo is None:
-                first_date = first_date.replace(tzinfo=timezone.utc)
-            days = max((datetime.now(timezone.utc) - first_date).days + 1, 7)
+                first_date = first_date.replace(tzinfo=UTC)
+            days = max((datetime.now(UTC) - first_date).days + 1, 7)
         else:
             days = 30
 
@@ -1392,54 +1316,35 @@ class BenchmarkSeries(BaseModel):
 
     name: str
     symbol: str
-    data: List[BenchmarkDataPoint]
+    data: list[BenchmarkDataPoint]
 
 
-@router.get("/benchmarks", response_model=List[BenchmarkSeries])
+@router.get("/benchmarks", response_model=list[BenchmarkSeries])
 async def get_benchmark_data(
     days: int = Query(default=90, ge=0, le=3650),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get normalized benchmark data (base 100) for overlay on portfolio chart.
 
     Returns BTC, SPY, MSCI World + portfolio performance, all normalized.
     """
-    from app.core.config import settings
-    from app.ml.historical_data import HistoricalDataFetcher
+    from app.domains.market_data.history.benchmarks import DASHBOARD_BENCHMARKS
+    from app.domains.market_data.history.reader import local_history
 
     user_id = current_user.id
-    coingecko_key = getattr(settings, "COINGECKO_API_KEY", None) or None
-    fetcher = HistoricalDataFetcher(coingecko_api_key=coingecko_key)
-
-    benchmarks = [
-        ("Bitcoin", "BTC", "crypto"),
-        ("S&P 500", "SPY", "etf"),
-        ("MSCI World", "IWDA.AS", "etf"),
-    ]
-
+    histories = await local_history([symbol for _, symbol, _ in DASHBOARD_BENCHMARKS], days or 3650, db)
     result = []
-
-    try:
-        for name, symbol, asset_type in benchmarks:
-            try:
-                dates, prices = await fetcher.get_history(symbol, asset_type, days)
-                if dates and prices and len(dates) > 1:
-                    base = float(prices[0]) if prices[0] != 0 else 1
-                    points = []
-                    for d, price in zip(dates, prices):
-                        date_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
-                        points.append(
-                            BenchmarkDataPoint(
-                                date=date_str,
-                                value=round(float(price) / base * 100, 2),
-                            )
-                        )
-                    result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
-            except Exception as exc:
-                logger.debug("Benchmark series fetch failed for %s: %s", symbol, exc)
-    finally:
-        await fetcher.close()
+    for name, symbol, _ in DASHBOARD_BENCHMARKS:
+        history = histories[symbol]
+        if len(history.prices) < 2:
+            continue
+        base = history.prices[0] or 1
+        points = [
+            BenchmarkDataPoint(date=d.strftime("%Y-%m-%d"), value=round(price / base * 100, 2))
+            for d, price in zip(history.dates, history.prices, strict=True)
+        ]
+        result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
 
     # Portfolio performance normalized — use real price-based series
     historical_data = await snapshot_service.build_portfolio_value_series(db, str(user_id), days)
@@ -1458,54 +1363,3 @@ async def get_benchmark_data(
 
 
 # ============== Backfill Endpoints ==============
-
-
-@router.post("/backfill-prices")
-async def trigger_price_backfill(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-):
-    """Trigger a backfill of historical prices for all assets.
-
-    Runs inline as a FastAPI background task (no Celery worker needed).
-    Falls back to Celery if available.
-    """
-    from app.tasks.history_cache import _fetch_and_cache_all
-
-    async def _run_backfill():
-        try:
-            count = await _fetch_and_cache_all()
-            logger.info("Backfill complete: %d assets cached", count)
-        except Exception as e:
-            logger.warning("Backfill failed: %s", e)
-
-    background_tasks.add_task(_run_backfill)
-    return {"status": "started", "message": "Backfill running in background"}
-
-
-@router.get("/backfill-status")
-async def get_backfill_status(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Check the status of historical price data coverage."""
-    from app.models.asset_price_history import AssetPriceHistory
-
-    # Count total price points in DB
-    count_result = await db.execute(select(func.count()).select_from(AssetPriceHistory))
-    total_points = count_result.scalar() or 0
-
-    # Count unique symbols with data
-    symbols_result = await db.execute(select(func.count(func.distinct(AssetPriceHistory.symbol))))
-    symbols_covered = symbols_result.scalar() or 0
-
-    # Count total active symbols
-    active_result = await db.execute(select(func.count(func.distinct(Asset.symbol))).where(Asset.quantity > 0))
-    total_active = active_result.scalar() or 0
-
-    return {
-        "total_price_points": total_points,
-        "symbols_covered": symbols_covered,
-        "total_active_symbols": total_active,
-        "is_complete": total_points > 0 and symbols_covered >= total_active,
-    }

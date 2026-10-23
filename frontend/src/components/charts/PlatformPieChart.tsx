@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { ResponsivePie } from '@nivo/pie'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'motion/react'
 import { useQuery } from '@tanstack/react-query'
 import { analyticsApi, PlatformDistributionItem } from '@/services/api'
 import { formatCurrency } from '@/lib/utils'

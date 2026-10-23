@@ -101,8 +101,6 @@ temp/
 # Vercel
 .vercel/
 
-# Railway
-.railway/
 *openapi.json
 .claude/
 .mypy_cache/
@@ -118,3 +116,5 @@ backend/tests/fixtures/*.pdf
 # Local design-skills tooling (not product code)
 .agents/
 skills-lock.json
+
+.msys*

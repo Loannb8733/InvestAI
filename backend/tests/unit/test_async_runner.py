@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.database import _running_in_worker
+from app.core.db.session import is_worker_process
 from app.tasks.async_runner import run_async
 
 _TASKS = Path(__file__).resolve().parents[2] / "app" / "tasks"
@@ -119,15 +119,15 @@ class TestDetectionDuContexte:
     def test_variable_d_environnement_prioritaire(self, monkeypatch):
         for valeur, attendu in (("1", True), ("true", True), ("on", True), ("0", False), ("no", False)):
             monkeypatch.setenv("DB_NULLPOOL", valeur)
-            assert _running_in_worker() is attendu
+            assert is_worker_process() is attendu
 
     def test_worker_celery_detecte(self, monkeypatch):
         monkeypatch.delenv("DB_NULLPOOL", raising=False)
         monkeypatch.setattr("sys.argv", ["/usr/local/bin/celery", "worker"])
-        assert _running_in_worker() is True
+        assert is_worker_process() is True
 
     def test_serveur_web_garde_son_pool(self, monkeypatch):
         # FastAPI sert tout dans une seule boucle : le pool y est un gain net.
         monkeypatch.delenv("DB_NULLPOOL", raising=False)
         monkeypatch.setattr("sys.argv", ["/usr/local/bin/uvicorn", "app.main:app"])
-        assert _running_in_worker() is False
+        assert is_worker_process() is False

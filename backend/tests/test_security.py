@@ -1,7 +1,7 @@
 """Security module tests."""
 
-
-from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
+from app.domains.identity.passwords import hash_password, verify_password
+from app.domains.identity.tokens import create_token, decode_token
 
 
 def test_hash_password():
@@ -25,14 +25,14 @@ def test_verify_password_incorrect():
 
 def test_create_access_token():
     """Test access token creation."""
-    token = create_access_token(subject="user-123")
+    token = create_token("user-123")
     assert isinstance(token, str)
     assert len(token) > 0
 
 
 def test_decode_access_token():
     """Test decoding access token."""
-    token = create_access_token(subject="user-123")
+    token = create_token("user-123")
     payload = decode_token(token)
     assert payload is not None
     assert payload["sub"] == "user-123"
@@ -41,7 +41,7 @@ def test_decode_access_token():
 
 def test_create_refresh_token():
     """Test refresh token creation."""
-    token = create_refresh_token(subject="user-123")
+    token = create_token("user-123", "refresh")
     assert isinstance(token, str)
     payload = decode_token(token)
     assert payload is not None
@@ -62,3 +62,20 @@ def test_password_hash_uniqueness():
     assert hash1 != hash2
     assert verify_password("samepassword", hash1)
     assert verify_password("samepassword", hash2)
+
+
+LONG_PASSWORD = "long-passphrase-" * 5
+BCRYPT4_HASH_OF_LONG_PASSWORD = "$2b$04$l8JyJOkV0D97aD8JfWAr2uHAB2UxY8ZCazbQtNX6D2d3ezljgdtUm"
+
+
+def test_long_password_hashed_by_bcrypt4_still_verifies():
+    assert verify_password(LONG_PASSWORD, BCRYPT4_HASH_OF_LONG_PASSWORD) is True
+
+
+def test_only_the_first_72_bytes_count_as_with_bcrypt4():
+    assert verify_password(LONG_PASSWORD[:72] + "anything", BCRYPT4_HASH_OF_LONG_PASSWORD) is True
+    assert verify_password(LONG_PASSWORD[:71], BCRYPT4_HASH_OF_LONG_PASSWORD) is False
+
+
+def test_long_password_can_be_hashed_and_verified():
+    assert verify_password(LONG_PASSWORD, hash_password(LONG_PASSWORD)) is True

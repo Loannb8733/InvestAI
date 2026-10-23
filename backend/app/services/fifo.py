@@ -12,7 +12,6 @@ decremented / popped) and tolerate underflow (they stop when layers run out).
 """
 
 from decimal import Decimal
-from typing import Optional, Tuple
 
 _ZERO = Decimal("0")
 
@@ -33,14 +32,14 @@ def consume_fifo(layers: list, qty: Decimal) -> Decimal:
     return cost
 
 
-def consume_fifo_with_dates(layers: list, qty: Decimal) -> Tuple[Decimal, Optional[object]]:
+def consume_fifo_with_dates(layers: list, qty: Decimal) -> tuple[Decimal, object | None]:
     """Like :func:`consume_fifo` but also return the oldest consumed acquired_at.
 
     The oldest layer's ``acquired_at`` drives the holding-period calc (tax M1).
     """
     remaining = qty
     cost = _ZERO
-    oldest: Optional[object] = None
+    oldest: object | None = None
     while remaining > 0 and layers:
         layer = layers[0]
         if oldest is None:

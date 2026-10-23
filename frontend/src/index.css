@@ -1,6 +1,343 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  --font-serif: Newsreader, Libre Bodoni, Georgia, serif;
+  --font-sans: Public Sans, system-ui, -apple-system, sans-serif;
+  --font-mono: JetBrains Mono, ui-monospace, monospace;
+
+  --color-border: oklch(var(--border));
+  --color-input: oklch(var(--input));
+  --color-ring: oklch(var(--ring));
+  --color-background: oklch(var(--background));
+  --color-foreground: oklch(var(--foreground));
+
+  --color-primary: oklch(var(--primary));
+  --color-primary-foreground: oklch(var(--primary-foreground));
+
+  --color-secondary: oklch(var(--secondary));
+  --color-secondary-foreground: oklch(var(--secondary-foreground));
+
+  --color-destructive: oklch(var(--destructive));
+  --color-destructive-foreground: oklch(var(--destructive-foreground));
+
+  --color-muted: oklch(var(--muted));
+  --color-muted-foreground: oklch(var(--muted-foreground));
+
+  --color-accent: oklch(var(--accent));
+  --color-accent-foreground: oklch(var(--accent-foreground));
+
+  --color-popover: oklch(var(--popover));
+  --color-popover-foreground: oklch(var(--popover-foreground));
+
+  --color-card: oklch(var(--card));
+  --color-card-foreground: oklch(var(--card-foreground));
+
+  --color-gain: oklch(var(--gain));
+  --color-gain-foreground: oklch(var(--gain-foreground));
+
+  --color-loss: oklch(var(--loss));
+  --color-loss-foreground: oklch(var(--loss-foreground));
+
+  --color-warning: oklch(var(--warning));
+  --color-warning-foreground: oklch(var(--warning-foreground));
+
+  --color-success: oklch(var(--gain));
+  --color-success-foreground: oklch(var(--gain-foreground));
+
+  --color-emerald: oklch(var(--emerald, 0.52 0.09 150));
+  --color-emerald-glow: oklch(0.52 0.09 150 / 0.15);
+
+  --color-indigo: oklch(var(--indigo, 0.64 0.1 78));
+  --color-indigo-glow: oklch(0.64 0.1 78 / 0.15);
+
+  --color-gold: oklch(var(--gold, 0.64 0.1 78));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-counter-in: counter-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.64 0.1 78 / 0);
+    }
+    50% {
+      box-shadow: 0 0 16px 4px oklch(0.64 0.1 78 / 0.22);
+    }
+  }
+  @keyframes counter-in {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility tap-target {
+  /* Cible tactile étendue sans changer le rendu (A11Y-03).
+     Les boutons d'action dans les tableaux mesurent 24 à 32 px : les agrandir
+     casserait la densité de ces vues, alors que le problème n'est pas leur
+     taille apparente mais la zone qui répond au doigt. Le pseudo-élément
+     étend la surface cliquable à 44 px — le minimum confortable sur mobile —
+     en laissant le bouton visuellement identique.
+     `pointer-events` n'a pas à être touché : le ::after appartient au bouton,
+     un appui dessus lui est donc attribué. */
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@utility tabular {
+  /* Chiffres tabulaires (tables, métriques) — les chiffres sont sacrés */
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+@utility hairline {
+  /* Filet fin éditorial (séparateur « relevé patrimonial ») */
+  border-bottom: 1px solid oklch(var(--border));
+}
+
+@utility eyebrow {
+  /* Étiquette discrète en capitales (eyebrows / sections) */
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+@utility gradient-text {
+  /* Titre accentué — aplat de couleur (pas de dégradé) */
+  color: oklch(var(--primary));
+}
+
+@utility glow {
+  /* Halo décoratif retiré — surfaces plates */
+  display: none;
+}
+
+@utility glass {
+  /* Carte plate (ex-« verre » : plus de flou ni de translucidité) */
+  background: oklch(var(--card));
+  border: 1px solid oklch(var(--border));
+}
+
+@utility mesh {
+  /* Fond plat (ex-dégradés radiaux retirés) */
+  background: transparent;
+}
+
+@utility elev-1 {
+  /* ── Système d'élévation — le relief opt-in des surfaces ────────────── */
+  box-shadow: var(--shadow-e1);
+}
+
+@utility elev-2 {
+  box-shadow: var(--shadow-e2);
+}
+
+@utility elev-3 {
+  box-shadow: var(--shadow-e3);
+}
+
+@utility pressable {
+  /* Surface tactile : enfoncement physique au clic, focus visible clavier */
+  cursor: pointer;
+  transition:
+    transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 180ms ease;
+  &:hover {
+    box-shadow: var(--shadow-e2);
+  }
+  &:active {
+    transform: translateY(1px) scale(0.995);
+    box-shadow: var(--shadow-e1);
+  }
+  &:focus-visible {
+    outline: 2px solid oklch(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@utility sheen {
+  /* Balayage spéculaire au survol (reflet qui traverse la surface) */
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      oklch(1 0 0 / 0.05) 50%,
+      transparent 60%
+    );
+    transform: translateX(-120%);
+    transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
+    pointer-events: none;
+  }
+  &:hover::after {
+    transform: translateX(120%);
+  }
+}
+
+@utility spot-card {
+  /* ── Spotlight de groupe : halo qui suit le pointeur sur une grille ──
+     Le conteneur .spotlight-group met à jour --mx/--my (JS, 1 listener) ;
+     chaque .spot-card peint un dégradé radial centré sur le pointeur. */
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      480px circle at calc(var(--mx, 50%)) calc(var(--my, 50%)),
+      oklch(var(--spot-color) / 0.08),
+      transparent 65%
+    );
+    opacity: 0;
+    transition: opacity 350ms ease;
+    pointer-events: none;
+  }
+  .spotlight-group:hover &::before {
+    opacity: 1;
+  }
+}
+
+@utility spotlight-group {
+  &:hover .spot-card::before {
+    opacity: 1;
+  }
+}
+
+@utility skeleton-shimmer {
+  /* Shimmer de squelette (balayage lumineux GPU-friendly) */
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(var(--foreground) / 0.05),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: shimmer-sweep 1.8s ease-in-out infinite;
+  }
+}
+
+@utility stagger-item {
+  /* Entrées staggered discrètes (récit) */
+  opacity: 0;
+  transform: translateY(16px);
+  animation: counter-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  &:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  &:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  &:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  &:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  &:nth-child(5) {
+    animation-delay: 240ms;
+  }
+  &:nth-child(6) {
+    animation-delay: 300ms;
+  }
+}
 
 /*
   InvestAI — Direction « Flux » (sombre, moderne, vivant, aéré, narratif)
@@ -129,152 +466,9 @@
 }
 
 @layer utilities {
-  /* Cible tactile étendue sans changer le rendu (A11Y-03).
-     Les boutons d'action dans les tableaux mesurent 24 à 32 px : les agrandir
-     casserait la densité de ces vues, alors que le problème n'est pas leur
-     taille apparente mais la zone qui répond au doigt. Le pseudo-élément
-     étend la surface cliquable à 44 px — le minimum confortable sur mobile —
-     en laissant le bouton visuellement identique.
-     `pointer-events` n'a pas à être touché : le ::after appartient au bouton,
-     un appui dessus lui est donc attribué. */
-  .tap-target {
-    position: relative;
-  }
-  .tap-target::after {
-    content: '';
-    position: absolute;
-    inset: 50%;
-    width: 44px;
-    height: 44px;
-    transform: translate(-50%, -50%);
-  }
-
-  /* Chiffres tabulaires (tables, métriques) — les chiffres sont sacrés */
-  .tabular {
-    font-variant-numeric: tabular-nums;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-  }
-
-  /* Filet fin éditorial (séparateur « relevé patrimonial ») */
-  .hairline {
-    border-bottom: 1px solid oklch(var(--border));
-  }
-
-  /* Étiquette discrète en capitales (eyebrows / sections) */
-  .eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  /* Titre accentué — aplat de couleur (pas de dégradé) */
-  .gradient-text {
-    color: oklch(var(--primary));
-  }
-
-  /* Halo décoratif retiré — surfaces plates */
-  .glow {
-    display: none;
-  }
-
-  /* Carte plate (ex-« verre » : plus de flou ni de translucidité) */
-  .glass {
-    background: oklch(var(--card));
-    border: 1px solid oklch(var(--border));
-  }
-
-  /* Fond plat (ex-dégradés radiaux retirés) */
-  .mesh {
-    background: transparent;
-  }
-
-  /* ── Système d'élévation — le relief opt-in des surfaces ────────────── */
-  .elev-1 { box-shadow: var(--shadow-e1); }
-  .elev-2 { box-shadow: var(--shadow-e2); }
-  .elev-3 { box-shadow: var(--shadow-e3); }
-
-  /* Surface tactile : enfoncement physique au clic, focus visible clavier */
-  .pressable {
-    cursor: pointer;
-    transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms ease;
-  }
-  .pressable:hover { box-shadow: var(--shadow-e2); }
-  .pressable:active { transform: translateY(1px) scale(0.995); box-shadow: var(--shadow-e1); }
-  .pressable:focus-visible {
-    outline: 2px solid oklch(var(--ring));
-    outline-offset: 2px;
-  }
-
-  /* Balayage spéculaire au survol (reflet qui traverse la surface) */
-  .sheen { position: relative; overflow: hidden; }
-  .sheen::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent 40%,
-      oklch(1 0 0 / 0.05) 50%,
-      transparent 60%
-    );
-    transform: translateX(-120%);
-    transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
-    pointer-events: none;
-  }
-  .sheen:hover::after { transform: translateX(120%); }
-
-  /* ── Spotlight de groupe : halo qui suit le pointeur sur une grille ──
-     Le conteneur .spotlight-group met à jour --mx/--my (JS, 1 listener) ;
-     chaque .spot-card peint un dégradé radial centré sur le pointeur. */
-  .spot-card { position: relative; }
-  .spot-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(
-      480px circle at calc(var(--mx, 50%)) calc(var(--my, 50%)),
-      oklch(var(--spot-color) / 0.08),
-      transparent 65%
-    );
-    opacity: 0;
-    transition: opacity 350ms ease;
-    pointer-events: none;
-  }
-  .spotlight-group:hover .spot-card::before { opacity: 1; }
-
-  /* Shimmer de squelette (balayage lumineux GPU-friendly) */
-  .skeleton-shimmer { position: relative; overflow: hidden; }
-  .skeleton-shimmer::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      oklch(var(--foreground) / 0.05),
-      transparent
-    );
-    transform: translateX(-100%);
-    animation: shimmer-sweep 1.8s ease-in-out infinite;
-  }
   @keyframes shimmer-sweep {
     to { transform: translateX(100%); }
   }
-
-  /* Entrées staggered discrètes (récit) */
-  .stagger-item {
-    opacity: 0;
-    transform: translateY(16px);
-    animation: counter-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-  }
-  .stagger-item:nth-child(1) { animation-delay: 0ms; }
-  .stagger-item:nth-child(2) { animation-delay: 60ms; }
-  .stagger-item:nth-child(3) { animation-delay: 120ms; }
-  .stagger-item:nth-child(4) { animation-delay: 180ms; }
-  .stagger-item:nth-child(5) { animation-delay: 240ms; }
-  .stagger-item:nth-child(6) { animation-delay: 300ms; }
 }
 
 /* Custom scrollbar */

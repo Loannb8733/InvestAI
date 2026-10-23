@@ -1,6 +1,6 @@
 import { memo, useId, useMemo } from 'react'
 import { ResponsiveLine, type LineSeries, type CommonCustomLayerProps } from '@nivo/line'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'motion/react'
 import { formatCurrency } from '@/lib/utils'
 import { useNivoTheme } from './nivo-theme'
 

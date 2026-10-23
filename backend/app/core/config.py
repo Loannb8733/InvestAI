@@ -1,10 +1,10 @@
 """Application configuration."""
 
 import os
-from typing import List, Optional, Union
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL, make_url
 
 # Environnements servis en clair (http://) : un cookie `secure` n'y est jamais
 # renvoyé par le client, donc toute la mécanique qui en dépend est intestable.
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Encryption for API keys - Required for production
     FERNET_KEY: str  # Required - no default
-    FERNET_OLD_KEYS: Optional[str] = None  # Comma-separated old keys for rotation
+    FERNET_OLD_KEYS: str | None = None  # Comma-separated old keys for rotation
 
     # Shared secret for cron-triggered task endpoints (/api/v1/cron/*). When empty,
     # those endpoints are disabled (503). Set to a long random value in prod and in
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     CELERY_WORKER_AVAILABLE: bool = False
 
     # Cookie settings
-    COOKIE_DOMAIN: Optional[str] = None  # None = current domain only
+    COOKIE_DOMAIN: str | None = None  # None = current domain only
     COOKIE_SECURE: bool = True  # Secure by default; overridden to False in dev via .env
 
     @field_validator("COOKIE_SECURE", mode="before")
@@ -131,18 +131,21 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL_SYNC(self) -> str:
-        """Build sync database URL for Alembic."""
+        """URL synchrone (Alembic, scripts) avec le pilote psycopg2 explicite."""
         external = os.environ.get("DATABASE_URL", "")
-        if external:
-            url = external.replace("postgresql+asyncpg://", "postgresql://")
-            # Ensure we have plain postgresql:// for psycopg2
-            if not url.startswith("postgresql://"):
-                url = url.replace("postgres://", "postgresql://")
-            return url
-        return (
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        url = (
+            make_url(external)
+            if external
+            else URL.create(
+                "postgresql",
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+                host=self.POSTGRES_HOST,
+                port=self.POSTGRES_PORT,
+                database=self.POSTGRES_DB,
+            )
         )
+        return url.set(drivername="postgresql+psycopg2").render_as_string(hide_password=False)
 
     # Redis
     REDIS_HOST: str = "localhost"
@@ -171,9 +174,9 @@ class Settings(BaseSettings):
 
     # CORS - Restricted methods and headers
     # Override with comma-separated env var: CORS_ORIGINS=https://mysite.com,https://www.mysite.com
-    CORS_ORIGINS: Union[
-        str, List[str]
-    ] = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    CORS_ORIGINS: str | list[str] = (
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -182,7 +185,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
-    CORS_ALLOWED_METHODS: List[str] = [
+    CORS_ALLOWED_METHODS: list[str] = [
         "GET",
         "POST",
         "PUT",
@@ -190,7 +193,7 @@ class Settings(BaseSettings):
         "DELETE",
         "OPTIONS",
     ]
-    CORS_ALLOWED_HEADERS: List[str] = [
+    CORS_ALLOWED_HEADERS: list[str] = [
         "Authorization",
         "Content-Type",
         "Accept",
@@ -266,9 +269,7 @@ class Settings(BaseSettings):
         """Check if running in production mode."""
         return self.APP_ENV == "production" and not self.DEBUG
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 
 settings = Settings()

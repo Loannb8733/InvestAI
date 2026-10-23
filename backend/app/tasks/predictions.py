@@ -1,12 +1,12 @@
 """ML prediction tasks."""
 
-
 import logging
+from datetime import UTC
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal as async_session_factory
-from app.models.asset import Asset
+from app.core.db.session import session_factory as async_session_factory
+from app.domains.portfolio.models import Asset
 from app.services.prediction_service import prediction_service
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -53,33 +53,6 @@ async def _run_daily_predictions():
         )
 
 
-@celery_app.task(name="app.tasks.predictions.predict_price")
-def predict_price(symbol: str, asset_type: str, horizon_days: int = 7):
-    """Generate price prediction for a specific asset."""
-    from app.models.asset import AssetType
-
-    type_map = {
-        "crypto": AssetType.CRYPTO,
-        "stock": AssetType.STOCK,
-        "etf": AssetType.ETF,
-    }
-
-    at = type_map.get(asset_type)
-    if not at:
-        logger.error("Unknown asset type: %s", asset_type)
-        return None
-
-    result = run_async(prediction_service.get_price_prediction(symbol, at, horizon_days))
-
-    return {
-        "symbol": result.symbol,
-        "trend": result.trend,
-        "trend_strength": result.trend_strength,
-        "model_used": result.model_used,
-        "predictions_count": len(result.predictions),
-    }
-
-
 @celery_app.task(name="app.tasks.predictions.detect_anomalies")
 def detect_anomalies():
     """Detect price anomalies across all users' assets."""
@@ -88,7 +61,7 @@ def detect_anomalies():
 
 async def _detect_anomalies():
     """Async implementation of anomaly detection."""
-    from app.models.user import User
+    from app.domains.identity.models import User
 
     async with async_session_factory() as db:
         result = await db.execute(select(User).where(User.is_active.is_(True)))
@@ -144,15 +117,14 @@ async def _check_prediction_accuracy():
 
     Fills: actual_price, mape, direction_correct, ci_covered, accuracy_checked.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from sqlalchemy import and_, select
 
+    from app.domains.market_data.prices.service import price_feed
     from app.models.prediction_log import PredictionLog
-    from app.services.price_service import PriceService
 
-    price_service = PriceService()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async with async_session_factory() as db:
         # Find predictions whose target_date has passed but haven't been checked
@@ -178,19 +150,15 @@ async def _check_prediction_accuracy():
         for log in logs:
             try:
                 # Get actual price
-                from app.models.asset import AssetType
+                from app.domains.portfolio.models import AssetType
 
                 asset_type = AssetType(log.asset_type) if log.asset_type else AssetType.CRYPTO
 
-                if asset_type == AssetType.CRYPTO:
-                    data = await price_service.get_crypto_price(log.symbol)
-                else:
-                    data = await price_service.get_stock_price(log.symbol)
-
-                if not data or "price" not in data:
+                quote = await price_feed.quote(log.symbol, asset_type)
+                if quote is None:
                     continue
 
-                actual_price = float(data["price"])
+                actual_price = float(quote.price)
                 log.actual_price = actual_price
                 log.accuracy_checked = now
 
@@ -250,10 +218,8 @@ async def _check_data_drift():
     """Compute PSI-based data drift for each tracked symbol."""
     import numpy as np
 
+    from app.domains.market_data.history.reader import local_series
     from app.ml.drift_detector import check_drift
-    from app.ml.historical_data import HistoricalDataFetcher
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -264,7 +230,7 @@ async def _check_data_drift():
 
     for symbol, asset_type in assets:
         try:
-            dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+            prices = (await local_series(symbol, 180)).prices
             if not prices or len(prices) < 60:
                 continue
 
@@ -303,10 +269,8 @@ def tune_hyperparameters():
 async def _tune_hyperparameters():
     """Async hyperparameter tuning."""
     from app.core.redis_client import cache_hyperparams
-    from app.ml.historical_data import HistoricalDataFetcher
+    from app.domains.market_data.history.reader import local_series
     from app.ml.hyperparameter_tuner import tune_prophet, tune_xgboost
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -316,7 +280,8 @@ async def _tune_hyperparameters():
 
     for symbol, asset_type in assets:
         try:
-            dates, prices = await fetcher.get_history(symbol, asset_type.value, days=90)
+            history = await local_series(symbol, 90)
+            dates, prices = history.dates, history.prices
             if not prices or len(prices) < 40:
                 continue
 
@@ -342,12 +307,10 @@ def check_bottom_zones():
 
 async def _check_bottom_zones():
     """Detect assets in bottom zone with confidence > 80% and alert via Telegram."""
-    from app.ml.historical_data import HistoricalDataFetcher
-    from app.models.portfolio import Portfolio
-    from app.models.user import User
+    from app.domains.identity.models import User
+    from app.domains.market_data.history.reader import local_series
+    from app.domains.portfolio.models import Portfolio
     from app.services.telegram_service import telegram_service
-
-    fetcher = HistoricalDataFetcher()
 
     async with async_session_factory() as db:
         result = await db.execute(select(Asset.symbol, Asset.asset_type).where(Asset.quantity > 0).distinct())
@@ -357,7 +320,7 @@ async def _check_bottom_zones():
 
         for symbol, asset_type in assets:
             try:
-                dates, prices = await fetcher.get_history(symbol, asset_type.value, days=180)
+                prices = (await local_series(symbol, 180)).prices
                 if not prices or len(prices) < 30:
                     continue
 

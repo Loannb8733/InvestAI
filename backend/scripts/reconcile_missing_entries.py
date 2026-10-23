@@ -44,16 +44,16 @@ import argparse
 import asyncio
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select  # noqa: E402
 
-from app.core.database import AsyncSessionLocal  # noqa: E402
-from app.models.asset import Asset  # noqa: E402
-from app.models.transaction import Transaction, TransactionType  # noqa: E402
+from app.core.db.session import session_factory  # noqa: E402
+from app.domains.portfolio.models import Asset  # noqa: E402
+from app.domains.transactions.models import Transaction, TransactionType  # noqa: E402
 
 _IN = (
     TransactionType.BUY,
@@ -101,7 +101,7 @@ def missing_entry(stored: Decimal, history: Decimal, pru: Decimal, dust: Decimal
 
 
 async def reconcile(commit: bool) -> int:
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         assets = (await db.execute(select(Asset).where(Asset.asset_type != "CROWDFUNDING"))).scalars().all()
         created = 0
         skipped = []
@@ -132,7 +132,7 @@ async def reconcile(commit: bool) -> int:
                     price=pru,
                     fee=0,
                     currency="EUR",
-                    executed_at=datetime.now(timezone.utc),
+                    executed_at=datetime.now(UTC),
                     exchange=asset.exchange,
                     notes=f"Réconciliation : {reason}",
                 )

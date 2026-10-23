@@ -24,23 +24,23 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Tuple
 
-from app.models.transaction import TransactionType as TxType
-from app.services.asset_classification import STABLECOIN_PEGS, is_stablecoin
+from app.domains.portfolio.classification import STABLECOIN_PEGS, is_stablecoin
+from app.domains.transactions.models import TransactionType as TxType
 from app.services.fifo import consume_fifo_with_dates, extract_fifo_layers
 
 logger = logging.getLogger(__name__)
 
 _ZERO = Decimal("0")
 _ONE = Decimal("1")
-_EPOCH = datetime.min.replace(tzinfo=timezone.utc)
+_EPOCH = datetime.min.replace(tzinfo=UTC)
 
-FifoKey = Tuple[str, str]  # (symbol, exchange)
+FifoKey = tuple[str, str]  # (symbol, exchange)
 
 
 # ---------------------------------------------------------------------------
@@ -156,30 +156,30 @@ class ReplayEvent:
 
     kind: str
     tx: object
-    tx_dt: Optional[datetime]
+    tx_dt: datetime | None
     symbol: str
     quantity: Decimal
     price: Decimal = _ZERO
     fee: Decimal = _ZERO
     total_cost: Decimal = _ZERO  # BUY: qty*price(+fee) entering the book
     cost_removed: Decimal = _ZERO  # SELL / CONVERSION_OUT
-    oldest_acquired_at: Optional[datetime] = None
+    oldest_acquired_at: datetime | None = None
     matched: bool = False
-    dest_symbol: Optional[str] = None
+    dest_symbol: str | None = None
     dest_qty: Decimal = _ZERO
     dest_cost: Decimal = _ZERO
 
 
 @dataclass
 class ReplayResult:
-    fifo: Dict[FifoKey, list] = field(default_factory=dict)
-    orphan_transit: Dict[FifoKey, list] = field(default_factory=dict)
-    events: List[ReplayEvent] = field(default_factory=list)
+    fifo: dict[FifoKey, list] = field(default_factory=dict)
+    orphan_transit: dict[FifoKey, list] = field(default_factory=dict)
+    events: list[ReplayEvent] = field(default_factory=list)
     # (key-or-"__div__SYM", amount, currency) — resolved post-replay by the
     # metrics caller with live forex rates (exact historical format).
-    pending_fee_conversions: List[tuple] = field(default_factory=list)
-    dividend_income: Dict[FifoKey, Decimal] = field(default_factory=dict)
-    warnings: List[str] = field(default_factory=list)
+    pending_fee_conversions: list[tuple] = field(default_factory=list)
+    dividend_income: dict[FifoKey, Decimal] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ def sort_transactions(txs: list) -> list:
     def _key(tx):
         dt = tx.executed_at or _EPOCH
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return (dt, 0 if tx.transaction_type == TxType.TRANSFER_OUT else 1, str(tx.id))
 
     return sorted(txs, key=_key)
@@ -227,9 +227,9 @@ def _ci_price_in_portfolio_ccy(price, conversion_rate) -> Decimal:
     return p * fx
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def _aware(dt: datetime | None) -> datetime | None:
     if dt is not None and dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -240,13 +240,13 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
 
 def replay(
     txs: list,
-    aid_to_symbol: Dict[str, str],
+    aid_to_symbol: dict[str, str],
     config: ReplayConfig,
     *,
-    aid_to_avg_price: Optional[Dict[str, Decimal]] = None,
-    sym_avg_price: Optional[Dict[str, Decimal]] = None,
-    usd_to_portfolio: Optional[Decimal] = None,
-    on_event: Optional[Callable[[ReplayEvent], None]] = None,
+    aid_to_avg_price: dict[str, Decimal] | None = None,
+    sym_avg_price: dict[str, Decimal] | None = None,
+    usd_to_portfolio: Decimal | None = None,
+    on_event: Callable[[ReplayEvent], None] | None = None,
 ) -> ReplayResult:
     """Run the chronological FIFO replay over pre-fetched, pre-sorted ``txs``.
 
@@ -258,7 +258,7 @@ def replay(
     aid_to_avg_price = aid_to_avg_price or {}
     sym_avg_price = sym_avg_price or {}
     result = ReplayResult()
-    fifo: Dict[FifoKey, list] = result.fifo
+    fifo: dict[FifoKey, list] = result.fifo
     portfolio_ccy = config.portfolio_currency.upper()
 
     def _emit(event: ReplayEvent) -> None:
@@ -272,7 +272,7 @@ def replay(
 
     conv_ins = [tx for tx in txs if tx.transaction_type == TxType.CONVERSION_IN]
 
-    def _match_conversion_in(co_tx, src_sym: str) -> Tuple[Optional[str], Optional[str], Decimal, Decimal]:
+    def _match_conversion_in(co_tx, src_sym: str) -> tuple[str | None, str | None, Decimal, Decimal]:
         """Find the matching CONVERSION_IN for a CONVERSION_OUT.
 
         Returns (dest_symbol, dest_exchange, matched_qty, matched_price) where
@@ -280,8 +280,8 @@ def replay(
         """
         notes = co_tx.notes or ""
         exch = co_tx.exchange or ""
-        dest_sym: Optional[str] = None
-        dest_exch: Optional[str] = None
+        dest_sym: str | None = None
+        dest_exch: str | None = None
         matched_qty = Decimal(str(co_tx.quantity))  # fallback
         matched_price = _ZERO
 

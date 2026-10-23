@@ -7,18 +7,17 @@ function takes plain arrays/lists and returns numbers.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from datetime import UTC, datetime
 
 import numpy as np
 from scipy import optimize as sp_optimize
 
 from app.core.finance_constants import RISK_FREE_RATE
 from app.core.finance_constants import annualization_days as _trading_days
-from app.models.transaction import Transaction, TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 
 
-def _compute_returns(prices: List[float]) -> np.ndarray:
+def _compute_returns(prices: list[float]) -> np.ndarray:
     """Compute daily log returns from price series."""
     arr = np.array(prices, dtype=float)
     if len(arr) < 2:
@@ -48,7 +47,7 @@ def _downside_deviation(returns: np.ndarray, threshold: float = 0.0, asset_type=
     return float(np.sqrt(np.mean(neg**2)) * np.sqrt(td) * 100)
 
 
-def _max_drawdown(prices: List[float]) -> float:
+def _max_drawdown(prices: list[float]) -> float:
     """Max drawdown (%) from price series. Returns negative number."""
     if len(prices) < 2:
         return 0.0
@@ -58,7 +57,7 @@ def _max_drawdown(prices: List[float]) -> float:
     return float(np.min(dd) * 100)
 
 
-def _daily_return_pct(prices: List[float]) -> float:
+def _daily_return_pct(prices: list[float]) -> float:
     """Latest daily return %."""
     if len(prices) < 2:
         return 0.0
@@ -141,7 +140,7 @@ def _annualized_return(returns: np.ndarray, asset_type=None) -> float:
     return (np.exp(mean_daily * td) - 1) * 100
 
 
-def _xirr(cashflows: List[Tuple[datetime, float]], guess: float = 0.1) -> Optional[float]:
+def _xirr(cashflows: list[tuple[datetime, float]], guess: float = 0.1) -> float | None:
     """
     Compute XIRR (Extended Internal Rate of Return) from a list of (date, amount).
     Convention used by all callers (compute_xirr, stress_test_service):
@@ -186,9 +185,9 @@ _XIRR_INFLOW_TYPES = frozenset(
 
 
 def _build_xirr_cashflows(
-    transactions: "List[Transaction]",
+    transactions: list[Transaction],
     eur_to_target: float = 1.0,
-) -> Tuple[List[Tuple[datetime, float]], int]:
+) -> tuple[list[tuple[datetime, float]], int]:
     """Build external cashflows for XIRR from a transaction list (pure, no I/O).
 
     Sign convention matches ``_xirr``: negative = cash out (investment), positive =
@@ -206,7 +205,7 @@ def _build_xirr_cashflows(
 
     Returns ``(cashflows, skipped)``; ``skipped`` counts rows with no execution date.
     """
-    cashflows: List[Tuple[datetime, float]] = []
+    cashflows: list[tuple[datetime, float]] = []
     skipped = 0
     for tx in transactions:
         dt = tx.executed_at
@@ -214,7 +213,7 @@ def _build_xirr_cashflows(
             skipped += 1
             continue
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
 
         # Per-line historical conversion to EUR, then EUR -> target currency.
         fx = float(tx.conversion_rate) if tx.conversion_rate else 1.0

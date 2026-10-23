@@ -22,25 +22,24 @@ concernées : l'ordre n'y change rien. Ce filet porte sur les endroits où
 l'ordre décide de ce que l'utilisateur voit.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
 
 from app.api.v1.endpoints.dashboard import get_recent_transactions_internal
-from app.core.security import create_access_token
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 @pytest.fixture
 def entetes(regular_user: User) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    return {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
 
 
 @pytest.fixture

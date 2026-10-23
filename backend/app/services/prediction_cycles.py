@@ -7,24 +7,22 @@ unchanged. Split out purely to shrink the 3.7k-line service.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import get_cached_history
+from app.domains.market_data.history.reader import local_series
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_cash_like, is_safe_haven
+from app.domains.portfolio.models import Asset, Portfolio
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig, RegimeResult, _rsi
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
-from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_types import _HISTORY_DAYS
-from app.services.price_history_store import prix_locaux
 
 # Temps maximal accordé aux données externes dans le chemin d'une requête HTTP.
 # Au-delà, mieux vaut une analyse partielle qu'un écran figé (NEW-13).
@@ -33,7 +31,7 @@ from app.services.price_history_store import prix_locaux
 # (12 s pour BTC, puis 12 s pour les autres actifs, et ainsi de suite), ce qui
 # ne bornait rien. Un unique compte à rebours partagé tient la promesse.
 _BUDGET_APPELS_EXTERNES = 12.0
-from app.services.price_service import PriceService
+from app.domains.market_data.prices.stablecoins import peg_quote
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class PredictionCyclesMixin:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Analyse de cycle de marche globale avec regime par actif."""
         # Compte à rebours commun à toutes les données externes de cette analyse.
         echeance = asyncio.get_event_loop().time() + _BUDGET_APPELS_EXTERNES
@@ -53,38 +51,22 @@ class PredictionCyclesMixin:
             return max(0.1, echeance - asyncio.get_event_loop().time())
 
         # ── 1. BTC as market reference ───────────────────────────────
-        btc_prices = None
-        for try_days in [_HISTORY_DAYS, 90]:
-            btc_hist = await get_cached_history("BTC", "crypto", try_days)
-            if btc_hist and btc_hist.get("prices"):
-                btc_prices = btc_hist["prices"]
-                break
+        btc_prices = (await local_series("BTC", _HISTORY_DAYS)).prices or None
         if not btc_prices:
-            # Sources locales uniquement (Redis puis PostgreSQL). Le réseau est
-            # le travail de `tasks.history_cache`, qui passe toutes les 30
-            # minutes : l'appeler ici exposait la requête HTTP au quota d'une
-            # API tierce, jusqu'à 65 s d'attente (NEW-13).
-            btc_prices = await prix_locaux("BTC", "crypto", _HISTORY_DAYS)
-            if not btc_prices:
-                logger.warning(
-                    "Historique BTC absent des sources locales — analyse rendue sans "
-                    "référence de marché ; la tâche de pré-chargement a-t-elle tourné ?"
-                )
+            logger.warning("Historique BTC absent de la base — analyse rendue sans référence de marché")
 
         # Fear & Greed — enrichissement optionnel, jamais bloquant.
         try:
             fear_greed = await asyncio.wait_for(fetch_fear_greed_index(), timeout=min(5.0, budget_restant()))
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             logger.debug("Fear & Greed : délai dépassé, ignoré")
             fear_greed = None
 
         btc_dominance = None
         try:
             # Enrichissement facultatif : il ne doit jamais retarder l'analyse.
-            btc_dominance = await asyncio.wait_for(
-                self.data_fetcher.get_btc_dominance(), timeout=min(5.0, budget_restant())
-            )
-        except (asyncio.TimeoutError, TimeoutError):
+            btc_dominance = await asyncio.wait_for(price_feed.btc_dominance(), timeout=min(5.0, budget_restant()))
+        except TimeoutError:
             logger.debug("Dominance BTC : délai dépassé, enrichissement ignoré")
         except Exception as exc:
             logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
@@ -139,9 +121,9 @@ class PredictionCyclesMixin:
             assets = result.scalars().all()
 
             # Deduplicate (Decimal precision)
-            asset_map: Dict[str, object] = {}
-            qty_map: Dict[str, Decimal] = {}
-            cash_like_qty: Dict[str, Decimal] = {}
+            asset_map: dict[str, object] = {}
+            qty_map: dict[str, Decimal] = {}
+            cash_like_qty: dict[str, Decimal] = {}
             for a in assets:
                 sym = a.symbol
                 qty = Decimal(str(a.quantity))
@@ -157,15 +139,8 @@ class PredictionCyclesMixin:
             # Include cash-like value in total for accurate weight calculation
             for sym, qty in cash_like_qty.items():
                 try:
-                    if PriceService.is_stablecoin(sym):
-                        # Un stablecoin vaut ~1 € : si le cours tarde, l'approximation
-                        # coûte moins cher que l'attente (le repli ci-dessous).
-                        p = await asyncio.wait_for(
-                            self.price_service._stablecoin_price_eur(sym),
-                            timeout=min(3.0, budget_restant()),
-                        )
-                    else:
-                        p = Decimal("1")
+                    pegged = await asyncio.wait_for(peg_quote(sym.upper(), "EUR"), timeout=min(3.0, budget_restant()))
+                    p = pegged.price if pegged is not None else Decimal("1")
                     total_value += qty * p
                 except Exception:
                     total_value += qty
@@ -175,22 +150,12 @@ class PredictionCyclesMixin:
             _top_assets = list(asset_map.values())[:7]
 
             async def _prefetch_history(a: object) -> tuple:
-                """Return (symbol, prices) — fetches from cache then network."""
+                """Return (symbol, prices) from the stored history."""
                 sym = a.symbol
-                atype = a.asset_type.value
                 if sym == "BTC" and btc_prices:
                     p = btc_prices[-90:] if len(btc_prices) > 90 else list(btc_prices)
                     return (sym, p)
-                for try_days in [_HISTORY_DAYS, 90]:
-                    cached = await get_cached_history(sym, atype, try_days)
-                    if cached and cached.get("prices"):
-                        p = cached["prices"]
-                        return (sym, p[-90:] if len(p) > 90 else p)
-                # Idem : sources locales seulement. Un symbole que la tâche
-                # n'a pas encore vu est simplement absent de l'analyse, ce qui
-                # coûte moins cher qu'une minute d'attente pour tout le monde.
-                locaux = await prix_locaux(sym, atype, 90)
-                return (sym, locaux or [])
+                return (sym, (await local_series(sym, 90)).prices)
 
             async def _prefetch_price(a: object) -> tuple:
                 """Return (symbol, price)."""
@@ -213,7 +178,7 @@ class PredictionCyclesMixin:
             async def _borne(coro, defaut: tuple) -> tuple:
                 try:
                     return await asyncio.wait_for(coro, timeout=budget_restant())
-                except (asyncio.TimeoutError, TimeoutError):
+                except TimeoutError:
                     return defaut
                 except Exception as exc:  # noqa: BLE001
                     logger.debug("Pré-chargement abandonné : %s", exc)
@@ -224,13 +189,13 @@ class PredictionCyclesMixin:
                 asyncio.gather(*[_borne(_prefetch_price(a), (a.symbol, 0)) for a in _top_assets]),
             )
 
-            _hist_map: Dict[str, list] = {sym: prices for sym, prices in _hist_results}
-            _price_map: Dict[str, float] = {sym: price for sym, price in _price_results}
+            _hist_map: dict[str, list] = {sym: prices for sym, prices in _hist_results}
+            _price_map: dict[str, float | None] = {sym: price for sym, price in _price_results}
 
             for asset in _top_assets:
                 try:
-                    price = _price_map.get(asset.symbol, 0)
-                    if price == 0:
+                    price = _price_map.get(asset.symbol)
+                    if not price:
                         continue
                     price_dec = Decimal(str(price))
                     qty_dec = qty_map[asset.symbol]
@@ -322,7 +287,7 @@ class PredictionCyclesMixin:
 
         # ── 4. Cycle position (0-100) — regime-based ─────────────────
         # Uses regime probabilities as primary signal + market context refinement
-        btc_ctx: Optional[MarketContext] = None
+        btc_ctx: MarketContext | None = None
         btc_probs = btc_regime.get("probabilities") if btc_regime else None
         if btc_prices and len(btc_prices) >= 30:
             btc_ctx = compute_market_context(btc_prices, "BTC", "crypto", fear_greed)
@@ -378,12 +343,7 @@ class PredictionCyclesMixin:
                 continue
             try:
                 # Fetch prices for this asset (check cache first)
-                a_prices_tb = None
-                for try_d in [_HISTORY_DAYS, 90]:
-                    cached_h = await get_cached_history(sym, asset_data.get("asset_type", "crypto"), try_d)
-                    if cached_h and cached_h.get("prices"):
-                        a_prices_tb = cached_h["prices"]
-                        break
+                a_prices_tb = (await local_series(sym, _HISTORY_DAYS)).prices or None
                 if a_prices_tb and len(a_prices_tb) >= 30:
                     a_current = float(a_prices_tb[-1])
                     a_regime = {
@@ -414,7 +374,7 @@ class PredictionCyclesMixin:
         # ── 7. Distribution diagnostic ────────────────────────────────
         # Flag assets in distribution phase (top/bearish regime + high cycle
         # position) and cross-reference with RSI / momentum weakness.
-        distribution_diagnostic: List[Dict] = []
+        distribution_diagnostic: list[dict] = []
         for asset_data in per_asset:
             dom = asset_data.get("dominant_regime", "")
             probs = asset_data.get("probabilities", {})
@@ -425,12 +385,7 @@ class PredictionCyclesMixin:
             sym = asset_data["symbol"]
             # Try to compute RSI for this asset
             rsi_val = None
-            a_prices_diag = None
-            for try_d in [_HISTORY_DAYS, 90]:
-                cached_h = await get_cached_history(sym, asset_data.get("asset_type", "crypto"), try_d)
-                if cached_h and cached_h.get("prices"):
-                    a_prices_diag = cached_h["prices"]
-                    break
+            a_prices_diag = (await local_series(sym, _HISTORY_DAYS)).prices or None
             if sym == "BTC" and btc_prices:
                 a_prices_diag = btc_prices
 
@@ -447,7 +402,7 @@ class PredictionCyclesMixin:
                 signals.append("Régime Sommet détecté")
                 sell_priority = "high" if sell_priority != "high" else sell_priority
             if probs.get("bearish", 0) > 0.25:
-                signals.append(f"Probabilité baissière {probs['bearish']*100:.0f}%")
+                signals.append(f"Probabilité baissière {probs['bearish'] * 100:.0f}%")
                 sell_priority = "medium" if sell_priority == "low" else sell_priority
 
             weight_pct = 0.0
@@ -501,9 +456,9 @@ class PredictionCyclesMixin:
     @staticmethod
     def _estimate_time_to_pivot(
         cycle_position: int,
-        btc_regime: Optional[Dict],
-        btc_estimate: Optional[Dict],
-    ) -> Dict:
+        btc_regime: dict | None,
+        btc_estimate: dict | None,
+    ) -> dict:
         """Estimate days until the next cycle phase transition.
 
         Uses cycle_position distance to the nearest phase boundary and
@@ -564,12 +519,12 @@ class PredictionCyclesMixin:
     def estimate_top_bottom(
         self,
         symbol: str,
-        prices: List[float],
+        prices: list[float],
         current_price: float,
-        regime_info: Optional[Dict] = None,
-        cycle_position: Optional[float] = None,
-        ctx: Optional[MarketContext] = None,
-    ) -> Dict:
+        regime_info: dict | None = None,
+        cycle_position: float | None = None,
+        ctx: MarketContext | None = None,
+    ) -> dict:
         """Estimate next market top and bottom (price + date) for an asset.
 
         Uses Ornstein-Uhlenbeck mean-reversion parameters, support/resistance
@@ -577,7 +532,7 @@ class PredictionCyclesMixin:
         """
         arr = np.array(prices, dtype=float)
         n = len(arr)
-        today = datetime.now(timezone.utc)
+        today = datetime.now(UTC)
 
         # ── OU parameters (mu, theta, sigma) ──────────────────────────
         if n >= 200:
@@ -762,10 +717,10 @@ class PredictionCyclesMixin:
     def _get_cycle_advice(
         regime: str,
         cycle_pos: int,
-        fear_greed: Optional[int],
+        fear_greed: int | None,
         portfolio_value: float = 0.0,
         max_risk_weight: float = 0.0,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Generate actionable advice based on market cycle position.
 
         Args:
@@ -893,7 +848,7 @@ class PredictionCyclesMixin:
                 {
                     "title": "N'achetez pas sur l'euphorie",
                     "description": (
-                        "Quand tout le monde est euphorique, c'est le pire moment pour acheter. " "Résistez au FOMO."
+                        "Quand tout le monde est euphorique, c'est le pire moment pour acheter. Résistez au FOMO."
                     ),
                     "action": "ATTENDRE",
                     "priority": "medium",

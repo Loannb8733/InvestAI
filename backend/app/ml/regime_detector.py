@@ -8,7 +8,6 @@ import logging
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -49,10 +48,10 @@ class RegimeResult:
     """Regime detection result for a single symbol."""
 
     symbol: str
-    probabilities: Dict[str, float]
+    probabilities: dict[str, float]
     dominant_regime: str
     confidence: float
-    signals: List[IndicatorSignal]
+    signals: list[IndicatorSignal]
     description: str
 
 
@@ -108,7 +107,7 @@ class MarketRegime:
     """Aggregate regime for market + per-asset."""
 
     market: RegimeResult
-    per_asset: List[RegimeResult] = field(default_factory=list)
+    per_asset: list[RegimeResult] = field(default_factory=list)
     generated_at: datetime = field(default_factory=datetime.utcnow)
 
     @property
@@ -134,7 +133,7 @@ def _safe(v) -> float:
     return f
 
 
-def _normalize(votes: Dict[str, float]) -> Dict[str, float]:
+def _normalize(votes: dict[str, float]) -> dict[str, float]:
     """Normalize votes so they sum to 1."""
     total = sum(votes.values())
     if total <= 0:
@@ -142,7 +141,7 @@ def _normalize(votes: Dict[str, float]) -> Dict[str, float]:
     return {p: round(votes[p] / total, 3) for p in PHASES}
 
 
-def _rsi(prices: List[float], period: int = 14) -> Optional[float]:
+def _rsi(prices: list[float], period: int = 14) -> float | None:
     """Compute RSI using Wilder's smoothing method (P8)."""
     if len(prices) < period + 1:
         return None
@@ -162,13 +161,13 @@ def _rsi(prices: List[float], period: int = 14) -> Optional[float]:
     return float(100 - 100 / (1 + rs))
 
 
-def _sma(prices: List[float], period: int) -> Optional[float]:
+def _sma(prices: list[float], period: int) -> float | None:
     if len(prices) < period:
         return None
     return float(np.mean(prices[-period:]))
 
 
-def _ema(prices: List[float], period: int) -> Optional[List[float]]:
+def _ema(prices: list[float], period: int) -> list[float] | None:
     """Compute full EMA series."""
     if len(prices) < period:
         return None
@@ -180,8 +179,8 @@ def _ema(prices: List[float], period: int) -> Optional[List[float]]:
 
 
 def _macd(
-    prices: List[float],
-) -> Optional[Tuple[List[float], List[float], List[float]]]:
+    prices: list[float],
+) -> tuple[list[float], list[float], list[float]] | None:
     """Return (macd_series, signal_series, histogram_series) as full lists (P9)."""
     if len(prices) < 35:
         return None
@@ -202,7 +201,7 @@ def _macd(
     return (macd_series, signal_series, histogram_series)
 
 
-def _bollinger(prices: List[float], period: int = 20, num_std: float = 2.0) -> Optional[Tuple[float, float, float]]:
+def _bollinger(prices: list[float], period: int = 20, num_std: float = 2.0) -> tuple[float, float, float] | None:
     """Return (lower_band, middle, upper_band) for last value."""
     if len(prices) < period:
         return None
@@ -222,13 +221,13 @@ class MarketRegimeDetector:
 
     def detect(
         self,
-        prices: List[float],
+        prices: list[float],
         symbol: str = "MARKET",
-        fear_greed: Optional[int] = None,
-        btc_dominance: Optional[float] = None,
-        asset_type: Optional[str] = None,
-        market_context: Optional[MarketContext] = None,
-        vix: Optional[float] = None,
+        fear_greed: int | None = None,
+        btc_dominance: float | None = None,
+        asset_type: str | None = None,
+        market_context: MarketContext | None = None,
+        vix: float | None = None,
     ) -> RegimeResult:
         """Analyze prices and return regime probabilities.
 
@@ -260,8 +259,8 @@ class MarketRegimeDetector:
         if ctx is None and len(prices) >= 30:
             ctx = compute_market_context(prices, symbol, asset_type or "crypto", fear_greed)
 
-        signals: List[IndicatorSignal] = []
-        all_votes: List[Dict[str, float]] = []
+        signals: list[IndicatorSignal] = []
+        all_votes: list[dict[str, float]] = []
 
         # 1. RSI 14
         sig = self._analyze_rsi(prices, ctx=ctx)
@@ -344,7 +343,7 @@ class MarketRegimeDetector:
         )
 
     @staticmethod
-    def refine_to_6phase(result: "RegimeResult", prices: List[float]) -> str:
+    def refine_to_6phase(result: "RegimeResult", prices: list[float]) -> str:
         """Map 4-phase regime to 6-phase professional nomenclature.
 
         Uses RSI, EMA-20 slope, and regime probabilities:
@@ -391,7 +390,7 @@ class MarketRegimeDetector:
     # Individual indicator analyzers
     # -----------------------------------------------------------------------
 
-    def _analyze_rsi(self, prices: List[float], ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_rsi(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         """Analyze RSI with adaptive thresholds derived from historical percentiles."""
         rsi = _rsi(prices)
         if rsi is None:
@@ -426,7 +425,7 @@ class MarketRegimeDetector:
 
         return IndicatorSignal("RSI 14", round(rsi, 1), signal, round(strength, 2), desc)
 
-    def _analyze_macd(self, prices: List[float], ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_macd(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         result = _macd(prices)
         if result is None:
             return None
@@ -499,7 +498,7 @@ class MarketRegimeDetector:
         strength = min(strength, 0.95)
         return IndicatorSignal("MACD", round(histogram, 4), signal, round(strength, 2), desc)
 
-    def _analyze_bollinger(self, prices: List[float], ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_bollinger(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         bb = _bollinger(prices)
         if bb is None:
             return None
@@ -539,7 +538,7 @@ class MarketRegimeDetector:
 
         return IndicatorSignal("Bollinger Bands", round(position, 2), signal, round(strength, 2), desc)
 
-    def _analyze_ma_cross(self, prices: List[float], ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_ma_cross(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         sma20 = _sma(prices, 20)
         sma50 = _sma(prices, 50)
         if sma20 is None or sma50 is None:
@@ -590,7 +589,7 @@ class MarketRegimeDetector:
 
         return IndicatorSignal(label, round(diff_pct, 2), signal, round(strength, 2), desc)
 
-    def _analyze_momentum(self, prices: List[float], ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_momentum(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         period = 14 if len(prices) >= 20 else 7
         if len(prices) < period + 5:
             return None
@@ -633,9 +632,7 @@ class MarketRegimeDetector:
 
         return IndicatorSignal(f"Momentum {period}j", round(roc, 1), signal, round(strength, 2), desc)
 
-    def _analyze_volatility(
-        self, prices: List[float], ctx: Optional[MarketContext] = None
-    ) -> Optional[IndicatorSignal]:
+    def _analyze_volatility(self, prices: list[float], ctx: MarketContext | None = None) -> IndicatorSignal | None:
         if len(prices) < 15:
             return None
 
@@ -683,8 +680,8 @@ class MarketRegimeDetector:
     def _analyze_fear_greed(
         self,
         fg: int,
-        btc_dominance: Optional[float] = None,
-        ctx: Optional[MarketContext] = None,
+        btc_dominance: float | None = None,
+        ctx: MarketContext | None = None,
     ) -> IndicatorSignal:
         # Adaptive F&G thresholds (vol-adjusted)
         if ctx:
@@ -715,7 +712,7 @@ class MarketRegimeDetector:
 
         return IndicatorSignal("Fear & Greed", float(fg), signal, round(strength, 2), desc)
 
-    def _analyze_vix(self, vix: float, ctx: Optional[MarketContext] = None) -> Optional[IndicatorSignal]:
+    def _analyze_vix(self, vix: float, ctx: MarketContext | None = None) -> IndicatorSignal | None:
         """Analyze CBOE VIX (Volatility Index) as a TradFi sentiment indicator.
 
         VIX thresholds (classic interpretation):
@@ -757,7 +754,7 @@ class MarketRegimeDetector:
     # Helpers
     # -----------------------------------------------------------------------
 
-    def _signal_to_votes(self, sig: IndicatorSignal, ctx: Optional[MarketContext] = None) -> Dict[str, float]:
+    def _signal_to_votes(self, sig: IndicatorSignal, ctx: MarketContext | None = None) -> dict[str, float]:
         """Convert a signal into weighted votes for each phase.
 
         Spillover weights are adaptive: higher volatility → more regime
@@ -796,10 +793,10 @@ class MarketRegimeDetector:
 
     def _compute_confidence(
         self,
-        probs: Dict[str, float],
+        probs: dict[str, float],
         num_indicators: int,
         num_prices: int,
-        ctx: Optional[MarketContext] = None,
+        ctx: MarketContext | None = None,
     ) -> float:
         """Confidence based on indicator count, data length, and probability spread.
 
@@ -819,7 +816,7 @@ class MarketRegimeDetector:
 
         return indicator_factor * ind_w + data_factor * data_w + spread_factor * spread_w
 
-    def _make_description(self, dominant: str, probs: Dict[str, float], confidence: float) -> str:
+    def _make_description(self, dominant: str, probs: dict[str, float], confidence: float) -> str:
         pct = probs[dominant] * 100
         labels = {
             "bearish": "Markdown — structure de prix descendante (Lower Highs)",
@@ -845,13 +842,13 @@ class MarketRegimeDetector:
 
     def detect_multi_timeframe(
         self,
-        prices: List[float],
+        prices: list[float],
         symbol: str = "MARKET",
-        fear_greed: Optional[int] = None,
-        btc_dominance: Optional[float] = None,
-        asset_type: Optional[str] = None,
-        market_context: Optional[MarketContext] = None,
-    ) -> Dict:
+        fear_greed: int | None = None,
+        btc_dominance: float | None = None,
+        asset_type: str | None = None,
+        market_context: MarketContext | None = None,
+    ) -> dict:
         """Detect regime on daily and weekly timeframes (P15).
 
         Returns dict with daily_regime, weekly_regime, timeframe_alignment, and note.

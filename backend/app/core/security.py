@@ -1,184 +1,29 @@
-"""Security utilities: password hashing, JWT, encryption."""
-
-import hashlib
-import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
-
-import bcrypt
-from cryptography.fernet import Fernet, InvalidToken, MultiFernet
-from jose import JWTError, jwt
+from cryptography.fernet import Fernet, MultiFernet
 
 from app.core.config import settings
 
 
-def compute_token_fingerprint(user_agent: str) -> str:
-    """Compute a fingerprint hash from the user-agent for token binding.
-
-    Portée réelle, et ses limites (SEC-05)
-    --------------------------------------
-    Ce contrôle gêne le rejeu d'un token volé depuis un client *différent* :
-    l'attaquant doit connaître le User-Agent exact de la victime en plus du
-    token. C'est une gêne, pas une barrière.
-
-    Ce qu'il ne fait PAS, malgré ce que « binding » laisse entendre :
-
-    - un User-Agent n'est pas un secret. Il est envoyé en clair à chaque
-      requête, journalisé partout, et se recopie en un en-tête ;
-    - quiconque a intercepté le token a très probablement vu la requête qui le
-      portait, donc son User-Agent ;
-    - les User-Agent sont peu variés (quelques valeurs couvrent l'essentiel du
-      parc), donc une valeur plausible se devine souvent sans rien intercepter.
-
-    À ne pas considérer comme une protection contre le vol de token : la
-    révocation (blocklist) et la durée de vie courte restent les vrais
-    contrôles.
-    """
-    return hashlib.sha256(user_agent.encode()).hexdigest()[:16]
-
-
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
-    salt = bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)
-    hashed: str = bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-    return hashed
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    result: bool = bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-    return result
-
-
-# JWT tokens
-def create_access_token(
-    subject: str | Any,
-    expires_delta: Optional[timedelta] = None,
-    fingerprint: Optional[str] = None,
-    token_version: int = 0,
-) -> str:
-    """Create a JWT access token."""
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    to_encode: Dict[str, Any] = {
-        "sub": str(subject),
-        "exp": expire,
-        # Génération de jetons qui l'a vu naître : un changement de mot de passe
-        # incrémente le compteur de l'utilisateur et périme tout ce qui précède
-        # (NEW-65).
-        "tv": int(token_version),
-        "type": "access",
-        "jti": uuid.uuid4().hex,  # enables per-token revocation (logout / blocklist)
-    }
-    if fingerprint:
-        to_encode["fp"] = fingerprint
-    encoded: str = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded
-
-
-def create_refresh_token(
-    subject: str | Any,
-    expires_delta: Optional[timedelta] = None,
-    fingerprint: Optional[str] = None,
-    token_version: int = 0,
-) -> str:
-    """Create a JWT refresh token with a unique jti for revocation support."""
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    to_encode: Dict[str, Any] = {
-        "sub": str(subject),
-        "exp": expire,
-        # Génération de jetons qui l'a vu naître : un changement de mot de passe
-        # incrémente le compteur de l'utilisateur et périme tout ce qui précède
-        # (NEW-65).
-        "tv": int(token_version),
-        "type": "refresh",
-        "jti": uuid.uuid4().hex,
-    }
-    if fingerprint:
-        to_encode["fp"] = fingerprint
-    encoded: str = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded
-
-
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and validate a JWT token."""
-    try:
-        payload: Dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError:
-        return None
-
-
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode an access token. Alias for decode_token used by Sentry middleware."""
-    return decode_token(token)
-
-
-# Fernet encryption for API keys
-def _build_fernet() -> Optional[MultiFernet]:
-    """Build MultiFernet instance with key rotation support.
-
-    Uses FERNET_KEY as the primary key and FERNET_OLD_KEYS (comma-separated)
-    as fallback keys for decrypting data encrypted with previous keys.
-    """
+def get_fernet() -> MultiFernet | None:
+    """Chiffrement Fernet avec rotation : FERNET_KEY chiffre, FERNET_OLD_KEYS (séparées par des virgules) déchiffrent encore."""
     if not settings.FERNET_KEY:
         return None
-    current_key = settings.FERNET_KEY
-    keys = [Fernet(current_key.encode())]
-    old_keys = getattr(settings, "FERNET_OLD_KEYS", "") or ""
-    if old_keys:
-        for k in old_keys.split(","):
-            k = k.strip()
-            if k:
-                keys.append(Fernet(k.encode()))
-    return MultiFernet(keys)
-
-
-def get_fernet() -> Optional[MultiFernet]:
-    """Get MultiFernet instance for encryption with key rotation support."""
-    return _build_fernet()
+    old_keys = [k.strip() for k in (settings.FERNET_OLD_KEYS or "").split(",") if k.strip()]
+    return MultiFernet([Fernet(settings.FERNET_KEY.encode()), *(Fernet(k.encode()) for k in old_keys)])
 
 
 def encrypt_api_key(api_key: str) -> str:
-    """Encrypt an API key using Fernet."""
+    """Chiffre un secret (clé d'API, secret TOTP) ; lève ValueError sans FERNET_KEY."""
     fernet = get_fernet()
-    if not fernet:
+    if fernet is None:
         raise ValueError("FERNET_KEY not configured")
     encrypted: str = fernet.encrypt(api_key.encode()).decode()
     return encrypted
 
 
 def decrypt_api_key(encrypted_key: str) -> str:
-    """Decrypt an API key using Fernet."""
+    """Déchiffre un secret chiffré par :func:`encrypt_api_key` ; lève ValueError sans FERNET_KEY."""
     fernet = get_fernet()
-    if not fernet:
+    if fernet is None:
         raise ValueError("FERNET_KEY not configured")
     decrypted: str = fernet.decrypt(encrypted_key.encode()).decode()
     return decrypted
-
-
-def decrypt_mfa_secret(stored: Optional[str]) -> Optional[str]:
-    """Decrypt a stored TOTP secret, tolerating legacy plaintext.
-
-    MFA secrets used to be stored in plaintext. To avoid locking out users
-    enrolled before at-rest encryption was added, fall back to the raw value
-    when it isn't a valid Fernet token. New secrets are written encrypted via
-    ``encrypt_api_key``; a user's stored value upgrades to ciphertext the next
-    time they (re-)enroll in MFA.
-    """
-    if not stored:
-        return stored
-    fernet = get_fernet()
-    if not fernet:
-        return stored
-    try:
-        return fernet.decrypt(stored.encode()).decode()
-    except InvalidToken:
-        return stored  # legacy plaintext secret

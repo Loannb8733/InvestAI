@@ -7,14 +7,14 @@ trading parameters (risk_multiplier, alpha_threshold, gold shield status).
 """
 
 import logging
-from typing import Optional
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.core.redis_client import _get_redis_txt
+from app.domains.identity.models import User
+from app.domains.market_data.history.reader import local_series
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig
-from app.models.user import User
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.telegram_service import telegram_service
 
@@ -32,60 +32,20 @@ class RegimeAlertService:
     def __init__(self) -> None:
         self.detector = MarketRegimeDetector()
 
-    async def _get_current_regime(self) -> Optional[str]:
+    async def _get_current_regime(self) -> str | None:
         """Detect current global regime via BTC prices (90-day window)."""
         try:
-            from app.services.data_fetcher import get_cached_history
-
-            _, btc_prices = get_cached_history("BTC", days=90)
-            if not btc_prices or len(btc_prices) < 7:
-                from app.ml.historical_data import HistoricalDataFetcher
-
-                fetcher = HistoricalDataFetcher()
-                _, btc_prices = await fetcher.get_crypto_history("BTC", days=90)
-
-            # Fallback: CoinGecko rate-limits/blocks Render's shared cloud IP. Yahoo
-            # Finance (BTC-USD) tolerates datacenter IPs and the app already uses it
-            # for stocks, so use it when CoinGecko returns too few points.
-            if not btc_prices or len(btc_prices) < 7:
-                btc_prices = await self._fetch_btc_prices_yahoo(days=90)
-
-            if not btc_prices or len(btc_prices) < 7:
+            btc_prices = (await local_series("BTC", 90)).prices
+            if len(btc_prices) < 7:
                 logger.warning("Not enough BTC price data for regime detection")
                 return None
-
-            # Fetch Fear & Greed for better accuracy
-            fear_greed: Optional[int] = await fetch_fear_greed_index(timeout=10.0)
-
-            result = self.detector.detect(btc_prices, "BTC", fear_greed)
-            return result.dominant_regime
+            fear_greed: int | None = await fetch_fear_greed_index(timeout=10.0)
+            return self.detector.detect(btc_prices, "BTC", fear_greed).dominant_regime
         except Exception as e:
             logger.error("Regime detection failed: %s", e)
             return None
 
-    @staticmethod
-    async def _fetch_btc_prices_yahoo(days: int = 90) -> list:
-        """Daily BTC close (USD) from Yahoo Finance — cloud-IP-tolerant fallback."""
-        import time
-
-        import httpx
-
-        try:
-            now = int(time.time())
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.get(
-                    "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
-                    params={"period1": now - (days + 5) * 86_400, "period2": now, "interval": "1d"},
-                    headers={"User-Agent": "Mozilla/5.0"},  # Yahoo rejects the default httpx UA
-                )
-                resp.raise_for_status()
-                closes = resp.json()["chart"]["result"][0]["indicators"]["quote"][0]["close"]
-                return [float(c) for c in closes if c is not None]
-        except Exception as e:  # noqa: BLE001 — fall through to "not enough data"
-            logger.warning("Yahoo BTC fallback failed for regime detection: %s", e)
-            return []
-
-    async def _get_last_regime(self) -> Optional[str]:
+    async def _get_last_regime(self) -> str | None:
         """Read last known regime from Redis.
 
         Rend ``None`` quand Redis est injoignable — la même valeur qu'à la
@@ -196,7 +156,7 @@ class RegimeAlertService:
 
         # Send to all Telegram-enabled users
         sent_count = 0
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await db.execute(
                 select(User).where(
                     User.is_active == True,  # noqa: E712

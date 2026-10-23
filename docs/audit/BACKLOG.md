@@ -250,21 +250,7 @@ tableau. **Huit restent à trancher.**
 
 | **NEW-39** | 🟢 | **Balayage du code mort sur tout `app/`** (673 fonctions examinées, 579 fichiers). Après NEW-38, la même recherche a été généralisée. **19 fonctions ne sont appelées nulle part** (517 lignes) et **6 ne le sont que par leurs tests** (42 lignes). Les trois plus grosses sont privées, donc sans contrat externe : `_compute_hit_rate` et `_compute_accuracy_from_data` (`prediction_metrics`), `_build_defensive_strategy` (`ai_strategy_service`). | 🟢 **203 lignes supprimées** (les trois privées). **Les 16 autres sont listées ci-dessous, non supprimées** : plusieurs sont des API publiques ou des alias de compatibilité dont le retrait est un arbitrage, pas un nettoyage. L'outil est conservé — `scripts/balayage_code_mort.py`. |
 
-**Les 16 fonctions mortes non supprimées**, par nature de la décision :
-
-| Fonction | Lignes | Pourquoi ce n'est pas un simple nettoyage |
-|---|---:|---|
-| `get_simple_earn_history` (`exchanges/binance.py`) | 62 | Méthode d'un connecteur d'exchange : la retirer réduit la parité d'API du connecteur avec ce que Binance expose. |
-| `get_optional_current_user` (`api/deps.py`) | 42 | Dépendance FastAPI d'authentification facultative — prévue pour des routes publiques à contenu enrichi. |
-| `calculate_beta` + `calculate_alpha` (`snapshot_risk`) | 52 | Deux métriques de risque que la docstring du module annonce, sans qu'aucun écran ne les affiche. Les supprimer ferme la porte ; les brancher l'ouvre. |
-| `get_stock_price_eur`, `get_staleness_info` (`market_data_service`) | 54 | Conversion en euros et fraîcheur : utiles le jour où des actions seront détenues (0 aujourd'hui, cf. FIN-10). |
-| `get_multiple_historical_prices` (`price_service`) | 23 | Variante groupée d'un appel déjà utilisé au singulier. |
-| `create_user_snapshot_if_missing` (`snapshot_service`) | 33 | Idempotence de snapshot — filet pour une tâche planifiée. |
-| `get_cached_hyperparams`, `get_cached_reliability`, `cache_reliability`, `get_redis` (`core/redis_client`) | 29 | `get_redis` se déclare lui-même « backward compat alias » : sa conservation était délibérée. |
-| `ci_safety_margin`, `xgboost_decay`, `sentiment_significance_threshold` (`ml/adaptive_thresholds`) | 20 | Seuils adaptatifs prévus pour des modèles qui ne les consomment pas encore. |
-| `stablecoin_peg` (`asset_classification`) | 3 | Accesseur d'une table déjà lue directement ailleurs. |
-
-Les **6 appelées seulement par des tests** — `_build_portfolio_var_parametric`, `invert_rate`, `calculate_cagr`, `calculate_roi`, `build_sorted_rates`, `is_crypto_quote` — sont mortes en production mais leur suppression emporterait les tests qui les couvrent. `calculate_roi` et `calculate_cagr` sont de surcroît des formules de référence, utiles à garder documentées et testées.
+**Mise à jour du 2026-10-18 (refonte, étape 2)** : les 16 fonctions mortes et les 6 appelées seulement par leurs tests ont été **supprimées**, avec leurs tests. La règle retenue pour la refonte exclut le code conservé pour un usage hypothétique ; l'historique git en garde la trace.
 
 | **NEW-40** | 🟢 | **Quatre dépendances frontend déclarées et jamais importées** : `date-fns` (**37 Mo**), `@tanstack/react-table` (796 ko), `@radix-ui/react-avatar` et `@radix-ui/react-separator`. Sur 40 dépendances examinées. Le bundle n'en portait rien — elles n'étaient dans aucun graphe d'import — mais elles s'installaient à chaque `npm ci`, en CI comme en Docker. **CLAUDE.md annonçait « Tables : TanStack Table »** alors que `components/ui/table.tsx` est un composant maison, seconde inexactitude de la doc après « Charts : Recharts » (corrigée en ARC-10). | ✅ **retirées**, doc corrigée. `@nivo/core` **conservée** : transitive de `@nivo/bar`, son épinglage explicite fige sa version — même intention qu'ARC-13. Les cinq devDependencies signalées étaient toutes des **faux positifs** : ESLint et PostCSS les référencent sans leur préfixe de paquet (`plugin:react-hooks/recommended` pour `eslint-plugin-react-hooks`), et `@vitest/coverage-v8` ne s'importe pas, il s'active par `--coverage`. |
 

@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class BitstampService(BaseExchangeService):
         query: str = "",
         body: str = "",
         content_type: str = "",
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Generate authentication headers for Bitstamp API v2.
 
         Signature payload format:
@@ -113,7 +113,7 @@ class BitstampService(BaseExchangeService):
         message = x_auth + method.upper() + host + path + query + content_type + nonce + timestamp + "v2" + body
 
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
@@ -143,7 +143,7 @@ class BitstampService(BaseExchangeService):
             logger.error(f"Bitstamp test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bitstamp.
 
         The balance endpoint returns a flat dict with keys like:
@@ -218,7 +218,7 @@ class BitstampService(BaseExchangeService):
         offset: int = 0,
         limit: int = 100,
         sort: str = "desc",
-    ) -> list:
+    ) -> list[dict[str, Any]]:
         """Fetch user transactions from Bitstamp.
 
         Transaction types:
@@ -247,7 +247,8 @@ class BitstampService(BaseExchangeService):
                     logger.error(f"Bitstamp user_transactions error: {response.status_code} - {response.text[:200]}")
                     return []
 
-                return response.json()
+                transactions: list[dict[str, Any]] = response.json()
+                return transactions
 
         except Exception as e:
             logger.error(f"Bitstamp _get_user_transactions error: {e}")
@@ -255,16 +256,16 @@ class BitstampService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Bitstamp.
 
         Trades are extracted from user_transactions where type=2.
         """
-        trades = []
+        trades: list[ExchangeTrade] = []
         offset = 0
         page_size = 100
 
@@ -309,7 +310,7 @@ class BitstampService(BaseExchangeService):
         logger.info(f"Bitstamp: Total trades found: {len(trades)}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
-    def _parse_trade_from_transaction(self, tx: dict, tx_datetime: datetime) -> Optional[ExchangeTrade]:
+    def _parse_trade_from_transaction(self, tx: dict[str, Any], tx_datetime: datetime) -> ExchangeTrade | None:
         """Parse a trade from a Bitstamp user transaction.
 
         In a trade transaction, one currency amount is positive (bought)
@@ -370,15 +371,15 @@ class BitstampService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Bitstamp.
 
         Deposits are extracted from user_transactions where type=0.
         """
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
         offset = 0
         page_size = 100
 
@@ -446,15 +447,15 @@ class BitstampService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bitstamp.
 
         Withdrawals are extracted from user_transactions where type=1.
         """
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
         offset = 0
         page_size = 100
 

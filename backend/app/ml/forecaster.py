@@ -5,8 +5,7 @@ Prophet, ARIMA, XGBoost, EMA, Linear Regression, and Mean-Reversion (OU).
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -23,10 +22,10 @@ logger = logging.getLogger(__name__)
 # (broken initial connection) cannot leave the process serving a permanently
 # dead singleton until restart. The PING failure is treated as "no cache
 # available" — callers already degrade to recompute on cache miss.
-_sync_redis: Optional[redis.Redis] = None
+_sync_redis: redis.Redis | None = None
 
 
-def _get_sync_redis() -> Optional[redis.Redis]:
+def _get_sync_redis() -> redis.Redis | None:
     global _sync_redis
     if _sync_redis is None:
         try:
@@ -51,16 +50,16 @@ def _get_sync_redis() -> Optional[redis.Redis]:
 class ForecastResult:
     """Result of a price forecast."""
 
-    dates: List[str]
-    prices: List[float]
-    confidence_low: List[float]
-    confidence_high: List[float]
+    dates: list[str]
+    prices: list[float]
+    confidence_low: list[float]
+    confidence_high: list[float]
     trend: str  # bullish, bearish, neutral
     trend_strength: float  # 0-100
     model_used: str  # e.g. "ensemble (prophet: 42%, xgboost: 35%)"
-    models_detail: List[Dict] = field(default_factory=list)
+    models_detail: list[dict] = field(default_factory=list)
     # [{name, weight_pct, mape, trend}]
-    explanations: List[Dict] = field(default_factory=list)
+    explanations: list[dict] = field(default_factory=list)
     # [{feature_name: str, importance: float, direction: str}]
 
 
@@ -85,11 +84,11 @@ _Z95 = 1.959963984540054
 
 
 def _ensemble_total_variance_ci(
-    points: List[float],
-    half_widths: List[float],
-    weights: List[float],
+    points: list[float],
+    half_widths: list[float],
+    weights: list[float],
     ensemble_mid: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """95% ensemble CI at one horizon via the law of total variance.
 
     Combines each model's OWN (out-of-model) interval instead of an in-sample
@@ -110,7 +109,7 @@ def _ensemble_total_variance_ci(
 class PriceForecaster:
     """Ensemble price forecaster combining multiple models."""
 
-    def __init__(self, hyperparams: Optional[Dict] = None):
+    def __init__(self, hyperparams: dict | None = None):
         self._prophet_available = self._check_import("prophet", "Prophet")
         self._xgboost_available = self._check_import("xgboost", "XGBRegressor")
         self._arima_available = self._check_import("statsmodels.tsa.arima.model", "ARIMA")
@@ -133,8 +132,8 @@ class PriceForecaster:
 
     def forecast(
         self,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days_ahead: int = 7,
     ) -> ForecastResult:
         """Legacy single-model forecast (still used as inner call)."""
@@ -149,16 +148,16 @@ class PriceForecaster:
 
     def ensemble_forecast(
         self,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days_ahead: int = 7,
-        symbol: Optional[str] = None,
-        data_hash: Optional[str] = None,
-        volumes: Optional[List[float]] = None,
-        btc_prices: Optional[List[float]] = None,
-        fear_greed: Optional[int] = None,
-        btc_dominance: Optional[float] = None,
-        market_context: Optional[MarketContext] = None,
+        symbol: str | None = None,
+        data_hash: str | None = None,
+        volumes: list[float] | None = None,
+        btc_prices: list[float] | None = None,
+        fear_greed: int | None = None,
+        btc_dominance: float | None = None,
+        market_context: MarketContext | None = None,
     ) -> ForecastResult:
         """Run all available models, weight by backtest, combine.
 
@@ -185,7 +184,7 @@ class PriceForecaster:
                 self._hyperparams = {**self._hyperparams, **cached_hparams}
 
         # ── 1. Collect individual forecasts ──────────────────────────
-        candidates: List[Tuple[str, ForecastResult]] = []
+        candidates: list[tuple[str, ForecastResult]] = []
 
         # Prophet
         if self._prophet_available and len(prices) >= 14:
@@ -349,10 +348,10 @@ class PriceForecaster:
 
     def _prophet_forecast(
         self,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days_ahead: int,
-        volumes: Optional[List[float]] = None,
+        volumes: list[float] | None = None,
     ) -> ForecastResult:
         """Facebook Prophet forecast with optional volume regressor (P10)."""
         from prophet import Prophet
@@ -398,7 +397,7 @@ class PriceForecaster:
             model_used="prophet",
         )
 
-    def _arima_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
+    def _arima_forecast(self, prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
         """ARIMA forecast with auto parameter selection via pmdarima or grid search."""
         import warnings
 
@@ -488,11 +487,11 @@ class PriceForecaster:
 
     def _xgboost_forecast(
         self,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days_ahead: int,
-        volumes: Optional[List[float]] = None,
-        btc_prices: Optional[List[float]] = None,
+        volumes: list[float] | None = None,
+        btc_prices: list[float] | None = None,
     ) -> ForecastResult:
         """XGBoost forecast with engineered features (price + volume + BTC)."""
         from xgboost import XGBRegressor
@@ -677,15 +676,15 @@ class PriceForecaster:
     def _build_features(
         prices: np.ndarray,
         idx: int,
-        volumes: Optional[np.ndarray] = None,
-        btc_prices: Optional[np.ndarray] = None,
-        rsi_array: Optional[np.ndarray] = None,
-    ) -> List[float]:
+        volumes: np.ndarray | None = None,
+        btc_prices: np.ndarray | None = None,
+        rsi_array: np.ndarray | None = None,
+    ) -> list[float]:
         """Build feature vector for XGBoost at given index.
 
         Returns 27 features: 7 lagged returns + 10 technical + 3 volume + 2 BTC + 5 new.
         """
-        feats: List[float] = []
+        feats: list[float] = []
 
         # --- Lagged returns J-1 to J-7 (7 features) ---
         for lag in range(1, 8):
@@ -855,7 +854,7 @@ class PriceForecaster:
 
         return feats
 
-    def _ema_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
+    def _ema_forecast(self, prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
         """EMA-based forecast using 7-day and 21-day EMAs."""
         arr = np.array(prices, dtype=float)
 
@@ -920,7 +919,7 @@ class PriceForecaster:
             result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
         return result
 
-    def _linear_forecast(self, prices: List[float], dates: List[datetime], days_ahead: int) -> ForecastResult:
+    def _linear_forecast(self, prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
         """Linear regression on log prices."""
         n = len(prices)
         x = np.arange(n, dtype=float)
@@ -963,8 +962,8 @@ class PriceForecaster:
 
     def _mean_reversion_forecast(
         self,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days_ahead: int,
     ) -> ForecastResult:
         """Mean-reversion forecast using Ornstein-Uhlenbeck process.
@@ -1048,9 +1047,9 @@ class PriceForecaster:
 
     def _ewma_volatility_forecast(
         self,
-        prices: List[float],
+        prices: list[float],
         days_ahead: int,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """EWMA volatility forecast (RiskMetrics lambda=0.94).
 
         Returns a dict with per-horizon volatility forecasts.
@@ -1078,11 +1077,11 @@ class PriceForecaster:
 
     def _combine_native_ci(
         self,
-        candidates: List[Tuple[str, "ForecastResult"]],
-        weights: List[float],
-        combined_prices: List[float],
+        candidates: list[tuple[str, "ForecastResult"]],
+        weights: list[float],
+        combined_prices: list[float],
         n_days: int,
-    ) -> Optional[Tuple[List[float], List[float]]]:
+    ) -> tuple[list[float], list[float]] | None:
         """Combine the candidate models' native CIs into an ensemble interval.
 
         Each base model (Prophet, ARIMA, ...) already exposes a proper 95%
@@ -1096,12 +1095,12 @@ class PriceForecaster:
         interval at some horizon, in which case the caller falls back to the
         empirical estimate.
         """
-        low: List[float] = [0.0] * n_days
-        high: List[float] = [0.0] * n_days
+        low: list[float] = [0.0] * n_days
+        high: list[float] = [0.0] * n_days
         for i in range(n_days):
-            pts: List[float] = []
-            halves: List[float] = []
-            ws: List[float] = []
+            pts: list[float] = []
+            halves: list[float] = []
+            ws: list[float] = []
             for (_name, res), w in zip(candidates, weights):
                 if i < len(res.prices) and i < len(res.confidence_low) and i < len(res.confidence_high):
                     half = (res.confidence_high[i] - res.confidence_low[i]) / 2
@@ -1120,12 +1119,12 @@ class PriceForecaster:
 
     def _empirical_quantile_ci(
         self,
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         days_ahead: int,
-        predicted_prices: List[float],
-        ewma_vols: Dict[str, float],
-    ) -> Tuple[List[float], List[float]]:
+        predicted_prices: list[float],
+        ewma_vols: dict[str, float],
+    ) -> tuple[list[float], list[float]]:
         """Compute calibrated CIs using empirical return distribution + EWMA scaling.
 
         Uses the actual N-day return distribution rather than Gaussian assumptions.
@@ -1180,7 +1179,7 @@ class PriceForecaster:
 
         return ci_lows, ci_highs
 
-    def _fallback_forecast(self, prices: List[float], days_ahead: int) -> ForecastResult:
+    def _fallback_forecast(self, prices: list[float], days_ahead: int) -> ForecastResult:
         """Random walk fallback for very little data."""
         if not prices:
             return ForecastResult(
@@ -1199,7 +1198,7 @@ class PriceForecaster:
         if len(prices) >= 2 and prices[0] > 1e-10:
             drift = (prices[-1] / prices[0]) ** (1 / len(prices)) - 1
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result_dates, result_prices, result_low, result_high = [], [], [], []
         base = current
         for i in range(1, days_ahead + 1):
@@ -1229,13 +1228,13 @@ class PriceForecaster:
     def _get_or_run_model(
         self,
         model_name: str,
-        symbol: Optional[str],
-        data_hash: Optional[str],
+        symbol: str | None,
+        data_hash: str | None,
         days_ahead: int,
-        prices: List[float],
-        dates: List[datetime],
-        volumes: Optional[List[float]] = None,
-        btc_prices: Optional[List[float]] = None,
+        prices: list[float],
+        dates: list[datetime],
+        volumes: list[float] | None = None,
+        btc_prices: list[float] | None = None,
     ) -> ForecastResult:
         """Try to load a cached individual model result; run and cache on miss.
 
@@ -1305,7 +1304,7 @@ class PriceForecaster:
             pass
 
     @staticmethod
-    def _get_cached_model_result(symbol: str, model_name: str, data_hash: str, days: int) -> Optional[ForecastResult]:
+    def _get_cached_model_result(symbol: str, model_name: str, data_hash: str, days: int) -> ForecastResult | None:
         """Get cached individual model ForecastResult from Redis (sync)."""
         r = _get_sync_redis()
         if r is None:
@@ -1351,7 +1350,7 @@ class PriceForecaster:
             logger.warning("Failed to cache model result %s:%s: %s", symbol, model_name, e)
 
     @staticmethod
-    def _load_cached_hyperparams(symbol: str) -> Optional[Dict]:
+    def _load_cached_hyperparams(symbol: str) -> dict | None:
         """Load cached Optuna hyperparameters from Redis (FIX6).
 
         Reads keys 'hparams:{symbol}:xgboost' and 'hparams:{symbol}:prophet'
@@ -1371,10 +1370,10 @@ class PriceForecaster:
 
     def _compute_weights(
         self,
-        prices: List[float],
-        dates: List[datetime],
-        candidates: List[Tuple[str, ForecastResult]],
-    ) -> Tuple[List[float], float, List[float]]:
+        prices: list[float],
+        dates: list[datetime],
+        candidates: list[tuple[str, ForecastResult]],
+    ) -> tuple[list[float], float, list[float]]:
         """Compute weights via rolling walk-forward backtest across multiple windows.
 
         Returns:
@@ -1485,11 +1484,11 @@ class PriceForecaster:
 
     def _compute_weights_single(
         self,
-        prices: List[float],
-        dates: List[datetime],
-        candidates: List[Tuple[str, ForecastResult]],
+        prices: list[float],
+        dates: list[datetime],
+        candidates: list[tuple[str, ForecastResult]],
         split: int = 7,
-    ) -> List[float]:
+    ) -> list[float]:
         """Fallback single-window backtest for short histories."""
         n_cand = len(candidates)
         if len(prices) < 14 or split < 1:
@@ -1521,11 +1520,11 @@ class PriceForecaster:
     def _run_model_by_name(
         self,
         name: str,
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         days: int,
-        volumes: Optional[List[float]] = None,
-        btc_prices: Optional[List[float]] = None,
+        volumes: list[float] | None = None,
+        btc_prices: list[float] | None = None,
     ) -> ForecastResult:
         """Run a specific model by name."""
         if name == "Prophet":
@@ -1543,8 +1542,8 @@ class PriceForecaster:
 
     @staticmethod
     def _quick_mape(
-        prices: List[float],
-        dates: List[datetime],
+        prices: list[float],
+        dates: list[datetime],
         name: str,
         result: ForecastResult,
     ) -> float:
@@ -1595,10 +1594,10 @@ class PriceForecaster:
     def _compute_trend(
         current_price: float,
         final_predicted: float,
-        historical: List[float],
+        historical: list[float],
         days_ahead: int = 7,
-        ctx: Optional[MarketContext] = None,
-    ) -> Tuple[str, float]:
+        ctx: MarketContext | None = None,
+    ) -> tuple[str, float]:
         """Compute trend direction and strength using adaptive thresholds."""
         if current_price == 0:
             return "neutral", 0.0

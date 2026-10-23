@@ -619,7 +619,7 @@ export default function CrowdfundingProjectsPage() {
                   elevation="interactive"
                   className={`transition-all duration-200 cursor-pointer ${
                     isSelected
-                      ? 'ring-2 ring-primary/50 bg-primary/[0.02]'
+                      ? 'ring-2 ring-primary/50 bg-primary/2'
                       : 'hover:bg-muted/30'
                   }`}
                   onClick={() => setSelectedProjectId(isSelected ? null : p.id)}

@@ -483,7 +483,7 @@ export default function PortfolioAssetList({
                   // Single platform — ligne cliquable vers la vue détail
                   <tr
                     key={group.assets[0].id}
-                    className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                    className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring"
                     {...detailRowProps(group)}
                   >
                     <td className="py-3 text-center">
@@ -566,7 +566,7 @@ export default function PortfolioAssetList({
                   // Multi-platform — grouped row + expandable sub-rows
                   <Fragment key={group.symbol}>
                     <tr
-                      className="border-b cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                      className="border-b cursor-pointer hover:bg-muted/30 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring"
                       {...detailRowProps(group)}
                     >
                       <td className="py-3 text-center">

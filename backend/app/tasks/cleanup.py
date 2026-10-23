@@ -1,15 +1,14 @@
 """Data cleanup tasks for database maintenance."""
 
-
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 # `case` est importé du module, non pris sur `func` : accolé à ce dernier il
 # construit un appel de fonction SQL nommée « case », qui refuse le mot-clé
 # `else_` et lève `TypeError` avant même d'atteindre la base.
 from sqlalchemy import and_, case, delete, func, select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.models.notification import Notification
 from app.models.prediction_log import PredictionLog
 from app.tasks.async_runner import run_async
@@ -20,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
     """Delete read notifications older than specified days."""
-    async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+    async with session_factory() as db:
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         # Count notifications to delete
         count_result = await db.execute(
@@ -51,8 +50,8 @@ async def _cleanup_old_notifications_async(days_to_keep: int = 30) -> dict:
 
 async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
     """Delete old prediction records older than specified days."""
-    async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+    async with session_factory() as db:
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         # Count predictions to delete
         count_result = await db.execute(
@@ -70,9 +69,9 @@ async def _cleanup_old_predictions_async(days_to_keep: int = 90) -> dict:
 
 async def _cleanup_duplicate_transactions_async() -> dict:
     """Find and remove duplicate transactions (same external_id)."""
-    from app.models.transaction import Transaction
+    from app.domains.transactions.models import Transaction
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Find duplicate external_ids
         dup_query = (
             select(Transaction.external_id, func.count(Transaction.id).label("cnt"))
@@ -114,12 +113,11 @@ async def _validate_portfolio_consistency_async() -> dict:
     left report-only — STEP 2 of the sync reconciles those to the exchange balance,
     which is authoritative and may legitimately differ from the transaction sum.
     """
-    from app.models.asset import Asset
-    from app.models.portfolio import Portfolio
-    from app.models.transaction import Transaction, TransactionType
-    from app.services.transfer_service import COLD_WALLET_DESTINATION
+    from app.domains.portfolio.models import Asset, Portfolio
+    from app.domains.transactions.models import Transaction, TransactionType
+    from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Fetch Asset ORM objects (so we can heal in place) + their portfolio name.
         result = await db.execute(
             select(Asset, Portfolio.name.label("portfolio_name")).join(Portfolio, Asset.portfolio_id == Portfolio.id)
@@ -251,24 +249,6 @@ async def _run_all_cleanup_async() -> dict:
 
 
 # === Celery Tasks ===
-
-
-@celery_app.task(name="app.tasks.cleanup.cleanup_old_notifications")
-def cleanup_old_notifications(days_to_keep: int = 30) -> dict:
-    """Celery task: Delete old read notifications."""
-    return run_async(_cleanup_old_notifications_async(days_to_keep))
-
-
-@celery_app.task(name="app.tasks.cleanup.cleanup_old_predictions")
-def cleanup_old_predictions(days_to_keep: int = 90) -> dict:
-    """Celery task: Delete old prediction records."""
-    return run_async(_cleanup_old_predictions_async(days_to_keep))
-
-
-@celery_app.task(name="app.tasks.cleanup.cleanup_duplicate_transactions")
-def cleanup_duplicate_transactions() -> dict:
-    """Celery task: Remove duplicate transactions."""
-    return run_async(_cleanup_duplicate_transactions_async())
 
 
 @celery_app.task(name="app.tasks.cleanup.validate_portfolio_consistency")

@@ -6,6 +6,7 @@ mathématiquement cohérentes sans dépendance à la base de données.
 
 import numpy as np
 
+from app.domains.portfolio.classification import is_safe_haven
 from app.services.analytics_service import (
     _annualized_return,
     _annualized_volatility,
@@ -13,7 +14,6 @@ from app.services.analytics_service import (
     _sharpe,
     _var_historical,
 )
-from app.services.metrics_service import is_safe_haven
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -63,9 +63,9 @@ class TestVaRWindowScaling:
         # Ratio should match sqrt(90/7) ≈ 3.586
         expected_ratio = np.sqrt(90 / 7)
         actual_ratio = var_90 / var_7
-        assert (
-            abs(actual_ratio - expected_ratio) < 0.001
-        ), f"VaR ratio should be √(90/7)={expected_ratio:.3f}, got {actual_ratio:.3f}"
+        assert abs(actual_ratio - expected_ratio) < 0.001, (
+            f"VaR ratio should be √(90/7)={expected_ratio:.3f}, got {actual_ratio:.3f}"
+        )
 
         # 30/7 ratio
         expected_30_7 = np.sqrt(30 / 7)
@@ -93,9 +93,9 @@ class TestAnnualizationConsistency:
         daily_std = float(np.std(returns, ddof=1)) * 100
         annualization_factor = np.sqrt(365)
         expected_vol = daily_std * annualization_factor
-        assert (
-            abs(vol - expected_vol) < 0.01
-        ), f"Annualized vol should be daily_std * √365: expected {expected_vol:.2f}, got {vol:.2f}"
+        assert abs(vol - expected_vol) < 0.01, (
+            f"Annualized vol should be daily_std * √365: expected {expected_vol:.2f}, got {vol:.2f}"
+        )
 
     def test_volatility_annualized_with_252_for_stocks(self):
         prices = _synthetic_prices(100, seed=10, drift=0.0005, vol=0.01)

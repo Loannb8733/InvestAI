@@ -1,5 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo, useState, useCallback } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router'
 import NavRail from './NavRail'
 import Header from './Header'
 import { FilDArianeProvider } from './FilDArianeProvider'
@@ -72,7 +72,7 @@ export default function Layout() {
           and header, which take ~15 tab stops before the actual content. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2"
       >
         Aller au contenu principal
       </a>

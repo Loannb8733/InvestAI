@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
 
 
 @dataclass
@@ -40,7 +39,7 @@ class ExchangeDeposit:
     amount: Decimal
     timestamp: datetime
     status: str
-    tx_id: Optional[str] = None
+    tx_id: str | None = None
 
 
 @dataclass
@@ -53,8 +52,8 @@ class ExchangeWithdrawal:
     fee: Decimal
     timestamp: datetime
     status: str
-    tx_id: Optional[str] = None
-    address: Optional[str] = None
+    tx_id: str | None = None
+    address: str | None = None
 
 
 @dataclass
@@ -79,8 +78,8 @@ class BaseExchangeService(ABC):
     def __init__(
         self,
         api_key: str,
-        secret_key: Optional[str] = None,
-        passphrase: Optional[str] = None,
+        secret_key: str | None = None,
+        passphrase: str | None = None,
     ):
         """Initialize exchange service with credentials."""
         self.api_key = api_key
@@ -92,48 +91,57 @@ class BaseExchangeService(ABC):
     def exchange_name(self) -> str:
         """Return the exchange name."""
 
+    def _require_secret_key(self) -> str:
+        if self.secret_key is None:
+            raise ValueError(f"{self.exchange_name} requires a secret key")
+        return self.secret_key
+
     @abstractmethod
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
 
+    async def connection_error(self) -> str | None:
+        """Motif lisible d'un échec de connexion, quand l'exchange le donne."""
+        return None
+
     @abstractmethod
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from the exchange."""
 
     @abstractmethod
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from the exchange."""
 
     @abstractmethod
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from the exchange."""
 
     @abstractmethod
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from the exchange."""
 
     async def get_fiat_orders(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List["ExchangeFiatOrder"]:
+    ) -> list["ExchangeFiatOrder"]:
         """Get fiat buy/sell order history. Optional method - not all exchanges support this."""
         return []
 

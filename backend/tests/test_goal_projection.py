@@ -138,9 +138,9 @@ class TestProbability:
             annual_vol=0.10,
         )
         # Higher returns generally yield higher probability
-        assert (
-            prob_agg > prob_con * 0.8
-        ), f"Aggressive should have comparable/higher prob: agg={prob_agg}, con={prob_con}"
+        assert prob_agg > prob_con * 0.8, (
+            f"Aggressive should have comparable/higher prob: agg={prob_agg}, con={prob_con}"
+        )
 
 
 # ── Curve Generation ─────────────────────────────────────────────
@@ -218,9 +218,9 @@ class TestCurve:
             start_date=date(2026, 3, 1),
         )
         for point in curve[1:]:
-            assert (
-                point.projected_p25 <= point.projected_p50 <= point.projected_p75
-            ), f"Month {point.month}: p25={point.projected_p25}, p50={point.projected_p50}, p75={point.projected_p75}"
+            assert point.projected_p25 <= point.projected_p50 <= point.projected_p75, (
+                f"Month {point.month}: p25={point.projected_p25}, p50={point.projected_p50}, p75={point.projected_p75}"
+            )
 
 
 # ── Gold Shield ──────────────────────────────────────────────────

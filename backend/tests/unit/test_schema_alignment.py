@@ -17,8 +17,8 @@ Ces tests lisent le modèle et la migration : ils n'ont besoin d'aucune base.
 
 from pathlib import Path
 
+from app.domains.transactions.models import Transaction
 from app.models.prediction_log import PredictionLog
-from app.models.transaction import Transaction
 
 _MIGRATION = (
     Path(__file__).resolve().parents[2] / "alembic" / "versions" / "s0n1o2p3q4r5_align_dev_prod_schema.py"

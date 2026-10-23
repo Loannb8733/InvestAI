@@ -3,24 +3,22 @@
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
-from app.models.asset import Asset, AssetType
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
+from app.domains.portfolio.models import CROWDFUNDING_KIND, Asset, AssetType, Portfolio
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus
 from app.models.crowdfunding_repayment import CrowdfundingRepayment, PaymentType
-from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
 from app.models.project_audit import ProjectAudit
 from app.models.project_document import ProjectDocument
-from app.models.user import User
 from app.schemas.crowdfunding import (
     CashflowMonthResponse,
     CashflowProjectAmount,
@@ -61,20 +59,20 @@ async def resoudre_portefeuille_crowdfunding(db: AsyncSession, user_id) -> Portf
     resultat = await db.execute(
         select(Portfolio).where(
             Portfolio.user_id == user_id,
-            or_(Portfolio.kind == PORTEFEUILLE_CROWDFUNDING, Portfolio.name == "Crowdfunding"),
+            or_(Portfolio.kind == CROWDFUNDING_KIND, Portfolio.name == "Crowdfunding"),
         )
     )
     portefeuille = resultat.scalars().first()
     if portefeuille is not None:
-        if portefeuille.kind != PORTEFEUILLE_CROWDFUNDING:
-            portefeuille.kind = PORTEFEUILLE_CROWDFUNDING
+        if portefeuille.kind != CROWDFUNDING_KIND:
+            portefeuille.kind = CROWDFUNDING_KIND
         return portefeuille
 
     portefeuille = Portfolio(
         id=uuid.uuid4(),
         user_id=user_id,
         name="Crowdfunding",
-        kind=PORTEFEUILLE_CROWDFUNDING,
+        kind=CROWDFUNDING_KIND,
         description="Portefeuille dédié aux investissements crowdfunding",
     )
     db.add(portefeuille)
@@ -93,7 +91,7 @@ router = APIRouter()
 _XIRR_MIN_SPAN_DAYS = 30
 
 
-def compute_xirr(flows: list[tuple[date, float]]) -> Optional[float]:
+def compute_xirr(flows: list[tuple[date, float]]) -> float | None:
     """XIRR (taux annualisé) qui annule la NPV de flux réels datés.
 
     Convention de signe : négatif = sortie de cash (investissement),
@@ -126,8 +124,8 @@ def compute_xirr(flows: list[tuple[date, float]]) -> Optional[float]:
 
 def _realized_xirr(
     project: CrowdfundingProject,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
-) -> Optional[float]:
+    repayments: list[CrowdfundingRepayment] | None = None,
+) -> float | None:
     """XIRR réalisé d'un projet (décimal), à partir des flux réellement datés.
 
     Flux construits :
@@ -182,7 +180,7 @@ def _compute_schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
 
 def _interest_earned(
     project: CrowdfundingProject,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
+    repayments: list[CrowdfundingRepayment] | None = None,
 ) -> float:
     """Real interest earned to date.
 
@@ -205,9 +203,9 @@ def _interest_earned(
 
 def _enrich(
     project: CrowdfundingProject,
-    documents: Optional[list[ProjectDocument]] = None,
-    repayments: Optional[list[CrowdfundingRepayment]] = None,
-    schedule: Optional[list[CrowdfundingPaymentSchedule]] = None,
+    documents: list[ProjectDocument] | None = None,
+    repayments: list[CrowdfundingRepayment] | None = None,
+    schedule: list[CrowdfundingPaymentSchedule] | None = None,
 ) -> CrowdfundingProjectResponse:
     """Add computed fields to a project response."""
     invested = float(project.invested_amount)
@@ -354,7 +352,7 @@ async def _get_project_for_user(db: AsyncSession, project_id: uuid.UUID, user_id
 async def list_projects(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     pids = [p.id for p in projects]
@@ -370,7 +368,7 @@ async def create_project(
     request: Request,
     data: CrowdfundingProjectCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     # Resolve or auto-create a dedicated crowdfunding portfolio
     if data.portfolio_id:
@@ -436,7 +434,7 @@ async def create_project(
 async def get_dashboard(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     pids = [p.id for p in projects]
@@ -554,7 +552,7 @@ async def get_dashboard(
 async def get_performance(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     projects = await _get_user_projects(db, current_user.id)
     repayments_by_project = await _get_repayments_for_projects(db, [p.id for p in projects])
@@ -629,7 +627,7 @@ async def get_performance(
 async def get_cashflow_schedule(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Échéancier consolidé de cash-flows : « combien je reçois en septembre ».
 
@@ -682,9 +680,9 @@ async def get_cashflow_schedule(
 @limiter.limit("30/minute")
 async def get_tax_report(
     request: Request,
-    year: Optional[int] = Query(None, ge=2000, le=2100),
+    year: int | None = Query(None, ge=2000, le=2100),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Rapport fiscal annuel : réconciliation des IFU (formulaire 2561).
 
@@ -758,7 +756,7 @@ async def get_tax_report(
 async def sync_calendar_events(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Regenerate calendar events for all active crowdfunding projects."""
     projects = await _get_user_projects(db, current_user.id)
@@ -783,10 +781,10 @@ _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 async def analyze_documents(
     request: Request,
     files: list[UploadFile] = File(...),
-    project_id: Optional[uuid.UUID] = Query(None),
-    project_id_form: Optional[uuid.UUID] = Form(None, alias="project_id"),
+    project_id: uuid.UUID | None = Query(None),
+    project_id_form: uuid.UUID | None = Form(None, alias="project_id"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Upload PDFs and get an AI-powered risk analysis.
 
@@ -861,7 +859,7 @@ async def analyze_documents(
 async def list_audits(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all audits for the current user."""
     result = await db.execute(
@@ -870,48 +868,7 @@ async def list_audits(
     return list(result.scalars().all())
 
 
-@router.get("/audits/{audit_id}", response_model=ProjectAuditResponse)
-@limiter.limit("30/minute")
-async def get_audit(
-    request: Request,
-    audit_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a specific audit by ID."""
-    result = await db.execute(
-        select(ProjectAudit).where(
-            ProjectAudit.id == audit_id,
-            ProjectAudit.user_id == current_user.id,
-        )
-    )
-    audit = result.scalar_one_or_none()
-    if not audit:
-        raise HTTPException(404, "Audit non trouvé")
-    return audit
-
-
 # ──────────────────── Payment Schedule ────────────────────
-
-
-@router.get("/{project_id}/schedule", response_model=list[PaymentScheduleEntryResponse])
-@limiter.limit("30/minute")
-async def get_schedule(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get the contractual payment schedule for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    entries = await reconciliation_service.get_schedule_for_project(db, project_id)
-
-    result = []
-    for e in entries:
-        resp = PaymentScheduleEntryResponse.model_validate(e)
-        resp.status = _compute_schedule_status(e)
-        result.append(resp)
-    return result
 
 
 # ──────────────────── Repayments ────────────────────
@@ -924,7 +881,7 @@ async def create_repayment(
     project_id: uuid.UUID,
     data: RepaymentCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Log a payment received from a crowdfunding project."""
     project = await _get_project_for_user(db, project_id, current_user.id)
@@ -966,24 +923,6 @@ async def create_repayment(
     return repayment
 
 
-@router.get("/{project_id}/repayments", response_model=list[RepaymentResponse])
-@limiter.limit("30/minute")
-async def list_repayments(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """List all repayments for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    result = await db.execute(
-        select(CrowdfundingRepayment)
-        .where(CrowdfundingRepayment.project_id == project_id)
-        .order_by(CrowdfundingRepayment.payment_date.desc())
-    )
-    return list(result.scalars().all())
-
-
 @router.delete("/{project_id}/repayments/{repayment_id}", status_code=204)
 @limiter.limit("10/minute")
 async def delete_repayment(
@@ -991,7 +930,7 @@ async def delete_repayment(
     project_id: uuid.UUID,
     repayment_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a repayment and decrement the project total."""
     project = await _get_project_for_user(db, project_id, current_user.id)
@@ -1026,7 +965,7 @@ async def download_document(
     request: Request,
     doc_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Download a project document PDF."""
     import io
@@ -1061,7 +1000,7 @@ async def upload_documents(
     project_id: uuid.UUID,
     files: list[UploadFile] = File(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Upload PDFs to a project and auto-trigger audit analysis."""
     from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
@@ -1131,25 +1070,6 @@ async def upload_documents(
     return docs
 
 
-@router.get("/{project_id}/documents", response_model=list[ProjectDocumentResponse])
-@limiter.limit("30/minute")
-async def list_project_documents(
-    request: Request,
-    project_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """List all documents for a project."""
-    await _get_project_for_user(db, project_id, current_user.id)
-    result = await db.execute(
-        select(ProjectDocument)
-        .options(defer(ProjectDocument.file_data))  # skip binary content in listing
-        .where(ProjectDocument.project_id == project_id)
-        .order_by(ProjectDocument.created_at.desc())
-    )
-    return list(result.scalars().all())
-
-
 # ──────────────────── Stress Test ────────────────────
 
 
@@ -1160,7 +1080,7 @@ async def get_stress_test(
     project_id: uuid.UUID,
     delay_months: int = Query(0, ge=0, le=24),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compute degraded IRR for a project with simulated payment delays."""
     if delay_months not in ALLOWED_DELAY_MONTHS:
@@ -1205,7 +1125,7 @@ async def get_project(
     request: Request,
     project_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
     docs_map = await _get_docs_for_projects(db, [project.id])
@@ -1226,7 +1146,7 @@ async def update_project(
     project_id: uuid.UUID,
     data: CrowdfundingProjectUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
 
@@ -1308,7 +1228,7 @@ async def delete_project(
     request: Request,
     project_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     project = await _get_project_for_user(db, project_id, current_user.id)
 

@@ -18,9 +18,9 @@ class TestPredictionMethodExists:
     def test_get_price_prediction_exists(self):
         """PredictionService must have get_price_prediction, not get_prediction."""
         svc = PredictionService()
-        assert hasattr(
-            svc, "get_price_prediction"
-        ), "Missing get_price_prediction — alpha scoring cannot compute 7d predictions"
+        assert hasattr(svc, "get_price_prediction"), (
+            "Missing get_price_prediction — alpha scoring cannot compute 7d predictions"
+        )
 
     def test_get_prediction_does_not_exist(self):
         """The old wrong name 'get_prediction' must NOT exist."""

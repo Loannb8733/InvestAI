@@ -6,9 +6,9 @@ import hmac
 import logging
 import ssl
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -34,11 +34,11 @@ class BinanceService(BaseExchangeService):
     # Most endpoints cost 10-40 weight. We throttle to ~1 req/s to stay safe.
     _REQUEST_INTERVAL = 0.3  # seconds between API calls (max ~200 req/min)
 
-    def __init__(self, api_key, secret_key, passphrase=None):
+    def __init__(self, api_key: str, secret_key: str | None, passphrase: str | None = None) -> None:
         super().__init__(api_key, secret_key, passphrase)
         self._server_time_offset: int = 0
-        self._all_account_symbols: set = set()
-        self._valid_pairs: set = set()
+        self._all_account_symbols: set[str] = set()
+        self._valid_pairs: set[str] = set()
         self._last_request_time: float = 0
 
     @property
@@ -70,12 +70,12 @@ class BinanceService(BaseExchangeService):
             await asyncio.sleep(self._REQUEST_INTERVAL - elapsed)
         self._last_request_time = time.monotonic()
 
-    async def _api_get(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    async def _api_get(self, client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
         """Throttled GET request."""
         await self._throttle()
         return await client.get(url, **kwargs)
 
-    async def _api_post(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    async def _api_post(self, client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
         """Throttled POST request."""
         await self._throttle()
         return await client.post(url, **kwargs)
@@ -101,22 +101,35 @@ class BinanceService(BaseExchangeService):
         """Get timestamp adjusted for Binance server time."""
         return int(time.time() * 1000) + self._server_time_offset
 
-    def _sign_request(self, params: dict) -> dict:
+    def _sign_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Sign a request with HMAC SHA256."""
         params["timestamp"] = self._get_timestamp()
         params["recvWindow"] = 60000  # 60 seconds window for safety
         query_string = urlencode(params)
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             query_string.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         params["signature"] = signature
         return params
 
-    def _get_headers(self) -> dict:
+    def _get_headers(self) -> dict[str, Any]:
         """Get request headers."""
         return {"X-MBX-APIKEY": self.api_key}
+
+    async def connection_error(self) -> str | None:
+        """Message renvoyé par /api/v3/account, ou None s'il répond ou ne répond pas du tout."""
+        try:
+            async with self._get_http_client(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/api/v3/account", params=self._sign_request({}), headers=self._get_headers()
+                )
+            if response.status_code == 200:
+                return None
+            return f"HTTP {response.status_code}: {response.json().get('msg', response.text[:200])}"
+        except Exception:  # noqa: BLE001
+            return None
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
@@ -139,7 +152,7 @@ class BinanceService(BaseExchangeService):
             logger.error(f"Binance test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Binance."""
         balances = []
 
@@ -338,7 +351,7 @@ class BinanceService(BaseExchangeService):
             logger.info(f"Funding wallet positions found: {dict((k, float(v)) for k, v in funding_totals.items())}")
         return funding_totals
 
-    async def _get_all_account_symbols(self) -> set:
+    async def _get_all_account_symbols(self) -> set[str]:
         """Get ALL symbols from the account (including 0 balance).
         Uses cached data from get_balances if available, otherwise fetches fresh."""
         if self._all_account_symbols:
@@ -370,7 +383,7 @@ class BinanceService(BaseExchangeService):
 
     # These are now initialized in __init__ as instance variables
 
-    async def _get_valid_trading_pairs(self) -> set:
+    async def _get_valid_trading_pairs(self) -> set[str]:
         """Fetch all valid trading pairs from Binance exchange info."""
         if self._valid_pairs:
             return self._valid_pairs
@@ -396,11 +409,11 @@ class BinanceService(BaseExchangeService):
         self,
         client: httpx.AsyncClient,
         trading_symbol: str,
-        start_time: Optional[datetime],
-        end_time: Optional[datetime],
+        start_time: datetime | None,
+        end_time: datetime | None,
         limit: int,
         semaphore: asyncio.Semaphore,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Fetch trades for a single trading symbol with rate limiting."""
         trades = []
 
@@ -449,7 +462,7 @@ class BinanceService(BaseExchangeService):
                                 price=Decimal(trade["price"]),
                                 fee=Decimal(trade["commission"]),
                                 fee_currency=trade["commissionAsset"],
-                                timestamp=datetime.fromtimestamp(trade["time"] / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(trade["time"] / 1000, tz=UTC),
                             )
                         )
 
@@ -471,11 +484,11 @@ class BinanceService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Binance using parallel requests."""
         # Sync server time first
         await self._sync_server_time()
@@ -537,18 +550,18 @@ class BinanceService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Binance."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         # Sync server time first
         await self._sync_server_time()
 
         async with self._get_http_client() as client:
-            params = {}
+            params: dict[str, Any] = {}
             if symbol:
                 params["coin"] = symbol
             if start_time:
@@ -575,7 +588,7 @@ class BinanceService(BaseExchangeService):
                         deposit_id=deposit.get("id", deposit.get("txId", "")),
                         symbol=deposit["coin"],
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.fromtimestamp(deposit["insertTime"] / 1000, tz=timezone.utc),
+                        timestamp=datetime.fromtimestamp(deposit["insertTime"] / 1000, tz=UTC),
                         status=status_map.get(deposit["status"], "unknown"),
                         tx_id=deposit.get("txId"),
                     )
@@ -585,18 +598,18 @@ class BinanceService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Binance."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         # Sync server time first
         await self._sync_server_time()
 
         async with self._get_http_client() as client:
-            params = {}
+            params: dict[str, Any] = {}
             if symbol:
                 params["coin"] = symbol
             if start_time:
@@ -643,10 +656,10 @@ class BinanceService(BaseExchangeService):
 
     async def get_fiat_orders(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeFiatOrder]:
+    ) -> list[ExchangeFiatOrder]:
         """Get fiat buy/sell order history from Binance."""
         orders = []
 
@@ -740,9 +753,7 @@ class BinanceService(BaseExchangeService):
                                         price=price,
                                         fee=Decimal(str(order.get("totalFee", 0))),
                                         status=order.get("status", "unknown"),
-                                        timestamp=datetime.fromtimestamp(
-                                            order.get("createTime", 0) / 1000, tz=timezone.utc
-                                        ),
+                                        timestamp=datetime.fromtimestamp(order.get("createTime", 0) / 1000, tz=UTC),
                                     )
                                 )
                                 total_orders_for_type += 1
@@ -767,11 +778,26 @@ class BinanceService(BaseExchangeService):
 
     async def get_convert_history(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 1000,
-    ) -> List[ExchangeFiatOrder]:
-        """Get convert trade history from Binance (EUR -> BTC conversions)."""
+    ) -> list[ExchangeFiatOrder]:
+        """Conversions fiat <-> crypto, depuis le lancement de Binance par défaut, en fenêtres de 30 jours."""
+        start = start_time or datetime(2017, 7, 1, tzinfo=UTC)
+        window_end = end_time or datetime.now(UTC)
+        orders: list[ExchangeFiatOrder] = []
+        while window_end > start:
+            window_start = max(window_end - timedelta(days=30), start)
+            orders.extend(await self._convert_window(window_start, window_end, limit))
+            window_end = window_start - timedelta(seconds=1)
+        return orders
+
+    async def _convert_window(
+        self,
+        start_time: datetime | None,
+        end_time: datetime | None,
+        limit: int,
+    ) -> list[ExchangeFiatOrder]:
         orders = []
 
         # Sync server time first (only if not already synced recently)
@@ -781,7 +807,7 @@ class BinanceService(BaseExchangeService):
             try:
                 # Paginate: keep fetching until we get fewer than page_size results
                 page_size = min(limit, 1000)
-                all_conversions = []
+                all_conversions: list[dict[str, Any]] = []
 
                 while len(all_conversions) < limit:
                     params = {
@@ -821,7 +847,7 @@ class BinanceService(BaseExchangeService):
 
                     # Move end_time to the oldest conversion in this batch for next page
                     oldest_time = min(c.get("createTime", 0) for c in convert_list)
-                    end_time = datetime.fromtimestamp((oldest_time - 1) / 1000, tz=timezone.utc)
+                    end_time = datetime.fromtimestamp((oldest_time - 1) / 1000, tz=UTC)
 
                 if all_conversions:
                     logger.info(f"Convert history: {len(all_conversions)} conversions found")
@@ -857,7 +883,7 @@ class BinanceService(BaseExchangeService):
                                 price=from_amount / to_amount if to_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=UTC),
                             )
                         )
                     # Crypto -> fiat: SELL
@@ -873,7 +899,7 @@ class BinanceService(BaseExchangeService):
                                 price=to_amount / from_amount if from_amount > 0 else Decimal("0"),
                                 fee=Decimal("0"),
                                 status="Completed",
-                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=UTC),
                             )
                         )
                     # Everything else (crypto↔stablecoin, crypto↔crypto) is
@@ -886,10 +912,10 @@ class BinanceService(BaseExchangeService):
 
     async def get_crypto_conversions(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get crypto-to-crypto conversions from Binance Convert feature.
 
         Filters convert history to only return true crypto-to-crypto swaps,
@@ -955,7 +981,7 @@ class BinanceService(BaseExchangeService):
                         from_amount = Decimal(str(conv.get("fromAmount", 0)))
                         to_amount = Decimal(str(conv.get("toAmount", 0)))
                         order_id = str(conv.get("quoteId", conv.get("orderId", "")))
-                        timestamp = datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=timezone.utc)
+                        timestamp = datetime.fromtimestamp(conv.get("createTime", 0) / 1000, tz=UTC)
 
                         # Skip if from is fiat (can't convert from fiat here)
                         if from_asset in fiat_currencies:
@@ -1061,12 +1087,12 @@ class BinanceService(BaseExchangeService):
 
     async def get_auto_invest_history(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 5000,
-    ) -> List[ExchangeFiatOrder]:
+    ) -> list[ExchangeFiatOrder]:
         """Get Auto-Invest (DCA) history from Binance with pagination."""
-        orders = []
+        orders: list[ExchangeFiatOrder] = []
 
         async with self._get_http_client() as client:
             page = 1
@@ -1126,9 +1152,7 @@ class BinanceService(BaseExchangeService):
                                     price=source_amount / executed_amount if executed_amount > 0 else Decimal("0"),
                                     fee=Decimal("0"),
                                     status="Completed",
-                                    timestamp=datetime.fromtimestamp(
-                                        invest.get("transactionTime", 0) / 1000, tz=timezone.utc
-                                    ),
+                                    timestamp=datetime.fromtimestamp(invest.get("transactionTime", 0) / 1000, tz=UTC),
                                 )
                             )
 
@@ -1147,70 +1171,7 @@ class BinanceService(BaseExchangeService):
 
         return orders
 
-    async def get_simple_earn_history(
-        self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        limit: int = 100,
-    ) -> List[ExchangeFiatOrder]:
-        """Get Simple Earn (flexible/locked savings) purchase history."""
-        orders = []
-
-        async with self._get_http_client() as client:
-            try:
-                params = {
-                    "size": min(limit, 100),
-                    "current": 1,
-                }
-
-                if start_time:
-                    params["startTime"] = int(start_time.timestamp() * 1000)
-                if end_time:
-                    params["endTime"] = int(end_time.timestamp() * 1000)
-
-                params = self._sign_request(params)
-                response = await self._api_get(
-                    client,
-                    f"{self.BASE_URL}/sapi/v1/simple-earn/flexible/history/subscriptionRecord",
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30.0,
-                )
-
-                if response.status_code != 200:
-                    return orders
-
-                data = response.json()
-                rows = data.get("rows", [])
-
-                if rows:
-                    logger.info(f"Simple earn subscriptions: {len(rows)} found")
-
-                for row in rows:
-                    if row.get("status") != "SUCCESS":
-                        continue
-
-                    orders.append(
-                        ExchangeFiatOrder(
-                            order_id=f"earn_{row.get('id', '')}",
-                            crypto_symbol=row.get("asset", ""),
-                            fiat_currency="EUR",
-                            side="buy",
-                            crypto_amount=Decimal(str(row.get("amount", 0))),
-                            fiat_amount=Decimal("0"),  # Already owned, just moved to earn
-                            price=Decimal("0"),
-                            fee=Decimal("0"),
-                            status="Completed",
-                            timestamp=datetime.fromtimestamp(row.get("time", 0) / 1000, tz=timezone.utc),
-                        )
-                    )
-
-            except Exception as e:
-                logger.error(f"Error fetching simple earn history: {e}")
-
-        return orders
-
-    async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs) -> List[ExchangeTrade]:
+    async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs: Any) -> list[ExchangeTrade]:
         """Get Simple Earn interest/rewards history from Binance.
 
         Queries rewardsRecord endpoints for flexible and locked earn products.
@@ -1229,7 +1190,7 @@ class BinanceService(BaseExchangeService):
 
         # Window strategy: walk back in 29-day chunks. Binance limits each
         # query to ~30 days, so 29 days gives a safety margin.
-        now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        now_ms = int(datetime.now(tz=UTC).timestamp() * 1000)
         window_ms = 29 * 24 * 60 * 60 * 1000
         oldest_ms = now_ms - lookback_days * 24 * 60 * 60 * 1000
 
@@ -1286,7 +1247,7 @@ class BinanceService(BaseExchangeService):
                                 if rewards_amt <= 0 or not asset:
                                     continue
                                 raw_time = row.get("time", 0)
-                                ts = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc)
+                                ts = datetime.fromtimestamp(raw_time / 1000, tz=UTC)
                                 trades.append(
                                     ExchangeTrade(
                                         trade_id=f"reward_staking_{asset}_{reward_type}_{raw_time}",
@@ -1305,7 +1266,7 @@ class BinanceService(BaseExchangeService):
                             current += 1
                     except Exception as e:
                         logger.warning(
-                            f"Failed to fetch {endpoint} type={reward_type} " f"window={win_start}-{win_end}: {e}"
+                            f"Failed to fetch {endpoint} type={reward_type} window={win_start}-{win_end}: {e}"
                         )
 
         # Dedup by trade_id (same reward can appear in overlapping windows)

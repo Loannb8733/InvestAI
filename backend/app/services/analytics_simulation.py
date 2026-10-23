@@ -9,8 +9,6 @@ projection. Sans cela, l'utilisateur verrait ses percentiles changer à chaque
 rafraîchissement, sans avoir rien fait.
 """
 
-from typing import Optional
-
 import numpy as np
 
 from app.services.analytics_types import MonteCarloResult
@@ -34,7 +32,7 @@ def _monte_carlo_compute(
     monthly_withdrawal: float = 0.0,
     initial_portfolio_value: float = 0.0,
     vol_regime: str = "normal",
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> "MonteCarloResult":
     """CPU-bound Monte Carlo with volatility shrinkage, withdrawals and fees.
 

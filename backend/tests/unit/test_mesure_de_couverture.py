@@ -37,7 +37,7 @@ RACINE = Path(__file__).resolve().parents[2]
 def _configuration() -> configparser.ConfigParser:
     fichier = RACINE / ".coveragerc"
     assert fichier.exists(), (
-        f"{fichier} a disparu : la couverture des routes retomberait à un tiers " "de sa valeur réelle"
+        f"{fichier} a disparu : la couverture des routes retomberait à un tiers de sa valeur réelle"
     )
     config = configparser.ConfigParser()
     config.read(fichier)

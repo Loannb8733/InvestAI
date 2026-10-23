@@ -87,21 +87,11 @@ class TestLeGardeFouDetecteVraiment:
 
     def test_ignore_un_try_sans_ecriture(self):
         """Un commit qui ne valide que ce que le handler vient de faire est sain."""
-        code = (
-            "async def f(db):\n"
-            "    try:\n"
-            "        await lire()\n"
-            "    except Exception:\n"
-            "        await db.commit()\n"
-        )
+        code = "async def f(db):\n    try:\n        await lire()\n    except Exception:\n        await db.commit()\n"
         assert commits_sans_rollback(code) == []
 
     def test_compte_aussi_les_flush(self):
         code = (
-            "async def f(db):\n"
-            "    try:\n"
-            "        await db.flush()\n"
-            "    except Exception:\n"
-            "        await db.commit()\n"
+            "async def f(db):\n    try:\n        await db.flush()\n    except Exception:\n        await db.commit()\n"
         )
         assert commits_sans_rollback(code) == [(4, 1)]

@@ -2,19 +2,18 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.goal import Goal, GoalPriority, GoalStatus, GoalStrategy, GoalType
-from app.models.user import User
 
 router = APIRouter()
 
@@ -27,13 +26,13 @@ class GoalCreate(BaseModel):
     goal_type: GoalType = GoalType.ASSET
     target_amount: Decimal = Field(..., gt=0)
     currency: str = Field(default="EUR", max_length=10)
-    target_date: Optional[str] = None
-    deadline_date: Optional[str] = None  # ISO date "2026-12-31"
+    target_date: str | None = None
+    deadline_date: str | None = None  # ISO date "2026-12-31"
     priority: GoalPriority = GoalPriority.MEDIUM
     strategy_type: GoalStrategy = GoalStrategy.MODERATE
     icon: str = Field(default="target", max_length=50)
     color: str = Field(default="#6366f1", max_length=7)
-    notes: Optional[str] = None
+    notes: str | None = None
 
     @field_validator("goal_type", mode="before")
     @classmethod
@@ -52,19 +51,19 @@ class GoalCreate(BaseModel):
 
 
 class GoalUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    goal_type: Optional[GoalType] = None
-    target_amount: Optional[Decimal] = Field(None, gt=0)
-    current_amount: Optional[Decimal] = Field(None, ge=0)
-    currency: Optional[str] = Field(None, max_length=10)
-    target_date: Optional[str] = None
-    deadline_date: Optional[str] = None
-    priority: Optional[GoalPriority] = None
-    strategy_type: Optional[GoalStrategy] = None
-    status: Optional[GoalStatus] = None
-    icon: Optional[str] = Field(None, max_length=50)
-    color: Optional[str] = Field(None, max_length=7)
-    notes: Optional[str] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    goal_type: GoalType | None = None
+    target_amount: Decimal | None = Field(None, gt=0)
+    current_amount: Decimal | None = Field(None, ge=0)
+    currency: str | None = Field(None, max_length=10)
+    target_date: str | None = None
+    deadline_date: str | None = None
+    priority: GoalPriority | None = None
+    strategy_type: GoalStrategy | None = None
+    status: GoalStatus | None = None
+    icon: str | None = Field(None, max_length=50)
+    color: str | None = Field(None, max_length=7)
+    notes: str | None = None
 
     @field_validator("goal_type", mode="before")
     @classmethod
@@ -94,22 +93,21 @@ class GoalResponse(BaseModel):
     target_amount: Decimal
     current_amount: Decimal
     currency: str
-    target_date: Optional[str]
-    deadline_date: Optional[str]
+    target_date: str | None
+    deadline_date: str | None
     priority: str
     strategy_type: str
     status: str
     icon: str
     color: str
-    notes: Optional[str]
+    notes: str | None
     is_resilient: bool = False
     progress_percent: float
-    days_remaining: Optional[int]
-    monthly_needed: Optional[float]
+    days_remaining: int | None
+    monthly_needed: float | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectionPointResponse(BaseModel):
@@ -130,14 +128,14 @@ class GoalProjectionResponse(BaseModel):
     rmc_with_returns: float
     probability_on_track: float
     probability_label: str
-    alert_message: Optional[str]
+    alert_message: str | None
     regime_label: str
     strategy_type: str
     gold_shield_active: bool
-    eta_date: Optional[str]
+    eta_date: str | None
     eta_months: int
-    gold_shield_advice: Optional[str]
-    curve: List[ProjectionPointResponse]
+    gold_shield_advice: str | None
+    curve: list[ProjectionPointResponse]
 
 
 def _build_response(goal: Goal) -> dict:
@@ -201,12 +199,12 @@ def _build_response(goal: Goal) -> dict:
     }
 
 
-@router.get("", response_model=List[GoalResponse])
+@router.get("", response_model=list[GoalResponse])
 async def list_goals(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all goals for the current user."""
     result = await db.execute(
@@ -220,17 +218,17 @@ async def list_goals(
 async def create_goal(
     data: GoalCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a new financial goal."""
     import logging
 
-    from app.services.asset_classification import is_liquidity
+    from app.domains.portfolio.classification import is_cash_like
 
     logger = logging.getLogger(__name__)
 
     # Block goals named after liquidity symbols (EUR, USD, USDT, USDC, etc.)
-    if is_liquidity(data.name.strip().upper()):
+    if is_cash_like(data.name.strip().upper()):
         raise HTTPException(
             status_code=400,
             detail="La liquidité n'est pas un actif d'investissement. Utilisez un objectif de type 'Épargne de Sécurité'.",
@@ -277,15 +275,13 @@ async def create_goal(
 
     # Initial sync: set current_amount from actual portfolio value
     try:
-        from app.models.asset import Asset
-        from app.models.portfolio import Portfolio
-        from app.services.price_service import PriceService
+        from app.domains.market_data.prices.service import price_feed
+        from app.domains.portfolio.models import Asset, Portfolio
 
         portfolios_result = await db.execute(select(Portfolio).where(Portfolio.user_id == current_user.id))
         portfolios = portfolios_result.scalars().all()
 
         total_value = Decimal("0")
-        price_service = PriceService()
         is_savings = goal.goal_type == GoalType.SAVINGS
         # Batch: one asset query for all portfolios (was one per portfolio), and
         # dedupe price lookups per symbol (same get_price → identical values).
@@ -295,14 +291,12 @@ async def create_goal(
         price_cache: dict = {}
         for asset in assets:
             if float(asset.quantity) > 0:
-                if is_savings and not is_liquidity(asset.symbol):
+                if is_savings and not is_cash_like(asset.symbol):
                     continue
                 pkey = (asset.symbol, asset.asset_type.value)
                 if pkey not in price_cache:
-                    try:
-                        price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
-                    except Exception:
-                        price_cache[pkey] = 0
+                    quote = await price_feed.quote(asset.symbol, asset.asset_type)
+                    price_cache[pkey] = quote.price if quote is not None else Decimal(str(asset.avg_buy_price or 0))
                 total_value += asset.quantity * Decimal(str(price_cache[pkey]))
         if is_savings:
             for portfolio in portfolios:
@@ -325,7 +319,7 @@ async def create_goal(
 async def get_goal(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get a specific goal."""
     result = await db.execute(
@@ -345,7 +339,7 @@ async def update_goal(
     goal_id: UUID,
     data: GoalUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a goal."""
     result = await db.execute(
@@ -399,7 +393,7 @@ async def update_goal(
 async def sync_goal_with_portfolio(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Sync goal's current_amount with actual portfolio value.
 
@@ -427,7 +421,7 @@ async def sync_goal_with_portfolio(
 async def delete_goal(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a goal."""
     result = await db.execute(
@@ -449,7 +443,7 @@ async def get_goal_projection(
     goal_id: UUID,
     monthly_contribution: float = Query(0.0, ge=0, description="Monthly DCA contribution (€)"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Monte Carlo projection for a specific goal.
 

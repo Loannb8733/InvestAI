@@ -1,28 +1,37 @@
 """Pytest configuration and fixtures."""
 
-import asyncio
 import os
 import pathlib
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 
 # Set test env vars before any app import
 os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_1234567890")
 os.environ.setdefault("FERNET_KEY", "icQAqvAxUzGIr5HCiFPkDICQtKw_tIwRDbCnZW0HW6M=")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
+_redis_auth = f":{os.environ['REDIS_PASSWORD']}@" if os.environ.get("REDIS_PASSWORD") else ""
+os.environ.setdefault(
+    "REDIS_URL",
+    f"redis://{_redis_auth}{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', '6379')}/15",
+)
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
+from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
-from app.core.database import get_db
-from app.core.security import hash_password
+from app.core.db.metadata import metadata
+from app.core.db.session import get_session
+from app.core.redis_client import redis_async_url
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
 from app.main import app
-from app.models import Base
-from app.models.user import User, UserRole
+from tests.http_stubs import HttpStub
+from tests.http_stubs import install as install_http_stub
 
 # Test database URL — only swap the database name in the path, never the username.
 # (A naive str.replace of the DB name corrupts the user when they share a substring,
@@ -31,7 +40,7 @@ _url_base, _url_db = settings.DATABASE_URL.rsplit("/", 1)
 TEST_DATABASE_URL = f"{_url_base}/{_url_db}_test"
 
 # Create test engine
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 
 # Create test session factory
 TestSessionLocal = sessionmaker(
@@ -83,14 +92,6 @@ def pytest_configure(config: pytest.Config) -> None:
     config._investai_verrou = descripteur
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(autouse=True)
 async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
     """Flush slowapi's rate-limit buckets before every test.
@@ -113,43 +114,68 @@ async def _reset_rate_limiter() -> AsyncGenerator[None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _vider_memo_de_change():
-    """Le mémo des taux de change est partagé par la classe PriceService : sans
-    remise à zéro, un taux mémorisé par un test fausserait le suivant."""
-    from app.services.price_service import PriceService
+def _reset_fx_memory():
+    from app.domains.market_data.fx.spot import spot_rates
 
-    PriceService._forex_memo.clear()
+    def reset() -> None:
+        spot_rates.clear()
+
+    reset()
     yield
-    PriceService._forex_memo.clear()
+    reset()
+
+
+@pytest.fixture
+def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
+    return install_http_stub(monkeypatch)
+
+
+@pytest.fixture
+def offline(http_stub: HttpStub) -> HttpStub:
+    return http_stub
+
+
+@pytest_asyncio.fixture
+async def empty_test_redis() -> None:
+    url = redis_async_url()
+    assert url.endswith("/15"), f"refusing to flush a non-test Redis database: {url}"
+    client = aioredis.from_url(url)
+    await client.flushdb()
+    await client.aclose()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
 
     async with TestSessionLocal() as session:
         yield session
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(metadata.drop_all)
 
 
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with database override."""
 
-    async def override_get_db():
-        yield db_session
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        """Comme get_session, une requête qui aboutit est validée.
 
-    app.dependency_overrides[get_db] = override_get_db
+        Pas de rollback en cas d'erreur : il périmerait les objets des fixtures, partagés avec la session.
+        """
+        yield db_session
+        await db_session.commit()
+
+    app.dependency_overrides[get_session] = override_get_db
 
     # The app sets redirect_slashes=False (see app/main.py), so collection routes
     # declared with an empty path ("") are reachable ONLY at the no-slash URL
     # (e.g. "/api/v1/portfolios", not ".../portfolios/"). Tests must match that
     # exactly — there is no 307 to follow.
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

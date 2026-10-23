@@ -10,14 +10,14 @@ Comportement actuel épinglé, pas spécification approuvée — et deux écarts
 mesurés y sont nommés sans être corrigés.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.services.insights_service import InsightsService
 
 
@@ -66,7 +66,7 @@ def mouvement(
         fee=Decimal(frais),
         fee_currency=devise_frais,
         exchange=exchange,
-        executed_at=datetime.fromisoformat(quand).replace(tzinfo=timezone.utc),
+        executed_at=datetime.fromisoformat(quand).replace(tzinfo=UTC),
     )
 
 
@@ -204,9 +204,9 @@ class TestAnalyseDesFrais:
         from app.services import insights_service as module
 
         async def cours(symbole, type_actif):
-            return {"price": 0.9} if symbole.upper() == "USDC" else None
+            return PriceQuote(price=Decimal("0.9")) if symbole.upper() == "USDC" else None
 
-        monkeypatch.setattr(module.price_service, "get_price", cours)
+        monkeypatch.setattr(module.price_feed, "quote", cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
@@ -234,7 +234,7 @@ class TestAnalyseDesFrais:
         async def aucun_cours(symbole, type_actif):
             return None
 
-        monkeypatch.setattr(module.price_service, "get_price", aucun_cours)
+        monkeypatch.setattr(module.price_feed, "quote", aucun_cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)

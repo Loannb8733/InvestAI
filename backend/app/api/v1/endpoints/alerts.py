@@ -1,7 +1,6 @@
 """Alerts endpoints for price and performance notifications."""
 
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,13 +8,12 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset
-from app.models.portfolio import Portfolio
-from app.models.user import User
 from app.services.alert_service import alert_service
 
 router = APIRouter()
@@ -32,7 +30,7 @@ PORTFOLIO_CONDITIONS = {
 class AlertCreate(BaseModel):
     """Schema for creating an alert."""
 
-    asset_id: Optional[UUID] = None
+    asset_id: UUID | None = None
     name: str = Field(..., min_length=1, max_length=100)
     condition: AlertCondition
     threshold: float = Field(default=0, ge=0)
@@ -61,30 +59,30 @@ class AlertCreate(BaseModel):
 class AlertUpdate(BaseModel):
     """Schema for updating an alert."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    threshold: Optional[float] = Field(None, gt=0)
-    is_active: Optional[bool] = None
-    notify_email: Optional[bool] = None
-    notify_in_app: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    threshold: float | None = Field(None, gt=0)
+    is_active: bool | None = None
+    notify_email: bool | None = None
+    notify_in_app: bool | None = None
 
 
 class AlertResponse(BaseModel):
     """Alert response schema."""
 
     id: UUID
-    asset_id: Optional[UUID]
+    asset_id: UUID | None
     name: str
     condition: str
     threshold: float
     currency: str
     is_active: bool
-    triggered_at: Optional[str]
+    triggered_at: str | None
     triggered_count: int
     notify_email: bool
     notify_in_app: bool
     created_at: datetime
-    asset_symbol: Optional[str] = None
-    asset_name: Optional[str] = None
+    asset_symbol: str | None = None
+    asset_name: str | None = None
 
 
 class AlertTriggerResponse(BaseModel):
@@ -118,11 +116,11 @@ class AlertConditionInfo(BaseModel):
     # True = condition au niveau portefeuille (pas de sélecteur d'actif).
     is_portfolio: bool = False
     # Unité/placeholder du seuil pour l'UI (ex "%", "0-1", "pts").
-    threshold_unit: Optional[str] = None
+    threshold_unit: str | None = None
 
 
-@router.get("/conditions", response_model=List[AlertConditionInfo])
-async def list_alert_conditions() -> List[AlertConditionInfo]:
+@router.get("/conditions", response_model=list[AlertConditionInfo])
+async def list_alert_conditions() -> list[AlertConditionInfo]:
     """List all available alert conditions."""
     conditions = [
         {
@@ -193,21 +191,21 @@ async def list_alert_conditions() -> List[AlertConditionInfo]:
 @router.get("/summary", response_model=AlertSummaryResponse)
 async def get_alert_summary(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertSummaryResponse:
     """Get summary of user's alerts."""
     summary = await alert_service.get_alert_summary(db, str(current_user.id))
     return AlertSummaryResponse(**summary)
 
 
-@router.get("", response_model=List[AlertResponse])
+@router.get("", response_model=list[AlertResponse])
 async def list_alerts(
     active_only: bool = False,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[AlertResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[AlertResponse]:
     """List all alerts for the current user."""
     query = select(Alert).where(Alert.user_id == current_user.id)
 
@@ -254,7 +252,7 @@ async def list_alerts(
 async def create_alert(
     alert_in: AlertCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Create a new alert."""
     # Les alertes de portefeuille ne ciblent aucun actif — pas de vérif d'actif.
@@ -319,7 +317,7 @@ async def create_alert(
 async def get_alert(
     alert_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Get a specific alert."""
     result = await db.execute(
@@ -369,7 +367,7 @@ async def update_alert(
     alert_id: UUID,
     alert_in: AlertUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> AlertResponse:
     """Update an alert."""
     result = await db.execute(
@@ -432,7 +430,7 @@ async def update_alert(
 async def delete_alert(
     alert_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete an alert."""
     result = await db.execute(
@@ -453,13 +451,13 @@ async def delete_alert(
     await db.commit()
 
 
-@router.post("/check", response_model=List[AlertTriggerResponse])
+@router.post("/check", response_model=list[AlertTriggerResponse])
 @limiter.limit("3/minute")
 async def check_alerts(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[AlertTriggerResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[AlertTriggerResponse]:
     """Manually check all alerts and return triggered ones."""
     triggered = await alert_service.check_alerts(db, str(current_user.id))
 

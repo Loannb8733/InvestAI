@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from app.ml.regime_detector import MarketRegime
 
@@ -41,11 +40,11 @@ class SmartInsight:
     severity: InsightSeverity
     title: str
     message: str
-    metric_name: Optional[str] = None
-    current_value: Optional[float] = None
-    target_value: Optional[float] = None
-    potential_improvement: Optional[str] = None
-    actions: List[Dict] = field(default_factory=list)
+    metric_name: str | None = None
+    current_value: float | None = None
+    target_value: float | None = None
+    potential_improvement: str | None = None
+    actions: list[dict] = field(default_factory=list)
     # Actions format: [{"type": "buy/sell/hold", "symbol": "BTC", "amount_eur": 500, "reason": "..."}]
 
 
@@ -84,9 +83,9 @@ class PortfolioHealthReport:
 
     overall_score: int  # 0-100
     overall_status: str  # "excellent", "good", "fair", "poor", "critical"
-    insights: List[SmartInsight]
-    rebalancing_orders: List[RebalancingOrder]
-    anomaly_impacts: List[AnomalyImpact]
-    metrics_summary: Dict[str, float]
-    market_regime: Optional[MarketRegime] = None
+    insights: list[SmartInsight]
+    rebalancing_orders: list[RebalancingOrder]
+    anomaly_impacts: list[AnomalyImpact]
+    metrics_summary: dict[str, float]
+    market_regime: MarketRegime | None = None
     generated_at: datetime = field(default_factory=datetime.utcnow)

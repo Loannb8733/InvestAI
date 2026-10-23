@@ -9,17 +9,17 @@ released afterwards, and it fails open when it cannot be acquired.
 import pytest
 from sqlalchemy import text
 
-from app.main import _BOOT_LOCK_KEY, _boot_advisory_lock
+from app.core.startup.migrations import BOOT_LOCK_KEY, boot_advisory_lock
 from tests.conftest import test_engine
 
 # Use a dedicated key so a parallel real boot can never interfere with the test.
-_TEST_KEY = _BOOT_LOCK_KEY + 1
+_TEST_KEY = BOOT_LOCK_KEY + 1
 
 
 @pytest.mark.asyncio
 async def test_lock_is_mutually_exclusive_then_released():
     # While the lock is held, a *different* session cannot take it.
-    async with _boot_advisory_lock(_TEST_KEY, lock_engine=test_engine):
+    async with boot_advisory_lock(_TEST_KEY, lock_engine=test_engine):
         async with test_engine.connect() as probe:
             held = (await probe.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": _TEST_KEY})).scalar()
         assert held is False, "lock should be held by the context manager"
@@ -40,6 +40,6 @@ async def test_lock_fails_open_when_engine_unavailable():
             raise RuntimeError("simulated DB unavailable")
 
     ran = False
-    async with _boot_advisory_lock(_TEST_KEY, lock_engine=_BrokenEngine()):
+    async with boot_advisory_lock(_TEST_KEY, lock_engine=_BrokenEngine()):
         ran = True
     assert ran is True, "body must run even when the lock cannot be acquired"

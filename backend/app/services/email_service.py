@@ -8,7 +8,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.config import settings
 
@@ -154,8 +154,8 @@ class EmailService:
         to_email: str,
         subject: str,
         html_content: str,
-        text_content: Optional[str] = None,
-        attachments: Optional[List[Dict[str, Any]]] = None,
+        text_content: str | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> bool:
         """
         Send an email.
@@ -261,8 +261,8 @@ class EmailService:
         total_invested: float,
         week_change: float,
         week_change_pct: float,
-        top_performers: List[Dict],
-        worst_performers: List[Dict],
+        top_performers: list[dict],
+        worst_performers: list[dict],
         currency: str = "EUR",
     ) -> bool:
         """Send weekly portfolio performance report."""
@@ -274,8 +274,8 @@ class EmailService:
         for p in top_performers[:3]:
             top_rows += f"""
             <tr>
-                <td>{p['symbol']}</td>
-                <td class="positive">+{p['change_pct']:.1f}%</td>
+                <td>{p["symbol"]}</td>
+                <td class="positive">+{p["change_pct"]:.1f}%</td>
             </tr>
             """
 
@@ -283,8 +283,8 @@ class EmailService:
         for p in worst_performers[:3]:
             worst_rows += f"""
             <tr>
-                <td>{p['symbol']}</td>
-                <td class="negative">{p['change_pct']:.1f}%</td>
+                <td>{p["symbol"]}</td>
+                <td class="negative">{p["change_pct"]:.1f}%</td>
             </tr>
             """
 
@@ -334,9 +334,9 @@ class EmailService:
         month_change: float,
         month_change_pct: float,
         ytd_change_pct: float,
-        allocation: List[Dict],
+        allocation: list[dict],
         currency: str = "EUR",
-        pdf_content: Optional[bytes] = None,
+        pdf_content: bytes | None = None,
     ) -> bool:
         """Send monthly portfolio report with optional PDF attachment."""
         change_class = "positive" if month_change >= 0 else "negative"
@@ -349,9 +349,9 @@ class EmailService:
         for a in allocation[:10]:
             alloc_rows += f"""
             <tr>
-                <td>{a['symbol']}</td>
-                <td>{a['allocation_pct']:.1f}%</td>
-                <td>{a['value']:,.2f} {currency}</td>
+                <td>{a["symbol"]}</td>
+                <td>{a["allocation_pct"]:.1f}%</td>
+                <td>{a["value"]:,.2f} {currency}</td>
             </tr>
             """
 
@@ -406,9 +406,9 @@ class EmailService:
         self,
         to_email: str,
         user_name: str,
-        alerts_triggered: List[Dict],
-        predictions: List[Dict],
-        insights: List[str],
+        alerts_triggered: list[dict],
+        predictions: list[dict],
+        insights: list[str],
     ) -> bool:
         """Send daily digest email with alerts, predictions and insights."""
         # Build alerts section
@@ -429,9 +429,9 @@ class EmailService:
                 sign = "+" if pred["predicted_change"] >= 0 else ""
                 predictions_html += f"""
                 <tr>
-                    <td>{pred['symbol']}</td>
-                    <td class="{pred_class}">{sign}{pred['predicted_change']:.1f}%</td>
-                    <td>{pred['confidence']:.0f}%</td>
+                    <td>{pred["symbol"]}</td>
+                    <td class="{pred_class}">{sign}{pred["predicted_change"]:.1f}%</td>
+                    <td>{pred["confidence"]:.0f}%</td>
                 </tr>
                 """
             predictions_html += "</tbody></table>"

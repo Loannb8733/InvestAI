@@ -1,47 +1,62 @@
-[tool.black]
+[tool.ruff]
 line-length = 120
-target-version = ["py311"]
-include = '\.pyi?$'
+target-version = "py312"
+src = ["backend"]
+extend-exclude = ["backend/alembic"]
 
-[tool.isort]
-profile = "black"
-line_length = 120
-src_paths = ["backend/app"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "N", "UP", "B", "SIM", "RUF", "BLE", "C901", "PLR0915"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"!backend/app/{domains/**,core/db/**,core/http/**,core/errors.py,core/error_handlers.py,core/health.py,core/sentry.py,core/openapi.py,core/startup/migrations.py,core/startup/lifespan.py,main.py}" = ["N", "B", "SIM", "RUF", "BLE", "C901", "PLR0915", "E402", "E501", "E712", "E741", "UP042"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 ignore_missing_imports = true
 no_strict_optional = true
 warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 check_untyped_defs = true
-plugins = ["sqlalchemy.ext.mypy.plugin"]
 exclude = ["backend/alembic/", "backend/tests/"]
 
 [[tool.mypy.overrides]]
+module = ["app.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
 module = [
-    "redis.*",
-    "celery.*",
-    "prophet.*",
-    "xgboost.*",
-    "pmdarima.*",
-    "statsmodels.*",
-    "optuna.*",
-    "shap.*",
-    "ta.*",
-    "reportlab.*",
-    "weasyprint.*",
-    "openpyxl.*",
-    "xlsxwriter.*",
-    "aiohttp.*",
-    "slowapi.*",
-    "jose.*",
-    "pyotp.*",
-    "qrcode.*",
-    "sentry_sdk.*",
+    "app.domains.*",
+    "app.core.db.*",
+    "app.core.http.*",
+    "app.core.errors",
+    "app.core.error_handlers",
+    "app.core.health",
+    "app.core.sentry",
+    "app.core.openapi",
+    "app.core.startup.migrations",
+    "app.core.startup.lifespan",
+    "app.main",
 ]
-ignore_missing_imports = true
+ignore_errors = false
+strict_optional = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
 
 [tool.bandit]
 exclude_dirs = ["backend/tests", "backend/alembic"]

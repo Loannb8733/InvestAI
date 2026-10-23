@@ -327,7 +327,7 @@ function TimelineRow({
     <div
       className={`group flex items-center gap-3 rounded-lg px-3 transition-colors duration-150 ${
         compact ? 'py-1.5' : 'py-2.5 hover:bg-muted/30'
-      } ${effectiveStatus === 'overdue' ? 'bg-loss/[0.03]' : ''}`}
+      } ${effectiveStatus === 'overdue' ? 'bg-loss/3' : ''}`}
     >
       {/* Status icon */}
       <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 ${config.bg} transition-all duration-300 ${

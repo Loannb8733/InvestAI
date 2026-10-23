@@ -151,7 +151,7 @@ class TestDistributionDiagnostic:
         ]
         # Verify no gaps: each phase starts where the previous ends
         for i in range(1, len(phases)):
-            assert phases[i][0] == phases[i - 1][1], f"Gap between {phases[i-1][2]} and {phases[i][2]}"
+            assert phases[i][0] == phases[i - 1][1], f"Gap between {phases[i - 1][2]} and {phases[i][2]}"
         # Full coverage 0-100
         assert phases[0][0] == 0
         assert phases[-1][1] == 100

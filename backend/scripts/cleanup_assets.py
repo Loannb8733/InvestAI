@@ -18,12 +18,11 @@ from decimal import Decimal
 
 sys.path.insert(0, "/app")
 
-from sqlalchemy import and_, delete, func, select, text
+from sqlalchemy import delete, func, select
 
-from app.core.database import AsyncSessionLocal
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.core.db.session import session_factory
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 
 BUY_TYPES = [
     TransactionType.BUY,
@@ -44,7 +43,7 @@ SELL_TYPES = [
 
 
 async def main():
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # ── Step 1: Delete QTY=0 assets (closed positions) ──
         result = await db.execute(
             select(Asset).where(

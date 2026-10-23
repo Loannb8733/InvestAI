@@ -5,9 +5,9 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ class KrakenService(BaseExchangeService):
 
         return self._normalize_asset(base), "EUR"
 
-    def _sign_request(self, uri_path: str, data: dict) -> dict:
+    def _sign_request(self, uri_path: str, data: dict[str, Any]) -> dict[str, Any]:
         """Sign a request with Kraken's signature method."""
         nonce = str(int(time.time() * 1000))
         data["nonce"] = nonce
@@ -170,7 +170,7 @@ class KrakenService(BaseExchangeService):
         message = uri_path.encode() + hashlib.sha256(encoded).digest()
 
         signature = hmac.new(
-            base64.b64decode(self.secret_key),
+            base64.b64decode(self._require_secret_key()),
             message,
             hashlib.sha512,
         )
@@ -185,7 +185,7 @@ class KrakenService(BaseExchangeService):
         try:
             async with httpx.AsyncClient() as client:
                 uri_path = "/0/private/Balance"
-                data = {}
+                data: dict[str, Any] = {}
                 headers = self._sign_request(uri_path, data)
 
                 response = await client.post(
@@ -204,13 +204,13 @@ class KrakenService(BaseExchangeService):
             logger.error(f"Kraken connection test failed: {type(e).__name__}: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Kraken."""
         balances = []
 
         async with httpx.AsyncClient() as client:
             uri_path = "/0/private/Balance"
-            data = {}
+            data: dict[str, Any] = {}
             headers = self._sign_request(uri_path, data)
 
             response = await client.post(
@@ -242,13 +242,13 @@ class KrakenService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 10000,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Kraken with full pagination."""
-        trades = []
+        trades: list[ExchangeTrade] = []
         offset = 0
 
         async with httpx.AsyncClient() as client:
@@ -300,7 +300,7 @@ class KrakenService(BaseExchangeService):
                             price=Decimal(trade["price"]),
                             fee=Decimal(trade["fee"]),
                             fee_currency=quote_currency,
-                            timestamp=datetime.fromtimestamp(trade["time"], tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(trade["time"], tz=UTC),
                         )
                     )
 
@@ -315,12 +315,12 @@ class KrakenService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Kraken."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         async with httpx.AsyncClient() as client:
             uri_path = "/0/private/DepositStatus"
@@ -348,7 +348,7 @@ class KrakenService(BaseExchangeService):
                         deposit_id=deposit.get("refid", ""),
                         symbol=self._normalize_asset(deposit["asset"]),
                         amount=Decimal(deposit["amount"]),
-                        timestamp=datetime.fromtimestamp(deposit["time"], tz=timezone.utc),
+                        timestamp=datetime.fromtimestamp(deposit["time"], tz=UTC),
                         status=deposit["status"],
                         tx_id=deposit.get("txid"),
                     )
@@ -358,12 +358,12 @@ class KrakenService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Kraken."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         async with httpx.AsyncClient() as client:
             uri_path = "/0/private/WithdrawStatus"
@@ -392,7 +392,7 @@ class KrakenService(BaseExchangeService):
                         symbol=self._normalize_asset(withdrawal["asset"]),
                         amount=Decimal(withdrawal["amount"]),
                         fee=Decimal(withdrawal.get("fee", 0)),
-                        timestamp=datetime.fromtimestamp(withdrawal["time"], tz=timezone.utc),
+                        timestamp=datetime.fromtimestamp(withdrawal["time"], tz=UTC),
                         status=withdrawal["status"],
                         tx_id=withdrawal.get("txid"),
                     )
@@ -402,12 +402,12 @@ class KrakenService(BaseExchangeService):
 
     async def get_ledgers(
         self,
-        asset: Optional[str] = None,
-        ledger_type: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        asset: str | None = None,
+        ledger_type: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 10000,
-    ) -> List[dict]:
+    ) -> list[dict[str, Any]]:
         """Get ledger entries from Kraken.
 
         Ledgers contain ALL transactions including Instant Buy purchases,
@@ -415,13 +415,13 @@ class KrakenService(BaseExchangeService):
 
         Types: trade, deposit, withdrawal, receive, spend, staking, etc.
         """
-        ledgers = []
+        ledgers: list[dict[str, Any]] = []
         offset = 0
 
         async with httpx.AsyncClient() as client:
             while len(ledgers) < limit:
                 uri_path = "/0/private/Ledgers"
-                data = {"ofs": offset}
+                data: dict[str, Any] = {"ofs": offset}
 
                 if asset:
                     data["asset"] = asset
@@ -459,7 +459,7 @@ class KrakenService(BaseExchangeService):
                         {
                             "ledger_id": ledger_id,
                             "refid": entry.get("refid", ""),
-                            "time": datetime.fromtimestamp(entry["time"], tz=timezone.utc),
+                            "time": datetime.fromtimestamp(entry["time"], tz=UTC),
                             "type": entry["type"],
                             "subtype": entry.get("subtype", ""),
                             "aclass": entry.get("aclass", ""),
@@ -477,7 +477,9 @@ class KrakenService(BaseExchangeService):
 
         return sorted(ledgers, key=lambda x: x["time"], reverse=True)
 
-    async def get_instant_buys(self, limit: int = 500, ledgers: list = None) -> tuple[List[ExchangeTrade], set]:
+    async def get_instant_buys(
+        self, limit: int = 500, ledgers: list[dict[str, Any]] | None = None
+    ) -> tuple[list[ExchangeTrade], set[str]]:
         """Extract Instant Buy transactions from ledgers.
 
         Instant Buy shows as paired 'spend' (EUR) and 'receive' (crypto) entries
@@ -493,7 +495,7 @@ class KrakenService(BaseExchangeService):
             ledgers = await self.get_ledgers(limit=limit * 2)
 
         # Group by refid to find paired transactions
-        by_refid = {}
+        by_refid: dict[str, list[dict[str, Any]]] = {}
         for entry in ledgers:
             refid = entry["refid"]
             if refid:
@@ -559,8 +561,8 @@ class KrakenService(BaseExchangeService):
         return sorted(trades, key=lambda x: x.timestamp, reverse=True), processed_refids
 
     async def get_crypto_conversions(
-        self, limit: int = 500, exclude_refids: set = None, ledgers: list = None
-    ) -> List[ExchangeTrade]:
+        self, limit: int = 500, exclude_refids: set[str] | None = None, ledgers: list[dict[str, Any]] | None = None
+    ) -> list[ExchangeTrade]:
         """Extract crypto-to-crypto conversions from ledgers.
 
         Conversions show as paired entries with the same refid:
@@ -582,7 +584,7 @@ class KrakenService(BaseExchangeService):
             ledgers = await self.get_ledgers(limit=limit * 2)
 
         # Group by refid to find paired transactions
-        by_refid = {}
+        by_refid: dict[str, list[dict[str, Any]]] = {}
         for entry in ledgers:
             refid = entry["refid"]
             if refid:
@@ -665,7 +667,7 @@ class KrakenService(BaseExchangeService):
         logger.info(f"Kraken: Total crypto conversions found: {len(trades) // 2}")
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
-    async def get_rewards(self, limit: int = 500, ledgers: list = None) -> List[ExchangeTrade]:
+    async def get_rewards(self, limit: int = 500, ledgers: list[dict[str, Any]] | None = None) -> list[ExchangeTrade]:
         """Extract staking rewards and other rewards from ledgers.
 
         Rewards appear as single entries with positive amounts.

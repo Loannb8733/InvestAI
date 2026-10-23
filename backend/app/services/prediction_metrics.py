@@ -9,7 +9,6 @@ so behaviour is unchanged.
 
 import logging
 import math
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class PredictionMetricsMixin:
     @staticmethod
-    def _compute_support_resistance(prices: List[float], current_price: float) -> Tuple[float, float]:
+    def _compute_support_resistance(prices: list[float], current_price: float) -> tuple[float, float]:
         """Compute support/resistance using pivot points + price clustering.
 
         1. Classic pivot points (H, L, C of recent window)
@@ -49,7 +48,7 @@ class PredictionMetricsMixin:
 
         # --- Cluster nearby levels (within 1.5% of each other) ---
         levels.sort()
-        clusters: List[List[float]] = []
+        clusters: list[list[float]] = []
         for lv in levels:
             if clusters and abs(lv - np.mean(clusters[-1])) / max(np.mean(clusters[-1]), 1e-10) < 0.015:
                 clusters[-1].append(lv)
@@ -110,8 +109,8 @@ class PredictionMetricsMixin:
 
     @staticmethod
     def _compute_reliability_from_ensemble(
-        models_detail: List[Dict], ensemble_trend: str
-    ) -> Tuple[float, float, int, bool]:
+        models_detail: list[dict], ensemble_trend: str
+    ) -> tuple[float, float, int, bool]:
         """Compute reliability from the ensemble's own MAPE and model consensus.
 
         Uses the already-computed backtest MAPE from each model (available in
@@ -175,7 +174,7 @@ class PredictionMetricsMixin:
     # -- Lightweight accuracy metrics (no expensive backtest) --
 
     @staticmethod
-    def _compute_lightweight_skill(prices: List[float]) -> float:
+    def _compute_lightweight_skill(prices: list[float]) -> float:
         """Estimate model skill from price predictability metrics.
 
         Uses autocorrelation and trend consistency as a proxy for how well
@@ -222,8 +221,8 @@ class PredictionMetricsMixin:
 
     @staticmethod
     def _compute_lightweight_hit_rate(
-        prices: List[float],
-    ) -> Tuple[float, int, bool]:
+        prices: list[float],
+    ) -> tuple[float, int, bool]:
         """Estimate directional hit rate from trend persistence.
 
         Measures how often the 7-day direction matches the prior 7-day

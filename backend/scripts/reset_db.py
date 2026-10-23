@@ -12,11 +12,11 @@ sys.path.insert(0, "/app")
 
 from sqlalchemy import text
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 
 
 async def main():
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Show current state
         for table in ["transactions", "assets", "portfolios", "api_keys", "users"]:
             r = await db.execute(text(f"SELECT count(*) FROM {table}"))

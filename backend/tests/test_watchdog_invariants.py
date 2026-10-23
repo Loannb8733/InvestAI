@@ -7,18 +7,17 @@ depuis juin sans que personne ne soit prévenu (NEW-80). Pour qu'il puisse
 chaque écart exactement comme ``scripts/check_invariants.py``.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
 
-from app.core import database
 from app.core.config import settings
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
+from app.core.db import session as db_session_module
+from app.domains.identity.models import User
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from tests.conftest import test_engine
 
 _JETON = "jeton-de-test-du-watchdog"
@@ -43,7 +42,7 @@ async def _actif(db, portefeuille, symbole, stocke, achete, pru) -> Asset:
             transaction_type=TransactionType.BUY,
             quantity=Decimal(achete),
             price=Decimal(pru),
-            executed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            executed_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
     )
     await db.flush()
@@ -55,7 +54,7 @@ def watchdog(monkeypatch):
     monkeypatch.setattr(settings, "CRON_SECRET", _JETON)
     # L'endpoint lit le moteur de l'application : sans substitution, il
     # interrogerait la base de développement au lieu de la base de test.
-    monkeypatch.setattr(database, "engine", test_engine)
+    monkeypatch.setattr(db_session_module, "engine", test_engine)
 
 
 async def _controler(client: AsyncClient) -> dict:

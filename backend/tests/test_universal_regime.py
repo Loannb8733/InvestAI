@@ -184,9 +184,9 @@ class TestMoonMissionBull:
         # Either bullish with high top probability, or top regime
         top_prob = result.probabilities.get("top", 0)
         # In a parabolic move, top probability should be non-trivial
-        assert (
-            top_prob > 0.05 or result.dominant_regime == "top"
-        ), f"Parabolic should have some top signal: top_prob={top_prob:.2f}, dom={result.dominant_regime}"
+        assert top_prob > 0.05 or result.dominant_regime == "top", (
+            f"Parabolic should have some top signal: top_prob={top_prob:.2f}, dom={result.dominant_regime}"
+        )
 
     def test_strategy_takes_profits_at_top(self):
         """At top, even with high alpha → PRENDRE PROFITS."""
@@ -287,9 +287,9 @@ class TestAlphaThresholdEnforcement:
         # Bear should get higher bonus than bottom (1.5× vs 1.0× on 10% gold)
         assert score_bear > score_none, "Bear should get gold bonus"
         assert score_bottom > score_none, "Bottom should get gold bonus"
-        assert (
-            score_bear >= score_bottom
-        ), f"Bear gold bonus (high relevance) should >= bottom (medium): bear={score_bear}, bottom={score_bottom}"
+        assert score_bear >= score_bottom, (
+            f"Bear gold bonus (high relevance) should >= bottom (medium): bear={score_bear}, bottom={score_bottom}"
+        )
 
 
 # ── Point 5: total_value parity ──────────────────────────────────
@@ -303,9 +303,9 @@ class TestTotalValueParity:
         cfg = RegimeConfig.from_regime("bearish")
         field_names = [f.name for f in cfg.__dataclass_fields__.values()]
         for name in field_names:
-            assert (
-                "value" not in name.lower() and "total" not in name.lower()
-            ), f"RegimeConfig should not touch total_value, found field: {name}"
+            assert "value" not in name.lower() and "total" not in name.lower(), (
+                f"RegimeConfig should not touch total_value, found field: {name}"
+            )
 
     def test_score_does_not_alter_inputs(self):
         """_calculate_overall_score should not mutate the total_value."""

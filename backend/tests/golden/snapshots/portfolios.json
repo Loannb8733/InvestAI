@@ -1,0 +1,15 @@
+{
+  "body": [
+    {
+      "cash_balances": {},
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-0>",
+      "kind": null,
+      "name": "Golden",
+      "updated_at": "<volatile>",
+      "user_id": "<id-1>"
+    }
+  ],
+  "status": 200
+}

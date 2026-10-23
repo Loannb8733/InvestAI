@@ -5,7 +5,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.db.session import session_factory
 from app.services.alert_service import alert_service
 from app.tasks.celery_app import celery_app
 from app.tasks.price_updates import run_async
@@ -19,38 +19,14 @@ def check_all_alerts():
     logger.info("Starting alert check for all users...")
 
     async def _check_alerts():
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await alert_service.check_all_user_alerts(db)
             return result
 
     result = run_async(_check_alerts())
     logger.info(
-        f"Alert check completed: {result['users_checked']} users checked, "
-        f"{result['alerts_triggered']} alerts triggered"
+        f"Alert check completed: {result['users_checked']} users checked, {result['alerts_triggered']} alerts triggered"
     )
-    return result
-
-
-@celery_app.task(name="app.tasks.alerts.check_user_alerts")
-def check_user_alerts(user_id: str):
-    """Check alerts for a specific user."""
-    logger.info(f"Checking alerts for user {user_id}...")
-
-    async def _check_user():
-        async with AsyncSessionLocal() as db:
-            triggered = await alert_service.check_alerts(db, user_id)
-            return [
-                {
-                    "alert_id": str(t.alert_id),
-                    "alert_name": t.alert_name,
-                    "symbol": t.symbol,
-                    "message": t.message,
-                }
-                for t in triggered
-            ]
-
-    result = run_async(_check_user())
-    logger.info(f"User {user_id}: {len(result)} alerts triggered")
     return result
 
 
@@ -64,12 +40,12 @@ def seed_risk_weight_snapshots():
     logger.info("Seeding daily risk weight snapshots...")
 
     async def _seed():
-        from app.models.portfolio import Portfolio
-        from app.models.user import User
+        from app.domains.identity.models import User
+        from app.domains.portfolio.models import Portfolio
         from app.services.metrics_service import metrics_service
 
         seeded = 0
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await db.execute(select(User.id).where(User.is_active == True))
             user_ids = [str(uid) for uid in result.scalars().all()]
 

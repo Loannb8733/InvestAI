@@ -89,7 +89,7 @@ export default function StatCard({
                     <button
                       type="button"
                       aria-label={`À propos de ${label}`}
-                      className="cursor-help rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                      className="cursor-help rounded-full focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring"
                     >
                       <Info className="h-3 w-3 text-muted-foreground" />
                     </button>

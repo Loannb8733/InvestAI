@@ -12,15 +12,14 @@ est parcouru pour de vrai.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.notification import Notification, NotificationType
-from app.models.portfolio import Portfolio
 from app.tasks import emails
 
 
@@ -30,7 +29,7 @@ def session_de_test(db_session, monkeypatch):
     async def _fabrique():
         yield db_session
 
-    monkeypatch.setattr(emails, "AsyncSessionLocal", _fabrique)
+    monkeypatch.setattr(emails, "session_factory", _fabrique)
     return db_session
 
 
@@ -137,7 +136,7 @@ class TestAvecDestinataires:
                 type=NotificationType.SYSTEM,
                 title="ancienne",
                 message="…",
-                created_at=datetime.now(timezone.utc) - timedelta(days=30),
+                created_at=datetime.now(UTC) - timedelta(days=30),
             )
         )
         await session_de_test.flush()

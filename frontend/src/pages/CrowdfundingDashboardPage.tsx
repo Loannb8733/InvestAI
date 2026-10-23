@@ -20,7 +20,7 @@ import {
   Banknote,
   Gift,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import QueryErrorState from '@/components/ui/query-error-state'
 import { ResponsivePie } from '@nivo/pie'

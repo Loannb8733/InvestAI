@@ -1,17 +1,16 @@
 """Notification endpoints."""
 
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.notification import NotificationPriority, NotificationType
-from app.models.user import User
 from app.services.notification_service import notification_service
 
 router = APIRouter()
@@ -36,8 +35,7 @@ class NotificationResponse(BaseModel):
     reference_id: UUID | None
     created_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationCountResponse(BaseModel):
@@ -46,20 +44,14 @@ class NotificationCountResponse(BaseModel):
     unread_count: int
 
 
-class MarkReadRequest(BaseModel):
-    """Request to mark notification as read."""
-
-    notification_id: UUID
-
-
-@router.get("", response_model=List[NotificationResponse])
+@router.get("", response_model=list[NotificationResponse])
 async def list_notifications(
     unread_only: bool = False,
     limit: int = 50,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[NotificationResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[NotificationResponse]:
     """List notifications for current user."""
     notifications = await notification_service.get_user_notifications(
         db=db,
@@ -87,7 +79,7 @@ async def list_notifications(
 @router.get("/count", response_model=NotificationCountResponse)
 async def get_unread_count(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> NotificationCountResponse:
     """Get count of unread notifications."""
     count = await notification_service.get_unread_count(db, current_user.id)
@@ -98,7 +90,7 @@ async def get_unread_count(
 async def mark_as_read(
     notification_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Mark a notification as read."""
     success = await notification_service.mark_as_read(
@@ -117,7 +109,7 @@ async def mark_as_read(
 @router.post("/read-all", response_model=MessageResponse)
 async def mark_all_as_read(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Mark all notifications as read."""
     count = await notification_service.mark_all_as_read(db, current_user.id)

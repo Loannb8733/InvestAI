@@ -21,15 +21,15 @@ from __future__ import annotations
 
 import logging
 import statistics
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_THRESHOLD = 25
 HORIZON_12M = 365
 HORIZON_SHORT = 90
-_BTC_START = datetime(2017, 8, 1, tzinfo=timezone.utc)
+_BTC_START = datetime(2017, 8, 1, tzinfo=UTC)
 
 
 def _fetch_fng(httpx_mod):  # type: ignore[no-untyped-def]
@@ -44,7 +44,7 @@ def _fetch_btc_yahoo(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
         "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
         params={
             "period1": int(_BTC_START.timestamp()),
-            "period2": int(datetime.now(timezone.utc).timestamp()),
+            "period2": int(datetime.now(UTC).timestamp()),
             "interval": "1d",
         },
         headers={"User-Agent": "Mozilla/5.0"},  # Yahoo rejects the default httpx UA
@@ -63,7 +63,7 @@ def _fetch_btc_cryptocompare(httpx_mod, pd_mod):  # type: ignore[no-untyped-def]
     """BTC daily close (USD) from CryptoCompare histoday — paginated fallback."""
     base = "https://min-api.cryptocompare.com/data/v2/histoday"
     start_ts = int(_BTC_START.timestamp())
-    to_ts = int(datetime.now(timezone.utc).timestamp())
+    to_ts = int(datetime.now(UTC).timestamp())
     rows: list = []
     seen: set = set()
     # Hard cap on pages: ~10y of daily data at limit=2000 needs <3 pages.
@@ -165,11 +165,11 @@ def compute_contrarian_stats(threshold: int = DEFAULT_THRESHOLD) -> dict[str, An
         "median_90d_pct": round(statistics.median([r * 100 for r in rets_90d]), 1) if rets_90d else None,
         "period_start": df.index.min().date().isoformat(),
         "period_end": df.index.max().date().isoformat(),
-        "as_of": datetime.now(timezone.utc).isoformat(),
+        "as_of": datetime.now(UTC).isoformat(),
     }
 
 
-def format_reasoning(fear_greed: Optional[int], stats: Optional[dict[str, Any]]) -> str:
+def format_reasoning(fear_greed: int | None, stats: dict[str, Any] | None) -> str:
     """Build a short, precise reasoning sentence from cached stats.
 
     Falls back to a qualitative sentence (no numbers) when stats are absent,

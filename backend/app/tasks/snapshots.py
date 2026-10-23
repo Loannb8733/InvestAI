@@ -1,17 +1,16 @@
 """Portfolio snapshot tasks for historical value tracking."""
 
-
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.database import AsyncSessionLocal
-from app.models.portfolio import Portfolio
+from app.core.db.session import session_factory
+from app.domains.identity.models import User
+from app.domains.portfolio.models import Portfolio
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.user import User
 from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 from app.tasks.async_runner import run_async
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 async def _create_all_snapshots_async() -> dict:
     """Create daily snapshots for all users with portfolios."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Get all users with at least one portfolio
         result = await db.execute(select(User.id).where(User.id.in_(select(Portfolio.user_id).distinct())))
         user_ids = [str(row[0]) for row in result.fetchall()]
@@ -39,7 +38,7 @@ async def _create_all_snapshots_async() -> dict:
         for user_id in user_ids:
             try:
                 # Check if snapshot already exists for today
-                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
                 today_end = today_start + timedelta(days=1)
 
                 existing = await db.execute(
@@ -97,7 +96,7 @@ async def _create_all_snapshots_async() -> dict:
                                 portfolio_snapshot = PortfolioSnapshot(
                                     user_id=user_id,
                                     portfolio_id=portfolio.id,
-                                    snapshot_date=datetime.now(timezone.utc),
+                                    snapshot_date=datetime.now(UTC),
                                     total_value=Decimal(str(metrics.get("total_value", 0))),
                                     total_invested=Decimal(str(metrics.get("total_invested", 0))),
                                     total_gain_loss=Decimal(str(metrics.get("total_gain_loss", 0))),
@@ -134,8 +133,8 @@ async def _create_all_snapshots_async() -> dict:
 
 async def _cleanup_old_snapshots_async(days_to_keep: int = 365) -> dict:
     """Delete snapshots older than specified days."""
-    async with AsyncSessionLocal() as db:
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+    async with session_factory() as db:
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         result = await db.execute(
             select(func.count(PortfolioSnapshot.id)).where(PortfolioSnapshot.snapshot_date < cutoff_date)
@@ -169,7 +168,7 @@ def create_user_snapshot(user_id: str) -> dict:
     """Celery task: Create a snapshot for a specific user (on-demand)."""
 
     async def _create():
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             snapshot = await snapshot_service.create_user_snapshot(db, user_id)
             if snapshot:
                 return {

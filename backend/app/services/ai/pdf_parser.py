@@ -3,9 +3,8 @@
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
-import fitz  # PyMuPDF
+import pymupdf
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +13,22 @@ logger = logging.getLogger(__name__)
 class ExtractedFinancials:
     """Financial data extracted from PDF tables."""
 
-    chiffre_affaires: Optional[float] = None
-    prix_revient: Optional[float] = None
-    marge_brute: Optional[float] = None
-    marge_brute_percent: Optional[float] = None
-    tri: Optional[float] = None
-    duration_min: Optional[int] = None
-    duration_max: Optional[int] = None
-    collecte: Optional[float] = None
-    ltv: Optional[float] = None
-    ltc: Optional[float] = None
-    pre_commercialisation: Optional[float] = None
-    fonds_propres: Optional[float] = None
+    chiffre_affaires: float | None = None
+    prix_revient: float | None = None
+    marge_brute: float | None = None
+    marge_brute_percent: float | None = None
+    tri: float | None = None
+    duration_min: int | None = None
+    duration_max: int | None = None
+    collecte: float | None = None
+    ltv: float | None = None
+    ltc: float | None = None
+    pre_commercialisation: float | None = None
+    fonds_propres: float | None = None
     raw_tables: list[str] = field(default_factory=list)
 
 
-def _parse_euro(s: str) -> Optional[float]:
+def _parse_euro(s: str) -> float | None:
     """Parse a French-formatted euro amount like '3 456 789 €' or '3.456.789€'."""
     cleaned = re.sub(r"[€\s]", "", s)
     cleaned = cleaned.replace("\xa0", "")
@@ -46,7 +45,7 @@ def _parse_euro(s: str) -> Optional[float]:
         return None
 
 
-def _parse_percent(s: str) -> Optional[float]:
+def _parse_percent(s: str) -> float | None:
     """Parse a percentage like '11,5%' or '21.46 %'."""
     cleaned = re.sub(r"[%\s]", "", s)
     cleaned = cleaned.replace(",", ".")
@@ -56,7 +55,7 @@ def _parse_percent(s: str) -> Optional[float]:
         return None
 
 
-def _find_number_near(text: str, keywords: list[str], is_percent: bool = False, window: int = 200) -> Optional[float]:
+def _find_number_near(text: str, keywords: list[str], is_percent: bool = False, window: int = 200) -> float | None:
     """Find a number near given keywords in text."""
     text_lower = text.lower()
     for kw in keywords:
@@ -108,7 +107,7 @@ class PDFParser:
 
     def extract_text(self, file_bytes: bytes) -> str:
         """Extract full text from PDF with cleanup."""
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         pages = []
         for page in doc:
             text = page.get_text()
@@ -119,7 +118,7 @@ class PDFParser:
 
     def extract_tables(self, file_bytes: bytes) -> list[str]:
         """Extract text blocks that look like tables (lines with numbers)."""
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         tables = []
         for page in doc:
             blocks = page.get_text("blocks")

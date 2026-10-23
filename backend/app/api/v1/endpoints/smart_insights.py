@@ -1,14 +1,12 @@
 """Smart Insights API endpoints."""
 
-from typing import Dict, List, Optional
-
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
-from app.models.user import User
+from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.services.smart_insights_service import smart_insights_service
 
 router = APIRouter()
@@ -22,8 +20,8 @@ class ActionResponse(BaseModel):
 
     type: str  # buy, sell, hold
     symbol: str
-    amount_eur: Optional[float] = None
-    reason: Optional[str] = None
+    amount_eur: float | None = None
+    reason: str | None = None
 
 
 class InsightResponse(BaseModel):
@@ -33,11 +31,11 @@ class InsightResponse(BaseModel):
     severity: str
     title: str
     message: str
-    metric_name: Optional[str] = None
-    current_value: Optional[float] = None
-    target_value: Optional[float] = None
-    potential_improvement: Optional[str] = None
-    actions: List[ActionResponse] = []
+    metric_name: str | None = None
+    current_value: float | None = None
+    target_value: float | None = None
+    potential_improvement: str | None = None
+    actions: list[ActionResponse] = []
 
 
 class RebalancingOrderResponse(BaseModel):
@@ -80,7 +78,7 @@ class RegimeConfigResponse(BaseModel):
 class RiskClusterResponse(BaseModel):
     """A cluster of highly correlated assets."""
 
-    assets: List[str]
+    assets: list[str]
     avg_corr: float
 
 
@@ -94,9 +92,9 @@ class MetricsSummaryResponse(BaseModel):
     max_drawdown: float
     hhi: float
     total_value: float
-    regime_config: Optional[RegimeConfigResponse] = None
-    avg_top5_correlation: Optional[float] = None
-    risk_clusters: Optional[List[RiskClusterResponse]] = None
+    regime_config: RegimeConfigResponse | None = None
+    avg_top5_correlation: float | None = None
+    risk_clusters: list[RiskClusterResponse] | None = None
 
 
 class IndicatorSignalResponse(BaseModel):
@@ -113,10 +111,10 @@ class RegimeResultResponse(BaseModel):
     """Regime detection for a symbol."""
 
     symbol: str
-    probabilities: Dict[str, float]
+    probabilities: dict[str, float]
     dominant_regime: str
     confidence: float
-    signals: List[IndicatorSignalResponse]
+    signals: list[IndicatorSignalResponse]
     description: str
 
 
@@ -124,7 +122,7 @@ class MarketRegimeResponse(BaseModel):
     """Market regime analysis."""
 
     market: RegimeResultResponse
-    per_asset: List[RegimeResultResponse]
+    per_asset: list[RegimeResultResponse]
     generated_at: str
 
 
@@ -133,18 +131,18 @@ class PortfolioHealthResponse(BaseModel):
 
     overall_score: int
     overall_status: str
-    insights: List[InsightResponse]
-    rebalancing_orders: List[RebalancingOrderResponse]
-    anomaly_impacts: List[AnomalyImpactResponse]
+    insights: list[InsightResponse]
+    rebalancing_orders: list[RebalancingOrderResponse]
+    anomaly_impacts: list[AnomalyImpactResponse]
     metrics_summary: MetricsSummaryResponse
-    market_regime: Optional[MarketRegimeResponse] = None
+    market_regime: MarketRegimeResponse | None = None
     generated_at: str
 
 
 # === Helpers ===
 
 
-def _safe_regime_config(raw: Optional[dict]) -> Optional[RegimeConfigResponse]:
+def _safe_regime_config(raw: dict | None) -> RegimeConfigResponse | None:
     """Safely build RegimeConfigResponse, returning None on bad data."""
     if not raw or not isinstance(raw, dict):
         return None
@@ -154,7 +152,7 @@ def _safe_regime_config(raw: Optional[dict]) -> Optional[RegimeConfigResponse]:
         return None
 
 
-def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
+def _build_regime_response(regime) -> MarketRegimeResponse | None:
     """Convert MarketRegime dataclass to response model."""
     if regime is None:
         return None
@@ -192,7 +190,7 @@ def _build_regime_response(regime) -> Optional[MarketRegimeResponse]:
 async def get_portfolio_health(
     days: int = Query(30, ge=7, le=365, description="Période d'analyse en jours"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioHealthResponse:
     """
     Analyse complète de la santé du portfolio.
@@ -299,11 +297,11 @@ class DashboardSummaryResponse(BaseModel):
 
     health_score: int
     health_status: str
-    top_insight: Optional[TopInsightResponse] = None
-    breakeven_pct: Optional[float] = None
-    top_alpha: Optional[TopAlphaResponse] = None
+    top_insight: TopInsightResponse | None = None
+    breakeven_pct: float | None = None
+    top_alpha: TopAlphaResponse | None = None
     anomaly_count: int
-    regime: Optional[str] = None
+    regime: str | None = None
     generated_at: str
 
 
@@ -311,7 +309,7 @@ class DashboardSummaryResponse(BaseModel):
 async def get_dashboard_summary(
     days: int = Query(30, ge=7, le=365, description="Période d'analyse en jours"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> DashboardSummaryResponse:
     """
     Résumé IA léger pour le widget dashboard Bento.
@@ -333,39 +331,11 @@ async def get_dashboard_summary(
     )
 
 
-@router.get("/rebalancing", response_model=List[RebalancingOrderResponse])
-async def get_rebalancing_suggestions(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[RebalancingOrderResponse]:
-    """
-    Suggestions de rééquilibrage basées sur l'optimisation MPT (Markowitz).
-
-    Retourne les ordres d'achat/vente suggérés pour maximiser le ratio de Sharpe.
-    """
-    report = await smart_insights_service.get_portfolio_health(db, str(current_user.id), days=30)
-
-    return [
-        RebalancingOrderResponse(
-            symbol=o.symbol,
-            name=o.name,
-            action=o.action,
-            current_weight=o.current_weight,
-            target_weight=o.target_weight,
-            current_value_eur=o.current_value_eur,
-            target_value_eur=o.target_value_eur,
-            amount_eur=o.amount_eur,
-            reason=o.reason,
-        )
-        for o in report.rebalancing_orders
-    ]
-
-
-@router.get("/anomalies-impact", response_model=List[AnomalyImpactResponse])
+@router.get("/anomalies-impact", response_model=list[AnomalyImpactResponse])
 async def get_anomalies_with_impact(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[AnomalyImpactResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[AnomalyImpactResponse]:
     """
     Anomalies détectées avec calcul de l'impact en EUR.
 

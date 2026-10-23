@@ -19,10 +19,9 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
 from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus, RepaymentType
-from app.models.portfolio import Portfolio
 from app.services.reconciliation_service import reconciliation_service
 
 

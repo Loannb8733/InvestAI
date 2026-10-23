@@ -41,25 +41,26 @@ const assetFormSchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.asset_type === 'real_estate') {
     if (!data.project_name?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Nom du projet requis', path: ['project_name'] })
+      ctx.addIssue({ code: 'custom', message: 'Nom du projet requis', path: ['project_name'] })
     }
     if (!data.invested_amount || data.invested_amount <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Montant doit être supérieur à 0', path: ['invested_amount'] })
+      ctx.addIssue({ code: 'custom', message: 'Montant doit être supérieur à 0', path: ['invested_amount'] })
     }
   } else {
     if (!data.symbol?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Symbole requis', path: ['symbol'] })
+      ctx.addIssue({ code: 'custom', message: 'Symbole requis', path: ['symbol'] })
     }
     if (data.quantity === undefined || data.quantity < 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Quantité invalide (≥ 0)', path: ['quantity'] })
+      ctx.addIssue({ code: 'custom', message: 'Quantité invalide (≥ 0)', path: ['quantity'] })
     }
     if (data.avg_buy_price === undefined || data.avg_buy_price < 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prix invalide (≥ 0)', path: ['avg_buy_price'] })
+      ctx.addIssue({ code: 'custom', message: 'Prix invalide (≥ 0)', path: ['avg_buy_price'] })
     }
   }
 })
 
-type AssetFormData = z.infer<typeof assetFormSchema>
+type AssetFormInput = z.input<typeof assetFormSchema>
+type AssetFormData = z.output<typeof assetFormSchema>
 
 interface AddAssetFormProps {
   open: boolean
@@ -93,7 +94,7 @@ export default function AddAssetForm({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<AssetFormData>({
+  } = useForm<AssetFormInput, unknown, AssetFormData>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
       asset_type: 'crypto',

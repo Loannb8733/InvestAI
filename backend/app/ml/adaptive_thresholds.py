@@ -7,7 +7,6 @@ and current market conditions.
 """
 
 import math
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 
@@ -18,7 +17,7 @@ from app.ml.market_context import MarketContext
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def rsi_thresholds(ctx: MarketContext) -> Tuple[float, float]:
+def rsi_thresholds(ctx: MarketContext) -> tuple[float, float]:
     """Return (overbought, oversold) RSI thresholds for this asset.
 
     Uses p90/p10 of the asset's own RSI history instead of fixed 80/20.
@@ -28,7 +27,7 @@ def rsi_thresholds(ctx: MarketContext) -> Tuple[float, float]:
     return ctx.rsi_history_p90, ctx.rsi_history_p10
 
 
-def rsi_midpoints(ctx: MarketContext) -> Tuple[float, float]:
+def rsi_midpoints(ctx: MarketContext) -> tuple[float, float]:
     """Return (bullish_upper, bearish_lower) RSI midpoint thresholds.
 
     Instead of hardcoded 60/40, interpolates between 50 and the
@@ -51,7 +50,7 @@ def macd_signal_scaling(ctx: MarketContext) -> float:
     return 50.0  # fallback: original behavior
 
 
-def bollinger_thresholds(ctx: MarketContext) -> Tuple[float, float, float, float]:
+def bollinger_thresholds(ctx: MarketContext) -> tuple[float, float, float, float]:
     """Return (extreme_high, high, low, extreme_low) Bollinger position thresholds.
 
     In high-vol regimes, price touches band extremes more often,
@@ -76,7 +75,7 @@ def ma_cross_significance(ctx: MarketContext) -> float:
     return max(1.0, min(15.0, sig))  # clamp to [1%, 15%]
 
 
-def momentum_thresholds(ctx: MarketContext) -> Tuple[float, float, float, float]:
+def momentum_thresholds(ctx: MarketContext) -> tuple[float, float, float, float]:
     """Return (strong_bull, bull, bear, strong_bear) ROC thresholds in %.
 
     Uses p90/p10 of the asset's own momentum distribution instead of
@@ -89,7 +88,7 @@ def momentum_thresholds(ctx: MarketContext) -> Tuple[float, float, float, float]
     return strong_bull, bull, bear, strong_bear
 
 
-def volatility_regime_thresholds(ctx: MarketContext) -> Tuple[float, float]:
+def volatility_regime_thresholds(ctx: MarketContext) -> tuple[float, float]:
     """Return (extreme_vol, high_vol) annualized volatility thresholds.
 
     Uses the asset's own vol distribution instead of hardcoded 80/50%.
@@ -100,7 +99,7 @@ def volatility_regime_thresholds(ctx: MarketContext) -> Tuple[float, float]:
     return float(extreme), float(high)
 
 
-def fear_greed_thresholds(ctx: MarketContext) -> Tuple[float, float, float, float]:
+def fear_greed_thresholds(ctx: MarketContext) -> tuple[float, float, float, float]:
     """Return (extreme_greed, greed, fear, extreme_fear) F&G thresholds.
 
     The F&G index is already normalized 0-100 across the whole market.
@@ -117,7 +116,7 @@ def fear_greed_thresholds(ctx: MarketContext) -> Tuple[float, float, float, floa
     )
 
 
-def phase_spillover_weights(ctx: MarketContext) -> Dict[str, float]:
+def phase_spillover_weights(ctx: MarketContext) -> dict[str, float]:
     """Return vote spillover weights for adjacent market phases.
 
     Higher volatility → more regime uncertainty → more spillover to
@@ -131,7 +130,7 @@ def phase_spillover_weights(ctx: MarketContext) -> Dict[str, float]:
     }
 
 
-def confidence_weights(ctx: MarketContext) -> Tuple[float, float, float]:
+def confidence_weights(ctx: MarketContext) -> tuple[float, float, float]:
     """Return (indicator_w, data_w, spread_w) for confidence calculation.
 
     In high-vol markets, data length matters more (need more samples).
@@ -218,14 +217,6 @@ def ci_widening_factor(
     return float(base * vol_factor)
 
 
-def xgboost_decay(ctx: MarketContext) -> float:
-    """Return XGBoost prediction decay factor.
-
-    Instead of hardcoded 0.95.  More conservative in high-vol markets.
-    """
-    return float(0.90 + 0.05 * (1 - ctx.vol_percentile / 100))
-
-
 def ci_floor(ctx: MarketContext, horizon_days: int) -> float:
     """Return minimum CI half-width as fraction of price.
 
@@ -236,21 +227,12 @@ def ci_floor(ctx: MarketContext, horizon_days: int) -> float:
     return base * math.sqrt(max(1, horizon_days))
 
 
-def ci_safety_margin(ctx: MarketContext) -> float:
-    """Return CI safety margin (fractional widening).
-
-    Instead of hardcoded 0.05.  Wider for fat-tailed distributions.
-    """
-    kurt_factor = min(1.0, max(0, ctx.kurtosis) / 10)
-    return float(0.02 + 0.06 * kurt_factor)
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # C) Cycle Position
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def cycle_position(ctx: MarketContext, regime_probs: Optional[dict] = None) -> float:
+def cycle_position(ctx: MarketContext, regime_probs: dict | None = None) -> float:
     """Return cycle position 0-100 representing the market cycle phase.
 
     The cycle goes clockwise:
@@ -321,7 +303,7 @@ def cycle_position(ctx: MarketContext, regime_probs: Optional[dict] = None) -> f
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def correlation_thresholds(ctx: Optional[MarketContext] = None) -> Tuple[float, float]:
+def correlation_thresholds(ctx: MarketContext | None = None) -> tuple[float, float]:
     """Return (strong_positive, negative) correlation thresholds.
 
     In high-vol regimes correlations spike, so we raise the bar.
@@ -331,7 +313,7 @@ def correlation_thresholds(ctx: Optional[MarketContext] = None) -> Tuple[float, 
     return 0.70, -0.30
 
 
-def concentration_thresholds() -> Tuple[float, float]:
+def concentration_thresholds() -> tuple[float, float]:
     """Return (warning, critical) HHI thresholds.
 
     Industry-standard portfolio construction limits.
@@ -373,7 +355,7 @@ def anomaly_price_threshold(ctx: MarketContext) -> float:
     return float(max(5.0, monthly_vol * 3 * 100))
 
 
-def sharpe_classification() -> Tuple[float, float, float, float]:
+def sharpe_classification() -> tuple[float, float, float, float]:
     """Return (excellent, good, fair, poor) Sharpe thresholds.
 
     These are financial convention, not data-dependent.
@@ -382,8 +364,8 @@ def sharpe_classification() -> Tuple[float, float, float, float]:
 
 
 def volatility_warning_thresholds(
-    ctx: Optional[MarketContext] = None,
-) -> Tuple[float, float]:
+    ctx: MarketContext | None = None,
+) -> tuple[float, float]:
     """Return (high_pct, extreme_pct) annualized volatility warning thresholds.
 
     Adapted by asset type: crypto naturally has higher volatility.
@@ -397,17 +379,9 @@ def volatility_warning_thresholds(
     return 50.0, 80.0
 
 
-def var_warning_thresholds() -> Tuple[float, float]:
+def var_warning_thresholds() -> tuple[float, float]:
     """Return (warning, critical) VaR thresholds as decimal."""
     return 0.10, 0.15
-
-
-def sentiment_significance_threshold(ctx: MarketContext) -> float:
-    """Return % change to classify an asset as bullish/bearish for sentiment.
-
-    Instead of hardcoded ±1%.  Uses half of the trend significance threshold.
-    """
-    return trend_significance_threshold(ctx, 1) * 0.5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -415,7 +389,7 @@ def sentiment_significance_threshold(ctx: MarketContext) -> float:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def build_display_thresholds(ctx: Optional[MarketContext] = None) -> Dict:
+def build_display_thresholds(ctx: MarketContext | None = None) -> dict:
     """Build thresholds dictionary to send to the frontend.
 
     The frontend reads these instead of hardcoding its own values.

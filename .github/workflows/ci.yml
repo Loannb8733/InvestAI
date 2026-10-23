@@ -7,19 +7,16 @@ on:
     branches: [main, develop]
 
 env:
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
 
 jobs:
   # ──────────────────────────────────────────
-  # Backend: Lint (black, isort, flake8, mypy)
+  # Backend: Lint (ruff, mypy, bandit)
   # ──────────────────────────────────────────
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -29,25 +26,54 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements-dev.txt
 
-      - name: Install dependencies
+      - name: Install lint tools
         run: |
           pip install --upgrade pip
-          pip install black==23.12.1 isort==5.13.2 flake8==7.0.0 mypy==1.8.0 types-redis==4.6.0.20240106 "sqlalchemy[mypy]==2.0.25"
+          grep -E '^(ruff|mypy|bandit\[toml\])==' backend/requirements-dev.txt > /tmp/lint-tools.txt
+          pip install -r /tmp/lint-tools.txt
 
-      - name: Check formatting (black)
-        run: black --check --diff --line-length=120 .
+      - name: Lint (ruff)
+        run: ruff check backend
 
-      - name: Check import sorting (isort)
-        run: isort --check-only --diff --profile=black --line-length=120 .
+      - name: Format (ruff)
+        run: ruff format --check backend
 
-      - name: Lint (flake8)
-        run: flake8 app/ --max-line-length=120 --extend-ignore=E402,E203,E712,W503,E501 --exclude=__pycache__,alembic
+      - name: Security (bandit)
+        run: bandit -c pyproject.toml -r backend/app
 
       - name: Type check (mypy)
-        run: mypy app/ --ignore-missing-imports --no-strict-optional
-        continue-on-error: true
+        run: mypy backend/app
+
+  # ──────────────────────────────────────────
+  # Code rules: 300 lignes max, aucun commentaire
+  # ──────────────────────────────────────────
+  code-rules:
+    name: Code Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Check code rules
+        run: python scripts/check_code_rules.py
 
   # ──────────────────────────────────────────
   # Backend: Tests (pytest)
@@ -107,7 +133,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements-dev.txt
 
       - name: Install system dependencies
         run: |
@@ -124,7 +150,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
         run: pytest --cov=app --cov-report=xml --cov-report=term-missing -v

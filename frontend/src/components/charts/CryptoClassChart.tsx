@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { ResponsivePie } from '@nivo/pie'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'motion/react'
 import { formatCurrency } from '@/lib/utils'
 import {
   CRYPTO_ASSET_CLASSES,

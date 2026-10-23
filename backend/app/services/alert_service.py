@@ -3,22 +3,20 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
 from uuid import UUID
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset, AssetType
 from app.models.notification import NotificationPriority
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
 from app.services.notification_service import notification_service
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +41,7 @@ class AlertService:
     """Service for managing and checking alerts."""
 
     def __init__(self):
-        self.price_service = PriceService()
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: aioredis.Redis | None = None
 
     async def _get_redis(self) -> aioredis.Redis:
         """Lazy init Redis connection."""
@@ -67,7 +64,7 @@ class AlertService:
         except Exception as e:
             logger.debug("Failed to cache risk weight for %s: %s", symbol, e)
 
-    async def _get_cached_risk_weight(self, symbol: str, date_str: str) -> Optional[float]:
+    async def _get_cached_risk_weight(self, symbol: str, date_str: str) -> float | None:
         """Get cached risk weight snapshot from Redis."""
         try:
             r = await self._get_redis()
@@ -82,7 +79,7 @@ class AlertService:
     # Break-even computation
     # ------------------------------------------------------------------
 
-    async def _compute_breakeven_price(self, db: AsyncSession, asset: Asset) -> Optional[float]:
+    async def _compute_breakeven_price(self, db: AsyncSession, asset: Asset) -> float | None:
         """Compute break-even price: (total_invested + fees) / quantity."""
         qty = float(asset.quantity)
         if qty <= 0:
@@ -112,7 +109,7 @@ class AlertService:
     # Risk weight snapshot (current)
     # ------------------------------------------------------------------
 
-    async def _get_current_risk_weight(self, db: AsyncSession, asset: Asset, user_id: str) -> Optional[float]:
+    async def _get_current_risk_weight(self, db: AsyncSession, asset: Asset, user_id: str) -> float | None:
         """Get current risk weight for an asset's symbol, caching for today."""
         today_str = date.today().isoformat()
         symbol_upper = asset.symbol.upper()
@@ -149,9 +146,9 @@ class AlertService:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> List[AlertTrigger]:
+    ) -> list[AlertTrigger]:
         """Check all active alerts for a user and return triggered ones."""
-        from app.models.user import User
+        from app.domains.identity.models import User
 
         triggered = []
 
@@ -169,14 +166,14 @@ class AlertService:
         alerts = result.scalars().all()
 
         for alert in alerts:
-            if alert.triggered_at and (datetime.now(timezone.utc) - alert.triggered_at) < timedelta(minutes=5):
+            if alert.triggered_at and (datetime.now(UTC) - alert.triggered_at) < timedelta(minutes=5):
                 continue
             trigger = await self._check_single_alert(db, alert)
             if trigger:
                 triggered.append(trigger)
 
                 # Update alert
-                alert.triggered_at = datetime.now(timezone.utc)
+                alert.triggered_at = datetime.now(UTC)
                 alert.triggered_count = (alert.triggered_count or 0) + 1
 
                 # Determine priority
@@ -230,7 +227,7 @@ class AlertService:
         db: AsyncSession,
     ) -> dict:
         """Check alerts for all users (for background task)."""
-        from app.models.user import User
+        from app.domains.identity.models import User
 
         result = await db.execute(select(User.id).where(User.is_active == True))
         user_ids = [str(uid) for uid in result.scalars().all()]
@@ -303,7 +300,7 @@ class AlertService:
         self,
         db: AsyncSession,
         alert: Alert,
-    ) -> Optional[AlertTrigger]:
+    ) -> AlertTrigger | None:
         """Check if a single alert should trigger."""
         # Conditions au niveau portefeuille : pas d'asset_id, on branche avant.
         if alert.condition in (
@@ -391,10 +388,10 @@ class AlertService:
                     # Correlate with anomaly detector (best-effort)
                     anomaly_info = ""
                     try:
+                        from app.domains.market_data.history.models import AssetPriceHistory
                         from app.ml.anomaly_detector import AnomalyDetector
-                        from app.models.asset_price_history import AssetPriceHistory
 
-                        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).date()
+                        cutoff = (datetime.now(UTC) - timedelta(days=30)).date()
                         hist_result = await db.execute(
                             select(AssetPriceHistory.price_eur)
                             .where(
@@ -435,13 +432,13 @@ class AlertService:
                 condition=alert.condition.value,
                 threshold=threshold,
                 current_value=current_price,
-                triggered_at=datetime.now(timezone.utc),
+                triggered_at=datetime.now(UTC),
                 message=message,
             )
 
         return None
 
-    async def _check_portfolio_alert(self, db: AsyncSession, alert: Alert) -> Optional[AlertTrigger]:
+    async def _check_portfolio_alert(self, db: AsyncSession, alert: Alert) -> AlertTrigger | None:
         """Évalue une condition au niveau portefeuille (drawdown / HHI / drift).
 
         Ces conditions protègent un patrimoine concentré — exactement le risque
@@ -496,7 +493,7 @@ class AlertService:
 
         elif alert.condition == AlertCondition.ALLOCATION_DRIFT:
             # Écart max vs allocation cible persistée (en points de %).
-            from app.models.user import User
+            from app.domains.identity.models import User
             from app.services.report_service import report_service
 
             user_obj = (await db.execute(select(User).where(User.id == alert.user_id))).scalar_one_or_none()
@@ -526,23 +523,17 @@ class AlertService:
                 condition=alert.condition.value,
                 threshold=threshold,
                 current_value=current_value,
-                triggered_at=datetime.now(timezone.utc),
+                triggered_at=datetime.now(UTC),
                 message=message,
             )
         return None
 
-    async def _get_daily_change(self, asset: Asset) -> Optional[float]:
+    async def _get_daily_change(self, asset: Asset) -> float | None:
         """Get 24h price change percentage for an asset."""
         try:
-            if asset.asset_type == AssetType.CRYPTO:
-                prices = await self.price_service.get_multiple_crypto_prices([asset.symbol], "eur")
-                data = prices.get(asset.symbol.upper())
-                if data:
-                    return float(data.get("change_percent_24h", 0) or 0)
-            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
-                data = await self.price_service.get_stock_price(asset.symbol)
-                if data:
-                    return float(data.get("change_percent_24h", 0) or 0)
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            if quote is not None:
+                return quote.change_percent_24h
         except Exception as exc:
             logger.debug("24h change fetch failed for %s: %s", asset.symbol, exc)
         return None
@@ -566,18 +557,10 @@ class AlertService:
         """
         cote = asset.asset_type in self._TYPES_COTES
         try:
-            if asset.asset_type == AssetType.CRYPTO:
-                price = await self.price_service.get_crypto_price(asset.symbol)
-                if isinstance(price, dict):
-                    return float(price.get("price", 0) or price.get("eur", 0))
-                return float(price) if price else 0.0
-            elif asset.asset_type in (AssetType.STOCK, AssetType.ETF):
-                data = await self.price_service.get_stock_price(asset.symbol)
-                if isinstance(data, dict):
-                    return float(data.get("price", 0))
-                return float(data) if data else 0.0
-            else:
-                return float(asset.avg_buy_price)
+            if cote:
+                quote = await price_feed.quote(asset.symbol, asset.asset_type)
+                return float(quote.price) if quote is not None else 0.0
+            return float(asset.avg_buy_price)
         except Exception as exc:
             logger.warning(
                 "Cours indisponible pour %s (%s) : %s — alerte non évaluée",
@@ -597,9 +580,7 @@ class AlertService:
         alerts = result.scalars().all()
 
         active_count = sum(1 for a in alerts if a.is_active)
-        triggered_today = sum(
-            1 for a in alerts if a.triggered_at and a.triggered_at.date() == datetime.now(timezone.utc).date()
-        )
+        triggered_today = sum(1 for a in alerts if a.triggered_at and a.triggered_at.date() == datetime.now(UTC).date())
         total_triggered = sum(a.triggered_count or 0 for a in alerts)
 
         return {

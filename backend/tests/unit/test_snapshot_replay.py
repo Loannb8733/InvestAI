@@ -10,7 +10,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 from app.services.snapshot_service import SnapshotService
 
 

@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.core.security import hash_password
-from app.models import Base
-from app.models.user import User, UserRole
+from app.core.db.metadata import metadata
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
 
 
 async def create_admin():
@@ -24,7 +24,7 @@ async def create_admin():
 
     # Create tables if they don't exist
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
 
     async with AsyncSessionLocal() as session:
         # Check if admin already exists
@@ -77,9 +77,9 @@ async def create_admin():
         session.add(admin)
         await session.commit()
 
-        print(f"\n✅ Admin créé avec succès!")
+        print("\n✅ Admin créé avec succès!")
         print(f"   Email: {email}")
-        print(f"   Rôle: admin")
+        print("   Rôle: admin")
 
     await engine.dispose()
 

@@ -11,18 +11,17 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=[
         "app.tasks.price_updates",
-        "app.tasks.sync_exchanges",
         "app.tasks.predictions",
         "app.tasks.alerts",
-        "app.tasks.history_cache",
         "app.tasks.snapshots",
         "app.tasks.emails",
         "app.tasks.cleanup",
         "app.tasks.monitor_delays",
-        "app.tasks.import_history",
         "app.tasks.contrarian_stats",
         "app.tasks.regime_alerts",
-        "app.tasks.fx_rates",
+        "app.domains.market_data.fx.tasks",
+        "app.domains.market_data.history.tasks",
+        "app.domains.exchanges.sync.tasks",
     ],
 )
 
@@ -64,7 +63,7 @@ celery_app.conf.beat_schedule = {
         "schedule": 300.0,  # Every 5 minutes
     },
     "sync-exchanges": {
-        "task": "app.tasks.sync_exchanges.sync_all_exchanges",
+        "task": "app.domains.exchanges.sync.tasks.sync_all_exchanges",
         "schedule": 3600.0,  # Every hour
     },
     "run-daily-predictions": {
@@ -80,7 +79,7 @@ celery_app.conf.beat_schedule = {
         "schedule": 300.0,  # Every 5 minutes
     },
     "refresh-fx-rates": {
-        "task": "app.tasks.fx_rates.refresh_fx_rates",
+        "task": "app.domains.market_data.fx.tasks.refresh_fx_rates",
         # 16h05 UTC : la BCE publie ses taux vers 16h00 CET les jours ouvrés. Une
         # seule passe par jour suffit — ensure_seeded ne lit que la fenêtre manquante,
         # et rattrape donc tout seul les jours sautés.
@@ -94,12 +93,12 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.predictions.check_prediction_accuracy",
         "schedule": 86400.0,  # Every 24 hours
     },
-    "cache-historical-data": {
-        "task": "app.tasks.history_cache.cache_historical_data",
+    "refresh-history": {
+        "task": "app.domains.market_data.history.tasks.refresh_history",
         "schedule": 1800.0,  # Every 30 minutes
     },
-    "deep-backfill-prices": {
-        "task": "app.tasks.history_cache.deep_backfill_prices",
+    "backfill-history": {
+        "task": "app.domains.market_data.history.tasks.backfill_history",
         "schedule": 86400.0,  # Every 24 hours — fills gaps + refreshes recent data
     },
     "tune-hyperparameters": {

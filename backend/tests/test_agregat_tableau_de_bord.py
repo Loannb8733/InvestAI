@@ -13,7 +13,7 @@ sur le réseau. Ce qu'il laisse s'exécuter : la base de test, et **toutes** les
 décisions propres à cette fonction — c'est précisément ce qu'on vient éprouver.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -21,13 +21,12 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.v1.endpoints.dashboard import _get_dashboard_impl
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.identity.models import User
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.models.transaction import Transaction, TransactionType
-from app.models.user import User
 
-MAINTENANT = datetime.now(timezone.utc)
+MAINTENANT = datetime.now(UTC)
 
 
 def actif_agrege(symbole: str, valeur: float, quantite: float, *, investi: float | None = None) -> dict:
@@ -101,7 +100,7 @@ async def appeler(db_session, utilisateur, *, jours=30, mesures=None, historique
             new=AsyncMock(return_value=RISQUES),
         ),
         patch(
-            "app.services.price_service.PriceService._get_eur_usd_rate",
+            "app.api.v1.endpoints.dashboard.spot_rates.get",
             new=AsyncMock(return_value=taux_usd),
         ),
     ):
@@ -405,7 +404,7 @@ class TestInstantaneQuotidien:
             PortfolioSnapshot(
                 user_id=regular_user.id,
                 portfolio_id=None,
-                snapshot_date=datetime.now(timezone.utc),
+                snapshot_date=datetime.now(UTC),
                 total_value=4900,
                 total_invested=4000,
                 total_gain_loss=900,
@@ -512,7 +511,7 @@ class TestInstantaneQuotidien:
         """
         from sqlalchemy.exc import IntegrityError
 
-        maintenant = datetime.now(timezone.utc)
+        maintenant = datetime.now(UTC)
         for _ in range(2):
             db_session.add(
                 PortfolioSnapshot(
@@ -616,7 +615,7 @@ class TestResistanceDesBlocsSecondaires:
             "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series": AsyncMock(return_value=[]),
             "app.api.v1.endpoints.dashboard.get_index_comparison": AsyncMock(return_value=[]),
             "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics": AsyncMock(return_value=RISQUES),
-            "app.services.price_service.PriceService._get_eur_usd_rate": AsyncMock(return_value=0.92),
+            "app.api.v1.endpoints.dashboard.spot_rates.get": AsyncMock(return_value=0.92),
         }
         patches[cible] = AsyncMock(side_effect=RuntimeError("panne simulée"))
         contextes = [patch(nom, new=double) for nom, double in patches.items()]

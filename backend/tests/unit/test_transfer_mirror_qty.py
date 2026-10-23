@@ -8,7 +8,7 @@ Tangem) : SOL OUT 2.99926463 fee 0.001 → reçu on-chain 2.99926463 exactement.
 
 from decimal import Decimal
 
-from app.services.transfer_service import mirror_received_qty
+from app.domains.transactions.transfers import mirror_received_qty
 
 D = Decimal
 

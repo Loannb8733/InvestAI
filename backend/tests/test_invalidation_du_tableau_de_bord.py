@@ -22,14 +22,14 @@ import pytest
 from httpx import AsyncClient
 
 from app.core import redis_client
-from app.core.security import create_access_token
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.services import metrics_service
 
 
 @pytest.fixture
 def entetes(regular_user: User) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(subject=str(regular_user.id))}"}
+    return {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
 
 
 @pytest.fixture
@@ -108,10 +108,14 @@ async def test_un_echec_d_invalidation_se_voit_sans_casser_l_ecriture(
         raise ConnectionError("Redis injoignable")
 
     monkeypatch.setattr(redis_client, "invalidate_dashboard_cache", _redis_en_panne)
-    caplog.set_level(logging.DEBUG, logger="app.main")
+    caplog.set_level(logging.DEBUG, logger="app.core.http.cache_invalidation")
 
     assert await _creer_portefeuille(client, entetes) == 201
 
     assert moi not in metrics_service._dashboard_cache, "une panne Redis ne doit pas épargner le cache en mémoire"
-    avertissements = [r.getMessage() for r in caplog.records if r.name == "app.main" and r.levelno >= logging.WARNING]
+    avertissements = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "app.core.http.cache_invalidation" and r.levelno >= logging.WARNING
+    ]
     assert any("Redis injoignable" in m for m in avertissements), avertissements

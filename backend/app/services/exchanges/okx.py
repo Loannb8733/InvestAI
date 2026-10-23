@@ -4,9 +4,9 @@ import base64
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class OkxService(BaseExchangeService):
 
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO 8601 format for OKX."""
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     def _sign_request(self, timestamp: str, method: str, request_path: str, body: str = "") -> str:
         """Sign a request with HMAC SHA256 + base64.
@@ -41,13 +41,13 @@ class OkxService(BaseExchangeService):
         """
         pre_sign = f"{timestamp}{method}{request_path}{body}"
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             pre_sign.encode("utf-8"),
             hashlib.sha256,
         ).digest()
         return base64.b64encode(signature).decode("utf-8")
 
-    def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict:
+    def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict[str, Any]:
         """Get request headers with authentication."""
         signature = self._sign_request(timestamp, method, request_path, body)
         return {
@@ -74,14 +74,15 @@ class OkxService(BaseExchangeService):
                     headers=headers,
                 )
                 data = response.json()
-                return data.get("code") == "0"
+                connected: bool = data.get("code") == "0"
+                return connected
         except Exception as e:
             logger.error(f"OKX test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from OKX."""
-        balances = []
+        balances: list[ExchangeBalance] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/account/balance"
@@ -123,11 +124,11 @@ class OkxService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from OKX."""
         all_trades = []
         try:
@@ -177,7 +178,7 @@ class OkxService(BaseExchangeService):
                                 price=Decimal(trade.get("fillPx", "0")),
                                 fee=abs(Decimal(trade.get("fee", "0"))),
                                 fee_currency=trade.get("feeCcy", ""),
-                                timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=UTC),
                             )
                         )
                         fetched += 1
@@ -196,12 +197,12 @@ class OkxService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from OKX."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/asset/deposit-history"
@@ -246,7 +247,7 @@ class OkxService(BaseExchangeService):
                             deposit_id=deposit.get("depId", ""),
                             symbol=deposit.get("ccy", ""),
                             amount=Decimal(deposit.get("amt", "0")),
-                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=UTC),
                             status=status_map.get(dep_status, "unknown"),
                             tx_id=deposit.get("txId"),
                         )
@@ -259,12 +260,12 @@ class OkxService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from OKX."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/asset/withdrawal-history"
@@ -312,7 +313,7 @@ class OkxService(BaseExchangeService):
                             symbol=withdrawal.get("ccy", ""),
                             amount=Decimal(withdrawal.get("amt", "0")),
                             fee=Decimal(withdrawal.get("fee", "0")),
-                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(int(ts) / 1000, tz=UTC),
                             status=status_map.get(w_status, "unknown"),
                             tx_id=withdrawal.get("txId"),
                             address=withdrawal.get("to"),

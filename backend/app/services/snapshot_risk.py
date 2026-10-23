@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class SnapshotRiskMixin:
     """Mixed into SnapshotService — portfolio risk analytics."""
 
-    def _estimate_interval_days(self, history: List[Dict]) -> float:
+    def _estimate_interval_days(self, history: list[dict]) -> float:
         """Estimate the average interval in days between data points.
 
         When data is subsampled (e.g. every 3 or 7 days), we need the actual
@@ -49,7 +48,7 @@ class SnapshotRiskMixin:
 
         return 1.0
 
-    def _compute_twr_log_returns(self, history: List[Dict]) -> List[float]:
+    def _compute_twr_log_returns(self, history: list[dict]) -> list[float]:
         """Compute Time-Weighted log returns that exclude capital flow effects.
 
         Standard log returns (log(V_t / V_{t-1})) are inflated by DCA buys
@@ -88,7 +87,7 @@ class SnapshotRiskMixin:
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        history: Optional[List[Dict]] = None,
+        history: list[dict] | None = None,
     ) -> float:
         """Calculate portfolio volatility based on TWR log returns.
 
@@ -124,8 +123,8 @@ class SnapshotRiskMixin:
         user_id: str,
         days: int = 30,
         risk_free_rate: float = RISK_FREE_RATE,
-        history: Optional[List[Dict]] = None,
-        roi_annualized: Optional[float] = None,
+        history: list[dict] | None = None,
+        roi_annualized: float | None = None,
     ) -> float:
         """Calculate Sharpe ratio for the portfolio.
 
@@ -171,8 +170,8 @@ class SnapshotRiskMixin:
         db: AsyncSession,
         user_id: str,
         days: int = 30,
-        history: Optional[List[Dict]] = None,
-    ) -> Dict:
+        history: list[dict] | None = None,
+    ) -> dict:
         """
         Calculate Maximum Drawdown (MDD) - the largest peak-to-trough decline.
         Returns both the percentage and the period.
@@ -219,8 +218,8 @@ class SnapshotRiskMixin:
         days: int = 30,
         confidence_level: float = 0.95,
         current_value: float = 0,
-        history: Optional[List[Dict]] = None,
-    ) -> Dict:
+        history: list[dict] | None = None,
+    ) -> dict:
         """
         Calculate Value at Risk (VaR) using historical simulation method.
         Returns the potential loss at the given confidence level.
@@ -273,61 +272,7 @@ class SnapshotRiskMixin:
             "confidence_level": confidence_level,
         }
 
-    async def calculate_beta(
-        self,
-        portfolio_returns: List[float],
-        benchmark_returns: List[float],
-    ) -> float:
-        """
-        Calculate Beta - measure of portfolio's volatility relative to the market.
-        Beta > 1: More volatile than market
-        Beta < 1: Less volatile than market
-        Beta = 1: Same volatility as market
-        """
-        if len(portfolio_returns) < 2 or len(benchmark_returns) < 2:
-            return 1.0
-
-        # Ensure same length
-        min_len = min(len(portfolio_returns), len(benchmark_returns))
-        portfolio_returns = portfolio_returns[:min_len]
-        benchmark_returns = benchmark_returns[:min_len]
-
-        # Calculate means
-        port_mean = sum(portfolio_returns) / len(portfolio_returns)
-        bench_mean = sum(benchmark_returns) / len(benchmark_returns)
-
-        # Calculate covariance and variance (unbiased, ddof=1, consistent with Sharpe/Volatility)
-        n = len(portfolio_returns)
-        covariance = sum((p - port_mean) * (b - bench_mean) for p, b in zip(portfolio_returns, benchmark_returns)) / (
-            n - 1
-        )
-
-        bench_variance = sum((b - bench_mean) ** 2 for b in benchmark_returns) / (n - 1)
-
-        if bench_variance == 0:
-            return 1.0
-
-        beta = covariance / bench_variance
-        return round(beta, 2)
-
-    async def calculate_alpha(
-        self,
-        portfolio_return: float,
-        benchmark_return: float,
-        beta: float,
-        risk_free_rate: float = RISK_FREE_RATE,
-    ) -> float:
-        """
-        Calculate Alpha - excess return compared to benchmark.
-        Alpha > 0: Outperforming the benchmark
-        Alpha < 0: Underperforming the benchmark
-        """
-        # Jensen's Alpha = Portfolio Return - [Risk Free Rate + Beta * (Benchmark Return - Risk Free Rate)]
-        expected_return = risk_free_rate + beta * (benchmark_return - risk_free_rate)
-        alpha = portfolio_return - expected_return
-        return round(alpha * 100, 2)  # Return as percentage
-
-    def calculate_hhi(self, allocations: List[Dict]) -> Dict:
+    def calculate_hhi(self, allocations: list[dict]) -> dict:
         """
         Calculate Herfindahl-Hirschman Index (HHI) for portfolio concentration.
         HHI ranges from 0 to 10000:
@@ -387,7 +332,7 @@ class SnapshotRiskMixin:
             "top_concentration": round(max_concentration, 1),
         }
 
-    def calculate_stress_test(self, current_value: float, allocations: List[Dict], scenario_drop: float = 0.20) -> Dict:
+    def calculate_stress_test(self, current_value: float, allocations: list[dict], scenario_drop: float = 0.20) -> dict:
         """
         Calculate portfolio value under stress scenario.
         Default scenario: 20% market drop.
@@ -419,11 +364,11 @@ class SnapshotRiskMixin:
         db: AsyncSession,
         user_id: str,
         current_value: float,
-        allocations: List[Dict],
+        allocations: list[dict],
         days: int = 30,
-        history: Optional[List[Dict]] = None,
-        roi_annualized: Optional[float] = None,
-    ) -> Dict:
+        history: list[dict] | None = None,
+        roi_annualized: float | None = None,
+    ) -> dict:
         """Get all risk metrics in one call (builds price series once)."""
         # Build portfolio value series once and share across all metric functions
         if history is None:

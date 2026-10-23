@@ -1,13 +1,11 @@
 """Unified symbol-to-CoinGecko-ID mapping.
 
-Single source of truth used by PriceService and HistoricalDataFetcher.
+Single source of truth used by the price feed and HistoricalDataFetcher.
 """
-
-from typing import Dict, Optional
 
 # Overrides for Yahoo Finance crypto tickers that don't follow the {SYMBOL}-EUR pattern.
 # Most cryptos use "{SYMBOL}-EUR" automatically; only add exceptions here.
-YAHOO_CRYPTO_OVERRIDES: Dict[str, str] = {
+YAHOO_CRYPTO_OVERRIDES: dict[str, str] = {
     "PEPE": "PEPE24478-EUR",
 }
 
@@ -15,7 +13,7 @@ YAHOO_CRYPTO_OVERRIDES: Dict[str, str] = {
 YAHOO_SKIP_SYMBOLS = {"USDC", "USDT", "USDG"}
 
 
-def get_yahoo_symbol(symbol: str) -> Optional[str]:
+def get_yahoo_symbol(symbol: str) -> str | None:
     """Return the Yahoo Finance ticker for a crypto symbol, or None to skip.
 
     Uses the override map for special cases, otherwise defaults to {SYMBOL}-EUR.
@@ -32,7 +30,7 @@ def get_yahoo_symbol(symbol: str) -> Optional[str]:
     return None
 
 
-COINGECKO_SYMBOL_MAP: Dict[str, str] = {
+COINGECKO_SYMBOL_MAP: dict[str, str] = {
     "BTC": "bitcoin",
     "ETH": "ethereum",
     "SOL": "solana",

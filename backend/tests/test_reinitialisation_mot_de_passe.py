@@ -10,12 +10,13 @@ et refus d'énumérer les comptes) et **ce qui ne protège pas** : deux constats
 sont commentés là où ils apparaissent (NEW-65 et NEW-66).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.core.security import create_access_token, hash_password
-from app.models.user import User, UserRole
+from app.domains.identity.models import User, UserRole
+from app.domains.identity.passwords import hash_password
+from app.domains.identity.tokens import create_token
 
 MOT_DE_PASSE_VALIDE = "NouveauMotDePasse1!"
 
@@ -60,7 +61,7 @@ class TestDemandeDeReinitialisation:
         compte = await _recharger(db_session, compte)
         assert compte.password_reset_token
         assert len(compte.password_reset_token) >= 40, "un jeton court serait devinable"
-        delai = compte.password_reset_expires - datetime.now(timezone.utc)
+        delai = compte.password_reset_expires - datetime.now(UTC)
         assert timedelta(minutes=55) < delai <= timedelta(hours=1)
 
     async def test_le_lien_envoye_porte_le_jeton(self, client, db_session, compte, monkeypatch):
@@ -166,7 +167,7 @@ class TestReinitialisation:
 
     async def test_un_jeton_expire_est_refuse_et_efface(self, client, db_session, compte, monkeypatch):
         jeton = await self._jeton(client, db_session, compte, monkeypatch)
-        compte.password_reset_expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        compte.password_reset_expires = datetime.now(UTC) - timedelta(minutes=1)
         await db_session.commit()
 
         reponse = await client.post(
@@ -223,7 +224,7 @@ class TestReinitialisation:
 class TestChangementDeMotDePasse:
     @pytest.fixture
     def entetes(self, compte: User) -> dict:
-        return {"Authorization": f"Bearer {create_access_token(subject=str(compte.id))}"}
+        return {"Authorization": f"Bearer {create_token(str(compte.id))}"}
 
     async def test_le_mot_de_passe_actuel_est_exige(self, client, entetes):
         reponse = await client.post(
@@ -270,7 +271,7 @@ class TestPorteeDesSessions:
     """
 
     async def test_un_jeton_emis_avant_le_changement_ne_passe_plus(self, client, compte):
-        jeton = create_access_token(subject=str(compte.id))
+        jeton = create_token(str(compte.id))
         entetes = {"Authorization": f"Bearer {jeton}"}
         assert (await client.get("/api/v1/auth/me", headers=entetes)).status_code == 200
 
@@ -285,7 +286,7 @@ class TestPorteeDesSessions:
         assert "mot de passe a été modifié" in apres.json()["detail"]
 
     async def test_la_reinitialisation_coupe_aussi_les_sessions(self, client, db_session, compte, monkeypatch):
-        jeton = create_access_token(subject=str(compte.id))
+        jeton = create_token(str(compte.id))
         entetes = {"Authorization": f"Bearer {jeton}"}
         await _demander_reinitialisation(client, compte.email, monkeypatch)
         jeton_reinit = (await _recharger(db_session, compte)).password_reset_token
@@ -304,9 +305,9 @@ class TestPorteeDesSessions:
         Sans ce contrôle sur `/refresh`, un jeton d'accès coupé se remplaçait
         aussitôt par un neuf et la faille restait entière.
         """
-        from app.core.security import create_refresh_token
+        from app.domains.identity.tokens import create_token
 
-        rafraichissement = create_refresh_token(subject=str(compte.id))
+        rafraichissement = create_token(str(compte.id), "refresh")
         await _demander_reinitialisation(client, compte.email, monkeypatch)
         jeton_reinit = (await _recharger(db_session, compte)).password_reset_token
         await client.post(
@@ -325,7 +326,7 @@ class TestPorteeDesSessions:
         La réponse repose des cookies neufs : la session courante continue,
         toutes les autres tombent.
         """
-        jeton = create_access_token(subject=str(compte.id))
+        jeton = create_token(str(compte.id))
         entetes = {"Authorization": f"Bearer {jeton}"}
 
         reponse = await client.post(
@@ -347,7 +348,7 @@ class TestPorteeDesSessions:
         n'a changé depuis ce correctif — aucun jeton n'est refusé, pas même
         ceux émis avant lui, qui ne portent pas de date d'émission.
         """
-        jeton = create_access_token(subject=str(compte.id))
+        jeton = create_token(str(compte.id))
 
         reponse = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {jeton}"})
 
@@ -360,14 +361,14 @@ class TestPorteeDesSessions:
         jamais changé depuis : ils passent tant que rien n'a bougé, et tombent
         au premier changement, avec les autres.
         """
-        from jose import jwt as jose_jwt
+        import jwt
 
         from app.core.config import settings
 
-        ancien_style = jose_jwt.encode(
+        ancien_style = jwt.encode(
             {
                 "sub": str(compte.id),
-                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+                "exp": datetime.now(UTC) + timedelta(minutes=15),
                 "type": "access",
                 "jti": "sans-generation",
             },
@@ -385,7 +386,7 @@ class TestPorteeDesSessions:
     async def test_le_compteur_avance_a_chaque_changement(self, client, db_session, compte):
         # Deux changements successifs doivent périmer deux fois : sans
         # incrément, le second laisserait passer les jetons du premier.
-        entetes = {"Authorization": f"Bearer {create_access_token(subject=str(compte.id))}"}
+        entetes = {"Authorization": f"Bearer {create_token(str(compte.id))}"}
 
         await client.post(
             "/api/v1/auth/change-password",
@@ -398,7 +399,7 @@ class TestPorteeDesSessions:
         await client.post(
             "/api/v1/auth/change-password",
             json={"current_password": MOT_DE_PASSE_VALIDE, "new_password": "EncoreUnAutre1!"},
-            headers={"Authorization": f"Bearer {create_access_token(subject=str(compte.id), token_version=premier)}"},
+            headers={"Authorization": f"Bearer {create_token(str(compte.id), token_version=premier)}"},
         )
         client.cookies.clear()
 
@@ -418,7 +419,7 @@ class TestUneSeuleRegleDeMotDePasse:
 
     Le validateur de la réinitialisation, lui, redisait la règle mot pour mot au
     lieu de l'appeler : identique ce jour-là, libre de diverger le lendemain.
-    Les quatre appellent désormais `_validate_password_complexity`.
+    Les cinq appellent désormais `check_password_strength`.
     """
 
     @pytest.mark.parametrize(
@@ -429,9 +430,13 @@ class TestUneSeuleRegleDeMotDePasse:
     def test_aucun_chemin_n_accepte_un_mot_de_passe_faible(self, modele, faible):
         import pydantic
 
-        from app.api.v1.endpoints.auth import ResetPasswordRequest
-        from app.schemas.auth import PasswordChangeRequest, RegisterRequest
-        from app.schemas.user import UserCreate, UserUpdate
+        from app.domains.identity.schemas import (
+            PasswordChangeRequest,
+            RegisterRequest,
+            ResetPasswordRequest,
+            UserCreate,
+            UserUpdate,
+        )
 
         classes = {
             "RegisterRequest": (RegisterRequest, {"email": "a@b.com", "password": faible}),
@@ -446,7 +451,7 @@ class TestUneSeuleRegleDeMotDePasse:
             classe(**champs)
 
     def test_une_modification_sans_mot_de_passe_reste_possible(self):
-        from app.schemas.user import UserUpdate
+        from app.domains.identity.schemas import UserUpdate
 
         # `UserUpdate.password` est facultatif : changer le seul prénom ne doit
         # pas buter sur la règle de complexité.

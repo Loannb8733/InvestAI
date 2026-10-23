@@ -9,7 +9,6 @@ import logging
 import math
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional
 
 import numpy as np
 from dateutil.relativedelta import relativedelta
@@ -72,14 +71,14 @@ class GoalProjection:
     rmc_with_returns: float  # RMC factoring in expected returns
     probability_on_track: float  # 0-100%
     probability_label: str  # "Forte", "Moyenne", "Faible"
-    alert_message: Optional[str] = None
+    alert_message: str | None = None
     regime_label: str = ""
     strategy_type: str = "moderate"
     gold_shield_active: bool = False
-    eta_date: Optional[str] = None  # "Mar 2027" — estimated time of arrival
+    eta_date: str | None = None  # "Mar 2027" — estimated time of arrival
     eta_months: int = 0
-    gold_shield_advice: Optional[str] = None
-    curve: List[ProjectionPoint] = field(default_factory=list)
+    gold_shield_advice: str | None = None
+    curve: list[ProjectionPoint] = field(default_factory=list)
 
 
 class GoalProjectionService:
@@ -126,7 +125,7 @@ class GoalProjectionService:
         annual_return: float,
         annual_vol: float,
         num_simulations: int = 5000,
-        coupon_schedule: Optional[Dict[int, float]] = None,
+        coupon_schedule: dict[int, float] | None = None,
     ) -> float:
         """Monte Carlo probability of reaching target by deadline.
 
@@ -164,8 +163,8 @@ class GoalProjectionService:
         annual_return: float,
         annual_vol: float,
         start_date: date,
-        coupon_schedule: Optional[Dict[int, float]] = None,
-    ) -> List[ProjectionPoint]:
+        coupon_schedule: dict[int, float] | None = None,
+    ) -> list[ProjectionPoint]:
         """Build projection curve with p25/p50/p75 bands."""
         if months <= 0:
             return []
@@ -185,7 +184,7 @@ class GoalProjectionService:
 
         # Sample monthly points (max 36 points for UI)
         step = max(1, months // 36)
-        points: List[ProjectionPoint] = []
+        points: list[ProjectionPoint] = []
 
         for m in range(0, months + 1, step):
             month_date = date(
@@ -293,10 +292,10 @@ class GoalProjectionService:
         goal_id: str,
         current_amount: float,
         target_amount: float,
-        deadline: Optional[date],
+        deadline: date | None,
         strategy_type: str = "moderate",
         monthly_contribution: float = 0.0,
-        coupon_income: Optional[List[dict]] = None,
+        coupon_income: list[dict] | None = None,
     ) -> GoalProjection:
         """Full goal projection with regime awareness."""
         # Get current regime
@@ -344,7 +343,7 @@ class GoalProjectionService:
         effective_contribution = monthly_contribution if monthly_contribution > 0 else rmc_returns
 
         # Build coupon schedule: {month_index: total_amount}
-        coupon_schedule: Optional[Dict[int, float]] = None
+        coupon_schedule: dict[int, float] | None = None
         if coupon_income:
             coupon_schedule = {}
             for entry in coupon_income:
@@ -444,11 +443,10 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
 
     from sqlalchemy import select
 
-    from app.models.asset import Asset
+    from app.domains.market_data.prices.service import price_feed
+    from app.domains.portfolio.classification import is_cash_like
+    from app.domains.portfolio.models import Asset, Portfolio
     from app.models.goal import Goal, GoalStatus, GoalType
-    from app.models.portfolio import Portfolio
-    from app.services.asset_classification import is_liquidity
-    from app.services.price_service import price_service
 
     conditions = [Goal.user_id == user_id, Goal.status == GoalStatus.ACTIVE]
     if only_goal_id is not None:
@@ -475,10 +473,11 @@ async def sync_goals_for_user(db: AsyncSession, user_id, only_goal_id=None) -> i
             continue
         pkey = (asset.symbol, asset.asset_type.value)
         if pkey not in price_cache:
-            price_cache[pkey] = await price_service.get_price(asset.symbol, asset.asset_type.value)
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            price_cache[pkey] = quote.price if quote is not None else Decimal(str(asset.avg_buy_price or 0))
         value = asset.quantity * Decimal(str(price_cache[pkey]))
         total_value += value
-        if is_liquidity(asset.symbol):
+        if is_cash_like(asset.symbol):
             liquid_value += value
     cash_total = Decimal("0")
     for portfolio in portfolios:

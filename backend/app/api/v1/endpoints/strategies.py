@@ -1,18 +1,18 @@
 """Strategy endpoints — CRUD + AI suggestions."""
 
 import logging
-from typing import List
+from datetime import UTC
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.models.strategy import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
-from app.models.user import User
 from app.schemas.strategy import StrategyActionUpdate, StrategyCreate, StrategyResponse, StrategyUpdate
 
 logger = logging.getLogger(__name__)
@@ -59,12 +59,12 @@ async def _enrich(db: AsyncSession, strategy: Strategy) -> dict:
     }
 
 
-@router.get("", response_model=List[StrategyResponse])
+@router.get("", response_model=list[StrategyResponse])
 @limiter.limit("30/minute")
 async def list_strategies(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List all strategies for the current user."""
     result = await db.execute(
@@ -80,7 +80,7 @@ async def create_strategy(
     request: Request,
     data: StrategyCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a user-defined strategy with optional actions."""
     strategy = Strategy(
@@ -118,7 +118,7 @@ async def update_strategy(
     strategy_id: UUID,
     data: StrategyUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a strategy (name, description, status, params)."""
     result = await db.execute(
@@ -151,7 +151,7 @@ async def delete_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a strategy and its actions."""
     result = await db.execute(
@@ -171,12 +171,12 @@ async def delete_strategy(
     await db.commit()
 
 
-@router.post("/ai-suggest", response_model=List[StrategyResponse])
+@router.post("/ai-suggest", response_model=list[StrategyResponse])
 @limiter.limit("5/minute")
 async def ai_suggest_strategies(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Ask AI to analyze portfolio and suggest strategies.
 
@@ -197,7 +197,7 @@ async def accept_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Accept an AI-proposed strategy (changes status to ACTIVE)."""
     result = await db.execute(
@@ -222,7 +222,7 @@ async def reject_strategy(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Reject an AI-proposed strategy."""
     result = await db.execute(
@@ -247,7 +247,7 @@ async def get_strategy_performance(
     request: Request,
     strategy_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Measure what the EXECUTED actions of this strategy actually returned.
 
@@ -291,7 +291,7 @@ async def update_action_status(
     action_id: UUID,
     data: StrategyActionUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Mark an action as EXECUTED or SKIPPED."""
     result = await db.execute(
@@ -312,9 +312,9 @@ async def update_action_status(
     if data.status is not None:
         action.status = ActionStatus(data.status)
         if data.status == "EXECUTED":
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            action.executed_at = datetime.now(timezone.utc)
+            action.executed_at = datetime.now(UTC)
 
     await db.commit()
     return {

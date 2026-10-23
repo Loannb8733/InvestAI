@@ -5,19 +5,13 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     alerts,
     analytics,
-    api_keys,
-    assets,
-    auth,
     calendar,
-    cold_wallets,
     cron,
     crowdfunding,
     dashboard,
     goals,
     insights,
-    notes,
     notifications,
-    portfolios,
     predictions,
     reports,
     simulations,
@@ -25,28 +19,32 @@ from app.api.v1.endpoints import (
     strategies,
     system,
     telegram_webhook,
-    transactions,
-    users,
     websocket,
 )
+from app.domains.exchanges.router import keys_router, wallets_router
+from app.domains.identity.admin_router import router as users_router
+from app.domains.identity.router import router as auth_router
+from app.domains.journal.router import router as journal_router
+from app.domains.portfolio.router import assets_router, portfolios_router
+from app.domains.transactions.router import router as transactions_router
 
 api_router = APIRouter()
 
 api_router.include_router(telegram_webhook.router, prefix="/bot", tags=["Telegram Bot"])
-api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-api_router.include_router(users.router, prefix="/users", tags=["Users"])
+api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(users_router, prefix="/users", tags=["Users"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
-api_router.include_router(portfolios.router, prefix="/portfolios", tags=["Portfolios"])
-api_router.include_router(assets.router, prefix="/assets", tags=["Assets"])
-api_router.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
-api_router.include_router(api_keys.router, prefix="/api-keys", tags=["API Keys"])
-api_router.include_router(cold_wallets.router, prefix="/cold-wallets", tags=["Cold Wallets"])
+api_router.include_router(portfolios_router, prefix="/portfolios", tags=["Portfolios"])
+api_router.include_router(assets_router, prefix="/assets", tags=["Assets"])
+api_router.include_router(transactions_router, prefix="/transactions", tags=["Transactions"])
+api_router.include_router(keys_router, prefix="/api-keys", tags=["API Keys"])
+api_router.include_router(wallets_router, prefix="/cold-wallets", tags=["Cold Wallets"])
 api_router.include_router(cron.router, prefix="/cron", tags=["Cron"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(predictions.router, prefix="/predictions", tags=["Predictions"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
-api_router.include_router(notes.router, prefix="/notes", tags=["Notes"])
+api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
 api_router.include_router(simulations.router, prefix="/simulations", tags=["Simulations"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])

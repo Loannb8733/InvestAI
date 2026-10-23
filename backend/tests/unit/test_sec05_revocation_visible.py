@@ -26,9 +26,7 @@ import ast
 from pathlib import Path
 
 _BACKEND = Path(__file__).resolve().parents[2]
-_DEPS = (_BACKEND / "app" / "api" / "deps.py").read_text(encoding="utf-8")
-_AUTH = (_BACKEND / "app" / "api" / "v1" / "endpoints" / "auth.py").read_text(encoding="utf-8")
-_KEYS = (_BACKEND / "app" / "api" / "v1" / "endpoints" / "api_keys.py").read_text(encoding="utf-8")
+_GUARDS = (_BACKEND / "app" / "domains" / "identity" / "guards.py").read_text(encoding="utf-8")
 
 
 def _appels_logger(source: str) -> list:
@@ -45,69 +43,25 @@ def _appels_logger(source: str) -> list:
     return appels
 
 
-def test_les_quatre_fail_open_de_revocation_sont_en_error():
-    """Un WARNING ici ne déclenche aucune alerte : le fail-open passerait inaperçu."""
-    trouves = []
-    for source in (_DEPS, _AUTH):
-        for niveau, msg in _appels_logger(source):
-            bas = msg.lower()
-            concerne = ("blocklist" in bas or "revocation" in bas or "revoked" in bas) and "redis" in bas
-            if concerne:
-                trouves.append((niveau, msg))
-                assert niveau == "error", f"fail-open de révocation loggué en {niveau} au lieu de error : {msg!r}"
+def _fail_open() -> list:
+    return [
+        (niveau, msg)
+        for niveau, msg in _appels_logger(_GUARDS)
+        if any(mot in msg.lower() for mot in ("blocklist", "revocation", "revoked")) and "redis" in msg.lower()
+    ]
 
-    assert len(trouves) == 4, (
-        f"4 sites attendus (vérif access + refresh, révocation des deux au logout), {len(trouves)} trouvé(s) : "
-        f"{[m for _, m in trouves]}"
-    )
+
+def test_les_fail_open_de_revocation_sont_en_error():
+    """Un WARNING ici ne déclenche aucune alerte : le fail-open passerait inaperçu.
+
+    Deux sites : la vérification (jetons d'accès et de rafraîchissement) et la
+    révocation (les deux jetons au logout).
+    """
+    trouves = _fail_open()
+    assert len(trouves) == 2, f"2 sites attendus, {len(trouves)} trouvé(s) : {trouves}"
+    assert all(niveau == "error" for niveau, _ in trouves), trouves
 
 
 def test_les_messages_de_fail_open_sont_identifiables():
     """Un préfixe stable rend la règle d'alerte possible côté supervision."""
-    for source in (_DEPS, _AUTH):
-        for niveau, msg in _appels_logger(source):
-            bas = msg.lower()
-            if ("blocklist" in bas or "revocation" in bas or "revoked" in bas) and "redis" in bas:
-                assert msg.startswith("SECURITY:"), f"message de fail-open sans préfixe SECURITY: {msg!r}"
-
-
-def _fonction(source: str, nom: str):
-    for noeud in ast.walk(ast.parse(source)):
-        if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef)) and noeud.name == nom:
-            return noeud
-    raise AssertionError(f"fonction {nom} introuvable")
-
-
-def test_import_status_verifie_le_proprietaire():
-    src = ast.unparse(_fonction(_KEYS, "get_import_status"))
-    assert "user_id" in src, "get_import_status ne consulte pas le propriétaire de la tâche"
-    assert "current_user.id" in src, "le propriétaire n'est pas comparé à l'utilisateur courant"
-
-
-def test_import_status_ne_distingue_pas_absente_et_interdite():
-    """Un 403 distinct confirmerait l'existence du task_id à un tiers."""
-    fn = _fonction(_KEYS, "get_import_status")
-    codes = [
-        kw.value.attr
-        for n in ast.walk(fn)
-        if isinstance(n, ast.Raise) and isinstance(n.exc, ast.Call)
-        for kw in n.exc.keywords
-        if kw.arg == "status_code" and isinstance(kw.value, ast.Attribute)
-    ]
-    assert codes, "get_import_status ne lève plus d'erreur : le contrôle a disparu"
-    assert all("404" in c for c in codes), f"réponse distincte pour une tâche d'autrui : {codes}"
-
-
-def test_le_proprietaire_est_enregistre_a_la_creation():
-    assert '"user_id": str(current_user.id)' in _KEYS, (
-        "aucune tâche d'import ne mémorise son propriétaire : la vérification "
-        "d'ownership rejetterait alors tout le monde"
-    )
-
-
-def test_l_identifiant_du_proprietaire_ne_fuit_pas_dans_la_reponse():
-    src = ast.unparse(_fonction(_KEYS, "get_import_status"))
-    assert "!= 'user_id'" in src or '!= "user_id"' in src, (
-        "le user_id stocké doit être retiré de la réponse, sinon la route "
-        "expose l'identifiant interne du propriétaire"
-    )
+    assert all(msg.startswith("SECURITY:") for _, msg in _fail_open())

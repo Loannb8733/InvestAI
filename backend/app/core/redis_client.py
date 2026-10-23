@@ -5,7 +5,7 @@ import hmac
 import json
 import logging
 import pickle  # nosec B403 — ML model caching; HMAC-verified before deserialization  # noqa: S403
-from typing import Any, Dict, Optional
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -29,7 +29,7 @@ def redis_async_url() -> str:
     return url
 
 
-def redis_ssl_kwargs() -> Dict[str, Any]:
+def redis_ssl_kwargs() -> dict[str, Any]:
     """Return extra kwargs needed for TLS connections (Upstash).
 
     ssl_cert_reqs="required" : redis-py valide le certificat du broker
@@ -51,7 +51,7 @@ def redis_ssl_kwargs() -> Dict[str, Any]:
 REDIS_DELAI_RESEAU = 3.0
 
 
-def redis_client_kwargs() -> Dict[str, Any]:
+def redis_client_kwargs() -> dict[str, Any]:
     """Options de connexion de tout client Redis applicatif : TLS et délais réseau.
 
     À utiliser pour chaque client qui exécute des commandes à réponse immédiate.
@@ -77,8 +77,8 @@ _HMAC_KEY: bytes = settings.SECRET_KEY.encode() if isinstance(settings.SECRET_KE
 logger = logging.getLogger(__name__)
 
 # Two async Redis clients: one for binary (pickle), one for text (JSON)
-_redis_bin: Optional[aioredis.Redis] = None
-_redis_txt: Optional[aioredis.Redis] = None
+_redis_bin: aioredis.Redis | None = None
+_redis_txt: aioredis.Redis | None = None
 
 
 async def _get_redis_bin() -> aioredis.Redis:
@@ -108,10 +108,6 @@ async def _get_redis_txt() -> aioredis.Redis:
 
 
 # Keep backward compat alias (binary client)
-async def get_redis() -> aioredis.Redis:
-    return await _get_redis_bin()
-
-
 # ── Cross-worker single-flight lock ──────────────────────────────────
 # A best-effort distributed lock so that, across multiple web workers, only one
 # recomputes an expensive cached value at a time. Every path is fail-OPEN: if
@@ -160,65 +156,6 @@ def _data_hash(prices: list) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-# ── Forex rate cache ─────────────────────────────────────────────────
-
-_FOREX_CACHE_TTL = 86400  # 24 hours
-_FOREX_KEY_PREFIX = "forex:"
-
-
-# Dernière écriture de chaque taux par ce processus : (instant monotone, taux).
-# Le tableau de bord réécrivait le même taux à chaque recalcul, alors que la clé
-# vit 24 h — une commande Upstash facturée pour rien.
-_forex_ecrits: Dict[tuple, tuple] = {}
-_FOREX_REECRITURE_S = 3600
-
-
-async def get_cached_forex_rate(from_ccy: str, to_ccy: str) -> Optional[dict]:
-    """Get cached forex rate. Returns {"rate": float, "cached_at": ISO timestamp} or None."""
-    try:
-        r = await _get_redis_txt()
-        data = await r.get(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}")
-        if data:
-            valeur = json.loads(data)
-            # Tant que price_service écrivait sa valeur brute (« 0.866 ») sous
-            # la même clé, json.loads rendait un nombre : l'appelant faisait
-            # alors `.get("rate")` sur un float et levait AttributeError.
-            if isinstance(valeur, dict):
-                return valeur
-            logger.warning("Cache de change %s→%s illisible (%r), ignoré", from_ccy, to_ccy, data)
-    except Exception as e:
-        logger.debug("Redis forex cache miss %s→%s: %s", from_ccy, to_ccy, e)
-    return None
-
-
-async def cache_forex_rate(from_ccy: str, to_ccy: str, rate: float) -> None:
-    """Cache a forex rate with 24h TTL and timestamp.
-
-    Un taux identique déjà écrit par ce processus depuis moins d'une heure n'est
-    pas réécrit : la clé vit 24 h, la réécriture ne changeait rien.
-    """
-    import time
-
-    cle = (from_ccy, to_ccy)
-    precedent = _forex_ecrits.get(cle)
-    if precedent and precedent[1] == rate and time.monotonic() - precedent[0] < _FOREX_REECRITURE_S:
-        return
-    try:
-        from datetime import datetime, timezone
-
-        r = await _get_redis_txt()
-        payload = json.dumps(
-            {
-                "rate": rate,
-                "cached_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        await r.setex(f"{_FOREX_KEY_PREFIX}{from_ccy}:{to_ccy}", _FOREX_CACHE_TTL, payload)
-        _forex_ecrits[cle] = (time.monotonic(), rate)
-    except Exception as e:
-        logger.warning("Failed to cache forex rate %s→%s: %s", from_ccy, to_ccy, e)
-
-
 # ── Dashboard response cache (use text client) ───────────────────────
 # The dashboard aggregates many DB queries. We cache the full serialized
 # response per (user, period, currency) with a short safety TTL. Any
@@ -233,7 +170,7 @@ def _dashboard_key(user_id: str, days: int, currency: str) -> str:
     return f"{_DASHBOARD_KEY_PREFIX}{user_id}:{days}:{currency}"
 
 
-async def get_cached_dashboard(user_id: str, days: int, currency: str) -> Optional[dict]:
+async def get_cached_dashboard(user_id: str, days: int, currency: str) -> dict | None:
     """Get cached dashboard response dict, or None on miss/error."""
     try:
         r = await _get_redis_txt()
@@ -280,7 +217,7 @@ CONTRARIAN_STATS_KEY = "contrarian_stats:btc:fng"
 CONTRARIAN_STATS_TTL = 691200  # 8 days
 
 
-async def get_cached_contrarian_stats() -> Optional[dict]:
+async def get_cached_contrarian_stats() -> dict | None:
     """Get cached contrarian backtest stats dict, or None on miss/error."""
     try:
         r = await _get_redis_txt()
@@ -295,7 +232,7 @@ async def get_cached_contrarian_stats() -> Optional[dict]:
 # ── JSON-based caches (use text client) ──────────────────────────────
 
 
-async def get_cached_prediction(symbol: str, days: int) -> Optional[dict]:
+async def get_cached_prediction(symbol: str, days: int) -> dict | None:
     """Get cached prediction result."""
     try:
         r = await _get_redis_txt()
@@ -316,18 +253,6 @@ async def cache_prediction(symbol: str, days: int, result: dict, ttl: int = 1800
         logger.warning("Failed to cache prediction: %s", e)
 
 
-async def get_cached_hyperparams(symbol: str, model_name: str) -> Optional[dict]:
-    """Get cached optimal hyperparameters."""
-    try:
-        r = await _get_redis_txt()
-        data = await r.get(f"hparams:{symbol}:{model_name}")
-        if data:
-            return json.loads(data)
-    except Exception as exc:
-        logger.debug("Redis hyperparams cache miss for %s:%s: %s", symbol, model_name, exc)
-    return None
-
-
 async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int = 604800):
     """Cache hyperparameters (default 7 days TTL)."""
     try:
@@ -337,73 +262,7 @@ async def cache_hyperparams(symbol: str, model_name: str, params: dict, ttl: int
         logger.warning("Failed to cache hyperparams: %s", e)
 
 
-# Couverture écrite par `tasks.history_cache` (DEFAULT_CACHE_DAYS). Dupliquée
-# plutôt qu'importée : ce module est chargé par le web comme par les workers, et
-# importer une tâche Celery ici créerait un cycle.
-_JOURS_CACHE_TACHE = 365
-
-
-async def get_cached_history(symbol: str, asset_type: str, days: int) -> Optional[dict]:
-    """Historique en cache, en lisant aussi ce qu'écrit la tâche périodique.
-
-    Deux caches d'historique coexistaient sans se connaître :
-
-    - ici, ``hist:<sym>:<type>:<jours>``, écrit à la demande, TTL 1 h ;
-    - dans ``tasks/history_cache.py``, ``hist:<SYM>_<jours>`` (plus une copie
-      ``:fallback`` à TTL long), alimenté toutes les 30 minutes par Celery avec
-      repli PostgreSQL.
-
-    Le second était donc rempli en permanence pour rien : aucun appelant de
-    cette fonction ne le lisait. `get_market_cycle` repartait chercher les mêmes
-    données chez CoinGecko dans le chemin d'une requête HTTP, jusqu'à 65 s
-    (NEW-13). On lit désormais les deux, du plus précis au plus large.
-    """
-    # `days` demandé, puis la couverture annuelle de la tâche, qu'on retaille.
-    candidats = [
-        f"hist:{symbol}:{asset_type}:{days}",
-        f"hist:{symbol.upper()}_{days}",
-        f"hist:{symbol.upper()}_{days}:fallback",
-    ]
-    if days != _JOURS_CACHE_TACHE:
-        candidats += [
-            f"hist:{symbol.upper()}_{_JOURS_CACHE_TACHE}",
-            f"hist:{symbol.upper()}_{_JOURS_CACHE_TACHE}:fallback",
-        ]
-
-    try:
-        r = await _get_redis_txt()
-        for cle in candidats:
-            data = await r.get(cle)
-            if not data:
-                continue
-            charge = json.loads(data)
-            prix = charge.get("prices")
-            if not prix:
-                continue
-            # Une série annuelle sert une demande plus courte ; l'inverse serait
-            # trompeur, on ne complète jamais ce qu'on n'a pas.
-            if len(prix) > days:
-                charge = dict(charge)
-                charge["prices"] = prix[-days:]
-                dates = charge.get("dates")
-                if dates and len(dates) > days:
-                    charge["dates"] = dates[-days:]
-            return charge
-    except Exception as e:
-        logger.debug("Redis cache miss for history %s: %s", symbol, e)
-    return None
-
-
-async def cache_history(symbol: str, asset_type: str, days: int, result: dict, ttl: int = 3600):
-    """Cache historical OHLCV data (default 1h TTL)."""
-    try:
-        r = await _get_redis_txt()
-        await r.setex(f"hist:{symbol}:{asset_type}:{days}", ttl, json.dumps(result, default=str))
-    except Exception as e:
-        logger.warning("Failed to cache history: %s", e)
-
-
-async def get_cached_ensemble(symbol: str, data_hash: str, days: int) -> Optional[dict]:
+async def get_cached_ensemble(symbol: str, data_hash: str, days: int) -> dict | None:
     """Get cached ensemble forecast result."""
     try:
         r = await _get_redis_txt()
@@ -428,27 +287,6 @@ async def cache_ensemble(symbol: str, data_hash: str, days: int, result: dict, t
         logger.warning("Failed to cache ensemble: %s", e)
 
 
-async def get_cached_reliability(symbol: str, days: int) -> Optional[dict]:
-    """Get cached reliability scores."""
-    try:
-        r = await _get_redis_txt()
-        data = await r.get(f"reliability:{symbol}:{days}")
-        if data:
-            return json.loads(data)
-    except Exception as exc:
-        logger.debug("Redis reliability cache miss for %s: %s", symbol, exc)
-    return None
-
-
-async def cache_reliability(symbol: str, days: int, result: dict, ttl: int = 86400):
-    """Cache reliability scores (default 24h TTL)."""
-    try:
-        r = await _get_redis_txt()
-        await r.setex(f"reliability:{symbol}:{days}", ttl, json.dumps(result))
-    except Exception as e:
-        logger.warning("Failed to cache reliability: %s", e)
-
-
 # ── Binary caches (use binary client for pickle) ─────────────────────
 # Pickle payloads are HMAC-signed on write and verified before deserialization
 # to prevent arbitrary code execution if Redis is compromised.
@@ -462,7 +300,7 @@ def _sign_payload(data: bytes) -> bytes:
     return sig + data
 
 
-def _verify_and_extract(data: bytes) -> Optional[bytes]:
+def _verify_and_extract(data: bytes) -> bytes | None:
     """Verify HMAC signature and return raw pickle payload, or None if invalid."""
     if len(data) <= _HMAC_SIG_LEN:
         return None
@@ -474,7 +312,7 @@ def _verify_and_extract(data: bytes) -> Optional[bytes]:
     return None
 
 
-async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> Optional[object]:
+async def get_cached_model(symbol: str, model_name: str, data_hash: str) -> object | None:
     """Get cached fitted model from Redis (HMAC-verified before deserialization)."""
     try:
         r = await _get_redis_bin()

@@ -370,7 +370,7 @@ export default function RiskPerformancePillar() {
       {/* Avertissement historique court (interprétation backend) */}
       {analytics.interpretations?.global && (
         <div className="flex items-center gap-2 rounded-lg border border-warning dark:border-warning bg-warning dark:bg-warning/20 p-3">
-          <Info className="h-4 w-4 text-warning flex-shrink-0" />
+          <Info className="h-4 w-4 text-warning shrink-0" />
           <p className="text-sm text-warning dark:text-warning">{analytics.interpretations.global}</p>
         </div>
       )}

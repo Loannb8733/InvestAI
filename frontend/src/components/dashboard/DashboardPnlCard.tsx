@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { PnLBreakdown } from '@/types'
 import { profileApi, investorProfileQueryKey, reportsApi, type TaxSummary } from '@/services/api'
 import { queryKeys } from '@/lib/queryKeys'

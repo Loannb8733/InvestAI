@@ -3,9 +3,8 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 import httpx
 import numpy as np
@@ -16,11 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.finance_constants import RISK_FREE_RATE
 from app.core.finance_constants import annualization_days as _trading_days
+from app.domains.market_data.fx.spot import spot_rates
+from app.domains.market_data.history.benchmarks import ANALYTICS_BENCHMARKS
+from app.domains.market_data.history.reader import local_series
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction
 from app.ml import adaptive_thresholds as adaptive_th
-from app.ml.historical_data import HistoricalDataFetcher
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction
 
 # `_var_parametric` n'est plus appelé ici depuis l'extraction du scoring, mais
 # reste ré-exporté : des tests l'importent depuis ce module.
@@ -57,15 +59,12 @@ from app.services.analytics_types import (  # noqa: F401  (ré-export pour les a
     PortfolioAnalytics,
     RebalanceOrder,
 )
-from app.services.price_service import PriceService
-from app.tasks.history_cache import get_cached_history
 
 logger = logging.getLogger(__name__)
 
 # RISK_FREE_RATE now lives in app.core.finance_constants (imported above).
 
 # Cache TTL for historical data (seconds) — shared across all endpoint calls
-_HISTORY_CACHE_TTL = 300  # 5 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -78,32 +77,13 @@ class AnalyticsService:
 
     # ECB Data Portal API — deposit facility rate (risk-free proxy for EUR)
     _ECB_DFR_URL = (
-        "https://data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV" "?lastNObservations=1&format=jsondata"
+        "https://data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV?lastNObservations=1&format=jsondata"
     )
     _ECB_RATE_TTL = 86400  # 24h cache
 
-    _MAX_CACHE_ENTRIES = 200
-
     def __init__(self):
-        self.price_service = PriceService()
-        # In-memory cache: key -> (timestamp, dates, prices) — bounded with LRU eviction
-        self._history_cache: Dict[str, Tuple[float, List[datetime], List[float]]] = {}
-        self._fetch_locks: Dict[str, asyncio.Lock] = {}  # Per-symbol locks
         # ECB risk-free rate cache: (timestamp, rate_decimal)
-        self._ecb_rate_cache: Optional[Tuple[float, float]] = None
-
-    def _get_fetch_lock(self, symbol: str) -> asyncio.Lock:
-        """Get or create a per-symbol lock to allow parallel fetches for different symbols."""
-        if symbol not in self._fetch_locks:
-            self._fetch_locks[symbol] = asyncio.Lock()
-        return self._fetch_locks[symbol]
-
-    def _cache_put(self, key: str, value: Tuple[float, List[datetime], List[float]]) -> None:
-        """Insert into cache with bounded size — evict oldest entry if full."""
-        if len(self._history_cache) >= self._MAX_CACHE_ENTRIES:
-            oldest_key = min(self._history_cache, key=lambda k: self._history_cache[k][0])
-            del self._history_cache[oldest_key]
-        self._history_cache[key] = value
+        self._ecb_rate_cache: tuple[float, float] | None = None
 
     async def _fetch_risk_free_rate(self) -> float:
         """Fetch ECB deposit facility rate with 24h in-memory cache.
@@ -152,69 +132,14 @@ class AnalyticsService:
     # Data fetching
     # ------------------------------------------------------------------
 
-    async def _fetch_history(self, symbol: str, asset_type, days: int = 60) -> Tuple[List[float], List[float]]:
-        """Fetch historical prices. Returns (timestamps, prices).
-        Priority: in-memory cache → Redis cache → live API (with rate limiting)."""
-        fetch_days = 90
-        cache_key = f"{symbol}_{fetch_days}"
-        now = time.time()
-
-        # 1. In-memory cache (fast, shared across endpoints in same process)
-        if cache_key in self._history_cache:
-            ts, dates, prices = self._history_cache[cache_key]
-            if now - ts < _HISTORY_CACHE_TTL:
-                if days < fetch_days and len(dates) > days:
-                    return [d.timestamp() for d in dates[-days:]], prices[-days:]
-                return [d.timestamp() for d in dates], prices
-
-        # 2. Redis cache (filled by Celery task every 30 min)
-        dates, prices = get_cached_history(symbol, days=fetch_days)
-        if dates and prices:
-            self._cache_put(cache_key, (now, dates, prices))
-            if days < fetch_days and len(dates) > days:
-                return [d.timestamp() for d in dates[-days:]], prices[-days:]
-            return [d.timestamp() for d in dates], prices
-
-        # 3. Live API fallback (per-symbol lock so different symbols fetch in parallel)
-        async with self._get_fetch_lock(symbol):
-            # Double-check after lock
-            if cache_key in self._history_cache:
-                ts, dates, prices = self._history_cache[cache_key]
-                if now - ts < _HISTORY_CACHE_TTL:
-                    if days < fetch_days and len(dates) > days:
-                        return [d.timestamp() for d in dates[-days:]], prices[-days:]
-                    return [d.timestamp() for d in dates], prices
-
-            fetcher = HistoricalDataFetcher()
-            try:
-                at = asset_type.value if isinstance(asset_type, AssetType) else asset_type
-                dates, prices = await fetcher.get_history(symbol, at, days=fetch_days)
-                if dates and prices:
-                    self._cache_put(cache_key, (time.time(), dates, prices))
-                await asyncio.sleep(1.5)
-                if days < fetch_days and len(dates) > days:
-                    return [d.timestamp() for d in dates[-days:]], prices[-days:]
-                return [d.timestamp() for d in dates], prices
-            except Exception as e:
-                logger.warning("History fetch failed for %s: %s", symbol, e)
-                return [], []
-            finally:
-                await fetcher.close()
+    async def _history_prices(self, symbol: str, days: int) -> list[float]:
+        """Cours en base de ``symbol`` sur ``days`` jours, sans réseau."""
+        return (await local_series(symbol, days)).prices
 
     async def _get_asset_price(self, asset: Asset) -> float:
         """Get current price for an asset."""
-        try:
-            price_data = None
-            if asset.asset_type == AssetType.CRYPTO:
-                price_data = await self.price_service.get_crypto_price(asset.symbol)
-            elif asset.asset_type in [AssetType.STOCK, AssetType.ETF]:
-                price_data = await self.price_service.get_stock_price(asset.symbol)
-            if price_data and "price" in price_data:
-                return float(price_data["price"])
-            return float(asset.avg_buy_price)
-        except Exception as e:
-            logger.warning("Price fetch failed for %s: %s", asset.symbol, e)
-            return float(asset.avg_buy_price)
+        quote = await price_feed.quote(asset.symbol, asset.asset_type)
+        return float(quote.price) if quote is not None else float(asset.avg_buy_price)
 
     # ------------------------------------------------------------------
     # Shared: fetch user assets (filtered, deduplicated)
@@ -224,10 +149,10 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         exclude_stablecoins: bool = True,
         min_value: float = 0.10,
-    ) -> List[Asset]:
+    ) -> list[Asset]:
         """Get user assets with consistent filtering (no dust, no stablecoins by default)."""
         if portfolio_id:
             result = await db.execute(
@@ -254,7 +179,7 @@ class AnalyticsService:
         filtered = []
         for a in assets:
             # Filter stablecoins
-            if exclude_stablecoins and PriceService.is_stablecoin(a.symbol):
+            if exclude_stablecoins and is_stablecoin(a.symbol):
                 continue
             # Filter dust by estimated value
             est_value = float(a.quantity) * float(a.avg_buy_price) if a.avg_buy_price else 0
@@ -275,7 +200,7 @@ class AnalyticsService:
         """
         asset_data = []
         for asset in assets:
-            _, hist_prices = await self._fetch_history(asset.symbol, asset.asset_type, days=days)
+            hist_prices = await self._history_prices(asset.symbol, days=days)
 
             # Use last historical price as current price (avoids extra API call)
             if hist_prices and hist_prices[-1] > 0:
@@ -296,7 +221,7 @@ class AnalyticsService:
             dd = _max_drawdown(hist_prices)
             dr = _daily_return_pct(hist_prices)
 
-            is_stable = PriceService.is_stablecoin(asset.symbol)
+            is_stable = is_stablecoin(asset.symbol)
 
             # Skip dust positions (value < $0.10)
             if current_value < 0.10:
@@ -473,7 +398,7 @@ class AnalyticsService:
         asset_data = await self._build_asset_data(assets, days=days)
 
         # Aggregate by symbol
-        aggregated: Dict[str, dict] = {}
+        aggregated: dict[str, dict] = {}
         for data in asset_data:
             sym = data["asset"].symbol
             if sym in aggregated:
@@ -502,8 +427,8 @@ class AnalyticsService:
         total_gl_pct = float(total_gl_dec / total_invested_dec * 100) if total_invested_dec > 0 else 0
 
         # Weights & allocation
-        allocation_by_type: Dict[str, float] = {}
-        allocation_by_asset: Dict[str, float] = {}
+        allocation_by_type: dict[str, float] = {}
+        allocation_by_asset: dict[str, float] = {}
         for d in real_assets:
             a = d["asset"]
             w = (d["current_value"] / total_value * 100) if total_value > 0 else 0
@@ -529,7 +454,7 @@ class AnalyticsService:
         var_95_eur = round(total_value * var95_pct / 100, 2)
         cvar_95_eur = round(total_value * cvar95_pct / 100, 2)
         var_95_desc = (
-            (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR " f"({var95_pct:.2f}% du portefeuille)")
+            (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR ({var95_pct:.2f}% du portefeuille)")
             if var95_pct > 0
             else ""
         )
@@ -608,7 +533,7 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         days: int = 60,
     ) -> CorrelationData:
         """Calculate correlation matrix from real historical returns."""
@@ -629,9 +554,9 @@ class AnalyticsService:
                 negatively_correlated=[],
             )
 
-        returns_map: Dict[str, np.ndarray] = {}
+        returns_map: dict[str, np.ndarray] = {}
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
+            prices = await self._history_prices(sym, days=days)
             rets = _compute_returns(prices)
             if len(rets) >= 5:
                 returns_map[sym] = rets
@@ -680,21 +605,16 @@ class AnalyticsService:
         # === Cross-asset benchmark correlation (P1) ===
         # Correlate portfolio assets against major benchmarks:
         # S&P500 (^GSPC), Nasdaq (^IXIC), Gold (PAXG)
-        _BENCHMARKS = {
-            "S&P500": ("^GSPC", "stock"),
-            "Nasdaq": ("^IXIC", "stock"),
-            "Gold": ("PAXG", "crypto"),
-        }
-        benchmark_correlations: Dict[str, Dict[str, float]] = {}
-        benchmark_returns: Dict[str, np.ndarray] = {}
+        benchmark_correlations: dict[str, dict[str, float]] = {}
+        benchmark_returns: dict[str, np.ndarray] = {}
 
-        for bench_label, (bench_sym, bench_type) in _BENCHMARKS.items():
+        for bench_label, bench_sym, _ in ANALYTICS_BENCHMARKS:
             try:
-                _, bench_prices = await self._fetch_history(bench_sym, bench_type, days=days)
+                bench_prices = await self._history_prices(bench_sym, days=days)
                 bench_rets = _compute_returns(bench_prices)
                 if len(bench_rets) >= 5:
                     benchmark_returns[bench_label] = bench_rets
-                    corr_map: Dict[str, float] = {}
+                    corr_map: dict[str, float] = {}
                     for sym in valid_symbols:
                         sym_rets = aligned[sym]
                         _min = min(len(sym_rets), len(bench_rets))
@@ -709,7 +629,7 @@ class AnalyticsService:
                 logger.debug("Benchmark %s fetch failed: %s", bench_label, e)
 
         # Compute portfolio Beta vs S&P500 (value-weighted)
-        portfolio_beta: Optional[float] = None
+        portfolio_beta: float | None = None
         is_beta_heavy = False
         sp500_corrs = benchmark_correlations.get("S&P500", {})
         if sp500_corrs and valid_symbols:
@@ -737,7 +657,7 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         days: int = 60,
     ) -> dict:
         if portfolio_id:
@@ -806,16 +726,16 @@ class AnalyticsService:
         user_id: str,
         horizon_days: int = 90,
         num_simulations: int = 5000,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         annual_withdrawal_rate: float = 0.0,
         ter_percentage: float = 0.0,
         monthly_withdrawal: float = 0.0,
-        contribution: Optional[Dict[str, float]] = None,
+        contribution: dict[str, float] | None = None,
         vol_regime: str = "normal",
     ) -> MonteCarloResult:
         """Run Monte Carlo simulation on the portfolio."""
 
-        from app.services.asset_classification import is_cash_like
+        from app.domains.portfolio.classification import is_cash_like
 
         # Get ALL user assets (including stablecoins/fiat for liquidity cushion)
         assets = await self._get_user_assets(
@@ -853,7 +773,7 @@ class AnalyticsService:
         total_value_dec = liquidity_value  # include liquidity in total
 
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=90)
+            prices = await self._history_prices(sym, days=90)
             price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
             if price <= 0:
                 continue
@@ -944,8 +864,8 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
-        target_weights: Dict[str, float],
-    ) -> List[RebalanceOrder]:
+        target_weights: dict[str, float],
+    ) -> list[RebalanceOrder]:
         """
         Calculate rebalancing orders to move from current to target allocation.
         target_weights: {symbol: weight_percent} e.g. {"BTC": 40, "ETH": 30, "AAPL": 30}
@@ -995,7 +915,7 @@ class AnalyticsService:
         user_id: str,
         objective: str = "max_sharpe",
         days: int = 90,
-    ) -> Optional[OptimizationResult]:
+    ) -> OptimizationResult | None:
         """
         Find optimal portfolio weights using Modern Portfolio Theory.
         objective: "max_sharpe" or "min_volatility"
@@ -1013,7 +933,7 @@ class AnalyticsService:
         symbols = []
         returns_list = []
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
+            prices = await self._history_prices(sym, days=days)
             rets = _compute_returns(prices)
             if len(rets) >= 10:
                 symbols.append(sym)
@@ -1080,7 +1000,7 @@ class AnalyticsService:
     # XIRR
     # ------------------------------------------------------------------
 
-    async def compute_xirr(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> Optional[float]:
+    async def compute_xirr(self, db: AsyncSession, user_id: str, currency: str = "EUR") -> float | None:
         """Compute XIRR across all user portfolios.
 
         Uses metrics_service for current portfolio value (single source of truth)
@@ -1122,7 +1042,7 @@ class AnalyticsService:
         eur_to_target = 1.0
         if target != "EUR":
             try:
-                rate = await self.price_service.get_forex_rate("EUR", target)
+                rate = await spot_rates.get("EUR", target)
                 eur_to_target = float(rate) if rate else 1.0
             except Exception as exc:  # noqa: BLE001 - degrade gracefully
                 logger.warning("Forex EUR→%s unavailable (%s), using 1.0", target, exc)
@@ -1152,7 +1072,7 @@ class AnalyticsService:
             usd_to_target = 1.0
             if target != "USD":
                 try:
-                    rate = await self.price_service.get_forex_rate("USD", target)
+                    rate = await spot_rates.get("USD", target)
                     usd_to_target = float(rate) if rate else 1.0
                 except Exception as fx_exc:  # noqa: BLE001
                     logger.warning("XIRR fallback forex USD→%s unavailable (%s)", target, fx_exc)
@@ -1161,7 +1081,7 @@ class AnalyticsService:
         if current_value <= 0:
             return None
 
-        cashflows.append((datetime.now(timezone.utc), current_value))
+        cashflows.append((datetime.now(UTC), current_value))
 
         # Guard: need at least one investment + current value
         negatives = sum(1 for _, a in cashflows if a < 0)
@@ -1276,9 +1196,9 @@ class AnalyticsService:
         self,
         db: AsyncSession,
         user_id: str,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
         currency: str = "EUR",
-        scenario_ids: Optional[List[str]] = None,
+        scenario_ids: list[str] | None = None,
     ) -> dict:
         """Run stress tests simulating historical crash scenarios on the portfolio.
 
@@ -1446,7 +1366,7 @@ class AnalyticsService:
         db: AsyncSession,
         user_id: str,
         days: int = 90,
-        portfolio_id: Optional[str] = None,
+        portfolio_id: str | None = None,
     ) -> dict:
         """Compute beta of each asset and the portfolio vs relevant benchmarks.
 
@@ -1464,8 +1384,8 @@ class AnalyticsService:
             }
 
         # Deduplicate
-        seen: Dict[str, Asset] = {}
-        qty_map: Dict[str, float] = {}
+        seen: dict[str, Asset] = {}
+        qty_map: dict[str, float] = {}
         for a in raw_assets:
             if a.symbol not in seen:
                 seen[a.symbol] = a
@@ -1474,10 +1394,10 @@ class AnalyticsService:
                 qty_map[a.symbol] += float(a.quantity)
 
         # Fetch benchmark returns
-        _, btc_prices = await self._fetch_history("BTC", "crypto", days=days)
+        btc_prices = await self._history_prices("BTC", days=days)
         btc_returns = _compute_returns(btc_prices)
 
-        _, spy_prices = await self._fetch_history("SPY", "stock", days=days)
+        spy_prices = await self._history_prices("SPY", days=days)
         spy_returns = _compute_returns(spy_prices)
 
         asset_betas = []
@@ -1488,7 +1408,7 @@ class AnalyticsService:
         stock_total_val = 0.0
 
         for sym, asset in seen.items():
-            _, prices = await self._fetch_history(sym, asset.asset_type, days=days)
+            prices = await self._history_prices(sym, days=days)
             price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
             if price <= 0:
                 continue

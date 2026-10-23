@@ -1,5 +1,5 @@
 import { useCallback, useRef, type ReactNode } from 'react'
-import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from 'motion/react'
 import { cn } from '@/lib/utils'
 
 /**

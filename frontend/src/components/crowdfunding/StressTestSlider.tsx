@@ -38,9 +38,9 @@ function getGlowRing(irr: number | null | undefined): string {
 
 function getSliderAccent(irr: number | null | undefined): string {
   if (irr == null) return ''
-  if (irr >= 6) return '[&_[role=slider]]:bg-gain [&_[role=slider]]:border-gain'
-  if (irr >= 3) return '[&_[role=slider]]:bg-warning [&_[role=slider]]:border-warning'
-  return '[&_[role=slider]]:bg-loss [&_[role=slider]]:border-loss'
+  if (irr >= 6) return '**:[[role=slider]]:bg-gain **:[[role=slider]]:border-gain'
+  if (irr >= 3) return '**:[[role=slider]]:bg-warning **:[[role=slider]]:border-warning'
+  return '**:[[role=slider]]:bg-loss **:[[role=slider]]:border-loss'
 }
 
 interface StressTestSliderProps {

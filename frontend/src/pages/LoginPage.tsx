@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +13,7 @@ import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { Loader2, ArrowRight, Sparkles } from 'lucide-react'
 
 const loginSchema = z.object({
-  email: z.string().email('Email invalide'),
+  email: z.email('Email invalide'),
   password: z.string().min(1, 'Mot de passe requis'),
   mfaCode: z.string().optional(),
   rememberMe: z.boolean().optional(),

@@ -36,9 +36,9 @@ API_PUBLIQUE = [
 class TestApiPublique:
     @pytest.mark.parametrize("methode", API_PUBLIQUE)
     def test_la_methode_reste_accessible(self, methode):
-        assert hasattr(
-            PredictionService(), methode
-        ), f"{methode} n'est plus atteignable — un mixin a-t-il cessé d'être hérité ?"
+        assert hasattr(PredictionService(), methode), (
+            f"{methode} n'est plus atteignable — un mixin a-t-il cessé d'être hérité ?"
+        )
 
     def test_les_trois_mixins_sont_herites(self):
         noms = {c.__name__ for c in PredictionService.__mro__}

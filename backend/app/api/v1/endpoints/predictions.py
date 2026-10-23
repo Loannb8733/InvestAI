@@ -1,18 +1,16 @@
 """Predictions endpoints for ML-based forecasting."""
 
 import logging
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
+from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
 from app.ml import adaptive_thresholds as at
-from app.models.asset import AssetType
-from app.models.user import User
 from app.services.prediction_service import prediction_service
 
 logger = logging.getLogger(__name__)
@@ -34,31 +32,13 @@ class RegimeInfo(BaseModel):
 
     dominant_regime: str
     confidence: float
-    probabilities: Dict[str, float] = {}
+    probabilities: dict[str, float] = {}
     timeframe_alignment: str = "unknown"
-    weekly_regime: Optional[str] = None
+    weekly_regime: str | None = None
     note: str = ""
-    liquidity_warning: Optional[str] = None
-    regime_price_adjustment: Optional[bool] = None
-    adjustment_factor: Optional[float] = None
-
-
-class AssetPredictionResponse(BaseModel):
-    """Asset prediction response."""
-
-    model_config = {"protected_namespaces": ()}
-
-    symbol: str
-    current_price: float
-    predictions: List[PredictionPoint]
-    trend: str
-    trend_strength: float
-    support_level: float
-    resistance_level: float
-    recommendation: str
-    model_used: str
-    regime_info: Optional[RegimeInfo] = None
-    display_thresholds: Optional[Dict] = None
+    liquidity_warning: str | None = None
+    regime_price_adjustment: bool | None = None
+    adjustment_factor: float | None = None
 
 
 class AnomalyResponse(BaseModel):
@@ -66,7 +46,7 @@ class AnomalyResponse(BaseModel):
 
     symbol: str
     is_anomaly: bool
-    anomaly_type: Optional[str]
+    anomaly_type: str | None
     severity: str
     description: str
     detected_at: str
@@ -88,8 +68,8 @@ class MarketSentimentResponse(BaseModel):
     sentiment_score: float
     fear_greed_index: int
     market_phase: str
-    signals: List[SignalResponse]
-    display_thresholds: Optional[Dict] = None
+    signals: list[SignalResponse]
+    display_thresholds: dict | None = None
 
 
 class ModelDetail(BaseModel):
@@ -98,7 +78,7 @@ class ModelDetail(BaseModel):
     name: str
     weight_pct: float
     trend: str
-    mape: Optional[float] = None
+    mape: float | None = None
 
 
 class FeatureExplanation(BaseModel):
@@ -124,7 +104,7 @@ class PortfolioAssetPrediction(BaseModel):
     trend_strength: float
     recommendation: str
     model_used: str
-    predictions: List[PredictionPoint]
+    predictions: list[PredictionPoint]
     support_level: float
     resistance_level: float
     # New scoring fields (replaces old accuracy/consensus_score)
@@ -135,9 +115,9 @@ class PortfolioAssetPrediction(BaseModel):
     reliability_score: float = 50.0
     model_confidence: str = "uncertain"
     models_agree: bool = True
-    models_detail: Optional[List[ModelDetail]] = None
-    explanations: List[FeatureExplanation] = Field(default_factory=list)
-    regime_info: Optional[RegimeInfo] = None
+    models_detail: list[ModelDetail] | None = None
+    explanations: list[FeatureExplanation] = Field(default_factory=list)
+    regime_info: RegimeInfo | None = None
 
 
 class PortfolioPredictionSummary(BaseModel):
@@ -156,52 +136,16 @@ class PortfolioPredictionSummary(BaseModel):
 class PortfolioPredictionResponse(BaseModel):
     """Portfolio predictions response."""
 
-    predictions: List[PortfolioAssetPrediction]
+    predictions: list[PortfolioAssetPrediction]
     summary: PortfolioPredictionSummary
-    display_thresholds: Optional[Dict] = None
-
-
-@router.get("/asset/{symbol}", response_model=AssetPredictionResponse)
-async def get_asset_prediction(
-    symbol: str,
-    asset_type: str = Query("crypto", regex="^(crypto|stock|etf)$"),
-    days: int = Query(7, ge=1, le=30),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> AssetPredictionResponse:
-    """Get price predictions for a specific asset."""
-    type_map = {
-        "crypto": AssetType.CRYPTO,
-        "stock": AssetType.STOCK,
-        "etf": AssetType.ETF,
-    }
-
-    prediction = await prediction_service.get_price_prediction(
-        symbol.upper(),
-        type_map[asset_type],
-        days,
-    )
-
-    return AssetPredictionResponse(
-        symbol=prediction.symbol,
-        current_price=prediction.current_price,
-        predictions=[PredictionPoint(**p) for p in prediction.predictions],
-        trend=prediction.trend,
-        trend_strength=prediction.trend_strength,
-        support_level=prediction.support_level,
-        resistance_level=prediction.resistance_level,
-        recommendation=prediction.recommendation,
-        model_used=prediction.model_used,
-        regime_info=RegimeInfo(**prediction.regime_info) if prediction.regime_info else None,
-        display_thresholds=prediction.display_thresholds,
-    )
+    display_thresholds: dict | None = None
 
 
 @router.get("/portfolio", response_model=PortfolioPredictionResponse)
 async def get_portfolio_predictions(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> PortfolioPredictionResponse:
     """Get predictions for all assets in user's portfolio."""
     result = await prediction_service.get_portfolio_predictions(db, str(current_user.id), days)
@@ -213,11 +157,11 @@ async def get_portfolio_predictions(
     )
 
 
-@router.get("/anomalies", response_model=List[AnomalyResponse])
+@router.get("/anomalies", response_model=list[AnomalyResponse])
 async def get_anomalies(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[AnomalyResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[AnomalyResponse]:
     """Detect anomalies in user's portfolio assets."""
     anomalies = await prediction_service.detect_anomalies(db, str(current_user.id))
 
@@ -238,7 +182,7 @@ async def get_anomalies(
 @router.get("/sentiment", response_model=MarketSentimentResponse)
 async def get_market_sentiment(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> MarketSentimentResponse:
     """Get market sentiment analysis."""
     sentiment = await prediction_service.get_market_sentiment(db, str(current_user.id))
@@ -263,14 +207,14 @@ class WhatIfScenario(BaseModel):
 class WhatIfRequest(BaseModel):
     """What-if request body."""
 
-    scenarios: List[WhatIfScenario]
+    scenarios: list[WhatIfScenario]
 
 
 @router.post("/what-if", response_model=dict)
 async def what_if_simulation(
     request: WhatIfRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Simulate what-if scenarios on the portfolio."""
     result = await prediction_service.get_what_if(
@@ -285,7 +229,7 @@ async def what_if_simulation(
 async def get_market_cycle(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Get market cycle analysis with regime detection for BTC and portfolio assets."""
     result = await prediction_service.get_market_cycle(db, str(current_user.id))
@@ -330,7 +274,7 @@ async def _send_cycle_alert(
     user_id: str,
     advice: dict,
     regime: str,
-    fear_greed: Optional[int],
+    fear_greed: int | None,
 ) -> None:
     """Send Telegram alert for actionable cycle insight."""
     try:
@@ -394,7 +338,7 @@ async def _send_euphoria_alert(
 async def get_top_alpha(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Detect the held asset with the highest short-term alpha potential."""
     result = await prediction_service.get_top_alpha_asset(db, str(current_user.id))
@@ -511,132 +455,13 @@ async def _send_concentration_alert(
         logger.warning("Telegram concentration alert failed for %s: %s", symbol, exc)
 
 
-@router.get("/reconciliation-report", response_model=dict)
-async def get_reconciliation_report(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Run a reconciliation check and send Telegram summary.
-
-    Fetches top-alpha + market-cycle, verifies parity, and optionally
-    sends a Telegram message summarising the reconciliation status.
-    Also computes the écart (delta) between Alpha total and Dashboard total
-    to confirm price source synchronization.
-    """
-    alpha_data = await prediction_service.get_top_alpha_asset(db, str(current_user.id))
-    cycle_data = await prediction_service.get_market_cycle(db, str(current_user.id))
-
-    top = alpha_data.get("top_alpha")
-    alpha_total = alpha_data.get("total_portfolio_value", 0)
-    market_regime = cycle_data.get("market_regime", {})
-    regime_label = market_regime.get("dominant_regime", "unknown") if market_regime else "unknown"
-    fear_greed = cycle_data.get("fear_greed")
-
-    # Compute Dashboard total from per-asset cycle values (same price source)
-    dashboard_total = sum(a.get("value", 0) for a in cycle_data.get("per_asset", []))
-    ecart = round(abs(alpha_total - dashboard_total), 2)
-
-    report = {
-        "reconciliation": "ok" if ecart < 0.01 else "drift",
-        "alpha_total_value": alpha_total,
-        "dashboard_total_value": round(dashboard_total, 2),
-        "ecart_eur": ecart,
-        "total_portfolio_value": alpha_total,
-        "market_regime": regime_label,
-        "fear_greed": fear_greed,
-        "top_alpha": top,
-    }
-
-    # Divergence validation for top asset
-    if top and top.get("divergence_log"):
-        dlog = top["divergence_log"]
-        report["divergence_validation"] = {
-            "symbol": top["symbol"],
-            **dlog,
-            "valid": dlog.get("is_bullish_divergence", False),
-        }
-
-    # Send Telegram reconciliation summary
-    if current_user.telegram_enabled and current_user.telegram_chat_id and top:
-        background_tasks.add_task(
-            _send_reconciliation_report,
-            chat_id=current_user.telegram_chat_id,
-            user_id=str(current_user.id),
-            top=top,
-            total_value=alpha_total,
-            regime=regime_label,
-            fear_greed=fear_greed,
-            ecart=ecart,
-        )
-
-    return report
-
-
-async def _send_reconciliation_report(
-    chat_id: str,
-    user_id: str,
-    top: dict,
-    total_value: float,
-    regime: str,
-    fear_greed: Optional[int],
-    ecart: float = 0.0,
-) -> None:
-    """Send Telegram reconciliation summary."""
-    try:
-        from app.services.telegram_service import telegram_service
-
-        symbol = top["symbol"]
-        score = top.get("score", 0)
-        pct = top.get("predicted_7d_pct", 0)
-        source = top.get("prediction_source", "none")
-        sign = "+" if pct >= 0 else ""
-        pv_str = f"{total_value:,.0f} €".replace(",", " ")
-        fg_str = f" | F&G: {fear_greed}" if fear_greed is not None else ""
-
-        # Divergence details
-        dlog = top.get("divergence_log", {})
-        div_section = ""
-        if dlog.get("rsi_t") is not None and dlog.get("rsi_t7") is not None:
-            div_label = "✅ Confirmée" if dlog.get("is_bullish_divergence") else "❌ Non détectée"
-            div_section = (
-                f"\n📉 <b>Divergence RSI</b>: {div_label}\n"
-                f"  Prix t-7: {dlog['price_t7']} → t: {dlog['price_t']} ({dlog['price_change_7d_pct']:+.2f}%)\n"
-                f"  RSI  t-7: {dlog['rsi_t7']} → t: {dlog['rsi_t']}"
-            )
-
-        ecart_str = f"{ecart:.2f} €"
-        ecart_icon = "✅" if ecart < 0.01 else "⚠️"
-
-        message = (
-            f"✅ <b>InvestAI Synchronisé</b>\n\n"
-            f"🏆 Top Alpha : <b>{symbol}</b> ({sign}{pct:.2f}%)\n"
-            f"🎯 Score: <b>{score:.0f}/100</b> (source: {source})\n"
-            f"🌍 Phase de marché : <b>{regime}</b>{fg_str}\n"
-            f"💰 Portefeuille : <b>{pv_str}</b>\n"
-            f"{ecart_icon} Écart Dashboard : <b>{ecart_str}</b>"
-            f"{div_section}"
-        )
-
-        await telegram_service.send_smart_alert(
-            message=message,
-            chat_id=chat_id,
-            user_id=user_id,
-            priority="normal",
-            symbol=symbol,
-            alert_type="RECONCILIATION_REPORT",
-        )
-    except Exception as exc:
-        logger.warning("Telegram reconciliation report failed: %s", exc)
-
-
 @router.get("/validate-signal", response_model=dict)
 async def validate_signal(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    symbol: Optional[str] = Query(None),
-    action: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_session),
+    symbol: str | None = Query(None),
+    action: str | None = Query(None),
 ):
     """Validate the top Alpha signal with Monte Carlo risk impact analysis.
 
@@ -863,9 +688,7 @@ async def _send_signal_report(
         # Rebalance suggestion
         rebal = result.get("rebalance_suggestion")
         if rebal:
-            message += (
-                f"\n\n💡 Suggestion : {rebal['reason']}" f" (−{rebal['trim_eur']:.2f} € sur {rebal['trim_symbol']})"
-            )
+            message += f"\n\n💡 Suggestion : {rebal['reason']} (−{rebal['trim_eur']:.2f} € sur {rebal['trim_symbol']})"
 
         await telegram_service.send_smart_alert(
             message=message,
@@ -883,7 +706,7 @@ async def _send_signal_report(
 async def get_strategy_map(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Build a strategy decision table crossing Alpha scores with Cycle phases."""
     result = await prediction_service.get_strategy_map(db, str(current_user.id))
@@ -956,7 +779,7 @@ async def get_market_events(
 async def get_portfolio_backtest(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Compare past predictions with actual prices across the portfolio.
 
@@ -985,7 +808,7 @@ async def get_track_record(
 @router.get("/planned-orders", response_model=list)
 async def list_planned_orders(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """List pending planned orders for the current user."""
     from sqlalchemy import select
@@ -1027,7 +850,7 @@ class PlannedOrderCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]{1,20}$")
     side: str = Field(pattern="^(buy|sell)$")
     amount_eur: float = Field(gt=0, le=10_000_000)
-    notes: Optional[str] = Field(None, max_length=1000)
+    notes: str | None = Field(None, max_length=1000)
     source: str = Field("frontend", pattern="^(frontend|telegram)$")
 
 
@@ -1037,7 +860,7 @@ async def create_planned_order(
     request: Request,
     data: PlannedOrderCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Create a pending planned order for the current user.
 
@@ -1076,7 +899,7 @@ async def update_planned_order(
     order_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Update a planned order status (executed/cancelled)."""
     from sqlalchemy import select

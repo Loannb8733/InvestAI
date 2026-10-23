@@ -59,14 +59,14 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
         {/* MaxDD Banner */}
         {maxDrawdown && (
           <div className="flex items-center gap-3 rounded-lg bg-loss dark:bg-loss/20 border border-loss dark:border-loss p-3">
-            <Shield className="h-5 w-5 text-loss flex-shrink-0" />
+            <Shield className="h-5 w-5 text-loss shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium">Drawdown Maximum Théorique</div>
               <div className="text-xs text-muted-foreground">
                 Pire scénario : {maxDrawdown.scenario}
               </div>
             </div>
-            <div className="text-right flex-shrink-0">
+            <div className="text-right shrink-0">
               <div className="text-lg font-bold text-loss">-{maxDrawdown.value.toFixed(1)}%</div>
               {maxDrawdown.estimated_recovery_months > 0 && (
                 <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
@@ -95,9 +95,9 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   {isBullish ? (
-                    <TrendingUp className="h-3.5 w-3.5 text-gain flex-shrink-0" />
+                    <TrendingUp className="h-3.5 w-3.5 text-gain shrink-0" />
                   ) : (
-                    <TrendingDown className="h-3.5 w-3.5 text-loss flex-shrink-0" />
+                    <TrendingDown className="h-3.5 w-3.5 text-loss shrink-0" />
                   )}
                   <span className="text-xs font-medium truncate">{scenario.name}</span>
                 </div>
@@ -206,7 +206,7 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
                       <span className="font-medium">{asset.symbol}</span>
                       <span className="text-muted-foreground truncate">{asset.name}</span>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       <span className="text-muted-foreground">{formatCurrency(asset.current_value, currency)}</span>
                       <span className={`font-mono font-medium ${asset.shock_pct > 0 ? 'text-gain' : 'text-loss'}`}>
                         {asset.shock_pct > 0 ? '+' : ''}{asset.shock_pct.toFixed(1)}%

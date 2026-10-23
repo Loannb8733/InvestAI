@@ -5,9 +5,9 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 
 import httpx
 
@@ -31,7 +31,7 @@ class CryptoComService(BaseExchangeService):
     # (balances, trades, deposits…) and a fresh AsyncClient per call opened a
     # fresh TLS connection each time, multiplying handshake latency and TIME_WAIT
     # sockets on Render.
-    _client: Optional[httpx.AsyncClient] = None
+    _client: httpx.AsyncClient | None = None
 
     @classmethod
     def _get_client(cls) -> httpx.AsyncClient:
@@ -43,7 +43,7 @@ class CryptoComService(BaseExchangeService):
     def exchange_name(self) -> str:
         return "Crypto.com"
 
-    def _sign_request(self, method: str, request_id: str, params: dict, nonce: str) -> str:
+    def _sign_request(self, method: str, request_id: str, params: dict[str, Any], nonce: str) -> str:
         """Sign a request with Crypto.com's signature method.
 
         ``nonce`` is passed in rather than read from the clock here: it is part of
@@ -64,14 +64,14 @@ class CryptoComService(BaseExchangeService):
         sig_payload = f"{method}{request_id}{self.api_key}{param_string}{nonce}"
 
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             sig_payload.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
 
         return signature
 
-    async def _make_request(self, method: str, params: Optional[dict] = None) -> dict:
+    async def _make_request(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Make an authenticated request to Crypto.com API."""
         request_id = str(int(time.time() * 1000))
         nonce = str(int(time.time() * 1000))
@@ -95,7 +95,8 @@ class CryptoComService(BaseExchangeService):
             json=payload,
         )
         response.raise_for_status()
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
@@ -105,9 +106,9 @@ class CryptoComService(BaseExchangeService):
         except Exception:
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Crypto.com."""
-        balances = []
+        balances: list[ExchangeBalance] = []
 
         try:
             result = await self._make_request("private/get-account-summary")
@@ -144,13 +145,13 @@ class CryptoComService(BaseExchangeService):
     async def _fetch_trades_for_instrument(
         self,
         instrument: str,
-        start_time: Optional[datetime],
-        end_time: Optional[datetime],
+        start_time: datetime | None,
+        end_time: datetime | None,
         limit: int,
         semaphore: asyncio.Semaphore,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Fetch trades for a single instrument with rate limiting."""
-        trades = []
+        trades: list[ExchangeTrade] = []
 
         async with semaphore:
             try:
@@ -187,7 +188,7 @@ class CryptoComService(BaseExchangeService):
                             price=Decimal(str(trade["traded_price"])),
                             fee=Decimal(str(trade.get("fee", 0))),
                             fee_currency=trade.get("fee_currency", "USDT"),
-                            timestamp=datetime.fromtimestamp(trade["create_time"] / 1000, tz=timezone.utc),
+                            timestamp=datetime.fromtimestamp(trade["create_time"] / 1000, tz=UTC),
                         )
                     )
             except Exception as exc:
@@ -197,11 +198,11 @@ class CryptoComService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Crypto.com using parallel requests."""
         # Build list of instruments to fetch dynamically from user's balances
         instruments_to_fetch = set()
@@ -259,15 +260,15 @@ class CryptoComService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Crypto.com."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
-            params = {"page_size": min(limit, 200)}
+            params: dict[str, Any] = {"page_size": min(limit, 200)}
 
             if symbol:
                 params["currency"] = symbol
@@ -293,7 +294,7 @@ class CryptoComService(BaseExchangeService):
                         deposit_id=str(deposit.get("id", "")),
                         symbol=deposit["currency"],
                         amount=Decimal(str(deposit["amount"])),
-                        timestamp=datetime.fromtimestamp(deposit["create_time"] / 1000, tz=timezone.utc),
+                        timestamp=datetime.fromtimestamp(deposit["create_time"] / 1000, tz=UTC),
                         status=status_map.get(deposit.get("status", 0), "unknown"),
                         tx_id=deposit.get("txid"),
                     )
@@ -305,15 +306,15 @@ class CryptoComService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Crypto.com."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
-            params = {"page_size": min(limit, 200)}
+            params: dict[str, Any] = {"page_size": min(limit, 200)}
 
             if symbol:
                 params["currency"] = symbol
@@ -341,7 +342,7 @@ class CryptoComService(BaseExchangeService):
                         symbol=withdrawal["currency"],
                         amount=Decimal(str(withdrawal["amount"])),
                         fee=Decimal(str(withdrawal.get("fee", 0))),
-                        timestamp=datetime.fromtimestamp(withdrawal["create_time"] / 1000, tz=timezone.utc),
+                        timestamp=datetime.fromtimestamp(withdrawal["create_time"] / 1000, tz=UTC),
                         status=status_map.get(withdrawal.get("status", 0), "unknown"),
                         tx_id=withdrawal.get("txid"),
                         address=withdrawal.get("address"),
@@ -352,7 +353,7 @@ class CryptoComService(BaseExchangeService):
 
         return withdrawals
 
-    async def get_crypto_conversions(self, limit: int = 500) -> List[ExchangeTrade]:
+    async def get_crypto_conversions(self, limit: int = 500) -> list[ExchangeTrade]:
         """
         Get crypto-to-crypto conversions from Crypto.com.
 

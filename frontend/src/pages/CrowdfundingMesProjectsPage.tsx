@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useFilDAriane } from '@/components/layout/fil-ariane'
 import { LayoutDashboard, FolderOpen, BarChart3, Loader2 } from 'lucide-react'

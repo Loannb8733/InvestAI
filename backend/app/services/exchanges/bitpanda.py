@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class BitpandaService(BaseExchangeService):
     def exchange_name(self) -> str:
         return "Bitpanda"
 
-    def _get_headers(self) -> dict:
+    def _get_headers(self) -> dict[str, Any]:
         """Get request headers with Bearer token authentication."""
         return {
             "Authorization": f"Bearer {self.api_key}",
@@ -52,7 +52,7 @@ class BitpandaService(BaseExchangeService):
             logger.error(f"Bitpanda test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bitpanda Pro."""
         balances = []
 
@@ -88,11 +88,11 @@ class BitpandaService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Bitpanda Pro.
 
         The API returns paginated results using a cursor.
@@ -166,12 +166,12 @@ class BitpandaService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Bitpanda Pro."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
             async with httpx.AsyncClient() as client:
@@ -215,12 +215,12 @@ class BitpandaService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bitpanda Pro."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
             async with httpx.AsyncClient() as client:

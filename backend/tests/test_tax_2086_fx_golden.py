@@ -10,14 +10,13 @@ Convention (same as the FIFO cost-basis engine):
 where ``conversion_rate`` = EUR per 1 unit of the trade currency (≈0.92 for USD).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from app.services.report_service import ReportService
 
 
@@ -73,7 +72,7 @@ async def test_usd_cession_converted_to_eur(db_session, regular_user):
             price=50000,
             rate="0.90",
             currency="USD",
-            when=datetime(2026, 1, 15, tzinfo=timezone.utc),
+            when=datetime(2026, 1, 15, tzinfo=UTC),
             ext="b1",
         )
     )
@@ -85,7 +84,7 @@ async def test_usd_cession_converted_to_eur(db_session, regular_user):
             price=60000,
             rate="0.92",
             currency="USD",
-            when=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            when=datetime(2026, 6, 15, tzinfo=UTC),
             ext="s1",
         )
     )
@@ -111,7 +110,7 @@ async def test_eur_cession_unchanged(db_session, regular_user):
             price=48000,
             rate=None,
             currency="EUR",
-            when=datetime(2026, 1, 15, tzinfo=timezone.utc),
+            when=datetime(2026, 1, 15, tzinfo=UTC),
             ext="b1",
         )
     )
@@ -123,7 +122,7 @@ async def test_eur_cession_unchanged(db_session, regular_user):
             price=55000,
             rate=None,
             currency="EUR",
-            when=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            when=datetime(2026, 6, 15, tzinfo=UTC),
             ext="s1",
         )
     )

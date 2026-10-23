@@ -4,7 +4,7 @@ import logging
 import math
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 import numpy as np
@@ -13,11 +13,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.core.database import get_db
-from app.models.portfolio import Portfolio
+from app.core.db.session import get_session
+from app.domains.identity.dependencies import get_current_user
+from app.domains.identity.models import User
+from app.domains.portfolio.models import Portfolio
 from app.models.simulation import Simulation, SimulationType
-from app.models.user import User
 from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ router = APIRouter()
 # ============ Internal helpers ============
 
 
-async def _get_portfolio_live_data(db: AsyncSession, user_id: str, currency: str = "EUR") -> Dict[str, Any]:
+async def _get_portfolio_live_data(db: AsyncSession, user_id: str, currency: str = "EUR") -> dict[str, Any]:
     """Fetch reconciled portfolio data from metrics_service.
 
     Returns dict with:
@@ -56,7 +56,7 @@ async def _get_portfolio_live_data(db: AsyncSession, user_id: str, currency: str
 # Hypothèses (rendement moyen, volatilité) par profil de risque investisseur.
 # Utilisées quand le body omet annual_return_mean / annual_volatility et que
 # l'utilisateur a renseigné users.risk_profile.
-RISK_PROFILE_ASSUMPTIONS: Dict[str, tuple] = {
+RISK_PROFILE_ASSUMPTIONS: dict[str, tuple] = {
     "conservative": (0.05, 0.10),
     "moderate": (0.07, 0.15),
     "aggressive": (0.10, 0.25),
@@ -75,9 +75,9 @@ def simulate_fire_probabilistic(
     index_contributions: bool,
     years_horizon: int,
     n_paths: int,
-    seed: Optional[int] = None,
-    start_year: Optional[int] = None,
-) -> Dict[str, Any]:
+    seed: int | None = None,
+    start_year: int | None = None,
+) -> dict[str, Any]:
     r"""Simulation Monte Carlo de l'atteinte du FIRE + survie post-FIRE.
 
     Modèle mathématique
@@ -144,8 +144,8 @@ def simulate_fire_probabilistic(
     # p atteint le nombre FIRE ; -1 = jamais atteint sur l'horizon.
     fire_month = np.full(n_paths, 0 if current_value >= fire_number_today else -1, dtype=np.int64)
 
-    median_by_year: List[float] = [float(current_value)]
-    fire_number_by_year: List[float] = [fire_number_today]
+    median_by_year: list[float] = [float(current_value)]
+    fire_number_by_year: list[float] = [fire_number_today]
 
     for t in range(n_months):
         contribution = monthly_contribution * (infl_m**t) if index_contributions else monthly_contribution
@@ -158,12 +158,12 @@ def simulate_fire_probabilistic(
             fire_number_by_year.append(fire_number_t)
 
     reached = fire_month >= 0
-    prob_by_year: List[Dict[str, Any]] = []
+    prob_by_year: list[dict[str, Any]] = []
     for k in range(years_horizon + 1):
         prob = float(np.mean(reached & (fire_month <= 12 * k)))
         prob_by_year.append({"year": start_year + k, "prob": round(prob, 4)})
 
-    def _year_at_quantile(q: float) -> Optional[int]:
+    def _year_at_quantile(q: float) -> int | None:
         """Première année calendaire où la proba cumulée atteint q (None sinon)."""
         for entry in prob_by_year:
             if entry["prob"] >= q:
@@ -214,48 +214,15 @@ def simulate_fire_probabilistic(
 # ============ Schemas ============
 
 
-class FIREParameters(BaseModel):
-    """Parameters for FIRE calculation."""
-
-    current_portfolio_value: Optional[float] = Field(
-        None,
-        description="Override portfolio value. If omitted, uses live dashboard value.",
-    )
-    monthly_contribution: float = Field(default=0, ge=0)
-    monthly_expenses: float = Field(..., gt=0)
-    expected_annual_return: float = Field(default=7.0, ge=0, le=30)
-    expense_ratio: float = Field(
-        default=0.0,
-        ge=0,
-        le=5,
-        description="Annual expense ratio / TER (%), deducted from expected return.",
-    )
-    inflation_rate: float = Field(default=2.0, ge=0, le=20)
-    withdrawal_rate: float = Field(default=4.0, gt=0, le=10)
-    target_years: int = Field(default=30, gt=0, le=50)
-
-
-class FIREResult(BaseModel):
-    """FIRE calculation result."""
-
-    fire_number: float
-    years_to_fire: Optional[int]
-    monthly_passive_income: float
-    projected_values: List[Dict[str, Any]]
-    is_fire_achieved: bool
-    current_progress_percent: float
-    currency: str
-
-
 class FIREProbabilisticParameters(BaseModel):
     """Paramètres de la simulation FIRE probabiliste (taux en DÉCIMAL : 0.04 = 4 %)."""
 
-    current_value: Optional[float] = Field(
+    current_value: float | None = Field(
         None,
         ge=0,
         description="Valeur de départ. Si omise, valeur live du portefeuille (metrics_service).",
     )
-    monthly_contribution: Optional[float] = Field(
+    monthly_contribution: float | None = Field(
         None,
         ge=0,
         description="Épargne mensuelle. Si omise, users.monthly_dca_eur (profil investisseur), sinon 0.",
@@ -264,13 +231,13 @@ class FIREProbabilisticParameters(BaseModel):
         ..., gt=0, description="Dépenses annuelles cibles à la retraite (euros d'aujourd'hui)."
     )
     withdrawal_rate: float = Field(default=0.04, ge=0.02, le=0.08)
-    annual_return_mean: Optional[float] = Field(
+    annual_return_mean: float | None = Field(
         None,
         ge=-0.05,
         le=0.20,
         description="Rendement annuel moyen. Si omis, dérivé de users.risk_profile, sinon 0.07.",
     )
-    annual_volatility: Optional[float] = Field(
+    annual_volatility: float | None = Field(
         None,
         ge=0.01,
         le=0.80,
@@ -283,26 +250,26 @@ class FIREProbabilisticParameters(BaseModel):
     )
     years_horizon: int = Field(default=30, gt=0, le=50)
     n_paths: int = Field(default=1000, ge=100, le=2000)
-    seed: Optional[int] = Field(None, description="Reproductibilité — tests uniquement.")
+    seed: int | None = Field(None, description="Reproductibilité — tests uniquement.")
 
 
 class FIREProbabilisticResult(BaseModel):
     """Résultat de la simulation FIRE probabiliste."""
 
-    prob_by_year: List[Dict[str, Any]]  # [{year, prob}] proba CUMULÉE d'avoir atteint FIRE
+    prob_by_year: list[dict[str, Any]]  # [{year, prob}] proba CUMULÉE d'avoir atteint FIRE
     prob_at_horizon: float
-    fire_year_p10: Optional[int]  # année optimiste (10 % des chemins FIRE) — null si jamais atteint
-    fire_year_p50: Optional[int]  # année médiane
-    fire_year_p90: Optional[int]  # année prudente (90 % des chemins FIRE)
+    fire_year_p10: int | None  # année optimiste (10 % des chemins FIRE) — null si jamais atteint
+    fire_year_p50: int | None  # année médiane
+    fire_year_p90: int | None  # année prudente (90 % des chemins FIRE)
     final_value_p10: float
     final_value_p50: float
     final_value_p90: float
     fire_number_today: float
     survival_prob_30y: float  # % de chemins survivant à 30 ans de retraits post-FIRE
-    median_path: List[Dict[str, Any]]  # [{year, portfolio_value, fire_number}] trajectoire médiane
+    median_path: list[dict[str, Any]]  # [{year, portfolio_value, fire_number}] trajectoire médiane
     n_paths: int
     currency: str
-    assumptions: Dict[str, Any]  # écho complet des hypothèses appliquées (+ defaults_from)
+    assumptions: dict[str, Any]  # écho complet des hypothèses appliquées (+ defaults_from)
 
 
 class ProjectionParameters(BaseModel):
@@ -325,7 +292,7 @@ class ProjectionResult(BaseModel):
     """Portfolio projection result."""
 
     current_value: float
-    projections: List[Dict[str, Any]]
+    projections: list[dict[str, Any]]
     final_value: float
     total_contributions: float
     total_returns: float
@@ -359,7 +326,7 @@ class DCAResult(BaseModel):
     average_cost: float
     total_units: float
     return_percent: float
-    projections: List[Dict[str, Any]]
+    projections: list[dict[str, Any]]
     currency: str
     # Distribution multi-chemins (nouveaux champs)
     dca_p10: float
@@ -372,35 +339,13 @@ class DCAResult(BaseModel):
     n_paths: int
 
 
-class WhatIfParameters(BaseModel):
-    """Parameters for what-if scenario."""
-
-    scenario_type: str  # price_change, allocation_change, withdrawal
-    asset_changes: Dict[str, float] = {}  # symbol -> percent change
-    market_change: Optional[float] = None  # uniform market shock (e.g. -20)
-    use_risk_weighting: bool = True  # weight market shock by asset risk
-    withdrawal_amount: float = Field(default=0, ge=0)
-    contribution_amount: float = Field(default=0, ge=0)
-
-
-class WhatIfResult(BaseModel):
-    """What-if scenario result."""
-
-    current_value: float
-    projected_value: float
-    difference: float
-    difference_percent: float
-    asset_breakdown: List[Dict[str, Any]]
-    currency: str
-
-
 class SimulationCreate(BaseModel):
     """Schema for creating a simulation."""
 
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     simulation_type: SimulationType
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
 
 class SimulationResponse(BaseModel):
@@ -408,147 +353,21 @@ class SimulationResponse(BaseModel):
 
     id: UUID
     name: str
-    description: Optional[str]
+    description: str | None
     simulation_type: str
-    parameters: Dict[str, Any]
-    results: Optional[Dict[str, Any]]
+    parameters: dict[str, Any]
+    results: dict[str, Any] | None
     created_at: datetime
 
 
-class SimulationTypeInfo(BaseModel):
-    """Simulation type information."""
-
-    value: str
-    label: str
-    description: str
-
-
 # ============ Endpoints ============
-
-
-@router.get("/types", response_model=List[SimulationTypeInfo])
-async def list_simulation_types() -> List[SimulationTypeInfo]:
-    """List all available simulation types."""
-    types = [
-        {
-            "value": "fire",
-            "label": "FIRE Calculator",
-            "description": "Calculez votre nombre FIRE et le temps pour l'atteindre",
-        },
-        {
-            "value": "projection",
-            "label": "Projection de portefeuille",
-            "description": "Projetez la valeur future de votre portefeuille",
-        },
-        {
-            "value": "dca",
-            "label": "DCA Simulation",
-            "description": "Simulez une strategie d'investissement programme (DCA)",
-        },
-        {
-            "value": "what_if",
-            "label": "Scenario What-If",
-            "description": "Analysez l'impact de changements sur votre portefeuille",
-        },
-        {
-            "value": "rebalance",
-            "label": "Reequilibrage",
-            "description": "Simulez un reequilibrage de votre allocation",
-        },
-    ]
-    return [SimulationTypeInfo(**t) for t in types]
-
-
-@router.post("/fire", response_model=FIREResult)
-async def calculate_fire(
-    params: FIREParameters,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> FIREResult:
-    """Calculate FIRE (Financial Independence, Retire Early) metrics.
-
-    Uses live portfolio value from metrics_service if current_portfolio_value is not provided.
-    """
-    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
-
-    # Use live dashboard value if not overridden
-    if params.current_portfolio_value is not None:
-        portfolio_value = params.current_portfolio_value
-    else:
-        live = await _get_portfolio_live_data(db, str(current_user.id), currency)
-        portfolio_value = live["total_value"]
-
-    if portfolio_value <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La valeur du portefeuille doit être positive pour le calcul FIRE.",
-        )
-
-    # FIRE number = annual expenses / withdrawal rate
-    annual_expenses = params.monthly_expenses * 12
-    if params.withdrawal_rate <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le taux de retrait doit être supérieur à 0",
-        )
-    fire_number = annual_expenses / (params.withdrawal_rate / 100)
-
-    # Monthly passive income at current portfolio value
-    monthly_passive_income = portfolio_value * (params.withdrawal_rate / 100) / 12
-
-    # Check if already FIRE
-    is_fire_achieved = portfolio_value >= fire_number
-    current_progress = (portfolio_value / fire_number) * 100
-
-    # Project portfolio growth (net of expense ratio / TER) — Decimal precision
-    projections = []
-    value = Decimal(str(portfolio_value))
-    net_annual_return = Decimal(str(params.expected_annual_return)) - Decimal(str(params.expense_ratio))
-    monthly_return = net_annual_return / 100 / 12
-    monthly_contribution = Decimal(str(params.monthly_contribution))
-    inflation = Decimal(str(params.inflation_rate)) / 100
-    withdrawal = Decimal(str(params.withdrawal_rate)) / 100
-    years_to_fire = None
-
-    for year in range(params.target_years + 1):
-        # Adjust expenses for inflation
-        adjusted_expenses = Decimal(str(annual_expenses)) * ((1 + inflation) ** year)
-        adjusted_fire_number = adjusted_expenses / withdrawal
-
-        projections.append(
-            {
-                "year": year,
-                "portfolio_value": float(round(value, 2)),
-                "fire_number": float(round(adjusted_fire_number, 2)),
-                "is_fire": value >= adjusted_fire_number,
-                "progress_percent": float(round(value / adjusted_fire_number * 100, 1)),
-            }
-        )
-
-        # Check if FIRE achieved this year
-        if years_to_fire is None and value >= adjusted_fire_number:
-            years_to_fire = year
-
-        # Grow portfolio for next year (monthly compounding + contributions)
-        for _ in range(12):
-            value = value * (1 + monthly_return) + monthly_contribution
-
-    return FIREResult(
-        fire_number=round(fire_number, 2),
-        years_to_fire=years_to_fire,
-        monthly_passive_income=round(monthly_passive_income, 2),
-        projected_values=projections,
-        is_fire_achieved=is_fire_achieved,
-        current_progress_percent=round(current_progress, 1),
-        currency=currency,
-    )
 
 
 @router.post("/fire-probabilistic", response_model=FIREProbabilisticResult)
 async def calculate_fire_probabilistic(
     params: FIREProbabilisticParameters,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> FIREProbabilisticResult:
     """FIRE probabiliste : « X % de chances d'être FIRE en année Y » (Monte Carlo).
 
@@ -561,7 +380,7 @@ async def calculate_fire_probabilistic(
     ``assumptions.defaults_from`` (hypothèses VISIBLES, exigence d'audit).
     """
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
-    defaults_from: Dict[str, str] = {}
+    defaults_from: dict[str, str] = {}
 
     # 1) Valeur de départ : live si non fournie (même source que /fire et /projection)
     current_value = params.current_value
@@ -615,7 +434,7 @@ async def calculate_fire_probabilistic(
 
     # Écho COMPLET des hypothèses réellement appliquées (exigence d'audit :
     # hypothèses visibles), avec la provenance des valeurs par défaut.
-    assumptions: Dict[str, Any] = {
+    assumptions: dict[str, Any] = {
         "current_value": round(current_value, 2),
         "monthly_contribution": round(monthly_contribution, 2),
         "annual_expenses": round(params.annual_expenses, 2),
@@ -636,7 +455,7 @@ async def calculate_fire_probabilistic(
 async def project_portfolio(
     params: ProjectionParameters,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> ProjectionResult:
     """Project portfolio value over time using live reconciled values."""
     currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
@@ -775,7 +594,7 @@ async def simulate_dca(
     dca_val_p90 = np.percentile(dca_values, 90, axis=0)
     ls_val_p50 = np.percentile(ls_values, 50, axis=0)
 
-    projections: List[Dict[str, Any]] = [
+    projections: list[dict[str, Any]] = [
         {
             "period": i + 1,
             "price": round(float(price_p50[i]), 2),
@@ -814,97 +633,14 @@ async def simulate_dca(
     )
 
 
-@router.post("/what-if", response_model=WhatIfResult)
-async def simulate_what_if(
-    params: WhatIfParameters,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> WhatIfResult:
-    """Simulate what-if scenario on current portfolio using live prices.
-
-    When `market_change` is set (e.g. -20 for a 20% crash) and `use_risk_weighting`
-    is True, the shock is distributed proportionally to each asset's risk_weight:
-    - High-risk assets (e.g. PEPE with 40% risk_weight) receive a larger shock
-    - Low-risk assets (e.g. BTC with 10% risk_weight) receive a smaller shock
-    The total portfolio-level impact equals the requested market_change.
-    """
-    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
-    live = await _get_portfolio_live_data(db, str(current_user.id), currency)
-    all_assets = live["assets"]
-
-    current_value = Decimal("0")
-    projected_value = Decimal("0")
-    asset_breakdown = []
-
-    # Compute total risk weight for normalization
-    total_risk_weight = sum(a.get("risk_weight", 0) for a in all_assets) or 1.0
-    n_assets = len(all_assets) or 1
-
-    for asset in all_assets:
-        asset_val_f = asset.get("current_value", 0.0)
-        asset_value = Decimal(str(asset_val_f))
-        symbol = asset.get("symbol", "")
-        risk_weight = asset.get("risk_weight", 0.0)
-        current_value += asset_value
-
-        # Determine per-asset change percent
-        if symbol in params.asset_changes:
-            # Explicit per-asset override
-            change_percent = params.asset_changes[symbol]
-        elif params.market_change is not None:
-            # Uniform market shock, optionally weighted by risk
-            if params.use_risk_weighting and total_risk_weight > 0 and risk_weight > 0:
-                avg_risk_weight = total_risk_weight / n_assets
-                multiplier = risk_weight / avg_risk_weight if avg_risk_weight > 0 else 1.0
-                multiplier = min(max(multiplier, 0.2), 3.0)
-                change_percent = params.market_change * multiplier
-            else:
-                change_percent = params.market_change
-        else:
-            change_percent = 0.0
-
-        change_dec = Decimal(str(change_percent))
-        new_value = asset_value * (1 + change_dec / 100)
-        projected_value += new_value
-
-        asset_breakdown.append(
-            {
-                "symbol": symbol,
-                "name": asset.get("name", ""),
-                "current_value": float(round(asset_value, 2)),
-                "change_percent": round(change_percent, 2),
-                "projected_value": float(round(new_value, 2)),
-                "difference": float(round(new_value - asset_value, 2)),
-                "risk_weight": risk_weight,
-            }
-        )
-
-    # Apply withdrawal/contribution
-    projected_value = (
-        projected_value - Decimal(str(params.withdrawal_amount)) + Decimal(str(params.contribution_amount))
-    )
-
-    difference = projected_value - current_value
-    difference_percent = float(difference / current_value * 100) if current_value > 0 else 0.0
-
-    return WhatIfResult(
-        current_value=float(round(current_value, 2)),
-        projected_value=float(round(projected_value, 2)),
-        difference=float(round(difference, 2)),
-        difference_percent=round(difference_percent, 2),
-        asset_breakdown=asset_breakdown,
-        currency=currency,
-    )
-
-
-@router.get("", response_model=List[SimulationResponse])
+@router.get("", response_model=list[SimulationResponse])
 async def list_simulations(
-    simulation_type: Optional[SimulationType] = None,
+    simulation_type: SimulationType | None = None,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> List[SimulationResponse]:
+    db: AsyncSession = Depends(get_session),
+) -> list[SimulationResponse]:
     """List all saved simulations."""
     query = select(Simulation).where(Simulation.user_id == current_user.id)
 
@@ -932,7 +668,7 @@ async def list_simulations(
 async def save_simulation(
     sim_in: SimulationCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> SimulationResponse:
     """Save a simulation for later reference."""
     simulation = Simulation(
@@ -962,7 +698,7 @@ async def save_simulation(
 async def get_simulation(
     simulation_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> SimulationResponse:
     """Get a specific simulation."""
     result = await db.execute(
@@ -994,7 +730,7 @@ async def get_simulation(
 async def delete_simulation(
     simulation_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ):
     """Delete a simulation."""
     result = await db.execute(

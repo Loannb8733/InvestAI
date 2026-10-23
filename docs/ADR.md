@@ -226,3 +226,99 @@ Le jour où un worker existe en production, poser `CELERY_WORKER_AVAILABLE=true`
 le service web suffit ; le jour où une seconde instance web existe, poser
 `RATE_LIMIT_SHARED_STORAGE=true` sur toutes. Détail des mesures : `docs/audit/BACKLOG.md`,
 NEW-77 à NEW-87.
+
+
+## ADR-012 : Architecture par domaine, transaction par requête, démarrage découpé
+
+**Contexte :** la logique métier, les requêtes SQL et les commits vivaient dans les
+endpoints (84 commits dans `api/`), `main.py` faisait 1 130 lignes, et les fichiers de
+plus de 1 000 lignes se comptaient par dizaines. La refonte migre le backend domaine
+par domaine ; `journal` (les notes) est le domaine pilote.
+
+**Décision — structure d'un domaine** (`app/domains/<domaine>/`) :
+
+| Fichier | Rôle | Interdit |
+|---|---|---|
+| `router.py` | HTTP : valide, appelle le service, rend un schéma | requête SQL, commit, règle métier |
+| `schemas.py` | Pydantic d'entrée et de sortie | — |
+| `models.py` | SQLAlchemy typé (`Mapped[...]`) | — |
+| `repository.py` | toutes les requêtes du domaine | `commit` (au plus `flush`) |
+| `service.py` | cas d'usage, lève des `DomainError` | `commit`, `HTTPException` |
+| modules purs (ex. `scorecard.py`) | calcul sans I/O | accès base |
+
+Un domaine lit les données d'un autre par ses **tables** (`Model.__table__.c`) et les
+rend sous des types qui lui appartiennent (ex. `AssetRef`), jamais en manipulant les
+classes ORM de l'autre domaine.
+
+**Décision — transaction :** pas de classe `UnitOfWork`. La dépendance
+`core.db.session.get_session` ouvre la session, commit si la requête aboutit, rollback
+sinon (`HTTPException` et `DomainError` comprises). Une classe enveloppant la session
+n'apporterait rien ; une classe exposant les repositories de tous les domaines
+deviendrait un fourre-tout. `core.db.metadata.metadata` charge tous les modèles :
+`create_all` et Alembic l'utilisent.
+
+**Décision — erreurs :** les services lèvent `core.errors.DomainError` (et ses
+sous-classes, ajoutées quand un domaine en a besoin). `core.error_handlers` les rend en
+`{"detail": ...}`, la forme d'une `HTTPException`, et traite aussi les exceptions non
+gérées (500 journalisée, détail masqué en production) et le dépassement de quota.
+
+**Décision — démarrage :** `main.py` ne fait qu'assembler l'application
+(`create_app`). `core/http/` porte les middlewares (enregistrés dans le même ordre
+qu'avant : journalisation, GZip, CORS, en-têtes de sécurité, invalidation du cache du
+dashboard), `core/health.py` les sondes, `core/startup/` le verrou de démarrage,
+Alembic puis `create_all`.
+
+Trois **auto-réparations** y tournaient à chaque démarrage jusqu'au 2026-10-23 ;
+leurs sources ont été corrigées une à une, puis elles ont été jouées une dernière
+fois par la migration de données `f7a2c9d1e3b4` (logique figée dans la migration)
+et retirées du démarrage :
+
+| Auto-réparation | Ce qu'elle réparait | Correction à la source |
+|---|---|---|
+| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | `PATCH` et import CSV (2026-10-22) ; la synchronisation adopte l'actif sans plateforme et inscrit la sienne sur chaque écriture ; changer la plateforme d'un actif y emmène ses transactions (2026-10-23) |
+| `transfer_mirrors` | `TRANSFER_OUT` sans miroir, hors notes d'ajustement interne (incident Tangem du 2026-06-07) | toute sortie saisie, importée ou devenue sortie par `PATCH` reçoit son miroir à l'écriture, sur la destination choisie ou le wallet froid par défaut (décision utilisateur du 2026-10-23) ; un échec du miroir annule la synchronisation ; une sortie du wallet par défaut lui-même n'a pas de miroir ; supprimer l'actif de destination ne le recrée plus |
+| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` | `PATCH` (2026-10-22) ; import d'historique supprimé, chaque écriture de la synchronisation calcule son empreinte (2026-10-23) |
+
+**Conséquences connues, non traitées ici :**
+- 13 index créés par des migrations ne sont déclarés dans aucun modèle : une base neuve
+  (`create_all` puis marquage à la tête) ne les a pas. Chaque domaine déclare ses index
+  dans ses modèles lors de sa migration.
+- La première migration (`001`) suppose la table `users` : l'historique Alembic ne sait
+  pas créer une base vierge. Le chemin d'une base neuve reste `create_all` + marquage.
+- `c4e8f1a2b3d5` fait converger `transactions.quantity/price/fee` vers les précisions du
+  modèle (élargit seulement, jamais de réduction) et ajoute `fee_currency`, qu'aucune
+  migration ne créait ; elle remplace `scripts/migrate_fee_currency.py`, qui ramenait
+  `fee` en `NUMERIC(18, 8)` et aurait tronqué les frais.
+
+## ADR-013 : Historique de prix — la base seule, jamais de réseau pendant une requête
+
+**Statut :** accepté (2026-10-19)
+
+**Contexte :** trois caches d'historique coexistaient (`hist:<sym>:<type>:<jours>` en
+Redis asynchrone, `hist:<SYM>_<jours>` et sa copie `:fallback` en Redis synchrone,
+`asset_price_history` en base), lus dans des ordres différents selon l'appelant. Une
+partie des pages web appelait CoinGecko ou Yahoo pendant la requête (benchmarks,
+analytics, prédictions, variations de période), une autre l'interdisait : la cause des
+65 s de `/predictions/market-cycle` (NEW-13). Les cotations Yahoo des actions étaient
+enregistrées dans leur devise de cotation sous `price_eur`, et l'immobilier physique
+recevait un historique tiré au hasard, utilisé ensuite dans la VaR et les corrélations.
+
+**Décision :** `domains/market_data/history` :
+- `asset_price_history` est l'unique source d'historique (plus de cache Redis) ; une
+  colonne `volume` y conserve les volumes utilisés par les prédictions ;
+- `reader.local_history` / `local_series` lisent la base, sans réseau, pour tout le code
+  web ; un symbole absent rend une série vide et peut être programmé avec
+  `tasks.schedule_refresh` ;
+- seules les tâches (`refresh_history` toutes les 30 min, `backfill_history` chaque jour,
+  `refresh_one`, préchargement au démarrage) interrogent CoinGecko (un appel à la fois,
+  `Retry-After` respecté), puis Yahoo en repli (paire `<SYM>-EUR` pour une crypto) ;
+- toute cotation Yahoo est convertie en euros au taux BCE du jour ; un jour sans taux est
+  écarté ;
+- les références de marché (BTC, SPY, IWDA.AS, ^GSPC, ^IXIC, PAXG) sont rafraîchies avec
+  les actifs détenus ;
+- un actif sans cotation (immobilier, crowdfunding) n'a pas d'historique.
+
+**Conséquences :** une page dont l'historique n'a pas encore été chargé affiche une série
+incomplète au lieu d'attendre une API tierce. La migration `d5f9a3b4c6e7` ajoute
+`volume` et supprime les lignes d'actions et d'ETF, rechargées converties au passage
+suivant de la tâche.

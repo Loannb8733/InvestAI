@@ -1,7 +1,7 @@
 """Signaux alpha, carte de stratégie et scénarios « what-if ».
 
 ``PredictionAlphaMixin`` est mixé dans ``PredictionService`` : ses méthodes appellent
-``self.get_price_prediction``, ``self.get_market_cycle``, ``self.data_fetcher`` et
+``self.get_price_prediction``, ``self.get_market_cycle`` et
 ``self.regime_detector``, fournis par la classe finale.
 
 Extrait de ``prediction_service.py`` (ARC-05), qui dépassait 2 400 lignes. Ce bloc en
@@ -12,25 +12,24 @@ alternative. Découpage à l'identique — aucune ligne de logique modifiée.
 
 import logging
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import cache_history, get_cached_history
+from app.domains.market_data.history.reader import local_series
+from app.domains.market_data.prices.service import price_feed
+from app.domains.market_data.prices.stablecoins import peg_quote
+from app.domains.portfolio.classification import is_cash_like, is_safe_haven
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml.regime_detector import RegimeConfig, _rsi
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.services.asset_classification import is_cash_like, is_safe_haven
 from app.services.market_sentiment import fetch_fear_greed_index
-from app.services.prediction_types import _HISTORY_DAYS  # noqa: F401 — re-exported
 from app.services.prediction_types import (  # noqa: F401 — re-exported for compatibility
+    _HISTORY_DAYS,  # noqa: F401 — re-exported
     AnomalyDetection,
     MarketSentiment,
     PricePrediction,
 )
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Detect the asset with the highest short-term alpha potential.
 
         Scores each held asset (quantity > 0) on 3 axes:
@@ -68,9 +67,9 @@ class PredictionAlphaMixin:
         raw_assets = result.scalars().all()
 
         # Deduplicate by symbol (Decimal precision)
-        asset_map: Dict[str, object] = {}
-        qty_map: Dict[str, Decimal] = {}
-        cash_like_qty: Dict[str, Decimal] = {}
+        asset_map: dict[str, object] = {}
+        qty_map: dict[str, Decimal] = {}
+        cash_like_qty: dict[str, Decimal] = {}
         for a in raw_assets:
             sym = a.symbol
             qty = Decimal(str(a.quantity))
@@ -87,48 +86,31 @@ class PredictionAlphaMixin:
             return {"found": False, "total_portfolio_value": 0.0}
 
         # ── Fetch BTC prices for correlation baseline ──
-        btc_prices: List[float] = []
-        try:
-            cached = await get_cached_history("BTC", "crypto", 90)
-            if cached and cached.get("prices"):
-                btc_prices = cached["prices"]
-            else:
-                dates, prices = await self.data_fetcher.get_history("BTC", "crypto", days=90)
-                if dates and prices:
-                    btc_prices = prices
-                    await cache_history(
-                        "BTC",
-                        "crypto",
-                        90,
-                        {"dates": [d.isoformat() for d in dates], "prices": prices},
-                    )
-        except Exception:
-            logger.warning("Failed to fetch BTC history for alpha scoring")
+        btc_prices = (await local_series("BTC", 90)).prices
 
         btc_returns = np.diff(np.log(np.array(btc_prices, dtype=float))) if len(btc_prices) > 10 else np.array([])
 
         # ── Fetch Fear & Greed for regime detection ──
-        fear_greed: Optional[int] = await fetch_fear_greed_index()
+        fear_greed: int | None = await fetch_fear_greed_index()
 
         # ── Batch-fetch prices (same source as Dashboard for parity) ──
         crypto_symbols = [s for s, a in asset_map.items() if a.asset_type == AssetType.CRYPTO]
         stock_symbols = [s for s, a in asset_map.items() if a.asset_type in (AssetType.STOCK, AssetType.ETF)]
-        price_map: Dict[str, float] = {}
+        price_map: dict[str, float] = {}
 
         if crypto_symbols:
             try:
-                batch = await self.price_service.get_multiple_crypto_prices(crypto_symbols, "eur")
-                for sym, data in batch.items():
-                    p = data.get("price", 0)
-                    price_map[sym.upper()] = float(p) if p else 0.0
+                batch = await price_feed.crypto(crypto_symbols)
+                for sym, quote in batch.items():
+                    price_map[sym] = float(quote.price)
             except Exception as e:
                 logger.warning("Batch crypto price fetch failed: %s", e)
 
         for sym in stock_symbols:
             try:
-                data = await self.price_service.get_stock_price(sym)
-                if data and data.get("price"):
-                    price_map[sym.upper()] = float(data["price"])
+                stock_quote = (await price_feed.stocks([sym])).get(sym.upper())
+                if stock_quote is not None:
+                    price_map[sym.upper()] = float(stock_quote.price)
             except Exception as exc:
                 logger.debug("Stock price fetch failed for %s (alpha scoring): %s", sym, exc)
 
@@ -136,26 +118,7 @@ class PredictionAlphaMixin:
         import asyncio as _aio
 
         async def _fetch_history(sym: str, atype: str) -> tuple:
-            """Fetch 90d history from cache or API."""
-            cached_hist = await get_cached_history(sym, atype, 90)
-            if cached_hist and cached_hist.get("prices"):
-                return (sym, cached_hist["prices"])
-            try:
-                a_dates, a_prices_raw = await self.data_fetcher.get_history(sym, atype, days=90)
-                if a_dates and a_prices_raw:
-                    await cache_history(
-                        sym,
-                        atype,
-                        90,
-                        {
-                            "dates": [d.isoformat() for d in a_dates],
-                            "prices": a_prices_raw,
-                        },
-                    )
-                    return (sym, a_prices_raw)
-            except Exception as exc:
-                logger.debug("90d history fetch failed for %s (alpha scoring): %s", sym, exc)
-            return (sym, [])
+            return (sym, (await local_series(sym, 90)).prices)
 
         # Limit assets to reduce memory usage on free-tier hosting (512 MB)
         _MAX_ASSETS = 7
@@ -163,12 +126,12 @@ class PredictionAlphaMixin:
 
         _items = list(asset_map.items())[:_MAX_ASSETS]
         history_results = await _aio.gather(*[_fetch_history(s, a.asset_type.value) for s, a in _items])
-        history_map: Dict[str, List[float]] = {sym: prices for sym, prices in history_results}
+        history_map: dict[str, list[float]] = {sym: prices for sym, prices in history_results}
 
         # ── Pre-fetch 7d predictions in batches to limit memory ──
         import gc
 
-        _prediction_cache: Dict[str, Optional[PricePrediction]] = {}
+        _prediction_cache: dict[str, PricePrediction | None] = {}
 
         async def _fetch_prediction(sym: str, atype: AssetType) -> tuple:
             try:
@@ -190,14 +153,14 @@ class PredictionAlphaMixin:
         # ── Score each asset ──
         scored_assets = []
         total_value = Decimal("0")
-        value_map: Dict[str, float] = {}
+        value_map: dict[str, float] = {}
 
         for symbol, asset in _items:
             try:
                 price = price_map.get(symbol.upper(), 0.0)
                 if price <= 0:
                     # Fallback to individual fetch
-                    price = await self._get_current_price(symbol, asset.asset_type)
+                    price = await self._get_current_price(symbol, asset.asset_type) or 0.0
                 if price <= 0:
                     logger.warning("Price fetch failed for %s (batch + fallback), skipping", symbol)
                     continue
@@ -248,7 +211,7 @@ class PredictionAlphaMixin:
                             }
                         )
                         logger.info(
-                            "Divergence %s CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f " "ET RSI(T-7)=%.2f < RSI(T)=%.2f",
+                            "Divergence %s CONFIRMÉE: Prix(T-7)=%.4f > Prix(T)=%.4f ET RSI(T-7)=%.2f < RSI(T)=%.2f",
                             symbol,
                             price_t7,
                             price_t,
@@ -403,8 +366,9 @@ class PredictionAlphaMixin:
         # Include cash-like assets in total for accurate weight calculation
         for sym, qty in cash_like_qty.items():
             try:
-                if PriceService.is_stablecoin(sym):
-                    p = await self.price_service._stablecoin_price_eur(sym)
+                pegged = await peg_quote(sym.upper(), "EUR")
+                if pegged is not None:
+                    p = pegged.price
                 else:
                     p = Decimal("1")  # fiat EUR=1, others approximated
                 total_value += qty * p
@@ -590,7 +554,7 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Build a strategy decision table crossing Alpha scores with Cycle phase.
 
         Calls get_top_alpha_asset() and get_market_cycle() then merges
@@ -611,12 +575,12 @@ class PredictionAlphaMixin:
         fear_greed = cycle_data.get("fear_greed")
 
         # Build regime lookup by symbol
-        regime_map: Dict[str, Dict] = {}
+        regime_map: dict[str, dict] = {}
         for a in per_asset_cycle:
             regime_map[a["symbol"]] = a
 
         # Merge: for each scored asset, cross with its cycle regime
-        strategy_rows: List[Dict] = []
+        strategy_rows: list[dict] = []
         summary_buys = 0
         summary_sells = 0
         summary_holds = 0
@@ -721,8 +685,8 @@ class PredictionAlphaMixin:
         self,
         db: AsyncSession,
         user_id: str,
-        scenarios: List[Dict],
-    ) -> Dict:
+        scenarios: list[dict],
+    ) -> dict:
         """Simulate what-if scenarios on the portfolio."""
         result = await db.execute(
             select(Portfolio).where(
@@ -749,8 +713,8 @@ class PredictionAlphaMixin:
         raw_assets = result.scalars().all()
 
         # Deduplicate by symbol (Decimal precision)
-        wi_asset_map: Dict[str, object] = {}
-        wi_qty_map: Dict[str, Decimal] = {}
+        wi_asset_map: dict[str, object] = {}
+        wi_qty_map: dict[str, Decimal] = {}
         for a in raw_assets:
             if a.symbol not in wi_asset_map:
                 wi_asset_map[a.symbol] = a
@@ -768,6 +732,8 @@ class PredictionAlphaMixin:
 
         for asset in assets[:15]:
             price = await self._get_current_price(asset.symbol, asset.asset_type)
+            if price is None:
+                continue
             price_dec = Decimal(str(price))
             qty_dec = wi_qty_map[asset.symbol]
             current_val = price_dec * qty_dec

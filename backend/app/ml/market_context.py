@@ -8,7 +8,6 @@ derive thresholds adaptively instead of using hardcoded constants.
 import logging
 import math
 from dataclasses import dataclass
-from typing import List, Optional
 
 import numpy as np
 
@@ -87,7 +86,7 @@ class MarketContext:
     skewness: float
 
     # ── External ────────────────────────────────────────────
-    fear_greed: Optional[int]  # 0-100, None if unavailable
+    fear_greed: int | None  # 0-100, None if unavailable
 
     # ── Derived convenience ─────────────────────────────────
     daily_vol: float  # = realized_vol_30d
@@ -106,10 +105,10 @@ class MarketContext:
 
 
 def compute_market_context(
-    prices: List[float],
+    prices: list[float],
     symbol: str,
     asset_type: str,
-    fear_greed: Optional[int] = None,
+    fear_greed: int | None = None,
 ) -> MarketContext:
     """Compute a MarketContext from raw price history.
 

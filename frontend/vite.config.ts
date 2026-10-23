@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],
   },
@@ -17,7 +17,7 @@ export default defineConfig({
         // the entry bundle (and the login page) no longer ships charts/motion.
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id))
             return 'react-vendor'
           if (id.includes('@tanstack')) return 'query'
           // Deux librairies de graphiques cohabitent (ADR-010) : Nivo pour les
@@ -28,7 +28,7 @@ export default defineConfig({
           // qui protégeait déjà `PortfolioAreaChart`.
           if (/[\\/]node_modules[\\/](@nivo|d3-)/.test(id)) return 'charts-nivo'
           if (/[\\/]node_modules[\\/]lightweight-charts/.test(id)) return 'charts-timeseries'
-          if (id.includes('framer-motion')) return 'motion'
+          if (/[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/.test(id)) return 'motion'
           if (id.includes('@radix-ui')) return 'radix'
           return undefined
         },
@@ -73,7 +73,7 @@ export default defineConfig({
       'class-variance-authority',
       'clsx',
       'cmdk',
-      'framer-motion',
+      'motion/react',
       'lightweight-charts',
       'lucide-react',
       'react',
@@ -81,7 +81,7 @@ export default defineConfig({
       'react-dom/client',
       'react-dropzone',
       'react-hook-form',
-      'react-router-dom',
+      'react-router',
       'react/jsx-runtime',
       'tailwind-merge',
       'zod',

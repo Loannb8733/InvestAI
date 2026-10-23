@@ -3,9 +3,8 @@
 import asyncio
 import logging
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from sqlalchemy import select
@@ -14,31 +13,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.redis_client import (
     _data_hash,
     cache_ensemble,
-    cache_history,
     cache_prediction,
     get_cached_ensemble,
-    get_cached_history,
     get_cached_prediction,
 )
+from app.domains.market_data.history.reader import local_series
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml import adaptive_thresholds as at
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.forecaster import PriceForecaster
-from app.ml.historical_data import HistoricalDataFetcher
 from app.ml.market_context import MarketContext, compute_market_context
 from app.ml.regime_detector import MarketRegimeDetector
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
 from app.services.market_sentiment import fetch_fear_greed_index
 from app.services.prediction_alpha import PredictionAlphaMixin
 from app.services.prediction_cycles import PredictionCyclesMixin
 from app.services.prediction_metrics import PredictionMetricsMixin
-from app.services.prediction_types import _HISTORY_DAYS  # noqa: F401 — re-exported
 from app.services.prediction_types import (  # noqa: F401 — re-exported for compatibility
+    _HISTORY_DAYS,  # noqa: F401 — re-exported
     AnomalyDetection,
     MarketSentiment,
     PricePrediction,
 )
-from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +44,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
     """Service for ML-based predictions and analysis."""
 
     def __init__(self):
-        self.price_service = PriceService()
         self.forecaster = PriceForecaster()
         self.anomaly_detector = AnomalyDetector()
         self.regime_detector = MarketRegimeDetector()
-        self.data_fetcher = HistoricalDataFetcher(
-            coingecko_api_key=getattr(self.price_service, "coingecko_api_key", None)
-        )
 
     async def get_price_prediction(
         self,
@@ -88,50 +81,15 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         current_price = await self._get_current_price(symbol, asset_type)
 
-        if current_price == 0:
+        if current_price is None:
             return self._empty_prediction(symbol)
 
-        # Fetch historical data (365 days for better ML training)
-        cached_hist = await get_cached_history(symbol, asset_type.value, _HISTORY_DAYS)
-        if cached_hist:
-            dates = [datetime.fromisoformat(d) for d in cached_hist["dates"]]
-            prices = cached_hist["prices"]
-            volumes = cached_hist.get("volumes")
-        else:
-            hist_result = await self.data_fetcher.get_history_extended(symbol, asset_type.value, days=_HISTORY_DAYS)
-            dates, prices, volumes = (
-                hist_result.dates,
-                hist_result.prices,
-                hist_result.volumes,
-            )
-            if dates and prices:
-                cache_payload = {
-                    "dates": [d.isoformat() for d in dates],
-                    "prices": prices,
-                }
-                if volumes:
-                    cache_payload["volumes"] = volumes
-                await cache_history(symbol, asset_type.value, _HISTORY_DAYS, cache_payload)
+        history = await local_series(symbol, _HISTORY_DAYS)
+        dates, prices, volumes = history.dates, history.prices, history.volumes
 
-        # Fetch BTC prices for altcoin correlation (crypto only, not BTC itself)
         btc_prices = None
         if asset_type == AssetType.CRYPTO and symbol.upper() != "BTC":
-            btc_cached = await get_cached_history("BTC", "crypto", _HISTORY_DAYS)
-            if btc_cached:
-                btc_prices = btc_cached["prices"]
-            else:
-                btc_dates, btc_prices_raw = await self.data_fetcher.get_history("BTC", "crypto", days=_HISTORY_DAYS)
-                if btc_dates and btc_prices_raw:
-                    btc_prices = btc_prices_raw
-                    await cache_history(
-                        "BTC",
-                        "crypto",
-                        _HISTORY_DAYS,
-                        {
-                            "dates": [d.isoformat() for d in btc_dates],
-                            "prices": btc_prices_raw,
-                        },
-                    )
+            btc_prices = (await local_series("BTC", _HISTORY_DAYS)).prices or None
 
         # Fetch Fear & Greed Index
         fear_greed = await fetch_fear_greed_index()
@@ -139,12 +97,12 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         # Fetch BTC dominance
         btc_dominance = None
         try:
-            btc_dominance = await self.data_fetcher.get_btc_dominance()
+            btc_dominance = await price_feed.btc_dominance()
         except Exception as exc:
             logger.debug("BTC dominance fetch failed (optional enrichment): %s", exc)
 
         # ── Compute MarketContext once for the entire pipeline ──────
-        ctx: Optional[MarketContext] = None
+        ctx: MarketContext | None = None
         if prices and len(prices) >= 30:
             ctx = compute_market_context(prices, symbol, asset_type.value, fear_greed)
 
@@ -217,7 +175,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                 ensemble_change_pct = (final_price - current_price) / current_price * 100
                 if abs(ensemble_change_pct) > 50:
                     logger.warning(
-                        "SANITY CHECK: %s ensemble prediction unrealistic " "(%.1f%% in %dd). Falling back to EMA-20.",
+                        "SANITY CHECK: %s ensemble prediction unrealistic (%.1f%% in %dd). Falling back to EMA-20.",
                         symbol,
                         ensemble_change_pct,
                         days_ahead,
@@ -486,7 +444,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         # Log prediction for monitoring (with CI for calibration tracking)
         try:
-            from app.core.database import AsyncSessionLocal
+            from app.core.db.session import session_factory
             from app.models.prediction_log import PredictionLog
 
             if predictions:
@@ -511,7 +469,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                         "model_weights": models_detail.get("weights") if models_detail else None,
                     },
                 )
-                async with AsyncSessionLocal() as log_db:
+                async with session_factory() as log_db:
                     log_db.add(log_entry)
                     await log_db.commit()
         except Exception as e:
@@ -556,7 +514,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         self,
         db: AsyncSession,
         user_id: str,
-    ) -> List[AnomalyDetection]:
+    ) -> list[AnomalyDetection]:
         """Detect anomalies using Isolation Forest and Z-score."""
         anomalies = []
 
@@ -582,27 +540,10 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         for asset in assets:
             try:
                 current_price = await self._get_current_price(asset.symbol, asset.asset_type)
-                if current_price == 0:
+                if current_price is None:
                     continue
 
-                # Fetch historical prices for ML-based detection (with cache)
-                cached_hist = await get_cached_history(asset.symbol, asset.asset_type.value, 30)
-                if cached_hist:
-                    prices = cached_hist["prices"]
-                else:
-                    hist_dates, prices = await self.data_fetcher.get_history(
-                        asset.symbol, asset.asset_type.value, days=30
-                    )
-                    if hist_dates and prices:
-                        await cache_history(
-                            asset.symbol,
-                            asset.asset_type.value,
-                            30,
-                            {
-                                "dates": [d.isoformat() for d in hist_dates],
-                                "prices": prices,
-                            },
-                        )
+                prices = (await local_series(asset.symbol, 30)).prices
 
                 anomaly = self.anomaly_detector.detect(
                     symbol=asset.symbol,
@@ -677,9 +618,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
             if crypto_symbols:
                 try:
-                    crypto_prices = await self.price_service.get_multiple_crypto_prices(crypto_symbols)
-                    for sym, price_data in crypto_prices.items():
-                        change_pct = float(price_data.get("change_percent_24h", 0))
+                    crypto_quotes = await price_feed.crypto(crypto_symbols)
+                    for quote in crypto_quotes.values():
+                        change_pct = quote.change_percent_24h
                         total_change += change_pct
                         asset_count += 1
                         if change_pct > sig_threshold:
@@ -692,9 +633,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             # Fetch stock/ETF prices individually (usually fewer)
             for sym, atype in stock_symbols:
                 try:
-                    price_data = await self.price_service.get_price(sym, atype)
-                    if price_data:
-                        change_pct = float(price_data.get("change_percent_24h", 0))
+                    stock_quote = await price_feed.quote(sym, atype)
+                    if stock_quote is not None:
+                        change_pct = stock_quote.change_percent_24h
                         total_change += change_pct
                         asset_count += 1
                         if change_pct > sig_threshold:
@@ -785,7 +726,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         db: AsyncSession,
         user_id: str,
         days_ahead: int = 7,
-    ) -> Dict:
+    ) -> dict:
         """Get predictions for all assets in user's portfolio."""
         result = await db.execute(
             select(Portfolio).where(
@@ -836,8 +777,8 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             }
 
         # Deduplicate by symbol: aggregate quantities (Decimal precision)
-        asset_map: Dict[str, object] = {}
-        quantity_map: Dict[str, Decimal] = {}
+        asset_map: dict[str, object] = {}
+        quantity_map: dict[str, Decimal] = {}
         for a in raw_assets:
             key = a.symbol
             if key not in asset_map:
@@ -855,7 +796,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         for asset in assets[:10]:
             # Skip stablecoins — their price is pegged, prediction is meaningless
-            if PriceService.is_stablecoin(asset.symbol):
+            if is_stablecoin(asset.symbol):
                 continue
 
             prediction = await self.get_price_prediction(asset.symbol, asset.asset_type, days_ahead)
@@ -971,11 +912,11 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
     # Top Alpha detection
     # ------------------------------------------------------------------
 
-    async def get_market_events(self) -> List[Dict]:
+    async def get_market_events(self) -> list[dict]:
         """Return upcoming market events from web scraping + Forex Factory API."""
         import re
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC; all evt_date constructions are also naive
+        now = datetime.now(UTC).replace(tzinfo=None)  # naive UTC; all evt_date constructions are also naive
         current_year = now.year
         events = []
 
@@ -1056,7 +997,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             # The page groups by year, find the current/next year sections
             for year in [current_year, current_year + 1]:
                 # Find meeting date patterns like "January 27-28" or "March 17-18*"
-                pattern = rf'({"|".join(month_map.keys())})\s+(\d{{1,2}})-(\d{{1,2}})\*?'
+                pattern = rf"({'|'.join(month_map.keys())})\s+(\d{{1,2}})-(\d{{1,2}})\*?"
                 year_section_match = re.search(rf'class="[^"]*"[^>]*>\s*{year}\s*<', html, re.IGNORECASE)
                 if not year_section_match:
                     continue
@@ -1212,16 +1153,16 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         unique.sort(key=lambda x: x["days_until"])
         return unique[:15]
 
-    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> Dict:
+    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> dict:
         """Get historical prediction track record for a symbol.
 
         Returns past predictions with actual outcomes for transparency.
         """
-        from app.core.database import AsyncSessionLocal
+        from app.core.db.session import session_factory
         from app.models.prediction_log import PredictionLog
 
         try:
-            async with AsyncSessionLocal() as db:
+            async with session_factory() as db:
                 filters = [
                     PredictionLog.symbol == symbol.upper(),
                     PredictionLog.accuracy_checked.isnot(None),
@@ -1302,7 +1243,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                 },
             }
 
-    async def get_portfolio_backtest(self, db: AsyncSession, user_id: str, days: int = 7) -> Dict:
+    async def get_portfolio_backtest(self, db: AsyncSession, user_id: str, days: int = 7) -> dict:
         """Aggregate backtest across all portfolio assets.
 
         Compares predictions made *days* ago with actual prices recorded
@@ -1352,12 +1293,12 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         logs = result.scalars().all()
 
         # Group by symbol
-        by_symbol: Dict[str, list] = {}
+        by_symbol: dict[str, list] = {}
         for log in logs:
             by_symbol.setdefault(log.symbol, []).append(log)
 
         asset_results = []
-        all_mapes: List[float] = []
+        all_mapes: list[float] = []
         dir_hits = 0
         dir_total = 0
 
@@ -1395,40 +1336,15 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
     # -- Private helpers --
 
-    async def _get_current_price(self, symbol: str, asset_type: AssetType) -> float:
-        """Get current price for an asset."""
-        try:
-            if asset_type == AssetType.CRYPTO:
-                data = await self.price_service.get_crypto_price(symbol)
-            elif asset_type in [AssetType.STOCK, AssetType.ETF]:
-                data = await self.price_service.get_stock_price(symbol)
-            else:
-                return 0.0
-
-            if data and "price" in data:
-                return float(data["price"])
-            return 0.0
-        except Exception:
-            return 0.0
+    async def _get_current_price(self, symbol: str, asset_type: AssetType) -> float | None:
+        """Cours courant en EUR, None s'il est inconnu."""
+        quote = await price_feed.quote(symbol, asset_type)
+        return float(quote.price) if quote is not None else None
 
     async def _get_daily_volatility(self, symbol: str, asset_type: AssetType) -> float:
         """Compute daily volatility from actual historical data."""
         try:
-            cached_hist = await get_cached_history(symbol, asset_type.value, 30)
-            if cached_hist:
-                prices = cached_hist["prices"]
-            else:
-                hist_dates, prices = await self.data_fetcher.get_history(symbol, asset_type.value, days=30)
-                if hist_dates and prices:
-                    await cache_history(
-                        symbol,
-                        asset_type.value,
-                        30,
-                        {
-                            "dates": [d.isoformat() for d in hist_dates],
-                            "prices": prices,
-                        },
-                    )
+            prices = (await local_series(symbol, 30)).prices
             if prices and len(prices) >= 5:
                 returns = [
                     (prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices)) if prices[i - 1] > 0
@@ -1453,7 +1369,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         support: float,
         resistance: float,
-        regime_info: Optional[Dict] = None,
+        regime_info: dict | None = None,
     ) -> str:
         """Observational regime/trend context, always suffixed with the non-advice disclaimer.
 
@@ -1474,7 +1390,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         support: float,
         resistance: float,
-        regime_info: Optional[Dict] = None,
+        regime_info: dict | None = None,
     ) -> str:
         """Observational regime/trend context in French (no prescriptive orders)."""
         regime = regime_info.get("dominant_regime") if regime_info else None
@@ -1519,7 +1435,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                         "Tendance haussière forte. Le risque de retournement tend à "
                         f"augmenter à mesure que le mouvement s'étend ; résistance à surveiller : {resistance:.0f}."
                     )
-                return "Marché haussier : la dynamique reste positive. " f"Résistance à surveiller : {resistance:.0f}."
+                return f"Marché haussier : la dynamique reste positive. Résistance à surveiller : {resistance:.0f}."
 
         # Fallback: trend-based observation
         if trend == "bullish" and trend_strength > 50:
@@ -1534,11 +1450,11 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
     @staticmethod
     def _ema20_fallback(
-        prices: List[float],
+        prices: list[float],
         current_price: float,
         days_ahead: int,
         smart_round,
-    ) -> Tuple[List[Dict], str, float]:
+    ) -> tuple[list[dict], str, float]:
         """EMA-20 slope extrapolation — used as sanity fallback when ensemble is unrealistic.
 
         Returns (predictions_list, trend, trend_strength).
@@ -1563,7 +1479,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         predictions = []
         for day in range(1, days_ahead + 1):
-            date = (datetime.now(timezone.utc) + timedelta(days=day)).strftime("%Y-%m-%d")
+            date = (datetime.now(UTC) + timedelta(days=day)).strftime("%Y-%m-%d")
             predicted = current_price * (1 + daily_slope * day)
             predicted = max(0.0, predicted)
             # Conservative CI: ±3% * sqrt(day)
@@ -1585,7 +1501,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
         current_price: float,
         asset_type: AssetType,
         days_ahead: int,
-    ) -> Tuple[List[Dict], str, float]:
+    ) -> tuple[list[dict], str, float]:
         """Deterministic fallback when no historical data available (FIX3).
 
         Uses observed momentum from cached prices if available,
@@ -1596,9 +1512,8 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
 
         # Try to get cached prices for momentum estimation
         trend_factor = 0.0
-        cached_hist = await get_cached_history(symbol, asset_type.value, 30)
-        if cached_hist and len(cached_hist.get("prices", [])) >= 2:
-            cached_prices = cached_hist["prices"]
+        cached_prices = (await local_series(symbol, 30)).prices
+        if len(cached_prices) >= 2:
             # Observed daily momentum from last 7 days (or available)
             window = cached_prices[-min(7, len(cached_prices)) :]
             if len(window) >= 2 and window[0] > 0:
@@ -1616,7 +1531,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             return round(v, 2)
 
         for day in range(1, days_ahead + 1):
-            date = datetime.now(timezone.utc) + timedelta(days=day)
+            date = datetime.now(UTC) + timedelta(days=day)
             # FIX3: linear projection instead of cumulative random chain
             predicted_price = base_price * (1 + trend_factor * day)
             predicted_price = max(0.0, predicted_price)

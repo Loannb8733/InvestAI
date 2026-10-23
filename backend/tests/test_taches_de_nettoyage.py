@@ -12,21 +12,20 @@ raconte sept lignes de « réconciliation » qui ont dégradé le P&L affiché d
 214 €. Ces tests décrivent ce que les tâches font aujourd'hui, y compris les
 cas où elles s'abstiennent — c'est cette abstention qui protège.
 
-Les fonctions ouvrent leur propre session (`AsyncSessionLocal`) au lieu d'en
+Les fonctions ouvrent leur propre session (`session_factory`) au lieu d'en
 recevoir une : le filet la remplace par celle du test, sans quoi elles
 écriraient dans la vraie base.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
-from app.services.transfer_service import COLD_WALLET_DESTINATION
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
 from app.tasks import cleanup
 
 
@@ -45,7 +44,7 @@ def session_de_test(db_session, monkeypatch):
     async def _flush_seulement():
         await db_session.flush()
 
-    monkeypatch.setattr(cleanup, "AsyncSessionLocal", _fabrique)
+    monkeypatch.setattr(cleanup, "session_factory", _fabrique)
     monkeypatch.setattr(db_session, "commit", _flush_seulement)
     return db_session
 
@@ -80,7 +79,7 @@ def _tx(asset, *, type_tx=TransactionType.BUY, quantite="1", externe=None, quand
         price=Decimal("100"),
         fee=Decimal("0"),
         external_id=externe,
-        executed_at=quand or datetime(2026, 1, 1, tzinfo=timezone.utc),
+        executed_at=quand or datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 
@@ -226,7 +225,7 @@ class TestPurgesParAnciennete:
                 asset_type="crypto",
                 model_name="test",
                 prediction_data={},
-                created_at=datetime.now(timezone.utc) - timedelta(days=jours),
+                created_at=datetime.now(UTC) - timedelta(days=jours),
             )
 
         vieille = _log("BTC", 200)

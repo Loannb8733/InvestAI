@@ -19,8 +19,8 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.v1.endpoints.crowdfunding import resoudre_portefeuille_crowdfunding
-from app.models.portfolio import PORTEFEUILLE_CROWDFUNDING, Portfolio
-from app.models.user import User
+from app.domains.identity.models import User
+from app.domains.portfolio.models import CROWDFUNDING_KIND, Portfolio
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ async def portefeuille_marque(db_session, regular_user: User) -> Portfolio:
         id=uuid.uuid4(),
         user_id=regular_user.id,
         name="Crowdfunding",
-        kind=PORTEFEUILLE_CROWDFUNDING,
+        kind=CROWDFUNDING_KIND,
     )
     db_session.add(p)
     await db_session.commit()
@@ -73,7 +73,7 @@ class TestReconnaissance:
         trouve = await _resoudre(db_session, regular_user)
 
         assert trouve.id == ancien.id
-        assert trouve.kind == PORTEFEUILLE_CROWDFUNDING, "marqué au passage, le nom cesse de compter"
+        assert trouve.kind == CROWDFUNDING_KIND, "marqué au passage, le nom cesse de compter"
 
     async def test_un_portefeuille_ordinaire_n_est_jamais_confondu(self, db_session, regular_user):
         """Un portefeuille sans marqueur reste hors de portée.
@@ -88,7 +88,7 @@ class TestReconnaissance:
         trouve = await _resoudre(db_session, regular_user)
 
         assert trouve.id != ordinaire.id
-        assert trouve.kind == PORTEFEUILLE_CROWDFUNDING
+        assert trouve.kind == CROWDFUNDING_KIND
 
     async def test_le_portefeuille_d_un_autre_utilisateur_n_est_pas_repris(
         self, db_session, regular_user, admin_user, portefeuille_marque
@@ -114,6 +114,6 @@ class TestReconnaissance:
         compte = await db_session.execute(
             select(func.count())
             .select_from(Portfolio)
-            .where(Portfolio.user_id == regular_user.id, Portfolio.kind == PORTEFEUILLE_CROWDFUNDING)
+            .where(Portfolio.user_id == regular_user.id, Portfolio.kind == CROWDFUNDING_KIND)
         )
         assert compte.scalar() == 1

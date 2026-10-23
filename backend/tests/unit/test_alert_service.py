@@ -11,8 +11,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, AssetType
 from app.models.alert import Alert, AlertCondition
-from app.models.asset import Asset, AssetType
 from app.services.alert_service import AlertService, AlertTrigger
 
 # ---------------------------------------------------------------------------
@@ -22,13 +24,7 @@ from app.services.alert_service import AlertService, AlertTrigger
 
 @pytest.fixture
 def alert_service():
-    """Create an AlertService with mocked PriceService."""
-    with patch("app.services.alert_service.PriceService") as MockPS:
-        mock_ps_instance = MagicMock()
-        MockPS.return_value = mock_ps_instance
-        svc = AlertService()
-        svc.price_service = mock_ps_instance
-        return svc
+    return AlertService()
 
 
 def _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO, avg_buy_price="30000.0", quantity="1.0"):
@@ -342,25 +338,13 @@ class TestGetAssetPriceDelegation:
     """Tests for _get_asset_price routing."""
 
     @pytest.mark.asyncio
-    async def test_crypto_routes_to_get_crypto_price(self, alert_service):
-        asset = _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO)
-        alert_service.price_service.get_crypto_price = AsyncMock(return_value={"price": Decimal("45000")})
-
-        # The actual _get_asset_price in the service expects get_crypto_price to
-        # return a dict with "price" key or a float directly. The current implementation
-        # calls get_crypto_price which returns a dict. The method returns the result directly.
-        # Looking at the actual code, it returns the result of get_crypto_price directly
-        # (not extracting "price"), so we test the actual behavior.
-        await alert_service._get_asset_price(asset)
-        alert_service.price_service.get_crypto_price.assert_called_once_with(asset.symbol)
-
-    @pytest.mark.asyncio
-    async def test_stock_routes_to_get_stock_price(self, alert_service):
-        asset = _make_asset(symbol="AAPL", asset_type=AssetType.STOCK)
-        alert_service.price_service.get_stock_price = AsyncMock(return_value={"price": Decimal("175")})
-
-        await alert_service._get_asset_price(asset)
-        alert_service.price_service.get_stock_price.assert_called_once_with(asset.symbol)
+    @pytest.mark.parametrize(("symbol", "asset_type"), [("BTC", AssetType.CRYPTO), ("AAPL", AssetType.STOCK)])
+    async def test_quoted_asset_uses_the_price_feed(self, alert_service, symbol, asset_type):
+        asset = _make_asset(symbol=symbol, asset_type=asset_type)
+        quote = AsyncMock(return_value=PriceQuote(price=Decimal("175")))
+        with patch.object(price_feed, "quote", quote):
+            assert await alert_service._get_asset_price(asset) == 175.0
+        quote.assert_awaited_once_with(symbol, asset_type)
 
     @pytest.mark.asyncio
     async def test_real_estate_uses_avg_buy_price(self, alert_service):
@@ -379,9 +363,8 @@ class TestGetAssetPriceDelegation:
         par `_check_single_alert`, qui saute l'évaluation.
         """
         asset = _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO, avg_buy_price="40000.0")
-        alert_service.price_service.get_crypto_price = AsyncMock(side_effect=Exception("API error"))
-
-        result = await alert_service._get_asset_price(asset)
+        with patch.object(price_feed, "quote", AsyncMock(side_effect=Exception("API error"))):
+            result = await alert_service._get_asset_price(asset)
         assert result == 0.0
 
     @pytest.mark.asyncio

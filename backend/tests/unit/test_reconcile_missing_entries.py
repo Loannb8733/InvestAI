@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models.transaction import TransactionType
+from app.domains.transactions.models import TransactionType
 from scripts.reconcile_missing_entries import history_net, missing_entry
 
 D = Decimal

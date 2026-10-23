@@ -5,7 +5,7 @@ import { lazyWithRetry } from '@/lib/lazyWithRetry'
 import type { PnLBreakdown } from '@/types'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,7 @@ import AnimatedNumber from '@/components/ui/animated-number'
 import EmptyState from '@/components/ui/empty-state'
 import SpotlightGroup from '@/components/ui/spotlight-group'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   TrendingUp,
   TrendingDown,

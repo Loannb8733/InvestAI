@@ -12,7 +12,7 @@ Ces tests épinglent ce que ces méthodes font aujourd'hui, avant tout découpag
 Ils ne disent pas ce qu'elles devraient faire : deux comportements y sont
 consignés comme des pièges, non comme des choix approuvés.
 
-Le service ne contacte rien ici : `_fetch_history` et `_get_user_assets` sont
+Le service ne contacte rien ici : `_history_prices` et `_get_user_assets` sont
 les deux seuls points de délégation des sept fonctions analytiques, et les
 figer suffit à rendre les calculs déterministes.
 """
@@ -21,8 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.services.analytics_service import AnalyticsService
 
 # Deux séries qui montent ensemble : corrélation forte et positive.
@@ -69,12 +68,12 @@ async def _persister(db_session, user, actifs):
 def _figer(service, actifs, series):
     """Fige les deux points de délégation du service."""
 
-    async def faux_historique(symbol, asset_type, days=60):
-        return series.get(symbol, ([], []))
+    async def faux_historique(symbol, days=60):
+        return series.get(symbol, ([], []))[1]
 
     return (
         patch.object(service, "_get_user_assets", new=AsyncMock(return_value=actifs)),
-        patch.object(service, "_fetch_history", side_effect=faux_historique),
+        patch.object(service, "_history_prices", side_effect=faux_historique),
     )
 
 

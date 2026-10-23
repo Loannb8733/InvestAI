@@ -4,9 +4,8 @@ Pourquoi c'est une règle et pas un détail
 -----------------------------------------
 Une route d'inscription qui répond « Un compte avec cet email existe déjà » est
 un oracle : elle permet de tester une liste d'adresses et d'apprendre lesquelles
-sont clientes du service. Le reste du module s'en protège déjà — `forgot-password`
-et `resend-verification` portent chacune un commentaire explicite disant qu'elles
-répondent toujours la même chose. Seul `register` avait été oublié.
+sont clientes du service. `forgot-password` répond déjà toujours la même chose ;
+seul `register` avait été oublié.
 
 Deux fuites sont couvertes ici :
 
@@ -23,7 +22,7 @@ est structurelle.
 import ast
 from pathlib import Path
 
-_AUTH = (Path(__file__).resolve().parents[2] / "app" / "api" / "v1" / "endpoints" / "auth.py").read_text(
+_AUTH = (Path(__file__).resolve().parents[2] / "app" / "domains" / "identity" / "account_service.py").read_text(
     encoding="utf-8"
 )
 
@@ -33,7 +32,7 @@ def _fonction_register() -> ast.AsyncFunctionDef:
     for noeud in ast.walk(arbre):
         if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef)) and noeud.name == "register":
             return noeud
-    raise AssertionError("fonction register introuvable dans auth.py")
+    raise AssertionError("fonction register introuvable dans account_service.py")
 
 
 def _chaines(noeud) -> list:

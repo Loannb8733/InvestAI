@@ -4,9 +4,9 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -32,10 +32,10 @@ class BybitService(BaseExchangeService):
     BASE_URLS = ["https://api.bybit.com", "https://api.bybit.nl"]
     RECV_WINDOW = "5000"
 
-    def __init__(self, api_key: str, secret_key: str, passphrase: str = None):
+    def __init__(self, api_key: str, secret_key: str, passphrase: str | None = None):
         super().__init__(api_key, secret_key, passphrase)
         # Will be resolved on first successful call
-        self._base_url: Optional[str] = None
+        self._base_url: str | None = None
 
     @property
     def exchange_name(self) -> str:
@@ -45,7 +45,7 @@ class BybitService(BaseExchangeService):
         """Get current timestamp in milliseconds."""
         return str(int(time.time() * 1000))
 
-    def _sign_request(self, timestamp: str, params: dict) -> str:
+    def _sign_request(self, timestamp: str, params: dict[str, Any]) -> str:
         """Sign a request with HMAC SHA256.
 
         Bybit v5 signature: HMAC_SHA256(timestamp + api_key + recv_window + queryString)
@@ -53,13 +53,13 @@ class BybitService(BaseExchangeService):
         query_string = urlencode(params) if params else ""
         pre_sign = f"{timestamp}{self.api_key}{self.RECV_WINDOW}{query_string}"
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             pre_sign.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         return signature
 
-    def _get_headers(self, timestamp: str, params: dict) -> dict:
+    def _get_headers(self, timestamp: str, params: dict[str, Any]) -> dict[str, Any]:
         """Get request headers with authentication."""
         signature = self._sign_request(timestamp, params)
         return {
@@ -112,9 +112,9 @@ class BybitService(BaseExchangeService):
             logger.error(f"Bybit test_connection error: {e}")
             return False
 
-    async def get_balances(self) -> List[ExchangeBalance]:
+    async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bybit."""
-        balances = []
+        balances: list[ExchangeBalance] = []
         try:
             base_url = await self._resolve_base_url()
             async with self._get_http_client() as client:
@@ -159,11 +159,11 @@ class BybitService(BaseExchangeService):
 
     async def get_trades(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 500,
-    ) -> List[ExchangeTrade]:
+    ) -> list[ExchangeTrade]:
         """Get trade history from Bybit using cursor-based pagination."""
         all_trades = []
         try:
@@ -172,7 +172,7 @@ class BybitService(BaseExchangeService):
                 fetched = 0
 
                 while fetched < limit:
-                    params: dict = {
+                    params: dict[str, Any] = {
                         "category": "spot",
                         "limit": str(min(limit - fetched, 100)),
                     }
@@ -217,7 +217,7 @@ class BybitService(BaseExchangeService):
                                 price=Decimal(trade.get("execPrice", "0")),
                                 fee=Decimal(trade.get("execFee", "0")),
                                 fee_currency=trade.get("feeCurrency", ""),
-                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000, tz=timezone.utc),
+                                timestamp=datetime.fromtimestamp(int(exec_time) / 1000, tz=UTC),
                             )
                         )
                         fetched += 1
@@ -236,15 +236,15 @@ class BybitService(BaseExchangeService):
 
     async def get_deposits(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeDeposit]:
+    ) -> list[ExchangeDeposit]:
         """Get deposit history from Bybit."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
         try:
             async with self._get_http_client() as client:
-                params: dict = {
+                params: dict[str, Any] = {
                     "limit": str(min(limit, 50)),
                 }
                 if symbol:
@@ -287,7 +287,7 @@ class BybitService(BaseExchangeService):
                             symbol=deposit.get("coin", ""),
                             amount=Decimal(deposit.get("amount", "0")),
                             timestamp=(
-                                datetime.fromtimestamp(int(success_time) / 1000, tz=timezone.utc)
+                                datetime.fromtimestamp(int(success_time) / 1000, tz=UTC)
                                 if int(success_time) > 0
                                 else datetime.now()
                             ),
@@ -303,15 +303,15 @@ class BybitService(BaseExchangeService):
 
     async def get_withdrawals(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[datetime] = None,
+        symbol: str | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[ExchangeWithdrawal]:
+    ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bybit."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
         try:
             async with self._get_http_client() as client:
-                params: dict = {
+                params: dict[str, Any] = {
                     "limit": str(min(limit, 50)),
                 }
                 if symbol:
@@ -357,7 +357,7 @@ class BybitService(BaseExchangeService):
                             amount=Decimal(withdrawal.get("amount", "0")),
                             fee=Decimal(withdrawal.get("withdrawFee", "0")),
                             timestamp=(
-                                datetime.fromtimestamp(int(create_time) / 1000, tz=timezone.utc)
+                                datetime.fromtimestamp(int(create_time) / 1000, tz=UTC)
                                 if int(create_time) > 0
                                 else datetime.now()
                             ),

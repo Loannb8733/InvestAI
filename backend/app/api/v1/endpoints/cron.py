@@ -36,11 +36,12 @@ async def verify_cron_token(x_cron_token: str = Header(default="")) -> None:
 @router.post("/sync-exchanges", dependencies=[Depends(verify_cron_token)])
 async def cron_sync_exchanges() -> dict:
     """Hourly exchange sync for all active API keys (replaces the Celery beat job)."""
-    from app.tasks.sync_exchanges import _sync_all_exchanges_async
+    from dataclasses import asdict
+
+    from app.domains.exchanges.sync.runner import sync_all
 
     logger.info("Cron: sync-exchanges started")
-    result = await _sync_all_exchanges_async()
-    return {"task": "sync-exchanges", "result": result}
+    return {"task": "sync-exchanges", "result": asdict(await sync_all())}
 
 
 @router.post("/sync-goals", dependencies=[Depends(verify_cron_token)])
@@ -50,14 +51,14 @@ async def cron_sync_goals() -> dict:
     ne bougent que quand l'utilisateur clique « Sync »."""
     from sqlalchemy import select
 
-    from app.core.database import AsyncSessionLocal
+    from app.core.db.session import session_factory
     from app.models.goal import Goal, GoalStatus
     from app.services.goal_projection_service import sync_goals_for_user
 
     logger.info("Cron: sync-goals started")
     synced_total = 0
     users_done = 0
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         user_ids = (
             (await db.execute(select(Goal.user_id).where(Goal.status == GoalStatus.ACTIVE).distinct())).scalars().all()
         )
@@ -115,7 +116,7 @@ async def cron_invariants_check() -> dict:
 
     from sqlalchemy import text
 
-    from app.core.database import engine
+    from app.core.db.session import engine
     from app.services.materialite_invariants import classify_holdings_gap
 
     invariants: dict[str, list[dict]] = {}

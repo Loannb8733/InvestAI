@@ -4,9 +4,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
+from app.domains.identity.models import User
+from app.domains.identity.tokens import create_token
 from app.models.notification import Notification, NotificationPriority, NotificationType
-from app.models.user import User
 
 
 async def _create_notification(db: AsyncSession, user_id, title: str = "Test Alert") -> Notification:
@@ -28,7 +28,7 @@ async def _create_notification(db: AsyncSession, user_id, title: str = "Test Ale
 @pytest.mark.asyncio
 async def test_list_notifications(client: AsyncClient, regular_user: User, db_session: AsyncSession):
     """Test listing notifications."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     await _create_notification(db_session, regular_user.id, "Alert 1")
@@ -43,7 +43,7 @@ async def test_list_notifications(client: AsyncClient, regular_user: User, db_se
 @pytest.mark.asyncio
 async def test_list_unread_only(client: AsyncClient, regular_user: User, db_session: AsyncSession):
     """Test listing only unread notifications."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     await _create_notification(db_session, regular_user.id, "Unread")
@@ -61,7 +61,7 @@ async def test_list_unread_only(client: AsyncClient, regular_user: User, db_sess
 @pytest.mark.asyncio
 async def test_unread_count(client: AsyncClient, regular_user: User, db_session: AsyncSession):
     """Test getting unread notification count."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     await _create_notification(db_session, regular_user.id)
@@ -75,7 +75,7 @@ async def test_unread_count(client: AsyncClient, regular_user: User, db_session:
 @pytest.mark.asyncio
 async def test_mark_as_read(client: AsyncClient, regular_user: User, db_session: AsyncSession):
     """Test marking a notification as read."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     notification = await _create_notification(db_session, regular_user.id)
@@ -94,7 +94,7 @@ async def test_mark_as_read(client: AsyncClient, regular_user: User, db_session:
 @pytest.mark.asyncio
 async def test_mark_all_as_read(client: AsyncClient, regular_user: User, db_session: AsyncSession):
     """Test marking all notifications as read."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     await _create_notification(db_session, regular_user.id)
@@ -111,7 +111,7 @@ async def test_mark_all_as_read(client: AsyncClient, regular_user: User, db_sess
 @pytest.mark.asyncio
 async def test_mark_nonexistent_notification(client: AsyncClient, regular_user: User):
     """Test marking a nonexistent notification as read."""
-    token = create_access_token(subject=str(regular_user.id))
+    token = create_token(str(regular_user.id))
     headers = {"Authorization": f"Bearer {token}"}
 
     response = await client.post(

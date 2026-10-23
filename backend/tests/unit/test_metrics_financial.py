@@ -189,7 +189,7 @@ class TestForexFallback:
 
     def test_all_stablecoins_are_recognized(self):
         """All defined stablecoins should be in STABLECOIN_SYMBOLS."""
-        from app.services.metrics_service import STABLECOIN_SYMBOLS
+        from app.domains.portfolio.classification import STABLECOIN_SYMBOLS
 
         expected = {
             "USDT",
@@ -224,35 +224,35 @@ class TestCheckConstraints:
 
     def test_transaction_has_quantity_check(self):
         """Transaction model should have ck_transactions_quantity_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_quantity_positive" in constraint_names
 
     def test_transaction_has_price_check(self):
         """Transaction model should have ck_transactions_price_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_price_positive" in constraint_names
 
     def test_transaction_has_fee_check(self):
         """Transaction model should have ck_transactions_fee_positive."""
-        from app.models.transaction import Transaction
+        from app.domains.transactions.models import Transaction
 
         constraint_names = {c.name for c in Transaction.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_transactions_fee_positive" in constraint_names
 
     def test_asset_has_quantity_check(self):
         """Asset model should have ck_assets_quantity_positive."""
-        from app.models.asset import Asset
+        from app.domains.portfolio.models import Asset
 
         constraint_names = {c.name for c in Asset.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_assets_quantity_positive" in constraint_names
 
     def test_asset_has_avg_buy_price_check(self):
         """Asset model should have ck_assets_avg_buy_price_positive."""
-        from app.models.asset import Asset
+        from app.domains.portfolio.models import Asset
 
         constraint_names = {c.name for c in Asset.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_assets_avg_buy_price_positive" in constraint_names
@@ -274,7 +274,7 @@ class TestClassificationHelpers:
     """Test is_fiat, is_stablecoin, is_cash_like."""
 
     def test_is_fiat(self):
-        from app.services.metrics_service import is_fiat
+        from app.domains.portfolio.classification import is_fiat
 
         assert is_fiat("EUR") is True
         assert is_fiat("usd") is True
@@ -282,7 +282,7 @@ class TestClassificationHelpers:
         assert is_fiat("USDT") is False
 
     def test_is_stablecoin(self):
-        from app.services.metrics_service import is_stablecoin
+        from app.domains.portfolio.classification import is_stablecoin
 
         assert is_stablecoin("USDT") is True
         assert is_stablecoin("usdc") is True
@@ -291,7 +291,7 @@ class TestClassificationHelpers:
         assert is_stablecoin("EUR") is False
 
     def test_is_cash_like(self):
-        from app.services.metrics_service import is_cash_like
+        from app.domains.portfolio.classification import is_cash_like
 
         assert is_cash_like("EUR") is True
         assert is_cash_like("USDT") is True

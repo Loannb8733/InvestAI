@@ -8,7 +8,6 @@ Supports:
 
 import json
 import logging
-from typing import Dict, List, Optional
 
 import httpx
 import redis.asyncio as aioredis
@@ -28,7 +27,7 @@ COOLDOWN_TTL = 4 * 3600  # 14400 seconds
 # Rate limit for Monte Carlo callbacks: 1 per 30s per user
 MC_CALLBACK_TTL = 30
 
-_redis: Optional[aioredis.Redis] = None
+_redis: aioredis.Redis | None = None
 
 
 async def _get_redis() -> aioredis.Redis:
@@ -40,7 +39,7 @@ async def _get_redis() -> aioredis.Redis:
     return _redis
 
 
-def _build_inline_keyboard(buttons: List[List[Dict]]) -> Dict:
+def _build_inline_keyboard(buttons: list[list[dict]]) -> dict:
     """Build Telegram InlineKeyboardMarkup from a list of button rows.
 
     Each button: {"text": "Label", "callback_data": "payload"}
@@ -55,7 +54,7 @@ class TelegramService:
     # contrarian signal, etc.) reuses one keep-alive connection instead of
     # opening and TIME_WAITing a fresh TCP socket per message — that pattern
     # caused noticeable latency and could pressure ulimit on Render free tier.
-    _client: Optional[httpx.AsyncClient] = None
+    _client: httpx.AsyncClient | None = None
 
     @classmethod
     def _get_client(cls) -> httpx.AsyncClient:
@@ -95,8 +94,8 @@ class TelegramService:
         text: str,
         chat_id: str,
         parse_mode: str = "HTML",
-        reply_markup: Optional[Dict] = None,
-    ) -> Optional[Dict]:
+        reply_markup: dict | None = None,
+    ) -> dict | None:
         """Send a message to a specific Telegram chat.
 
         Returns the Telegram message dict on success, None on failure.
@@ -106,7 +105,7 @@ class TelegramService:
             return None
 
         url = TELEGRAM_SEND.format(token=settings.TELEGRAM_BOT_TOKEN)
-        payload: Dict = {
+        payload: dict = {
             "chat_id": chat_id,
             "text": text,
             "parse_mode": parse_mode,
@@ -133,14 +132,14 @@ class TelegramService:
         message_id: int,
         text: str,
         parse_mode: str = "HTML",
-        reply_markup: Optional[Dict] = None,
+        reply_markup: dict | None = None,
     ) -> bool:
         """Edit an existing Telegram message."""
         if not settings.telegram_bot_enabled:
             return False
 
         url = TELEGRAM_EDIT.format(token=settings.TELEGRAM_BOT_TOKEN)
-        payload: Dict = {
+        payload: dict = {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": text,
@@ -161,7 +160,7 @@ class TelegramService:
     async def answer_callback_query(
         self,
         callback_query_id: str,
-        text: Optional[str] = None,
+        text: str | None = None,
         show_alert: bool = False,
     ) -> bool:
         """Answer a Telegram callback query (removes loading indicator)."""
@@ -169,7 +168,7 @@ class TelegramService:
             return False
 
         url = TELEGRAM_ANSWER_CALLBACK.format(token=settings.TELEGRAM_BOT_TOKEN)
-        payload: Dict = {"callback_query_id": callback_query_id}
+        payload: dict = {"callback_query_id": callback_query_id}
         if text:
             payload["text"] = text
             payload["show_alert"] = show_alert
@@ -186,12 +185,12 @@ class TelegramService:
         self,
         message: str,
         chat_id: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         priority: str = "normal",
-        symbol: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        reply_markup: Optional[Dict] = None,
-    ) -> Optional[Dict]:
+        symbol: str | None = None,
+        alert_type: str | None = None,
+        reply_markup: dict | None = None,
+    ) -> dict | None:
         """Send a smart alert with per-user cooldown rate-limiting.
 
         Returns the Telegram message dict on success, None if skipped or failed.
@@ -240,7 +239,7 @@ class TelegramService:
         description: str,
         price_change_pct: float,
         chat_id: str = "",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         """Send anomaly detection alert to a user."""
         if not chat_id:
@@ -280,7 +279,7 @@ class TelegramService:
         confidence: float,
         distance_pct: float,
         chat_id: str = "",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         """Send alert when asset enters bottom zone with high confidence."""
         if not chat_id:
@@ -369,12 +368,12 @@ class TelegramService:
             ("\U0001f514 Alerte Stratégie", ""),
         )
 
-        return f"<b>{tone_title} — {symbol}</b>\n" f"Action : {action}\n" f"{description}\n\n" f"<i>{tone_hint}</i>"
+        return f"<b>{tone_title} — {symbol}</b>\nAction : {action}\n{description}\n\n<i>{tone_hint}</i>"
 
     # ── InlineKeyboard helpers ──────────────────────────────────────
 
     @staticmethod
-    def build_alpha_keyboard(user_id: str, symbol: str, order_eur: float) -> Dict:
+    def build_alpha_keyboard(user_id: str, symbol: str, order_eur: float) -> dict:
         """Build InlineKeyboard for TOP_ALPHA alerts with action buttons."""
         callback_prefix = f"alpha:{user_id}:{symbol}:{order_eur}"
         return _build_inline_keyboard(

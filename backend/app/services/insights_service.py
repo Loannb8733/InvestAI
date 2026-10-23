@@ -1,23 +1,17 @@
 """Advanced analysis service: fees, tax-loss harvesting, passive income, DCA backtest."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset, AssetType
-from app.models.portfolio import Portfolio
-from app.models.transaction import Transaction, TransactionType
-from app.services.price_service import price_service
+from app.domains.market_data.fx.spot import FIAT_CURRENCIES
+from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 
 logger = logging.getLogger(__name__)
-
-
-# Devises dont le montant est déjà exploitable tel quel, ou converti par le
-# taux capté à l'exécution. Les autres sont des jetons : il leur faut un cours.
-DEVISES_FIAT = frozenset({"EUR", "USD", "GBP", "CAD", "JPY", "CHF", "AUD"})
 
 
 def convertir_frais_en_devise_portefeuille(
@@ -26,8 +20,8 @@ def convertir_frais_en_devise_portefeuille(
     symbole_actif: str,
     prix_transaction: float,
     devise_transaction: str,
-    taux_conversion: Optional[float],
-    cours_par_jeton: Optional[Dict[str, float]] = None,
+    taux_conversion: float | None,
+    cours_par_jeton: dict[str, float] | None = None,
 ) -> tuple[float, bool]:
     """Ramène des frais dans la devise du portefeuille. Rend (montant, converti).
 
@@ -60,7 +54,7 @@ def convertir_frais_en_devise_portefeuille(
 
     fx = float(taux_conversion) if taux_conversion else 1.0
 
-    if devise in DEVISES_FIAT:
+    if devise in FIAT_CURRENCIES:
         if devise == (devise_transaction or "EUR").upper():
             return montant * fx, True
         return montant, False
@@ -126,10 +120,10 @@ class InsightsService:
         txns = result.scalars().all()
 
         total_fees = 0.0
-        by_exchange: Dict[str, float] = {}
-        by_asset: Dict[str, float] = {}
-        by_type: Dict[str, float] = {}
-        by_month: Dict[str, float] = {}
+        by_exchange: dict[str, float] = {}
+        by_asset: dict[str, float] = {}
+        by_type: dict[str, float] = {}
+        by_month: dict[str, float] = {}
         fee_list = []
 
         # Cours des jetons dans lesquels des frais ont été prélevés sans que la
@@ -138,20 +132,19 @@ class InsightsService:
         jetons_a_coter = {
             (tx.fee_currency or "").upper()
             for tx in txns
-            if (tx.fee_currency or "EUR").upper() not in DEVISES_FIAT
+            if (tx.fee_currency or "EUR").upper() not in FIAT_CURRENCIES
             and (tx.fee_currency or "").upper()
             != (asset_map.get(str(tx.asset_id)).symbol.upper() if asset_map.get(str(tx.asset_id)) else "")
         }
-        cours_par_jeton: Dict[str, float] = {}
+        cours_par_jeton: dict[str, float] = {}
         for jeton in jetons_a_coter:
             if not jeton:
                 continue
-            try:
-                donnees = await price_service.get_price(jeton, "crypto")
-                if donnees and donnees.get("price"):
-                    cours_par_jeton[jeton] = float(donnees["price"])
-            except Exception:
+            cours = await price_feed.quote(jeton, "crypto")
+            if cours is None:
                 logger.warning("Cours indisponible pour %s — frais laissés dans leur devise", jeton)
+            else:
+                cours_par_jeton[jeton] = float(cours.price)
 
         frais_non_convertis = 0
 
@@ -249,8 +242,8 @@ class InsightsService:
 
             # Get current price
             at = asset.asset_type.value if isinstance(asset.asset_type, AssetType) else str(asset.asset_type)
-            price_data = await price_service.get_price(asset.symbol, at)
-            current_price = float(price_data["price"]) if price_data and price_data.get("price") else avg_price
+            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            current_price = float(quote.price) if quote is not None else avg_price
 
             cost_basis = qty * avg_price
             current_value = qty * current_price
@@ -295,7 +288,7 @@ class InsightsService:
     # Passive Income Tracker
     # ------------------------------------------------------------------
 
-    async def get_passive_income(self, db: AsyncSession, user_id: str, year: Optional[int] = None) -> dict:
+    async def get_passive_income(self, db: AsyncSession, user_id: str, year: int | None = None) -> dict:
         """Track dividends, staking rewards, interest — by month and by asset."""
         portfolios = await self._get_user_portfolios(db, user_id)
         if not portfolios:
@@ -322,9 +315,9 @@ class InsightsService:
         txns = result.scalars().all()
 
         total = 0.0
-        by_type: Dict[str, float] = {}
-        by_asset: Dict[str, float] = {}
-        by_month: Dict[str, float] = {}
+        by_type: dict[str, float] = {}
+        by_asset: dict[str, float] = {}
+        by_month: dict[str, float] = {}
         history = []
 
         for tx in txns:
@@ -389,12 +382,10 @@ class InsightsService:
 
         Returns what the portfolio would be worth today.
         """
-        from app.core.config import settings
-        from app.ml.historical_data import HistoricalDataFetcher
+        from app.domains.market_data.history.reader import local_series
+        from app.domains.market_data.history.tasks import schedule_refresh
 
-        fetcher = HistoricalDataFetcher(coingecko_api_key=getattr(settings, "COINGECKO_API_KEY", None))
-
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start_date = datetime(start_year, start_month, 1)
         total_months = (now.year - start_date.year) * 12 + (now.month - start_date.month)
 
@@ -403,11 +394,11 @@ class InsightsService:
 
         # Fetch max historical data
         days = min(total_months * 31 + 30, 365 * 5)  # up to 5 years
-        dates, prices = await fetcher.get_history(symbol, asset_type, days=days)
-        await fetcher.close()
-
-        if not prices or len(prices) < 30:
-            return {"error": f"Pas assez d'historique pour {symbol}"}
+        history = await local_series(symbol, days)
+        dates, prices = history.dates, history.prices
+        if len(prices) < 30:
+            schedule_refresh(symbol, asset_type)
+            return {"error": f"Pas assez d'historique pour {symbol} : chargement en cours, réessayez plus tard"}
 
         # Build date->price lookup (use closest available date)
         date_price = {}

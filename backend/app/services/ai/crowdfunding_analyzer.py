@@ -4,15 +4,13 @@ import json
 import logging
 import uuid
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.asset import Asset
+from app.domains.portfolio.models import Asset, Portfolio
 from app.models.crowdfunding_project import CrowdfundingProject
-from app.models.portfolio import Portfolio
 from app.models.project_audit import ProjectAudit
 from app.services.ai.pdf_parser import PDFParser
 
@@ -555,7 +553,7 @@ Réponds UNIQUEMENT avec le JSON, sans aucun texte autour."""
         db: AsyncSession,
         file_contents: list[tuple[str, bytes]],
         user_id: uuid.UUID,
-        project_id: Optional[uuid.UUID] = None,
+        project_id: uuid.UUID | None = None,
         munitions: float = 0.0,
         total_capital: float = 0.0,
     ) -> ProjectAudit:

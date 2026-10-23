@@ -10,7 +10,6 @@ Reference:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 import numpy as np
 
@@ -27,9 +26,9 @@ class DriftResult:
     """Result of a drift check for one symbol."""
 
     symbol: str
-    psi_values: Dict[str, float] = field(default_factory=dict)  # feature → PSI
+    psi_values: dict[str, float] = field(default_factory=dict)  # feature → PSI
     overall_psi: float = 0.0
-    drifted_features: List[str] = field(default_factory=list)
+    drifted_features: list[str] = field(default_factory=list)
     status: str = "ok"  # "ok" | "warning" | "drift"
 
 
@@ -68,12 +67,12 @@ def _compute_psi(
     return max(psi, 0.0)  # PSI is non-negative by definition
 
 
-def _extract_features(prices: np.ndarray) -> Dict[str, np.ndarray]:
+def _extract_features(prices: np.ndarray) -> dict[str, np.ndarray]:
     """Extract key features from a price series for drift monitoring.
 
     Returns a dict of feature_name → values array.
     """
-    features: Dict[str, np.ndarray] = {}
+    features: dict[str, np.ndarray] = {}
 
     if len(prices) < 20:
         return features

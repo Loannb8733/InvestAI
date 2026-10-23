@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/vitest'
 import { configure } from '@testing-library/react'
 
 // Les `findBy*` et `waitFor` abandonnent par défaut au bout de 1 s. Un

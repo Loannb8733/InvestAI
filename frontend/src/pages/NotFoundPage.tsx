@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { FileQuestion, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AuroraCanvas from '@/components/ui/aurora-canvas'
