@@ -23,77 +23,22 @@ EXCHANGE_SERVICES: dict[str, type[BaseExchangeService]] = {
     "okx": OkxService,
 }
 
+_CATALOGUE = (
+    ("binance", "Binance", True, False, "Plus grande plateforme d'échange crypto au monde"),
+    ("bitpanda", "Bitpanda", False, False, "Plateforme d'investissement européenne (crypto, actions, métaux)"),
+    ("bitstamp", "Bitstamp", True, False, "L'un des plus anciens exchanges crypto au monde"),
+    ("bybit", "Bybit", True, False, "Exchange crypto avec trading de dérivés avancé"),
+    ("coinbase", "Coinbase", True, False, "Exchange américain grand public avec Advanced Trade"),
+    ("cryptocom", "Crypto.com", True, False, "Plateforme crypto populaire avec carte Visa et app mobile"),
+    ("gateio", "Gate.io", True, False, "Exchange crypto avec un large choix d'altcoins"),
+    ("kraken", "Kraken", True, False, "Exchange américain réputé pour sa sécurité"),
+    ("kucoin", "KuCoin", True, True, "Exchange crypto populaire avec large choix d'altcoins"),
+    ("okx", "OKX", True, True, "Exchange crypto global avec trading spot et dérivés"),
+)
+
 SUPPORTED_EXCHANGES = [
-    {
-        "id": "binance",
-        "name": "Binance",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Plus grande plateforme d'échange crypto au monde",
-    },
-    {
-        "id": "bitpanda",
-        "name": "Bitpanda",
-        "requires_secret": False,
-        "requires_passphrase": False,
-        "description": "Plateforme d'investissement européenne (crypto, actions, métaux)",
-    },
-    {
-        "id": "bitstamp",
-        "name": "Bitstamp",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "L'un des plus anciens exchanges crypto au monde",
-    },
-    {
-        "id": "bybit",
-        "name": "Bybit",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Exchange crypto avec trading de dérivés avancé",
-    },
-    {
-        "id": "coinbase",
-        "name": "Coinbase",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Exchange américain grand public avec Advanced Trade",
-    },
-    {
-        "id": "cryptocom",
-        "name": "Crypto.com",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Plateforme crypto populaire avec carte Visa et app mobile",
-    },
-    {
-        "id": "gateio",
-        "name": "Gate.io",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Exchange crypto avec un large choix d'altcoins",
-    },
-    {
-        "id": "kraken",
-        "name": "Kraken",
-        "requires_secret": True,
-        "requires_passphrase": False,
-        "description": "Exchange américain réputé pour sa sécurité",
-    },
-    {
-        "id": "kucoin",
-        "name": "KuCoin",
-        "requires_secret": True,
-        "requires_passphrase": True,
-        "description": "Exchange crypto populaire avec large choix d'altcoins",
-    },
-    {
-        "id": "okx",
-        "name": "OKX",
-        "requires_secret": True,
-        "requires_passphrase": True,
-        "description": "Exchange crypto global avec trading spot et dérivés",
-    },
+    {"id": key, "name": name, "requires_secret": secret, "requires_passphrase": passphrase, "description": text}
+    for key, name, secret, passphrase, text in _CATALOGUE
 ]
 
 
