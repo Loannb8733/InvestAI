@@ -57,27 +57,31 @@ class BinanceEarn(BinanceCore):
                         logger.info(f"Auto-invest history: fetching page {page}...")
 
                     for invest in invest_list:
-                        if invest.get("status") != "SUCCESS":
+                        if invest.get("transactionStatus", invest.get("status")) != "SUCCESS":
                             continue
 
                         target_asset = invest.get("targetAsset", "")
                         source_asset = invest.get("sourceAsset", "EUR")
-                        executed_amount = Decimal(str(invest.get("executedAmount", 0)))
+                        executed_amount = Decimal(str(invest.get("targetAssetAmount", invest.get("executedAmount", 0))))
+                        moment = invest.get("transactionDateTime", invest.get("transactionTime", 0))
+                        fee = Decimal(str(invest.get("transactionFee", 0)))
+                        if invest.get("transactionFeeUnit", source_asset) != source_asset:
+                            fee = Decimal("0")
                         source_amount = Decimal(str(invest.get("sourceAssetAmount", 0)))
 
                         if executed_amount > 0:
                             orders.append(
                                 ExchangeFiatOrder(
-                                    order_id=f"autoinvest_{invest.get('id', invest.get('transactionTime', ''))}",
+                                    order_id=f"autoinvest_{invest.get('id', moment)}",
                                     crypto_symbol=target_asset,
                                     fiat_currency=source_asset,
                                     side="buy",
                                     crypto_amount=executed_amount,
                                     fiat_amount=source_amount,
                                     price=source_amount / executed_amount if executed_amount > 0 else Decimal("0"),
-                                    fee=Decimal("0"),
+                                    fee=fee,
                                     status="Completed",
-                                    timestamp=datetime.fromtimestamp(invest.get("transactionTime", 0) / 1000, tz=UTC),
+                                    timestamp=datetime.fromtimestamp(int(moment) / 1000, tz=UTC),
                                 )
                             )
 

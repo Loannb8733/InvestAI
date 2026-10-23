@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from app.domains.exchanges.connectors.base import ExchangeFiatOrder
-from app.domains.exchanges.connectors.binance.core import BinanceCore
+from app.domains.exchanges.connectors.binance.core import BinanceCore, utc_window
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,7 @@ class BinanceFiat(BinanceCore):
 
         await self._sync_server_time()
 
-        if not start_time:
-            start_time = datetime(2017, 7, 1)
-        if not end_time:
-            end_time = datetime.now()
+        start_time, end_time = utc_window(start_time, end_time)
 
         async with self._get_http_client() as client:
             for transaction_type in [0, 1]:
@@ -129,8 +126,7 @@ class BinanceFiat(BinanceCore):
         limit: int = 1000,
     ) -> list[ExchangeFiatOrder]:
         """Conversions fiat <-> crypto, depuis le lancement de Binance par défaut, en fenêtres de 30 jours."""
-        start = start_time or datetime(2017, 7, 1, tzinfo=UTC)
-        window_end = end_time or datetime.now(UTC)
+        start, window_end = utc_window(start_time, end_time)
         orders: list[ExchangeFiatOrder] = []
         while window_end > start:
             window_start = max(window_end - timedelta(days=30), start)

@@ -4,13 +4,13 @@ from decimal import Decimal
 from typing import Any
 
 from app.domains.exchanges.connectors.base import ExchangeTrade
-from app.domains.exchanges.connectors.binance.core import BinanceCore
+from app.domains.exchanges.connectors.binance.core import BinanceCore, utc_window
 
 logger = logging.getLogger(__name__)
 
 
 class BinanceConversions(BinanceCore):
-    async def get_crypto_conversions(  # noqa: C901
+    async def get_crypto_conversions(
         self,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
@@ -34,10 +34,7 @@ class BinanceConversions(BinanceCore):
 
         await self._sync_server_time()
 
-        if not start_time:
-            start_time = datetime(2017, 7, 1)
-        if not end_time:
-            end_time = datetime.now()
+        start_time, end_time = utc_window(start_time, end_time)
 
         chunk_end = end_time
 

@@ -4,12 +4,26 @@ import hmac
 import logging
 import ssl
 import time
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 from urllib.parse import urlencode
 
 import httpx
 
 from app.domains.exchanges.connectors.base import BaseExchangeService
+
+BINANCE_LAUNCH = datetime(2017, 7, 1, tzinfo=UTC)
+
+
+def utc_window(start_time: datetime | None, end_time: datetime | None) -> tuple[datetime, datetime]:
+    """Fenêtre en UTC, du lancement de Binance à maintenant par défaut ; une date naïve est lue en UTC."""
+    start = start_time or BINANCE_LAUNCH
+    end = end_time or datetime.now(UTC)
+    return (
+        start if start.tzinfo else start.replace(tzinfo=UTC),
+        end if end.tzinfo else end.replace(tzinfo=UTC),
+    )
+
 
 logger = logging.getLogger(__name__)
 

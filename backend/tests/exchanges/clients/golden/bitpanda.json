@@ -34,7 +34,26 @@
     "requests": {
       "GET api.exchange.bitpanda.com/api/v1/account/balances q=[] b=[]": 1
     },
-    "result": []
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      },
+      {
+        "free": "1.2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "1.2"
+      },
+      {
+        "free": "0",
+        "locked": "3",
+        "symbol": "",
+        "total": "3"
+      }
+    ]
   },
   "connection_error": {
     "requests": {},

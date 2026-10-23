@@ -56,8 +56,9 @@ class BitpandaService(BaseExchangeService):
                 )
                 response.raise_for_status()
                 data = response.json()
+                items = data.get("balances", []) if isinstance(data, dict) else data
 
-                for item in data:
+                for item in items:
                     available = Decimal(str(item.get("available", "0")))
                     locked = Decimal(str(item.get("locked", "0")))
                     total = available + locked
