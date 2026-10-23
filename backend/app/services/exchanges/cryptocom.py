@@ -7,6 +7,7 @@ import logging
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import httpx
 
@@ -42,7 +43,7 @@ class CryptoComService(BaseExchangeService):
     def exchange_name(self) -> str:
         return "Crypto.com"
 
-    def _sign_request(self, method: str, request_id: str, params: dict, nonce: str) -> str:
+    def _sign_request(self, method: str, request_id: str, params: dict[str, Any], nonce: str) -> str:
         """Sign a request with Crypto.com's signature method.
 
         ``nonce`` is passed in rather than read from the clock here: it is part of
@@ -63,14 +64,14 @@ class CryptoComService(BaseExchangeService):
         sig_payload = f"{method}{request_id}{self.api_key}{param_string}{nonce}"
 
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             sig_payload.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
 
         return signature
 
-    async def _make_request(self, method: str, params: dict | None = None) -> dict:
+    async def _make_request(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Make an authenticated request to Crypto.com API."""
         request_id = str(int(time.time() * 1000))
         nonce = str(int(time.time() * 1000))
@@ -94,7 +95,8 @@ class CryptoComService(BaseExchangeService):
             json=payload,
         )
         response.raise_for_status()
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
@@ -106,7 +108,7 @@ class CryptoComService(BaseExchangeService):
 
     async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Crypto.com."""
-        balances = []
+        balances: list[ExchangeBalance] = []
 
         try:
             result = await self._make_request("private/get-account-summary")
@@ -149,7 +151,7 @@ class CryptoComService(BaseExchangeService):
         semaphore: asyncio.Semaphore,
     ) -> list[ExchangeTrade]:
         """Fetch trades for a single instrument with rate limiting."""
-        trades = []
+        trades: list[ExchangeTrade] = []
 
         async with semaphore:
             try:
@@ -263,10 +265,10 @@ class CryptoComService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from Crypto.com."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
-            params = {"page_size": min(limit, 200)}
+            params: dict[str, Any] = {"page_size": min(limit, 200)}
 
             if symbol:
                 params["currency"] = symbol
@@ -309,10 +311,10 @@ class CryptoComService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Crypto.com."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
-            params = {"page_size": min(limit, 200)}
+            params: dict[str, Any] = {"page_size": min(limit, 200)}
 
             if symbol:
                 params["currency"] = symbol

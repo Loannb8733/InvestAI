@@ -1,4 +1,5 @@
 from app.core.db.base import Base
+from app.domains.exchanges import models as exchange_models
 from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
@@ -7,10 +8,8 @@ from app.domains.portfolio import models as portfolio_models
 from app.domains.transactions import models as transaction_models
 from app.models import (
     alert,
-    api_key,
     audit_log,
     calendar_event,
-    cold_wallet_address,
     crowdfunding_payment_schedule,
     crowdfunding_project,
     crowdfunding_repayment,
@@ -29,13 +28,12 @@ metadata = Base.metadata
 
 __all__ = [
     "alert",
-    "api_key",
     "audit_log",
     "calendar_event",
-    "cold_wallet_address",
     "crowdfunding_payment_schedule",
     "crowdfunding_project",
     "crowdfunding_repayment",
+    "exchange_models",
     "fx_models",
     "goal",
     "history_models",

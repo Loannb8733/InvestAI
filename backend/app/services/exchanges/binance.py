@@ -8,6 +8,7 @@ import ssl
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -33,11 +34,11 @@ class BinanceService(BaseExchangeService):
     # Most endpoints cost 10-40 weight. We throttle to ~1 req/s to stay safe.
     _REQUEST_INTERVAL = 0.3  # seconds between API calls (max ~200 req/min)
 
-    def __init__(self, api_key, secret_key, passphrase=None):
+    def __init__(self, api_key: str, secret_key: str | None, passphrase: str | None = None) -> None:
         super().__init__(api_key, secret_key, passphrase)
         self._server_time_offset: int = 0
-        self._all_account_symbols: set = set()
-        self._valid_pairs: set = set()
+        self._all_account_symbols: set[str] = set()
+        self._valid_pairs: set[str] = set()
         self._last_request_time: float = 0
 
     @property
@@ -69,12 +70,12 @@ class BinanceService(BaseExchangeService):
             await asyncio.sleep(self._REQUEST_INTERVAL - elapsed)
         self._last_request_time = time.monotonic()
 
-    async def _api_get(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    async def _api_get(self, client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
         """Throttled GET request."""
         await self._throttle()
         return await client.get(url, **kwargs)
 
-    async def _api_post(self, client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    async def _api_post(self, client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
         """Throttled POST request."""
         await self._throttle()
         return await client.post(url, **kwargs)
@@ -100,22 +101,35 @@ class BinanceService(BaseExchangeService):
         """Get timestamp adjusted for Binance server time."""
         return int(time.time() * 1000) + self._server_time_offset
 
-    def _sign_request(self, params: dict) -> dict:
+    def _sign_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Sign a request with HMAC SHA256."""
         params["timestamp"] = self._get_timestamp()
         params["recvWindow"] = 60000  # 60 seconds window for safety
         query_string = urlencode(params)
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             query_string.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         params["signature"] = signature
         return params
 
-    def _get_headers(self) -> dict:
+    def _get_headers(self) -> dict[str, Any]:
         """Get request headers."""
         return {"X-MBX-APIKEY": self.api_key}
+
+    async def connection_error(self) -> str | None:
+        """Message renvoyé par /api/v3/account, ou None s'il répond ou ne répond pas du tout."""
+        try:
+            async with self._get_http_client(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/api/v3/account", params=self._sign_request({}), headers=self._get_headers()
+                )
+            if response.status_code == 200:
+                return None
+            return f"HTTP {response.status_code}: {response.json().get('msg', response.text[:200])}"
+        except Exception:  # noqa: BLE001
+            return None
 
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
@@ -337,7 +351,7 @@ class BinanceService(BaseExchangeService):
             logger.info(f"Funding wallet positions found: {dict((k, float(v)) for k, v in funding_totals.items())}")
         return funding_totals
 
-    async def _get_all_account_symbols(self) -> set:
+    async def _get_all_account_symbols(self) -> set[str]:
         """Get ALL symbols from the account (including 0 balance).
         Uses cached data from get_balances if available, otherwise fetches fresh."""
         if self._all_account_symbols:
@@ -369,7 +383,7 @@ class BinanceService(BaseExchangeService):
 
     # These are now initialized in __init__ as instance variables
 
-    async def _get_valid_trading_pairs(self) -> set:
+    async def _get_valid_trading_pairs(self) -> set[str]:
         """Fetch all valid trading pairs from Binance exchange info."""
         if self._valid_pairs:
             return self._valid_pairs
@@ -541,13 +555,13 @@ class BinanceService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from Binance."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         # Sync server time first
         await self._sync_server_time()
 
         async with self._get_http_client() as client:
-            params = {}
+            params: dict[str, Any] = {}
             if symbol:
                 params["coin"] = symbol
             if start_time:
@@ -589,13 +603,13 @@ class BinanceService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Binance."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         # Sync server time first
         await self._sync_server_time()
 
         async with self._get_http_client() as client:
-            params = {}
+            params: dict[str, Any] = {}
             if symbol:
                 params["coin"] = symbol
             if start_time:
@@ -778,7 +792,7 @@ class BinanceService(BaseExchangeService):
             try:
                 # Paginate: keep fetching until we get fewer than page_size results
                 page_size = min(limit, 1000)
-                all_conversions = []
+                all_conversions: list[dict[str, Any]] = []
 
                 while len(all_conversions) < limit:
                     params = {
@@ -1063,7 +1077,7 @@ class BinanceService(BaseExchangeService):
         limit: int = 5000,
     ) -> list[ExchangeFiatOrder]:
         """Get Auto-Invest (DCA) history from Binance with pagination."""
-        orders = []
+        orders: list[ExchangeFiatOrder] = []
 
         async with self._get_http_client() as client:
             page = 1
@@ -1142,7 +1156,7 @@ class BinanceService(BaseExchangeService):
 
         return orders
 
-    async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs) -> list[ExchangeTrade]:
+    async def get_rewards(self, limit: int = 500, lookback_days: int = 730, **kwargs: Any) -> list[ExchangeTrade]:
         """Get Simple Earn interest/rewards history from Binance.
 
         Queries rewardsRecord endpoints for flexible and locked earn products.

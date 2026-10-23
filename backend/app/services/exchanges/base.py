@@ -91,9 +91,18 @@ class BaseExchangeService(ABC):
     def exchange_name(self) -> str:
         """Return the exchange name."""
 
+    def _require_secret_key(self) -> str:
+        if self.secret_key is None:
+            raise ValueError(f"{self.exchange_name} requires a secret key")
+        return self.secret_key
+
     @abstractmethod
     async def test_connection(self) -> bool:
         """Test if the API connection is working."""
+
+    async def connection_error(self) -> str | None:
+        """Motif lisible d'un échec de connexion, quand l'exchange le donne."""
+        return None
 
     @abstractmethod
     async def get_balances(self) -> list[ExchangeBalance]:

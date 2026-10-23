@@ -7,6 +7,7 @@ import logging
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class KuCoinService(BaseExchangeService):
         """Get current UNIX timestamp in milliseconds as string."""
         return str(int(time.time() * 1000))
 
-    def _sign_request(self, method: str, endpoint: str, body: str = "") -> dict:
+    def _sign_request(self, method: str, endpoint: str, body: str = "") -> dict[str, Any]:
         """Sign a request with HMAC SHA256 base64 encoding.
 
         KuCoin v2 signature: base64(HMAC-SHA256(timestamp + method + endpoint + body)).
@@ -45,7 +46,7 @@ class KuCoinService(BaseExchangeService):
 
         signature = base64.b64encode(
             hmac.new(
-                self.secret_key.encode("utf-8"),
+                self._require_secret_key().encode("utf-8"),
                 message.encode("utf-8"),
                 hashlib.sha256,
             ).digest()
@@ -54,7 +55,7 @@ class KuCoinService(BaseExchangeService):
         # KuCoin API v2: passphrase must also be HMAC-encrypted
         passphrase = base64.b64encode(
             hmac.new(
-                self.secret_key.encode("utf-8"),
+                self._require_secret_key().encode("utf-8"),
                 (self.passphrase or "").encode("utf-8"),
                 hashlib.sha256,
             ).digest()
@@ -82,7 +83,8 @@ class KuCoinService(BaseExchangeService):
                     timeout=15.0,
                 )
                 data = response.json()
-                return data.get("code") == "200000"
+                connected: bool = data.get("code") == "200000"
+                return connected
         except Exception as e:
             logger.error(f"KuCoin test_connection error: {e}")
             return False
@@ -92,7 +94,7 @@ class KuCoinService(BaseExchangeService):
 
         Filters to 'trade' account type and returns only non-zero balances.
         """
-        balances = []
+        balances: list[ExchangeBalance] = []
 
         try:
             endpoint = "/api/v1/accounts?type=trade"
@@ -142,7 +144,7 @@ class KuCoinService(BaseExchangeService):
 
         Uses page-based pagination (currentPage, pageSize).
         """
-        trades = []
+        trades: list[ExchangeTrade] = []
 
         try:
             current_page = 1
@@ -224,7 +226,7 @@ class KuCoinService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from KuCoin."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
             current_page = 1
@@ -302,7 +304,7 @@ class KuCoinService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from KuCoin."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
             current_page = 1

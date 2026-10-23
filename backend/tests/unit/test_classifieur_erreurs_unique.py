@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-import app.api.v1.endpoints.api_keys as endpoints_cles
+import app.domains.exchanges.service as endpoints_cles
 import app.tasks.sync_exchanges as tache_sync
 from app.services.exchange_error_classifier import classify_and_mark_error, rollback_puis_marquer
 

@@ -11,14 +11,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import session_factory
+from app.domains.exchanges.models import APIKey, ColdWalletAddress
 from app.domains.market_data.fx.repository import FxRateRepository
 from app.domains.market_data.fx.service import FxService
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
-from app.models.api_key import APIKey
-from app.models.cold_wallet_address import ColdWalletAddress
 from app.services.exchange_error_classifier import rollback_puis_marquer
 from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.pair_utils import quote_fx_currency, split_pair

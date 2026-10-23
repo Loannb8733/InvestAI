@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class GateIOService(BaseExchangeService):
         path: str,
         query: str = "",
         body: str = "",
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Generate authentication headers for Gate.io API v4.
 
         Signature payload format:
@@ -54,7 +55,7 @@ class GateIOService(BaseExchangeService):
         sign_string = f"{method}\n{path}\n{query}\n{body_hash}\n{timestamp}"
 
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             sign_string.encode("utf-8"),
             hashlib.sha512,
         ).hexdigest()
@@ -133,7 +134,7 @@ class GateIOService(BaseExchangeService):
         If no symbol is provided, fetches trades for all currency pairs
         based on current balances.
         """
-        trades = []
+        trades: list[ExchangeTrade] = []
 
         try:
             # Determine which currency pairs to query
@@ -187,7 +188,7 @@ class GateIOService(BaseExchangeService):
         limit: int,
     ) -> list[ExchangeTrade]:
         """Fetch trades for a single currency pair with pagination."""
-        trades = []
+        trades: list[ExchangeTrade] = []
         page = 1
         page_size = min(limit, 100)
 
@@ -259,7 +260,7 @@ class GateIOService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from Gate.io."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
             async with httpx.AsyncClient() as client:
@@ -321,7 +322,7 @@ class GateIOService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Gate.io."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
             async with httpx.AsyncClient() as client:

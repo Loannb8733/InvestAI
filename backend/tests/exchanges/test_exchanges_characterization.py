@@ -8,10 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
+from app.domains.exchanges.models import APIKey
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
-from app.models.api_key import APIKey
 from app.services.exchanges.base import ExchangeBalance
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
@@ -36,6 +36,9 @@ class FakeExchange:
     async def get_balances(self) -> list[ExchangeBalance]:
         return self.balances
 
+    async def connection_error(self) -> str | None:
+        return None
+
 
 def _balance(symbol: str, total: str) -> ExchangeBalance:
     amount = Decimal(total)
@@ -45,7 +48,7 @@ def _balance(symbol: str, total: str) -> ExchangeBalance:
 @pytest.fixture
 def exchange(monkeypatch: pytest.MonkeyPatch) -> FakeExchange:
     fake = FakeExchange()
-    monkeypatch.setattr("app.api.v1.endpoints.api_keys.construire_service_exchange", lambda key: fake)
+    monkeypatch.setattr("app.domains.exchanges.service.construire_service_exchange", lambda key: fake)
     return fake
 
 
@@ -133,36 +136,51 @@ class TestBalanceSync:
     ) -> None:
         created = await _key(client, regular_user)
         body = (await client.post(f"{KEYS}/{created['id']}/sync", headers=_bearer(regular_user))).json()
-        assert body == {"message": "Aucun solde trouvé sur l'exchange", "synced_assets": 0}
+        assert (body["message"], body["synced_assets"]) == ("Aucun solde trouvé sur l'exchange", 0)
 
 
-class TestBackgroundImportCurrentBugs:
-    async def test_status_is_private_and_lost_once_finished(
-        self, client: AsyncClient, regular_user: User, admin_user: User, monkeypatch: pytest.MonkeyPatch
+class TestBackgroundImport:
+    @pytest.mark.parametrize(
+        ("route", "message"), [("import-async", "Import réussi"), ("refresh-fx", "Recalcul FX terminé")]
+    )
+    async def test_the_owner_reads_the_final_status(
+        self,
+        client: AsyncClient,
+        regular_user: User,
+        admin_user: User,
+        monkeypatch: pytest.MonkeyPatch,
+        route: str,
+        message: str,
     ) -> None:
         async def sync(api_key_id: str, heal_fx: bool = False) -> dict[str, Any]:
             return {"success": True, "synced": 3}
 
         monkeypatch.setattr("app.tasks.sync_exchanges._sync_single_exchange", sync)
         created = await _key(client, regular_user)
-        task = (await client.post(f"{KEYS}/{created['id']}/import-async", headers=_bearer(regular_user))).json()
+        task = (await client.post(f"{KEYS}/{created['id']}/{route}", headers=_bearer(regular_user))).json()
         assert task["status"] == "dispatched"
         url = f"{KEYS}/import-status/{task['task_id']}"
         await asyncio.sleep(0.05)
+        body = (await client.get(url, headers=_bearer(regular_user))).json()
+        assert {k: body[k] for k in ("status", "synced", "message")} == {
+            "status": "completed",
+            "synced": 3,
+            "message": message,
+        }
         assert (await client.get(url, headers=_bearer(admin_user))).status_code == 404
-        assert (await client.get(url, headers=_bearer(regular_user))).status_code == 404
 
-    async def test_fx_refresh_status_is_unreachable(
+    async def test_a_failure_shows_a_generic_message(
         self, client: AsyncClient, regular_user: User, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         async def sync(api_key_id: str, heal_fx: bool = False) -> dict[str, Any]:
-            return {"success": True, "synced": 0}
+            raise RuntimeError("secret internal path /app/x")
 
         monkeypatch.setattr("app.tasks.sync_exchanges._sync_single_exchange", sync)
         created = await _key(client, regular_user)
-        task = (await client.post(f"{KEYS}/{created['id']}/refresh-fx", headers=_bearer(regular_user))).json()
-        status = await client.get(f"{KEYS}/import-status/{task['task_id']}", headers=_bearer(regular_user))
-        assert status.status_code == 404
+        task = (await client.post(f"{KEYS}/{created['id']}/import-async", headers=_bearer(regular_user))).json()
+        await asyncio.sleep(0.05)
+        body = (await client.get(f"{KEYS}/import-status/{task['task_id']}", headers=_bearer(regular_user))).json()
+        assert body["status"] == "failed" and "secret" not in body["error"]
 
 
 class TestColdWallets:

@@ -18,7 +18,9 @@ from pathlib import Path
 
 _ENDPOINTS = Path(__file__).resolve().parents[2] / "app" / "api" / "v1" / "endpoints"
 _WEBHOOK = (_ENDPOINTS / "telegram_webhook.py").read_text(encoding="utf-8")
-_API_KEYS = (_ENDPOINTS / "api_keys.py").read_text(encoding="utf-8")
+_BACKGROUND = (Path(__file__).resolve().parents[2] / "app" / "domains" / "exchanges" / "background.py").read_text(
+    encoding="utf-8"
+)
 
 
 class TestWebhookTelegram:
@@ -46,19 +48,10 @@ class TestWebhookTelegram:
 
 
 class TestPasDeFuiteAuClient:
-    def test_le_statut_d_import_ne_contient_pas_l_exception(self):
-        bloc = _API_KEYS.split("_import_tasks[task_id] = {")
-        for morceau in bloc[1:]:
-            entete = morceau[:300]
-            assert "type(e).__name__" not in entete, (
-                "le détail de l'exception ne doit pas atterrir dans un statut consultable par le client"
-            )
+    def test_un_echec_ne_rend_au_client_qu_un_libelle_generique(self):
+        assert "FAILURE_MESSAGE" in _BACKGROUND and "str(exc)" not in _BACKGROUND, (
+            "le détail de l'exception ne doit pas atterrir dans un statut consultable par le client"
+        )
 
     def test_le_detail_reste_journalise_cote_serveur(self):
-        # Masquer au client ne doit pas revenir à perdre l'information.
-        assert "logger.exception(" in _API_KEYS
-
-    def test_les_occurrences_restantes_sont_des_journaux(self):
-        for ligne in _API_KEYS.splitlines():
-            if "type(e).__name__" in ligne:
-                assert "logger." in ligne, f"exception hors journal : {ligne.strip()[:80]}"
+        assert "logger.exception(" in _BACKGROUND

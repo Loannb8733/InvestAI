@@ -8,7 +8,7 @@ sys.path.insert(0, "/app")
 from sqlalchemy import select
 
 from app.core.db.session import session_factory
-from app.models.api_key import APIKey
+from app.domains.exchanges.models import APIKey
 
 
 async def main():

@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class CoinbaseService(BaseExchangeService):
         """Get current UNIX timestamp as string."""
         return str(int(time.time()))
 
-    def _sign_request(self, method: str, request_path: str, body: str = "") -> dict:
+    def _sign_request(self, method: str, request_path: str, body: str = "") -> dict[str, Any]:
         """Sign a request with HMAC SHA256.
 
         Coinbase signature: HMAC-SHA256 of (timestamp + method + requestPath + body).
@@ -42,7 +43,7 @@ class CoinbaseService(BaseExchangeService):
         message = timestamp + method.upper() + request_path + body
 
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
@@ -213,7 +214,7 @@ class CoinbaseService(BaseExchangeService):
         Uses the transaction_summary or account transactions to retrieve deposits.
         Coinbase Advanced Trade API uses account-level transaction listing.
         """
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
             # First, get all accounts to find account UUIDs
@@ -292,7 +293,7 @@ class CoinbaseService(BaseExchangeService):
 
         Uses account-level transaction listing to retrieve withdrawals.
         """
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
             # First, get all accounts to find account UUIDs
@@ -367,7 +368,7 @@ class CoinbaseService(BaseExchangeService):
 
         return withdrawals
 
-    async def _get_account_ids(self, symbol: str | None = None) -> list[tuple]:
+    async def _get_account_ids(self, symbol: str | None = None) -> list[tuple[str, str]]:
         """Get account UUIDs from Coinbase.
 
         Returns list of (account_id, currency) tuples.

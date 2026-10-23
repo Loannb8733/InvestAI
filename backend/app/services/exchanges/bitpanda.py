@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class BitpandaService(BaseExchangeService):
     def exchange_name(self) -> str:
         return "Bitpanda"
 
-    def _get_headers(self) -> dict:
+    def _get_headers(self) -> dict[str, Any]:
         """Get request headers with Bearer token authentication."""
         return {
             "Authorization": f"Bearer {self.api_key}",
@@ -170,7 +171,7 @@ class BitpandaService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from Bitpanda Pro."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
 
         try:
             async with httpx.AsyncClient() as client:
@@ -219,7 +220,7 @@ class BitpandaService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bitpanda Pro."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
 
         try:
             async with httpx.AsyncClient() as client:

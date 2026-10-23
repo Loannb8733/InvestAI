@@ -73,10 +73,8 @@ def split_pair(symbol: str) -> tuple[str | None, str | None]:
     # Common separators used by some exchanges: BTC-USDT, BTC/USDT, BTC_USDT.
     for sep in ("-", "/", "_"):
         if sep in s:
-            base, _, quote = s.partition(sep)
-            base = base or None
-            quote = quote or None
-            return (base, quote)
+            head, _, tail = s.partition(sep)
+            return (head or None, tail or None)
     for quote in KNOWN_QUOTES:
         if s.endswith(quote) and len(s) > len(quote):
             return (s[: -len(quote)], quote)

@@ -1,6 +1,5 @@
 comments	backend/app/api/v1/endpoints/alerts.py
 comments	backend/app/api/v1/endpoints/analytics.py
-comments	backend/app/api/v1/endpoints/api_keys.py
 comments	backend/app/api/v1/endpoints/calendar.py
 comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/crowdfunding.py
@@ -28,8 +27,6 @@ comments	backend/app/ml/hyperparameter_tuner.py
 comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
 comments	backend/app/models/alert.py
-comments	backend/app/models/api_key.py
-comments	backend/app/models/cold_wallet_address.py
 comments	backend/app/models/crowdfunding_project.py
 comments	backend/app/models/crowdfunding_repayment.py
 comments	backend/app/models/goal.py
@@ -56,10 +53,7 @@ comments	backend/app/services/crowdfunding_calendar_service.py
 comments	backend/app/services/csv_parsers.py
 comments	backend/app/services/email_service.py
 comments	backend/app/services/exchange_error_classifier.py
-comments	backend/app/services/exchange_import_classification.py
-comments	backend/app/services/exchange_import_collection.py
 comments	backend/app/services/exchange_import_preparation.py
-comments	backend/app/services/exchange_import_valuation.py
 comments	backend/app/services/exchanges/base.py
 comments	backend/app/services/exchanges/binance.py
 comments	backend/app/services/exchanges/bitpanda.py
@@ -235,7 +229,6 @@ comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
 too-long	backend/app/api/v1/endpoints/alerts.py
 too-long	backend/app/api/v1/endpoints/analytics.py
-too-long	backend/app/api/v1/endpoints/api_keys.py
 too-long	backend/app/api/v1/endpoints/calendar.py
 too-long	backend/app/api/v1/endpoints/crowdfunding.py
 too-long	backend/app/api/v1/endpoints/dashboard.py

@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class BybitService(BaseExchangeService):
     BASE_URLS = ["https://api.bybit.com", "https://api.bybit.nl"]
     RECV_WINDOW = "5000"
 
-    def __init__(self, api_key: str, secret_key: str, passphrase: str = None):
+    def __init__(self, api_key: str, secret_key: str, passphrase: str | None = None):
         super().__init__(api_key, secret_key, passphrase)
         # Will be resolved on first successful call
         self._base_url: str | None = None
@@ -44,7 +45,7 @@ class BybitService(BaseExchangeService):
         """Get current timestamp in milliseconds."""
         return str(int(time.time() * 1000))
 
-    def _sign_request(self, timestamp: str, params: dict) -> str:
+    def _sign_request(self, timestamp: str, params: dict[str, Any]) -> str:
         """Sign a request with HMAC SHA256.
 
         Bybit v5 signature: HMAC_SHA256(timestamp + api_key + recv_window + queryString)
@@ -52,13 +53,13 @@ class BybitService(BaseExchangeService):
         query_string = urlencode(params) if params else ""
         pre_sign = f"{timestamp}{self.api_key}{self.RECV_WINDOW}{query_string}"
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             pre_sign.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         return signature
 
-    def _get_headers(self, timestamp: str, params: dict) -> dict:
+    def _get_headers(self, timestamp: str, params: dict[str, Any]) -> dict[str, Any]:
         """Get request headers with authentication."""
         signature = self._sign_request(timestamp, params)
         return {
@@ -113,7 +114,7 @@ class BybitService(BaseExchangeService):
 
     async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from Bybit."""
-        balances = []
+        balances: list[ExchangeBalance] = []
         try:
             base_url = await self._resolve_base_url()
             async with self._get_http_client() as client:
@@ -171,7 +172,7 @@ class BybitService(BaseExchangeService):
                 fetched = 0
 
                 while fetched < limit:
-                    params: dict = {
+                    params: dict[str, Any] = {
                         "category": "spot",
                         "limit": str(min(limit - fetched, 100)),
                     }
@@ -240,10 +241,10 @@ class BybitService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from Bybit."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
         try:
             async with self._get_http_client() as client:
-                params: dict = {
+                params: dict[str, Any] = {
                     "limit": str(min(limit, 50)),
                 }
                 if symbol:
@@ -307,10 +308,10 @@ class BybitService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from Bybit."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
         try:
             async with self._get_http_client() as client:
-                params: dict = {
+                params: dict[str, Any] = {
                     "limit": str(min(limit, 50)),
                 }
                 if symbol:

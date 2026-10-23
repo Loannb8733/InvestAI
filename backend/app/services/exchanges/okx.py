@@ -6,6 +6,7 @@ import hmac
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,13 @@ class OkxService(BaseExchangeService):
         """
         pre_sign = f"{timestamp}{method}{request_path}{body}"
         signature = hmac.new(
-            self.secret_key.encode("utf-8"),
+            self._require_secret_key().encode("utf-8"),
             pre_sign.encode("utf-8"),
             hashlib.sha256,
         ).digest()
         return base64.b64encode(signature).decode("utf-8")
 
-    def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict:
+    def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict[str, Any]:
         """Get request headers with authentication."""
         signature = self._sign_request(timestamp, method, request_path, body)
         return {
@@ -73,14 +74,15 @@ class OkxService(BaseExchangeService):
                     headers=headers,
                 )
                 data = response.json()
-                return data.get("code") == "0"
+                connected: bool = data.get("code") == "0"
+                return connected
         except Exception as e:
             logger.error(f"OKX test_connection error: {e}")
             return False
 
     async def get_balances(self) -> list[ExchangeBalance]:
         """Get all non-zero balances from OKX."""
-        balances = []
+        balances: list[ExchangeBalance] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/account/balance"
@@ -200,7 +202,7 @@ class OkxService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
         """Get deposit history from OKX."""
-        deposits = []
+        deposits: list[ExchangeDeposit] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/asset/deposit-history"
@@ -263,7 +265,7 @@ class OkxService(BaseExchangeService):
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
         """Get withdrawal history from OKX."""
-        withdrawals = []
+        withdrawals: list[ExchangeWithdrawal] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/asset/withdrawal-history"
