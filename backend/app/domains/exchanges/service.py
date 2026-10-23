@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DomainError, NotFoundError
 from app.core.security import encrypt_api_key
+from app.domains.exchanges.clients import crypto_portfolio, open_client
+from app.domains.exchanges.failures import rollback_and_mark
 from app.domains.exchanges.models import APIKey, ColdWalletAddress
 from app.domains.exchanges.schemas import (
     APIKeyCreate,
@@ -17,16 +19,14 @@ from app.domains.exchanges.schemas import (
     ColdWalletCreate,
     ConnectionTestResult,
 )
+from app.domains.exchanges.sync.symbols import holdings
 from app.domains.portfolio.models import Asset, AssetType
-from app.services.exchange_error_classifier import rollback_puis_marquer
-from app.services.exchange_import_preparation import construire_service_exchange, resoudre_portefeuille_crypto
 from app.services.exchanges.registry import SUPPORTED_EXCHANGES
 
 logger = logging.getLogger(__name__)
 
 KEY_NOT_FOUND = "Clé API non trouvée"
 SHOWN_BALANCES = 10
-SYNC_FIAT = frozenset({"USD", "EUR", "GBP", "TRY", "RUB", "UAH", "BRL", "AUD", "CAD", "JPY"})
 QUANTITY_EPSILON = Decimal("0.00000001")
 
 
@@ -94,7 +94,7 @@ class ExchangeAccounts:
         """Teste la connexion ; le succès montre dix soldes, l'échec est inscrit sur la clé."""
         key = await self.key(user_id, key_id)
         try:
-            client = construire_service_exchange(key)
+            client = open_client(key)
             if await client.test_connection():
                 balances = await client.get_balances()
                 key.last_sync_at = datetime.now(UTC)
@@ -112,26 +112,20 @@ class ExchangeAccounts:
 
     async def sync_balances(self, user_id: UUID, key_id: UUID) -> BalanceSyncResult:
         """Recopie les soldes de l'exchange dans les actifs de sa plateforme, sans créer de transaction."""
-        from app.tasks.sync_exchanges import _normalize_earn_variant
-
         key = await self.key(user_id, key_id)
         try:
-            client = construire_service_exchange(key)
-            totals: dict[str, Decimal] = {}
-            for balance in await client.get_balances():
-                symbol = _normalize_earn_variant(balance.symbol) or balance.symbol
-                totals[symbol] = totals.get(symbol, Decimal("0")) + Decimal(str(balance.total))
-            if not totals:
+            client = open_client(key)
+            balances = await client.get_balances()
+            if not balances:
                 return BalanceSyncResult(message="Aucun solde trouvé sur l'exchange", synced_assets=0)
-            portfolio = await resoudre_portefeuille_crypto(self._session, user_id, client.exchange_name)
+            totals = holdings(balances).totals
+            portfolio = await crypto_portfolio(self._session, user_id, client.exchange_name)
             assets = (
                 (await self._session.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))).scalars().all()
             )
             on_platform = {(a.symbol, a.exchange): a for a in assets}
             synced = 0
             for symbol, total in totals.items():
-                if symbol in SYNC_FIAT:
-                    continue
                 asset = on_platform.get((symbol, client.exchange_name)) or on_platform.get((symbol, ""))
                 created = asset is None
                 if asset is None:
@@ -155,7 +149,7 @@ class ExchangeAccounts:
             await self._session.flush()
         except Exception as exc:
             logger.exception("Sync error for API key %s", key_id)
-            await rollback_puis_marquer(self._session, APIKey, key_id, exc)
+            await rollback_and_mark(self._session, key_id, exc)
             raise SyncFailedError(
                 "La synchronisation a échoué. Réessayez ; si le problème persiste, contactez le support."
             ) from exc

@@ -36,11 +36,12 @@ async def verify_cron_token(x_cron_token: str = Header(default="")) -> None:
 @router.post("/sync-exchanges", dependencies=[Depends(verify_cron_token)])
 async def cron_sync_exchanges() -> dict:
     """Hourly exchange sync for all active API keys (replaces the Celery beat job)."""
-    from app.tasks.sync_exchanges import _sync_all_exchanges_async
+    from dataclasses import asdict
+
+    from app.domains.exchanges.sync.runner import sync_all
 
     logger.info("Cron: sync-exchanges started")
-    result = await _sync_all_exchanges_async()
-    return {"task": "sync-exchanges", "result": result}
+    return {"task": "sync-exchanges", "result": asdict(await sync_all())}
 
 
 @router.post("/sync-goals", dependencies=[Depends(verify_cron_token)])

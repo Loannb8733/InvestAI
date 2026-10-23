@@ -782,7 +782,22 @@ class BinanceService(BaseExchangeService):
         end_time: datetime | None = None,
         limit: int = 1000,
     ) -> list[ExchangeFiatOrder]:
-        """Get convert trade history from Binance (EUR -> BTC conversions)."""
+        """Conversions fiat <-> crypto, depuis le lancement de Binance par défaut, en fenêtres de 30 jours."""
+        start = start_time or datetime(2017, 7, 1, tzinfo=UTC)
+        window_end = end_time or datetime.now(UTC)
+        orders: list[ExchangeFiatOrder] = []
+        while window_end > start:
+            window_start = max(window_end - timedelta(days=30), start)
+            orders.extend(await self._convert_window(window_start, window_end, limit))
+            window_end = window_start - timedelta(seconds=1)
+        return orders
+
+    async def _convert_window(
+        self,
+        start_time: datetime | None,
+        end_time: datetime | None,
+        limit: int,
+    ) -> list[ExchangeFiatOrder]:
         orders = []
 
         # Sync server time first (only if not already synced recently)

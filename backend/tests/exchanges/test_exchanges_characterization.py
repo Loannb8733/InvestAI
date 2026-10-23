@@ -1,6 +1,7 @@
 import asyncio
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
 from app.domains.exchanges.models import APIKey
+from app.domains.exchanges.sync.runner import SyncOutcome
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
@@ -48,7 +50,7 @@ def _balance(symbol: str, total: str) -> ExchangeBalance:
 @pytest.fixture
 def exchange(monkeypatch: pytest.MonkeyPatch) -> FakeExchange:
     fake = FakeExchange()
-    monkeypatch.setattr("app.domains.exchanges.service.construire_service_exchange", lambda key: fake)
+    monkeypatch.setattr("app.domains.exchanges.service.open_client", lambda key: fake)
     return fake
 
 
@@ -152,10 +154,10 @@ class TestBackgroundImport:
         route: str,
         message: str,
     ) -> None:
-        async def sync(api_key_id: str, heal_fx: bool = False) -> dict[str, Any]:
-            return {"success": True, "synced": 3}
+        async def sync(api_key_id: UUID, *, heal_fx: bool = False) -> SyncOutcome:
+            return SyncOutcome(success=True, synced=3)
 
-        monkeypatch.setattr("app.tasks.sync_exchanges._sync_single_exchange", sync)
+        monkeypatch.setattr("app.domains.exchanges.background.sync_account", sync)
         created = await _key(client, regular_user)
         task = (await client.post(f"{KEYS}/{created['id']}/{route}", headers=_bearer(regular_user))).json()
         assert task["status"] == "dispatched"
@@ -172,10 +174,10 @@ class TestBackgroundImport:
     async def test_a_failure_shows_a_generic_message(
         self, client: AsyncClient, regular_user: User, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def sync(api_key_id: str, heal_fx: bool = False) -> dict[str, Any]:
+        async def sync(api_key_id: UUID, *, heal_fx: bool = False) -> SyncOutcome:
             raise RuntimeError("secret internal path /app/x")
 
-        monkeypatch.setattr("app.tasks.sync_exchanges._sync_single_exchange", sync)
+        monkeypatch.setattr("app.domains.exchanges.background.sync_account", sync)
         created = await _key(client, regular_user)
         task = (await client.post(f"{KEYS}/{created['id']}/import-async", headers=_bearer(regular_user))).json()
         await asyncio.sleep(0.05)

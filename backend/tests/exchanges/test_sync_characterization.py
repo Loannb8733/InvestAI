@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import encrypt_api_key
 from app.domains.exchanges.models import APIKey, APIKeyStatus, ColdWalletAddress
+from app.domains.exchanges.sync.runner import SyncOutcome, SyncSummary, sync_account, sync_all
 from app.domains.identity.models import User
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
@@ -23,6 +24,7 @@ from tests.conftest import TestSessionLocal
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 DAY = datetime(2025, 3, 10, 12, 0, tzinfo=UTC)
+EARN = (TransactionType.STAKING, TransactionType.UNSTAKING)
 USD_EUR = Decimal("0.9")
 BTC_EUR = Decimal("60000")
 
@@ -72,6 +74,15 @@ class FakeClient:
 
     async def get_trades(self, limit: int = 500) -> list[ExchangeTrade]:
         return self.trades
+
+    async def get_fiat_orders(self) -> list[ExchangeFiatOrder]:
+        return []
+
+    async def get_deposits(self, limit: int = 500) -> list[ExchangeDeposit]:
+        return []
+
+    async def get_withdrawals(self, limit: int = 500) -> list[ExchangeWithdrawal]:
+        return []
 
 
 class FullClient(FakeClient):
@@ -125,11 +136,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> FullClient:
     async def quote(symbol: str, kind: str) -> PriceQuote | None:
         return PriceQuote(price=BTC_EUR) if symbol == "BTC" else None
 
-    monkeypatch.setattr("app.tasks.sync_exchanges.session_factory", TestSessionLocal)
-    monkeypatch.setattr("app.tasks.sync_exchanges.construire_service_exchange", lambda key: fake)
-    monkeypatch.setattr("app.tasks.sync_exchanges.FxService", FakeFx)
-    monkeypatch.setattr("app.tasks.sync_exchanges.price_feed.quote", quote)
-    monkeypatch.setattr("app.domains.market_data.history.tasks.schedule_refresh", lambda *a: None)
+    monkeypatch.setattr("app.domains.exchanges.sync.runner.session_factory", TestSessionLocal)
+    monkeypatch.setattr("app.domains.exchanges.sync.runner.open_client", lambda key: fake)
+    monkeypatch.setattr("app.domains.exchanges.sync.pricing.FxService", FakeFx)
+    monkeypatch.setattr("app.domains.exchanges.sync.pricing.price_feed.quote", quote)
+    monkeypatch.setattr("app.domains.exchanges.sync.book.schedule_refresh", lambda *a: None)
     return fake
 
 
@@ -147,10 +158,8 @@ async def _key(db: AsyncSession, user: User, last_sync_at: datetime | None = Non
     return str(key.id)
 
 
-async def _sync(key: str, heal_fx: bool = False) -> dict[str, Any]:
-    from app.tasks.sync_exchanges import _sync_single_exchange
-
-    return await _sync_single_exchange(key, heal_fx=heal_fx)
+async def _sync(key: str, heal_fx: bool = False) -> SyncOutcome:
+    return await sync_account(key, heal_fx=heal_fx)
 
 
 async def _rows(db: AsyncSession) -> list[tuple[str, str, TransactionType, Decimal, Decimal, str, str | None]]:
@@ -198,7 +207,7 @@ class TestFirstSync:
         client.balances = [_balance("BTC", "0.4"), _balance("ETH", "1"), _balance("SOL", "2"), _balance("EUR", "5")]
         key = await _key(db_session, regular_user)
 
-        assert await _sync(key) == {"success": True, "synced": 8}
+        assert await _sync(key) == SyncOutcome(success=True, synced=8)
 
         rows = await _rows(db_session)
         assert [(s, k, q, p, c, x) for s, _, k, q, p, c, x in rows if not (x or "").startswith("binance_")] == [
@@ -238,7 +247,7 @@ class TestFirstSync:
     ) -> None:
         client.balances = [_balance("BTC", "0.3"), _balance("LDBTC", "0.2"), _balance("XYZ", "10")]
         key = await _key(db_session, regular_user)
-        assert await _sync(key) == {"success": True, "synced": 2}
+        assert await _sync(key) == SyncOutcome(success=True, synced=3)
         assert await _assets(db_session) == {
             ("BTC", "binance"): (Decimal("0.5"), BTC_EUR),
             ("XYZ", "binance"): (Decimal("10"), Decimal("0")),
@@ -246,10 +255,11 @@ class TestFirstSync:
         kinds = [(s, k, q, p) for s, _, k, q, p, _, _ in await _rows(db_session)]
         assert kinds == [
             ("BTC", TransactionType.TRANSFER_IN, Decimal("0.5"), BTC_EUR),
+            ("BTC", TransactionType.STAKING, Decimal("0.2"), Decimal("0")),
             ("XYZ", TransactionType.TRANSFER_IN, Decimal("10"), Decimal("0")),
         ]
 
-    async def test_a_conversion_waits_for_a_later_sync_when_its_asset_is_new(
+    async def test_a_conversion_finds_the_asset_bought_in_the_same_sync(
         self, db_session: AsyncSession, regular_user: User, client: FullClient
     ) -> None:
         client.trades = [_trade("t1", "DOGEEUR", "buy", "100", "0.1")]
@@ -260,14 +270,10 @@ class TestFirstSync:
         client.balances = [_balance("DOGE", "50")]
         key = await _key(db_session, regular_user)
         await _sync(key)
-        db_session.expire_all()
-        kinds = [(s, k, q) for s, _, k, q, _, _, _ in await _rows(db_session)]
-        assert ("DOGE", TransactionType.CONVERSION_OUT, Decimal("50")) not in kinds
-        assert {s for s, _, _ in kinds} == {"DOGE"}
-        await _sync(key)
         kinds = [(s, k, q) for s, _, k, q, _, _, _ in await _rows(db_session)]
         assert ("DOGE", TransactionType.CONVERSION_OUT, Decimal("50")) in kinds
         assert {s for s, _, _ in kinds} == {"DOGE"}
+        assert (await _assets(db_session))[("DOGE", "binance")][0] == Decimal("50")
 
 
 class TestLaterSyncs:
@@ -279,7 +285,7 @@ class TestLaterSyncs:
         key = await _key(db_session, regular_user)
         await _sync(key)
         before = await _rows(db_session)
-        assert await _sync(key) == {"success": True, "synced": 0}
+        assert await _sync(key) == SyncOutcome(success=True, synced=0)
         assert await _rows(db_session) == before
 
     async def test_a_new_withdrawal_moves_to_the_named_cold_wallet(
@@ -303,7 +309,7 @@ class TestLaterSyncs:
             )
         ]
         client.balances = [_balance("BTC", "0.6")]
-        assert await _sync(key) == {"success": True, "synced": 1}
+        assert await _sync(key) == SyncOutcome(success=True, synced=1)
         assets = await _assets(db_session)
         assert assets[("BTC", "binance")][0] == Decimal("0.6")
         assert assets[("BTC", "Ledger")] == (Decimal("0.4"), Decimal("50000"))
@@ -362,7 +368,7 @@ class TestHealFx:
         tx.currency, tx.conversion_rate, tx.price = "EUR", None, Decimal("45000")
         await db_session.commit()
         client.balances = [_balance("BTC", "5")]
-        assert await _sync(key, heal_fx=True) == {"success": True, "synced": 1, "healed": 1}
+        assert await _sync(key, heal_fx=True) == SyncOutcome(success=True, synced=1, healed=1)
         rows = await _rows(db_session)
         assert [(k, q, p, c) for _, _, k, q, p, c, _ in rows] == [
             (TransactionType.BUY, Decimal("0.1"), Decimal("50000"), "USD")
@@ -376,7 +382,7 @@ class TestFailures:
         key = await _key(db_session, regular_user)
         (await db_session.execute(select(APIKey))).scalar_one().is_active = False
         await db_session.commit()
-        assert await _sync(key) == {"success": False, "error": "API key not found or inactive"}
+        assert await _sync(key) == SyncOutcome(success=False, error="API key not found or inactive")
 
     async def test_an_exchange_error_rolls_back_and_marks_the_key(
         self, db_session: AsyncSession, regular_user: User, client: FullClient, monkeypatch: pytest.MonkeyPatch
@@ -386,7 +392,7 @@ class TestFailures:
 
         monkeypatch.setattr(client, "get_balances", broken)
         key = await _key(db_session, regular_user)
-        assert await _sync(key) == {"success": False, "error": "sync_failed"}
+        assert await _sync(key) == SyncOutcome(success=False, error="sync_failed")
         db_session.expire_all()
         stored = (await db_session.execute(select(APIKey))).scalar_one()
         assert (stored.status, stored.last_error) == (APIKeyStatus.ERROR, "boom")
@@ -395,9 +401,142 @@ class TestFailures:
     async def test_sync_all_counts_each_key(
         self, db_session: AsyncSession, regular_user: User, admin_user: User, client: FullClient
     ) -> None:
-        from app.tasks.sync_exchanges import _sync_all_exchanges_async
-
         client.balances = [_balance("BTC", "1")]
         await _key(db_session, regular_user)
         await _key(db_session, admin_user)
-        assert await _sync_all_exchanges_async() == {"total": 2, "success": 2, "failed": 0}
+        assert await sync_all() == SyncSummary(total=2, success=2, failed=0)
+
+
+class LedgerClient(FakeClient):
+    exchange_name = "kraken"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ledger_calls: list[int] = []
+        self.excluded: set[str] | None = None
+
+    async def get_ledgers(self, *, limit: int = 10000) -> list[dict[str, Any]]:
+        self.ledger_calls.append(limit)
+        return [{"refid": "R1"}]
+
+    async def get_instant_buys(
+        self, limit: int = 500, ledgers: list[dict[str, Any]] | None = None
+    ) -> tuple[list[ExchangeTrade], set[str]]:
+        assert ledgers == [{"refid": "R1"}]
+        return [_trade("R1", "BTCEUR", "buy", "0.1", "50000")], {"R1"}
+
+    async def get_crypto_conversions(
+        self, limit: int = 500, exclude_refids: set[str] | None = None, ledgers: list[dict[str, Any]] | None = None
+    ) -> list[ExchangeTrade]:
+        self.excluded = exclude_refids
+        return []
+
+    async def get_rewards(self, limit: int = 500, ledgers: list[dict[str, Any]] | None = None) -> list[ExchangeTrade]:
+        assert ledgers == [{"refid": "R1"}]
+        return []
+
+
+class ConvertClient(FullClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.convert_since: list[datetime | None] = []
+        self.converts: list[ExchangeFiatOrder] = []
+
+    async def get_convert_history(self, start_time: datetime | None = None) -> list[ExchangeFiatOrder]:
+        self.convert_since.append(start_time)
+        return self.converts
+
+
+class TestSourcesOfThisRewrite:
+    async def test_kraken_ledgers_are_read_once_and_shared(
+        self, db_session: AsyncSession, regular_user: User, monkeypatch: pytest.MonkeyPatch, client: FullClient
+    ) -> None:
+        kraken = LedgerClient()
+        kraken.balances = [_balance("BTC", "0.1")]
+        monkeypatch.setattr("app.domains.exchanges.sync.runner.open_client", lambda key: kraken)
+        key = await _key(db_session, regular_user)
+        await _sync(key)
+        await _sync(key)
+        assert kraken.ledger_calls == [10000, 1000]
+        assert kraken.excluded == {"R1"}
+        rows = [(s, e, k, x) for s, e, k, _, _, _, x in await _rows(db_session)]
+        assert rows == [("BTC", "kraken", TransactionType.BUY, "R1")]
+
+    async def test_binance_fiat_converts_are_imported_once(
+        self, db_session: AsyncSession, regular_user: User, monkeypatch: pytest.MonkeyPatch, client: FullClient
+    ) -> None:
+        binance = ConvertClient()
+        binance.fiat_orders = [_order("f1", "BTC", "0.05", "40000")]
+        binance.converts = [_order("c-same", "BTC", "0.05", "40000"), _order("c2", "ETH", "1", "3000")]
+        binance.balances = [_balance("BTC", "0.05"), _balance("ETH", "1")]
+        monkeypatch.setattr("app.domains.exchanges.sync.runner.open_client", lambda key: binance)
+        last = datetime(2025, 3, 1, tzinfo=UTC)
+        key = await _key(db_session, regular_user, last_sync_at=last)
+        assert await _sync(key) == SyncOutcome(success=True, synced=2)
+        assert binance.convert_since == [last - timedelta(days=30)]
+        rows = [(s, k, q, x) for s, _, k, q, _, _, x in await _rows(db_session)]
+        assert rows == [
+            ("BTC", TransactionType.BUY, Decimal("0.05"), "fiat_f1"),
+            ("ETH", TransactionType.BUY, Decimal("1"), "fiat_c2"),
+        ]
+
+    async def test_earn_positions_are_opened_grown_and_closed(
+        self, db_session: AsyncSession, regular_user: User, client: FullClient
+    ) -> None:
+        client.balances = [_balance("BTC", "0.3"), _balance("LDBTC", "0.2")]
+        key = await _key(db_session, regular_user)
+        await _sync(key)
+        client.balances = [_balance("BTC", "0.3"), _balance("LDBTC", "0.25")]
+        await _sync(key)
+        markers = [(k, q) for _, _, k, q, _, _, _ in await _rows(db_session) if k in EARN]
+        assert markers == [(TransactionType.STAKING, Decimal("0.25"))]
+        client.balances = [_balance("BTC", "0.55")]
+        await _sync(key)
+        markers = [(k, q) for _, _, k, q, _, _, _ in await _rows(db_session) if k in EARN]
+        assert markers == [(TransactionType.STAKING, Decimal("0.25")), (TransactionType.UNSTAKING, Decimal("0.25"))]
+        assert (await _assets(db_session))[("BTC", "binance")][0] == Decimal("0.55")
+
+    async def test_an_asset_without_platform_is_adopted_with_its_transactions(
+        self, db_session: AsyncSession, regular_user: User, client: FullClient
+    ) -> None:
+        portfolio = Portfolio(user_id=regular_user.id, name="Crypto")
+        db_session.add(portfolio)
+        await db_session.flush()
+        db_session.add(
+            Asset(
+                portfolio_id=portfolio.id,
+                symbol="BTC",
+                name="BTC",
+                asset_type=AssetType.CRYPTO,
+                quantity=Decimal("0"),
+                avg_buy_price=Decimal("0"),
+                exchange="",
+            )
+        )
+        key = await _key(db_session, regular_user)
+        client.trades = [_trade("t1", "BTCEUR", "buy", "0.1", "50000")]
+        client.balances = [_balance("BTC", "0.1")]
+        await _sync(key)
+        assert list((await _assets(db_session)).items()) == [(("BTC", "binance"), (Decimal("0.1"), Decimal("50000")))]
+        db_session.expire_all()
+        exchanges = (await db_session.execute(select(Transaction.exchange))).scalars().all()
+        assert exchanges == ["binance"]
+
+    async def test_a_portfolio_named_after_the_exchange_becomes_the_crypto_portfolio(
+        self, db_session: AsyncSession, regular_user: User, client: FullClient
+    ) -> None:
+        db_session.add(Portfolio(user_id=regular_user.id, name="binance"))
+        key = await _key(db_session, regular_user)
+        client.balances = [_balance("BTC", "0.1")]
+        await _sync(key)
+        db_session.expire_all()
+        assert (await db_session.execute(select(Portfolio.name))).scalars().all() == ["Crypto"]
+
+    async def test_fx_recalculation_never_imports_new_orders(
+        self, db_session: AsyncSession, regular_user: User, client: FullClient
+    ) -> None:
+        client.trades = [_trade("t1", "BTCUSD", "buy", "0.1", "50000")]
+        client.balances = [_balance("BTC", "0.1")]
+        key = await _key(db_session, regular_user, last_sync_at=datetime(2025, 1, 1, tzinfo=UTC))
+        assert await _sync(key, heal_fx=True) == SyncOutcome(success=True, synced=0, healed=0)
+        assert await _rows(db_session) == []

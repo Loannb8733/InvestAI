@@ -11,7 +11,6 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=[
         "app.tasks.price_updates",
-        "app.tasks.sync_exchanges",
         "app.tasks.predictions",
         "app.tasks.alerts",
         "app.tasks.snapshots",
@@ -22,6 +21,7 @@ celery_app = Celery(
         "app.tasks.regime_alerts",
         "app.domains.market_data.fx.tasks",
         "app.domains.market_data.history.tasks",
+        "app.domains.exchanges.sync.tasks",
     ],
 )
 
@@ -63,7 +63,7 @@ celery_app.conf.beat_schedule = {
         "schedule": 300.0,  # Every 5 minutes
     },
     "sync-exchanges": {
-        "task": "app.tasks.sync_exchanges.sync_all_exchanges",
+        "task": "app.domains.exchanges.sync.tasks.sync_all_exchanges",
         "schedule": 3600.0,  # Every hour
     },
     "run-daily-predictions": {

@@ -6,6 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.domains.exchanges.schemas import TaskStatus
+from app.domains.exchanges.sync.runner import sync_account
 
 logger = logging.getLogger(__name__)
 
@@ -25,21 +26,19 @@ _tasks: dict[str, _Task] = {}
 
 
 async def _run(task_id: str, api_key_id: UUID, mode: Mode) -> None:
-    from app.tasks.sync_exchanges import _sync_single_exchange
-
     task = _tasks[task_id]
     try:
-        result = await _sync_single_exchange(str(api_key_id), heal_fx=mode == "fx_refresh")
+        outcome = await sync_account(api_key_id, heal_fx=mode == "fx_refresh")
     except Exception:
         logger.exception("Background import error for task %s", task_id)
         task.status = TaskStatus(task_id=task_id, status="failed", error=FAILURE_MESSAGE)
         return
-    if result.get("success"):
+    if outcome.success:
         task.status = TaskStatus(
-            task_id=task_id, status="completed", synced=result.get("synced", 0), message=DONE_MESSAGES[mode]
+            task_id=task_id, status="completed", synced=outcome.synced, message=DONE_MESSAGES[mode]
         )
     else:
-        task.status = TaskStatus(task_id=task_id, status="failed", error=str(result.get("error", "Unknown error")))
+        task.status = TaskStatus(task_id=task_id, status="failed", error=outcome.error or FAILURE_MESSAGE)
 
 
 def start(owner: UUID, api_key_id: UUID, mode: Mode) -> str:
