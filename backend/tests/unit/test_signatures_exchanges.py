@@ -19,9 +19,9 @@ from urllib.parse import urlencode
 
 import pytest
 
-from app.services.exchanges.binance import BinanceService
-from app.services.exchanges.bybit import BybitService
-from app.services.exchanges.cryptocom import CryptoComService
+from app.domains.exchanges.connectors.binance.connector import BinanceService
+from app.domains.exchanges.connectors.bybit.connector import BybitService
+from app.domains.exchanges.connectors.cryptocom.connector import CryptoComService
 
 CLE = "cle-publique-de-test"
 SECRET = "secret-de-test"
@@ -199,7 +199,9 @@ class TestCryptoCom:
         cas systématique au lieu d'occasionnel.
         """
         millisecondes = itertools.count(1_700_000_000_000)
-        monkeypatch.setattr("app.services.exchanges.cryptocom.time.time", lambda: next(millisecondes) / 1000.0)
+        monkeypatch.setattr(
+            "app.domains.exchanges.connectors.cryptocom.core.time.time", lambda: next(millisecondes) / 1000.0
+        )
         envoye = {}
         monkeypatch.setattr(CryptoComService, "_get_client", classmethod(lambda cls: ClientQuiRetient(envoye)))
 

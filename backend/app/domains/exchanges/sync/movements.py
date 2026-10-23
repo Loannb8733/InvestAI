@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
+from app.domains.exchanges.connectors.base import ExchangeDeposit, ExchangeTrade, ExchangeWithdrawal
 from app.domains.exchanges.sync.book import Book
 from app.domains.exchanges.sync.pricing import market_price
 from app.domains.exchanges.sync.rules import CREDITED, SENT, as_utc, cold_wallet_for, has_status
@@ -8,7 +9,6 @@ from app.domains.exchanges.sync.symbols import FIATS, base_symbol, conversion_ba
 from app.domains.portfolio.models import Asset
 from app.domains.transactions.models import TransactionType
 from app.domains.transactions.transfers import SAME_TRANSFER_TOLERANCE, create_mirror_transfer_in
-from app.services.exchanges.base import ExchangeDeposit, ExchangeTrade, ExchangeWithdrawal
 
 SELL_PREFIX = "convert_sell_"
 REWARD_QUOTES = ("EUR", "USD")

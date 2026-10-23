@@ -1,0 +1,526 @@
+{
+  "balances": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "2.5E+2",
+        "locked": "0",
+        "symbol": "USDT",
+        "total": "2.5E+2"
+      },
+      {
+        "free": "1.25",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "1.25"
+      },
+      {
+        "free": "1E+1",
+        "locked": "0",
+        "symbol": "EUR",
+        "total": "1E+1"
+      }
+    ]
+  },
+  "balances_empty": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_refused": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "connection_error": {
+    "requests": {},
+    "result": null
+  },
+  "connection_refused": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/deposits q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "100.5",
+        "deposit_id": "d0",
+        "status": "completed",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0x0"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d1",
+        "status": "cancelled",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:21+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d2",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:22+00:00",
+        "tx_id": "0x2"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d3",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:23+00:00",
+        "tx_id": "0x3"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d4",
+        "status": "completed",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:24+00:00",
+        "tx_id": "0x4"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d5",
+        "status": "unknown",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:25+00:00",
+        "tx_id": "0x5"
+      },
+      {
+        "amount": "0",
+        "deposit_id": "7",
+        "status": "unknown",
+        "symbol": "",
+        "timestamp": "1970-01-01T00:00:00+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_empty": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/deposits q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "deposits_filtered": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/deposits q=['currency', 'from', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "100.5",
+        "deposit_id": "d0",
+        "status": "completed",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0x0"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d1",
+        "status": "cancelled",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:21+00:00",
+        "tx_id": "0x1"
+      }
+    ]
+  },
+  "deposits_refused": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/deposits q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "exchange_name": "Gate.io",
+  "fiat_orders": {
+    "requests": {},
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "trades_from_balances": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1,
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'limit', 'page'] b=[]": 6
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "ETH_USDT",
+        "timestamp": "2023-11-14T22:28:20+00:00",
+        "trade_id": "4"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "1"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "weird",
+        "symbol": "BTC_ETH",
+        "timestamp": "2023-07-22T04:26:40+00:00",
+        "trade_id": "3"
+      }
+    ]
+  },
+  "trades_limited_across_pairs": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1,
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'limit', 'page'] b=[]": 3
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "1"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "weird",
+        "symbol": "BTC_ETH",
+        "timestamp": "2023-07-22T04:26:40+00:00",
+        "trade_id": "3"
+      }
+    ]
+  },
+  "trades_no_pairs": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_page_two_error": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'limit', 'page'] b=[]": 2
+    },
+    "result": {
+      "count": 100,
+      "newest": {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "SOL_USDT",
+        "timestamp": "2023-11-14T22:14:59+00:00",
+        "trade_id": "199"
+      },
+      "oldest": {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "SOL_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "100"
+      }
+    }
+  },
+  "trades_paginated": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'from', 'limit', 'page', 'to'] b=[]": 2
+    },
+    "result": {
+      "count": 120,
+      "newest": {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "SOL_USDT",
+        "timestamp": "2023-11-14T22:15:19+00:00",
+        "trade_id": "219"
+      },
+      "oldest": {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "SOL_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "100"
+      }
+    }
+  },
+  "trades_refused": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'limit', 'page'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_unknown_pair": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/my_trades q=['currency_pair', 'limit', 'page'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_without_balances": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/spot/accounts q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/withdrawals q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "tx0",
+        "withdrawal_id": "w0"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:21+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:22+00:00",
+        "tx_id": "tx2",
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:23+00:00",
+        "tx_id": "tx3",
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:24+00:00",
+        "tx_id": "tx4",
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:25+00:00",
+        "tx_id": "tx5",
+        "withdrawal_id": "w5"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "failed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:26+00:00",
+        "tx_id": "tx6",
+        "withdrawal_id": "w6"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "failed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:27+00:00",
+        "tx_id": "tx7",
+        "withdrawal_id": "w7"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:28+00:00",
+        "tx_id": "tx8",
+        "withdrawal_id": "w8"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:29+00:00",
+        "tx_id": "tx9",
+        "withdrawal_id": "w9"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:30+00:00",
+        "tx_id": "tx10",
+        "withdrawal_id": "w10"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:31+00:00",
+        "tx_id": "tx11",
+        "withdrawal_id": "w11"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:32+00:00",
+        "tx_id": "tx12",
+        "withdrawal_id": "w12"
+      },
+      {
+        "address": null,
+        "amount": "0",
+        "fee": "0",
+        "status": "unknown",
+        "symbol": "",
+        "timestamp": "1970-01-01T00:00:00+00:00",
+        "tx_id": null,
+        "withdrawal_id": "8"
+      }
+    ]
+  },
+  "withdrawals_empty": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/withdrawals q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals_filtered": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/withdrawals q=['currency', 'from', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "tx0",
+        "withdrawal_id": "w0"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:21+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:22+00:00",
+        "tx_id": "tx2",
+        "withdrawal_id": "w2"
+      }
+    ]
+  },
+  "withdrawals_refused": {
+    "requests": {
+      "GET api.gateio.ws/api/v4/wallet/withdrawals q=['limit'] b=[]": 1
+    },
+    "result": []
+  }
+}

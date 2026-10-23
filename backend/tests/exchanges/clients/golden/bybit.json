@@ -1,0 +1,594 @@
+{
+  "balances": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "0",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_after_eu_fallback": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1,
+      "GET api.bybit.nl/v5/account/wallet-balance q=['accountType'] b=[]": 2
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "0",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_blank_field": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      }
+    ]
+  },
+  "balances_fresh_client": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 2
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "0",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_http_error": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_refused": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_unresolved": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 2,
+      "GET api.bybit.nl/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": []
+  },
+  "connection_cached": {
+    "requests": {},
+    "result": true
+  },
+  "connection_error": {
+    "requests": {},
+    "result": null
+  },
+  "connection_eu_fallback": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1,
+      "GET api.bybit.nl/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": true
+  },
+  "connection_global_down": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1,
+      "GET api.bybit.nl/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": true
+  },
+  "connection_refused_everywhere": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1,
+      "GET api.bybit.nl/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/deposit/query-record q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "100.5",
+        "deposit_id": "d1",
+        "status": "success",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d2",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d3",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:16:40+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d4",
+        "status": "failed",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:18:20+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d5",
+        "status": "unknown",
+        "symbol": "USDT",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d6",
+        "status": "unknown",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "1",
+        "deposit_id": "d7",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_empty": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/deposit/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "deposits_filtered": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/deposit/query-record q=['coin', 'limit', 'startTime'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "100.5",
+        "deposit_id": "d1",
+        "status": "success",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d2",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d3",
+        "status": "pending",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:16:40+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d4",
+        "status": "failed",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:18:20+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d5",
+        "status": "unknown",
+        "symbol": "USDT",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "100.5",
+        "deposit_id": "d6",
+        "status": "unknown",
+        "symbol": "USDT",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "tx_id": "0x1"
+      },
+      {
+        "amount": "1",
+        "deposit_id": "d7",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_http_error": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/deposit/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "deposits_refused": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/deposit/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "eu_base_url": "https://api.bybit.nl",
+  "exchange_name": "Bybit",
+  "fiat_orders": {
+    "requests": {},
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "GET api.bybit.com/v5/account/wallet-balance q=['accountType'] b=[]": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "requests": {
+      "GET api.bybit.com/v5/execution/list q=['category', 'cursor', 'endTime', 'limit', 'startTime', 'symbol'] b=[]": 1,
+      "GET api.bybit.com/v5/execution/list q=['category', 'endTime', 'limit', 'startTime', 'symbol'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "trade_id": "t2"
+      },
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      },
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-07-22T04:26:40+00:00",
+        "trade_id": "t3"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "",
+        "price": "0",
+        "quantity": "0",
+        "side": "buy",
+        "symbol": "",
+        "timestamp": "1970-01-01T00:00:00+00:00",
+        "trade_id": "t4"
+      }
+    ]
+  },
+  "trades_after_eu_fallback": {
+    "requests": {
+      "GET api.bybit.nl/v5/execution/list q=['category', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_partial_http_error": {
+    "requests": {
+      "GET api.bybit.com/v5/execution/list q=['category', 'cursor', 'limit'] b=[]": 1,
+      "GET api.bybit.com/v5/execution/list q=['category', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_refused": {
+    "requests": {
+      "GET api.bybit.com/v5/execution/list q=['category', 'limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_until_empty_page": {
+    "requests": {
+      "GET api.bybit.com/v5/execution/list q=['category', 'cursor', 'limit'] b=[]": 1,
+      "GET api.bybit.com/v5/execution/list q=['category', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_without_resolution": {
+    "requests": {
+      "GET api.bybit.com/v5/execution/list q=['category', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.0006",
+        "fee_currency": "BTC",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "unresolved_base_url": "https://api.bybit.com",
+  "withdrawals": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/withdraw/query-record q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": "tx0",
+        "withdrawal_id": "w0"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.001000+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.002000+00:00",
+        "tx_id": "tx2",
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.003000+00:00",
+        "tx_id": "tx3",
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "rejected",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.004000+00:00",
+        "tx_id": "tx4",
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "failure",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.005000+00:00",
+        "tx_id": "tx5",
+        "withdrawal_id": "w5"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.006000+00:00",
+        "tx_id": "tx6",
+        "withdrawal_id": "w6"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.007000+00:00",
+        "tx_id": "tx7",
+        "withdrawal_id": "w7"
+      }
+    ]
+  },
+  "withdrawals_empty": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/withdraw/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals_filtered": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/withdraw/query-record q=['coin', 'limit', 'startTime'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": "tx0",
+        "withdrawal_id": "w0"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.001000+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.002000+00:00",
+        "tx_id": "tx2",
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.003000+00:00",
+        "tx_id": "tx3",
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "rejected",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.004000+00:00",
+        "tx_id": "tx4",
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "failure",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.005000+00:00",
+        "tx_id": "tx5",
+        "withdrawal_id": "w5"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.006000+00:00",
+        "tx_id": "tx6",
+        "withdrawal_id": "w6"
+      },
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20.007000+00:00",
+        "tx_id": "tx7",
+        "withdrawal_id": "w7"
+      }
+    ]
+  },
+  "withdrawals_http_error": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/withdraw/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals_refused": {
+    "requests": {
+      "GET api.bybit.com/v5/asset/withdraw/query-record q=['limit'] b=[]": 1
+    },
+    "result": []
+  }
+}

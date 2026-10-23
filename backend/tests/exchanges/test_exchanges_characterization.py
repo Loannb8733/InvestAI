@@ -9,12 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
+from app.domains.exchanges.connectors.base import ExchangeBalance
 from app.domains.exchanges.models import APIKey
 from app.domains.exchanges.sync.runner import SyncOutcome
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
-from app.services.exchanges.base import ExchangeBalance
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 KEYS = "/api/v1/api-keys"

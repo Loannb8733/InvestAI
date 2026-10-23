@@ -1,0 +1,536 @@
+{
+  "conversions": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "0",
+        "quantity": "0.02",
+        "side": "sell",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_sell_RTWOSELLS"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDC",
+        "price": "0",
+        "quantity": "1.2E+3",
+        "side": "buy",
+        "symbol": "USDCEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_buy_RTWOSELLS"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "0",
+        "quantity": "0.03",
+        "side": "sell",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "convert_sell_RMIX"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "DOGE",
+        "price": "0",
+        "quantity": "1E+3",
+        "side": "buy",
+        "symbol": "DOGEEUR",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "convert_buy_RMIX"
+      },
+      {
+        "fee": "0.00001",
+        "fee_currency": "BTC",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_sell_RCONV"
+      },
+      {
+        "fee": "0.01",
+        "fee_currency": "DOT",
+        "price": "0",
+        "quantity": "25",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_buy_RCONV"
+      }
+    ]
+  },
+  "conversions_excluding_instant_buys": {
+    "requests": {},
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "0",
+        "quantity": "0.02",
+        "side": "sell",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_sell_RTWOSELLS"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDC",
+        "price": "0",
+        "quantity": "1.2E+3",
+        "side": "buy",
+        "symbol": "USDCEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_buy_RTWOSELLS"
+      },
+      {
+        "fee": "0.00001",
+        "fee_currency": "BTC",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_sell_RCONV"
+      },
+      {
+        "fee": "0.01",
+        "fee_currency": "DOT",
+        "price": "0",
+        "quantity": "25",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_buy_RCONV"
+      }
+    ]
+  },
+  "conversions_prefetched": {
+    "requests": {},
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "0",
+        "quantity": "0.02",
+        "side": "sell",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_sell_RTWOSELLS"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDC",
+        "price": "0",
+        "quantity": "1.2E+3",
+        "side": "buy",
+        "symbol": "USDCEUR",
+        "timestamp": "2023-11-14T22:25:00+00:00",
+        "trade_id": "convert_buy_RTWOSELLS"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "0",
+        "quantity": "0.03",
+        "side": "sell",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "convert_sell_RMIX"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "DOGE",
+        "price": "0",
+        "quantity": "1E+3",
+        "side": "buy",
+        "symbol": "DOGEEUR",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "convert_buy_RMIX"
+      },
+      {
+        "fee": "0.00001",
+        "fee_currency": "BTC",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_sell_RCONV"
+      },
+      {
+        "fee": "0.01",
+        "fee_currency": "DOT",
+        "price": "0",
+        "quantity": "25",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_buy_RCONV"
+      }
+    ]
+  },
+  "conversions_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": []
+  },
+  "conversions_truncated": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      {
+        "fee": "0.00001",
+        "fee_currency": "BTC",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_sell_RCONV"
+      },
+      {
+        "fee": "0.01",
+        "fee_currency": "DOT",
+        "price": "0",
+        "quantity": "25",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:20:00+00:00",
+        "trade_id": "convert_buy_RCONV"
+      }
+    ]
+  },
+  "instant_buys": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      [
+        {
+          "fee": "0",
+          "fee_currency": "EUR",
+          "price": "0.1",
+          "quantity": "1E+3",
+          "side": "buy",
+          "symbol": "DOGEEUR",
+          "timestamp": "2023-11-14T22:21:40+00:00",
+          "trade_id": "instant_RMIX"
+        },
+        {
+          "fee": "0.1",
+          "fee_currency": "USD",
+          "price": "1.2E+2",
+          "quantity": "0.5",
+          "side": "buy",
+          "symbol": "SOLUSD",
+          "timestamp": "2023-11-14T22:16:40+00:00",
+          "trade_id": "instant_RTRADE"
+        },
+        {
+          "fee": "2.5",
+          "fee_currency": "EUR",
+          "price": "2.5E+3",
+          "quantity": "0.1",
+          "side": "buy",
+          "symbol": "ETHEUR",
+          "timestamp": "2023-11-14T22:15:00+00:00",
+          "trade_id": "instant_RMULTI"
+        },
+        {
+          "fee": "0.9",
+          "fee_currency": "EUR",
+          "price": "4E+4",
+          "quantity": "0.0025",
+          "side": "buy",
+          "symbol": "BTCEUR",
+          "timestamp": "2023-11-14T22:13:20.250000+00:00",
+          "trade_id": "instant_RBUY"
+        }
+      ],
+      [
+        "RBUY",
+        "RMIX",
+        "RMULTI",
+        "RTRADE"
+      ]
+    ]
+  },
+  "instant_buys_prefetched": {
+    "requests": {},
+    "result": [
+      [
+        {
+          "fee": "0",
+          "fee_currency": "EUR",
+          "price": "0.1",
+          "quantity": "1E+3",
+          "side": "buy",
+          "symbol": "DOGEEUR",
+          "timestamp": "2023-11-14T22:21:40+00:00",
+          "trade_id": "instant_RMIX"
+        },
+        {
+          "fee": "0.1",
+          "fee_currency": "USD",
+          "price": "1.2E+2",
+          "quantity": "0.5",
+          "side": "buy",
+          "symbol": "SOLUSD",
+          "timestamp": "2023-11-14T22:16:40+00:00",
+          "trade_id": "instant_RTRADE"
+        },
+        {
+          "fee": "2.5",
+          "fee_currency": "EUR",
+          "price": "2.5E+3",
+          "quantity": "0.1",
+          "side": "buy",
+          "symbol": "ETHEUR",
+          "timestamp": "2023-11-14T22:15:00+00:00",
+          "trade_id": "instant_RMULTI"
+        },
+        {
+          "fee": "0.9",
+          "fee_currency": "EUR",
+          "price": "4E+4",
+          "quantity": "0.0025",
+          "side": "buy",
+          "symbol": "BTCEUR",
+          "timestamp": "2023-11-14T22:13:20.250000+00:00",
+          "trade_id": "instant_RBUY"
+        }
+      ],
+      [
+        "RBUY",
+        "RMIX",
+        "RMULTI",
+        "RTRADE"
+      ]
+    ]
+  },
+  "instant_buys_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      [],
+      []
+    ]
+  },
+  "instant_buys_truncated": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      [
+        {
+          "fee": "0.9",
+          "fee_currency": "EUR",
+          "price": "4E+4",
+          "quantity": "0.0025",
+          "side": "buy",
+          "symbol": "BTCEUR",
+          "timestamp": "2023-11-14T22:13:20.250000+00:00",
+          "trade_id": "instant_RBUY"
+        }
+      ],
+      [
+        "RBUY"
+      ]
+    ]
+  },
+  "rewards": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.2",
+        "side": "buy",
+        "symbol": "CHFEUR",
+        "timestamp": "2023-11-14T22:36:40+00:00",
+        "trade_id": "reward_staking_L27"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.02",
+        "side": "buy",
+        "symbol": "SOLEUR",
+        "timestamp": "2023-11-14T22:33:20+00:00",
+        "trade_id": "reward_staking_L25"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.00005",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:31:40+00:00",
+        "trade_id": "reward_airdrop_L24"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "4E+1",
+        "side": "buy",
+        "symbol": "FLREUR",
+        "timestamp": "2023-11-14T22:30:00+00:00",
+        "trade_id": "reward_airdrop_L23"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.003",
+        "side": "buy",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:28:20+00:00",
+        "trade_id": "reward_staking_L22"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.12",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:26:40+00:00",
+        "trade_id": "reward_staking_L21"
+      }
+    ]
+  },
+  "rewards_prefetched": {
+    "requests": {},
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.2",
+        "side": "buy",
+        "symbol": "CHFEUR",
+        "timestamp": "2023-11-14T22:36:40+00:00",
+        "trade_id": "reward_staking_L27"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.02",
+        "side": "buy",
+        "symbol": "SOLEUR",
+        "timestamp": "2023-11-14T22:33:20+00:00",
+        "trade_id": "reward_staking_L25"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.00005",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:31:40+00:00",
+        "trade_id": "reward_airdrop_L24"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "4E+1",
+        "side": "buy",
+        "symbol": "FLREUR",
+        "timestamp": "2023-11-14T22:30:00+00:00",
+        "trade_id": "reward_airdrop_L23"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.003",
+        "side": "buy",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:28:20+00:00",
+        "trade_id": "reward_staking_L22"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.12",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:26:40+00:00",
+        "trade_id": "reward_staking_L21"
+      }
+    ]
+  },
+  "rewards_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": []
+  },
+  "rewards_truncated": {
+    "requests": {
+      "POST api.kraken.com/0/private/Ledgers q=[] b=['ofs']": 1
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.00005",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:31:40+00:00",
+        "trade_id": "reward_airdrop_L24"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "4E+1",
+        "side": "buy",
+        "symbol": "FLREUR",
+        "timestamp": "2023-11-14T22:30:00+00:00",
+        "trade_id": "reward_airdrop_L23"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.003",
+        "side": "buy",
+        "symbol": "ETHEUR",
+        "timestamp": "2023-11-14T22:28:20+00:00",
+        "trade_id": "reward_staking_L22"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.12",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:26:40+00:00",
+        "trade_id": "reward_staking_L21"
+      }
+    ]
+  }
+}

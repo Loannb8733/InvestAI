@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
-from app.services.exchanges.base import (
+from app.domains.exchanges.connectors.base import (
     BaseExchangeService,
     ExchangeDeposit,
     ExchangeFiatOrder,

@@ -1,0 +1,377 @@
+{
+  "accounts": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": [
+      [
+        "a-btc",
+        "BTC"
+      ],
+      [
+        "a-eth",
+        "ETH"
+      ],
+      [
+        "a-doge",
+        "DOGE"
+      ],
+      [
+        "a-usd",
+        "USD"
+      ]
+    ]
+  },
+  "accounts_empty": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "accounts_eth": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": [
+      [
+        "a-eth",
+        "ETH"
+      ]
+    ]
+  },
+  "accounts_refused": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      },
+      {
+        "free": "100.25",
+        "locked": "0",
+        "symbol": "USD",
+        "total": "100.25"
+      }
+    ]
+  },
+  "balances_empty": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_refused": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_without_secret": {
+    "requests": {},
+    "result": []
+  },
+  "connection_error": {
+    "requests": {},
+    "result": null
+  },
+  "connection_refused": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": false
+  },
+  "connection_without_secret": {
+    "requests": {},
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-btc/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-doge/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-eth/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-usd/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-doge/deposits q=[] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-eth/deposits q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "0.25",
+        "deposit_id": "d1",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2026-09-10T08:00:00+00:00",
+        "tx_id": "0xabc"
+      },
+      {
+        "amount": "0.1",
+        "deposit_id": "d3",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2026-09-11T00:00:00+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d4",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_eth": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-eth/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-eth/deposits q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "d4",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2026-10-01T12:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_limited": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-btc/transactions q=['limit', 'type'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "0.25",
+        "deposit_id": "d1",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2026-09-10T08:00:00+00:00",
+        "tx_id": "0xabc"
+      },
+      {
+        "amount": "1",
+        "deposit_id": "d2",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2025-01-01T00:00:00+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_refused": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "exchange_name": "Coinbase",
+  "fiat_orders": {
+    "requests": {},
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['cursor', 'end_sequence_timestamp', 'limit', 'product_id', 'start_sequence_timestamp'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['end_sequence_timestamp', 'limit', 'product_id', 'start_sequence_timestamp'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USD",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCUSD",
+        "timestamp": "2026-09-02T10:00:00.250000+00:00",
+        "trade_id": "e2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USD",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USD",
+        "timestamp": "2026-09-01T10:00:00+00:00",
+        "trade_id": "t1"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "EUR",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "ETH-EUR",
+        "timestamp": "2026-08-01T00:00:00+00:00",
+        "trade_id": "t3"
+      }
+    ]
+  },
+  "trades_empty": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_http_error": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['limit'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_limited": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USD",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTCUSD",
+        "timestamp": "2026-09-02T10:00:00.250000+00:00",
+        "trade_id": "e2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USD",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USD",
+        "timestamp": "2026-09-01T10:00:00+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_malformed": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/orders/historical/fills q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USD",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USD",
+        "timestamp": "2026-09-03T00:00:00+00:00",
+        "trade_id": "t4"
+      }
+    ]
+  },
+  "withdrawals": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-btc/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-doge/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-eth/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-usd/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-doge/withdrawals q=[] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-eth/withdrawals q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1qxyz",
+        "amount": "0.05",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2026-09-12T00:00:00+00:00",
+        "tx_id": "txw1",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": null,
+        "amount": "0.5",
+        "fee": "0.001",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2026-09-20T00:00:00+00:00",
+        "tx_id": "0xw3",
+        "withdrawal_id": "w3"
+      }
+    ]
+  },
+  "withdrawals_eth": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-eth/transactions q=['limit', 'type'] b=[]": 1,
+      "GET api.coinbase.com/v2/accounts/a-eth/withdrawals q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.5",
+        "fee": "0.001",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2026-09-20T00:00:00+00:00",
+        "tx_id": "0xw3",
+        "withdrawal_id": "w3"
+      }
+    ]
+  },
+  "withdrawals_limited": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['cursor', 'limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1,
+      "GET api.coinbase.com/api/v3/brokerage/accounts/a-btc/transactions q=['limit', 'type'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1qxyz",
+        "amount": "0.05",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2026-09-12T00:00:00+00:00",
+        "tx_id": "txw1",
+        "withdrawal_id": "w1"
+      }
+    ]
+  },
+  "withdrawals_refused": {
+    "requests": {
+      "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1
+    },
+    "result": []
+  }
+}

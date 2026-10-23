@@ -1,0 +1,378 @@
+{
+  "balances": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/balance/ q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "100.5",
+        "locked": "0",
+        "symbol": "USD",
+        "total": "100.5"
+      },
+      {
+        "free": "2.5",
+        "locked": "0.5",
+        "symbol": "XYZ",
+        "total": "3"
+      }
+    ]
+  },
+  "balances_refused": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/balance/ q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "connection_error": {
+    "requests": {},
+    "result": null
+  },
+  "connection_refused": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/balance/ q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "amount": "5E+2",
+        "deposit_id": "6",
+        "status": "completed",
+        "symbol": "EUR",
+        "timestamp": "2023-11-09T06:00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "0.25",
+        "deposit_id": "7",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-08T05:00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "3",
+        "deposit_id": "21",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2022-05-01T12:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_error_body": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "deposits_filtered": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "amount": "0.25",
+        "deposit_id": "7",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-08T05:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_limited": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": [
+      {
+        "amount": "5E+2",
+        "deposit_id": "6",
+        "status": "completed",
+        "symbol": "EUR",
+        "timestamp": "2023-11-09T06:00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_refused": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "exchange_name": "Bitstamp",
+  "fiat_orders": {
+    "requests": {},
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/balance/ q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "fee": "0.74",
+        "fee_currency": "USD",
+        "price": "3.7E+4",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC_USD",
+        "timestamp": "2023-11-14T22:13:20",
+        "trade_id": "1"
+      },
+      {
+        "fee": "6",
+        "fee_currency": "EUR",
+        "price": "2E+3",
+        "quantity": "1.5",
+        "side": "sell",
+        "symbol": "ETH_EUR",
+        "timestamp": "2023-11-13T10:00:00",
+        "trade_id": "2"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "BTC",
+        "price": "0.05",
+        "quantity": "2",
+        "side": "buy",
+        "symbol": "ETH_BTC",
+        "timestamp": "2023-11-12T09:30:00.250000",
+        "trade_id": "3"
+      },
+      {
+        "fee": "1.48",
+        "fee_currency": "USD",
+        "price": "0.02",
+        "quantity": "3.7E+4",
+        "side": "buy",
+        "symbol": "BTC_USD_USD",
+        "timestamp": "2023-11-11T08:00:00",
+        "trade_id": "4"
+      },
+      {
+        "fee": "0.1",
+        "fee_currency": "EUR",
+        "price": "2.5E+4",
+        "quantity": "0.001",
+        "side": "buy",
+        "symbol": "BTC_EUR",
+        "timestamp": "2022-06-01T12:00:00",
+        "trade_id": "20"
+      }
+    ]
+  },
+  "trades_empty": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "trades_empty_next_page": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "USD",
+        "price": "3.7E+4",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC_USD",
+        "timestamp": "2023-11-14T22:13:20",
+        "trade_id": "30"
+      }
+    ]
+  },
+  "trades_error_body": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "trades_limited": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": [
+      {
+        "fee": "0.74",
+        "fee_currency": "USD",
+        "price": "3.7E+4",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC_USD",
+        "timestamp": "2023-11-14T22:13:20",
+        "trade_id": "1"
+      },
+      {
+        "fee": "6",
+        "fee_currency": "EUR",
+        "price": "2E+3",
+        "quantity": "1.5",
+        "side": "sell",
+        "symbol": "ETH_EUR",
+        "timestamp": "2023-11-13T10:00:00",
+        "trade_id": "2"
+      }
+    ]
+  },
+  "trades_refused": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "trades_window": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "fee": "6",
+        "fee_currency": "EUR",
+        "price": "2E+3",
+        "quantity": "1.5",
+        "side": "sell",
+        "symbol": "ETH_EUR",
+        "timestamp": "2023-11-13T10:00:00",
+        "trade_id": "2"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "BTC",
+        "price": "0.05",
+        "quantity": "2",
+        "side": "buy",
+        "symbol": "ETH_BTC",
+        "timestamp": "2023-11-12T09:30:00.250000",
+        "trade_id": "3"
+      },
+      {
+        "fee": "1.48",
+        "fee_currency": "USD",
+        "price": "0.02",
+        "quantity": "3.7E+4",
+        "side": "buy",
+        "symbol": "BTC_USD_USD",
+        "timestamp": "2023-11-11T08:00:00",
+        "trade_id": "4"
+      }
+    ]
+  },
+  "unsigned_balances": {
+    "requests": {},
+    "result": []
+  },
+  "unsigned_connection": {
+    "requests": {},
+    "result": false
+  },
+  "unsigned_trades": {
+    "requests": {},
+    "result": []
+  },
+  "withdrawals": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.75",
+        "fee": "0.001",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-06T03:00:00",
+        "tx_id": null,
+        "withdrawal_id": "9"
+      },
+      {
+        "address": null,
+        "amount": "2E+2",
+        "fee": "0",
+        "status": "completed",
+        "symbol": "EUR",
+        "timestamp": "2023-11-05T02:00:00",
+        "tx_id": null,
+        "withdrawal_id": "10"
+      },
+      {
+        "address": null,
+        "amount": "0.05",
+        "fee": "0.0005",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2022-04-01T12:00:00",
+        "tx_id": null,
+        "withdrawal_id": "22"
+      }
+    ]
+  },
+  "withdrawals_error_body": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  },
+  "withdrawals_filtered": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 2
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.75",
+        "fee": "0.001",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-06T03:00:00",
+        "tx_id": null,
+        "withdrawal_id": "9"
+      }
+    ]
+  },
+  "withdrawals_limited": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.75",
+        "fee": "0.001",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-06T03:00:00",
+        "tx_id": null,
+        "withdrawal_id": "9"
+      }
+    ]
+  },
+  "withdrawals_refused": {
+    "requests": {
+      "POST www.bitstamp.net/api/v2/user_transactions/ q=[] b=['limit', 'offset', 'sort']": 1
+    },
+    "result": []
+  }
+}

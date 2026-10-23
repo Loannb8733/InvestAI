@@ -13,7 +13,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.exchanges.binance import BinanceService
+from app.domains.exchanges.connectors.binance.connector import BinanceService
 
 
 class _FakeResponse:

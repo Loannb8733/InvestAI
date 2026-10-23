@@ -1,0 +1,394 @@
+{
+  "auto_invest_limit_reached": {
+    "requests": {
+      "GET api.binance.com/sapi/v1/lending/auto-invest/history/list q=['current', 'size'] b=[]": 1
+    },
+    "result": [
+      {
+        "crypto_amount": "0.0008",
+        "crypto_symbol": "BTC",
+        "fee": "0",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "EUR",
+        "order_id": "autoinvest_500",
+        "price": "6.25E+4",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:20+00:00"
+      },
+      {
+        "crypto_amount": "0.02",
+        "crypto_symbol": "ETH",
+        "fee": "0",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "EUR",
+        "order_id": "autoinvest_1790000001000",
+        "price": "2.5E+3",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:21+00:00"
+      }
+    ]
+  },
+  "auto_invest_paginated": {
+    "requests": {
+      "GET api.binance.com/sapi/v1/lending/auto-invest/history/list q=['current', 'endTime', 'size', 'startTime'] b=[]": 2
+    },
+    "result": [
+      {
+        "crypto_amount": "0.0008",
+        "crypto_symbol": "BTC",
+        "fee": "0",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "EUR",
+        "order_id": "autoinvest_500",
+        "price": "6.25E+4",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:20+00:00"
+      },
+      {
+        "crypto_amount": "0.02",
+        "crypto_symbol": "ETH",
+        "fee": "0",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "EUR",
+        "order_id": "autoinvest_1790000001000",
+        "price": "2.5E+3",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:21+00:00"
+      },
+      {
+        "crypto_amount": "0.001",
+        "crypto_symbol": "BTC",
+        "fee": "0",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "USDC",
+        "order_id": "autoinvest_600",
+        "price": "5E+4",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:25+00:00"
+      }
+    ]
+  },
+  "auto_invest_refused": {
+    "requests": {
+      "GET api.binance.com/sapi/v1/lending/auto-invest/history/list q=['current', 'size'] b=[]": 1
+    },
+    "result": []
+  },
+  "convert_history_default_range": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 113,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 113
+    },
+    "result": []
+  },
+  "convert_history_paginated": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 2
+    },
+    "result": [
+      {
+        "crypto_amount": "0.2",
+        "crypto_symbol": "SOL",
+        "fee": "0",
+        "fiat_amount": "25",
+        "fiat_currency": "EUR",
+        "order_id": "q1789998000000",
+        "price": "125",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T13:40:00+00:00"
+      }
+    ]
+  },
+  "convert_history_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 1
+    },
+    "result": []
+  },
+  "convert_history_window": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 1
+    },
+    "result": [
+      {
+        "crypto_amount": "0.0015",
+        "crypto_symbol": "BTC",
+        "fee": "0",
+        "fiat_amount": "1E+2",
+        "fiat_currency": "EUR",
+        "order_id": "q1790000000000",
+        "price": "66666.66666666666666666666667",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:20+00:00"
+      },
+      {
+        "crypto_amount": "0.01",
+        "crypto_symbol": "BTC",
+        "fee": "0",
+        "fiat_amount": "6E+2",
+        "fiat_currency": "EUR",
+        "order_id": "q1790000001000",
+        "price": "6E+4",
+        "side": "sell",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:21+00:00"
+      },
+      {
+        "crypto_amount": "0",
+        "crypto_symbol": "ETH",
+        "fee": "0",
+        "fiat_amount": "2E+1",
+        "fiat_currency": "GBP",
+        "order_id": "1790000007000",
+        "price": "0",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:27+00:00"
+      }
+    ]
+  },
+  "crypto_conversions_aware_start_only": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "TypeError"
+    }
+  },
+  "crypto_conversions_default_range": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 113
+    },
+    "result": []
+  },
+  "crypto_conversions_resilient": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 3
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "DOT",
+        "price": "0.8",
+        "quantity": "1E+1",
+        "side": "sell",
+        "symbol": "DOTATOM",
+        "timestamp": "2026-08-12T14:13:20+00:00",
+        "trade_id": "convert_sell_q1786544000000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "ATOM",
+        "price": "1.25",
+        "quantity": "8",
+        "side": "buy",
+        "symbol": "ATOMDOT",
+        "timestamp": "2026-08-12T14:13:20+00:00",
+        "trade_id": "convert_buy_q1786544000000"
+      }
+    ]
+  },
+  "crypto_conversions_window": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "ADA",
+        "price": "0",
+        "quantity": "0",
+        "side": "sell",
+        "symbol": "ADADOT",
+        "timestamp": "2026-09-21T14:13:28+00:00",
+        "trade_id": "convert_sell_1790000008000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "DOT",
+        "price": "0",
+        "quantity": "5",
+        "side": "buy",
+        "symbol": "DOTADA",
+        "timestamp": "2026-09-21T14:13:28+00:00",
+        "trade_id": "convert_buy_1790000008000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "15.5",
+        "quantity": "1",
+        "side": "sell",
+        "symbol": "ETHSOL",
+        "timestamp": "2026-09-21T14:13:25+00:00",
+        "trade_id": "convert_sell_q1790000005000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "SOL",
+        "price": "0.06451612903225806451612903226",
+        "quantity": "15.5",
+        "side": "buy",
+        "symbol": "SOLETH",
+        "timestamp": "2026-09-21T14:13:25+00:00",
+        "trade_id": "convert_buy_q1790000005000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDC",
+        "price": "0.0004",
+        "quantity": "1E+2",
+        "side": "sell",
+        "symbol": "USDCETH",
+        "timestamp": "2026-09-21T14:13:24+00:00",
+        "trade_id": "convert_sell_q1790000004000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "ETH",
+        "price": "2.5E+3",
+        "quantity": "0.04",
+        "side": "buy",
+        "symbol": "ETHUSDC",
+        "timestamp": "2026-09-21T14:13:24+00:00",
+        "trade_id": "convert_buy_q1790000004000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "BTC",
+        "price": "6E+4",
+        "quantity": "0.02",
+        "side": "sell",
+        "symbol": "BTCUSDT",
+        "timestamp": "2026-09-21T14:13:23+00:00",
+        "trade_id": "convert_sell_q1790000003000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "0.00001666666666666666666666666667",
+        "quantity": "1.2E+3",
+        "side": "buy",
+        "symbol": "USDTBTC",
+        "timestamp": "2026-09-21T14:13:23+00:00",
+        "trade_id": "convert_buy_q1790000003000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "0.000016",
+        "quantity": "5E+1",
+        "side": "sell",
+        "symbol": "USDTBTC",
+        "timestamp": "2026-09-21T14:13:22+00:00",
+        "trade_id": "convert_sell_q1790000002000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "BTC",
+        "price": "6.25E+4",
+        "quantity": "0.0008",
+        "side": "buy",
+        "symbol": "BTCUSDT",
+        "timestamp": "2026-09-21T14:13:22+00:00",
+        "trade_id": "convert_buy_q1790000002000"
+      }
+    ]
+  },
+  "fiat_orders_aware_start_only": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "TypeError"
+    }
+  },
+  "fiat_orders_default_range_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/fiat/payments q=['beginTime', 'endTime', 'page', 'rows', 'transactionType'] b=[]": 76
+    },
+    "result": []
+  },
+  "fiat_orders_window": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/fiat/payments q=['beginTime', 'endTime', 'page', 'rows', 'transactionType'] b=[]": 5
+    },
+    "result": [
+      {
+        "crypto_amount": "0",
+        "crypto_symbol": "BTC",
+        "fee": "1.5",
+        "fiat_amount": "1E+1",
+        "fiat_currency": "EUR",
+        "order_id": "s2",
+        "price": "0",
+        "side": "sell",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:24+00:00"
+      },
+      {
+        "crypto_amount": "0.01",
+        "crypto_symbol": "BTC",
+        "fee": "1.5",
+        "fiat_amount": "6E+2",
+        "fiat_currency": "EUR",
+        "order_id": "s1",
+        "price": "6E+4",
+        "side": "sell",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:23+00:00"
+      },
+      {
+        "crypto_amount": "0.0003",
+        "crypto_symbol": "BTC",
+        "fee": "1.5",
+        "fiat_amount": "2E+1",
+        "fiat_currency": "EUR",
+        "order_id": "b3",
+        "price": "66666.66666666666666666666667",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:22+00:00"
+      },
+      {
+        "crypto_amount": "0.02",
+        "crypto_symbol": "ETH",
+        "fee": "1.5",
+        "fiat_amount": "5E+1",
+        "fiat_currency": "EUR",
+        "order_id": "1790000001000",
+        "price": "2.5E+3",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:21+00:00"
+      },
+      {
+        "crypto_amount": "0.0015",
+        "crypto_symbol": "BTC",
+        "fee": "1.5",
+        "fiat_amount": "1E+2",
+        "fiat_currency": "USD",
+        "order_id": "b1",
+        "price": "66666.66666666666666666666667",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:20+00:00"
+      }
+    ]
+  }
+}

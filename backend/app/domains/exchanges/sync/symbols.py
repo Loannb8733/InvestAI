@@ -3,8 +3,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from app.domains.exchanges.connectors.base import ExchangeBalance
 from app.domains.exchanges.sync.pairs import split_pair
-from app.services.exchanges.base import ExchangeBalance
 
 logger = logging.getLogger(__name__)
 

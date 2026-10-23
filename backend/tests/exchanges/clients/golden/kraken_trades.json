@@ -1,0 +1,242 @@
+{
+  "trades": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 1
+    },
+    "result": [
+      {
+        "fee": "7",
+        "fee_currency": "EUR",
+        "price": "9E+2",
+        "quantity": "5",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2023-11-14T22:30:00+00:00",
+        "trade_id": "T4"
+      },
+      {
+        "fee": "0.0001",
+        "fee_currency": "BTC",
+        "price": "0.055",
+        "quantity": "1",
+        "side": "sell",
+        "symbol": "ETHBTC",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "T2"
+      },
+      {
+        "fee": "0.000002",
+        "fee_currency": "BTC",
+        "price": "0.000003",
+        "quantity": "3E+2",
+        "side": "sell",
+        "symbol": "XLMBTC",
+        "timestamp": "2023-11-14T22:17:30+00:00",
+        "trade_id": "T5"
+      },
+      {
+        "fee": "0.48",
+        "fee_currency": "EUR",
+        "price": "3E+4",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:13:20.123400+00:00",
+        "trade_id": "T1"
+      },
+      {
+        "fee": "0.9",
+        "fee_currency": "USDT",
+        "price": "6E+1",
+        "quantity": "1E+1",
+        "side": "buy",
+        "symbol": "SOLUSDT",
+        "timestamp": "2023-11-14T19:26:40+00:00",
+        "trade_id": "T3"
+      }
+    ]
+  },
+  "trades_capped_by_limit": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 1
+    },
+    "result": [
+      "TP019",
+      "TP018",
+      "TP017",
+      "TP016",
+      "TP015",
+      "TP014",
+      "TP013",
+      "TP012",
+      "TP011",
+      "TP010",
+      "TP009",
+      "TP008",
+      "TP007",
+      "TP006",
+      "TP005",
+      "TP004",
+      "TP003",
+      "TP002",
+      "TP001",
+      "TP000"
+    ]
+  },
+  "trades_empty": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 1
+    },
+    "result": []
+  },
+  "trades_paginated": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 2
+    },
+    "result": [
+      "TP052",
+      "TP051",
+      "TP050",
+      "TP049",
+      "TP048",
+      "TP047",
+      "TP046",
+      "TP045",
+      "TP044",
+      "TP043",
+      "TP042",
+      "TP041",
+      "TP040",
+      "TP039",
+      "TP038",
+      "TP037",
+      "TP036",
+      "TP035",
+      "TP034",
+      "TP033",
+      "TP032",
+      "TP031",
+      "TP030",
+      "TP029",
+      "TP028",
+      "TP027",
+      "TP026",
+      "TP025",
+      "TP024",
+      "TP023",
+      "TP022",
+      "TP021",
+      "TP020",
+      "TP019",
+      "TP018",
+      "TP017",
+      "TP016",
+      "TP015",
+      "TP014",
+      "TP013",
+      "TP012",
+      "TP011",
+      "TP010",
+      "TP009",
+      "TP008",
+      "TP007",
+      "TP006",
+      "TP005",
+      "TP004",
+      "TP003",
+      "TP002",
+      "TP001",
+      "TP000"
+    ]
+  },
+  "trades_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 1
+    },
+    "result": []
+  },
+  "trades_refused_mid_pagination": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['ofs']": 2
+    },
+    "result": [
+      "TP049",
+      "TP048",
+      "TP047",
+      "TP046",
+      "TP045",
+      "TP044",
+      "TP043",
+      "TP042",
+      "TP041",
+      "TP040",
+      "TP039",
+      "TP038",
+      "TP037",
+      "TP036",
+      "TP035",
+      "TP034",
+      "TP033",
+      "TP032",
+      "TP031",
+      "TP030",
+      "TP029",
+      "TP028",
+      "TP027",
+      "TP026",
+      "TP025",
+      "TP024",
+      "TP023",
+      "TP022",
+      "TP021",
+      "TP020",
+      "TP019",
+      "TP018",
+      "TP017",
+      "TP016",
+      "TP015",
+      "TP014",
+      "TP013",
+      "TP012",
+      "TP011",
+      "TP010",
+      "TP009",
+      "TP008",
+      "TP007",
+      "TP006",
+      "TP005",
+      "TP004",
+      "TP003",
+      "TP002",
+      "TP001",
+      "TP000"
+    ]
+  },
+  "trades_windowed": {
+    "requests": {
+      "POST api.kraken.com/0/private/TradesHistory q=[] b=['end', 'ofs', 'start']": 1
+    },
+    "result": [
+      {
+        "fee": "0.0001",
+        "fee_currency": "BTC",
+        "price": "0.055",
+        "quantity": "1",
+        "side": "sell",
+        "symbol": "ETHBTC",
+        "timestamp": "2023-11-14T22:21:40+00:00",
+        "trade_id": "T2"
+      },
+      {
+        "fee": "0.48",
+        "fee_currency": "EUR",
+        "price": "3E+4",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2023-11-14T22:13:20.123400+00:00",
+        "trade_id": "T1"
+      }
+    ]
+  }
+}

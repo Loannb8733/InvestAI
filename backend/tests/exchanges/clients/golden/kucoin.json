@@ -1,0 +1,325 @@
+{
+  "balances": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=['type'] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      },
+      {
+        "free": "1E+2",
+        "locked": "0",
+        "symbol": "USDT",
+        "total": "1E+2"
+      }
+    ]
+  },
+  "balances_http_error": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=['type'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_refused": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=['type'] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_without_secret": {
+    "requests": {},
+    "result": []
+  },
+  "connection_error": {
+    "requests": {},
+    "result": null
+  },
+  "connection_http_error": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "connection_refused": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "connection_without_secret": {
+    "requests": {},
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/deposits q=['currency', 'currentPage', 'pageSize', 'startAt'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "d1",
+        "status": "success",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0xabc"
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d2",
+        "status": "processing",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d3",
+        "status": "failure",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d4",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_empty": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/deposits q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": []
+  },
+  "deposits_limited": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/deposits q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "d1",
+        "status": "success",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0xabc"
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d2",
+        "status": "processing",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_refused": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/deposits q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": []
+  },
+  "exchange_name": "KuCoin",
+  "fiat_orders": {
+    "requests": {},
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/accounts q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/fills q=['currentPage', 'endAt', 'pageSize', 'startAt', 'symbol'] b=[]": 2
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "trade_id": "t2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "ETH-USDT",
+        "timestamp": "2023-07-22T04:26:40+00:00",
+        "trade_id": "t3"
+      }
+    ]
+  },
+  "trades_http_error": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/fills q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": []
+  },
+  "trades_limited": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/fills q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_malformed": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/fills q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t4"
+      }
+    ]
+  },
+  "trades_refused": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/fills q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/withdrawals q=['currency', 'currentPage', 'pageSize', 'startAt'] b=[]": 2
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": "bc1qxyz",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "txw3",
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "failure",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w5"
+      }
+    ]
+  },
+  "withdrawals_http_error": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/withdrawals q=['currentPage', 'pageSize'] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals_limited": {
+    "requests": {
+      "GET api.kucoin.com/api/v1/withdrawals q=['currentPage', 'pageSize'] b=[]": 2
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": null,
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": "bc1qxyz",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "txw3",
+        "withdrawal_id": "w3"
+      }
+    ]
+  }
+}

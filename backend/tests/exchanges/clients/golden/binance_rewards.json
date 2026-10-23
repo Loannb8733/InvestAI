@@ -1,0 +1,118 @@
+{
+  "rewards_default_lookback_unavailable": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 52,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 78
+    },
+    "result": []
+  },
+  "rewards_locked_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 5,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 6
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BNBEUR",
+        "timestamp": "2026-09-21T14:13:24+00:00",
+        "trade_id": "reward_staking_BNB_BONUS_1790000004000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.0002",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2026-09-21T14:13:23+00:00",
+        "trade_id": "reward_staking_BTC_REALTIME_1790000003000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.0001",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2026-09-21T14:13:20+00:00",
+        "trade_id": "reward_staking_BTC_REALTIME_1790000000000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.003",
+        "side": "buy",
+        "symbol": "ETHEUR",
+        "timestamp": "2026-09-01T14:13:20+00:00",
+        "trade_id": "reward_staking_ETH_REALTIME_1788272000000"
+      }
+    ]
+  },
+  "rewards_recent_limit_ignored": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 5,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/history/rewardsRecord q=['current', 'endTime', 'size', 'startTime', 'type'] b=[]": 6
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BNBEUR",
+        "timestamp": "2026-09-21T14:13:24+00:00",
+        "trade_id": "reward_staking_BNB_BONUS_1790000004000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.0002",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2026-09-21T14:13:23+00:00",
+        "trade_id": "reward_staking_BTC_REALTIME_1790000003000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.0001",
+        "side": "buy",
+        "symbol": "BTCEUR",
+        "timestamp": "2026-09-21T14:13:20+00:00",
+        "trade_id": "reward_staking_BTC_REALTIME_1790000000000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.003",
+        "side": "buy",
+        "symbol": "ETHEUR",
+        "timestamp": "2026-09-01T14:13:20+00:00",
+        "trade_id": "reward_staking_ETH_REALTIME_1788272000000"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "EUR",
+        "price": "0",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "DOTEUR",
+        "timestamp": "2026-08-27T14:13:20+00:00",
+        "trade_id": "reward_staking_DOT_REWARDS_1787840000000"
+      }
+    ]
+  }
+}
