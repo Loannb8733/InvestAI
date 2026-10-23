@@ -74,7 +74,7 @@ class TestRandomWalkFallback:
     """Tests for _random_walk_fallback."""
 
     @pytest.fixture
-    def svc(self):
+    def svc(self, db_session):
         svc = object.__new__(PredictionService)
         return svc
 

@@ -9,6 +9,8 @@ os.environ.setdefault("SECRET_KEY", "testsecretkey_for_unit_tests_only_123456789
 os.environ.setdefault("FERNET_KEY", "icQAqvAxUzGIr5HCiFPkDICQtKw_tIwRDbCnZW0HW6M=")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
+if not os.environ.get("POSTGRES_DB", "investai").endswith("_test"):
+    os.environ["POSTGRES_DB"] = os.environ.get("POSTGRES_DB", "investai") + "_test"
 _redis_auth = f":{os.environ['REDIS_PASSWORD']}@" if os.environ.get("REDIS_PASSWORD") else ""
 os.environ.setdefault(
     "REDIS_URL",
@@ -33,11 +35,11 @@ from app.main import app
 from tests.http_stubs import HttpStub
 from tests.http_stubs import install as install_http_stub
 
-# Test database URL — only swap the database name in the path, never the username.
-# (A naive str.replace of the DB name corrupts the user when they share a substring,
-#  e.g. user "investai" + db "investai" -> both become "investai_test".)
-_url_base, _url_db = settings.DATABASE_URL.rsplit("/", 1)
-TEST_DATABASE_URL = f"{_url_base}/{_url_db}_test"
+# The application itself targets "<POSTGRES_DB>_test" (set above, before any app
+# import): code that opens its own session never reads the development database.
+TEST_DATABASE_URL = settings.DATABASE_URL
+if not TEST_DATABASE_URL.rsplit("/", 1)[1].split("?")[0].endswith("_test"):
+    raise RuntimeError("Les tests suppriment le schéma de leur base : elle doit se nommer « …_test ».")
 
 # Create test engine
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
