@@ -5,8 +5,8 @@ from typing import Any
 import httpx
 import pytest
 
-import app.services.exchanges.binance as module
-from app.services.exchanges.binance import BinanceService
+from app.domains.exchanges.connectors.binance import conversions, core, earn, fiat, trades, transfers
+from app.domains.exchanges.connectors.binance.connector import BinanceService
 from tests.exchanges.clients.harness import FROZEN_NOW, ScriptedApi, assert_golden, install, record
 
 T0 = 1_790_000_000_000
@@ -23,6 +23,7 @@ TRADE_FLOW = "/sapi/v1/convert/tradeFlow"
 AUTO_INVEST = "/sapi/v1/lending/auto-invest/history/list"
 FLEXIBLE_REWARDS = "/sapi/v1/simple-earn/flexible/history/rewardsRecord"
 LOCKED_REWARDS = "/sapi/v1/simple-earn/locked/history/rewardsRecord"
+MODULES = (core, trades, transfers, fiat, conversions, earn)
 
 
 def _ms(moment: datetime) -> int:
@@ -81,7 +82,7 @@ ACCOUNT = {
 
 
 async def test_binance_account_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, *MODULES)
     _reset(api)
     client = BinanceService("key", "secret")
     api.on("GET", "/api/v3/account", ACCOUNT)
@@ -193,7 +194,7 @@ WITHDRAWALS = [_withdrawal(s, f"2026-09-1{s} 08:30:00", address="bc1q", txId=f"t
 
 
 async def test_binance_transfers_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, *MODULES)
     _reset(api)
     client = BinanceService("key", "secret")
     api.on("GET", "/sapi/v1/capital/deposit/hisrec", DEPOSITS)
@@ -259,7 +260,7 @@ def _my_trades(request: httpx.Request) -> list[dict[str, Any]]:
 
 
 async def test_binance_trades_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, *MODULES)
     _reset(api)
     api.on("GET", "/api/v3/exchangeInfo", PAIRS)
     api.on(
@@ -402,7 +403,7 @@ INVEST_FIRST_PAGE = [_invest("FAILURE", "0", T0 - i * 1000, id=i) for i in range
 
 
 async def test_binance_conversions_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, *MODULES)
     _reset(api)
     client = BinanceService("key", "secret")
     api.on("GET", "/sapi/v1/fiat/payments", _fiat_payments)
@@ -517,7 +518,7 @@ def _rewards(table: RewardTable) -> Callable[[httpx.Request], Any]:
 
 
 async def test_binance_rewards_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, *MODULES)
     _reset(api)
     client = BinanceService("key", "secret")
     api.on("GET", FLEXIBLE_REWARDS, _rewards(FLEXIBLE_ROWS))

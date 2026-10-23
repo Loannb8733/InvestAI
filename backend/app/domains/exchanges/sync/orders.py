@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from app.domains.exchanges.connectors.base import ExchangeFiatOrder, ExchangeTrade
 from app.domains.exchanges.sync.book import Book
 from app.domains.exchanges.sync.feed import Feed
 from app.domains.exchanges.sync.pricing import TradeFx
 from app.domains.exchanges.sync.symbols import FIATS, trade_base
 from app.domains.transactions.models import TransactionType
-from app.services.exchanges.base import ExchangeFiatOrder, ExchangeTrade
 
 
 @dataclass(frozen=True)

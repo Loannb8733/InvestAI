@@ -5,8 +5,9 @@ from typing import Any
 import httpx
 import pytest
 
-import app.services.exchanges.bybit as module
-from app.services.exchanges.bybit import BybitService
+from app.domains.exchanges.connectors.bybit import trades as bybit_trades
+from app.domains.exchanges.connectors.bybit import transfers as bybit_transfers
+from app.domains.exchanges.connectors.bybit.connector import BybitService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 GLOBAL = "api.bybit.com"
@@ -118,7 +119,7 @@ DEPOSIT_ROWS = [
 
 
 async def test_bybit_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, bybit_trades, bybit_transfers)
     client = BybitService("key", "secret")
     api.on("GET", WALLET, _wallet(GLOBAL))
     api.on(

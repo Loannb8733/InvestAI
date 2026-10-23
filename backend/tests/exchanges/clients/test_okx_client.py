@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 
-import app.services.exchanges.okx as module
-from app.services.exchanges.okx import OkxService
+import app.domains.exchanges.connectors.okx as module
+from app.domains.exchanges.connectors.okx import OkxService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 OK = "0"

@@ -195,10 +195,6 @@
     "requests": {},
     "result": []
   },
-  "normalize_symbol": {
-    "BTC-USD": "BTC",
-    "ETH": "ETH"
-  },
   "test_connection": {
     "requests": {
       "GET api.coinbase.com/api/v3/brokerage/accounts q=['limit'] b=[]": 1

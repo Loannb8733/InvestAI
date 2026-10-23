@@ -1,15 +1,11 @@
-"""Bitpanda Pro exchange service."""
-
 import logging
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import httpx
 
-from app.services.exchanges.base import (
+from app.domains.exchanges.connectors.base import (
     BaseExchangeService,
     ExchangeBalance,
     ExchangeDeposit,
@@ -17,13 +13,11 @@ from app.services.exchanges.base import (
     ExchangeWithdrawal,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class BitpandaService(BaseExchangeService):
-    """Bitpanda Pro exchange integration.
-
-    Authentication uses a Bearer token (API key only, no secret required).
-    API docs: https://developers.bitpanda.com/exchange/
-    """
+    """Connecteur Bitpanda Pro, authentifié par jeton Bearer (clé API seule, sans secret)."""
 
     BASE_URL = "https://api.exchange.bitpanda.com"
 
@@ -32,14 +26,12 @@ class BitpandaService(BaseExchangeService):
         return "Bitpanda"
 
     def _get_headers(self) -> dict[str, Any]:
-        """Get request headers with Bearer token authentication."""
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
         }
 
     async def test_connection(self) -> bool:
-        """Test if the API connection is working."""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -48,12 +40,11 @@ class BitpandaService(BaseExchangeService):
                     timeout=15.0,
                 )
                 return response.status_code == 200
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Bitpanda test_connection error: {e}")
             return False
 
     async def get_balances(self) -> list[ExchangeBalance]:
-        """Get all non-zero balances from Bitpanda Pro."""
         balances = []
 
         try:
@@ -81,22 +72,18 @@ class BitpandaService(BaseExchangeService):
                             )
                         )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Bitpanda get_balances error: {e}")
 
         return balances
 
-    async def get_trades(
+    async def get_trades(  # noqa: C901
         self,
         symbol: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 500,
     ) -> list[ExchangeTrade]:
-        """Get trade history from Bitpanda Pro.
-
-        The API returns paginated results using a cursor.
-        """
         trades = []
 
         try:
@@ -153,12 +140,11 @@ class BitpandaService(BaseExchangeService):
                         )
                         collected += 1
 
-                    # Check for next page cursor
                     cursor = data.get("cursor")
                     if not cursor:
                         break
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Bitpanda get_trades error: {e}")
 
         logger.info(f"Bitpanda: Total trades found: {len(trades)}")
@@ -170,7 +156,6 @@ class BitpandaService(BaseExchangeService):
         start_time: datetime | None = None,
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
-        """Get deposit history from Bitpanda Pro."""
         deposits: list[ExchangeDeposit] = []
 
         try:
@@ -208,7 +193,7 @@ class BitpandaService(BaseExchangeService):
                         )
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Bitpanda get_deposits error: {e}")
 
         return deposits
@@ -219,7 +204,6 @@ class BitpandaService(BaseExchangeService):
         start_time: datetime | None = None,
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
-        """Get withdrawal history from Bitpanda Pro."""
         withdrawals: list[ExchangeWithdrawal] = []
 
         try:
@@ -259,7 +243,7 @@ class BitpandaService(BaseExchangeService):
                         )
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Bitpanda get_withdrawals error: {e}")
 
         return withdrawals

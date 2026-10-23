@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import DomainError, NotFoundError
 from app.core.security import encrypt_api_key
 from app.domains.exchanges.clients import crypto_portfolio, open_client
+from app.domains.exchanges.connectors.registry import SUPPORTED_EXCHANGES
 from app.domains.exchanges.failures import rollback_and_mark
 from app.domains.exchanges.models import APIKey, ColdWalletAddress
 from app.domains.exchanges.schemas import (
@@ -21,7 +22,6 @@ from app.domains.exchanges.schemas import (
 )
 from app.domains.exchanges.sync.symbols import holdings
 from app.domains.portfolio.models import Asset, AssetType
-from app.services.exchanges.registry import SUPPORTED_EXCHANGES
 
 logger = logging.getLogger(__name__)
 

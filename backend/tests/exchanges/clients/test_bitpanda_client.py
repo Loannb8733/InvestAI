@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-import app.services.exchanges.bitpanda as module
-from app.services.exchanges.bitpanda import BitpandaService
+import app.domains.exchanges.connectors.bitpanda as module
+from app.domains.exchanges.connectors.bitpanda import BitpandaService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 BALANCES = "/api/v1/account/balances"

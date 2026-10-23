@@ -7,19 +7,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import encrypt_api_key
-from app.domains.exchanges.models import APIKey, APIKeyStatus, ColdWalletAddress
-from app.domains.exchanges.sync.runner import SyncOutcome, SyncSummary, sync_account, sync_all
-from app.domains.identity.models import User
-from app.domains.market_data.prices.quote import PriceQuote
-from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.domains.transactions.models import Transaction, TransactionType
-from app.services.exchanges.base import (
+from app.domains.exchanges.connectors.base import (
     ExchangeBalance,
     ExchangeDeposit,
     ExchangeFiatOrder,
     ExchangeTrade,
     ExchangeWithdrawal,
 )
+from app.domains.exchanges.models import APIKey, APIKeyStatus, ColdWalletAddress
+from app.domains.exchanges.sync.runner import SyncOutcome, SyncSummary, sync_account, sync_all
+from app.domains.identity.models import User
+from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction, TransactionType
 from tests.conftest import TestSessionLocal
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")

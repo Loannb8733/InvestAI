@@ -5,6 +5,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from app.domains.exchanges.connectors.base import ExchangeBalance, ExchangeFiatOrder
 from app.domains.exchanges.failures import mark_failure
 from app.domains.exchanges.models import APIKey, APIKeyStatus
 from app.domains.exchanges.sync.feed import unseen_converts
@@ -21,7 +22,6 @@ from app.domains.exchanges.sync.rules import (
 )
 from app.domains.exchanges.sync.symbols import base_symbol, conversion_base, holdings, trade_base
 from app.domains.market_data.prices.quote import PriceQuote
-from app.services.exchanges.base import ExchangeBalance, ExchangeFiatOrder
 
 D = Decimal
 

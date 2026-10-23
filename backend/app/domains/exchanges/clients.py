@@ -4,10 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
+from app.domains.exchanges.connectors.base import BaseExchangeService
+from app.domains.exchanges.connectors.registry import get_exchange_service
 from app.domains.exchanges.models import APIKey
 from app.domains.portfolio.models import Portfolio
-from app.services.exchanges.base import BaseExchangeService
-from app.services.exchanges.registry import get_exchange_service
 
 CRYPTO_PORTFOLIO = "Crypto"
 CRYPTO_DESCRIPTION = "Portefeuille crypto consolidé"

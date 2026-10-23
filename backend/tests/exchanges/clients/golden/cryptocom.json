@@ -526,12 +526,6 @@
     "requests": {},
     "result": []
   },
-  "normalize_symbol": {
-    "BTC_USDT": "BTC_",
-    "CRO": "CRO",
-    "ETHBTC": "ETH",
-    "USDT": "USDT"
-  },
   "test_connection": {
     "params": [
       {}

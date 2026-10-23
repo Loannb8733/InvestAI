@@ -6,8 +6,9 @@ from urllib.parse import parse_qsl
 import httpx
 import pytest
 
-import app.services.exchanges.gateio as module
-from app.services.exchanges.gateio import GateIOService
+from app.domains.exchanges.connectors.gateio import trades as gateio_trades
+from app.domains.exchanges.connectors.gateio import transfers as gateio_transfers
+from app.domains.exchanges.connectors.gateio.connector import GateIOService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 ACCOUNTS = "/api/v4/spot/accounts"
@@ -99,7 +100,7 @@ def _withdrawal(index: int, status: str) -> dict[str, Any]:
 
 
 async def test_gateio_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, gateio_trades, gateio_transfers)
     client = GateIOService("key", "secret")
     api.on("GET", ACCOUNTS, ACCOUNT_ROWS)
     api.on("GET", MY_TRADES, _my_trades)

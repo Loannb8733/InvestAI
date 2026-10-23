@@ -8,6 +8,7 @@ from app.core.db.session import get_session
 from app.core.errors import NotFoundError
 from app.core.rate_limit import limiter
 from app.domains.exchanges import background
+from app.domains.exchanges.connectors.registry import SUPPORTED_EXCHANGES
 from app.domains.exchanges.schemas import (
     APIKeyCreate,
     APIKeyResponse,
@@ -22,7 +23,6 @@ from app.domains.exchanges.schemas import (
 )
 from app.domains.exchanges.service import ExchangeAccounts
 from app.domains.identity.dependencies import CurrentUser
-from app.services.exchanges.registry import SUPPORTED_EXCHANGES
 
 keys_router = APIRouter()
 wallets_router = APIRouter()

@@ -6,8 +6,9 @@ from urllib.parse import parse_qsl
 import httpx
 import pytest
 
-import app.services.exchanges.kraken as module
-from app.services.exchanges.kraken import KrakenService
+from app.domains.exchanges.connectors.kraken import ledgers as kraken_ledgers
+from app.domains.exchanges.connectors.kraken import trades as kraken_trades
+from app.domains.exchanges.connectors.kraken.connector import KrakenService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 SECRET = "c2VjcmV0"
@@ -116,7 +117,7 @@ LEDGER = {
 
 
 async def test_kraken_account_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, kraken_trades, kraken_ledgers)
     client = KrakenService("key", SECRET)
     api.on(
         "POST",
@@ -218,7 +219,7 @@ async def test_kraken_account_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 async def test_kraken_trades_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, kraken_trades, kraken_ledgers)
     client = KrakenService("key", SECRET)
     api.on(
         "POST",
@@ -269,7 +270,7 @@ async def test_kraken_trades_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_kraken_ledgers_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, kraken_trades, kraken_ledgers)
     client = KrakenService("key", SECRET)
     api.on("POST", "/0/private/Ledgers", _ok({"count": len(LEDGER), "ledger": LEDGER}))
     observed = {
@@ -308,7 +309,7 @@ async def test_kraken_ledgers_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 async def test_kraken_ledger_derived_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, kraken_trades, kraken_ledgers)
     client = KrakenService("key", SECRET)
     api.on("POST", "/0/private/Ledgers", _ok({"count": len(LEDGER), "ledger": LEDGER}))
     ledgers = await client.get_ledgers()

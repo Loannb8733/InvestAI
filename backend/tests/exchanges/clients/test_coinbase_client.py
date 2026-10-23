@@ -5,8 +5,9 @@ from typing import Any
 import httpx
 import pytest
 
-import app.services.exchanges.coinbase as module
-from app.services.exchanges.coinbase import CoinbaseService
+import app.domains.exchanges.connectors.coinbase.movements as movements_module
+import app.domains.exchanges.connectors.coinbase.trades as trades_module
+from app.domains.exchanges.connectors.coinbase.connector import CoinbaseService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 ACCOUNTS = "/api/v3/brokerage/accounts"
@@ -100,7 +101,7 @@ BTC_WITHDRAWALS = {
 
 
 async def test_coinbase_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, trades_module, movements_module)
     client = CoinbaseService("key", "secret")
     api.on("GET", ACCOUNTS, _by_cursor(ACCOUNT_PAGES))
     api.on("GET", FILLS, _by_cursor(FILL_PAGES))
@@ -132,7 +133,6 @@ async def test_coinbase_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     observed = {
         "exchange_name": client.exchange_name,
-        "normalize_symbol": {s: client.normalize_symbol(s) for s in ("BTC-USD", "ETH")},
         "test_connection": await record(api, client.test_connection),
         "connection_error": await record(api, client.connection_error),
         "balances": await record(api, client.get_balances),

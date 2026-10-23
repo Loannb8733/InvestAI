@@ -6,8 +6,8 @@ from urllib.parse import parse_qsl
 import httpx
 import pytest
 
-import app.services.exchanges.bitstamp as module
-from app.services.exchanges.bitstamp import BitstampService
+from app.domains.exchanges.connectors.bitstamp import movements, trades
+from app.domains.exchanges.connectors.bitstamp.connector import BitstampService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 BALANCE = "/api/v2/balance/"
@@ -70,7 +70,7 @@ OLDER = [
 
 
 async def test_bitstamp_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, trades, movements)
     client = BitstampService("key", "secret")
     api.on("POST", BALANCE, BALANCE_SHEET)
     api.on("POST", LEDGER, _ledger({0: RECENT, PAGE_SIZE: OLDER}))

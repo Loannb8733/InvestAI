@@ -1,14 +1,14 @@
-from app.services.exchanges.base import BaseExchangeService
-from app.services.exchanges.binance import BinanceService
-from app.services.exchanges.bitpanda import BitpandaService
-from app.services.exchanges.bitstamp import BitstampService
-from app.services.exchanges.bybit import BybitService
-from app.services.exchanges.coinbase import CoinbaseService
-from app.services.exchanges.cryptocom import CryptoComService
-from app.services.exchanges.gateio import GateIOService
-from app.services.exchanges.kraken import KrakenService
-from app.services.exchanges.kucoin import KuCoinService
-from app.services.exchanges.okx import OkxService
+from app.domains.exchanges.connectors.base import BaseExchangeService
+from app.domains.exchanges.connectors.binance.connector import BinanceService
+from app.domains.exchanges.connectors.bitpanda import BitpandaService
+from app.domains.exchanges.connectors.bitstamp.connector import BitstampService
+from app.domains.exchanges.connectors.bybit.connector import BybitService
+from app.domains.exchanges.connectors.coinbase.connector import CoinbaseService
+from app.domains.exchanges.connectors.cryptocom.connector import CryptoComService
+from app.domains.exchanges.connectors.gateio.connector import GateIOService
+from app.domains.exchanges.connectors.kraken.connector import KrakenService
+from app.domains.exchanges.connectors.kucoin.connector import KuCoinService
+from app.domains.exchanges.connectors.okx import OkxService
 
 EXCHANGE_SERVICES: dict[str, type[BaseExchangeService]] = {
     "binance": BinanceService,

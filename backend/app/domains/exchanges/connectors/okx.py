@@ -1,5 +1,3 @@
-"""OKX exchange service."""
-
 import base64
 import hashlib
 import hmac
@@ -8,11 +6,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import httpx
 
-from app.services.exchanges.base import (
+from app.domains.exchanges.connectors.base import (
     BaseExchangeService,
     ExchangeBalance,
     ExchangeDeposit,
@@ -20,9 +16,11 @@ from app.services.exchanges.base import (
     ExchangeWithdrawal,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class OkxService(BaseExchangeService):
-    """OKX exchange integration (API v5)."""
+    """Connecteur OKX (API v5)."""
 
     BASE_URL = "https://www.okx.com"
 
@@ -31,14 +29,9 @@ class OkxService(BaseExchangeService):
         return "OKX"
 
     def _get_timestamp(self) -> str:
-        """Get current timestamp in ISO 8601 format for OKX."""
         return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     def _sign_request(self, timestamp: str, method: str, request_path: str, body: str = "") -> str:
-        """Sign a request with HMAC SHA256 + base64.
-
-        OKX signature: base64(HMAC_SHA256(timestamp + method + requestPath + body))
-        """
         pre_sign = f"{timestamp}{method}{request_path}{body}"
         signature = hmac.new(
             self._require_secret_key().encode("utf-8"),
@@ -48,7 +41,6 @@ class OkxService(BaseExchangeService):
         return base64.b64encode(signature).decode("utf-8")
 
     def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict[str, Any]:
-        """Get request headers with authentication."""
         signature = self._sign_request(timestamp, method, request_path, body)
         return {
             "OK-ACCESS-KEY": self.api_key,
@@ -59,39 +51,30 @@ class OkxService(BaseExchangeService):
         }
 
     def _get_http_client(self, timeout: float = 30.0) -> httpx.AsyncClient:
-        """Create HTTP client for OKX API."""
         return httpx.AsyncClient(timeout=timeout)
 
     async def test_connection(self) -> bool:
-        """Test if the API connection is working."""
         try:
             async with self._get_http_client(timeout=15.0) as client:
                 request_path = "/api/v5/account/balance"
                 timestamp = self._get_timestamp()
                 headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(
-                    f"{self.BASE_URL}{request_path}",
-                    headers=headers,
-                )
+                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
                 data = response.json()
                 connected: bool = data.get("code") == "0"
                 return connected
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OKX test_connection error: {e}")
             return False
 
     async def get_balances(self) -> list[ExchangeBalance]:
-        """Get all non-zero balances from OKX."""
         balances: list[ExchangeBalance] = []
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/account/balance"
                 timestamp = self._get_timestamp()
                 headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(
-                    f"{self.BASE_URL}{request_path}",
-                    headers=headers,
-                )
+                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
                 response.raise_for_status()
                 data = response.json()
 
@@ -117,19 +100,18 @@ class OkxService(BaseExchangeService):
                                 )
                             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OKX get_balances error: {e}")
 
         return balances
 
-    async def get_trades(
+    async def get_trades(  # noqa: C901
         self,
         symbol: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 500,
     ) -> list[ExchangeTrade]:
-        """Get trade history from OKX."""
         all_trades = []
         try:
             async with self._get_http_client() as client:
@@ -150,10 +132,7 @@ class OkxService(BaseExchangeService):
 
                     timestamp = self._get_timestamp()
                     headers = self._get_headers(timestamp, "GET", request_path)
-                    response = await client.get(
-                        f"{self.BASE_URL}{request_path}",
-                        headers=headers,
-                    )
+                    response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
                     response.raise_for_status()
                     data = response.json()
 
@@ -183,13 +162,12 @@ class OkxService(BaseExchangeService):
                         )
                         fetched += 1
 
-                    # Use the last billId for pagination (OKX uses billId as cursor)
                     last_bill_id = trades_list[-1].get("billId", "")
                     if not last_bill_id:
                         break
                     after = last_bill_id
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OKX get_trades error: {e}")
 
         logger.info(f"OKX: Total trades found: {len(all_trades)}")
@@ -201,7 +179,6 @@ class OkxService(BaseExchangeService):
         start_time: datetime | None = None,
         limit: int = 100,
     ) -> list[ExchangeDeposit]:
-        """Get deposit history from OKX."""
         deposits: list[ExchangeDeposit] = []
         try:
             async with self._get_http_client() as client:
@@ -218,10 +195,7 @@ class OkxService(BaseExchangeService):
 
                 timestamp = self._get_timestamp()
                 headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(
-                    f"{self.BASE_URL}{request_path}",
-                    headers=headers,
-                )
+                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
                 response.raise_for_status()
                 data = response.json()
 
@@ -229,7 +203,6 @@ class OkxService(BaseExchangeService):
                     logger.error(f"OKX get_deposits error: {data.get('msg')}")
                     return deposits
 
-                # OKX deposit status mapping
                 status_map = {
                     "0": "pending",
                     "1": "pending",
@@ -253,7 +226,7 @@ class OkxService(BaseExchangeService):
                         )
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OKX get_deposits error: {e}")
 
         return deposits
@@ -264,7 +237,6 @@ class OkxService(BaseExchangeService):
         start_time: datetime | None = None,
         limit: int = 100,
     ) -> list[ExchangeWithdrawal]:
-        """Get withdrawal history from OKX."""
         withdrawals: list[ExchangeWithdrawal] = []
         try:
             async with self._get_http_client() as client:
@@ -281,10 +253,7 @@ class OkxService(BaseExchangeService):
 
                 timestamp = self._get_timestamp()
                 headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(
-                    f"{self.BASE_URL}{request_path}",
-                    headers=headers,
-                )
+                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
                 response.raise_for_status()
                 data = response.json()
 
@@ -292,7 +261,6 @@ class OkxService(BaseExchangeService):
                     logger.error(f"OKX get_withdrawals error: {data.get('msg')}")
                     return withdrawals
 
-                # OKX withdrawal status mapping
                 status_map = {
                     "-3": "pending",
                     "-2": "cancelled",
@@ -320,7 +288,7 @@ class OkxService(BaseExchangeService):
                         )
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OKX get_withdrawals error: {e}")
 
         return withdrawals

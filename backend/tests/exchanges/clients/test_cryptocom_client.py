@@ -6,8 +6,8 @@ from typing import Any
 import httpx
 import pytest
 
-import app.services.exchanges.cryptocom as module
-from app.services.exchanges.cryptocom import CryptoComService
+from app.domains.exchanges.connectors.cryptocom import movements, trades
+from app.domains.exchanges.connectors.cryptocom.connector import CryptoComService
 from tests.exchanges.clients.harness import ScriptedApi, assert_golden, install, record
 
 SUMMARY = "/v2/private/get-account-summary"
@@ -127,7 +127,7 @@ WITHDRAWAL_LIST = {
 
 
 async def test_cryptocom_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = CryptoComApi(install(monkeypatch, module))
+    api = CryptoComApi(install(monkeypatch, trades, movements))
     client = CryptoComService("key", "secret")
     api.on(SUMMARY, ACCOUNTS)
     api.on(TRADES, EMPTY_TRADES, TRADE_ANSWERS)
@@ -135,7 +135,6 @@ async def test_cryptocom_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> No
     api.on(WITHDRAWALS, WITHDRAWAL_LIST)
     observed: dict[str, Any] = {
         "exchange_name": client.exchange_name,
-        "normalize_symbol": {s: client.normalize_symbol(s) for s in ("BTC_USDT", "ETHBTC", "CRO", "USDT")},
         "connection_error": await api.observe(client.connection_error),
         "fiat_orders": await api.observe(client.get_fiat_orders),
         "test_connection": await api.observe(client.test_connection),

@@ -5,8 +5,9 @@ from typing import Any
 import httpx
 import pytest
 
-import app.services.exchanges.kucoin as module
-from app.services.exchanges.kucoin import KuCoinService
+import app.domains.exchanges.connectors.kucoin.movements as movements_module
+import app.domains.exchanges.connectors.kucoin.trades as trades_module
+from app.domains.exchanges.connectors.kucoin.connector import KuCoinService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
 OK = "200000"
@@ -61,7 +62,7 @@ def _withdrawal(key: str, status: str, **extra: Any) -> dict[str, Any]:
 
 
 async def test_kucoin_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, trades_module, movements_module)
     client = KuCoinService("key", "secret", "pass")
     api.on(
         "GET",
@@ -110,7 +111,6 @@ async def test_kucoin_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     observed = {
         "exchange_name": client.exchange_name,
-        "normalize_symbol": {s: client.normalize_symbol(s) for s in ("BTC-USDT", "ETH")},
         "test_connection": await record(api, client.test_connection),
         "connection_error": await record(api, client.connection_error),
         "balances": await record(api, client.get_balances),

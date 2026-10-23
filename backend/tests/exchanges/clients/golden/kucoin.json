@@ -133,10 +133,6 @@
     "requests": {},
     "result": []
   },
-  "normalize_symbol": {
-    "BTC-USDT": "BTC",
-    "ETH": "ETH"
-  },
   "test_connection": {
     "requests": {
       "GET api.kucoin.com/api/v1/accounts q=[] b=[]": 1

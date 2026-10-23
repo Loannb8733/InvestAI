@@ -14,7 +14,7 @@ Ces tests épinglent le comportement actuel, replis compris.
 
 import pytest
 
-from app.services.exchanges.kraken import KrakenService
+from app.domains.exchanges.connectors.kraken.connector import KrakenService
 
 
 @pytest.fixture
