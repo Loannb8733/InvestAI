@@ -16,7 +16,7 @@ from app.domains.transactions import ledger
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
 from app.domains.transactions.schemas import CsvImportResult
-from app.domains.transactions.transfers import create_mirror_transfer_in
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.services.csv_parsers import detect_csv_format, get_parser_by_name
 
 logger = logging.getLogger(__name__)
@@ -138,8 +138,11 @@ class CsvImporter:
         self._transactions.add(transaction)
         asset.quantity = ledger.moved(asset.quantity, kind, quantity)
         batch.touched[asset.id] = asset
-        if kind == TransactionType.TRANSFER_OUT and batch.destination:
-            await create_mirror_transfer_in(self._session, transaction, asset, batch.destination)
+        if kind == TransactionType.TRANSFER_OUT:
+            await self._transactions.flush()
+            await create_mirror_transfer_in(
+                self._session, transaction, asset, batch.destination or COLD_WALLET_DESTINATION
+            )
         await self._transactions.flush()
         batch.created.append(transaction.id)
 

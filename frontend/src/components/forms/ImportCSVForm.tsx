@@ -228,12 +228,12 @@ export default function ImportCSVForm({
         <PlatformSelect
           value={destinationExchange}
           onChange={setDestinationExchange}
-          placeholder="Aucune (optionnel)"
+          placeholder="Wallet froid par défaut (Tangem)"
           showTrustBadge={false}
         />
         <p className="text-xs text-muted-foreground">
-          Si vos transferts sortants vont vers un cold wallet, sélectionnez-le ici
-          pour créer automatiquement les transferts entrants correspondants.
+          Chaque transfert sortant crée le transfert entrant correspondant sur cette
+          plateforme, ou sur le wallet froid par défaut (Tangem) si aucune n'est choisie.
         </p>
       </div>
 

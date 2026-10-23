@@ -8,9 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.core.config import settings
 from app.core.db.metadata import metadata
 from app.core.db.session import engine
-from app.core.startup.multiplatform import fix_multiplatform_assets
-from app.core.startup.rehash import rehash_transactions_internal_hash
-from app.core.startup.transfer_mirrors import create_missing_transfer_mirrors
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +72,7 @@ def run_alembic_upgrade() -> None:
 
 
 async def run_startup_migrations() -> None:
-    """Migrations, création des tables manquantes et auto-réparations, sous verrou de démarrage."""
+    """Migrations et création des tables manquantes, sous verrou de démarrage."""
     async with boot_advisory_lock(BOOT_LOCK_KEY):
         run_alembic_upgrade()
         async with engine.begin() as conn:
@@ -83,6 +80,3 @@ async def run_startup_migrations() -> None:
             await conn.execute(
                 text("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS cash_balances JSON NOT NULL DEFAULT '{}'")
             )
-        fix_multiplatform_assets()
-        create_missing_transfer_mirrors()
-        await rehash_transactions_internal_hash()

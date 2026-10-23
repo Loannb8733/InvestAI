@@ -266,17 +266,18 @@ gérées (500 journalisée, détail masqué en production) et le dépassement de
 (`create_app`). `core/http/` porte les middlewares (enregistrés dans le même ordre
 qu'avant : journalisation, GZip, CORS, en-têtes de sécurité, invalidation du cache du
 dashboard), `core/health.py` les sondes, `core/startup/` le verrou de démarrage,
-Alembic puis `create_all`, puis trois **auto-réparations idempotentes** :
+Alembic puis `create_all`.
 
-| Auto-réparation | Ce qu'elle répare | Chemins d'écriture qui produisent encore ces données (2026-10-19) |
+Trois **auto-réparations** y tournaient à chaque démarrage jusqu'au 2026-10-23 ;
+leurs sources ont été corrigées une à une, puis elles ont été jouées une dernière
+fois par la migration de données `f7a2c9d1e3b4` (logique figée dans la migration)
+et retirées du démarrage :
+
+| Auto-réparation | Ce qu'elle réparait | Correction à la source |
 |---|---|---|
-| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | aucun : corrigé pour `PATCH` et l'import CSV le 2026-10-22 ; la synchronisation (`domains/exchanges/sync`) adopte l'actif sans plateforme et inscrit la sienne sur chaque écriture depuis le 2026-10-23 |
-| `transfer_mirrors` | `TRANSFER_OUT` sans miroir valide, hors notes d'ajustement interne (incident Tangem du 2026-06-07 : 5 positions fantômes) | sortie manuelle ou CSV sans destination ; un échec du miroir annule toute la synchronisation depuis le 2026-10-23 ; `PATCH` du type d'un transfert relié refusé depuis le 2026-10-22 |
-| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` en libérant avant d'occuper (ordre des UPDATE, 2026-09-10) | aucun : import d'historique supprimé le 2026-10-23 (la synchronisation calcule l'empreinte de chaque écriture) ; `PATCH` corrigé le 2026-10-22 (empreinte recalculée, 409 sur doublon) |
-
-Elles restent au démarrage tant que ces chemins existent : en faire des migrations à
-usage unique changerait le comportement. Elles disparaîtront quand les domaines
-`transactions` et `exchanges` corrigeront ces écritures à la source.
+| `multiplatform` | transaction dont la plateforme diffère de celle de son actif | `PATCH` et import CSV (2026-10-22) ; la synchronisation adopte l'actif sans plateforme et inscrit la sienne sur chaque écriture ; changer la plateforme d'un actif y emmène ses transactions (2026-10-23) |
+| `transfer_mirrors` | `TRANSFER_OUT` sans miroir, hors notes d'ajustement interne (incident Tangem du 2026-06-07) | toute sortie saisie, importée ou devenue sortie par `PATCH` reçoit son miroir à l'écriture, sur la destination choisie ou le wallet froid par défaut (décision utilisateur du 2026-10-23) ; un échec du miroir annule la synchronisation ; une sortie du wallet par défaut lui-même n'a pas de miroir ; supprimer l'actif de destination ne le recrée plus |
+| `rehash` | `internal_hash` absent ou périmé, collisions mises à `NULL` | `PATCH` (2026-10-22) ; import d'historique supprimé, chaque écriture de la synchronisation calcule son empreinte (2026-10-23) |
 
 **Conséquences connues, non traitées ici :**
 - 13 index créés par des migrations ne sont déclarés dans aucun modèle : une base neuve

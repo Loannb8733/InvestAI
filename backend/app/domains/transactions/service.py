@@ -12,7 +12,7 @@ from app.domains.transactions import ledger
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
 from app.domains.transactions.schemas import TransactionCreate, TransactionUpdate
-from app.domains.transactions.transfers import create_mirror_transfer_in
+from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
 from app.services.audit_service import log_audit
 
 TRANSACTION_NOT_FOUND = "Transaction non trouvée"
@@ -111,8 +111,9 @@ class TransactionService:
         self._transactions.add(transaction)
         asset.quantity = ledger.moved(asset.quantity, transaction.transaction_type, quantity)
         await self._refresh_cost_basis(asset)
-        if data.destination_exchange and data.transaction_type == TransactionType.TRANSFER_OUT:
-            await create_mirror_transfer_in(self._session, transaction, asset, data.destination_exchange.strip())
+        if data.transaction_type == TransactionType.TRANSFER_OUT:
+            destination = (data.destination_exchange or "").strip() or COLD_WALLET_DESTINATION
+            await create_mirror_transfer_in(self._session, transaction, asset, destination)
         await self._audit(
             requester,
             "transaction.create",
@@ -153,6 +154,9 @@ class TransactionService:
         await self._rehash(transaction)
         if "quantity" in changes and transaction.related_transaction_id:
             await self._resize_mirror(transaction)
+        if changes.get("transaction_type") == TransactionType.TRANSFER_OUT and not transaction.related_transaction_id:
+            await self._transactions.flush()
+            await create_mirror_transfer_in(self._session, transaction, target, COLD_WALLET_DESTINATION)
         await self._refresh_cost_basis(*{source.id: source, target.id: target}.values())
         await self._audit(
             requester,

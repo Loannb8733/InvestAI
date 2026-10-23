@@ -66,6 +66,8 @@ async def create_mirror_transfer_in(
     doublé. Le miroir porte le prix de revient de la source, qui se propage ainsi
     à la destination.
     """
+    if destination_exchange.strip().lower() == (source_asset.exchange or "").strip().lower():
+        return None
     destination = await AssetRepository(session).on_platform(source_asset, destination_exchange)
     symbol = source_asset.symbol.upper()
     quantity = mirror_received_qty(

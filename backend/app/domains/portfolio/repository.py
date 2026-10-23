@@ -2,10 +2,11 @@ from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.models import Transaction
 
 
 class PortfolioRepository:
@@ -87,6 +88,14 @@ class AssetRepository:
         self._session.add(created)
         await self._session.flush()
         return created
+
+    async def relabel_transactions(self, asset: Asset, exchange: str) -> None:
+        """Les transactions qui nomment leur plateforme suivent l'actif sur sa nouvelle plateforme."""
+        await self._session.execute(
+            update(Transaction)
+            .where(Transaction.asset_id == asset.id, func.coalesce(func.trim(Transaction.exchange), "") != "")
+            .values(exchange=exchange or None)
+        )
 
     async def by_id(self, asset_id: UUID) -> Asset:
         return await self._session.get_one(Asset, asset_id)

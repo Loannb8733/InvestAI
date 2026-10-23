@@ -605,7 +605,8 @@ export default function AddTransactionForm({
               showTrustBadge
             />
             <p className="text-[10px] text-muted-foreground">
-              Un transfert entrant sera créé automatiquement sur la destination
+              Un transfert entrant sera créé automatiquement sur la destination ; sans destination, sur le
+              wallet froid par défaut (Tangem)
             </p>
           </div>
         )}

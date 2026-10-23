@@ -109,6 +109,8 @@ class AssetService:
         changes = data.model_dump(exclude_unset=True)
         if "exchange" in changes and changes["exchange"] is None:
             changes["exchange"] = ""
+        if "exchange" in changes and changes["exchange"] != asset.exchange:
+            await self._assets.relabel_transactions(asset, changes["exchange"])
         for field, value in changes.items():
             setattr(asset, field, value)
         return await self._assets.save(asset)
