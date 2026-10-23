@@ -74,7 +74,11 @@ class BybitTrades(BybitCore):
                             )
                         )
                         fetched += 1
+                        if fetched >= limit:
+                            break
 
+                    if fetched >= limit:
+                        break
                     next_cursor = result.get("nextPageCursor", "")
                     if not next_cursor:
                         break

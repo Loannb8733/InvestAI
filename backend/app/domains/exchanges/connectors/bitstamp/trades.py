@@ -65,7 +65,7 @@ class BitstampTrades(BitstampCore):
         sold_amount = Decimal("0")
 
         for key, value in tx.items():
-            if key in ("id", "type", "datetime", "fee", "order_id"):
+            if key in ("id", "type", "datetime", "fee", "order_id") or "_" in key:
                 continue
 
             try:

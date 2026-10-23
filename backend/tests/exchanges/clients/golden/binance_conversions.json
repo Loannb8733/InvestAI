@@ -27,6 +27,18 @@
         "side": "buy",
         "status": "Completed",
         "timestamp": "2026-09-21T14:13:21+00:00"
+      },
+      {
+        "crypto_amount": "0.0016",
+        "crypto_symbol": "BTC",
+        "fee": "0.1",
+        "fiat_amount": "1E+2",
+        "fiat_currency": "USDT",
+        "order_id": "autoinvest_504",
+        "price": "6.25E+4",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:24+00:00"
       }
     ]
   },
@@ -58,6 +70,18 @@
         "side": "buy",
         "status": "Completed",
         "timestamp": "2026-09-21T14:13:21+00:00"
+      },
+      {
+        "crypto_amount": "0.0016",
+        "crypto_symbol": "BTC",
+        "fee": "0.1",
+        "fiat_amount": "1E+2",
+        "fiat_currency": "USDT",
+        "order_id": "autoinvest_504",
+        "price": "6.25E+4",
+        "side": "buy",
+        "status": "Completed",
+        "timestamp": "2026-09-21T14:13:24+00:00"
       },
       {
         "crypto_amount": "0.001",
@@ -159,11 +183,10 @@
   },
   "crypto_conversions_aware_start_only": {
     "requests": {
-      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/convert/tradeFlow q=['endTime', 'limit', 'startTime'] b=[]": 2
     },
-    "result": {
-      "raised": "TypeError"
-    }
+    "result": []
   },
   "crypto_conversions_default_range": {
     "requests": {
@@ -310,11 +333,10 @@
   },
   "fiat_orders_aware_start_only": {
     "requests": {
-      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/fiat/payments q=['beginTime', 'endTime', 'page', 'rows', 'transactionType'] b=[]": 4
     },
-    "result": {
-      "raised": "TypeError"
-    }
+    "result": []
   },
   "fiat_orders_default_range_refused": {
     "requests": {

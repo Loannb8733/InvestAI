@@ -162,10 +162,10 @@
       {
         "fee": "1.48",
         "fee_currency": "USD",
-        "price": "0.02",
-        "quantity": "3.7E+4",
+        "price": "3.7E+4",
+        "quantity": "0.02",
         "side": "buy",
-        "symbol": "BTC_USD_USD",
+        "symbol": "BTC_USD",
         "timestamp": "2023-11-11T08:00:00",
         "trade_id": "4"
       },
@@ -271,10 +271,10 @@
       {
         "fee": "1.48",
         "fee_currency": "USD",
-        "price": "0.02",
-        "quantity": "3.7E+4",
+        "price": "3.7E+4",
+        "quantity": "0.02",
         "side": "buy",
-        "symbol": "BTC_USD_USD",
+        "symbol": "BTC_USD",
         "timestamp": "2023-11-11T08:00:00",
         "trade_id": "4"
       }

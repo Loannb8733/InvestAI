@@ -309,16 +309,6 @@
         "symbol": "BTCUSDT",
         "timestamp": "2023-07-22T04:26:40+00:00",
         "trade_id": "t3"
-      },
-      {
-        "fee": "0",
-        "fee_currency": "",
-        "price": "0",
-        "quantity": "0",
-        "side": "buy",
-        "symbol": "",
-        "timestamp": "1970-01-01T00:00:00+00:00",
-        "trade_id": "t4"
       }
     ]
   },
