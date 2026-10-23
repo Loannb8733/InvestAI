@@ -1,0 +1,215 @@
+{
+  "balances": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "1250.43",
+        "locked": "0",
+        "symbol": "EUR",
+        "total": "1250.43"
+      },
+      {
+        "free": "1.2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "1.2"
+      },
+      {
+        "free": "3",
+        "locked": "0",
+        "symbol": "SOL",
+        "total": "3"
+      },
+      {
+        "free": "1E+2",
+        "locked": "0",
+        "symbol": "ADA",
+        "total": "1E+2"
+      },
+      {
+        "free": "1E+1",
+        "locked": "0",
+        "symbol": "DOGE",
+        "total": "1E+1"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "MLN",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_empty": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "balances_http_error": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "HTTPStatusError"
+    }
+  },
+  "balances_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "Exception"
+    }
+  },
+  "balances_without_secret": {
+    "requests": {},
+    "result": {
+      "raised": "ValueError"
+    }
+  },
+  "connection_http_error": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "connection_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "connection_without_secret": {
+    "requests": {},
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "POST api.kraken.com/0/private/DepositStatus q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "5E+2",
+        "deposit_id": "D1",
+        "status": "Success",
+        "symbol": "EUR",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "TX1"
+      },
+      {
+        "amount": "0.05",
+        "deposit_id": "",
+        "status": "Settled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:30:00+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1E+2",
+        "deposit_id": "D3",
+        "status": "Failure",
+        "symbol": "ADA",
+        "timestamp": "2023-11-03T08:26:40+00:00",
+        "tx_id": "TX3"
+      }
+    ]
+  },
+  "deposits_empty": {
+    "requests": {
+      "POST api.kraken.com/0/private/DepositStatus q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "deposits_filtered": {
+    "requests": {
+      "POST api.kraken.com/0/private/DepositStatus q=[] b=['asset']": 1
+    },
+    "result": [
+      {
+        "amount": "5E+2",
+        "deposit_id": "D1",
+        "status": "Success",
+        "symbol": "EUR",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "TX1"
+      }
+    ]
+  },
+  "deposits_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/DepositStatus q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "test_connection": {
+    "requests": {
+      "POST api.kraken.com/0/private/Balance q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "withdrawals": {
+    "requests": {
+      "POST api.kraken.com/0/private/WithdrawStatus q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.5",
+        "fee": "0.0035",
+        "status": "Success",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:46:40+00:00",
+        "tx_id": "0xabc",
+        "withdrawal_id": "W1"
+      },
+      {
+        "address": null,
+        "amount": "12",
+        "fee": "0",
+        "status": "Pending",
+        "symbol": "DOT",
+        "timestamp": "2023-11-14T23:03:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": ""
+      }
+    ]
+  },
+  "withdrawals_empty": {
+    "requests": {
+      "POST api.kraken.com/0/private/WithdrawStatus q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "withdrawals_filtered": {
+    "requests": {
+      "POST api.kraken.com/0/private/WithdrawStatus q=[] b=['asset']": 1
+    },
+    "result": [
+      {
+        "address": null,
+        "amount": "0.5",
+        "fee": "0.0035",
+        "status": "Success",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:46:40+00:00",
+        "tx_id": "0xabc",
+        "withdrawal_id": "W1"
+      }
+    ]
+  },
+  "withdrawals_refused": {
+    "requests": {
+      "POST api.kraken.com/0/private/WithdrawStatus q=[] b=[]": 1
+    },
+    "result": []
+  }
+}

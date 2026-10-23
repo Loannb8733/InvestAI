@@ -1,0 +1,121 @@
+{
+  "balances": {
+    "requests": {
+      "GET www.okx.com/api/v5/account/balance q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      }
+    ]
+  },
+  "balances_refused": {
+    "requests": {
+      "GET www.okx.com/api/v5/account/balance q=[] b=[]": 1
+    },
+    "result": []
+  },
+  "connection_refused": {
+    "requests": {
+      "GET www.okx.com/api/v5/account/balance q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "deposits": {
+    "requests": {
+      "GET www.okx.com/api/v5/asset/deposit-history q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "d1",
+        "status": "success",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0xabc"
+      },
+      {
+        "amount": "2",
+        "deposit_id": "d2",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "test_connection": {
+    "requests": {
+      "GET www.okx.com/api/v5/account/balance q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "requests": {
+      "GET www.okx.com/api/v5/trade/fills-history q=['after', 'instType', 'limit'] b=[]": 1,
+      "GET www.okx.com/api/v5/trade/fills-history q=['instType', 'limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "sell",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "trade_id": "t2"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      },
+      {
+        "fee": "0.6",
+        "fee_currency": "USDT",
+        "price": "60000.5",
+        "quantity": "0.01",
+        "side": "buy",
+        "symbol": "BTC-USDT",
+        "timestamp": "2023-07-22T04:26:40+00:00",
+        "trade_id": "t3"
+      }
+    ]
+  },
+  "withdrawals": {
+    "requests": {
+      "GET www.okx.com/api/v5/asset/withdrawal-history q=['limit'] b=[]": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "0.2",
+        "fee": "0.0001",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "tx",
+        "withdrawal_id": "w1"
+      },
+      {
+        "address": null,
+        "amount": "0.3",
+        "fee": "0",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w2"
+      }
+    ]
+  }
+}

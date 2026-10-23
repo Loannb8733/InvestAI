@@ -1,0 +1,961 @@
+{
+  "balances": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": [
+      {
+        "free": "0.4",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.5"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      },
+      {
+        "free": "0",
+        "locked": "1E+3",
+        "symbol": "CRO",
+        "total": "1E+3"
+      },
+      {
+        "free": "1.5",
+        "locked": "1.5",
+        "symbol": "SOL",
+        "total": "3"
+      },
+      {
+        "free": "1.5E+2",
+        "locked": "0",
+        "symbol": "EUR",
+        "total": "1.5E+2"
+      }
+    ]
+  },
+  "balances_http_error": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "balances_refused": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "balances_without_result": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "connection_error": {
+    "params": [],
+    "requests": {},
+    "result": null
+  },
+  "connection_http_error": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": false
+  },
+  "connection_refused": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": false
+  },
+  "connection_string_code": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": false
+  },
+  "conversions": {
+    "params": [
+      {
+        "instrument_name": "BTC_CRO",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "BTC_ETH",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "BTC_SOL",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "BTC_USDC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "BTC_USDT",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "CRO_BTC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "CRO_ETH",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "CRO_SOL",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "CRO_USDC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "CRO_USDT",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "ETH_BTC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "ETH_CRO",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "ETH_SOL",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "ETH_USDC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "ETH_USDT",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "SOL_BTC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "SOL_CRO",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "SOL_ETH",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDC_BTC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDC_CRO",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDC_ETH",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDC_USDT",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDT_BTC",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDT_CRO",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDT_ETH",
+        "page_size": 50
+      },
+      {
+        "instrument_name": "USDT_USDC",
+        "page_size": 50
+      },
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1,
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 26
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "USDC_USDT",
+        "timestamp": "2023-11-14T22:20:40+00:00",
+        "trade_id": "convert_42"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "sell",
+        "symbol": "BTC_ETH",
+        "timestamp": "2023-11-14T22:20:30+00:00",
+        "trade_id": "convert_t8"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "sell",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:18:20+00:00",
+        "trade_id": "convert_2"
+      },
+      {
+        "fee": "0.0001",
+        "fee_currency": "BTC",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "ETH_BTC",
+        "timestamp": "2023-11-14T22:16:40+00:00",
+        "trade_id": "convert_t3"
+      },
+      {
+        "fee": "0.15",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "convert_t1"
+      }
+    ]
+  },
+  "conversions_without_balances": {
+    "params": [
+      {
+        "instrument_name": "BTC_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_ETH",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USDC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_ETH",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_USDC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_USDC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDC_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDC_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDC_ETH",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDC_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_ETH",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_USDC",
+        "page_size": 200
+      },
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1,
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 20
+    },
+    "result": []
+  },
+  "deposits": {
+    "params": [
+      {
+        "currency": "ETH",
+        "page_size": 200,
+        "start_ts": 1788220800000
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-deposit-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "11",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0xa"
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d2",
+        "status": "processing",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "0.25",
+        "deposit_id": "d3",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d4",
+        "status": "failed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d6",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d7",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_default": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-deposit-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": [
+      {
+        "amount": "1.5",
+        "deposit_id": "11",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "0xa"
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d2",
+        "status": "processing",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "0.25",
+        "deposit_id": "d3",
+        "status": "completed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d4",
+        "status": "failed",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d6",
+        "status": "pending",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      },
+      {
+        "amount": "1.5",
+        "deposit_id": "d7",
+        "status": "unknown",
+        "symbol": "ETH",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null
+      }
+    ]
+  },
+  "deposits_empty": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-deposit-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "deposits_not_scripted": {
+    "params": [],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-deposit-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "deposits_refused": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-deposit-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "exchange_name": "Crypto.com",
+  "fiat_orders": {
+    "params": [],
+    "requests": {},
+    "result": []
+  },
+  "normalize_symbol": {
+    "BTC_USDT": "BTC_",
+    "CRO": "CRO",
+    "ETHBTC": "ETH",
+    "USDT": "USDT"
+  },
+  "test_connection": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": true
+  },
+  "trades": {
+    "params": [
+      {
+        "instrument_name": "BTC_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USD",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_USD",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "CRO_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_USD",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "ETH_USDT",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "SOL_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "SOL_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "SOL_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "SOL_USD",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "SOL_USDT",
+        "page_size": 200
+      },
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1,
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 18
+    },
+    "result": [
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "sell",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:18:20+00:00",
+        "trade_id": "2"
+      },
+      {
+        "fee": "0.0001",
+        "fee_currency": "BTC",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "ETH_BTC",
+        "timestamp": "2023-11-14T22:16:40+00:00",
+        "trade_id": "t3"
+      },
+      {
+        "fee": "0",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "sell",
+        "symbol": "SOL_EUR",
+        "timestamp": "2023-11-14T22:15:00+00:00",
+        "trade_id": "t4"
+      },
+      {
+        "fee": "0.15",
+        "fee_currency": "USDT",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "BTC_USDT",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "trade_id": "t1"
+      }
+    ]
+  },
+  "trades_for_quote_symbol": {
+    "params": [
+      {
+        "instrument_name": "USDT_BTC",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "USDT_USD",
+        "page_size": 200
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 4
+    },
+    "result": []
+  },
+  "trades_for_symbol": {
+    "params": [
+      {
+        "end_ts": 1790726400000,
+        "instrument_name": "ETH_BTC",
+        "page_size": 50,
+        "start_ts": 1788220800000
+      },
+      {
+        "end_ts": 1790726400000,
+        "instrument_name": "ETH_CRO",
+        "page_size": 50,
+        "start_ts": 1788220800000
+      },
+      {
+        "end_ts": 1790726400000,
+        "instrument_name": "ETH_EUR",
+        "page_size": 50,
+        "start_ts": 1788220800000
+      },
+      {
+        "end_ts": 1790726400000,
+        "instrument_name": "ETH_USD",
+        "page_size": 50,
+        "start_ts": 1788220800000
+      },
+      {
+        "end_ts": 1790726400000,
+        "instrument_name": "ETH_USDT",
+        "page_size": 50,
+        "start_ts": 1788220800000
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 5
+    },
+    "result": [
+      {
+        "fee": "0.0001",
+        "fee_currency": "BTC",
+        "price": "30000.25",
+        "quantity": "0.5",
+        "side": "buy",
+        "symbol": "ETH_BTC",
+        "timestamp": "2023-11-14T22:16:40+00:00",
+        "trade_id": "t3"
+      }
+    ]
+  },
+  "trades_http_error": {
+    "params": [
+      {
+        "instrument_name": "BTC_CRO",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_EUR",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USD",
+        "page_size": 200
+      },
+      {
+        "instrument_name": "BTC_USDT",
+        "page_size": 200
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-trades q=[] b=['id', 'method', 'params']": 4
+    },
+    "result": []
+  },
+  "trades_without_balances": {
+    "params": [
+      {}
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-account-summary q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "withdrawals": {
+    "params": [
+      {
+        "currency": "BTC",
+        "page_size": 20,
+        "start_ts": 1788220800000
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-withdrawal-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "1.5",
+        "fee": "0.0005",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "21"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0.001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "failed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w5"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": ""
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w7"
+      }
+    ]
+  },
+  "withdrawals_default": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-withdrawal-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": [
+      {
+        "address": "bc1q",
+        "amount": "1.5",
+        "fee": "0.0005",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": "tx1",
+        "withdrawal_id": "21"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0.001",
+        "status": "processing",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w2"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "completed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w3"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "cancelled",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w4"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "failed",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w5"
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "unknown",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": ""
+      },
+      {
+        "address": null,
+        "amount": "1.5",
+        "fee": "0",
+        "status": "pending",
+        "symbol": "BTC",
+        "timestamp": "2023-11-14T22:13:20+00:00",
+        "tx_id": null,
+        "withdrawal_id": "w7"
+      }
+    ]
+  },
+  "withdrawals_http_error": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-withdrawal-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  },
+  "withdrawals_without_result": {
+    "params": [
+      {
+        "page_size": 100
+      }
+    ],
+    "requests": {
+      "POST api.crypto.com/v2/private/get-withdrawal-history q=[] b=['id', 'method', 'params']": 1
+    },
+    "result": []
+  }
+}

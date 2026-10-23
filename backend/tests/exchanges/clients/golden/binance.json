@@ -1,0 +1,187 @@
+{
+  "balances": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/position q=['current', 'size'] b=[]": 2,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/position q=['current', 'size'] b=[]": 1,
+      "POST api.binance.com/sapi/v1/asset/get-funding-asset q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.56",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.66"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      },
+      {
+        "free": "0",
+        "locked": "1.05",
+        "symbol": "LDETH",
+        "total": "1.05"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "LDBNB",
+        "total": "2"
+      },
+      {
+        "free": "0",
+        "locked": "3",
+        "symbol": "LDSOL",
+        "total": "3"
+      },
+      {
+        "free": "11",
+        "locked": "0",
+        "symbol": "USDT",
+        "total": "11"
+      }
+    ]
+  },
+  "balances_enrichment_failures": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/position q=['current', 'size'] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/position q=['current', 'size'] b=[]": 1,
+      "POST api.binance.com/sapi/v1/asset/get-funding-asset q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      },
+      {
+        "free": "1",
+        "locked": "0",
+        "symbol": "LDETH",
+        "total": "1"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "LDBNB",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "HTTPStatusError"
+    }
+  },
+  "balances_spot_only": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/flexible/position q=['current', 'size'] b=[]": 1,
+      "GET api.binance.com/sapi/v1/simple-earn/locked/position q=['current', 'size'] b=[]": 1,
+      "POST api.binance.com/sapi/v1/asset/get-funding-asset q=[] b=[]": 1
+    },
+    "result": [
+      {
+        "free": "0.5",
+        "locked": "0.1",
+        "symbol": "BTC",
+        "total": "0.6"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "ETH",
+        "total": "2"
+      },
+      {
+        "free": "1",
+        "locked": "0",
+        "symbol": "LDETH",
+        "total": "1"
+      },
+      {
+        "free": "2",
+        "locked": "0",
+        "symbol": "LDBNB",
+        "total": "2"
+      }
+    ]
+  },
+  "balances_without_secret": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": {
+      "raised": "ValueError"
+    }
+  },
+  "connection_error": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1
+    },
+    "result": null
+  },
+  "connection_error_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1
+    },
+    "result": "HTTP 401: Invalid API-key, IP, or permissions for action."
+  },
+  "connection_error_unreadable": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1
+    },
+    "result": null
+  },
+  "connection_error_without_secret": {
+    "requests": {},
+    "result": null
+  },
+  "connection_refused": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "connection_without_secret": {
+    "requests": {
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": false
+  },
+  "exchange_name": "Binance",
+  "test_connection": {
+    "requests": {
+      "GET api.binance.com/api/v3/account q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": true
+  },
+  "trades_after_balances": {
+    "requests": {
+      "GET api.binance.com/api/v3/exchangeInfo q=[] b=[]": 1,
+      "GET api.binance.com/api/v3/myTrades q=['limit', 'symbol'] b=[]": 2,
+      "GET api.binance.com/api/v3/time q=[] b=[]": 1
+    },
+    "result": []
+  }
+}
