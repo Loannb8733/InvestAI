@@ -9,7 +9,7 @@ from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.reports.service import report_service
 from app.tasks import emails
-from tests.reports.seed import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
+from tests.sample_portfolio import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
 
 USDC_VALUE = 2000 * 0.92
 

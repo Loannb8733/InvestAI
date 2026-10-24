@@ -141,6 +141,17 @@ def _no_background_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def live_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cotations fixes de tests.sample_portfolio à la place du réseau."""
+    from app.domains.market_data.prices.service import price_feed
+    from tests.sample_portfolio import fake_quote, fake_quotes
+
+    monkeypatch.setattr(price_feed, "crypto", fake_quotes)
+    monkeypatch.setattr(price_feed, "stocks", fake_quotes)
+    monkeypatch.setattr(price_feed, "quote", fake_quote)
+
+
+@pytest.fixture
 def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
     return install_http_stub(monkeypatch)
 

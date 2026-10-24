@@ -1263,13 +1263,13 @@ class PriceForecaster:
                 # The holder timed out (or the lock TTL expired) — fall through
                 # to compute ourselves rather than fail.
 
-        # Run the model
-        result = self._run_model_by_name(model_name, prices, dates, days_ahead, volumes, btc_prices)
-
-        # Cache the result for next time and release the compute lock.
-        if symbol and data_hash:
-            self._cache_model_result(symbol, model_name, data_hash, days_ahead, result)
-            self._release_compute_lock(symbol, model_name, data_hash, days_ahead)
+        try:
+            result = self._run_model_by_name(model_name, prices, dates, days_ahead, volumes, btc_prices)
+            if symbol and data_hash:
+                self._cache_model_result(symbol, model_name, data_hash, days_ahead, result)
+        finally:
+            if symbol and data_hash:
+                self._release_compute_lock(symbol, model_name, data_hash, days_ahead)
 
         return result
 
