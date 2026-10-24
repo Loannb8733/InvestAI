@@ -130,6 +130,72 @@
         0.0456
       ]
     ],
+    "Analyse de Risque": [
+      [
+        "Indicateur",
+        "Valeur"
+      ],
+      [
+        "Volatilité annualisée",
+        0.7559
+      ],
+      [
+        "Ratio de Sharpe",
+        0.98
+      ],
+      [
+        "Max Drawdown",
+        0.0824
+      ],
+      [
+        "Max Drawdown — Pic",
+        "2026-07-23T00:00:00"
+      ],
+      [
+        "Max Drawdown — Creux",
+        "2026-09-03T00:00:00"
+      ],
+      [
+        "VaR 95% (%)",
+        0.0306
+      ],
+      [
+        "VaR 95% (montant)",
+        1947.01
+      ],
+      [
+        "Indice HHI",
+        4154
+      ],
+      [
+        "Concentration",
+        "Forte concentration"
+      ],
+      [
+        "Actif dominant",
+        "BTC"
+      ],
+      [
+        "Poids actif dominant",
+        0.613
+      ],
+      [
+        "Stress Test -20% (perte)",
+        12720
+      ],
+      [
+        "Stress Test -20% (valeur)",
+        50880
+      ],
+      [
+        "Stress Test -40% (perte)",
+        25440
+      ],
+      [
+        "Stress Test -40% (valeur)",
+        38160
+      ]
+    ],
     "Attribution": [
       [
         "Attribution de Performance",
@@ -144,12 +210,12 @@
       [
         "Alpha (Altcoins)",
         24600,
-        0.3868
+        0.3759
       ],
       [
         "Beta (BTC)",
         39000,
-        0.6132
+        0.596
       ],
       [
         "Protection (Or)",
@@ -158,8 +224,8 @@
       ],
       [
         "Munitions (Cash/Stables)",
-        0,
-        0
+        1840,
+        0.0281
       ]
     ],
     "Flux de Trésorerie": [

@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.portfolio.classification import is_cash_like, is_safe_haven
+from app.domains.portfolio.classification import is_safe_haven
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction
 from app.services.metrics_service import metrics_service
@@ -171,8 +171,8 @@ async def _risk_metrics(
         )
         first_tx_date = first_tx_result.scalar()
         if first_tx_date:
-            if hasattr(first_tx_date, "tzinfo") and first_tx_date.tzinfo is not None:
-                first_tx_date = first_tx_date.replace(tzinfo=None)
+            if first_tx_date.tzinfo is None:
+                first_tx_date = first_tx_date.replace(tzinfo=UTC)
             risk_days = max((datetime.now(UTC) - first_tx_date).days + 1, 7)
         else:
             risk_days = 30
@@ -216,19 +216,17 @@ def _platform_analysis(asset_reports: list[AssetReport]) -> list[dict[str, Any]]
     return platform_analysis
 
 
-def _attribution(asset_reports: list[AssetReport]) -> dict[str, float]:
+def _attribution(asset_reports: list[AssetReport], liquidity: float) -> dict[str, float]:
     attribution = {
         "alpha": 0.0,
         "beta": 0.0,
         "protection": 0.0,
         "fixed_income": 0.0,
-        "munitions": 0.0,
+        "munitions": liquidity,
     }
     for ar in asset_reports:
         sym = ar.symbol.upper()
-        if is_cash_like(sym):
-            attribution["munitions"] += ar.current_value
-        elif ar.asset_type == "crowdfunding":
+        if ar.asset_type == "crowdfunding":
             attribution["fixed_income"] += ar.current_value
         elif sym == "BTC":
             attribution["beta"] += ar.current_value
@@ -288,7 +286,7 @@ class ReportDataMixin:
             "pnl_data": dashboard.get("pnl_data", {}),
             "risk_metrics": risk_metrics,
             "platform_analysis": _platform_analysis(asset_reports),
-            "attribution": _attribution(asset_reports),
+            "attribution": _attribution(asset_reports, dashboard.get("available_liquidity", 0.0)),
             "cash_flows": _cash_flows(tax_transactions),
             "generated_at": datetime.now(UTC),
             "year": year,

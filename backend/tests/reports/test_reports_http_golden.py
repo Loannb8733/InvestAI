@@ -1,11 +1,9 @@
 import csv
 import io
 import json
-import math
 import os
 import re
-from collections.abc import Iterable
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -19,57 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.domains.market_data.history.models import AssetPriceHistory
-from app.domains.market_data.prices.quote import PriceQuote
-from app.domains.market_data.prices.service import price_feed
+from tests.reports.seed import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-SET_RE = re.compile(r"\{('[^']*'(?:, '[^']*')*)\}")
-FROZEN_NOW = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
-HISTORY_DAYS = 420
 PDF = "application/pdf"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-ASSETS = [
-    ("BTC", "crypto", "Binance", "60000"),
-    ("ETH", "crypto", "Kraken", "3000"),
-    ("SOL", "crypto", "Tangem", "150"),
-    ("ARB", "crypto", "Binance", "0.8"),
-    ("UNI", "crypto", "Kraken", "9"),
-    ("USDC", "crypto", "Binance", "0.92"),
-    ("DOGE", "crypto", "Binance", "0.15"),
-    ("AAPL", "stock", "Trade Republic", "200"),
-]
-QUOTES = {symbol: Decimal(price) for symbol, _, _, price in ASSETS}
-TRANSACTIONS = [
-    ("BTC", "buy", "0.5", "30000", "10", "2025-01-10T10:00:00Z"),
-    ("BTC", "buy", "0.25", "50000", "5", "2025-08-01T10:00:00Z"),
-    ("BTC", "sell", "0.1", "70000", "7", "2025-11-15T10:00:00Z"),
-    ("ETH", "buy", "4", "2000", "4", "2025-02-15T10:00:00Z"),
-    ("ETH", "sell", "1", "3500", "3", "2026-03-01T10:00:00Z"),
-    ("SOL", "buy", "50", "100", "2", "2025-04-01T10:00:00Z"),
-    ("ARB", "buy", "1000", "1.2", "1", "2025-03-01T10:00:00Z"),
-    ("UNI", "buy", "200", "7", "1", "2025-06-01T10:00:00Z"),
-    ("USDC", "buy", "2000", "0.93", "0", "2025-01-05T10:00:00Z"),
-    ("DOGE", "buy", "10000", "0.1", "1", "2025-09-01T10:00:00Z"),
-    ("AAPL", "buy", "20", "170", "1", "2025-05-20T10:00:00Z"),
-]
-SERIES = {
-    "BTC": (40000, 0.0012, 0.08, 23, 0.0),
-    "ETH": (2200, 0.0009, 0.11, 17, 1.0),
-    "SOL": (90, 0.0015, 0.15, 13, 2.0),
-    "ARB": (1.1, -0.0008, 0.2, 11, 0.3),
-    "UNI": (7, 0.0004, 0.18, 19, 1.7),
-    "USDC": (0.92, 0.0, 0.002, 7, 0.0),
-    "DOGE": (0.1, 0.001, 0.25, 9, 2.4),
-    "AAPL": (165, 0.0004, 0.04, 31, 0.5),
-    "PAXG": (2000, 0.0003, 0.02, 41, 1.5),
-    "SPY": (480, 0.0003, 0.03, 29, 0.7),
-    "^GSPC": (5000, 0.0003, 0.03, 29, 0.6),
-}
-TARGETS = {"L1": 0.5, "L2": 0.1, "DeFi": 0.1, "Stable": 0.2, "Meme": 0.1}
 
 GET_ROUTES = [
     ("performance_pdf", "/api/v1/reports/performance/pdf"),
@@ -127,10 +81,6 @@ OFFLINE = [
 ]
 
 
-def _sorted_set(match: re.Match[str]) -> str:
-    return "{" + ", ".join(sorted(match.group(1).split(", "))) + "}"
-
-
 def _plain(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: _plain(v) for k, v in sorted(value.items())}
@@ -143,7 +93,7 @@ def _plain(value: Any) -> Any:
     if isinstance(value, Decimal):
         return str(value)
     if isinstance(value, str):
-        return SET_RE.sub(_sorted_set, UUID_RE.sub("<id>", value))
+        return UUID_RE.sub("<id>", value)
     return value
 
 
@@ -179,68 +129,6 @@ def _snapshot(response: Response) -> dict[str, Any]:
     return _plain({"status": response.status_code, "headers": headers, "body": _body(response)})
 
 
-def _price(symbol: str, day: int) -> Decimal:
-    base, drift, amplitude, period, phase = SERIES[symbol]
-    value = base * (1 + drift * day) * (1 + amplitude * math.sin(day / period + phase))
-    return Decimal(str(round(value, 6)))
-
-
-async def _quotes(symbols: Iterable[str], currency: str = "EUR") -> dict[str, PriceQuote]:
-    return {s.upper(): PriceQuote(price=QUOTES[s.upper()]) for s in symbols if s.upper() in QUOTES}
-
-
-async def _quote(symbol: str, asset_type: str, currency: str = "EUR") -> PriceQuote | None:
-    price = QUOTES.get(symbol.upper())
-    return PriceQuote(price=price) if price is not None else None
-
-
-@pytest.fixture
-def live_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(price_feed, "crypto", _quotes)
-    monkeypatch.setattr(price_feed, "stocks", _quotes)
-    monkeypatch.setattr(price_feed, "quote", _quote)
-
-
-async def _seed_history(db: AsyncSession) -> None:
-    start = FROZEN_NOW.date() - timedelta(days=HISTORY_DAYS)
-    for symbol in SERIES:
-        for day in range(HISTORY_DAYS + 1):
-            moment: date = start + timedelta(days=day)
-            db.add(AssetPriceHistory(symbol=symbol, price_date=moment, price_eur=_price(symbol, day), source="test"))
-    await db.commit()
-
-
-async def _seed_portfolio(client: AsyncClient, headers: dict[str, str]) -> None:
-    portfolio = await client.post("/api/v1/portfolios", json={"name": "Rapports"}, headers=headers)
-    assert portfolio.status_code == 201, portfolio.text
-    portfolio_id = portfolio.json()["id"]
-    asset_ids: dict[str, str] = {}
-    for symbol, kind, exchange, price in ASSETS:
-        body = {
-            "portfolio_id": portfolio_id,
-            "symbol": symbol,
-            "asset_type": kind,
-            "exchange": exchange,
-            "current_price": price,
-        }
-        asset = await client.post("/api/v1/assets", json=body, headers=headers)
-        assert asset.status_code == 201, asset.text
-        asset_ids[symbol] = asset.json()["id"]
-    for symbol, kind, quantity, price, fee, executed_at in TRANSACTIONS:
-        body = {
-            "asset_id": asset_ids[symbol],
-            "transaction_type": kind,
-            "quantity": quantity,
-            "price": price,
-            "fee": fee,
-            "currency": "EUR",
-            "executed_at": executed_at,
-            "exchange": next(e for s, _, e, _ in ASSETS if s == symbol),
-        }
-        tx = await client.post("/api/v1/transactions", json=body, headers=headers)
-        assert tx.status_code == 201, tx.text
-
-
 def _compare(name: str, actual: dict[str, Any], mismatches: list[str]) -> None:
     path = GOLDEN_DIR / f"{name}.json"
     rendered = json.dumps(actual, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
@@ -269,8 +157,8 @@ async def test_reports_routes_match_golden(
     headers = {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
     empty = {"Authorization": f"Bearer {create_token(str(admin_user.id))}"}
     with time_machine.travel(FROZEN_NOW, tick=False):
-        await _seed_history(db_session)
-        await _seed_portfolio(client, headers)
+        await seed_history(db_session)
+        await seed_portfolio(client, headers)
         scenarios = [(name, "GET", url, headers, None) for name, url in GET_ROUTES]
         scenarios += [(name, method, url, headers, body) for name, method, url, body in REBALANCING]
         scenarios += [(name, method, url, empty, body) for name, method, url, body in EMPTY_ROUTES]
@@ -285,7 +173,7 @@ async def test_reports_without_live_quotes_match_golden(
 ) -> None:
     headers = {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
     with time_machine.travel(FROZEN_NOW, tick=False):
-        await _seed_history(db_session)
-        await _seed_portfolio(client, headers)
+        await seed_history(db_session)
+        await seed_portfolio(client, headers)
         mismatches = await _play(client, [(name, method, url, headers, body) for name, method, url, body in OFFLINE])
     assert not mismatches, f"golden reports différent : {mismatches} (GOLDEN_UPDATE=1 pour accepter)"

@@ -135,6 +135,26 @@ def _build_report(
     )
 
 
+def _stablecoin_allocations(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "symbol": s["symbol"],
+            "asset_type": "crypto",
+            "current_value": s["value"],
+            "current_price": s["unit_price"],
+            "quantity": s["quantity"],
+        }
+        for s in dashboard.get("stablecoins", [])
+    ]
+
+
+def _unit_price(asset_info: dict[str, Any]) -> Decimal:
+    if asset_info.get("current_price"):
+        return Decimal(str(asset_info["current_price"]))
+    quantity = Decimal(str(asset_info.get("quantity") or 0))
+    return Decimal(str(asset_info.get("value", 0))) / quantity if quantity > 0 else _ZERO
+
+
 def _symbol_layers(fifo: FifoLayers, sym: str) -> list[Any]:
     sym_layers: list[Any] = []
     for fkey, layers in fifo.items():
@@ -162,13 +182,13 @@ def _estimate_order_gain(order: RebalanceOrder, assets_in_class: list[dict[str, 
         if sell_remaining <= 0:
             break
         sym = asset_info.get("symbol", "").upper()
-        current_price = Decimal(str(asset_info.get("current_price", 0)))
+        current_price = _unit_price(asset_info)
         if current_price <= 0:
             continue
         sym_layers = _symbol_layers(fifo, sym)
         asset_value = Decimal(str(asset_info.get("value", 0)))
         sell_from_this = min(sell_remaining, asset_value)
-        qty_to_sell = sell_from_this / current_price if current_price > 0 else _ZERO
+        qty_to_sell = sell_from_this / current_price
         estimated_gain = _walk_layers(sym_layers, qty_to_sell, current_price, estimated_gain)
         sell_remaining -= sell_from_this
     return estimated_gain
@@ -183,10 +203,10 @@ class RebalancingMixin:
         currency: str = "EUR",
         estimate_tax: bool = True,
     ) -> RebalancingReport:
-        """Ordres pour atteindre target_allocations (fractions par classe crypto, somme 1), actifs sous 0,10 € ignorés.
+        """Ordres pour atteindre target_allocations (fractions par classe crypto, stablecoins détenus compris).
 
-        L'impôt des ventes est estimé par FIFO (désactivable via estimate_tax) sur l'alias `value` = current_value
-        ajouté à chaque actif ; sans lui chaque ligne valait zéro et l'impôt estimé restait nul.
+        Les actifs sous 0,10 € sont ignorés. L'impôt des ventes est estimé par FIFO (désactivable via
+        estimate_tax) au cours courant, à défaut au prix unitaire valeur / quantité.
         """
         dashboard = await metrics_service.get_user_dashboard_metrics(
             db,
@@ -197,7 +217,8 @@ class RebalancingMixin:
         if total_value <= 0:
             return RebalancingReport(total_value=0, categories=[], orders=[])
 
-        class_totals, class_assets = _group_by_class(dashboard.get("aggregated_assets", []))
+        allocations = dashboard.get("aggregated_assets", []) + _stablecoin_allocations(dashboard)
+        class_totals, class_assets = _group_by_class(allocations)
         crypto_total = sum(class_totals.values())
         if crypto_total <= 0:
             return RebalancingReport(total_value=total_value, categories=[], orders=[])

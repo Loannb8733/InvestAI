@@ -99,14 +99,16 @@ async def _calculer(db_session, user, metriques, historique, variations=None, de
 
 
 class TestFormeDeLaReponse:
-    async def test_les_vingt_quatre_cles_attendues_par_le_dashboard(self, db_session, regular_user):
+    async def test_les_vingt_cinq_cles_attendues_par_le_dashboard(self, db_session, regular_user):
         """L'écran principal lit ces clés : en perdre une le casse.
 
         Trois d'entre elles — `assets`, `total_dividend_income` et
         `total_return` — ont été **ajoutées** le 2026-09-08 : l'endpoint les
         lisait déjà, sans qu'elles soient jamais produites. L'exposition par
         devise restait donc vide et les deux montants à zéro (NEW-34). Ce test
-        a signalé l'ajout, comme il doit.
+        a signalé l'ajout, comme il doit. `stablecoins` (2026-10-24) remonte la
+        liste par portefeuille : sans elle, la classe Stable du rééquilibrage
+        restait vide quels que soient les stablecoins détenus.
         """
         await _portefeuille(db_session, regular_user)
         actifs = [_actif("BTC", 30000.0, 20000.0)]
@@ -132,6 +134,7 @@ class TestFormeDeLaReponse:
             "period_changes",
             "pnl_data",
             "portfolios_count",
+            "stablecoins",
             "top_performers",
             "total_gain_loss",
             "total_gain_loss_percent",

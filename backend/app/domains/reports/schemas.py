@@ -20,7 +20,7 @@ class RebalancingRequest(BaseModel):
         """Clés parmi les six classes crypto, poids entre 0 et 1, somme à 1 (± 0,01)."""
         for key in v:
             if key not in _CRYPTO_CLASSES:
-                raise ValueError(f"Invalid category '{key}'. Allowed: {_CRYPTO_CLASSES}")
+                raise ValueError(f"Invalid category '{key}'. Allowed: {', '.join(sorted(_CRYPTO_CLASSES))}")
         total = sum(v.values())
         if not (0.99 <= total <= 1.01):
             raise ValueError(f"Allocations must sum to 1.0 (got {total:.4f})")

@@ -163,7 +163,7 @@ async def _send_monthly_reports_async() -> dict:
                 # Generate PDF report
                 pdf_content = None
                 try:
-                    report_data = await report_service.get_portfolio_data(db, str(user.id))
+                    report_data = await report_service.get_report_data(db, str(user.id))
                     pdf_content = render_performance_pdf(report_data)
                 except Exception as e:
                     logger.warning(f"Could not generate PDF for {user.email}: {e}")

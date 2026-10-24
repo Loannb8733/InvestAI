@@ -1103,6 +1103,7 @@ class MetricsService:
         total_pnl_fees = Decimal("0")
         total_liquidity = Decimal("0")
         all_assets = []
+        all_stablecoins = []
         total_dividends = Decimal("0")
         any_forex_stale = False
 
@@ -1159,6 +1160,7 @@ class MetricsService:
             for _ccy, amount in (portfolio.cash_balances or {}).items():
                 total_liquidity += Decimal(str(amount))
             all_assets.extend(portfolio_metrics["assets"])
+            all_stablecoins.extend(portfolio_metrics.get("stablecoins", []))
             total_dividends += Decimal(str(portfolio_metrics.get("total_dividend_income", 0)))
             any_forex_stale = any_forex_stale or portfolio_metrics.get("forex_stale", False)
 
@@ -1310,6 +1312,7 @@ class MetricsService:
             # s'affichait jamais côté client. Les deux autres retombaient sur
             # leur défaut de 0.
             "assets": all_assets,
+            "stablecoins": all_stablecoins,
             "total_dividend_income": float(total_dividends),
             # Base cohérente avec le reste de l'écran : `total_gain_loss` du
             # dashboard, augmenté des dividendes perçus. Sommer les
