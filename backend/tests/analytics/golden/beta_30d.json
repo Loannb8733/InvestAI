@@ -1,0 +1,45 @@
+{
+  "body": {
+    "assets": [
+      {
+        "asset_type": "crypto",
+        "benchmark": "BTC",
+        "beta": -4.825,
+        "interpretation": "Inversement corrélé — se comporte à l'inverse du marché",
+        "symbol": "SOL",
+        "value": 7607.02
+      },
+      {
+        "asset_type": "stock",
+        "benchmark": "SPY",
+        "beta": 1.126,
+        "interpretation": "Agressif — plus volatil que le marché",
+        "symbol": "AAPL",
+        "value": 4007.97
+      },
+      {
+        "asset_type": "crypto",
+        "benchmark": "BTC",
+        "beta": 1.0,
+        "interpretation": "Neutre — suit le marché",
+        "symbol": "BTC",
+        "value": 43115.7
+      },
+      {
+        "asset_type": "crypto",
+        "benchmark": "BTC",
+        "beta": 0.598,
+        "interpretation": "Défensif — moins volatil que le marché",
+        "symbol": "ETH",
+        "value": 9637.31
+      }
+    ],
+    "benchmarks": {
+      "crypto": "BTC",
+      "stock": "SPY (S&P 500)"
+    },
+    "portfolio_beta_crypto": 0.202,
+    "portfolio_beta_stock": 1.126
+  },
+  "status": 200
+}

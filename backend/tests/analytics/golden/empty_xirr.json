@@ -1,0 +1,8 @@
+{
+  "body": {
+    "currency": "EUR",
+    "description": "Taux de rendement interne annualisé (XIRR) en %",
+    "xirr": null
+  },
+  "status": 200
+}

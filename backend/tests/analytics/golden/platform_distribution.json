@@ -1,0 +1,29 @@
+{
+  "body": [
+    {
+      "name": "Binance",
+      "percentage": 0.0,
+      "trust_score": 7,
+      "value": 0.0
+    },
+    {
+      "name": "Kraken",
+      "percentage": 0.0,
+      "trust_score": 8,
+      "value": 0.0
+    },
+    {
+      "name": "Tangem",
+      "percentage": 0.0,
+      "trust_score": 10,
+      "value": 0.0
+    },
+    {
+      "name": "Trade Republic",
+      "percentage": 0.0,
+      "trust_score": 6,
+      "value": 0.0
+    }
+  ],
+  "status": 200
+}

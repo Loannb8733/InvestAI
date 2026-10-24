@@ -1,0 +1,302 @@
+{
+  "body": {
+    "currency": "EUR",
+    "max_drawdown": {
+      "estimated_recovery_months": 18,
+      "scenario": "LUNA/FTX (2022)",
+      "value": 80.09
+    },
+    "scenarios": [
+      {
+        "description": "Effondrement crypto (Luna Mai + FTX Nov) — altcoins -60%, BTC -40%",
+        "duration_days": 60,
+        "estimated_recovery_months": 18,
+        "id": "luna_ftx_2022",
+        "name": "LUNA/FTX (2022)",
+        "per_asset": [
+          {
+            "current_value": 27515.0,
+            "loss": -26139.25,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": -95.0,
+            "stressed_value": 1375.75,
+            "symbol": "BTC"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": -3941.18,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": -78.8,
+            "stressed_value": 1060.82,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": -3292.05,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": -54.8,
+            "stressed_value": 2710.95,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 3401.0,
+            "loss": -204.06,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": -6.0,
+            "stressed_value": 3196.94,
+            "symbol": "AAPL"
+          }
+        ],
+        "stressed_value": 8344.47,
+        "total_loss": -33576.53,
+        "total_loss_pct": -80.09
+      },
+      {
+        "description": "Krach pandémique — chute rapide sur toutes les classes d'actifs en 30 jours",
+        "duration_days": 30,
+        "estimated_recovery_months": 5,
+        "id": "covid_2020",
+        "name": "COVID-19 (Mars 2020)",
+        "per_asset": [
+          {
+            "current_value": 27515.0,
+            "loss": -23866.51,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": -86.7,
+            "stressed_value": 3648.49,
+            "symbol": "BTC"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": -3284.31,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": -65.7,
+            "stressed_value": 1717.69,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": -2743.37,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": -45.7,
+            "stressed_value": 3259.63,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 3401.0,
+            "loss": -357.11,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": -10.5,
+            "stressed_value": 3043.89,
+            "symbol": "AAPL"
+          }
+        ],
+        "stressed_value": 11669.7,
+        "total_loss": -30251.3,
+        "total_loss_pct": -72.16
+      },
+      {
+        "description": "Crise systémique bancaire — chute massive des actions et immobilier",
+        "duration_days": 180,
+        "estimated_recovery_months": 48,
+        "id": "crisis_2008",
+        "name": "Crise financière 2008",
+        "per_asset": [
+          {
+            "current_value": 27515.0,
+            "loss": -14319.91,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": -52.0,
+            "stressed_value": 13195.09,
+            "symbol": "BTC"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": -1970.59,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": -39.4,
+            "stressed_value": 3031.41,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": -1646.02,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": -27.4,
+            "stressed_value": 4356.98,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 3401.0,
+            "loss": -510.15,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": -15.0,
+            "stressed_value": 2890.85,
+            "symbol": "AAPL"
+          }
+        ],
+        "stressed_value": 23474.33,
+        "total_loss": -18446.67,
+        "total_loss_pct": -44.0
+      },
+      {
+        "description": "Resserrement monétaire brutal — impact sur les valorisations",
+        "duration_days": 90,
+        "estimated_recovery_months": 12,
+        "id": "rate_hike",
+        "name": "Hausse des taux (+300bp)",
+        "per_asset": [
+          {
+            "current_value": 27515.0,
+            "loss": -11933.26,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": -43.4,
+            "stressed_value": 15581.74,
+            "symbol": "BTC"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": -1642.16,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": -32.8,
+            "stressed_value": 3359.84,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": -1371.69,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": -22.9,
+            "stressed_value": 4631.31,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 3401.0,
+            "loss": -183.65,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": -5.4,
+            "stressed_value": 3217.35,
+            "symbol": "AAPL"
+          }
+        ],
+        "stressed_value": 26790.25,
+        "total_loss": -15130.75,
+        "total_loss_pct": -36.09
+      },
+      {
+        "description": "Chute éclair intra-journalière sur tous les marchés",
+        "duration_days": 1,
+        "estimated_recovery_months": 1,
+        "id": "flash_crash",
+        "name": "Flash Crash",
+        "per_asset": [
+          {
+            "current_value": 27515.0,
+            "loss": -7159.95,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": -26.0,
+            "stressed_value": 20355.05,
+            "symbol": "BTC"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": -985.29,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": -19.7,
+            "stressed_value": 4016.71,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": -823.01,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": -13.7,
+            "stressed_value": 5179.99,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 3401.0,
+            "loss": -102.03,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": -3.0,
+            "stressed_value": 3298.97,
+            "symbol": "AAPL"
+          }
+        ],
+        "stressed_value": 32850.71,
+        "total_loss": -9070.29,
+        "total_loss_pct": -21.64
+      },
+      {
+        "description": "Hausse généralisée — crypto +100%, actions +25%, ETF +20%",
+        "duration_days": 365,
+        "estimated_recovery_months": 0,
+        "id": "bull_run_2021",
+        "name": "Bull Run 2021",
+        "per_asset": [
+          {
+            "current_value": 3401.0,
+            "loss": 850.25,
+            "name": null,
+            "risk_weight": 0.95,
+            "shock_pct": 25,
+            "stressed_value": 4251.25,
+            "symbol": "AAPL"
+          },
+          {
+            "current_value": 5002.0,
+            "loss": 5002.0,
+            "name": null,
+            "risk_weight": 32.83,
+            "shock_pct": 100,
+            "stressed_value": 10004.0,
+            "symbol": "SOL"
+          },
+          {
+            "current_value": 6003.0,
+            "loss": 6003.0,
+            "name": null,
+            "risk_weight": 22.85,
+            "shock_pct": 100,
+            "stressed_value": 12006.0,
+            "symbol": "ETH"
+          },
+          {
+            "current_value": 27515.0,
+            "loss": 27515.0,
+            "name": null,
+            "risk_weight": 43.37,
+            "shock_pct": 100,
+            "stressed_value": 55030.0,
+            "symbol": "BTC"
+          }
+        ],
+        "stressed_value": 81291.25,
+        "total_loss": 39370.25,
+        "total_loss_pct": 93.92
+      }
+    ],
+    "total_value": 41921.0
+  },
+  "status": 200
+}
