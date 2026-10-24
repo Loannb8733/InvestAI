@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.analytics.core import AnalyticsCore
+from app.domains.analytics.core import AnalyticsCore, last_known_price
 from app.domains.analytics.metrics import compute_returns
 from app.domains.analytics.scoring import calc_beta, interpret_beta
 from app.domains.analytics.xirr import build_xirr_cashflows, xirr
@@ -134,7 +134,7 @@ class AnalyticsReturns(AnalyticsCore):
         rows: list[tuple[str, float | None, float]] = []
         for sym, asset in seen.items():
             prices = await self._history_prices(sym, days=days)
-            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
+            price = prices[-1] if prices and prices[-1] > 0 else last_known_price(asset)
             if price <= 0:
                 continue
             val = float(Decimal(str(qty_map[sym])) * Decimal(str(price)))

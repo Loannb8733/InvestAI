@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.market_data.history import tasks as history_tasks
 
 
 async def _create_portfolio(client: AsyncClient, token: str) -> str:
@@ -169,3 +170,17 @@ async def test_get_nonexistent_asset(client: AsyncClient, regular_user: User):
         headers=headers,
     )
     assert response.status_code == 404
+
+
+async def test_creating_an_asset_starts_no_background_refresh_in_tests(
+    client: AsyncClient, regular_user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un rafraîchissement lancé sur la boucle survit au test et entre en deadlock avec le DROP TABLE du nettoyage."""
+    monkeypatch.setattr(history_tasks, "_running", {})
+    monkeypatch.setattr(history_tasks, "_last_attempt", {})
+    token = create_token(str(regular_user.id))
+    portfolio_id = await _create_portfolio(client, token)
+    body = {"portfolio_id": portfolio_id, "symbol": "XRP", "asset_type": "crypto", "quantity": "1"}
+    response = await client.post("/api/v1/assets", json=body, headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 201
+    assert history_tasks._running == {}

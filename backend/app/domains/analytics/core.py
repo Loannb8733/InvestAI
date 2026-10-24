@@ -40,8 +40,15 @@ def _ecb_rate_pct(payload: Any) -> float | None:
     return None
 
 
+def last_known_price(asset: Asset) -> float:
+    """Dernier cours connu de l'actif (current_price), à défaut son prix moyen d'achat."""
+    if asset.current_price and asset.current_price > 0:
+        return float(asset.current_price)
+    return float(asset.avg_buy_price or 0)
+
+
 def _asset_entry(asset: Asset, hist_prices: list[float]) -> AssetData:
-    price = hist_prices[-1] if hist_prices and hist_prices[-1] > 0 else float(asset.avg_buy_price)
+    price = hist_prices[-1] if hist_prices and hist_prices[-1] > 0 else last_known_price(asset)
     current_value = float(asset.quantity) * price if price else 0
     total_invested = float(asset.quantity) * float(asset.avg_buy_price)
     gain_loss = current_value - total_invested
@@ -106,7 +113,7 @@ class AnalyticsCore:
 
     async def _get_asset_price(self, asset: Asset) -> float:
         quote = await price_feed.quote(asset.symbol, asset.asset_type)
-        return float(quote.price) if quote is not None else float(asset.avg_buy_price)
+        return float(quote.price) if quote is not None else last_known_price(asset)
 
     async def _get_user_assets(
         self,
@@ -129,8 +136,7 @@ class AnalyticsCore:
         for a in result.scalars().all():
             if exclude_stablecoins and is_stablecoin(a.symbol):
                 continue
-            est_value = float(a.quantity) * float(a.avg_buy_price) if a.avg_buy_price else 0
-            if est_value < min_value:
+            if float(a.quantity) * last_known_price(a) < min_value:
                 continue
             filtered.append(a)
         return filtered
