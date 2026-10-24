@@ -39,7 +39,7 @@ class AIStrategyService:
         user_id: str,
     ) -> list[dict[str, Any]]:
         """Analyze portfolio and propose strategies."""
-        from app.services.prediction_service import prediction_service
+        from app.domains.predictions.service import prediction_service
         from app.services.strategy_service import strategy_service
 
         # 1. Get strategy map (alpha + regime per asset)
@@ -62,7 +62,7 @@ class AIStrategyService:
         assets = strategy_map.get("rows", [])
         regime_name = strategy_map.get("market_regime", "unknown") or "unknown"
         fear_greed = strategy_map.get("fear_greed")
-        regime_confidence = (fear_greed / 100.0) if fear_greed and isinstance(fear_greed, (int, float)) else 0.5
+        regime_confidence = (fear_greed / 100.0) if fear_greed and isinstance(fear_greed, int | float) else 0.5
         strategies: list[dict[str, Any]] = []
 
         # Classify assets by signal

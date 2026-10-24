@@ -11,7 +11,7 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=[
         "app.tasks.price_updates",
-        "app.tasks.predictions",
+        "app.domains.predictions.tasks",
         "app.tasks.alerts",
         "app.tasks.snapshots",
         "app.tasks.emails",
@@ -67,11 +67,11 @@ celery_app.conf.beat_schedule = {
         "schedule": 3600.0,  # Every hour
     },
     "run-daily-predictions": {
-        "task": "app.tasks.predictions.run_daily_predictions",
+        "task": "app.domains.predictions.tasks.run_daily_predictions",
         "schedule": 86400.0,  # Every 24 hours
     },
     "detect-anomalies": {
-        "task": "app.tasks.predictions.detect_anomalies",
+        "task": "app.domains.predictions.tasks.detect_anomalies",
         "schedule": 43200.0,  # Every 12 hours
     },
     "check-alerts": {
@@ -90,7 +90,7 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=0, minute=5),  # Daily at 00:05 UTC
     },
     "check-prediction-accuracy": {
-        "task": "app.tasks.predictions.check_prediction_accuracy",
+        "task": "app.domains.predictions.tasks.check_prediction_accuracy",
         "schedule": 86400.0,  # Every 24 hours
     },
     "refresh-history": {
@@ -102,15 +102,15 @@ celery_app.conf.beat_schedule = {
         "schedule": 86400.0,  # Every 24 hours — fills gaps + refreshes recent data
     },
     "tune-hyperparameters": {
-        "task": "app.tasks.predictions.tune_hyperparameters",
+        "task": "app.domains.predictions.tasks.tune_hyperparameters",
         "schedule": 604800.0,  # Every 7 days
     },
     "check-data-drift": {
-        "task": "app.tasks.predictions.check_data_drift",
+        "task": "app.domains.predictions.tasks.check_data_drift",
         "schedule": 86400.0,  # Every 24 hours
     },
     "check-bottom-zones": {
-        "task": "app.tasks.predictions.check_bottom_zones",
+        "task": "app.domains.predictions.tasks.check_bottom_zones",
         "schedule": 21600.0,  # Every 6 hours
     },
     # === Snapshots ===

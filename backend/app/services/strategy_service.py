@@ -196,7 +196,7 @@ class StrategyService:
         next_action = None
         next_amount = 0.0
         try:
-            from app.services.prediction_service import prediction_service
+            from app.domains.predictions.service import prediction_service
 
             strategy_data = await prediction_service.get_strategy_map(db, user_id)
             assets = strategy_data.get("assets", [])

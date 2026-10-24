@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.predictions.models import PredictionLog
 from app.ml import forecaster as forecaster_module
 from app.ml.forecaster import PriceForecaster
-from app.models.prediction_log import PredictionLog
 from tests.predictions.forecaster_double import WEIGHTS
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 

@@ -11,7 +11,7 @@ import re
 
 import pytest
 
-from app.services.prediction_service import PredictionService
+from app.domains.predictions.cycle_advice import cycle_advice
 
 
 def _amount_range(description: str) -> tuple[float, float]:
@@ -22,11 +22,11 @@ def _amount_range(description: str) -> tuple[float, float]:
 
 
 class TestCycleAdviceCoherence:
-    """Test _get_cycle_advice static method directly."""
+    """Test cycle_advice directly."""
 
     def test_extreme_fear_suggests_accumulation(self):
         """Extreme Fear (F&G < 20) must suggest DCA, never VENDRE."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bearish",
             cycle_pos=85,
             fear_greed=10,  # Extreme Fear
@@ -38,7 +38,7 @@ class TestCycleAdviceCoherence:
 
     def test_bottom_regime_suggests_dca(self):
         """Bottom regime must always suggest DCA accumulation."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=25,
@@ -52,7 +52,7 @@ class TestCycleAdviceCoherence:
 
     def test_extreme_greed_suggests_profit_taking(self):
         """Extreme Greed (F&G > 80) must suggest VENDRE, not buying."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bullish",
             cycle_pos=75,
             fear_greed=90,  # Extreme Greed
@@ -64,7 +64,7 @@ class TestCycleAdviceCoherence:
 
     def test_high_concentration_warns_diversify(self):
         """When max_risk_weight > 60%, must warn DIVERSIFIER."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=15,
@@ -79,7 +79,7 @@ class TestCycleAdviceCoherence:
 
     def test_no_concentration_warning_when_balanced(self):
         """No DIVERSIFIER warning when risk is well-distributed."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=15,
@@ -96,13 +96,13 @@ class TestCycleAdviceCoherence:
         100000/1000 = 100) rather than hard-coding the regime multiplier, so the
         test survives retuning of RegimeConfig.risk_multiplier.
         """
-        advice_small = PredictionService._get_cycle_advice(
+        advice_small = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=15,
             portfolio_value=1000.0,
         )
-        advice_large = PredictionService._get_cycle_advice(
+        advice_large = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=15,
@@ -125,7 +125,7 @@ class TestCycleAdviceCoherence:
         Product philosophy (commit 94e1ac4): bear = accumulate, bull = take profits.
         A bearish regime must therefore advise spread-out buying, not selling.
         """
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bearish",
             cycle_pos=80,
             fear_greed=30,
@@ -137,7 +137,7 @@ class TestCycleAdviceCoherence:
 
     def test_no_dca_amount_without_portfolio_value(self):
         """Without portfolio value, DCA advice has no EUR amount."""
-        advice = PredictionService._get_cycle_advice(
+        advice = cycle_advice(
             regime="bottom",
             cycle_pos=10,
             fear_greed=15,

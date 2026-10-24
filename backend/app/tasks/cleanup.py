@@ -9,8 +9,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, case, delete, func, select
 
 from app.core.db.session import session_factory
+from app.domains.predictions.models import PredictionLog
 from app.models.notification import Notification
-from app.models.prediction_log import PredictionLog
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 

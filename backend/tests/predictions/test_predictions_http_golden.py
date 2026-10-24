@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.prediction_log import PredictionLog
+from app.domains.predictions.models import PredictionLog
 from app.services.telegram_service import telegram_service
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 

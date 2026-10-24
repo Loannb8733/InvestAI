@@ -216,7 +216,7 @@ class TestCoherenceDesQuantites:
 
 class TestPurgesParAnciennete:
     async def test_les_predictions_anterieures_au_seuil_partent(self, session_de_test, regular_user):
-        from app.models.prediction_log import PredictionLog
+        from app.domains.predictions.models import PredictionLog
 
         def _log(symbole, jours):
             return PredictionLog(

@@ -10,7 +10,7 @@ Validates that:
 
 import pytest
 
-from app.services.prediction_service import PredictionService
+from app.domains.predictions.strategy_map import STRATEGY_MATRIX
 
 
 class TestStrategyMatrix:
@@ -18,25 +18,25 @@ class TestStrategyMatrix:
 
     def test_high_alpha_bottom_cycle_is_strong_buy(self):
         """Alpha high + cycle bottom → ACHAT FORT."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("high", "bottom")]
+        action, desc, impact = STRATEGY_MATRIX[("high", "bottom")]
         assert action == "ACHAT FORT"
         assert impact > 0
 
     def test_low_alpha_top_cycle_is_sell(self):
         """Alpha low + cycle top → VENDRE."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("low", "top")]
+        action, desc, impact = STRATEGY_MATRIX[("low", "top")]
         assert action == "VENDRE"
         assert impact < 0
 
     def test_high_alpha_top_cycle_takes_profits(self):
         """Alpha high + cycle top → PRENDRE PROFITS."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("high", "top")]
+        action, desc, impact = STRATEGY_MATRIX[("high", "top")]
         assert action == "PRENDRE PROFITS"
         assert impact < 0
 
     def test_medium_alpha_bottom_cycle_dca(self):
         """Alpha medium + cycle bottom → DCA."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("medium", "bottom")]
+        action, desc, impact = STRATEGY_MATRIX[("medium", "bottom")]
         assert action == "DCA"
         assert impact > 0
 
@@ -47,28 +47,28 @@ class TestStrategyMatrix:
         for alpha in alpha_levels:
             for regime in regimes:
                 key = (alpha, regime)
-                assert key in PredictionService.STRATEGY_MATRIX, f"Missing key {key}"
-                action, desc, impact = PredictionService.STRATEGY_MATRIX[key]
+                assert key in STRATEGY_MATRIX, f"Missing key {key}"
+                action, desc, impact = STRATEGY_MATRIX[key]
                 assert isinstance(action, str) and len(action) > 0
                 assert isinstance(desc, str)
                 assert isinstance(impact, float)
 
     def test_buy_actions_have_positive_impact(self):
         """Actions containing ACHAT or DCA should have positive impact."""
-        for key, (action, desc, impact) in PredictionService.STRATEGY_MATRIX.items():
+        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
             if "ACHAT" in action or action == "DCA":
                 assert impact > 0, f"{key}: {action} should have positive impact, got {impact}"
 
     def test_sell_actions_have_negative_impact(self):
         """Actions containing VENDRE, PROFITS, or ALLÉGER should have negative impact."""
-        for key, (action, desc, impact) in PredictionService.STRATEGY_MATRIX.items():
+        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
             if "VENDRE" in action or "PROFITS" in action or "ALLÉGER" in action:
                 assert impact < 0, f"{key}: {action} should have negative impact, got {impact}"
 
     def test_hold_actions_have_zero_impact(self):
         """MAINTENIR, ATTENDRE, OBSERVER, CONSERVER should have zero impact."""
         zero_actions = {"MAINTENIR", "ATTENDRE", "OBSERVER", "CONSERVER", "ÉVITER"}
-        for key, (action, desc, impact) in PredictionService.STRATEGY_MATRIX.items():
+        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
             if action in zero_actions:
                 assert impact == 0.0, f"{key}: {action} should have 0 impact, got {impact}"
 
