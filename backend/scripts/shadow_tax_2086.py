@@ -6,7 +6,7 @@ Run against prod (or any environment) WITHOUT writing anything:
     DATABASE_URL=postgresql://...  python -m scripts.shadow_tax_2086 --years 2024 2025 2026
 
 For every (user, year) it runs ``ReportService.compute_tax_2086`` twice — once
-with ``report_service.TAX_MODE_LEGACY`` (the exact behaviour before the four
+with ``app.domains.reports.tax.TAX_MODE_LEGACY`` (the exact behaviour before the four
 accidental 2086 bugs were fixed) and once with the default converged mode — and
 prints every difference in the headline numbers and per-event fields.
 
@@ -14,7 +14,7 @@ Purpose: quantify the real-world impact of the convergence on YOUR data before
 trusting it. A clean run (no differences) means the fixes touch nothing in this
 dataset; any line printed is a cession whose taxable figure changed.
 
-The four converged fixes (see report_service.TAX_MODE docstrings):
+The four converged fixes (see app.domains.reports.tax):
   1. deterministic ordering (TRANSFER_OUT before same-timestamp TRANSFER_IN),
   2. external_id conversion-match fallback,
   3. transfer network-fee trim,
@@ -32,8 +32,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.domains.identity.models import User
-from app.services import report_service
-from app.services.report_service import ReportService
+from app.domains.reports.service import ReportService
+from app.domains.reports.tax import TAX_MODE_LEGACY
 
 # A field difference below this (in EUR) is treated as float noise, not a change.
 EPS = 0.005
@@ -115,7 +115,7 @@ async def main(years: list[int]) -> int:
         for year in years:
             # Fresh session per computation so no state bleeds between modes.
             async with session_factory() as db:
-                legacy = await svc.compute_tax_2086(db, uid, year, mode=report_service.TAX_MODE_LEGACY)
+                legacy = await svc.compute_tax_2086(db, uid, year, mode=TAX_MODE_LEGACY)
             async with session_factory() as db:
                 converged = await svc.compute_tax_2086(db, uid, year)
 

@@ -47,10 +47,11 @@ import pytest
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.reports.rebalancing import RebalanceOrder
+from app.domains.reports.service import ReportService
+from app.domains.reports.tax import TAX_MODE_LEGACY
 from app.domains.transactions.models import Transaction, TransactionType
-from app.services import report_service
 from app.services.metrics_service import MetricsService
-from app.services.report_service import RebalanceOrder, ReportService
 
 TxType = TransactionType
 
@@ -368,9 +369,7 @@ async def test_unmatched_conversion_out_diverges(db_session, regular_user):
 
     # Cross-check the payoff of the convergence: the LEGACY mode still destroys
     # the basis (acquisition 0), proving the fix is what changed the number.
-    legacy = await ReportService().compute_tax_2086(
-        db_session, str(regular_user.id), 2026, mode=report_service.TAX_MODE_LEGACY
-    )
+    legacy = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026, mode=TAX_MODE_LEGACY)
     assert legacy.events[0].total_acquisition_cost == pytest.approx(0.0, abs=1e-9)
 
 

@@ -1,0 +1,114 @@
+{
+  "body": {
+    "categories": [
+      {
+        "category": "DeFi",
+        "current_pct": 3.02,
+        "current_value": 1800.0,
+        "drift_eur": -4160.0,
+        "drift_pct": -6.98,
+        "label": "DeFi",
+        "target_pct": 10.0
+      },
+      {
+        "category": "L1",
+        "current_pct": 93.12,
+        "current_value": 55500.0,
+        "drift_eur": 25700.0,
+        "drift_pct": 43.12,
+        "label": "Layer 1",
+        "target_pct": 50.0
+      },
+      {
+        "category": "L2",
+        "current_pct": 1.34,
+        "current_value": 800.0,
+        "drift_eur": -5160.0,
+        "drift_pct": -8.66,
+        "label": "Layer 2",
+        "target_pct": 10.0
+      },
+      {
+        "category": "Meme",
+        "current_pct": 2.52,
+        "current_value": 1500.0,
+        "drift_eur": -4460.0,
+        "drift_pct": -7.48,
+        "label": "Meme",
+        "target_pct": 10.0
+      },
+      {
+        "category": "Stable",
+        "current_pct": 0.0,
+        "current_value": 0.0,
+        "drift_eur": -11920.0,
+        "drift_pct": -20.0,
+        "label": "Stablecoins",
+        "target_pct": 20.0
+      }
+    ],
+    "hhi_after": 3200.0,
+    "hhi_before": 8688.7,
+    "orders": [
+      {
+        "action": "buy",
+        "amount_eur": 4160.0,
+        "category": "DeFi",
+        "current_pct": 3.02,
+        "drift_pct": -6.98,
+        "estimated_gain": 0.0,
+        "estimated_tax": 0.0,
+        "target_pct": 10.0
+      },
+      {
+        "action": "sell",
+        "amount_eur": 25700.0,
+        "category": "L1",
+        "current_pct": 93.12,
+        "drift_pct": 43.12,
+        "estimated_gain": 12274.77,
+        "estimated_tax": 3682.43,
+        "target_pct": 50.0
+      },
+      {
+        "action": "buy",
+        "amount_eur": 5160.0,
+        "category": "L2",
+        "current_pct": 1.34,
+        "drift_pct": -8.66,
+        "estimated_gain": 0.0,
+        "estimated_tax": 0.0,
+        "target_pct": 10.0
+      },
+      {
+        "action": "buy",
+        "amount_eur": 4460.0,
+        "category": "Meme",
+        "current_pct": 2.52,
+        "drift_pct": -7.48,
+        "estimated_gain": 0.0,
+        "estimated_tax": 0.0,
+        "target_pct": 10.0
+      },
+      {
+        "action": "buy",
+        "amount_eur": 11920.0,
+        "category": "Stable",
+        "current_pct": 0.0,
+        "drift_pct": -20.0,
+        "estimated_gain": 0.0,
+        "estimated_tax": 0.0,
+        "target_pct": 20.0
+      }
+    ],
+    "total_buy_amount": 25700.0,
+    "total_estimated_gain": 12274.77,
+    "total_estimated_tax": 3682.43,
+    "total_sell_amount": 25700.0,
+    "total_value": 63600.0
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

@@ -1,0 +1,25 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "L1": 0.5,
+          "NFT": 0.5
+        },
+        "loc": [
+          "body",
+          "target_allocations"
+        ],
+        "msg": "Value error, Invalid category 'NFT'. Allowed: {'DeFi', 'L1', 'L2', 'Meme', 'Other', 'Stable'}",
+        "type": "value_error"
+      }
+    ]
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 422
+}

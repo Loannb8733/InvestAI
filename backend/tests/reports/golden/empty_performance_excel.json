@@ -1,0 +1,39 @@
+{
+  "body": {
+    "Résumé": [
+      [
+        "Rapport de Performance InvestAI",
+        null
+      ],
+      [
+        "Généré le 17/10/2026 à 14:00 (heure de Paris)",
+        null
+      ],
+      [
+        "Indicateur",
+        "Valeur"
+      ],
+      [
+        "Valeur totale",
+        0
+      ],
+      [
+        "Total investi",
+        0
+      ],
+      [
+        "Plus/Moins-value",
+        0
+      ],
+      [
+        "Performance (%)",
+        0
+      ]
+    ]
+  },
+  "headers": {
+    "content-disposition": "attachment; filename=rapport_performance_20261017.xlsx",
+    "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  "status": 200
+}

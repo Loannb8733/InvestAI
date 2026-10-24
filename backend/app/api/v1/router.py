@@ -12,7 +12,6 @@ from app.api.v1.endpoints import (
     insights,
     notifications,
     predictions,
-    reports,
     simulations,
     smart_insights,
     strategies,
@@ -26,6 +25,7 @@ from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
 from app.domains.journal.router import router as journal_router
 from app.domains.portfolio.router import assets_router, portfolios_router
+from app.domains.reports.router import router as reports_router
 from app.domains.transactions.router import router as transactions_router
 
 api_router = APIRouter()
@@ -43,7 +43,7 @@ api_router.include_router(cron.router, prefix="/cron", tags=["Cron"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(predictions.router, prefix="/predictions", tags=["Predictions"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
-api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
+api_router.include_router(reports_router, prefix="/reports", tags=["Reports"])
 api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
 api_router.include_router(simulations.router, prefix="/simulations", tags=["Simulations"])

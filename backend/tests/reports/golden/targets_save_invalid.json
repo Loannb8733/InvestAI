@@ -1,0 +1,24 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "L1": 1.5
+        },
+        "loc": [
+          "body",
+          "target_allocations"
+        ],
+        "msg": "Value error, Allocations must sum to 1.0 (got 1.5000)",
+        "type": "value_error"
+      }
+    ]
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 422
+}

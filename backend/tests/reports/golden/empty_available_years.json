@@ -1,0 +1,11 @@
+{
+  "body": {
+    "years": [
+      2026
+    ]
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

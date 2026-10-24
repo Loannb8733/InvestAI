@@ -1,0 +1,9 @@
+{
+  "body": {
+    "detail": "Rapport Valeurs Mobilières non disponible - fonctionnalité en cours de développement"
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 501
+}

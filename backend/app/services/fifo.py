@@ -1,6 +1,6 @@
 """Shared FIFO cost-basis primitives (single source of truth).
 
-``metrics_service`` (displayed P&L / cost basis) and ``report_service`` (tax
+``metrics_service`` (displayed P&L / cost basis) and ``app.domains.reports`` (tax
 2086 + sell-order estimates) both consume FIFO layers. The consume math used
 to be duplicated as nested closures in each service, which risked the two
 diverging — i.e. the displayed gain disagreeing with the tax-form gain.

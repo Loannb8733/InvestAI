@@ -494,7 +494,7 @@ class AlertService:
         elif alert.condition == AlertCondition.ALLOCATION_DRIFT:
             # Écart max vs allocation cible persistée (en points de %).
             from app.domains.identity.models import User
-            from app.services.report_service import report_service
+            from app.domains.reports.service import report_service
 
             user_obj = (await db.execute(select(User).where(User.id == alert.user_id))).scalar_one_or_none()
             targets = getattr(user_obj, "target_allocations", None) if user_obj else None

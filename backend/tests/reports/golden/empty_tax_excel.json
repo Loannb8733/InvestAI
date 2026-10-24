@@ -1,0 +1,86 @@
+{
+  "body": {
+    "Cessions": [
+      [
+        "Date",
+        "Actif",
+        "Type",
+        "Quantité",
+        "Prix unitaire",
+        "Prix cession",
+        "Valeur portefeuille",
+        "Coût acquisition",
+        "Fraction acq.",
+        "PV/MV",
+        "Durée"
+      ]
+    ],
+    "Résumé 2026": [
+      [
+        "Déclaration Fiscale Crypto — Année 2026",
+        null
+      ],
+      [
+        "Généré le 17/10/2026",
+        null
+      ],
+      [
+        "Résumé des cessions",
+        null
+      ],
+      [
+        "Nombre de cessions",
+        0
+      ],
+      [
+        "  dont court terme (< 2 ans)",
+        0
+      ],
+      [
+        "  dont long terme (≥ 2 ans)",
+        0
+      ],
+      [
+        "Prix total de cession",
+        0
+      ],
+      [
+        "Fraction d'acquisition (PMP)",
+        0
+      ],
+      [
+        "Total plus-values",
+        0
+      ],
+      [
+        "Total moins-values",
+        0
+      ],
+      [
+        "Plus-value nette imposable",
+        0
+      ],
+      [
+        "Estimation fiscale (PFU 30%)",
+        null
+      ],
+      [
+        "Impôt sur le revenu (12,8%)",
+        0
+      ],
+      [
+        "Prélèvements sociaux (17,2%)",
+        0
+      ],
+      [
+        "Total Flat Tax (30%)",
+        0
+      ]
+    ]
+  },
+  "headers": {
+    "content-disposition": "attachment; filename=declaration_fiscale_crypto_2026.xlsx",
+    "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  "status": 200
+}

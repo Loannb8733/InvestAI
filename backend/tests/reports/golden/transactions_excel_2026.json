@@ -1,0 +1,29 @@
+{
+  "body": {
+    "Transactions": [
+      [
+        "Date",
+        "Type",
+        "Actif",
+        "Quantité",
+        "Prix Unitaire (EUR)",
+        "Valeur Totale (EUR)",
+        "Frais (EUR)"
+      ],
+      [
+        "01/03/2026",
+        "Vente",
+        "ETH",
+        1,
+        3500,
+        3500,
+        3
+      ]
+    ]
+  },
+  "headers": {
+    "content-disposition": "attachment; filename=transactions_2026_20261017.xlsx",
+    "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  "status": 200
+}

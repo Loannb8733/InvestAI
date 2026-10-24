@@ -6,7 +6,6 @@ comments	backend/app/api/v1/endpoints/dashboard.py
 comments	backend/app/api/v1/endpoints/goals.py
 comments	backend/app/api/v1/endpoints/notifications.py
 comments	backend/app/api/v1/endpoints/predictions.py
-comments	backend/app/api/v1/endpoints/reports.py
 comments	backend/app/api/v1/endpoints/simulations.py
 comments	backend/app/api/v1/endpoints/smart_insights.py
 comments	backend/app/api/v1/endpoints/telegram_webhook.py
@@ -60,12 +59,6 @@ comments	backend/app/services/prediction_service.py
 comments	backend/app/services/prediction_types.py
 comments	backend/app/services/reconciliation_service.py
 comments	backend/app/services/regime_alert_service.py
-comments	backend/app/services/report_common.py
-comments	backend/app/services/report_performance.py
-comments	backend/app/services/report_rebalancing.py
-comments	backend/app/services/report_service.py
-comments	backend/app/services/report_tax.py
-comments	backend/app/services/report_transactions.py
 comments	backend/app/services/smart_insights_analyzers.py
 comments	backend/app/services/smart_insights_service.py
 comments	backend/app/services/smart_insights_types.py
@@ -212,7 +205,6 @@ too-long	backend/app/api/v1/endpoints/crowdfunding.py
 too-long	backend/app/api/v1/endpoints/dashboard.py
 too-long	backend/app/api/v1/endpoints/goals.py
 too-long	backend/app/api/v1/endpoints/predictions.py
-too-long	backend/app/api/v1/endpoints/reports.py
 too-long	backend/app/api/v1/endpoints/simulations.py
 too-long	backend/app/api/v1/endpoints/smart_insights.py
 too-long	backend/app/api/v1/endpoints/strategies.py
@@ -237,10 +229,6 @@ too-long	backend/app/services/prediction_alpha.py
 too-long	backend/app/services/prediction_cycles.py
 too-long	backend/app/services/prediction_service.py
 too-long	backend/app/services/reconciliation_service.py
-too-long	backend/app/services/report_performance.py
-too-long	backend/app/services/report_rebalancing.py
-too-long	backend/app/services/report_service.py
-too-long	backend/app/services/report_tax.py
 too-long	backend/app/services/smart_insights_analyzers.py
 too-long	backend/app/services/smart_insights_service.py
 too-long	backend/app/services/snapshot_risk.py

@@ -1,0 +1,17 @@
+{
+  "body": {
+    "categories": [],
+    "hhi_after": 0.0,
+    "hhi_before": 0.0,
+    "orders": [],
+    "total_buy_amount": 0.0,
+    "total_estimated_gain": 0.0,
+    "total_estimated_tax": 0.0,
+    "total_sell_amount": 0.0,
+    "total_value": 0
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

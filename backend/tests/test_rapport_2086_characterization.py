@@ -2,7 +2,7 @@
 
 Pourquoi ce fichier existe
 --------------------------
-`generate_tax_report_2086` produit le document que l'utilisateur joint à sa
+`render_tax_pdf` produit le document que l'utilisateur joint à sa
 déclaration de revenus : plus-values de cessions d'actifs numériques, formulaire
 2086. 225 lignes, couvertes à **3 %**.
 
@@ -16,12 +16,12 @@ PDF valide mais vide passerait le premier contrôle ; il ne passe pas ceux-ci.
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
 
 import pymupdf
 
-from app.services.report_service import ReportService
-from app.services.report_tax import TaxEvent2086, TaxSummary2086
+from app.domains.reports.styles import money
+from app.domains.reports.tax import TaxEvent2086, TaxSummary2086
+from app.domains.reports.tax_pdf import render_tax_pdf
 
 
 def _cession(symbole="BTC", quantite=0.5, prix_cession=15000.0, gain=5000.0, duree="long_terme"):
@@ -66,9 +66,7 @@ def _resume(evenements=None, **surcharges):
 
 
 async def _generer(db_session, resume):
-    service = ReportService()
-    with patch.object(service, "compute_tax_2086", new=AsyncMock(return_value=resume)):
-        return await service.generate_tax_report_2086(db_session, "un-utilisateur", 2026)
+    return render_tax_pdf(resume, 2026)
 
 
 def _texte(pdf: bytes) -> str:
@@ -129,16 +127,14 @@ class TestMontantsImprimes:
         si bien qu'un test portant sur les taux passait au vert même en
         supprimant la ligne du tableau — vérifié par canari.
         """
-        from app.services.report_common import _money
-
         resume = _resume([_cession(gain=10000.0)])
         texte = _texte(await _generer(db_session, resume))
 
-        # Montants formatés en entier, tels que `_money` les écrit — « 1,280.00 € ».
+        # Montants formatés en entier, tels que `money` les écrit — « 1,280.00 € ».
         # Une première version comparait un « noyau » tronqué à la virgule, donc
         # au seul chiffre « 1 » : présent partout, le test ne prouvait rien.
         for montant in (resume.ir_12_8, resume.ps_17_2):
-            attendu = _money(montant)
+            attendu = money(montant)
             assert attendu in texte, f"{attendu} absent du document"
 
 
