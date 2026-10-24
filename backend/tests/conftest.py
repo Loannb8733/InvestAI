@@ -127,6 +127,19 @@ def _reset_fx_memory():
     reset()
 
 
+@pytest.fixture(autouse=True)
+def _no_background_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aucun rafraîchissement d'historique hors du test : ni tâche sur la boucle, ni envoi au worker Celery.
+
+    Sur la boucle, la tâche survit au test, interroge le réseau puis écrit dans la base pendant le
+    ``drop_all`` du nettoyage : deadlock, et le test suivant hérite des lignes non supprimées.
+    """
+    from app.domains.market_data.history import tasks as history_tasks
+
+    monkeypatch.setattr(settings, "CELERY_WORKER_AVAILABLE", True)
+    monkeypatch.setattr(history_tasks.refresh_one, "delay", lambda *args, **kwargs: None)
+
+
 @pytest.fixture
 def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
     return install_http_stub(monkeypatch)
