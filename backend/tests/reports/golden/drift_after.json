@@ -1,0 +1,64 @@
+{
+  "body": {
+    "categories": [
+      {
+        "category": "DeFi",
+        "current_pct": 3.02,
+        "current_value": 1800.0,
+        "drift_eur": -4160.0,
+        "drift_pct": -6.98,
+        "label": "DeFi",
+        "target_pct": 10.0
+      },
+      {
+        "category": "L1",
+        "current_pct": 93.12,
+        "current_value": 55500.0,
+        "drift_eur": 25700.0,
+        "drift_pct": 43.12,
+        "label": "Layer 1",
+        "target_pct": 50.0
+      },
+      {
+        "category": "L2",
+        "current_pct": 1.34,
+        "current_value": 800.0,
+        "drift_eur": -5160.0,
+        "drift_pct": -8.66,
+        "label": "Layer 2",
+        "target_pct": 10.0
+      },
+      {
+        "category": "Meme",
+        "current_pct": 2.52,
+        "current_value": 1500.0,
+        "drift_eur": -4460.0,
+        "drift_pct": -7.48,
+        "label": "Meme",
+        "target_pct": 10.0
+      },
+      {
+        "category": "Stable",
+        "current_pct": 0.0,
+        "current_value": 0.0,
+        "drift_eur": -11920.0,
+        "drift_pct": -20.0,
+        "label": "Stablecoins",
+        "target_pct": 20.0
+      }
+    ],
+    "max_drift_pct": 43.12,
+    "targets": {
+      "DeFi": 0.1,
+      "L1": 0.5,
+      "L2": 0.1,
+      "Meme": 0.1,
+      "Stable": 0.2
+    },
+    "total_crypto_value": 63600.0
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

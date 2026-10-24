@@ -1,0 +1,9 @@
+{
+  "body": {
+    "detail": "Not authenticated"
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 401
+}

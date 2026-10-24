@@ -1,0 +1,99 @@
+{
+  "body": {
+    "Cessions": [
+      [
+        "Date",
+        "Actif",
+        "Type",
+        "Quantité",
+        "Prix unitaire",
+        "Prix cession",
+        "Valeur portefeuille",
+        "Coût acquisition",
+        "Fraction acq.",
+        "PV/MV",
+        "Durée"
+      ],
+      [
+        "15/11/2025",
+        "BTC",
+        "Vente",
+        0.1,
+        70000,
+        6993,
+        65664.2145,
+        42982,
+        4577.4267,
+        2415.5733,
+        "< 2 ans"
+      ]
+    ],
+    "Résumé 2025": [
+      [
+        "Déclaration Fiscale Crypto — Année 2025",
+        null
+      ],
+      [
+        "Généré le 17/10/2026",
+        null
+      ],
+      [
+        "Résumé des cessions",
+        null
+      ],
+      [
+        "Nombre de cessions",
+        1
+      ],
+      [
+        "  dont court terme (< 2 ans)",
+        1
+      ],
+      [
+        "  dont long terme (≥ 2 ans)",
+        0
+      ],
+      [
+        "Prix total de cession",
+        6993
+      ],
+      [
+        "Fraction d'acquisition (PMP)",
+        4577.4267
+      ],
+      [
+        "Total plus-values",
+        2415.5733
+      ],
+      [
+        "Total moins-values",
+        0
+      ],
+      [
+        "Plus-value nette imposable",
+        2415.5733
+      ],
+      [
+        "Estimation fiscale (PFU 30%)",
+        null
+      ],
+      [
+        "Impôt sur le revenu (12,8%)",
+        309.1934
+      ],
+      [
+        "Prélèvements sociaux (17,2%)",
+        415.4786
+      ],
+      [
+        "Total Flat Tax (30%)",
+        724.672
+      ]
+    ]
+  },
+  "headers": {
+    "content-disposition": "attachment; filename=declaration_fiscale_crypto_2025.xlsx",
+    "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  "status": 200
+}

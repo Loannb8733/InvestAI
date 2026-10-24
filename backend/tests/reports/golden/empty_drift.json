@@ -1,0 +1,12 @@
+{
+  "body": {
+    "categories": [],
+    "max_drift_pct": 0.0,
+    "targets": null,
+    "total_crypto_value": 0.0
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

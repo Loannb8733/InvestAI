@@ -1,0 +1,17 @@
+{
+  "body": {
+    "flat_tax_30": 262.59,
+    "ir_12_8": 112.04,
+    "nb_cessions": 1,
+    "net_plus_value": 875.29,
+    "ps_17_2": 150.55,
+    "total_cessions": 3497.0,
+    "total_moins_values": 0,
+    "total_plus_values": 875.29,
+    "year": 2026
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

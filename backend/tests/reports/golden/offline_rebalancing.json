@@ -1,0 +1,9 @@
+{
+  "body": {
+    "detail": "Internal server error"
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 500
+}

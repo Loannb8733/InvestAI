@@ -1,0 +1,25 @@
+{
+  "body": [
+    [
+      "Page 1",
+      "Rapport de Performance",
+      "Généré le 17/10/2026 à 14:00 (heure de Paris)",
+      "Résumé Global",
+      "Indicateur",
+      "Valeur",
+      "Valeur totale",
+      "0.00 €",
+      "Total investi",
+      "0.00 €",
+      "Plus/Moins-value",
+      "0.00 €",
+      "Performance",
+      "0.00 %"
+    ]
+  ],
+  "headers": {
+    "content-disposition": "attachment; filename=rapport_performance_20261017.pdf",
+    "content-type": "application/pdf"
+  },
+  "status": 200
+}

@@ -1,0 +1,31 @@
+{
+  "body": [
+    [
+      "Page 1",
+      "Rapport de Rééquilibrage",
+      "Généré le 17/10/2026 à 14:00 (heure de Paris)",
+      "1. Valeur du portefeuille crypto",
+      "Valeur totale : 0.00 €",
+      "2. Allocation Actuelle vs Cible",
+      "Catégorie",
+      "Valeur",
+      "Actuel %",
+      "Cible %",
+      "Écart %",
+      "Écart EUR",
+      "5. Score de Diversification (HHI)",
+      "HHI avant rééquilibrage",
+      "0",
+      "HHI après rééquilibrage",
+      "0",
+      "HHI < 1500 = bien diversifié | 1500-2500 = modéré | > 2500 = concentré",
+      "Ce rapport est fourni à titre indicatif. L'estimation fiscale utilise les couches FIFO actuelles et le PFU à 30%. Consultez",
+      "un professionnel avant d'exécuter les ordres suggérés."
+    ]
+  ],
+  "headers": {
+    "content-disposition": "attachment; filename=rapport_reequilibrage_20261017.pdf",
+    "content-type": "application/pdf"
+  },
+  "status": 200
+}

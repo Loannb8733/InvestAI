@@ -1,0 +1,110 @@
+{
+  "body": {
+    "Transactions": [
+      [
+        "Date",
+        "Type",
+        "Actif",
+        "Quantité",
+        "Prix Unitaire (EUR)",
+        "Valeur Totale (EUR)",
+        "Frais (EUR)"
+      ],
+      [
+        "01/03/2026",
+        "Vente",
+        "ETH",
+        1,
+        3500,
+        3500,
+        3
+      ],
+      [
+        "15/11/2025",
+        "Vente",
+        "BTC",
+        0.1,
+        70000,
+        7000,
+        7
+      ],
+      [
+        "01/09/2025",
+        "Achat",
+        "DOGE",
+        10000,
+        0.1,
+        1000,
+        1
+      ],
+      [
+        "01/08/2025",
+        "Achat",
+        "BTC",
+        0.25,
+        50000,
+        12500,
+        5
+      ],
+      [
+        "01/06/2025",
+        "Achat",
+        "UNI",
+        200,
+        7,
+        1400,
+        1
+      ],
+      [
+        "20/05/2025",
+        "Achat",
+        "AAPL",
+        20,
+        170,
+        3400,
+        1
+      ],
+      [
+        "01/04/2025",
+        "Achat",
+        "SOL",
+        50,
+        100,
+        5000,
+        2
+      ],
+      [
+        "01/03/2025",
+        "Achat",
+        "ARB",
+        1000,
+        1.2,
+        1200,
+        1
+      ],
+      [
+        "15/02/2025",
+        "Achat",
+        "ETH",
+        4,
+        2000,
+        8000,
+        4
+      ],
+      [
+        "10/01/2025",
+        "Achat",
+        "BTC",
+        0.5,
+        30000,
+        15000,
+        10
+      ]
+    ]
+  },
+  "headers": {
+    "content-disposition": "attachment; filename=transactions_all_20261017.xlsx",
+    "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  "status": 200
+}

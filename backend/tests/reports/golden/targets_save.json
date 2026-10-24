@@ -1,0 +1,15 @@
+{
+  "body": {
+    "targets": {
+      "DeFi": 0.1,
+      "L1": 0.5,
+      "L2": 0.1,
+      "Meme": 0.1,
+      "Stable": 0.2
+    }
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "status": 200
+}

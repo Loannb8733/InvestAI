@@ -1,0 +1,18 @@
+{
+  "body": [
+    [
+      "Date",
+      "Type",
+      "Actif",
+      "Quantité",
+      "Prix Unitaire (EUR)",
+      "Valeur Totale (EUR)",
+      "Frais (EUR)"
+    ]
+  ],
+  "headers": {
+    "content-disposition": "attachment; filename=transactions_all_20261017.csv",
+    "content-type": "text/csv; charset=utf-8"
+  },
+  "status": 200
+}

@@ -1,0 +1,21 @@
+{
+  "body": [
+    [
+      "Page 1",
+      "Historique des Transactions",
+      "Toutes les années — Généré le 17/10/2026 à 14:00 (heure de Paris)",
+      "Résumé",
+      "Nombre de transactions",
+      "0",
+      "Volume total",
+      "0.00 €",
+      "Total frais",
+      "0.00 €"
+    ]
+  ],
+  "headers": {
+    "content-disposition": "attachment; filename=rapport_transactions_all_20261017.pdf",
+    "content-type": "application/pdf"
+  },
+  "status": 200
+}
