@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.analytics.core import AnalyticsCore
+from app.domains.analytics.core import AnalyticsCore, last_known_price
 from app.domains.analytics.metrics import compute_returns
 from app.domains.analytics.results import MonteCarloResult
 from app.domains.analytics.simulation import simulate_monte_carlo
@@ -35,7 +35,7 @@ def _split_liquidity(assets: list[Asset]) -> tuple[dict[str, Asset], Decimal]:
     liquidity_value = Decimal("0")
     for a in assets:
         if is_cash_like(a.symbol):
-            price = float(a.avg_buy_price) if a.avg_buy_price and float(a.avg_buy_price) > 0 else 1.0
+            price = last_known_price(a) or 1.0
             liquidity_value += Decimal(str(a.quantity)) * Decimal(str(price))
             continue
         if a.symbol not in seen:
@@ -77,13 +77,14 @@ def _simulation_inputs(
 class AnalyticsMonteCarlo(AnalyticsCore):
     async def _risky_returns(
         self, seen: dict[str, Asset], liquidity_value: Decimal
-    ) -> tuple[list[FloatArray], list[float], Decimal]:
+    ) -> tuple[list[FloatArray], list[float], list[str], Decimal]:
         all_returns: list[FloatArray] = []
         all_weights: list[float] = []
+        simulated: list[str] = []
         total_value_dec = liquidity_value
         for sym, asset in seen.items():
             prices = await self._history_prices(sym, days=HISTORY_DAYS)
-            price = prices[-1] if prices and prices[-1] > 0 else float(asset.avg_buy_price or 0)
+            price = prices[-1] if prices and prices[-1] > 0 else last_known_price(asset)
             if price <= 0:
                 continue
             val_dec = Decimal(str(asset.quantity)) * Decimal(str(price))
@@ -92,7 +93,8 @@ class AnalyticsMonteCarlo(AnalyticsCore):
             if len(rets) >= MIN_RETURNS:
                 all_returns.append(rets)
                 all_weights.append(float(val_dec))
-        return all_returns, all_weights, total_value_dec
+                simulated.append(sym)
+        return all_returns, all_weights, simulated, total_value_dec
 
     async def monte_carlo(
         self,
@@ -114,7 +116,7 @@ class AnalyticsMonteCarlo(AnalyticsCore):
             return _no_simulation(horizon_days)
 
         seen, liquidity_value = _split_liquidity(assets)
-        all_returns, all_weights, total_value_dec = await self._risky_returns(seen, liquidity_value)
+        all_returns, all_weights, simulated, total_value_dec = await self._risky_returns(seen, liquidity_value)
         if float(liquidity_value) > 0 and all_returns:
             all_returns.append(np.zeros(min(len(r) for r in all_returns)))
             all_weights.append(float(liquidity_value))
@@ -124,7 +126,7 @@ class AnalyticsMonteCarlo(AnalyticsCore):
             return _no_simulation(horizon_days)
 
         if contribution:
-            total_value = _apply_contribution(contribution, list(seen.keys()), all_weights, total_value)
+            total_value = _apply_contribution(contribution, simulated, all_weights, total_value)
 
         mu_vec, cholesky_factor, w, n_assets = _simulation_inputs(all_returns, all_weights)
         loop = asyncio.get_event_loop()
