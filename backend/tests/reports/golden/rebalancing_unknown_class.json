@@ -13,7 +13,7 @@
           "body",
           "target_allocations"
         ],
-        "msg": "Value error, Invalid category 'NFT'. Allowed: {'DeFi', 'L1', 'L2', 'Meme', 'Other', 'Stable'}",
+        "msg": "Value error, Invalid category 'NFT'. Allowed: DeFi, L1, L2, Meme, Other, Stable",
         "type": "value_error"
       }
     ]
