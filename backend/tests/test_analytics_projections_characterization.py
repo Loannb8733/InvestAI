@@ -20,8 +20,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.analytics.service import AnalyticsService
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.services.analytics_service import AnalyticsService
 
 # Une série qui monte régulièrement, assez longue pour les calculs de volatilité.
 SERIE_HAUSSIERE = [100, 102, 101, 105, 108, 107, 110, 112, 111, 115] * 6

@@ -1,6 +1,6 @@
 """Golden numeric tests for XIRR cashflow construction (FIN-02 / audit F-02..F-04, F-08).
 
-These pin the pure pipeline ``_build_xirr_cashflows`` + ``_xirr`` against known
+These pin the pure pipeline ``build_xirr_cashflows`` + ``xirr`` against known
 reference series, the gap the audit flagged: prior tests only checked XIRR was
 "finite and within [-95, 1000]", never a value against a hand-computed expectation.
 
@@ -15,8 +15,8 @@ Covered:
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from app.domains.analytics.xirr import build_xirr_cashflows, xirr
 from app.domains.transactions.models import TransactionType
-from app.services.analytics_service import _build_xirr_cashflows, _xirr
 
 
 class _Tx:
@@ -41,11 +41,11 @@ def test_known_cashflows_yield_known_rate():
         _Tx(TransactionType.BUY, qty=1, price=10000, when=_T0),
         _Tx(TransactionType.SELL, qty=1, price=11000, when=_T1),
     ]
-    cashflows, skipped = _build_xirr_cashflows(txs)
+    cashflows, skipped = build_xirr_cashflows(txs)
     assert skipped == 0
     assert cashflows[0][1] < 0  # F-08: BUY is a negative (outflow)
     assert cashflows[1][1] > 0
-    rate = _xirr(cashflows)
+    rate = xirr(cashflows)
     assert rate is not None
     assert abs(rate * 100 - 10.0) < 0.1
 
@@ -60,11 +60,11 @@ def test_matched_internal_transfers_do_not_affect_rate():
         _Tx(TransactionType.TRANSFER_OUT, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=UTC)),
         _Tx(TransactionType.TRANSFER_IN, qty=1, price=10500, when=datetime(2023, 6, 1, tzinfo=UTC)),
     ]
-    cf_base, _ = _build_xirr_cashflows(base)
-    cf_xfer, _ = _build_xirr_cashflows(with_transfers)
+    cf_base, _ = build_xirr_cashflows(base)
+    cf_xfer, _ = build_xirr_cashflows(with_transfers)
     # Transfers contribute zero extra cashflows.
     assert len(cf_xfer) == len(cf_base)
-    assert _xirr(cf_xfer) == _xirr(cf_base)
+    assert xirr(cf_xfer) == xirr(cf_base)
 
 
 def test_dividends_and_interest_count_as_inflows():
@@ -77,17 +77,17 @@ def test_dividends_and_interest_count_as_inflows():
         _Tx(TransactionType.DIVIDEND, qty=1, price=300, when=datetime(2023, 7, 1, tzinfo=UTC)),
         _Tx(TransactionType.INTEREST, qty=1, price=200, when=datetime(2023, 7, 1, tzinfo=UTC)),
     ]
-    cf_without, _ = _build_xirr_cashflows(without)
-    cf_with, _ = _build_xirr_cashflows(with_income)
+    cf_without, _ = build_xirr_cashflows(without)
+    cf_with, _ = build_xirr_cashflows(with_income)
     assert len(cf_with) == len(cf_without) + 2
     # Flat trade returns ~0%; adding 500 of income makes it strictly positive.
-    assert (_xirr(cf_without) or 0) < (_xirr(cf_with) or 0)
+    assert (xirr(cf_without) or 0) < (xirr(cf_with) or 0)
 
 
 def test_per_line_conversion_rate_applied():
     """A USD buy with conversion_rate 0.9 contributes -9000 EUR, not -10000 (F-02)."""
     txs = [_Tx(TransactionType.BUY, qty=1, price=10000, when=_T0, rate="0.9")]
-    cashflows, _ = _build_xirr_cashflows(txs)
+    cashflows, _ = build_xirr_cashflows(txs)
     assert cashflows[0][1] == -9000.0
 
 
@@ -97,12 +97,12 @@ def test_eur_to_target_scales_all_lines():
         _Tx(TransactionType.BUY, qty=1, price=1000, when=_T0),
         _Tx(TransactionType.SELL, qty=1, price=2000, when=_T1),
     ]
-    cf_eur, _ = _build_xirr_cashflows(txs, eur_to_target=1.0)
-    cf_usd, _ = _build_xirr_cashflows(txs, eur_to_target=1.1)
+    cf_eur, _ = build_xirr_cashflows(txs, eur_to_target=1.0)
+    cf_usd, _ = build_xirr_cashflows(txs, eur_to_target=1.1)
     assert cf_usd[0][1] == cf_eur[0][1] * 1.1
     assert cf_usd[1][1] == cf_eur[1][1] * 1.1
     # A uniform scale of all flows leaves the rate unchanged.
-    assert abs((_xirr(cf_usd) or 0) - (_xirr(cf_eur) or 0)) < 1e-6
+    assert abs((xirr(cf_usd) or 0) - (xirr(cf_eur) or 0)) < 1e-6
 
 
 def test_null_date_rows_are_skipped():
@@ -110,6 +110,6 @@ def test_null_date_rows_are_skipped():
         _Tx(TransactionType.BUY, qty=1, price=100, when=None),
         _Tx(TransactionType.BUY, qty=1, price=100, when=_T0),
     ]
-    cashflows, skipped = _build_xirr_cashflows(txs)
+    cashflows, skipped = build_xirr_cashflows(txs)
     assert skipped == 1
     assert len(cashflows) == 1

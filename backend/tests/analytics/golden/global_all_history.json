@@ -1,0 +1,99 @@
+{
+  "body": {
+    "allocation_by_asset": {
+      "AAPL": 6.2266,
+      "BTC": 66.9831,
+      "ETH": 14.9722,
+      "SOL": 11.818
+    },
+    "allocation_by_type": {
+      "crypto": 93.7734,
+      "stock": 6.2266
+    },
+    "asset_count": 4,
+    "assets": [
+      {
+        "asset_type": "crypto",
+        "current_value": 43115.7011,
+        "daily_return": 0.38,
+        "gain_loss": 15600.7011,
+        "gain_loss_percent": 56.6989,
+        "max_drawdown": -9.92,
+        "name": "BTC",
+        "sharpe_ratio": 7.19,
+        "sortino_ratio": 9.71,
+        "symbol": "BTC",
+        "total_invested": 27515.0,
+        "volatility_30d": 4.7,
+        "weight": 66.9831
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 9637.306,
+        "daily_return": 0.59,
+        "gain_loss": 3634.306,
+        "gain_loss_percent": 60.5415,
+        "max_drawdown": -16.95,
+        "name": "ETH",
+        "sharpe_ratio": 2.87,
+        "sortino_ratio": 3.23,
+        "symbol": "ETH",
+        "total_invested": 6003.0,
+        "volatility_30d": 8.8,
+        "weight": 14.9722
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 7607.0216,
+        "daily_return": -0.96,
+        "gain_loss": 2605.0216,
+        "gain_loss_percent": 52.0796,
+        "max_drawdown": -23.11,
+        "name": "SOL",
+        "sharpe_ratio": 2.4,
+        "sortino_ratio": 2.68,
+        "symbol": "SOL",
+        "total_invested": 5002.0,
+        "volatility_30d": 15.7,
+        "weight": 11.818
+      },
+      {
+        "asset_type": "stock",
+        "current_value": 4007.9688,
+        "daily_return": 0.05,
+        "gain_loss": 606.9688,
+        "gain_loss_percent": 17.8468,
+        "max_drawdown": -4.7,
+        "name": "AAPL",
+        "sharpe_ratio": 5.34,
+        "sortino_ratio": 7.3,
+        "symbol": "AAPL",
+        "total_invested": 3401.0,
+        "volatility_30d": 1.4,
+        "weight": 6.2266
+      }
+    ],
+    "best_performer": "ETH",
+    "calmar_ratio": 3.69,
+    "concentration_risk": 0.4889,
+    "cvar_95": 186.67,
+    "diversification_score": 32.9,
+    "interpretations": {
+      "calmar": "Excellente récupération : le rendement compense largement le pire drawdown subi.",
+      "sharpe": "Performance atypique (Sharpe > 3) : probablement liée à une volatilité extrême ou un pump récent. Ne pas extrapoler.",
+      "sortino": "Sortino nettement supérieur au Sharpe : votre volatilité est principalement positive (hausses). C'est un signe de force — le Sortino est plus pertinent en crypto car il ne punit pas les gains explosifs."
+    },
+    "max_drawdown": -9.25,
+    "portfolio_volatility": 3.6,
+    "sharpe_ratio": 8.5,
+    "sortino_ratio": 10.93,
+    "total_gain_loss": 22446.9975,
+    "total_gain_loss_percent": 53.5459,
+    "total_invested": 41921.0,
+    "total_value": 64367.9975,
+    "var_95": 154.48,
+    "var_95_description": "Perte journalière maximale attendue (95%): 154.48 EUR (0.24% du portefeuille)",
+    "worst_performer": "AAPL"
+  },
+  "status": 200
+}

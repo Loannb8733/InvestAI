@@ -1,0 +1,40 @@
+{
+  "body": {
+    "allocation_by_type": {
+      "crypto": 93.7734,
+      "stock": 6.2266
+    },
+    "asset_count": 4,
+    "concentration_risk": 0.4889,
+    "rating": "Faible",
+    "recommendations": [
+      {
+        "action": "Envisagez de diversifier vers d'autres actifs",
+        "message": "Concentration élevée: BTC représente 67.0% du portefeuille",
+        "severity": "high",
+        "type": "concentration"
+      },
+      {
+        "action": "Diversifiez entre crypto, actions, ETF et immobilier",
+        "message": "Seulement 2 classe(s) d'actifs",
+        "severity": "medium",
+        "type": "asset_types"
+      },
+      {
+        "action": "Réduisez l'exposition à crypto",
+        "message": "crypto représente 93.8% du portefeuille",
+        "severity": "medium",
+        "type": "overweight"
+      },
+      {
+        "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
+        "message": "Seulement 4 actif(s) en portefeuille",
+        "severity": "low",
+        "type": "asset_count"
+      }
+    ],
+    "score": 32.9,
+    "type_count": 2
+  },
+  "status": 200
+}

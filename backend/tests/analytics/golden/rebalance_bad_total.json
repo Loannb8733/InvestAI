@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Les poids cibles doivent sommer à 100% (actuellement 80.0%)"
+  },
+  "status": 400
+}

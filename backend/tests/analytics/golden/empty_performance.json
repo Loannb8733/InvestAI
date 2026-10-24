@@ -1,0 +1,21 @@
+{
+  "body": {
+    "largest_positions": [],
+    "most_volatile": [],
+    "period": "30d",
+    "summary": {
+      "calmar_ratio": 0.0,
+      "cvar_95": 0.0,
+      "max_drawdown": 0.0,
+      "sharpe_ratio": 0.0,
+      "sortino_ratio": 0.0,
+      "total_gain_loss": 0.0,
+      "total_gain_loss_percent": 0.0,
+      "total_value": 0.0,
+      "volatility": 0.0
+    },
+    "top_gainers": [],
+    "top_losers": []
+  },
+  "status": 200
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "currency": "EUR",
+    "max_drawdown": null,
+    "scenarios": [],
+    "total_value": 0
+  },
+  "status": 200
+}

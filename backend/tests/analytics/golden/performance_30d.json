@@ -1,0 +1,132 @@
+{
+  "body": {
+    "largest_positions": [
+      {
+        "asset_type": "crypto",
+        "current_value": 43115.7011,
+        "gain_loss_percent": null,
+        "name": "BTC",
+        "symbol": "BTC",
+        "volatility": null,
+        "weight": 66.9831
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 9637.306,
+        "gain_loss_percent": null,
+        "name": "ETH",
+        "symbol": "ETH",
+        "volatility": null,
+        "weight": 14.9722
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 7607.0216,
+        "gain_loss_percent": null,
+        "name": "SOL",
+        "symbol": "SOL",
+        "volatility": null,
+        "weight": 11.818
+      },
+      {
+        "asset_type": "stock",
+        "current_value": 4007.9688,
+        "gain_loss_percent": null,
+        "name": "AAPL",
+        "symbol": "AAPL",
+        "volatility": null,
+        "weight": 6.2266
+      }
+    ],
+    "most_volatile": [
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": null,
+        "name": "SOL",
+        "symbol": "SOL",
+        "volatility": 11.8,
+        "weight": null
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": null,
+        "name": "BTC",
+        "symbol": "BTC",
+        "volatility": 2.4,
+        "weight": null
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": null,
+        "name": "ETH",
+        "symbol": "ETH",
+        "volatility": 2.0,
+        "weight": null
+      },
+      {
+        "asset_type": "stock",
+        "current_value": null,
+        "gain_loss_percent": null,
+        "name": "AAPL",
+        "symbol": "AAPL",
+        "volatility": 0.5,
+        "weight": null
+      }
+    ],
+    "period": "30d",
+    "summary": {
+      "calmar_ratio": 0.0,
+      "cvar_95": -102.99,
+      "max_drawdown": 0.0,
+      "sharpe_ratio": 235.28,
+      "sortino_ratio": 0.0,
+      "total_gain_loss": 22446.9975,
+      "total_gain_loss_percent": 53.5459,
+      "total_value": 64367.9975,
+      "volatility": 0.5
+    },
+    "top_gainers": [
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": 60.5415,
+        "name": "ETH",
+        "symbol": "ETH",
+        "volatility": null,
+        "weight": null
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": 56.6989,
+        "name": "BTC",
+        "symbol": "BTC",
+        "volatility": null,
+        "weight": null
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": null,
+        "gain_loss_percent": 52.0796,
+        "name": "SOL",
+        "symbol": "SOL",
+        "volatility": null,
+        "weight": null
+      },
+      {
+        "asset_type": "stock",
+        "current_value": null,
+        "gain_loss_percent": 17.8468,
+        "name": "AAPL",
+        "symbol": "AAPL",
+        "volatility": null,
+        "weight": null
+      }
+    ],
+    "top_losers": []
+  },
+  "status": 200
+}

@@ -21,8 +21,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.analytics.service import AnalyticsService
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.services.analytics_service import AnalyticsService
 
 # Deux séries qui montent ensemble : corrélation forte et positive.
 SERIE_BTC = [100, 102, 101, 105, 108, 107, 110, 112, 111, 115] * 3

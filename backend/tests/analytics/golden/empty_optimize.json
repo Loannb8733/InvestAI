@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Pas assez d'actifs avec suffisamment d'historique pour optimiser (minimum 2)"
+  },
+  "status": 400
+}

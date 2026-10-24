@@ -1,0 +1,26 @@
+{
+  "body": {
+    "allocation_by_asset": {},
+    "allocation_by_type": {},
+    "asset_count": 0,
+    "assets": [],
+    "best_performer": null,
+    "calmar_ratio": 0.0,
+    "concentration_risk": 0.0,
+    "cvar_95": 0.0,
+    "diversification_score": 0.0,
+    "interpretations": {},
+    "max_drawdown": 0.0,
+    "portfolio_volatility": 0.0,
+    "sharpe_ratio": 0.0,
+    "sortino_ratio": 0.0,
+    "total_gain_loss": 0.0,
+    "total_gain_loss_percent": 0.0,
+    "total_invested": 0.0,
+    "total_value": 0.0,
+    "var_95": 0.0,
+    "var_95_description": "",
+    "worst_performer": null
+  },
+  "status": 200
+}

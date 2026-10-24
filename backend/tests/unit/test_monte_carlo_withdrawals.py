@@ -10,11 +10,11 @@ Validates that:
 import numpy as np
 import pytest
 
-from app.services.analytics_simulation import _monte_carlo_compute
+from app.domains.analytics.simulation import simulate_monte_carlo
 
 
 class TestMonteCarloWithdrawals:
-    """Test the _monte_carlo_compute static method directly."""
+    """Test the simulate_monte_carlo static method directly."""
 
     @staticmethod
     def _make_inputs(n_assets: int = 1, daily_mu: float = 0.0, daily_vol: float = 0.0):
@@ -31,7 +31,7 @@ class TestMonteCarloWithdrawals:
         so returns are near-zero but not mathematically exact.
         """
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=0.0)
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -56,7 +56,7 @@ class TestMonteCarloWithdrawals:
         daily_mu = np.log(1.10) / 252  # log return
         mu_vec, L, w = self._make_inputs(daily_mu=daily_mu, daily_vol=0.0)
 
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -90,8 +90,8 @@ class TestMonteCarloWithdrawals:
             ter_percentage=0.5,
             seed=12345,
         )
-        r1 = _monte_carlo_compute(mu_vec, L, w, **kwargs)
-        r2 = _monte_carlo_compute(mu_vec, L, w, **kwargs)
+        r1 = simulate_monte_carlo(mu_vec, L, w, **kwargs)
+        r2 = simulate_monte_carlo(mu_vec, L, w, **kwargs)
         assert r1.expected_return == r2.expected_return
         assert r1.prob_ruin == r2.prob_ruin
 
@@ -103,7 +103,7 @@ class TestMonteCarloWithdrawals:
         """
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=0.0)
 
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -123,7 +123,7 @@ class TestMonteCarloWithdrawals:
         daily_vol = 0.80 / np.sqrt(252)
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=daily_vol)
 
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -145,7 +145,7 @@ class TestMonteCarloWithdrawals:
         daily_mu = 0.0005
         mu_vec, L, w = self._make_inputs(daily_mu=daily_mu, daily_vol=daily_vol)
 
-        result_no_wd = _monte_carlo_compute(
+        result_no_wd = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -164,7 +164,7 @@ class TestMonteCarloWithdrawals:
         """Absolute withdrawal of 100€/month on 10000€ portfolio → ~12% loss in 1 year."""
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=0.0)
         # 100€/month on 10000€ portfolio = 1200€/year = 12% drain
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -183,7 +183,7 @@ class TestMonteCarloWithdrawals:
     def test_ter_daily_formula_365(self):
         """TER 5% over 90 days (no shrinkage): V = V0 * (1 - 0.05/365)^90 ≈ -1.23%."""
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=0.0)
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,
@@ -200,7 +200,7 @@ class TestMonteCarloWithdrawals:
     def test_absolute_withdrawal_causes_ruin(self):
         """Huge monthly withdrawal on small portfolio causes ruin."""
         mu_vec, L, w = self._make_inputs(daily_mu=0.0, daily_vol=0.0)
-        result = _monte_carlo_compute(
+        result = simulate_monte_carlo(
             mu_vec,
             L,
             w,

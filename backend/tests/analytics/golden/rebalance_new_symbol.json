@@ -1,0 +1,55 @@
+{
+  "body": {
+    "orders": [
+      {
+        "action": "sell",
+        "asset_type": "crypto",
+        "current_value": 43115.7,
+        "current_weight": 66.98,
+        "diff_value": -10931.7,
+        "diff_weight": -16.98,
+        "name": "BTC",
+        "symbol": "BTC",
+        "target_value": 32184.0,
+        "target_weight": 50.0
+      },
+      {
+        "action": "hold",
+        "asset_type": "crypto",
+        "current_value": 9637.31,
+        "current_weight": 14.97,
+        "diff_value": 0.0,
+        "diff_weight": 0.0,
+        "name": "ETH",
+        "symbol": "ETH",
+        "target_value": 9637.31,
+        "target_weight": 14.97
+      },
+      {
+        "action": "hold",
+        "asset_type": "crypto",
+        "current_value": 7607.02,
+        "current_weight": 11.82,
+        "diff_value": 0.0,
+        "diff_weight": 0.0,
+        "name": "SOL",
+        "symbol": "SOL",
+        "target_value": 7607.02,
+        "target_weight": 11.82
+      },
+      {
+        "action": "hold",
+        "asset_type": "stock",
+        "current_value": 4007.97,
+        "current_weight": 6.23,
+        "diff_value": 0.0,
+        "diff_weight": 0.0,
+        "name": "AAPL",
+        "symbol": "AAPL",
+        "target_value": 4007.97,
+        "target_weight": 6.23
+      }
+    ]
+  },
+  "status": 200
+}

@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     alerts,
-    analytics,
     calendar,
     cron,
     crowdfunding,
@@ -21,6 +20,7 @@ from app.api.v1.endpoints import (
     telegram_webhook,
     websocket,
 )
+from app.domains.analytics.router import router as analytics_router
 from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
@@ -40,7 +40,7 @@ api_router.include_router(transactions_router, prefix="/transactions", tags=["Tr
 api_router.include_router(keys_router, prefix="/api-keys", tags=["API Keys"])
 api_router.include_router(wallets_router, prefix="/cold-wallets", tags=["Cold Wallets"])
 api_router.include_router(cron.router, prefix="/cron", tags=["Cron"])
-api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(predictions.router, prefix="/predictions", tags=["Predictions"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])

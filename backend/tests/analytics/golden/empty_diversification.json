@@ -1,0 +1,25 @@
+{
+  "body": {
+    "allocation_by_type": {},
+    "asset_count": 0,
+    "concentration_risk": 0.0,
+    "rating": "Très faible",
+    "recommendations": [
+      {
+        "action": "Diversifiez entre crypto, actions, ETF et immobilier",
+        "message": "Seulement 0 classe(s) d'actifs",
+        "severity": "medium",
+        "type": "asset_types"
+      },
+      {
+        "action": "Un portefeuille diversifié contient généralement 10-20 actifs",
+        "message": "Seulement 0 actif(s) en portefeuille",
+        "severity": "low",
+        "type": "asset_count"
+      }
+    ],
+    "score": 0.0,
+    "type_count": 0
+  },
+  "status": 200
+}

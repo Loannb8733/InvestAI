@@ -1,0 +1,14 @@
+{
+  "body": {
+    "expected_return": 41.63,
+    "expected_volatility": 0.37,
+    "sharpe_ratio": 102.95,
+    "weights": {
+      "AAPL": 88.71,
+      "BTC": 11.29,
+      "ETH": 0.0,
+      "SOL": 0.0
+    }
+  },
+  "status": 200
+}

@@ -1,5 +1,4 @@
 comments	backend/app/api/v1/endpoints/alerts.py
-comments	backend/app/api/v1/endpoints/analytics.py
 comments	backend/app/api/v1/endpoints/calendar.py
 comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/crowdfunding.py
@@ -43,11 +42,6 @@ comments	backend/app/services/ai/crowdfunding_analyzer.py
 comments	backend/app/services/ai/pdf_parser.py
 comments	backend/app/services/ai_strategy_service.py
 comments	backend/app/services/alert_service.py
-comments	backend/app/services/analytics_math.py
-comments	backend/app/services/analytics_scoring.py
-comments	backend/app/services/analytics_service.py
-comments	backend/app/services/analytics_simulation.py
-comments	backend/app/services/analytics_types.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/crowdfunding_calendar_service.py
 comments	backend/app/services/csv_parsers.py
@@ -213,7 +207,6 @@ comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
 too-long	backend/app/api/v1/endpoints/alerts.py
-too-long	backend/app/api/v1/endpoints/analytics.py
 too-long	backend/app/api/v1/endpoints/calendar.py
 too-long	backend/app/api/v1/endpoints/crowdfunding.py
 too-long	backend/app/api/v1/endpoints/dashboard.py
@@ -234,7 +227,6 @@ too-long	backend/app/services/ai/crowdfunding_analyzer.py
 too-long	backend/app/services/ai/pdf_parser.py
 too-long	backend/app/services/ai_strategy_service.py
 too-long	backend/app/services/alert_service.py
-too-long	backend/app/services/analytics_service.py
 too-long	backend/app/services/csv_parsers.py
 too-long	backend/app/services/email_service.py
 too-long	backend/app/services/fifo_replay.py

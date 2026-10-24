@@ -1,0 +1,18 @@
+{
+  "body": {
+    "expected_return": 0.0,
+    "horizon_days": 90,
+    "percentiles": {
+      "p25": 0.0,
+      "p5": 0.0,
+      "p50": 0.0,
+      "p75": 0.0,
+      "p95": 0.0
+    },
+    "prob_loss_10": 0.0,
+    "prob_positive": 0.0,
+    "prob_ruin": 0.0,
+    "simulations": 0
+  },
+  "status": 200
+}

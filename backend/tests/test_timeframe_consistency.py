@@ -6,14 +6,14 @@ mathématiquement cohérentes sans dépendance à la base de données.
 
 import numpy as np
 
-from app.domains.portfolio.classification import is_safe_haven
-from app.services.analytics_service import (
-    _annualized_return,
-    _annualized_volatility,
-    _compute_returns,
-    _sharpe,
-    _var_historical,
+from app.domains.analytics.metrics import (
+    annualized_return,
+    annualized_volatility,
+    compute_returns,
+    sharpe,
+    var_historical,
 )
+from app.domains.portfolio.classification import is_safe_haven
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -43,8 +43,8 @@ class TestVaRWindowScaling:
 
     def test_var_90j_greater_than_var_7j(self):
         prices = _btc_prices(100)
-        returns = _compute_returns(prices)
-        daily_var = _var_historical(returns)
+        returns = compute_returns(prices)
+        daily_var = var_historical(returns)
 
         var_7 = daily_var * np.sqrt(7)
         var_90 = daily_var * np.sqrt(90)
@@ -53,8 +53,8 @@ class TestVaRWindowScaling:
 
     def test_var_window_ratio_matches_sqrt_ratio(self):
         prices = _btc_prices(100)
-        returns = _compute_returns(prices)
-        daily_var = _var_historical(returns)
+        returns = compute_returns(prices)
+        daily_var = var_historical(returns)
 
         var_7 = daily_var * np.sqrt(7)
         var_30 = daily_var * np.sqrt(30)
@@ -74,8 +74,8 @@ class TestVaRWindowScaling:
 
     def test_var_daily_positive(self):
         prices = _btc_prices(100)
-        returns = _compute_returns(prices)
-        daily_var = _var_historical(returns)
+        returns = compute_returns(prices)
+        daily_var = var_historical(returns)
         assert daily_var > 0, "Daily VaR should be positive for a volatile asset"
 
 
@@ -87,8 +87,8 @@ class TestAnnualizationConsistency:
 
     def test_volatility_annualized_with_365_for_crypto(self):
         prices = _btc_prices(100)
-        returns = _compute_returns(prices)
-        vol = _annualized_volatility(returns, asset_type="crypto")
+        returns = compute_returns(prices)
+        vol = annualized_volatility(returns, asset_type="crypto")
         # Vol = std * sqrt(365) * 100 → should be significantly > daily std
         daily_std = float(np.std(returns, ddof=1)) * 100
         annualization_factor = np.sqrt(365)
@@ -99,9 +99,9 @@ class TestAnnualizationConsistency:
 
     def test_volatility_annualized_with_252_for_stocks(self):
         prices = _synthetic_prices(100, seed=10, drift=0.0005, vol=0.01)
-        returns = _compute_returns(prices)
-        vol_crypto = _annualized_volatility(returns, asset_type="crypto")
-        vol_stock = _annualized_volatility(returns, asset_type="stock")
+        returns = compute_returns(prices)
+        vol_crypto = annualized_volatility(returns, asset_type="crypto")
+        vol_stock = annualized_volatility(returns, asset_type="stock")
         # crypto uses 365, stock uses 252 → crypto vol > stock vol
         assert vol_crypto > vol_stock, (
             f"Crypto annualized vol ({vol_crypto:.2f}) should be > stock ({vol_stock:.2f}) "
@@ -111,11 +111,11 @@ class TestAnnualizationConsistency:
     def test_sharpe_ratio_sign_consistency(self):
         """Positive drift → positive annualized return → positive Sharpe (with low Rf)."""
         prices = _synthetic_prices(200, drift=0.003, vol=0.01)
-        returns = _compute_returns(prices)
-        ann_ret = _annualized_return(returns, asset_type="crypto")
-        vol = _annualized_volatility(returns, asset_type="crypto")
-        sharpe = _sharpe(ann_ret, vol, risk_free_rate=0.0)
-        assert sharpe > 0, f"Positive-drift asset should have positive Sharpe, got {sharpe}"
+        returns = compute_returns(prices)
+        ann_ret = annualized_return(returns, asset_type="crypto")
+        vol = annualized_volatility(returns, asset_type="crypto")
+        ratio = sharpe(ann_ret, vol, risk_free_rate=0.0)
+        assert ratio > 0, f"Positive-drift asset should have positive Sharpe, got {ratio}"
 
 
 # ── Test 3: Gold Beta recalculated per window ────────────────────
