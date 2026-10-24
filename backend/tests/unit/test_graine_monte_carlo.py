@@ -17,7 +17,7 @@ l'effet de la décision au lieu de le noyer dans deux tirages distincts.
 
 import inspect
 
-from app.services import analytics_simulation
+from app.domains.analytics import simulation
 
 
 def _appels_du_module() -> set[str]:
@@ -29,7 +29,7 @@ def _appels_du_module() -> set[str]:
     """
     import ast
 
-    arbre = ast.parse(inspect.getsource(analytics_simulation))
+    arbre = ast.parse(inspect.getsource(simulation))
     noms = set()
     for noeud in ast.walk(arbre):
         if isinstance(noeud, ast.Call):
@@ -69,7 +69,7 @@ class TestGraineParDefaut:
     def test_elle_est_constante_et_nommee(self):
         # Sa valeur n'importe pas ; sa constance, si. Une constante nommée dit
         # l'intention mieux qu'un nombre posé au milieu du calcul.
-        assert isinstance(analytics_simulation._GRAINE_PAR_DEFAUT, int)
+        assert isinstance(simulation.DEFAULT_SEED, int)
 
     def test_deux_calculs_identiques_donnent_le_meme_tirage(self):
         """La propriété qui compte, éprouvée sur le générateur lui-même.
@@ -79,7 +79,7 @@ class TestGraineParDefaut:
         """
         import numpy as np
 
-        graine = analytics_simulation._GRAINE_PAR_DEFAUT & 0x7FFFFFFF
+        graine = simulation.DEFAULT_SEED & 0x7FFFFFFF
         premier = np.random.default_rng(graine).standard_normal(5)
         second = np.random.default_rng(graine).standard_normal(5)
 
@@ -104,7 +104,7 @@ class TestGraineParDefaut:
 
         entrees = dict(
             mu_vec=np.array([0.0005]),
-            L=np.array([[0.04]]),
+            cholesky=np.array([[0.04]]),
             w=np.array([1.0]),
             num_simulations=200,
             horizon_days=30,
@@ -113,9 +113,9 @@ class TestGraineParDefaut:
             initial_portfolio_value=10000.0,
         )
 
-        premier = analytics_simulation._monte_carlo_compute(**entrees)
+        premier = simulation.simulate_monte_carlo(**entrees)
         time.sleep(1.05)
-        second = analytics_simulation._monte_carlo_compute(**entrees)
+        second = simulation.simulate_monte_carlo(**entrees)
 
         assert premier.percentiles == second.percentiles
 
@@ -136,7 +136,7 @@ class TestGraineParDefaut:
 
         marche = dict(
             mu_vec=np.array([0.0005]),
-            L=np.array([[0.04]]),
+            cholesky=np.array([[0.04]]),
             w=np.array([1.0]),
             num_simulations=200,
             horizon_days=30,
@@ -144,8 +144,8 @@ class TestGraineParDefaut:
             initial_portfolio_value=10000.0,
         )
 
-        premier = analytics_simulation._monte_carlo_compute(user_id="alice", **marche)
-        second = analytics_simulation._monte_carlo_compute(user_id="bob-nom-bien-plus-long", **marche)
+        premier = simulation.simulate_monte_carlo(user_id="alice", **marche)
+        second = simulation.simulate_monte_carlo(user_id="bob-nom-bien-plus-long", **marche)
 
         assert premier.percentiles == second.percentiles, (
             "les tirages diffèrent d'un scénario à l'autre : leur comparaison "
@@ -158,7 +158,7 @@ class TestGraineParDefaut:
         C'est ce qui permet d'explorer plusieurs tirages quand on le veut
         vraiment — l'inverse du hasard subi.
         """
-        signature = inspect.signature(analytics_simulation._monte_carlo_compute)
+        signature = inspect.signature(simulation.simulate_monte_carlo)
 
         assert "seed" in signature.parameters
         assert signature.parameters["seed"].default is None

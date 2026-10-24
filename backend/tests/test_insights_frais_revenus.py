@@ -320,7 +320,7 @@ class TestRevenusPassifs:
         un dividende d'action ou un intérêt obligataire n'apparaît nulle part
         dans le suivi des revenus passifs. Les deux types existent, et tout le
         reste du code les traite bien comme des revenus — ils comptent dans les
-        entrées du TRI (`analytics_math._XIRR_INFLOW_TYPES`) et créditent les
+        entrées du TRI (`app.domains.analytics.xirr._INFLOW_TYPES`) et créditent les
         quantités à l'import.
 
         Exposition mesurée : **zéro transaction** de ces deux types en base de

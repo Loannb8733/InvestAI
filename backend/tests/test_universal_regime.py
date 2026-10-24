@@ -9,8 +9,8 @@ Point 5 : total_value invariant quel que soit le régime.
 import numpy as np
 import pytest
 
+from app.domains.analytics.metrics import compute_returns, var_historical
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
-from app.services.analytics_service import _compute_returns, _var_historical
 from app.services.prediction_service import PredictionService
 
 # ── Synthetic price generators ───────────────────────────────────
@@ -57,11 +57,11 @@ class TestFlashCrash:
         """VaR over crash period should be significantly higher than pre-crash."""
         prices = _flash_crash_prices(90)
         # Pre-crash VaR (first 80 days)
-        pre_returns = _compute_returns(prices[:80])
-        pre_var = _var_historical(pre_returns)
+        pre_returns = compute_returns(prices[:80])
+        pre_var = var_historical(pre_returns)
         # Full-period VaR (includes crash)
-        full_returns = _compute_returns(prices)
-        full_var = _var_historical(full_returns)
+        full_returns = compute_returns(prices)
+        full_var = var_historical(full_returns)
         assert full_var > pre_var * 1.3, f"VaR should spike during crash: pre={pre_var:.4f}, full={full_var:.4f}"
 
     def test_regime_detects_bearish_after_crash(self):

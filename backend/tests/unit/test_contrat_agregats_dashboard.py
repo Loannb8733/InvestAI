@@ -175,9 +175,9 @@ def test_le_contrat_de_l_analyse_de_diversification(cle):
     """`get_diversification_analysis`, lue par `smart_insights` et l'API analytics.
 
     `concentration_risk` y est le HHI **en fraction** — celui d'
-    `analytics_scoring._hhi`, pas l'échelle 0-10000 de `snapshot_risk`. Les
+    `app.domains.analytics.scoring.hhi`, pas l'échelle 0-10000 de `snapshot_risk`. Les
     seuils des analyseurs (0,10 et 0,25) en dépendent.
     """
-    produites = _cles_de("app.services.analytics_service", "get_diversification_analysis")
+    produites = _cles_de("app.domains.analytics.correlation", "get_diversification_analysis")
 
     assert cle in produites

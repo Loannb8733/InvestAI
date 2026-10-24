@@ -470,7 +470,7 @@ async def validate_signal(
     3. Runs Monte Carlo BEFORE and AFTER the purchase to compare prob_ruin.
     4. Sends a detailed Telegram report.
     """
-    from app.services.analytics_service import analytics_service
+    from app.domains.analytics.service import analytics_service
     from app.services.smart_insights_service import smart_insights_service
 
     # ── 1. Top Alpha ──

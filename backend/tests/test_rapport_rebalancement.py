@@ -204,7 +204,7 @@ class TestConcentration:
 
         Ici `sum(w**2)` avec des poids en pourcentages : un portefeuille
         mono-classe vaut 10 000. `snapshot_risk.calculate_hhi` emploie la même
-        échelle sur les **actifs** ; `analytics_scoring._hhi` rend, lui, une
+        échelle sur les **actifs** ; `app.domains.analytics.scoring.hhi` rend, lui, une
         fraction 0-1. Trois calculs, deux échelles, aucun nom pour les
         distinguer.
         """

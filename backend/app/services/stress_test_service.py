@@ -6,8 +6,8 @@ from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
 
+from app.domains.analytics.xirr import xirr
 from app.models.crowdfunding_project import CrowdfundingProject, RepaymentType
-from app.services.analytics_service import _xirr
 from app.services.reconciliation_service import ReconciliationService
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class StressTestService:
 
         # Build base cashflows: negative = outflow, positive = inflow
         base_xirr_flows = self._build_xirr_flows(schedule, invested, invest_date, 0)
-        base_irr_raw = _xirr(base_xirr_flows)
+        base_irr_raw = xirr(base_xirr_flows)
         base_irr = round(base_irr_raw * 100, 2) if base_irr_raw is not None else None
 
         # Build stressed cashflows
@@ -86,7 +86,7 @@ class StressTestService:
             cashflows = self._build_display_cashflows(schedule, 0)
         else:
             stressed_xirr_flows = self._build_xirr_flows(schedule, invested, invest_date, delay_months)
-            stressed_irr_raw = _xirr(stressed_xirr_flows)
+            stressed_irr_raw = xirr(stressed_xirr_flows)
             stressed_irr = round(stressed_irr_raw * 100, 2) if stressed_irr_raw is not None else None
             cashflows = self._build_display_cashflows(schedule, delay_months)
 

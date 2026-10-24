@@ -11,6 +11,7 @@ from sqlalchemy.orm import defer
 
 from app.core.db.session import get_session
 from app.core.rate_limit import limiter
+from app.domains.analytics.xirr import xirr
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
 from app.domains.portfolio.models import CROWDFUNDING_KIND, Asset, AssetType, Portfolio
@@ -35,7 +36,6 @@ from app.schemas.crowdfunding import (
     StressTestResponse,
     TaxReportPlatform,
 )
-from app.services.analytics_math import _xirr as _solve_xirr
 from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 from app.services.reconciliation_service import reconciliation_service
 from app.services.stress_test_service import ALLOWED_DELAY_MONTHS, stress_test_service
@@ -98,7 +98,7 @@ def compute_xirr(flows: list[tuple[date, float]]) -> float | None:
     positif = entrée (remboursement, coupon, valeur terminale).
 
     Délègue la résolution numérique au solveur partagé
-    :func:`app.services.analytics_math._xirr` (bissection Brent sur
+    :func:`app.domains.analytics.xirr.xirr` (bissection Brent sur
     [-0.99, 10.0] puis fallback Newton-Raphson, jour-count 365.25) — même
     moteur que /analytics/xirr et le stress test, pour des chiffres cohérents
     partout dans l'app.
@@ -119,7 +119,7 @@ def compute_xirr(flows: list[tuple[date, float]]) -> float | None:
     dates = [d for d, _ in flows]
     if (max(dates) - min(dates)).days < _XIRR_MIN_SPAN_DAYS:
         return None
-    return _solve_xirr([(datetime(d.year, d.month, d.day), amount) for d, amount in flows])
+    return xirr([(datetime(d.year, d.month, d.day), amount) for d, amount in flows])
 
 
 def _realized_xirr(

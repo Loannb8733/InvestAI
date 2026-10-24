@@ -120,7 +120,7 @@ class TestAnalyseDeLaDiversification:
         """`_analyze_diversification` compare le HHI à 0,25 et 0,10.
 
         Deux HHI coexistent dans le projet, à des échelles différentes :
-        `analytics_scoring._hhi` rend une **fraction** (somme des carrés des
+        `app.domains.analytics.scoring.hhi` rend une **fraction** (somme des carrés des
         parts, 1,0 pour un mono-actif) et c'est celui qui arrive ici, tandis que
         `snapshot_risk.calculate_hhi` rend l'échelle **0-10000** de la
         convention antitrust. Les intervertir ferait déclarer « concentration

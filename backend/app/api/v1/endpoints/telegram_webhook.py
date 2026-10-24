@@ -178,7 +178,7 @@ async def _handle_simulate_ruin(
     await telegram_service.answer_callback_query(callback_id, "Simulation Monte Carlo en cours...")
 
     try:
-        from app.services.analytics_service import analytics_service
+        from app.domains.analytics.service import analytics_service
         from app.services.smart_insights_service import smart_insights_service
 
         # Derive vol_regime from market regime

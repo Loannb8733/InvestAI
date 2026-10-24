@@ -2,7 +2,7 @@
 
 ``compute_xirr`` is the pure gateway used by /crowdfunding/performance : it
 validates the dated flows (both signs present, span >= 30 days) then delegates
-the root-finding to the shared solver ``app.services.analytics_math._xirr``
+the root-finding to the shared solver ``app.domains.analytics.xirr.xirr``
 (Brent bisection on [-0.99, 10.0], Newton fallback, day-count 365.25).
 
 Sign convention: negative = cash out (investment), positive = cash in
