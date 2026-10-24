@@ -45,9 +45,9 @@ def cles_projetees() -> set[str]:
 CONTRAT = {
     "symbol": "les cinq consommateurs",
     "name": "dashboard.py — allocation par actif",
-    "asset_type": "report_rebalancing — filtre crypto ; dashboard — allocation",
+    "asset_type": "reports.rebalancing — filtre crypto ; dashboard — allocation",
     "current_value": "les cinq consommateurs",
-    "current_price": "report_rebalancing — estimation fiscale (NEW-32)",
+    "current_price": "reports.rebalancing — estimation fiscale (NEW-32)",
     "quantity": "dashboard.py — prix unitaire du résumé Earn",
     "avg_buy_price": "dashboard.py — allocation par actif",
     "gain_loss_percent": "dashboard.py — allocation par actif",
@@ -140,7 +140,7 @@ def _cles_de(chemin_module: str, nom_fonction: str) -> set[str]:
     module = importlib.import_module(chemin_module)
     arbre = ast.parse(Path(module.__file__).read_text())
     fonction = next(
-        n for n in ast.walk(arbre) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == nom_fonction
+        n for n in ast.walk(arbre) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == nom_fonction
     )
     return {
         k.value

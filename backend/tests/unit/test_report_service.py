@@ -2,17 +2,15 @@
 
 import io
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from openpyxl import load_workbook
 
-from app.services.report_service import AssetReport, PortfolioSummary, ReportService, TaxSummary2086, TaxTransaction
-
-
-@pytest.fixture
-def report_service():
-    return ReportService()
+from app.domains.reports.data import AssetReport, PortfolioSummary, TaxTransaction
+from app.domains.reports.performance_excel import render_performance_excel
+from app.domains.reports.performance_pdf import render_performance_pdf
+from app.domains.reports.tax import TaxSummary2086
+from app.domains.reports.tax_excel import render_tax_excel
 
 
 @pytest.fixture
@@ -104,17 +102,17 @@ def empty_data():
 class TestPerformancePDF:
     """Tests for PDF performance report generation."""
 
-    def test_generates_bytes(self, report_service, sample_data):
-        result = report_service.generate_performance_pdf(sample_data)
+    def test_generates_bytes(self, sample_data):
+        result = render_performance_pdf(sample_data)
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    def test_valid_pdf_header(self, report_service, sample_data):
-        result = report_service.generate_performance_pdf(sample_data)
+    def test_valid_pdf_header(self, sample_data):
+        result = render_performance_pdf(sample_data)
         assert result[:5] == b"%PDF-"
 
-    def test_empty_data_still_generates(self, report_service, empty_data):
-        result = report_service.generate_performance_pdf(empty_data)
+    def test_empty_data_still_generates(self, empty_data):
+        result = render_performance_pdf(empty_data)
         assert isinstance(result, bytes)
         assert result[:5] == b"%PDF-"
 
@@ -122,47 +120,47 @@ class TestPerformancePDF:
 class TestPerformanceExcel:
     """Tests for Excel performance report generation."""
 
-    def test_generates_bytes(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_generates_bytes(self, sample_data):
+        result = render_performance_excel(sample_data)
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    def test_valid_xlsx(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_valid_xlsx(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         assert "Résumé" in wb.sheetnames
 
-    def test_has_portfolio_sheet(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_has_portfolio_sheet(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         assert "Portefeuilles" in wb.sheetnames
 
-    def test_has_assets_sheet(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_has_assets_sheet(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         assert "Actifs" in wb.sheetnames
 
-    def test_has_transactions_sheet(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_has_transactions_sheet(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         assert "Transactions" in wb.sheetnames
 
-    def test_summary_values(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_summary_values(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         ws = wb["Résumé"]
         assert ws["A5"].value == "Valeur totale"
         assert ws["B5"].value == 23000.0
 
-    def test_empty_data_no_extra_sheets(self, report_service, empty_data):
-        result = report_service.generate_performance_excel(empty_data)
+    def test_empty_data_no_extra_sheets(self, empty_data):
+        result = render_performance_excel(empty_data)
         wb = load_workbook(io.BytesIO(result))
         assert "Résumé" in wb.sheetnames
         # No portfolios/assets/transactions sheets when empty
         assert "Portefeuilles" not in wb.sheetnames
 
-    def test_asset_data_in_sheet(self, report_service, sample_data):
-        result = report_service.generate_performance_excel(sample_data)
+    def test_asset_data_in_sheet(self, sample_data):
+        result = render_performance_excel(sample_data)
         wb = load_workbook(io.BytesIO(result))
         ws = wb["Actifs"]
         # Row 2 should have BTC data
@@ -211,51 +209,27 @@ class TestTaxExcel:
         )
 
     @pytest.mark.asyncio
-    async def test_generates_bytes(self, report_service, tax_summary_with_cession):
-        with patch.object(
-            report_service,
-            "compute_tax_2086",
-            new_callable=AsyncMock,
-            return_value=tax_summary_with_cession,
-        ):
-            result = await report_service.generate_tax_excel(None, "test_user", 2025)
+    async def test_generates_bytes(self, tax_summary_with_cession):
+        result = render_tax_excel(tax_summary_with_cession, 2025)
         assert isinstance(result, bytes)
 
     @pytest.mark.asyncio
-    async def test_sheet_title_contains_year(self, report_service, tax_summary_with_cession):
-        with patch.object(
-            report_service,
-            "compute_tax_2086",
-            new_callable=AsyncMock,
-            return_value=tax_summary_with_cession,
-        ):
-            result = await report_service.generate_tax_excel(None, "test_user", 2025)
+    async def test_sheet_title_contains_year(self, tax_summary_with_cession):
+        result = render_tax_excel(tax_summary_with_cession, 2025)
         wb = load_workbook(io.BytesIO(result))
         assert "Résumé 2025" in wb.sheetnames
 
     @pytest.mark.asyncio
-    async def test_transaction_count(self, report_service, tax_summary_with_cession):
-        with patch.object(
-            report_service,
-            "compute_tax_2086",
-            new_callable=AsyncMock,
-            return_value=tax_summary_with_cession,
-        ):
-            result = await report_service.generate_tax_excel(None, "test_user", 2025)
+    async def test_transaction_count(self, tax_summary_with_cession):
+        result = render_tax_excel(tax_summary_with_cession, 2025)
         wb = load_workbook(io.BytesIO(result))
         ws = wb.active
         # B5 = nombre de cessions
         assert ws["B5"].value == 1
 
     @pytest.mark.asyncio
-    async def test_empty_transactions(self, report_service, tax_summary_empty):
-        with patch.object(
-            report_service,
-            "compute_tax_2086",
-            new_callable=AsyncMock,
-            return_value=tax_summary_empty,
-        ):
-            result = await report_service.generate_tax_excel(None, "test_user", 2025)
+    async def test_empty_transactions(self, tax_summary_empty):
+        result = render_tax_excel(tax_summary_empty, 2025)
         wb = load_workbook(io.BytesIO(result))
         ws = wb.active
         assert ws["B5"].value == 0  # 0 cessions

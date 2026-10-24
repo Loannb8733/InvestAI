@@ -14,8 +14,8 @@ from datetime import UTC
 
 import pytest
 
-from app.services import report_rebalancing as module_rebal
-from app.services.report_service import report_service
+from app.domains.reports import rebalancing as module_rebal
+from app.domains.reports.service import report_service
 
 
 @pytest.fixture

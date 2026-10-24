@@ -8,10 +8,11 @@ from sqlalchemy import and_, select
 from app.core.db.session import session_factory
 from app.domains.identity.models import User
 from app.domains.portfolio.models import Portfolio
+from app.domains.reports.performance_pdf import render_performance_pdf
+from app.domains.reports.service import report_service
 from app.models.notification import Notification
 from app.services.email_service import email_service
 from app.services.metrics_service import metrics_service
-from app.services.report_service import report_service
 from app.services.snapshot_service import snapshot_service
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -163,7 +164,7 @@ async def _send_monthly_reports_async() -> dict:
                 pdf_content = None
                 try:
                     report_data = await report_service.get_portfolio_data(db, str(user.id))
-                    pdf_content = report_service.generate_performance_pdf(report_data)
+                    pdf_content = render_performance_pdf(report_data)
                 except Exception as e:
                     logger.warning(f"Could not generate PDF for {user.email}: {e}")
 

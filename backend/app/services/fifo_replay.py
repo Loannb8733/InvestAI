@@ -3,8 +3,8 @@
 Single chronological replay loop shared by the three former copies:
 
 - ``metrics_service.get_portfolio_metrics`` (displayed P&L / cost basis),
-- ``report_service.compute_tax_2086`` (French tax form 2086),
-- ``report_service._estimate_rebalancing_tax`` (sell-order tax estimates).
+- ``app.domains.reports.tax.TaxMixin.compute_tax_2086`` (French tax form 2086),
+- ``app.domains.reports.rebalancing.RebalancingMixin`` (sell-order tax estimates).
 
 The two original implementations had drifted apart. Every *legitimate*
 difference (tax rules genuinely differ from display P&L) is an explicit

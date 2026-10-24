@@ -43,7 +43,7 @@ export function generateCSV(transactions: Transaction[]): string {
    *
    * Les nombres partent avec un point décimal parce que le parseur du serveur
    * fait `Decimal(quantity_str)`, qui refuse la virgule. C'est l'inverse de
-   * l'export CSV du serveur (`report_transactions`), lui destiné à Excel en
+   * l'export CSV du serveur (`domains/reports/transactions_export`), lui destiné à Excel en
    * locale française, et qui emploie la virgule depuis NEW-25.
    *
    * Deux fichiers, deux publics, deux conventions : « harmoniser » celui-ci

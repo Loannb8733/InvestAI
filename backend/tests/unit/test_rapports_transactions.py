@@ -17,7 +17,11 @@ import pymupdf
 import pytest
 from openpyxl import load_workbook
 
-from app.services.report_service import report_service
+from app.domains.reports.transactions_export import (
+    render_transactions_csv,
+    render_transactions_excel,
+    render_transactions_pdf,
+)
 
 
 def tx(**surcharges):
@@ -50,7 +54,7 @@ def feuille_excel(octets: bytes):
 
 class TestExportPdf:
     def test_le_pdf_porte_le_titre_et_la_periode(self):
-        pdf = report_service.generate_transactions_pdf({"transactions": [tx()], "year": 2026})
+        pdf = render_transactions_pdf({"transactions": [tx()], "year": 2026})
 
         texte = texte_pdf(pdf)
 
@@ -58,14 +62,12 @@ class TestExportPdf:
         assert "Année 2026" in texte
 
     def test_sans_annee_la_periode_couvre_tout(self):
-        pdf = report_service.generate_transactions_pdf({"transactions": [tx()]})
+        pdf = render_transactions_pdf({"transactions": [tx()]})
 
         assert "Toutes les années" in texte_pdf(pdf)
 
     def test_le_resume_totalise_volume_et_frais(self):
-        pdf = report_service.generate_transactions_pdf(
-            {"transactions": [tx(total=20000.0, fee=12.5), tx(total=5000.0, fee=3.5)]}
-        )
+        pdf = render_transactions_pdf({"transactions": [tx(total=20000.0, fee=12.5), tx(total=5000.0, fee=3.5)]})
 
         texte = texte_pdf(pdf)
 
@@ -80,7 +82,7 @@ class TestExportPdf:
         omis : l'utilisateur voit que l'export a fonctionné et qu'il n'y avait
         rien à exporter.
         """
-        pdf = report_service.generate_transactions_pdf({"transactions": []})
+        pdf = render_transactions_pdf({"transactions": []})
 
         texte = texte_pdf(pdf)
 
@@ -88,21 +90,21 @@ class TestExportPdf:
         assert "Détail" not in texte
 
     def test_les_types_sont_traduits_en_francais(self):
-        pdf = report_service.generate_transactions_pdf({"transactions": [tx(transaction_type="staking_reward")]})
+        pdf = render_transactions_pdf({"transactions": [tx(transaction_type="staking_reward")]})
 
         assert "Reward" in texte_pdf(pdf)
 
     def test_un_type_inconnu_est_affiche_tel_quel(self):
         # `_TYPE_MAP.get(type, type)` : plutôt qu'une case vide, l'export montre
         # le libellé technique — visible, donc corrigeable.
-        pdf = report_service.generate_transactions_pdf({"transactions": [tx(transaction_type="lending_reward")]})
+        pdf = render_transactions_pdf({"transactions": [tx(transaction_type="lending_reward")]})
 
         assert "lending_reward" in texte_pdf(pdf)
 
 
 class TestExportExcel:
     def test_l_entete_couvre_les_sept_colonnes(self):
-        ws = feuille_excel(report_service.generate_transactions_excel({"transactions": [tx()]}))
+        ws = feuille_excel(render_transactions_excel({"transactions": [tx()]}))
 
         entete = [c.value for c in ws[1]]
 
@@ -123,11 +125,11 @@ class TestExportExcel:
         format d'affichage est porté par `number_format`, séparément de la
         valeur — contrairement à l'export CSV, qui aplatit tout en texte.
         """
-        ws = feuille_excel(report_service.generate_transactions_excel({"transactions": [tx()]}))
+        ws = feuille_excel(render_transactions_excel({"transactions": [tx()]}))
 
         for colonne in (4, 5, 6, 7):
             valeur = ws.cell(row=2, column=colonne).value
-            assert isinstance(valeur, (int, float)), f"colonne {colonne} écrite en texte"
+            assert isinstance(valeur, int | float), f"colonne {colonne} écrite en texte"
 
         assert ws.cell(row=2, column=4).value == 0.5
         # 40000.0 se relit `40000` : openpyxl normalise les flottants entiers.
@@ -135,31 +137,31 @@ class TestExportExcel:
 
     def test_la_quantite_garde_six_decimales_a_l_affichage(self):
         # Les fractions de crypto ne survivent pas à un format à deux décimales.
-        ws = feuille_excel(report_service.generate_transactions_excel({"transactions": [tx()]}))
+        ws = feuille_excel(render_transactions_excel({"transactions": [tx()]}))
 
         assert ws.cell(row=2, column=4).number_format == "0.000000"
 
     def test_les_libelles_sont_plus_explicites_que_dans_le_pdf(self):
         # Le PDF, contraint par la largeur des colonnes, abrège en « Conv. ↓ ».
-        excel = report_service.generate_transactions_excel({"transactions": [tx(transaction_type="conversion_in")]})
+        excel = render_transactions_excel({"transactions": [tx(transaction_type="conversion_in")]})
 
         assert feuille_excel(excel).cell(row=2, column=2).value == "Conversion entrante"
 
     def test_un_export_vide_ne_contient_que_l_entete(self):
-        ws = feuille_excel(report_service.generate_transactions_excel({"transactions": []}))
+        ws = feuille_excel(render_transactions_excel({"transactions": []}))
 
         assert ws.max_row == 1
 
 
 class TestExportCsv:
     def test_le_separateur_et_le_bom_visent_excel_francais(self):
-        octets = report_service.generate_transactions_csv({"transactions": [tx()]})
+        octets = render_transactions_csv({"transactions": [tx()]})
 
         assert octets.startswith(b"\xef\xbb\xbf")  # BOM UTF-8
         assert b";" in octets
 
     def test_l_entete_est_identique_a_celui_de_l_excel(self):
-        lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": [tx()]}))
+        lignes = lignes_csv(render_transactions_csv({"transactions": [tx()]}))
 
         assert lignes[0][0] == "Date"
         assert lignes[0][-1] == "Frais (EUR)"
@@ -175,7 +177,7 @@ class TestExportCsv:
         Aucun séparateur de milliers : il entrerait en conflit avec le
         point-virgule qui sépare déjà les colonnes.
         """
-        lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": [tx()]}))
+        lignes = lignes_csv(render_transactions_csv({"transactions": [tx()]}))
 
         assert lignes[1][3] == "0,500000"
         assert lignes[1][4] == "40000,00"
@@ -184,7 +186,7 @@ class TestExportCsv:
     def test_un_grand_montant_ne_prend_pas_de_separateur_de_milliers(self):
         # Un espace ou un point de milliers casserait la lecture numérique
         # autant que le point décimal qu'on vient de retirer.
-        lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": [tx(total=1234567.89)]}))
+        lignes = lignes_csv(render_transactions_csv({"transactions": [tx(total=1234567.89)]}))
 
         assert lignes[1][5] == "1234567,89"
 
@@ -196,14 +198,14 @@ class TestExportCsv:
         technique. Un utilisateur qui compare ses trois exports voit trois
         vocabulaires.
         """
-        csv_octets = report_service.generate_transactions_csv({"transactions": [tx(transaction_type="transfer_in")]})
-        excel = report_service.generate_transactions_excel({"transactions": [tx(transaction_type="transfer_in")]})
+        csv_octets = render_transactions_csv({"transactions": [tx(transaction_type="transfer_in")]})
+        excel = render_transactions_excel({"transactions": [tx(transaction_type="transfer_in")]})
 
         assert lignes_csv(csv_octets)[1][1] == "transfer_in"
         assert feuille_excel(excel).cell(row=2, column=2).value == "Transfert entrant"
 
     def test_un_export_vide_ne_contient_que_l_entete(self):
-        lignes = lignes_csv(report_service.generate_transactions_csv({"transactions": []}))
+        lignes = lignes_csv(render_transactions_csv({"transactions": []}))
 
         assert len(lignes) == 1
 
@@ -216,11 +218,9 @@ class TestDateManquante:
         donnees = {"transactions": [tx(date=None)]}
 
         if generateur == "pdf":
-            assert "BTC" in texte_pdf(report_service.generate_transactions_pdf(donnees))
+            assert "BTC" in texte_pdf(render_transactions_pdf(donnees))
         elif generateur == "excel":
             # openpyxl relit une chaîne vide comme `None`, pas comme "".
-            assert (
-                feuille_excel(report_service.generate_transactions_excel(donnees)).cell(row=2, column=1).value is None
-            )
+            assert feuille_excel(render_transactions_excel(donnees)).cell(row=2, column=1).value is None
         else:
-            assert lignes_csv(report_service.generate_transactions_csv(donnees))[1][0] == ""
+            assert lignes_csv(render_transactions_csv(donnees))[1][0] == ""

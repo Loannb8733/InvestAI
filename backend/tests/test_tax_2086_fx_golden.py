@@ -16,8 +16,8 @@ from decimal import Decimal
 import pytest
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.reports.service import ReportService
 from app.domains.transactions.models import Transaction, TransactionType
-from app.services.report_service import ReportService
 
 
 async def _portfolio(db_session, user):
