@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "pattern": "^(frontend|telegram)$"
+        },
+        "input": "api",
+        "loc": [
+          "body",
+          "source"
+        ],
+        "msg": "String should match pattern '^(frontend|telegram)$'",
+        "type": "string_pattern_mismatch"
+      }
+    ]
+  },
+  "status": 422
+}

@@ -1,0 +1,195 @@
+{
+  "body": {
+    "all_scores": [
+      {
+        "asset_type": "stock",
+        "current_price": 200.0,
+        "divergence_log": {
+          "is_bullish_divergence": false,
+          "price_change_7d_pct": 0.41,
+          "price_t": 200.3984,
+          "price_t7": 199.5709,
+          "rsi_t": 100.0,
+          "rsi_t7": 100.0
+        },
+        "name": null,
+        "predicted_7d_pct": 0.62,
+        "prediction_source": "ensemble",
+        "reasons": [
+          {
+            "detail": "Corrélation -0.77 (faible = indépendant)",
+            "label": "Décorrélé du BTC",
+            "score": 68
+          }
+        ],
+        "regime": "bullish",
+        "regime_confidence": 0.95,
+        "score": 68.3,
+        "symbol": "AAPL",
+        "value": 4000.0,
+        "weight_pct": 6.1
+      },
+      {
+        "asset_type": "crypto",
+        "current_price": 0.15,
+        "divergence_log": {
+          "is_bullish_divergence": false,
+          "price_change_7d_pct": 0.08,
+          "price_t": 0.1089,
+          "price_t7": 0.1088,
+          "rsi_t": 19.77,
+          "rsi_t7": 12.37
+        },
+        "name": null,
+        "predicted_7d_pct": -26.67,
+        "prediction_source": "ensemble",
+        "reasons": [
+          {
+            "detail": "Corrélation -0.39 (faible = indépendant)",
+            "label": "Décorrélé du BTC",
+            "score": 49
+          },
+          {
+            "detail": "RSI à 20 (seuil 35)",
+            "label": "Survente RSI",
+            "score": 18
+          }
+        ],
+        "regime": "bearish",
+        "regime_confidence": 0.94,
+        "score": 67.7,
+        "symbol": "DOGE",
+        "value": 1500.0,
+        "weight_pct": 2.3
+      },
+      {
+        "asset_type": "crypto",
+        "current_price": 9.0,
+        "divergence_log": {
+          "is_bullish_divergence": false,
+          "price_change_7d_pct": 0.72,
+          "price_t": 6.7477,
+          "price_t7": 6.6997,
+          "rsi_t": 13.81,
+          "rsi_t7": 1.4
+        },
+        "name": null,
+        "predicted_7d_pct": -25.0,
+        "prediction_source": "ensemble",
+        "reasons": [
+          {
+            "detail": "Corrélation -0.05 (faible = indépendant)",
+            "label": "Décorrélé du BTC",
+            "score": 32
+          },
+          {
+            "detail": "RSI à 14 (seuil 35)",
+            "label": "Survente RSI",
+            "score": 20
+          }
+        ],
+        "regime": "bearish",
+        "regime_confidence": 0.95,
+        "score": 52.3,
+        "symbol": "UNI",
+        "value": 1800.0,
+        "weight_pct": 2.8
+      },
+      {
+        "asset_type": "crypto",
+        "current_price": 150.0,
+        "divergence_log": {
+          "degraded": true,
+          "is_bullish_divergence": false,
+          "penalty": 10,
+          "price_change_7d_pct": -5.65,
+          "price_t": 152.1404,
+          "price_t7": 161.2593,
+          "rsi_t": 28.16,
+          "rsi_t7": 60.48
+        },
+        "name": null,
+        "predicted_7d_pct": -4.31,
+        "prediction_source": "ensemble",
+        "reasons": [
+          {
+            "detail": "Corrélation -0.19 (faible = indépendant)",
+            "label": "Décorrélé du BTC",
+            "score": 40
+          },
+          {
+            "detail": "Prix -5.7% et RSI -32.3 pts (pas de divergence)",
+            "label": "Divergence Non Confirmée",
+            "score": -10
+          }
+        ],
+        "regime": "bearish",
+        "regime_confidence": 0.85,
+        "score": 29.5,
+        "symbol": "SOL",
+        "value": 7500.0,
+        "weight_pct": 11.5
+      },
+      {
+        "asset_type": "crypto",
+        "current_price": 0.8,
+        "divergence_log": {
+          "is_bullish_divergence": false,
+          "price_change_7d_pct": 9.94,
+          "price_t": 0.8334,
+          "price_t7": 0.758,
+          "rsi_t": 88.03,
+          "rsi_t7": 78.9
+        },
+        "name": null,
+        "predicted_7d_pct": 15.0,
+        "prediction_source": "ensemble",
+        "reasons": [
+          {
+            "detail": "Régime: bullish (bottom 24%, bull 45%)",
+            "label": "Momentum de Régime",
+            "score": 23
+          }
+        ],
+        "regime": "bullish",
+        "regime_confidence": 0.91,
+        "score": 26.4,
+        "symbol": "ARB",
+        "value": 800.0,
+        "weight_pct": 1.2
+      }
+    ],
+    "concentration_risk": false,
+    "found": true,
+    "top_alpha": {
+      "asset_type": "stock",
+      "current_price": 200.0,
+      "divergence_log": {
+        "is_bullish_divergence": false,
+        "price_change_7d_pct": 0.41,
+        "price_t": 200.3984,
+        "price_t7": 199.5709,
+        "rsi_t": 100.0,
+        "rsi_t7": 100.0
+      },
+      "name": null,
+      "predicted_7d_pct": 0.62,
+      "prediction_source": "ensemble",
+      "reasons": [
+        {
+          "detail": "Corrélation -0.77 (faible = indépendant)",
+          "label": "Décorrélé du BTC",
+          "score": 68
+        }
+      ],
+      "regime": "bullish",
+      "regime_confidence": 0.95,
+      "score": 68.3,
+      "symbol": "AAPL",
+      "value": 4000.0,
+      "weight_pct": 6.1
+    },
+    "total_portfolio_value": 65440.0
+  },
+  "status": 200
+}

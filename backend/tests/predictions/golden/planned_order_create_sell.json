@@ -1,0 +1,13 @@
+{
+  "body": {
+    "action": "VENDRE",
+    "created_at": "<volatile>",
+    "id": "<id-1>",
+    "notes": "MPT",
+    "order_eur": 100.0,
+    "source": "frontend",
+    "status": "pending",
+    "symbol": "SOL"
+  },
+  "status": 201
+}

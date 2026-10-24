@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "pattern": "^(buy|sell)$"
+        },
+        "input": "hold",
+        "loc": [
+          "body",
+          "side"
+        ],
+        "msg": "String should match pattern '^(buy|sell)$'",
+        "type": "string_pattern_mismatch"
+      }
+    ]
+  },
+  "status": 422
+}

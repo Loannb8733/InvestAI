@@ -1,0 +1,478 @@
+{
+  "body": {
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.3,
+        "strong": 0.6
+      },
+      "volatility": {
+        "extreme": 2.5,
+        "high": 1.5,
+        "low": 0.9
+      }
+    },
+    "predictions": [
+      {
+        "asset_type": "crypto",
+        "change_percent": -3.75,
+        "current_price": 60000.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "BTC",
+        "predicted_price": 57749.07,
+        "predictions": [
+          {
+            "confidence_high": 61208.86,
+            "confidence_low": 54289.27,
+            "date": "2026-10-18",
+            "price": 57749.07
+          }
+        ],
+        "recommendation": "Marché haussier : la dynamique reste positive. Résistance à surveiller : 65000.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": 0.025,
+          "confidence": 0.95,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Divergence: regime journalier = bullish, regime hebdomadaire = bottom. Prudence recommandee.",
+          "probabilities": {
+            "bearish": 0.057,
+            "bottom": 0.116,
+            "bullish": 0.656,
+            "top": 0.171
+          },
+          "regime_price_adjustment": true,
+          "timeframe_alignment": "divergent",
+          "weekly_regime": "bottom"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 65000.0,
+        "skill_score": 86.4,
+        "support_level": 59652.43,
+        "symbol": "BTC",
+        "trend": "neutral",
+        "trend_strength": 3.5
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": 7.79,
+        "current_price": 3000.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "ETH",
+        "predicted_price": 3233.56,
+        "predictions": [
+          {
+            "confidence_high": 3395.24,
+            "confidence_low": 3071.88,
+            "date": "2026-10-18",
+            "price": 3233.56
+          }
+        ],
+        "recommendation": "Marché haussier : la dynamique reste positive. Résistance à surveiller : 3100.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.071,
+            "bottom": 0.075,
+            "bullish": 0.579,
+            "top": 0.275
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 3100.0,
+        "skill_score": 86.4,
+        "support_level": 2900.0,
+        "symbol": "ETH",
+        "trend": "neutral",
+        "trend_strength": 6.6
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": 0.59,
+        "current_price": 150.0,
+        "explanations": [],
+        "hit_rate": 62.5,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "SOL",
+        "predicted_price": 150.88,
+        "predictions": [
+          {
+            "confidence_high": 161.08,
+            "confidence_low": 140.69,
+            "date": "2026-10-18",
+            "price": 150.88
+          }
+        ],
+        "recommendation": "Signal haussier en marché baissier — possible retournement, sans garantie. Ces zones ont historiquement présenté un rapport rendement/risque plus favorable.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": 0.036,
+          "confidence": 0.85,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Divergence: regime journalier = bearish, regime hebdomadaire = top. Prudence recommandee.",
+          "probabilities": {
+            "bearish": 0.378,
+            "bottom": 0.298,
+            "bullish": 0.221,
+            "top": 0.103
+          },
+          "regime_price_adjustment": true,
+          "timeframe_alignment": "divergent",
+          "weekly_regime": "top"
+        },
+        "reliability_score": 76.8,
+        "resistance_level": 160.0,
+        "skill_score": 86.4,
+        "support_level": 145.42,
+        "symbol": "SOL",
+        "trend": "bullish",
+        "trend_strength": 8.1
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": 6.25,
+        "current_price": 0.8,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "ARB",
+        "predicted_price": 0.85,
+        "predictions": [
+          {
+            "confidence_high": 0.89,
+            "confidence_low": 0.8,
+            "date": "2026-10-18",
+            "price": 0.85
+          }
+        ],
+        "recommendation": "Marché haussier : la dynamique reste positive. Résistance à surveiller : 1.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.84,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.114,
+            "bottom": 0.236,
+            "bullish": 0.379,
+            "top": 0.271
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 0.86,
+        "skill_score": 86.4,
+        "support_level": 0.72,
+        "symbol": "ARB",
+        "trend": "bullish",
+        "trend_strength": 14.2
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": -25.11,
+        "current_price": 9.0,
+        "explanations": [],
+        "hit_rate": 62.5,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "UNI",
+        "predicted_price": 6.74,
+        "predictions": [
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-18",
+            "price": 6.74
+          }
+        ],
+        "recommendation": "Marché baissier — contexte historiquement associé aux phases d'accumulation ; les creux de cycle s'y sont souvent formés.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.95,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+          "probabilities": {
+            "bearish": 0.564,
+            "bottom": 0.22,
+            "bullish": 0.09,
+            "top": 0.126
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bearish"
+        },
+        "reliability_score": 76.8,
+        "resistance_level": 9.5,
+        "skill_score": 86.4,
+        "support_level": 8.5,
+        "symbol": "UNI",
+        "trend": "bearish",
+        "trend_strength": 1.0
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": -26.67,
+        "current_price": 0.15,
+        "explanations": [],
+        "hit_rate": 62.5,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "DOGE",
+        "predicted_price": 0.11,
+        "predictions": [
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-18",
+            "price": 0.11
+          }
+        ],
+        "recommendation": "Marché baissier — contexte historiquement associé aux phases d'accumulation ; les creux de cycle s'y sont souvent formés.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+          "probabilities": {
+            "bearish": 0.658,
+            "bottom": 0.15,
+            "bullish": 0.082,
+            "top": 0.11
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bearish"
+        },
+        "reliability_score": 76.8,
+        "resistance_level": 0.16,
+        "skill_score": 86.4,
+        "support_level": 0.15,
+        "symbol": "DOGE",
+        "trend": "bearish",
+        "trend_strength": 0.1
+      },
+      {
+        "asset_type": "stock",
+        "change_percent": 0.26,
+        "current_price": 200.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "AAPL",
+        "predicted_price": 200.52,
+        "predictions": [
+          {
+            "confidence_high": 211.2,
+            "confidence_low": 189.83,
+            "date": "2026-10-18",
+            "price": 200.52
+          }
+        ],
+        "recommendation": "Marché haussier : la dynamique reste positive. Résistance à surveiller : 210.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.087,
+            "bottom": 0.091,
+            "bullish": 0.515,
+            "top": 0.307
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 210.0,
+        "skill_score": 86.4,
+        "support_level": 190.0,
+        "symbol": "AAPL",
+        "trend": "neutral",
+        "trend_strength": 0.6
+      }
+    ],
+    "summary": {
+      "bearish_assets": 2,
+      "bullish_assets": 2,
+      "days_ahead": 1,
+      "expected_change_percent": -2.37,
+      "neutral_assets": 3,
+      "overall_sentiment": "neutral",
+      "total_current_value": 63600.0,
+      "total_predicted_value": 62089.98
+    }
+  },
+  "status": 200
+}

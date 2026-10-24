@@ -1,0 +1,10 @@
+{
+  "body": {
+    "assets": [],
+    "days": 7,
+    "needs_retraining": false,
+    "overall_direction_accuracy": null,
+    "overall_mape": null
+  },
+  "status": 200
+}

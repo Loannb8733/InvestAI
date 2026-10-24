@@ -1,0 +1,57 @@
+{
+  "body": {
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 25,
+        "extreme_greed": 75,
+        "fear": 45,
+        "greed": 55
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 2.0,
+        "strong": 4.0
+      },
+      "volatility": {
+        "extreme": 80,
+        "high": 50,
+        "low": 30.0
+      }
+    },
+    "fear_greed_index": 50,
+    "market_phase": "distribution",
+    "overall_sentiment": "neutral",
+    "sentiment_score": 0.0,
+    "signals": [
+      {
+        "action": "Envisagez de diversifier avec d'autres classes d'actifs",
+        "message": "Forte concentration crypto: 7/8 actifs",
+        "type": "info"
+      }
+    ]
+  },
+  "status": 200
+}

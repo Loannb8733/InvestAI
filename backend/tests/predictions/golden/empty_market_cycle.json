@@ -1,0 +1,174 @@
+{
+  "body": {
+    "btc_dominance": null,
+    "cycle_advice": [
+      {
+        "action": "PLANIFIER",
+        "description": "Tendance haussière — laissez courir vos positions mais définissez VOS niveaux de sortie maintenant. \"Be fearful when others are greedy.\" Ne soyez pas le dernier à vendre.",
+        "priority": "high",
+        "title": "Préparez la prise de profits"
+      },
+      {
+        "action": "PROTÉGER",
+        "description": "Remontez progressivement vos stop-loss pour verrouiller les gains. Un trailing stop sous l'EMA-20 protège sans couper trop tôt.",
+        "priority": "high",
+        "title": "Stop-loss progressifs"
+      },
+      {
+        "action": "ATTENDRE",
+        "description": "En marché haussier, les prix sont chers. Réduisez vos montants d'achat réguliers et gardez du cash pour accumuler au prochain creux.",
+        "priority": "medium",
+        "title": "Réduisez le DCA"
+      }
+    ],
+    "cycle_position": 42,
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.3,
+        "strong": 0.6
+      },
+      "volatility": {
+        "extreme": 2.5,
+        "high": 1.5,
+        "low": 0.9
+      }
+    },
+    "distribution_diagnostic": [],
+    "fear_greed": null,
+    "market_regime": {
+      "confidence": 0.95,
+      "description": "Mark-up — cassure de resistance, volume croissant (66%).",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.057,
+        "bottom": 0.116,
+        "bullish": 0.656,
+        "top": 0.171
+      }
+    },
+    "market_signals": [
+      {
+        "description": "RSI haussier (93)",
+        "name": "RSI 14",
+        "signal": "bullish",
+        "strength": 0.62,
+        "value": 93.3
+      },
+      {
+        "description": "MACD positif et croissant — tendance haussiere confirmee",
+        "name": "MACD",
+        "signal": "bullish",
+        "strength": 0.95,
+        "value": 207.5412
+      },
+      {
+        "description": "Prix dans la partie haute des bandes de Bollinger",
+        "name": "Bollinger Bands",
+        "signal": "bullish",
+        "strength": 0.69,
+        "value": 0.97
+      },
+      {
+        "description": "MA courte au-dessus de la MA longue (+1.2%)",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bullish",
+        "strength": 0.4,
+        "value": 1.19
+      },
+      {
+        "description": "Momentum haussier (+4.4%)",
+        "name": "Momentum 14j",
+        "signal": "bullish",
+        "strength": 0.37,
+        "value": 4.4
+      },
+      {
+        "description": "Volatilite moderee (1%) — marche stable",
+        "name": "Volatilite 14j",
+        "signal": "bullish",
+        "strength": 0.1,
+        "value": 1.0
+      }
+    ],
+    "per_asset": [],
+    "portfolio_regime": {
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.25,
+        "bottom": 0.25,
+        "bullish": 0.25,
+        "top": 0.25
+      }
+    },
+    "time_to_pivot": {
+      "confidence": 0.85,
+      "current_phase": "Expansion",
+      "cycle_position": 42,
+      "estimated_days": 65,
+      "next_phase": "Distribution"
+    },
+    "top_bottom_estimates": {
+      "btc": {
+        "current_price": 57487.6,
+        "current_regime": "bullish",
+        "cycle_position": 42,
+        "next_bottom": {
+          "confidence": 0.73,
+          "distance_pct": 5.0,
+          "estimated_date": "2026-12-23",
+          "estimated_days": 67,
+          "estimated_price": 54613.22,
+          "method": "OU mean-reversion + support clustering",
+          "support_level": 56405.19
+        },
+        "next_top": {
+          "confidence": 0.73,
+          "distance_pct": 5.0,
+          "estimated_date": "2027-03-09",
+          "estimated_days": 143,
+          "estimated_price": 60361.98,
+          "method": "OU mean-reversion + resistance clustering",
+          "resistance_level": 59652.43
+        },
+        "ou_parameters": {
+          "mu": 54453.78,
+          "sigma": 0.0025,
+          "theta": 0.001
+        },
+        "symbol": "BTC"
+      },
+      "per_asset": []
+    }
+  },
+  "status": 200
+}

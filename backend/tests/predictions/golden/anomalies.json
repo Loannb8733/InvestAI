@@ -1,0 +1,77 @@
+{
+  "body": [
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 4.4% (score anomalie: -0.00)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": 4.37,
+      "severity": "low",
+      "symbol": "BTC"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 6.6% (score anomalie: -0.09)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": -6.61,
+      "severity": "low",
+      "symbol": "ETH"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 1.4% (score anomalie: -0.02)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": -1.41,
+      "severity": "low",
+      "symbol": "SOL"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 4.0% (score anomalie: -0.08)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": -4.01,
+      "severity": "low",
+      "symbol": "ARB"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 33.4% (score anomalie: -0.08)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": 33.38,
+      "severity": "low",
+      "symbol": "UNI"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": 0.06,
+      "severity": "low",
+      "symbol": "USDC"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 37.7% (score anomalie: -0.10)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": 37.71,
+      "severity": "low",
+      "symbol": "DOGE"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 0.2% (score anomalie: -0.06)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "is_anomaly": true,
+      "price_change_percent": -0.2,
+      "severity": "low",
+      "symbol": "AAPL"
+    }
+  ],
+  "status": 200
+}

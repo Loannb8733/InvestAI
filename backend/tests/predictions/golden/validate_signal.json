@@ -1,0 +1,51 @@
+{
+  "body": {
+    "action": "MAINTENIR",
+    "btc_correlation": null,
+    "concentration_risk": false,
+    "concentration_status": "SÉCURISÉE",
+    "current_weight_pct": 6.1,
+    "divergence_log": {
+      "is_bullish_divergence": false,
+      "price_change_7d_pct": 0.41,
+      "price_t": 200.3984,
+      "price_t7": 199.5709,
+      "rsi_t": 100.0,
+      "rsi_t7": 100.0
+    },
+    "ecart_eur": 1840.0,
+    "impact_pct": 0.0,
+    "mc_after": {
+      "expected_return": -2.43,
+      "prob_loss_10": 0.0,
+      "prob_positive": 8.5
+    },
+    "mc_before": {
+      "expected_return": -2.43,
+      "prob_loss_10": 0.0,
+      "prob_positive": 8.5
+    },
+    "order_eur": 0.0,
+    "post_purchase_weight_pct": 6.1,
+    "predicted_7d_pct": 0.62,
+    "prediction_source": "ensemble",
+    "prob_ruin_after": 0.0,
+    "prob_ruin_before": 0.0,
+    "reasons": [
+      {
+        "detail": "Corrélation -0.77 (faible = indépendant)",
+        "label": "Décorrélé du BTC",
+        "score": 68
+      }
+    ],
+    "rebalance_suggestion": null,
+    "regime": "markup",
+    "risk_impact": "Stable",
+    "score": 68.3,
+    "symbol": "AAPL",
+    "total_portfolio_value": 65440.0,
+    "validated": false,
+    "weight_overflow": false
+  },
+  "status": 200
+}

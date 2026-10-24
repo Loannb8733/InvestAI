@@ -1,0 +1,13 @@
+{
+  "body": {
+    "records": [],
+    "summary": {
+      "avg_mape": null,
+      "ci_coverage": null,
+      "direction_accuracy": null,
+      "total_checked": 0
+    },
+    "symbol": "XRP"
+  },
+  "status": 200
+}

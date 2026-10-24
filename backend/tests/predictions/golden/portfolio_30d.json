@@ -1,0 +1,1696 @@
+{
+  "body": {
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.3,
+        "strong": 0.6
+      },
+      "volatility": {
+        "extreme": 2.5,
+        "high": 1.5,
+        "low": 0.9
+      }
+    },
+    "predictions": [
+      {
+        "asset_type": "crypto",
+        "change_percent": 6.0,
+        "current_price": 60000.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "BTC",
+        "predicted_price": 63600.13,
+        "predictions": [
+          {
+            "confidence_high": 61147.68,
+            "confidence_low": 54235.02,
+            "date": "2026-10-18",
+            "price": 57691.35
+          },
+          {
+            "confidence_high": 61363.64,
+            "confidence_low": 54426.57,
+            "date": "2026-10-19",
+            "price": 57895.1
+          },
+          {
+            "confidence_high": 61579.6,
+            "confidence_low": 54618.11,
+            "date": "2026-10-20",
+            "price": 58098.85
+          },
+          {
+            "confidence_high": 61795.56,
+            "confidence_low": 54809.65,
+            "date": "2026-10-21",
+            "price": 58302.6
+          },
+          {
+            "confidence_high": 62011.51,
+            "confidence_low": 55001.2,
+            "date": "2026-10-22",
+            "price": 58506.36
+          },
+          {
+            "confidence_high": 62227.47,
+            "confidence_low": 55192.74,
+            "date": "2026-10-23",
+            "price": 58710.11
+          },
+          {
+            "confidence_high": 62443.43,
+            "confidence_low": 55384.28,
+            "date": "2026-10-24",
+            "price": 58913.86
+          },
+          {
+            "confidence_high": 62659.39,
+            "confidence_low": 55575.83,
+            "date": "2026-10-25",
+            "price": 59117.61
+          },
+          {
+            "confidence_high": 62875.35,
+            "confidence_low": 55767.37,
+            "date": "2026-10-26",
+            "price": 59321.36
+          },
+          {
+            "confidence_high": 63091.31,
+            "confidence_low": 55958.91,
+            "date": "2026-10-27",
+            "price": 59525.11
+          },
+          {
+            "confidence_high": 63307.26,
+            "confidence_low": 56150.46,
+            "date": "2026-10-28",
+            "price": 59728.86
+          },
+          {
+            "confidence_high": 63523.22,
+            "confidence_low": 56342.0,
+            "date": "2026-10-29",
+            "price": 59932.61
+          },
+          {
+            "confidence_high": 63739.18,
+            "confidence_low": 56533.54,
+            "date": "2026-10-30",
+            "price": 60136.36
+          },
+          {
+            "confidence_high": 63955.14,
+            "confidence_low": 56725.09,
+            "date": "2026-10-31",
+            "price": 60340.11
+          },
+          {
+            "confidence_high": 64171.1,
+            "confidence_low": 56916.63,
+            "date": "2026-11-01",
+            "price": 60543.86
+          },
+          {
+            "confidence_high": 64387.06,
+            "confidence_low": 57108.17,
+            "date": "2026-11-02",
+            "price": 60747.61
+          },
+          {
+            "confidence_high": 64603.0,
+            "confidence_low": 57299.73,
+            "date": "2026-11-03",
+            "price": 60951.37
+          },
+          {
+            "confidence_high": 64818.96,
+            "confidence_low": 57491.27,
+            "date": "2026-11-04",
+            "price": 61155.12
+          },
+          {
+            "confidence_high": 65034.92,
+            "confidence_low": 57682.81,
+            "date": "2026-11-05",
+            "price": 61358.87
+          },
+          {
+            "confidence_high": 65250.88,
+            "confidence_low": 57874.36,
+            "date": "2026-11-06",
+            "price": 61562.62
+          },
+          {
+            "confidence_high": 65466.84,
+            "confidence_low": 58065.9,
+            "date": "2026-11-07",
+            "price": 61766.37
+          },
+          {
+            "confidence_high": 65682.8,
+            "confidence_low": 58257.44,
+            "date": "2026-11-08",
+            "price": 61970.12
+          },
+          {
+            "confidence_high": 65898.74,
+            "confidence_low": 58449.0,
+            "date": "2026-11-09",
+            "price": 62173.87
+          },
+          {
+            "confidence_high": 66114.71,
+            "confidence_low": 58640.53,
+            "date": "2026-11-10",
+            "price": 62377.62
+          },
+          {
+            "confidence_high": 66330.67,
+            "confidence_low": 58832.07,
+            "date": "2026-11-11",
+            "price": 62581.37
+          },
+          {
+            "confidence_high": 66546.62,
+            "confidence_low": 59023.63,
+            "date": "2026-11-12",
+            "price": 62785.12
+          },
+          {
+            "confidence_high": 66762.58,
+            "confidence_low": 59215.17,
+            "date": "2026-11-13",
+            "price": 62988.87
+          },
+          {
+            "confidence_high": 66978.54,
+            "confidence_low": 59406.71,
+            "date": "2026-11-14",
+            "price": 63192.63
+          },
+          {
+            "confidence_high": 67194.49,
+            "confidence_low": 59598.26,
+            "date": "2026-11-15",
+            "price": 63396.38
+          },
+          {
+            "confidence_high": 67410.45,
+            "confidence_low": 59789.8,
+            "date": "2026-11-16",
+            "price": 63600.13
+          }
+        ],
+        "recommendation": "Tendance haussière forte. Le risque de retournement tend à augmenter à mesure que le mouvement s'étend ; résistance à surveiller : 65000.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.95,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Divergence: regime journalier = bullish, regime hebdomadaire = bottom. Prudence recommandee.",
+          "probabilities": {
+            "bearish": 0.057,
+            "bottom": 0.116,
+            "bullish": 0.656,
+            "top": 0.171
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "divergent",
+          "weekly_regime": "bottom"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 65000.0,
+        "skill_score": 86.4,
+        "support_level": 59652.43,
+        "symbol": "BTC",
+        "trend": "bullish",
+        "trend_strength": 100.0
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": 28.2,
+        "current_price": 3000.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "ETH",
+        "predicted_price": 3846.14,
+        "predictions": [
+          {
+            "confidence_high": 3395.24,
+            "confidence_low": 3071.88,
+            "date": "2026-10-18",
+            "price": 3233.56
+          },
+          {
+            "confidence_high": 3417.42,
+            "confidence_low": 3091.95,
+            "date": "2026-10-19",
+            "price": 3254.68
+          },
+          {
+            "confidence_high": 3439.6,
+            "confidence_low": 3112.02,
+            "date": "2026-10-20",
+            "price": 3275.81
+          },
+          {
+            "confidence_high": 3461.78,
+            "confidence_low": 3132.08,
+            "date": "2026-10-21",
+            "price": 3296.93
+          },
+          {
+            "confidence_high": 3483.96,
+            "confidence_low": 3152.15,
+            "date": "2026-10-22",
+            "price": 3318.05
+          },
+          {
+            "confidence_high": 3506.14,
+            "confidence_low": 3172.22,
+            "date": "2026-10-23",
+            "price": 3339.18
+          },
+          {
+            "confidence_high": 3528.32,
+            "confidence_low": 3192.29,
+            "date": "2026-10-24",
+            "price": 3360.3
+          },
+          {
+            "confidence_high": 3550.5,
+            "confidence_low": 3212.35,
+            "date": "2026-10-25",
+            "price": 3381.42
+          },
+          {
+            "confidence_high": 3572.67,
+            "confidence_low": 3232.42,
+            "date": "2026-10-26",
+            "price": 3402.55
+          },
+          {
+            "confidence_high": 3594.85,
+            "confidence_low": 3252.49,
+            "date": "2026-10-27",
+            "price": 3423.67
+          },
+          {
+            "confidence_high": 3617.03,
+            "confidence_low": 3272.55,
+            "date": "2026-10-28",
+            "price": 3444.79
+          },
+          {
+            "confidence_high": 3639.21,
+            "confidence_low": 3292.62,
+            "date": "2026-10-29",
+            "price": 3465.92
+          },
+          {
+            "confidence_high": 3661.39,
+            "confidence_low": 3312.69,
+            "date": "2026-10-30",
+            "price": 3487.04
+          },
+          {
+            "confidence_high": 3683.57,
+            "confidence_low": 3332.76,
+            "date": "2026-10-31",
+            "price": 3508.17
+          },
+          {
+            "confidence_high": 3705.75,
+            "confidence_low": 3352.82,
+            "date": "2026-11-01",
+            "price": 3529.29
+          },
+          {
+            "confidence_high": 3727.93,
+            "confidence_low": 3372.89,
+            "date": "2026-11-02",
+            "price": 3550.41
+          },
+          {
+            "confidence_high": 3750.11,
+            "confidence_low": 3392.96,
+            "date": "2026-11-03",
+            "price": 3571.54
+          },
+          {
+            "confidence_high": 3772.29,
+            "confidence_low": 3413.03,
+            "date": "2026-11-04",
+            "price": 3592.66
+          },
+          {
+            "confidence_high": 3794.47,
+            "confidence_low": 3433.09,
+            "date": "2026-11-05",
+            "price": 3613.78
+          },
+          {
+            "confidence_high": 3816.65,
+            "confidence_low": 3453.16,
+            "date": "2026-11-06",
+            "price": 3634.91
+          },
+          {
+            "confidence_high": 3838.83,
+            "confidence_low": 3473.23,
+            "date": "2026-11-07",
+            "price": 3656.03
+          },
+          {
+            "confidence_high": 3861.01,
+            "confidence_low": 3493.3,
+            "date": "2026-11-08",
+            "price": 3677.15
+          },
+          {
+            "confidence_high": 3883.19,
+            "confidence_low": 3513.36,
+            "date": "2026-11-09",
+            "price": 3698.28
+          },
+          {
+            "confidence_high": 3905.37,
+            "confidence_low": 3533.43,
+            "date": "2026-11-10",
+            "price": 3719.4
+          },
+          {
+            "confidence_high": 3927.55,
+            "confidence_low": 3553.5,
+            "date": "2026-11-11",
+            "price": 3740.52
+          },
+          {
+            "confidence_high": 3949.73,
+            "confidence_low": 3573.57,
+            "date": "2026-11-12",
+            "price": 3761.65
+          },
+          {
+            "confidence_high": 3971.91,
+            "confidence_low": 3593.63,
+            "date": "2026-11-13",
+            "price": 3782.77
+          },
+          {
+            "confidence_high": 3994.09,
+            "confidence_low": 3613.7,
+            "date": "2026-11-14",
+            "price": 3803.9
+          },
+          {
+            "confidence_high": 4016.27,
+            "confidence_low": 3633.77,
+            "date": "2026-11-15",
+            "price": 3825.02
+          },
+          {
+            "confidence_high": 4038.45,
+            "confidence_low": 3653.84,
+            "date": "2026-11-16",
+            "price": 3846.14
+          }
+        ],
+        "recommendation": "Tendance haussière forte. Le risque de retournement tend à augmenter à mesure que le mouvement s'étend ; résistance à surveiller : 3100.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.071,
+            "bottom": 0.075,
+            "bullish": 0.579,
+            "top": 0.275
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 3100.0,
+        "skill_score": 86.4,
+        "support_level": 2900.0,
+        "symbol": "ETH",
+        "trend": "bullish",
+        "trend_strength": 100.0
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": -23.15,
+        "current_price": 150.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bearish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bearish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "SOL",
+        "predicted_price": 115.27,
+        "predictions": [
+          {
+            "confidence_high": 161.11,
+            "confidence_low": 140.72,
+            "date": "2026-10-18",
+            "price": 150.91
+          },
+          {
+            "confidence_high": 159.79,
+            "confidence_low": 139.58,
+            "date": "2026-10-19",
+            "price": 149.68
+          },
+          {
+            "confidence_high": 158.48,
+            "confidence_low": 138.43,
+            "date": "2026-10-20",
+            "price": 148.45
+          },
+          {
+            "confidence_high": 157.17,
+            "confidence_low": 137.28,
+            "date": "2026-10-21",
+            "price": 147.22
+          },
+          {
+            "confidence_high": 155.86,
+            "confidence_low": 136.14,
+            "date": "2026-10-22",
+            "price": 146.0
+          },
+          {
+            "confidence_high": 154.54,
+            "confidence_low": 134.99,
+            "date": "2026-10-23",
+            "price": 144.77
+          },
+          {
+            "confidence_high": 153.22,
+            "confidence_low": 133.85,
+            "date": "2026-10-24",
+            "price": 143.54
+          },
+          {
+            "confidence_high": 151.91,
+            "confidence_low": 132.7,
+            "date": "2026-10-25",
+            "price": 142.31
+          },
+          {
+            "confidence_high": 150.59,
+            "confidence_low": 131.56,
+            "date": "2026-10-26",
+            "price": 141.08
+          },
+          {
+            "confidence_high": 149.29,
+            "confidence_low": 130.41,
+            "date": "2026-10-27",
+            "price": 139.85
+          },
+          {
+            "confidence_high": 147.98,
+            "confidence_low": 129.26,
+            "date": "2026-10-28",
+            "price": 138.62
+          },
+          {
+            "confidence_high": 146.66,
+            "confidence_low": 128.12,
+            "date": "2026-10-29",
+            "price": 137.39
+          },
+          {
+            "confidence_high": 145.36,
+            "confidence_low": 126.96,
+            "date": "2026-10-30",
+            "price": 136.16
+          },
+          {
+            "confidence_high": 144.04,
+            "confidence_low": 125.83,
+            "date": "2026-10-31",
+            "price": 134.93
+          },
+          {
+            "confidence_high": 142.73,
+            "confidence_low": 124.68,
+            "date": "2026-11-01",
+            "price": 133.71
+          },
+          {
+            "confidence_high": 141.42,
+            "confidence_low": 123.53,
+            "date": "2026-11-02",
+            "price": 132.48
+          },
+          {
+            "confidence_high": 140.11,
+            "confidence_low": 122.38,
+            "date": "2026-11-03",
+            "price": 131.25
+          },
+          {
+            "confidence_high": 138.8,
+            "confidence_low": 121.24,
+            "date": "2026-11-04",
+            "price": 130.02
+          },
+          {
+            "confidence_high": 137.49,
+            "confidence_low": 120.09,
+            "date": "2026-11-05",
+            "price": 128.79
+          },
+          {
+            "confidence_high": 136.17,
+            "confidence_low": 118.95,
+            "date": "2026-11-06",
+            "price": 127.56
+          },
+          {
+            "confidence_high": 134.87,
+            "confidence_low": 117.79,
+            "date": "2026-11-07",
+            "price": 126.33
+          },
+          {
+            "confidence_high": 133.55,
+            "confidence_low": 116.66,
+            "date": "2026-11-08",
+            "price": 125.1
+          },
+          {
+            "confidence_high": 132.24,
+            "confidence_low": 115.51,
+            "date": "2026-11-09",
+            "price": 123.87
+          },
+          {
+            "confidence_high": 130.93,
+            "confidence_low": 114.36,
+            "date": "2026-11-10",
+            "price": 122.64
+          },
+          {
+            "confidence_high": 129.62,
+            "confidence_low": 113.21,
+            "date": "2026-11-11",
+            "price": 121.41
+          },
+          {
+            "confidence_high": 128.31,
+            "confidence_low": 112.07,
+            "date": "2026-11-12",
+            "price": 120.19
+          },
+          {
+            "confidence_high": 126.98,
+            "confidence_low": 110.93,
+            "date": "2026-11-13",
+            "price": 118.96
+          },
+          {
+            "confidence_high": 125.67,
+            "confidence_low": 109.78,
+            "date": "2026-11-14",
+            "price": 117.73
+          },
+          {
+            "confidence_high": 124.37,
+            "confidence_low": 108.62,
+            "date": "2026-11-15",
+            "price": 116.5
+          },
+          {
+            "confidence_high": 123.05,
+            "confidence_low": 107.49,
+            "date": "2026-11-16",
+            "price": 115.27
+          }
+        ],
+        "recommendation": "Marché baissier confirmé : les prix sont décotés par rapport aux plus hauts récents. Support technique estimé vers 135.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.85,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Divergence: regime journalier = bearish, regime hebdomadaire = top. Prudence recommandee.",
+          "probabilities": {
+            "bearish": 0.378,
+            "bottom": 0.298,
+            "bullish": 0.221,
+            "top": 0.103
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "divergent",
+          "weekly_regime": "top"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 160.0,
+        "skill_score": 86.4,
+        "support_level": 145.42,
+        "symbol": "SOL",
+        "trend": "bearish",
+        "trend_strength": 100.0
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": 48.75,
+        "current_price": 0.8,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "ARB",
+        "predicted_price": 1.19,
+        "predictions": [
+          {
+            "confidence_high": 0.89,
+            "confidence_low": 0.8,
+            "date": "2026-10-18",
+            "price": 0.85
+          },
+          {
+            "confidence_high": 0.9,
+            "confidence_low": 0.81,
+            "date": "2026-10-19",
+            "price": 0.86
+          },
+          {
+            "confidence_high": 0.91,
+            "confidence_low": 0.83,
+            "date": "2026-10-20",
+            "price": 0.87
+          },
+          {
+            "confidence_high": 0.92,
+            "confidence_low": 0.84,
+            "date": "2026-10-21",
+            "price": 0.88
+          },
+          {
+            "confidence_high": 0.94,
+            "confidence_low": 0.85,
+            "date": "2026-10-22",
+            "price": 0.89
+          },
+          {
+            "confidence_high": 0.95,
+            "confidence_low": 0.86,
+            "date": "2026-10-23",
+            "price": 0.9
+          },
+          {
+            "confidence_high": 0.96,
+            "confidence_low": 0.87,
+            "date": "2026-10-24",
+            "price": 0.92
+          },
+          {
+            "confidence_high": 0.97,
+            "confidence_low": 0.88,
+            "date": "2026-10-25",
+            "price": 0.93
+          },
+          {
+            "confidence_high": 0.99,
+            "confidence_low": 0.89,
+            "date": "2026-10-26",
+            "price": 0.94
+          },
+          {
+            "confidence_high": 1.0,
+            "confidence_low": 0.9,
+            "date": "2026-10-27",
+            "price": 0.95
+          },
+          {
+            "confidence_high": 1.01,
+            "confidence_low": 0.92,
+            "date": "2026-10-28",
+            "price": 0.96
+          },
+          {
+            "confidence_high": 1.02,
+            "confidence_low": 0.93,
+            "date": "2026-10-29",
+            "price": 0.98
+          },
+          {
+            "confidence_high": 1.04,
+            "confidence_low": 0.94,
+            "date": "2026-10-30",
+            "price": 0.99
+          },
+          {
+            "confidence_high": 1.05,
+            "confidence_low": 0.95,
+            "date": "2026-10-31",
+            "price": 1.0
+          },
+          {
+            "confidence_high": 1.06,
+            "confidence_low": 0.96,
+            "date": "2026-11-01",
+            "price": 1.01
+          },
+          {
+            "confidence_high": 1.07,
+            "confidence_low": 0.97,
+            "date": "2026-11-02",
+            "price": 1.02
+          },
+          {
+            "confidence_high": 1.09,
+            "confidence_low": 0.98,
+            "date": "2026-11-03",
+            "price": 1.03
+          },
+          {
+            "confidence_high": 1.1,
+            "confidence_low": 0.99,
+            "date": "2026-11-04",
+            "price": 1.05
+          },
+          {
+            "confidence_high": 1.11,
+            "confidence_low": 1.01,
+            "date": "2026-11-05",
+            "price": 1.06
+          },
+          {
+            "confidence_high": 1.12,
+            "confidence_low": 1.02,
+            "date": "2026-11-06",
+            "price": 1.07
+          },
+          {
+            "confidence_high": 1.14,
+            "confidence_low": 1.03,
+            "date": "2026-11-07",
+            "price": 1.08
+          },
+          {
+            "confidence_high": 1.15,
+            "confidence_low": 1.04,
+            "date": "2026-11-08",
+            "price": 1.09
+          },
+          {
+            "confidence_high": 1.16,
+            "confidence_low": 1.05,
+            "date": "2026-11-09",
+            "price": 1.11
+          },
+          {
+            "confidence_high": 1.17,
+            "confidence_low": 1.06,
+            "date": "2026-11-10",
+            "price": 1.12
+          },
+          {
+            "confidence_high": 1.19,
+            "confidence_low": 1.07,
+            "date": "2026-11-11",
+            "price": 1.13
+          },
+          {
+            "confidence_high": 1.2,
+            "confidence_low": 1.08,
+            "date": "2026-11-12",
+            "price": 1.14
+          },
+          {
+            "confidence_high": 1.21,
+            "confidence_low": 1.1,
+            "date": "2026-11-13",
+            "price": 1.15
+          },
+          {
+            "confidence_high": 1.22,
+            "confidence_low": 1.11,
+            "date": "2026-11-14",
+            "price": 1.16
+          },
+          {
+            "confidence_high": 1.24,
+            "confidence_low": 1.12,
+            "date": "2026-11-15",
+            "price": 1.18
+          },
+          {
+            "confidence_high": 1.25,
+            "confidence_low": 1.13,
+            "date": "2026-11-16",
+            "price": 1.19
+          }
+        ],
+        "recommendation": "Tendance haussière forte. Le risque de retournement tend à augmenter à mesure que le mouvement s'étend ; résistance à surveiller : 1.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.84,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.114,
+            "bottom": 0.236,
+            "bullish": 0.379,
+            "top": 0.271
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 0.86,
+        "skill_score": 86.4,
+        "support_level": 0.72,
+        "symbol": "ARB",
+        "trend": "bullish",
+        "trend_strength": 100.0
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": -25.11,
+        "current_price": 9.0,
+        "explanations": [],
+        "hit_rate": 30.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "UNI",
+        "predicted_price": 6.74,
+        "predictions": [
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-18",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-19",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-20",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-21",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-22",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-23",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-24",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-25",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-26",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.33,
+            "date": "2026-10-27",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-28",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-10-29",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.33,
+            "date": "2026-10-30",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-10-31",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-01",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.33,
+            "date": "2026-11-02",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-03",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-04",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-05",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-06",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-07",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-08",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-09",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-10",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-11",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-12",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-13",
+            "price": 6.74
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-14",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.18,
+            "confidence_low": 6.32,
+            "date": "2026-11-15",
+            "price": 6.75
+          },
+          {
+            "confidence_high": 7.17,
+            "confidence_low": 6.32,
+            "date": "2026-11-16",
+            "price": 6.74
+          }
+        ],
+        "recommendation": "Marché baissier — contexte historiquement associé aux phases d'accumulation ; les creux de cycle s'y sont souvent formés.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.95,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+          "probabilities": {
+            "bearish": 0.564,
+            "bottom": 0.22,
+            "bullish": 0.09,
+            "top": 0.126
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bearish"
+        },
+        "reliability_score": 63.8,
+        "resistance_level": 9.5,
+        "skill_score": 86.4,
+        "support_level": 8.5,
+        "symbol": "UNI",
+        "trend": "bearish",
+        "trend_strength": 30.7
+      },
+      {
+        "asset_type": "crypto",
+        "change_percent": -33.33,
+        "current_price": 0.15,
+        "explanations": [],
+        "hit_rate": 62.5,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "neutral",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "neutral",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "DOGE",
+        "predicted_price": 0.1,
+        "predictions": [
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-18",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-19",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-20",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-21",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-22",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-23",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-24",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-25",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-26",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-27",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-28",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-29",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-30",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-10-31",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-01",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-02",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-03",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-04",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-05",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.11,
+            "confidence_low": 0.1,
+            "date": "2026-11-06",
+            "price": 0.11
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.1,
+            "date": "2026-11-07",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.1,
+            "date": "2026-11-08",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-09",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-10",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-11",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-12",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-13",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-14",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-15",
+            "price": 0.1
+          },
+          {
+            "confidence_high": 0.1,
+            "confidence_low": 0.09,
+            "date": "2026-11-16",
+            "price": 0.1
+          }
+        ],
+        "recommendation": "Marché baissier — contexte historiquement associé aux phases d'accumulation ; les creux de cycle s'y sont souvent formés.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bearish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+          "probabilities": {
+            "bearish": 0.658,
+            "bottom": 0.15,
+            "bullish": 0.082,
+            "top": 0.11
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bearish"
+        },
+        "reliability_score": 76.8,
+        "resistance_level": 0.16,
+        "skill_score": 86.4,
+        "support_level": 0.15,
+        "symbol": "DOGE",
+        "trend": "bearish",
+        "trend_strength": 3.3
+      },
+      {
+        "asset_type": "stock",
+        "change_percent": 1.98,
+        "current_price": 200.0,
+        "explanations": [],
+        "hit_rate": 85.0,
+        "hit_rate_n_samples": 2,
+        "hit_rate_significant": false,
+        "model_confidence": "useful",
+        "model_used": "ensemble (prophet: 60%, xgboost: 40%)",
+        "models_agree": true,
+        "models_detail": [
+          {
+            "mape": 3.0,
+            "name": "Prophet",
+            "trend": "bullish",
+            "weight_pct": 60.0
+          },
+          {
+            "mape": 4.0,
+            "name": "XGBoost",
+            "trend": "bullish",
+            "weight_pct": 40.0
+          }
+        ],
+        "name": "AAPL",
+        "predicted_price": 203.96,
+        "predictions": [
+          {
+            "confidence_high": 211.2,
+            "confidence_low": 189.83,
+            "date": "2026-10-18",
+            "price": 200.52
+          },
+          {
+            "confidence_high": 211.33,
+            "confidence_low": 189.94,
+            "date": "2026-10-19",
+            "price": 200.64
+          },
+          {
+            "confidence_high": 211.45,
+            "confidence_low": 190.06,
+            "date": "2026-10-20",
+            "price": 200.75
+          },
+          {
+            "confidence_high": 211.58,
+            "confidence_low": 190.17,
+            "date": "2026-10-21",
+            "price": 200.87
+          },
+          {
+            "confidence_high": 211.7,
+            "confidence_low": 190.28,
+            "date": "2026-10-22",
+            "price": 200.99
+          },
+          {
+            "confidence_high": 211.83,
+            "confidence_low": 190.4,
+            "date": "2026-10-23",
+            "price": 201.11
+          },
+          {
+            "confidence_high": 211.95,
+            "confidence_low": 190.51,
+            "date": "2026-10-24",
+            "price": 201.23
+          },
+          {
+            "confidence_high": 212.09,
+            "confidence_low": 190.61,
+            "date": "2026-10-25",
+            "price": 201.35
+          },
+          {
+            "confidence_high": 212.21,
+            "confidence_low": 190.72,
+            "date": "2026-10-26",
+            "price": 201.47
+          },
+          {
+            "confidence_high": 212.33,
+            "confidence_low": 190.84,
+            "date": "2026-10-27",
+            "price": 201.59
+          },
+          {
+            "confidence_high": 212.46,
+            "confidence_low": 190.95,
+            "date": "2026-10-28",
+            "price": 201.7
+          },
+          {
+            "confidence_high": 212.58,
+            "confidence_low": 191.06,
+            "date": "2026-10-29",
+            "price": 201.82
+          },
+          {
+            "confidence_high": 212.71,
+            "confidence_low": 191.17,
+            "date": "2026-10-30",
+            "price": 201.94
+          },
+          {
+            "confidence_high": 212.83,
+            "confidence_low": 191.29,
+            "date": "2026-10-31",
+            "price": 202.06
+          },
+          {
+            "confidence_high": 212.96,
+            "confidence_low": 191.4,
+            "date": "2026-11-01",
+            "price": 202.18
+          },
+          {
+            "confidence_high": 213.08,
+            "confidence_low": 191.51,
+            "date": "2026-11-02",
+            "price": 202.3
+          },
+          {
+            "confidence_high": 213.21,
+            "confidence_low": 191.63,
+            "date": "2026-11-03",
+            "price": 202.42
+          },
+          {
+            "confidence_high": 213.33,
+            "confidence_low": 191.74,
+            "date": "2026-11-04",
+            "price": 202.54
+          },
+          {
+            "confidence_high": 213.46,
+            "confidence_low": 191.85,
+            "date": "2026-11-05",
+            "price": 202.65
+          },
+          {
+            "confidence_high": 213.58,
+            "confidence_low": 191.96,
+            "date": "2026-11-06",
+            "price": 202.77
+          },
+          {
+            "confidence_high": 213.71,
+            "confidence_low": 192.08,
+            "date": "2026-11-07",
+            "price": 202.89
+          },
+          {
+            "confidence_high": 213.83,
+            "confidence_low": 192.19,
+            "date": "2026-11-08",
+            "price": 203.01
+          },
+          {
+            "confidence_high": 213.96,
+            "confidence_low": 192.3,
+            "date": "2026-11-09",
+            "price": 203.13
+          },
+          {
+            "confidence_high": 214.08,
+            "confidence_low": 192.42,
+            "date": "2026-11-10",
+            "price": 203.25
+          },
+          {
+            "confidence_high": 214.2,
+            "confidence_low": 192.53,
+            "date": "2026-11-11",
+            "price": 203.37
+          },
+          {
+            "confidence_high": 214.33,
+            "confidence_low": 192.64,
+            "date": "2026-11-12",
+            "price": 203.48
+          },
+          {
+            "confidence_high": 214.45,
+            "confidence_low": 192.75,
+            "date": "2026-11-13",
+            "price": 203.6
+          },
+          {
+            "confidence_high": 214.58,
+            "confidence_low": 192.87,
+            "date": "2026-11-14",
+            "price": 203.72
+          },
+          {
+            "confidence_high": 214.7,
+            "confidence_low": 192.98,
+            "date": "2026-11-15",
+            "price": 203.84
+          },
+          {
+            "confidence_high": 214.83,
+            "confidence_low": 193.09,
+            "date": "2026-11-16",
+            "price": 203.96
+          }
+        ],
+        "recommendation": "Marché haussier : la dynamique reste positive. Résistance à surveiller : 210.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+        "regime_info": {
+          "adjustment_factor": null,
+          "confidence": 0.94,
+          "dominant_regime": "bullish",
+          "liquidity_warning": null,
+          "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+          "probabilities": {
+            "bearish": 0.087,
+            "bottom": 0.091,
+            "bullish": 0.515,
+            "top": 0.307
+          },
+          "regime_price_adjustment": null,
+          "timeframe_alignment": "aligned",
+          "weekly_regime": "bullish"
+        },
+        "reliability_score": 85.8,
+        "resistance_level": 210.0,
+        "skill_score": 86.4,
+        "support_level": 190.0,
+        "symbol": "AAPL",
+        "trend": "bullish",
+        "trend_strength": 17.8
+      }
+    ],
+    "summary": {
+      "bearish_assets": 3,
+      "bullish_assets": 4,
+      "days_ahead": 30,
+      "expected_change_percent": 4.18,
+      "neutral_assets": 0,
+      "overall_sentiment": "bullish",
+      "total_current_value": 63600.0,
+      "total_predicted_value": 66259.2
+    }
+  },
+  "status": 200
+}
