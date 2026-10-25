@@ -1,0 +1,314 @@
+{
+  "body": {
+    "assumptions": {
+      "annual_expenses": 30000.0,
+      "annual_return_mean": 0.07,
+      "annual_volatility": 0.15,
+      "current_value": 0.0,
+      "defaults_from": {
+        "current_value": "portefeuille live"
+      },
+      "index_contributions": true,
+      "inflation": 0.02,
+      "monthly_contribution": 0.0,
+      "n_paths": 1000,
+      "withdrawal_rate": 0.04,
+      "years_horizon": 30
+    },
+    "currency": "EUR",
+    "final_value_p10": 0.0,
+    "final_value_p50": 0.0,
+    "final_value_p90": 0.0,
+    "fire_number_today": 750000.0,
+    "fire_year_p10": null,
+    "fire_year_p50": null,
+    "fire_year_p90": null,
+    "median_path": [
+      {
+        "fire_number": 750000.0,
+        "portfolio_value": 0.0,
+        "year": 2026
+      },
+      {
+        "fire_number": 765000.0,
+        "portfolio_value": 0.0,
+        "year": 2027
+      },
+      {
+        "fire_number": 780300.0,
+        "portfolio_value": 0.0,
+        "year": 2028
+      },
+      {
+        "fire_number": 795906.0,
+        "portfolio_value": 0.0,
+        "year": 2029
+      },
+      {
+        "fire_number": 811824.12,
+        "portfolio_value": 0.0,
+        "year": 2030
+      },
+      {
+        "fire_number": 828060.6,
+        "portfolio_value": 0.0,
+        "year": 2031
+      },
+      {
+        "fire_number": 844621.81,
+        "portfolio_value": 0.0,
+        "year": 2032
+      },
+      {
+        "fire_number": 861514.25,
+        "portfolio_value": 0.0,
+        "year": 2033
+      },
+      {
+        "fire_number": 878744.54,
+        "portfolio_value": 0.0,
+        "year": 2034
+      },
+      {
+        "fire_number": 896319.43,
+        "portfolio_value": 0.0,
+        "year": 2035
+      },
+      {
+        "fire_number": 914245.81,
+        "portfolio_value": 0.0,
+        "year": 2036
+      },
+      {
+        "fire_number": 932530.73,
+        "portfolio_value": 0.0,
+        "year": 2037
+      },
+      {
+        "fire_number": 951181.35,
+        "portfolio_value": 0.0,
+        "year": 2038
+      },
+      {
+        "fire_number": 970204.97,
+        "portfolio_value": 0.0,
+        "year": 2039
+      },
+      {
+        "fire_number": 989609.07,
+        "portfolio_value": 0.0,
+        "year": 2040
+      },
+      {
+        "fire_number": 1009401.25,
+        "portfolio_value": 0.0,
+        "year": 2041
+      },
+      {
+        "fire_number": 1029589.28,
+        "portfolio_value": 0.0,
+        "year": 2042
+      },
+      {
+        "fire_number": 1050181.06,
+        "portfolio_value": 0.0,
+        "year": 2043
+      },
+      {
+        "fire_number": 1071184.69,
+        "portfolio_value": 0.0,
+        "year": 2044
+      },
+      {
+        "fire_number": 1092608.38,
+        "portfolio_value": 0.0,
+        "year": 2045
+      },
+      {
+        "fire_number": 1114460.55,
+        "portfolio_value": 0.0,
+        "year": 2046
+      },
+      {
+        "fire_number": 1136749.76,
+        "portfolio_value": 0.0,
+        "year": 2047
+      },
+      {
+        "fire_number": 1159484.75,
+        "portfolio_value": 0.0,
+        "year": 2048
+      },
+      {
+        "fire_number": 1182674.45,
+        "portfolio_value": 0.0,
+        "year": 2049
+      },
+      {
+        "fire_number": 1206327.94,
+        "portfolio_value": 0.0,
+        "year": 2050
+      },
+      {
+        "fire_number": 1230454.5,
+        "portfolio_value": 0.0,
+        "year": 2051
+      },
+      {
+        "fire_number": 1255063.59,
+        "portfolio_value": 0.0,
+        "year": 2052
+      },
+      {
+        "fire_number": 1280164.86,
+        "portfolio_value": 0.0,
+        "year": 2053
+      },
+      {
+        "fire_number": 1305768.15,
+        "portfolio_value": 0.0,
+        "year": 2054
+      },
+      {
+        "fire_number": 1331883.52,
+        "portfolio_value": 0.0,
+        "year": 2055
+      },
+      {
+        "fire_number": 1358521.19,
+        "portfolio_value": 0.0,
+        "year": 2056
+      }
+    ],
+    "n_paths": 1000,
+    "prob_at_horizon": 0.0,
+    "prob_by_year": [
+      {
+        "prob": 0.0,
+        "year": 2026
+      },
+      {
+        "prob": 0.0,
+        "year": 2027
+      },
+      {
+        "prob": 0.0,
+        "year": 2028
+      },
+      {
+        "prob": 0.0,
+        "year": 2029
+      },
+      {
+        "prob": 0.0,
+        "year": 2030
+      },
+      {
+        "prob": 0.0,
+        "year": 2031
+      },
+      {
+        "prob": 0.0,
+        "year": 2032
+      },
+      {
+        "prob": 0.0,
+        "year": 2033
+      },
+      {
+        "prob": 0.0,
+        "year": 2034
+      },
+      {
+        "prob": 0.0,
+        "year": 2035
+      },
+      {
+        "prob": 0.0,
+        "year": 2036
+      },
+      {
+        "prob": 0.0,
+        "year": 2037
+      },
+      {
+        "prob": 0.0,
+        "year": 2038
+      },
+      {
+        "prob": 0.0,
+        "year": 2039
+      },
+      {
+        "prob": 0.0,
+        "year": 2040
+      },
+      {
+        "prob": 0.0,
+        "year": 2041
+      },
+      {
+        "prob": 0.0,
+        "year": 2042
+      },
+      {
+        "prob": 0.0,
+        "year": 2043
+      },
+      {
+        "prob": 0.0,
+        "year": 2044
+      },
+      {
+        "prob": 0.0,
+        "year": 2045
+      },
+      {
+        "prob": 0.0,
+        "year": 2046
+      },
+      {
+        "prob": 0.0,
+        "year": 2047
+      },
+      {
+        "prob": 0.0,
+        "year": 2048
+      },
+      {
+        "prob": 0.0,
+        "year": 2049
+      },
+      {
+        "prob": 0.0,
+        "year": 2050
+      },
+      {
+        "prob": 0.0,
+        "year": 2051
+      },
+      {
+        "prob": 0.0,
+        "year": 2052
+      },
+      {
+        "prob": 0.0,
+        "year": 2053
+      },
+      {
+        "prob": 0.0,
+        "year": 2054
+      },
+      {
+        "prob": 0.0,
+        "year": 2055
+      },
+      {
+        "prob": 0.0,
+        "year": 2056
+      }
+    ],
+    "survival_prob_30y": 0.753
+  },
+  "status": 200
+}

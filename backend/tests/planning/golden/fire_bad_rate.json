@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "le": 0.08
+        },
+        "input": 0.1,
+        "loc": [
+          "body",
+          "withdrawal_rate"
+        ],
+        "msg": "Input should be less than or equal to 0.08",
+        "type": "less_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'fire', 'projection', 'dca', 'what_if' or 'rebalance'"
+        },
+        "input": "lottery",
+        "loc": [
+          "body",
+          "simulation_type"
+        ],
+        "msg": "Input should be 'fire', 'projection', 'dca', 'what_if' or 'rebalance'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

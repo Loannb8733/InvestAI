@@ -1,0 +1,195 @@
+{
+  "body": {
+    "currency": "EUR",
+    "current_value": 63600.0,
+    "final_value": 433291.97,
+    "projections": [
+      {
+        "contributions": 0.0,
+        "nominal_value": 63600.0,
+        "real_value": 63600.0,
+        "returns": 0.0,
+        "year": 0
+      },
+      {
+        "contributions": 4800.0,
+        "nominal_value": 71559.2,
+        "real_value": 69474.95,
+        "returns": 3159.2,
+        "year": 1
+      },
+      {
+        "contributions": 9600.0,
+        "nominal_value": 79900.65,
+        "real_value": 75314.03,
+        "returns": 6700.65,
+        "year": 2
+      },
+      {
+        "contributions": 14400.0,
+        "nominal_value": 88642.71,
+        "real_value": 81120.63,
+        "returns": 10642.71,
+        "year": 3
+      },
+      {
+        "contributions": 19200.0,
+        "nominal_value": 97804.6,
+        "real_value": 86898.12,
+        "returns": 15004.6,
+        "year": 4
+      },
+      {
+        "contributions": 24000.0,
+        "nominal_value": 107406.51,
+        "real_value": 92649.8,
+        "returns": 19806.51,
+        "year": 5
+      },
+      {
+        "contributions": 28800.0,
+        "nominal_value": 117469.55,
+        "real_value": 98378.9,
+        "returns": 25069.55,
+        "year": 6
+      },
+      {
+        "contributions": 33600.0,
+        "nominal_value": 128015.89,
+        "real_value": 104088.63,
+        "returns": 30815.89,
+        "year": 7
+      },
+      {
+        "contributions": 38400.0,
+        "nominal_value": 139068.71,
+        "real_value": 109782.13,
+        "returns": 37068.71,
+        "year": 8
+      },
+      {
+        "contributions": 43200.0,
+        "nominal_value": 150652.36,
+        "real_value": 115462.49,
+        "returns": 43852.36,
+        "year": 9
+      },
+      {
+        "contributions": 48000.0,
+        "nominal_value": 162792.32,
+        "real_value": 121132.77,
+        "returns": 51192.32,
+        "year": 10
+      },
+      {
+        "contributions": 52800.0,
+        "nominal_value": 175515.31,
+        "real_value": 126796.0,
+        "returns": 59115.31,
+        "year": 11
+      },
+      {
+        "contributions": 57600.0,
+        "nominal_value": 188849.34,
+        "real_value": 132455.12,
+        "returns": 67649.34,
+        "year": 12
+      },
+      {
+        "contributions": 62400.0,
+        "nominal_value": 202823.74,
+        "real_value": 138113.1,
+        "returns": 76823.74,
+        "year": 13
+      },
+      {
+        "contributions": 67200.0,
+        "nominal_value": 217469.27,
+        "real_value": 143772.81,
+        "returns": 86669.27,
+        "year": 14
+      },
+      {
+        "contributions": 72000.0,
+        "nominal_value": 232818.17,
+        "real_value": 149437.12,
+        "returns": 97218.17,
+        "year": 15
+      },
+      {
+        "contributions": 76800.0,
+        "nominal_value": 248904.21,
+        "real_value": 155108.87,
+        "returns": 108504.21,
+        "year": 16
+      },
+      {
+        "contributions": 81600.0,
+        "nominal_value": 265762.79,
+        "real_value": 160790.86,
+        "returns": 120562.79,
+        "year": 17
+      },
+      {
+        "contributions": 86400.0,
+        "nominal_value": 283431.02,
+        "real_value": 166485.85,
+        "returns": 133431.02,
+        "year": 18
+      },
+      {
+        "contributions": 91200.0,
+        "nominal_value": 301947.78,
+        "real_value": 172196.6,
+        "returns": 147147.78,
+        "year": 19
+      },
+      {
+        "contributions": 96000.0,
+        "nominal_value": 321353.83,
+        "real_value": 177925.82,
+        "returns": 161753.83,
+        "year": 20
+      },
+      {
+        "contributions": 100800.0,
+        "nominal_value": 341691.86,
+        "real_value": 183676.21,
+        "returns": 177291.86,
+        "year": 21
+      },
+      {
+        "contributions": 105600.0,
+        "nominal_value": 363006.65,
+        "real_value": 189450.45,
+        "returns": 193806.65,
+        "year": 22
+      },
+      {
+        "contributions": 110400.0,
+        "nominal_value": 385345.09,
+        "real_value": 195251.18,
+        "returns": 211345.09,
+        "year": 23
+      },
+      {
+        "contributions": 115200.0,
+        "nominal_value": 408756.36,
+        "real_value": 201081.04,
+        "returns": 229956.36,
+        "year": 24
+      },
+      {
+        "contributions": 120000.0,
+        "nominal_value": 433291.97,
+        "real_value": 206942.66,
+        "returns": 249691.97,
+        "year": 25
+      }
+    ],
+    "real_final_value": 206942.66,
+    "total_contributions": 124800.0,
+    "total_returns": 244891.97
+  },
+  "status": 200
+}

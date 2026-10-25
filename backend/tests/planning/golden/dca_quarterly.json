@@ -1,0 +1,117 @@
+{
+  "body": {
+    "average_cost": 86.58,
+    "currency": "EUR",
+    "dca_p10": 4305.1,
+    "dca_p50": 7655.77,
+    "dca_p90": 14123.92,
+    "final_value": 7655.77,
+    "lumpsum_p10": 1673.43,
+    "lumpsum_p50": 6735.23,
+    "lumpsum_p90": 19291.3,
+    "n_paths": 500,
+    "prob_dca_beats_ls": 60.4,
+    "projections": [
+      {
+        "amount_invested": 1000.0,
+        "current_value": 1000.0,
+        "current_value_p10": 1000.0,
+        "current_value_p90": 1000.0,
+        "lump_sum_value": 8353.54,
+        "period": 1,
+        "price": 104.42,
+        "total_invested": 1000.0,
+        "total_units": 9.5768,
+        "units_bought": 9.5768
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 2005.86,
+        "current_value_p10": 1637.72,
+        "current_value_p90": 2421.11,
+        "lump_sum_value": 8090.17,
+        "period": 2,
+        "price": 101.13,
+        "total_invested": 2000.0,
+        "total_units": 19.466,
+        "units_bought": 9.8885
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 3020.52,
+        "current_value_p10": 2199.23,
+        "current_value_p90": 3927.35,
+        "lump_sum_value": 7849.14,
+        "period": 3,
+        "price": 98.11,
+        "total_invested": 3000.0,
+        "total_units": 30.4871,
+        "units_bought": 10.1922
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 4003.84,
+        "current_value_p10": 2578.24,
+        "current_value_p90": 5612.61,
+        "lump_sum_value": 7562.02,
+        "period": 4,
+        "price": 94.53,
+        "total_invested": 4000.0,
+        "total_units": 41.8847,
+        "units_bought": 10.5792
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 4920.12,
+        "current_value_p10": 3122.49,
+        "current_value_p90": 7296.54,
+        "lump_sum_value": 7016.45,
+        "period": 5,
+        "price": 87.71,
+        "total_invested": 5000.0,
+        "total_units": 53.8854,
+        "units_bought": 11.402
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 5917.9,
+        "current_value_p10": 3673.73,
+        "current_value_p90": 9233.12,
+        "lump_sum_value": 7187.77,
+        "period": 6,
+        "price": 89.85,
+        "total_invested": 6000.0,
+        "total_units": 67.7629,
+        "units_bought": 11.13
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 6710.95,
+        "current_value_p10": 3968.53,
+        "current_value_p90": 11248.72,
+        "lump_sum_value": 6643.5,
+        "period": 7,
+        "price": 83.04,
+        "total_invested": 7000.0,
+        "total_units": 79.2968,
+        "units_bought": 12.0418
+      },
+      {
+        "amount_invested": 1000.0,
+        "current_value": 7655.77,
+        "current_value_p10": 4305.1,
+        "current_value_p90": 14123.92,
+        "lump_sum_value": 6735.23,
+        "period": 8,
+        "price": 84.19,
+        "total_invested": 8000.0,
+        "total_units": 92.4003,
+        "units_bought": 11.8779
+      }
+    ],
+    "return_percent": -4.3,
+    "total_invested": 8000.0,
+    "total_units": 92.4003
+  },
+  "status": 200
+}

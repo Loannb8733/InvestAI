@@ -1,0 +1,26 @@
+{
+  "body": [
+    {
+      "color": "#6366f1",
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "current_amount": "12000.00",
+      "days_remaining": 440,
+      "deadline_date": null,
+      "goal_type": "savings",
+      "icon": "target",
+      "id": "<id-1>",
+      "is_resilient": true,
+      "monthly_needed": null,
+      "name": "Matelas de sécurité",
+      "notes": null,
+      "priority": "medium",
+      "progress_percent": 100.0,
+      "status": "reached",
+      "strategy_type": "conservative",
+      "target_amount": "10000.00",
+      "target_date": "2027-12-31"
+    }
+  ],
+  "status": 200
+}

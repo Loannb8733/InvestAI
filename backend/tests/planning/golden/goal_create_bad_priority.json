@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'LOW', 'MEDIUM' or 'HIGH'"
+        },
+        "input": "URGENT",
+        "loc": [
+          "body",
+          "priority"
+        ],
+        "msg": "Input should be 'LOW', 'MEDIUM' or 'HIGH'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

@@ -1,0 +1,25 @@
+{
+  "body": [
+    {
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-3>",
+      "name": "DCA",
+      "parameters": {},
+      "results": null,
+      "simulation_type": "dca"
+    },
+    {
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-2>",
+      "name": "FIRE 2040",
+      "parameters": {
+        "annual_expenses": 30000
+      },
+      "results": null,
+      "simulation_type": "fire"
+    }
+  ],
+  "status": 200
+}

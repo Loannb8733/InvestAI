@@ -1,0 +1,24 @@
+{
+  "body": {
+    "color": "#6366f1",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "current_amount": "65440.00",
+    "days_remaining": 987,
+    "deadline_date": "2029-06-30",
+    "goal_type": "asset",
+    "icon": "target",
+    "id": "<id-0>",
+    "is_resilient": false,
+    "monthly_needed": 2642.5,
+    "name": "Apport immobilier",
+    "notes": "Résidence principale",
+    "priority": "high",
+    "progress_percent": 43.6,
+    "status": "active",
+    "strategy_type": "aggressive",
+    "target_amount": "150000.00",
+    "target_date": null
+  },
+  "status": 201
+}

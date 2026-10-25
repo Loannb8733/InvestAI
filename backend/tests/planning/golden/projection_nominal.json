@@ -1,0 +1,55 @@
+{
+  "body": {
+    "currency": "EUR",
+    "current_value": 63600.0,
+    "final_value": 90160.97,
+    "projections": [
+      {
+        "contributions": 0.0,
+        "nominal_value": 63600.0,
+        "real_value": 63600.0,
+        "returns": 0.0,
+        "year": 0
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 68197.65,
+        "real_value": 68197.65,
+        "returns": 4597.65,
+        "year": 1
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 73127.66,
+        "real_value": 73127.66,
+        "returns": 9527.66,
+        "year": 2
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 78414.07,
+        "real_value": 78414.07,
+        "returns": 14814.07,
+        "year": 3
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 84082.63,
+        "real_value": 84082.63,
+        "returns": 20482.63,
+        "year": 4
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 90160.97,
+        "real_value": 90160.97,
+        "returns": 26560.97,
+        "year": 5
+      }
+    ],
+    "real_final_value": 90160.97,
+    "total_contributions": 0.0,
+    "total_returns": 26560.97
+  },
+  "status": 200
+}
