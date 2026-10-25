@@ -52,8 +52,8 @@ async def cron_sync_goals() -> dict:
     from sqlalchemy import select
 
     from app.core.db.session import session_factory
-    from app.models.goal import Goal, GoalStatus
-    from app.services.goal_projection_service import sync_goals_for_user
+    from app.domains.planning.goals.models import Goal, GoalStatus
+    from app.domains.planning.goals.sync import sync_goals_for_user
 
     logger.info("Cron: sync-goals started")
     synced_total = 0

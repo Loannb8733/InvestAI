@@ -13,9 +13,9 @@ from decimal import Decimal
 import pytest
 from dateutil.relativedelta import relativedelta
 
-from app.api.v1.endpoints.goals import _build_response
-from app.models.goal import Goal
-from app.services.goal_projection_service import GoalProjectionService
+from app.domains.planning.goals.models import Goal
+from app.domains.planning.goals.projection import GoalProjectionService
+from app.domains.planning.goals.router import _build_response
 
 
 def _objectif(*, restant: Decimal, echeance: date) -> Goal:
