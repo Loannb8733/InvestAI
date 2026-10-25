@@ -276,13 +276,6 @@ async def get_portfolio_health(
     )
 
 
-class TopAlphaResponse(BaseModel):
-    """Top alpha signal summary."""
-
-    symbol: str
-    alpha_score: float
-
-
 class TopInsightResponse(BaseModel):
     """Top insight summary."""
 
@@ -299,7 +292,6 @@ class DashboardSummaryResponse(BaseModel):
     health_status: str
     top_insight: TopInsightResponse | None = None
     breakeven_pct: float | None = None
-    top_alpha: TopAlphaResponse | None = None
     anomaly_count: int
     regime: str | None = None
     generated_at: str
@@ -324,7 +316,6 @@ async def get_dashboard_summary(
         health_status=data["health_status"],
         top_insight=TopInsightResponse(**data["top_insight"]) if data.get("top_insight") else None,
         breakeven_pct=data.get("breakeven_pct"),
-        top_alpha=TopAlphaResponse(**data["top_alpha"]) if data.get("top_alpha") else None,
         anomaly_count=data["anomaly_count"],
         regime=data.get("regime"),
         generated_at=data["generated_at"],

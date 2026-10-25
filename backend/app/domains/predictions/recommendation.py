@@ -1,6 +1,14 @@
 from typing import Any
 
 
+def _level(price: float) -> str:
+    if abs(price) >= 100:
+        return f"{price:.0f}"
+    if abs(price) >= 1:
+        return f"{price:.2f}"
+    return f"{price:.4g}"
+
+
 def _bottom(trend: str) -> str:
     if trend == "bearish":
         return (
@@ -18,7 +26,7 @@ def _bearish(trend: str, trend_strength: float, current_price: float) -> str:
     if trend == "bearish" and trend_strength > 50:
         return (
             "Marché baissier confirmé : les prix sont décotés par rapport aux "
-            f"plus hauts récents. Support technique estimé vers {current_price * 0.9:.0f}."
+            f"plus hauts récents. Support technique estimé vers {_level(current_price * 0.9)}."
         )
     if trend == "bullish":
         return (
@@ -35,9 +43,9 @@ def _bullish(trend: str, trend_strength: float, resistance: float) -> str:
     if trend == "bullish" and trend_strength > 50:
         return (
             "Tendance haussière forte. Le risque de retournement tend à "
-            f"augmenter à mesure que le mouvement s'étend ; résistance à surveiller : {resistance:.0f}."
+            f"augmenter à mesure que le mouvement s'étend ; résistance à surveiller : {_level(resistance)}."
         )
-    return f"Marché haussier : la dynamique reste positive. Résistance à surveiller : {resistance:.0f}."
+    return f"Marché haussier : la dynamique reste positive. Résistance à surveiller : {_level(resistance)}."
 
 
 def _regime_body(
@@ -50,7 +58,7 @@ def _regime_body(
     if regime == "top":
         return (
             "Signes de sommet de marché : le risque de correction est "
-            f"historiquement élevé dans ces configurations. Support à surveiller : {support:.0f}."
+            f"historiquement élevé dans ces configurations. Support à surveiller : {_level(support)}."
         )
     if regime == "bullish":
         return _bullish(trend, trend_strength, resistance)

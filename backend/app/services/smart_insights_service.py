@@ -1007,7 +1007,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         """Lightweight summary for the dashboard IA widget.
 
         Returns health score, top insight, breakeven distance,
-        top alpha signal, anomaly count, and data freshness.
+        anomaly count, and data freshness.
         """
         report = await self.get_portfolio_health(db, user_id, days)
 
@@ -1033,19 +1033,6 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         except Exception as exc:
             logger.debug("Breakeven distance computation failed for dashboard summary: %s", exc)
 
-        # Top alpha: try prediction service
-        top_alpha = None
-        try:
-            alpha_data = await self.prediction_service.get_top_alpha(db, user_id)
-            if alpha_data and isinstance(alpha_data, list) and len(alpha_data) > 0:
-                best_alpha = alpha_data[0]
-                top_alpha = {
-                    "symbol": best_alpha.get("symbol", "?"),
-                    "alpha_score": best_alpha.get("alpha_score", 0),
-                }
-        except Exception as exc:
-            logger.debug("Top-alpha lookup failed for dashboard summary: %s", exc)
-
         # Market regime
         regime_label = None
         if report.market_regime and hasattr(report.market_regime, "market"):
@@ -1056,7 +1043,6 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
             "health_status": report.overall_status,
             "top_insight": top_insight,
             "breakeven_pct": breakeven_pct,
-            "top_alpha": top_alpha,
             "anomaly_count": len(report.anomaly_impacts),
             "regime": regime_label,
             "generated_at": report.generated_at.isoformat(),

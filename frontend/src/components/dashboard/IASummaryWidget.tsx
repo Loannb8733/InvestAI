@@ -11,7 +11,6 @@ import {
 import {
   Brain,
   Activity,
-  TrendingUp,
   AlertTriangle,
   Target,
   Loader2,
@@ -249,7 +248,7 @@ export default function IASummaryWidget() {
           </div>
 
           {/* Flash indicators — 2 cols */}
-          <div className="col-span-3 sm:col-span-2 grid grid-cols-2 gap-2">
+          <div className="col-span-3 sm:col-span-2 grid grid-cols-3 gap-2">
             <FlashCard
               icon={Target}
               label="Breakeven"
@@ -266,18 +265,6 @@ export default function IASummaryWidget() {
                     ? 'success'
                     : 'danger'
               }
-            />
-            <FlashCard
-              icon={TrendingUp}
-              label="Top Alpha"
-              value={data.top_alpha ? data.top_alpha.symbol : '—'}
-              subtext={
-                data.top_alpha
-                  ? `Score ${data.top_alpha.alpha_score.toFixed(0)}/100`
-                  : 'Aucun signal'
-              }
-              variant={data.top_alpha ? 'success' : 'default'}
-              onClick={() => navigate('/intelligence/insights')}
             />
             <FlashCard
               icon={AlertTriangle}
