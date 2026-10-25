@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import get_cached_contrarian_stats
@@ -223,7 +224,7 @@ class AIStrategyService:
 
         candidates = _signal_strategies(sig) + await _cycle_strategies(sig)
         strategies = [s for s in candidates if s]
-        if not strategies:
+        if not strategies and sig.assets:
             strategies.append(_observation(sig.regime, sig.confidence))
         return _finalize(strategies, liquidity, total_value)
 
@@ -233,7 +234,15 @@ class AIStrategyService:
         user_id: str,
         suggestions: list[dict[str, Any]],
     ) -> list[Strategy]:
-        """Enregistre chaque suggestion comme stratégie PROPOSED, ses actions PENDING planifiées à J+1."""
+        """Remplace les propositions encore en attente (PROPOSED) par ces suggestions, actions PENDING planifiées
+        à J+1 ; les stratégies acceptées ou rejetées restent."""
+        await db.execute(
+            delete(Strategy).where(
+                Strategy.user_id == user_id,
+                Strategy.source == StrategySource.AI,
+                Strategy.status == StrategyStatus.PROPOSED,
+            )
+        )
         saved: list[Strategy] = []
         now = datetime.now(UTC)
 

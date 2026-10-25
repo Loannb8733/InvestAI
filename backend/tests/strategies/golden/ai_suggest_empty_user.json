@@ -1,28 +1,4 @@
 {
-  "body": [
-    {
-      "actions": [],
-      "ai_reasoning": "Aucun signal d'achat ou de vente suffisamment fort détecté.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
-      "confidence": 0.5,
-      "created_at": "<volatile>",
-      "description": "Le marché est en phase 'bullish' sans signaux forts. Continuez à surveiller. Aucune action immédiate recommandée.",
-      "id": "<id-19>",
-      "market_regime": "bullish",
-      "name": "Observation — Attente de signaux",
-      "params": {
-        "available_liquidity": 0.0,
-        "performance_potential": 1,
-        "proposed_pct_of_liquidity": 0,
-        "risk_level": 1,
-        "total_portfolio_value": 0.0,
-        "total_proposed_amount": 0,
-        "type": "observation"
-      },
-      "source": "AI",
-      "status": "PROPOSED",
-      "updated_at": "<volatile>",
-      "user_id": "<id-20>"
-    }
-  ],
+  "body": [],
   "status": 200
 }

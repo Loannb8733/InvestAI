@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domains.strategies.models import ActionStatus, StrategyStatus
+
 
 class StrategyActionCreate(BaseModel):
     action: str = Field(..., min_length=1, max_length=100)
@@ -23,7 +25,7 @@ class StrategyCreate(BaseModel):
 class StrategyUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
-    status: str | None = None
+    status: StrategyStatus | None = None
     params: dict[str, Any] | None = None
 
 
@@ -64,5 +66,5 @@ class StrategyResponse(BaseModel):
 class StrategyActionUpdate(BaseModel):
     """Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant proposé par l'IA."""
 
-    status: str | None = None
+    status: ActionStatus | None = None
     amount: float | None = None

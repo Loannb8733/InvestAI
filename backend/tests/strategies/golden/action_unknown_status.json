@@ -1,6 +1,19 @@
 {
   "body": {
-    "detail": "Internal server error"
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'PENDING', 'EXECUTED' or 'SKIPPED'"
+        },
+        "input": "DONE",
+        "loc": [
+          "body",
+          "status"
+        ],
+        "msg": "Input should be 'PENDING', 'EXECUTED' or 'SKIPPED'",
+        "type": "enum"
+      }
+    ]
   },
-  "status": 500
+  "status": 422
 }

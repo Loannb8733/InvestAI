@@ -105,8 +105,8 @@ async def _user_strategy_flow(rec: _Recorder, headers: dict[str, str], other: di
 
 
 async def _ai_flow(rec: _Recorder, headers: dict[str, str], other: dict[str, str]) -> None:
-    suggested = await rec.shot("ai_suggest", "POST", f"{BASE}/ai-suggest", headers)
-    await rec.shot("ai_suggest_again", "POST", f"{BASE}/ai-suggest", headers)
+    await rec.shot("ai_suggest", "POST", f"{BASE}/ai-suggest", headers)
+    suggested = await rec.shot("ai_suggest_again", "POST", f"{BASE}/ai-suggest", headers)
     await rec.shot("ai_suggest_empty_user", "POST", f"{BASE}/ai-suggest", other)
     if suggested:
         first, last = suggested[0]["id"], suggested[-1]["id"]

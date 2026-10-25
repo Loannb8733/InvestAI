@@ -22,7 +22,7 @@
       "description": "Marché en phase 'bullish' avec forte volatilité. Budget total : 87€ sur 1840€ de liquidités disponibles. Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts.",
       "id": "<id-13>",
       "market_regime": "bullish",
-      "name": "VCA Dynamique — 1 assets",
+      "name": "VCA Dynamique — 1 actif",
       "params": {
         "assets": [
           "DOGE"
@@ -38,7 +38,7 @@
         "type": "vca"
       },
       "source": "AI",
-      "status": "PROPOSED",
+      "status": "ACTIVE",
       "updated_at": "<volatile>",
       "user_id": "<id-3>"
     },
@@ -124,150 +124,7 @@
       "description": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.",
       "id": "<id-18>",
       "market_regime": "bullish",
-      "name": "DCA Modéré — 1 assets",
-      "params": {
-        "assets": [
-          "DOGE"
-        ],
-        "available_liquidity": 1840.0,
-        "performance_potential": 2,
-        "proposed_pct_of_liquidity": 2.4,
-        "regime": "bullish",
-        "risk_level": 2,
-        "total_portfolio_value": 63600.0,
-        "total_proposed_amount": 45.0,
-        "type": "dca_modéré"
-      },
-      "source": "AI",
-      "status": "PROPOSED",
-      "updated_at": "<volatile>",
-      "user_id": "<id-3>"
-    },
-    {
-      "actions": [
-        {
-          "action": "VCA",
-          "amount": 86.63,
-          "created_at": "<volatile>",
-          "currency": "EUR",
-          "executed_at": null,
-          "id": "<id-5>",
-          "reason": "Alpha 67.7/100 — investir 86.63€ soit ~4.7% de vos liquidités. Alpha élevé en Markdown : accumuler progressivement (contrarian)",
-          "scheduled_at": "2026-10-18T12:00:00Z",
-          "status": "PENDING",
-          "strategy_id": "<id-6>",
-          "symbol": "DOGE"
-        }
-      ],
-      "ai_reasoning": "La volatilité élevée crée des opportunités d'accumulation à prix réduit. Le VCA surperforme le DCA dans ces conditions car il achète automatiquement plus de quantité quand les prix baissent.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
-      "confidence": 0.5,
-      "created_at": "<volatile>",
-      "description": "Marché en phase 'bullish' avec forte volatilité. Budget total : 87€ sur 1840€ de liquidités disponibles. Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts.",
-      "id": "<id-6>",
-      "market_regime": "bullish",
-      "name": "VCA Dynamique — 1 assets",
-      "params": {
-        "assets": [
-          "DOGE"
-        ],
-        "available_liquidity": 1840.0,
-        "base_amount": 73.6,
-        "performance_potential": 4,
-        "proposed_pct_of_liquidity": 4.7,
-        "regime": "bullish",
-        "risk_level": 3,
-        "total_portfolio_value": 63600.0,
-        "total_proposed_amount": 86.63,
-        "type": "vca"
-      },
-      "source": "AI",
-      "status": "ACTIVE",
-      "updated_at": "<volatile>",
-      "user_id": "<id-3>"
-    },
-    {
-      "actions": [
-        {
-          "action": "PRENDRE PROFITS",
-          "amount": 800.0,
-          "created_at": "<volatile>",
-          "currency": "EUR",
-          "executed_at": null,
-          "id": "<id-7>",
-          "reason": "Phase 1/3 — Sécuriser 20% (800.0€) maintenant. Garder 80% pour laisser courir si la hausse continue.",
-          "scheduled_at": "2026-10-18T12:00:00Z",
-          "status": "PENDING",
-          "strategy_id": "<id-8>",
-          "symbol": "AAPL"
-        },
-        {
-          "action": "PRENDRE PROFITS",
-          "amount": 360.0,
-          "created_at": "<volatile>",
-          "currency": "EUR",
-          "executed_at": null,
-          "id": "<id-9>",
-          "reason": "Phase 1/3 — Sécuriser 20% (360.0€) maintenant. Garder 80% pour laisser courir si la hausse continue.",
-          "scheduled_at": "2026-10-18T12:00:00Z",
-          "status": "PENDING",
-          "strategy_id": "<id-8>",
-          "symbol": "UNI"
-        }
-      ],
-      "ai_reasoning": "La prise de profits progressive évite deux erreurs : vendre trop tôt (rater la suite de la hausse) et vendre trop tard (rester coincé dans la correction). Le plan 20/30/50 est un compromis optimal.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
-      "confidence": 0.5,
-      "created_at": "<volatile>",
-      "description": "Marché en phase 'bullish' — il est temps de sécuriser des gains. Plan en 3 étapes : 20% maintenant, 30% sur signal de faiblesse, 50% restants avec trailing stop. Ne jamais tout vendre ou tout garder.",
-      "id": "<id-8>",
-      "market_regime": "bullish",
-      "name": "Plan de Sortie Progressif — Bull",
-      "params": {
-        "assets": [
-          "AAPL",
-          "UNI"
-        ],
-        "available_liquidity": 1840.0,
-        "performance_potential": 3,
-        "proposed_pct_of_liquidity": 0.0,
-        "regime": "bullish",
-        "risk_level": 2,
-        "stages": [
-          20,
-          30,
-          50
-        ],
-        "total_portfolio_value": 63600.0,
-        "total_proposed_amount": 0,
-        "type": "progressive_profit"
-      },
-      "source": "AI",
-      "status": "PROPOSED",
-      "updated_at": "<volatile>",
-      "user_id": "<id-3>"
-    },
-    {
-      "actions": [
-        {
-          "action": "DCA",
-          "amount": 45.0,
-          "created_at": "<volatile>",
-          "currency": "EUR",
-          "executed_at": null,
-          "id": "<id-10>",
-          "reason": "Alpha 67.7/100 — 45.0€ (2.4% de vos liquidités). Alpha élevé en Markdown : accumuler progressivement (contrarian)",
-          "scheduled_at": "2026-10-18T12:00:00Z",
-          "status": "PENDING",
-          "strategy_id": "<id-11>",
-          "symbol": "DOGE"
-        }
-      ],
-      "ai_reasoning": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
-      "confidence": 0.5,
-      "created_at": "<volatile>",
-      "description": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.",
-      "id": "<id-11>",
-      "market_regime": "bullish",
-      "name": "DCA Modéré — 1 assets",
+      "name": "DCA Modéré — 1 actif",
       "params": {
         "assets": [
           "DOGE"

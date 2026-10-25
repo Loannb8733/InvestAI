@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion
+from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion, asset_count
 from app.services.contrarian_stats_service import format_reasoning
 
 
@@ -58,7 +58,7 @@ def build_vca_strategy(
     total_vca = sum(a["amount"] for a in actions)
 
     return {
-        "name": f"VCA Dynamique — {len(top)} assets",
+        "name": f"VCA Dynamique — {asset_count(len(top))}",
         "description": _vca_description(regime, is_accumulation, total_vca, liquidity),
         "params": {
             "type": "vca",
@@ -141,7 +141,7 @@ def build_dca_strategy(
         return None
 
     return {
-        "name": f"DCA {intensity} — {len(top)} assets",
+        "name": f"DCA {intensity} — {asset_count(len(top))}",
         "description": reasoning,
         "params": {
             "type": f"dca_{intensity.lower()}",

@@ -7,11 +7,11 @@
         "created_at": "<volatile>",
         "currency": "EUR",
         "executed_at": null,
-        "id": "<id-10>",
+        "id": "<id-17>",
         "reason": "Alpha 67.7/100 — 45.0€ (2.4% de vos liquidités). Alpha élevé en Markdown : accumuler progressivement (contrarian)",
         "scheduled_at": "2026-10-18T12:00:00Z",
         "status": "PENDING",
-        "strategy_id": "<id-11>",
+        "strategy_id": "<id-18>",
         "symbol": "DOGE"
       }
     ],
@@ -19,9 +19,9 @@
     "confidence": 0.5,
     "created_at": "<volatile>",
     "description": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.",
-    "id": "<id-11>",
+    "id": "<id-18>",
     "market_regime": "bullish",
-    "name": "DCA Modéré — 1 assets",
+    "name": "DCA Modéré — 1 actif",
     "params": {
       "assets": [
         "DOGE"
