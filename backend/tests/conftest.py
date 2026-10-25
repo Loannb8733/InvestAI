@@ -152,6 +152,15 @@ def live_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def deterministic_forecaster(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remplace le forecaster du service de prédictions par son double déterministe (tests.forecaster_double)."""
+    from app.domains.predictions.service import prediction_service
+    from tests.forecaster_double import DeterministicForecaster
+
+    monkeypatch.setattr(prediction_service, "forecaster", DeterministicForecaster())
+
+
+@pytest.fixture
 def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
     return install_http_stub(monkeypatch)
 

@@ -1,0 +1,18 @@
+{
+  "body": {
+    "actions": [],
+    "ai_reasoning": null,
+    "confidence": null,
+    "created_at": "<volatile>",
+    "description": null,
+    "id": "<id-4>",
+    "market_regime": null,
+    "name": "Vide",
+    "params": {},
+    "source": "USER",
+    "status": "ACTIVE",
+    "updated_at": "<volatile>",
+    "user_id": "<id-3>"
+  },
+  "status": 201
+}

@@ -1,0 +1,21 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "min_length": 1
+        },
+        "input": "",
+        "loc": [
+          "body",
+          "actions",
+          0,
+          "action"
+        ],
+        "msg": "String should have at least 1 character",
+        "type": "string_too_short"
+      }
+    ]
+  },
+  "status": 422
+}

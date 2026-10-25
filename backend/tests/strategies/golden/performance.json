@@ -1,0 +1,36 @@
+{
+  "body": {
+    "baseline_no_action_eur": 0.0,
+    "evaluated_count": 1,
+    "executed_count": 1,
+    "follow_rate_pct": 50.0,
+    "lines": [
+      {
+        "action": "BUY",
+        "action_id": "<id-0>",
+        "amount_eur": 150.0,
+        "baseline_eur": 0.0,
+        "current_price": 57487.6014,
+        "current_price_date": "2026-10-17",
+        "direction": "buy",
+        "executed_at": "2026-10-17T12:00:00+00:00",
+        "pnl_eur": 0.0,
+        "pnl_pct": 0.0,
+        "price_at_execution": 57487.6014,
+        "price_at_execution_date": "2026-10-17",
+        "symbol": "BTC"
+      }
+    ],
+    "non_evaluable": [],
+    "non_evaluable_count": 0,
+    "pending_count": 0,
+    "sell_note": "Pour les ventes, l'impact mesure le gain/perte évité depuis la vente (pas un P&L réalisé). La baseline « ne rien faire » suppose la position conservée.",
+    "skipped_count": 1,
+    "strategy_id": "<id-1>",
+    "strategy_name": "Renfort BTC v2",
+    "strategy_status": "PAUSED",
+    "total_impact_eur": 0.0,
+    "vs_baseline_eur": 0.0
+  },
+  "status": 200
+}

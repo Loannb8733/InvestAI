@@ -9,7 +9,7 @@ from app.domains.identity.tokens import create_token
 from app.domains.predictions.models import PredictionLog
 from app.ml import forecaster as forecaster_module
 from app.ml.forecaster import PriceForecaster
-from tests.predictions.forecaster_double import WEIGHTS
+from tests.forecaster_double import WEIGHTS
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes", "deterministic_forecaster")

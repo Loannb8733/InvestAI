@@ -1,0 +1,44 @@
+{
+  "body": {
+    "actions": [
+      {
+        "action": "DCA",
+        "amount": 45.0,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-10>",
+        "reason": "Alpha 67.7/100 — 45.0€ (2.4% de vos liquidités). Alpha élevé en Markdown : accumuler progressivement (contrarian)",
+        "scheduled_at": "2026-10-18T12:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-11>",
+        "symbol": "DOGE"
+      }
+    ],
+    "ai_reasoning": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+    "confidence": 0.5,
+    "created_at": "<volatile>",
+    "description": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.",
+    "id": "<id-11>",
+    "market_regime": "bullish",
+    "name": "DCA Modéré — 1 assets",
+    "params": {
+      "assets": [
+        "DOGE"
+      ],
+      "available_liquidity": 1840.0,
+      "performance_potential": 2,
+      "proposed_pct_of_liquidity": 2.4,
+      "regime": "bullish",
+      "risk_level": 2,
+      "total_portfolio_value": 63600.0,
+      "total_proposed_amount": 45.0,
+      "type": "dca_modéré"
+    },
+    "source": "AI",
+    "status": "REJECTED",
+    "updated_at": "<volatile>",
+    "user_id": "<id-3>"
+  },
+  "status": 200
+}
