@@ -11,7 +11,7 @@ from httpx import AsyncClient
 GOLDEN_DIR = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-VOLATILE_KEYS = frozenset({"created_at", "updated_at", "completed_at"})
+VOLATILE_KEYS = frozenset({"created_at", "updated_at", "completed_at", "file_size"})
 BASE = "/api/v1/crowdfunding"
 UNKNOWN_ID = "00000000-0000-0000-0000-000000000000"
 

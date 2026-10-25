@@ -148,6 +148,7 @@ async def test_project_documents_match_golden(
         await rec.shot("upload_other_user", "POST", docs_url, other, files=_files("d.pdf"))
         await rec.shot("project_with_documents", "GET", f"{BASE}/{project_id}", headers)
         await rec.shot("audits_after_upload", "GET", f"{BASE}/audits", headers)
+        rec.compare("upload_sizes", [doc["file_size"] == len(DECK_PDF) for doc in uploaded])
         for index, doc in enumerate(uploaded):
             response = await client.get(f"{BASE}/documents/{doc['id']}/download", headers=headers)
             rec.compare(
