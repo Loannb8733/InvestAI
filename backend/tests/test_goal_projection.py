@@ -190,7 +190,7 @@ class TestCurve:
             annual_vol=0.10,
             start_date=date(2026, 3, 1),
         )
-        assert curve[0].date_label == "Mar 2026"
+        assert curve[0].date_label == "mars 2026"
 
     def test_target_line_linear(self, svc):
         """Target line should go from current to target linearly."""

@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.planning.goals.assumptions import ANNUAL_RETURN, ANNUAL_VOL, current_vol_regime
+from app.domains.planning.goals.months import long_month, short_month
 from app.domains.planning.goals.projection_types import GoalProjection, ProjectionPoint
 
 
@@ -18,7 +19,7 @@ def _month_start(start: date, offset: int) -> date:
 def _curve_point(month: int, month_date: date, col: NDArray[Any], target_line: float) -> ProjectionPoint:
     return ProjectionPoint(
         month=month,
-        date_label=month_date.strftime("%b %Y"),
+        date_label=short_month(month_date),
         projected_p50=round(float(np.median(col)), 2),
         projected_p25=round(float(np.percentile(col, 25)), 2),
         projected_p75=round(float(np.percentile(col, 75)), 2),
@@ -46,7 +47,7 @@ def _probability_label(prob: float) -> str:
 
 def _alert_message(prob: float, deadline: date | None, rmc_returns: float) -> str | None:
     if prob < 50 and deadline:
-        deadline_str = deadline.strftime("%B %Y")
+        deadline_str = long_month(deadline)
         return (
             f"DCA insuffisant pour atteindre la cible en {deadline_str}. "
             f"Contribution mensuelle recommandée : {rmc_returns:.0f} €."
@@ -243,7 +244,7 @@ class GoalProjectionService:
         eta_months_val, _eta_prob = self.calculate_eta(
             current_amount, target_amount, effective_contribution, annual_return, annual_vol
         )
-        eta_date_str = _month_start(date.today(), eta_months_val).strftime("%b %Y")
+        eta_date_str = short_month(_month_start(date.today(), eta_months_val))
 
         alert = _alert_message(prob, deadline, rmc_returns)
 
