@@ -1,6 +1,7 @@
 """Predictions endpoints for ML-based forecasting."""
 
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from pydantic import BaseModel, Field
@@ -512,7 +513,7 @@ async def validate_signal(
     current_weight = top.get("weight_pct", 0)
     current_value = top.get("value", 0)
     new_weight = round((current_value + order_eur) / (total_value + order_eur) * 100, 1) if total_value > 0 else 0
-    weight_overflow = new_weight > 50
+    weight_overflow = bool(new_weight > 50)
 
     # ── 3. Monte Carlo before/after ──
     uid = str(current_user.id)
@@ -585,7 +586,7 @@ async def validate_signal(
     predicted_pct = top.get("predicted_7d_pct", 0)
     score = top.get("score", 0)
 
-    validated = score > 85 and impact_pct > 0 and not weight_overflow
+    validated = bool(score > 85 and impact_pct > 0 and not weight_overflow)
     concentration_status = "ALERTE" if new_weight > 60 else ("VIGILANCE" if new_weight > 50 else "SÉCURISÉE")
 
     result = {
@@ -896,7 +897,7 @@ async def create_planned_order(
 
 @router.patch("/planned-orders/{order_id}", response_model=dict)
 async def update_planned_order(
-    order_id: str,
+    order_id: UUID,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),

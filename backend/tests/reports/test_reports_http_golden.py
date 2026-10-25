@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from tests.reports.seed import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
+from tests.sample_portfolio import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"

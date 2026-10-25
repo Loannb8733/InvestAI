@@ -466,7 +466,9 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
                         "btc_dominance": btc_dominance,
                         "regime": regime_info.get("dominant_regime") if regime_info else None,
                         "history_days": len(prices) if prices else 0,
-                        "model_weights": models_detail.get("weights") if models_detail else None,
+                        "model_weights": {m["name"]: m.get("weight_pct") for m in models_detail}
+                        if models_detail
+                        else None,
                     },
                 )
                 async with session_factory() as log_db:
@@ -854,7 +856,7 @@ class PredictionService(PredictionAlphaMixin, PredictionCyclesMixin, PredictionM
             predictions.append(
                 {
                     "symbol": asset.symbol,
-                    "name": asset.name,
+                    "name": asset.name or asset.symbol,
                     "asset_type": asset.asset_type.value,
                     "current_price": prediction.current_price,
                     "predicted_price": predicted_price,
