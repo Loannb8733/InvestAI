@@ -47,12 +47,16 @@ def _routeurs_importes(arbre: ast.Module) -> dict[str, tuple[str, str]]:
     return noms
 
 
-def _montages(arbre: ast.Module) -> list[tuple[str, str, str]]:
-    """(module, variable du routeur, préfixe) de chaque include_router."""
+def _montages(arbre: ast.Module, receveur: str | None = None) -> list[tuple[str, str, str]]:
+    """(module, variable du routeur, préfixe) de chaque include_router, sur ``receveur`` s'il est donné."""
     importes = _routeurs_importes(arbre)
     montages = []
     for noeud in ast.walk(arbre):
         if not (isinstance(noeud, ast.Call) and getattr(noeud.func, "attr", None) == "include_router"):
+            continue
+        if receveur is not None and not (
+            isinstance(noeud.func.value, ast.Name) and noeud.func.value.id == receveur
+        ):
             continue
         prefixe = next(
             (k.value.value for k in noeud.keywords if k.arg == "prefix" and isinstance(k.value, ast.Constant)), ""
@@ -75,27 +79,36 @@ def routes_declarees() -> set[tuple[str, str]]:
     porte trois destinées à docker-compose (`BACKEND_HOST`, `BACKEND_PORT`,
     `VITE_API_URL`). Le contrôle ne doit pas dépendre de cela — il lit les
     montages de `router.py` (routeurs des endpoints comme des domaines, alias
-    compris) puis les décorateurs de chaque routeur.
+    compris) puis les décorateurs de chaque routeur, et descend dans les routeurs
+    qu'un routeur inclut lui-même.
     """
     arbre = ast.parse((BACKEND / "app" / "api" / "v1" / "router.py").read_text())
     routes: set[tuple[str, str]] = set()
     for module, variable, prefixe in _montages(arbre):
-        for noeud in ast.walk(ast.parse(_fichier(module).read_text())):
-            if not isinstance(noeud, ast.FunctionDef | ast.AsyncFunctionDef):
-                continue
-            for deco in noeud.decorator_list:
-                if (
-                    isinstance(deco, ast.Call)
-                    and isinstance(deco.func, ast.Attribute)
-                    and deco.func.attr in METHODES
-                    and isinstance(deco.func.value, ast.Name)
-                    and deco.func.value.id == variable
-                    and deco.args
-                    and isinstance(deco.args[0], ast.Constant)
-                ):
-                    complet = (PREFIXE + prefixe + deco.args[0].value).rstrip("/") or PREFIXE + prefixe
-                    routes.add((deco.func.attr.upper(), complet))
+        _routes_du_routeur(module, variable, prefixe, routes)
     return routes
+
+
+def _routes_du_routeur(module: str, variable: str, prefixe: str, routes: set[tuple[str, str]]) -> None:
+    """Routes déclarées sur ``variable`` dans ``module``, puis celles des routeurs qu'il inclut à son tour."""
+    arbre = ast.parse(_fichier(module).read_text())
+    for noeud in ast.walk(arbre):
+        if not isinstance(noeud, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        for deco in noeud.decorator_list:
+            if (
+                isinstance(deco, ast.Call)
+                and isinstance(deco.func, ast.Attribute)
+                and deco.func.attr in METHODES
+                and isinstance(deco.func.value, ast.Name)
+                and deco.func.value.id == variable
+                and deco.args
+                and isinstance(deco.args[0], ast.Constant)
+            ):
+                complet = (PREFIXE + prefixe + deco.args[0].value).rstrip("/") or PREFIXE + prefixe
+                routes.add((deco.func.attr.upper(), complet))
+    for sous_module, sous_variable, sous_prefixe in _montages(arbre, receveur=variable):
+        _routes_du_routeur(sous_module, sous_variable, prefixe + sous_prefixe, routes)
 
 
 def appels_du_client() -> list[tuple[str, str]]:
