@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import get_session
+from app.domains.crowdfunding.calendar import upcoming_coupon_income
 from app.domains.identity.dependencies import CurrentUser
 from app.domains.identity.models import User
 from app.domains.planning.goals.models import Goal, GoalStatus, GoalStrategy, GoalType
@@ -23,7 +24,6 @@ from app.domains.planning.goals.schemas import (
 )
 from app.domains.planning.goals.sync import initial_sync, sync_goals_for_user
 from app.domains.portfolio.classification import is_cash_like
-from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ async def get_goal_projection(
     else:
         strategy = goal.strategy_type.value.lower() if goal.strategy_type else "moderate"
 
-    coupon_income = await crowdfunding_calendar_service.get_upcoming_coupon_income(session, user.id, months_ahead=60)
+    coupon_income = await upcoming_coupon_income(session, user.id, months_ahead=60)
 
     projection = await goal_projection_service.project_goal(
         db=session,

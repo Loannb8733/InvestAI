@@ -6,7 +6,6 @@ from app.api.v1.endpoints import (
     alerts,
     calendar,
     cron,
-    crowdfunding,
     dashboard,
     insights,
     notifications,
@@ -16,6 +15,7 @@ from app.api.v1.endpoints import (
     websocket,
 )
 from app.domains.analytics.router import router as analytics_router
+from app.domains.crowdfunding.router import router as crowdfunding_router
 from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
@@ -52,6 +52,6 @@ api_router.include_router(insights.router, prefix="/insights", tags=["Insights"]
 api_router.include_router(websocket.router, tags=["WebSocket"])
 api_router.include_router(goals_router, prefix="/goals", tags=["Goals"])
 api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
-api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
+api_router.include_router(crowdfunding_router, prefix="/crowdfunding", tags=["Crowdfunding"])
 api_router.include_router(strategies_router, prefix="/strategies", tags=["Strategies"])
 api_router.include_router(system.router, prefix="/system", tags=["System"])

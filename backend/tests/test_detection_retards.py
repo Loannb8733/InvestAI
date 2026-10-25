@@ -2,9 +2,9 @@
 
 `check_crowdfunding_delays` tourne chaque jour à 8 h 30 UTC : elle passe les
 projets en retard au statut « delayed » et prévient l'utilisateur. Sa décision
-repose entièrement sur `reconciliation_service.get_overdue_entries`.
+repose entièrement sur `overdue_entries`.
 
-La tâche elle-même n'est pas exécutable ici — sa logique vit dans une closure
+La tâche elle-même n'est pas exécutable ici — sa logique vit dans une coroutine
 appelée par `run_async`, qui installe une boucle d'événements neuve puis la
 ferme (voir `async_runner`). C'est donc la requête qui décide, testée sur le
 même chemin de code.
@@ -19,10 +19,14 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.crowdfunding.models import (
+    CrowdfundingPaymentSchedule,
+    CrowdfundingProject,
+    ProjectStatus,
+    RepaymentType,
+)
+from app.domains.crowdfunding.reconciliation import overdue_entries
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.crowdfunding_payment_schedule import CrowdfundingPaymentSchedule
-from app.models.crowdfunding_project import CrowdfundingProject, ProjectStatus, RepaymentType
-from app.services.reconciliation_service import reconciliation_service
 
 
 @pytest.fixture
@@ -72,7 +76,7 @@ class TestDelaiDeGrace:
     async def test_une_echeance_depassee_au_dela_du_delai_est_signalee(self, db_session, projet):
         await _echeance(db_session, projet, jours_avant=10)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert len(retards) == 1
 
@@ -84,14 +88,14 @@ class TestDelaiDeGrace:
         """
         await _echeance(db_session, projet, jours_avant=3)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert retards == []
 
     async def test_le_delai_est_un_parametre_et_non_une_constante(self, db_session, projet):
         await _echeance(db_session, projet, jours_avant=3)
 
-        strict = await reconciliation_service.get_overdue_entries(db_session, grace_days=1)
+        strict = await overdue_entries(db_session, grace_days=1)
 
         assert len(strict) == 1
 
@@ -100,7 +104,7 @@ class TestAbstentions:
     async def test_une_echeance_deja_reglee_est_ignoree(self, db_session, projet):
         await _echeance(db_session, projet, jours_avant=30, reglee=True)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert retards == []
 
@@ -113,7 +117,7 @@ class TestAbstentions:
         projet.status = ProjectStatus.COMPLETED
         await _echeance(db_session, projet, jours_avant=30)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert retards == []
 
@@ -121,7 +125,7 @@ class TestAbstentions:
         projet.status = ProjectStatus.DELAYED
         await _echeance(db_session, projet, jours_avant=30)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert retards == []
 
@@ -133,7 +137,7 @@ class TestPlusieursEcheances:
         for jours in (10, 40, 70):
             await _echeance(db_session, projet, jours_avant=jours)
 
-        retards = await reconciliation_service.get_overdue_entries(db_session, grace_days=5)
+        retards = await overdue_entries(db_session, grace_days=5)
 
         assert len(retards) == 3
         assert {p.id for _, p in retards} == {projet.id}

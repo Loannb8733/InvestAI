@@ -15,13 +15,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.project_audit import ProjectAudit
-from app.services.ai.crowdfunding_analyzer import CrowdfundingAnalyzerService
+from app.domains.crowdfunding.audit import analyzer, providers
+from app.domains.crowdfunding.audit.models import ProjectAudit
 
 
 @pytest.fixture
 def analyseur():
-    return CrowdfundingAnalyzerService()
+    return analyzer
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ class TestProvenance:
         monkeypatch.setattr(settings, "GROQ_API_KEY", "cle-de-test", raising=False)
 
         reponse = '{"project_name": "Résidence Test", "verdict": "GO", "risk_score": 72}'
-        with patch.object(analyseur, "_call_groq", new=AsyncMock(return_value=reponse)):
+        with patch.object(providers, "call_groq", new=AsyncMock(return_value=reponse)):
             audit = await analyseur.analyze_documents(db_session, pdf_minimal, regular_user.id, None)
 
         assert audit.analysis_source == "Groq"
@@ -92,8 +92,8 @@ class TestProvenance:
         monkeypatch.setattr(settings, "GEMINI_API_KEY", "cle-de-test", raising=False)
 
         with (
-            patch.object(analyseur, "_call_groq", new=AsyncMock(side_effect=RuntimeError("429"))),
-            patch.object(analyseur, "_call_gemini", new=AsyncMock(return_value='{"verdict": "VIGILANCE"}')),
+            patch.object(providers, "call_groq", new=AsyncMock(side_effect=RuntimeError("429"))),
+            patch.object(providers, "call_gemini", new=AsyncMock(return_value='{"verdict": "VIGILANCE"}')),
         ):
             audit = await analyseur.analyze_documents(db_session, pdf_minimal, regular_user.id, None)
 
@@ -112,7 +112,7 @@ class TestProvenance:
         _sans_fournisseur(monkeypatch)
         monkeypatch.setattr(settings, "GROQ_API_KEY", "cle-de-test", raising=False)
 
-        with patch.object(analyseur, "_call_groq", new=AsyncMock(return_value="je ne sais pas répondre")):
+        with patch.object(providers, "call_groq", new=AsyncMock(return_value="je ne sais pas répondre")):
             audit = await analyseur.analyze_documents(db_session, pdf_minimal, regular_user.id, None)
 
         assert audit.analysis_source == "statique"

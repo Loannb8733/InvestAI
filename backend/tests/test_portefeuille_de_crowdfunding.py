@@ -18,7 +18,7 @@ import uuid
 import pytest
 from sqlalchemy import func, select
 
-from app.api.v1.endpoints.crowdfunding import resoudre_portefeuille_crowdfunding
+from app.domains.crowdfunding.repository import resolve_crowdfunding_portfolio
 from app.domains.identity.models import User
 from app.domains.portfolio.models import CROWDFUNDING_KIND, Portfolio
 
@@ -44,7 +44,7 @@ async def _resoudre(db_session, utilisateur) -> Portfolio:
     l'a démasquée : revenir à `name == "Crowdfunding"` dans l'endpoint ne faisait
     échouer aucun test, puisque aucun ne passait par lui.
     """
-    return await resoudre_portefeuille_crowdfunding(db_session, utilisateur.id)
+    return await resolve_crowdfunding_portfolio(db_session, utilisateur.id)
 
 
 class TestReconnaissance:
