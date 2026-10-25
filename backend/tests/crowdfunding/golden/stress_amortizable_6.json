@@ -1,0 +1,96 @@
+{
+  "body": {
+    "base_irr": 10.72,
+    "cashflows": [
+      {
+        "capital": 166.67,
+        "date": "2026-08-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2026-09-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2026-10-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2026-11-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2026-12-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-01-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-02-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-03-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-04-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-05-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.67,
+        "date": "2027-06-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 176.0
+      },
+      {
+        "capital": 166.63,
+        "date": "2027-07-15",
+        "interest": 9.33,
+        "is_delayed": true,
+        "total": 175.96
+      }
+    ],
+    "delay_months": 6,
+    "irr_delta": -5.32,
+    "project_id": "<id-11>",
+    "stressed_irr": 5.4
+  },
+  "status": 200
+}

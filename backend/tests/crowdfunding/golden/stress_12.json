@@ -1,0 +1,68 @@
+{
+  "body": {
+    "base_irr": 7.19,
+    "cashflows": [
+      {
+        "capital": 0.0,
+        "date": "2027-01-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2027-04-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2027-07-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2027-10-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2028-01-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2028-04-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 0.0,
+        "date": "2028-07-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 17.5
+      },
+      {
+        "capital": 1000.0,
+        "date": "2028-10-01",
+        "interest": 17.5,
+        "is_delayed": true,
+        "total": 1017.5
+      }
+    ],
+    "delay_months": 12,
+    "irr_delta": -2.55,
+    "project_id": "<id-1>",
+    "stressed_irr": 4.64
+  },
+  "status": 200
+}

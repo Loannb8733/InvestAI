@@ -1,0 +1,44 @@
+{
+  "body": {
+    "actual_end_date": null,
+    "annual_rate": 12.0,
+    "asset_id": "<id-27>",
+    "created_at": "<volatile>",
+    "delay_months": 0,
+    "description": null,
+    "documents": [],
+    "duration_months": 18,
+    "estimated_end_date": null,
+    "id": "<id-28>",
+    "interest_earned": 0.0,
+    "interest_frequency": "annual",
+    "invested_amount": 1500.0,
+    "platform": "Wiseed",
+    "progress_percent": 100.0,
+    "project_name": "Hôtel Lac",
+    "project_url": null,
+    "projected_interest_gross": 270.0,
+    "projected_total_interest": 189.0,
+    "repayment_type": "in_fine",
+    "repayments": [],
+    "schedule": [
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2025-01-01",
+        "expected_capital": 1500.0,
+        "expected_interest": 126.0,
+        "id": "<id-29>",
+        "is_completed": false,
+        "project_id": "<id-28>",
+        "repayment_id": null,
+        "status": "overdue"
+      }
+    ],
+    "start_date": "2024-01-01",
+    "status": "defaulted",
+    "tax_rate": 30.0,
+    "total_received": 0.0,
+    "updated_at": "<volatile>"
+  },
+  "status": 201
+}

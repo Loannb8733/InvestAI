@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'funding', 'active', 'completed', 'delayed' or 'defaulted'"
+        },
+        "input": "paused",
+        "loc": [
+          "body",
+          "status"
+        ],
+        "msg": "Input should be 'funding', 'active', 'completed', 'delayed' or 'defaulted'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

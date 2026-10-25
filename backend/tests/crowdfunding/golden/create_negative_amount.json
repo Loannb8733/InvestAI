@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "ge": 0
+        },
+        "input": "-1",
+        "loc": [
+          "body",
+          "invested_amount"
+        ],
+        "msg": "Input should be greater than or equal to 0",
+        "type": "greater_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

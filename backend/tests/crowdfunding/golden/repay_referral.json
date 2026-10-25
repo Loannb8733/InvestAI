@@ -1,0 +1,15 @@
+{
+  "body": {
+    "amount": 10.0,
+    "capital_amount": null,
+    "created_at": "<volatile>",
+    "id": "<id-40>",
+    "interest_amount": null,
+    "notes": "Parrainage",
+    "payment_date": "2026-03-20",
+    "payment_type": "referral",
+    "project_id": "<id-11>",
+    "tax_amount": null
+  },
+  "status": 201
+}

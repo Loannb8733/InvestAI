@@ -1,0 +1,16 @@
+{
+  "body": {
+    "detail": [
+      {
+        "input": null,
+        "loc": [
+          "body",
+          "files"
+        ],
+        "msg": "Field required",
+        "type": "missing"
+      }
+    ]
+  },
+  "status": 422
+}

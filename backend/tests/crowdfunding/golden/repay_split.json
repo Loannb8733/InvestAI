@@ -1,0 +1,15 @@
+{
+  "body": {
+    "amount": 180.0,
+    "capital_amount": 166.67,
+    "created_at": "<volatile>",
+    "id": "<id-38>",
+    "interest_amount": 13.33,
+    "notes": null,
+    "payment_date": "2026-02-16",
+    "payment_type": "both",
+    "project_id": "<id-11>",
+    "tax_amount": 4.0
+  },
+  "status": 201
+}

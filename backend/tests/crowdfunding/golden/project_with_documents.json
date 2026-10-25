@@ -1,0 +1,61 @@
+{
+  "body": {
+    "actual_end_date": null,
+    "annual_rate": 10.0,
+    "asset_id": "<id-3>",
+    "created_at": "<volatile>",
+    "delay_months": 0,
+    "description": null,
+    "documents": [
+      {
+        "audit_id": null,
+        "created_at": "<volatile>",
+        "file_name": "deck.pdf",
+        "file_size": "<volatile>",
+        "id": "<id-0>",
+        "project_id": "<id-1>"
+      },
+      {
+        "audit_id": null,
+        "created_at": "<volatile>",
+        "file_name": "fici %22v2%22.pdf",
+        "file_size": "<volatile>",
+        "id": "<id-2>",
+        "project_id": "<id-1>"
+      }
+    ],
+    "duration_months": 24,
+    "estimated_end_date": "2027-10-01",
+    "id": "<id-1>",
+    "interest_earned": 0.0,
+    "interest_frequency": "at_maturity",
+    "invested_amount": 1000.0,
+    "platform": "Anaxago",
+    "progress_percent": 52.2,
+    "project_name": "Résidence des Tilleuls",
+    "project_url": null,
+    "projected_interest_gross": 200.0,
+    "projected_total_interest": 140.0,
+    "repayment_type": "in_fine",
+    "repayments": [],
+    "schedule": [
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2027-10-01",
+        "expected_capital": 1000.0,
+        "expected_interest": 140.0,
+        "id": "<id-4>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      }
+    ],
+    "start_date": "2025-10-01",
+    "status": "active",
+    "tax_rate": 30.0,
+    "total_received": 0.0,
+    "updated_at": "<volatile>"
+  },
+  "status": 200
+}

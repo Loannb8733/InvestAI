@@ -1,0 +1,31 @@
+{
+  "body": {
+    "nb_payments": 2,
+    "platforms": [
+      {
+        "gross_interest": 55.0,
+        "nb_payments": 1,
+        "net_interest": 55.0,
+        "platform": "Fundimmo",
+        "tax_withheld": 0.0,
+        "theoretical_pfu": 16.5,
+        "withholding_gap": true
+      },
+      {
+        "gross_interest": 180.0,
+        "nb_payments": 1,
+        "net_interest": 180.0,
+        "platform": "Wiseed",
+        "tax_withheld": 0.0,
+        "theoretical_pfu": 54.0,
+        "withholding_gap": true
+      }
+    ],
+    "total_gross_interest": 235.0,
+    "total_net_interest": 235.0,
+    "total_tax_withheld": 0.0,
+    "total_theoretical_pfu": 70.5,
+    "year": 2025
+  },
+  "status": 200
+}
