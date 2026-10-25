@@ -22,7 +22,7 @@
       "description": "Marché en phase 'bullish' avec forte volatilité. Budget total : 87€ sur 1840€ de liquidités disponibles. Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts.",
       "id": "<id-13>",
       "market_regime": "bullish",
-      "name": "VCA Dynamique — 1 assets",
+      "name": "VCA Dynamique — 1 actif",
       "params": {
         "assets": [
           "DOGE"
@@ -124,7 +124,7 @@
       "description": "Marché en phase 'bullish' — tendance haussière. Continuer le DCA avec des montants standards. Rester discipliné.",
       "id": "<id-18>",
       "market_regime": "bullish",
-      "name": "DCA Modéré — 1 assets",
+      "name": "DCA Modéré — 1 actif",
       "params": {
         "assets": [
           "DOGE"

@@ -1,6 +1,19 @@
 {
   "body": {
-    "detail": "Internal server error"
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'PROPOSED', 'ACTIVE', 'PAUSED', 'COMPLETED' or 'REJECTED'"
+        },
+        "input": "ARCHIVED",
+        "loc": [
+          "body",
+          "status"
+        ],
+        "msg": "Input should be 'PROPOSED', 'ACTIVE', 'PAUSED', 'COMPLETED' or 'REJECTED'",
+        "type": "enum"
+      }
+    ]
   },
-  "status": 500
+  "status": 422
 }

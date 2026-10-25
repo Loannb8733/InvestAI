@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.domains.portfolio.classification import STABLECOIN_SYMBOLS
-from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion
+from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion, asset_count
 
 
 def _rebalance_actions(
@@ -215,7 +215,7 @@ def build_swing_strategy(
     per_asset = round(swing_budget / len(top), 2)
 
     return {
-        "name": f"Swing Trading — {len(top)} assets",
+        "name": f"Swing Trading — {asset_count(len(top))}",
         "description": (
             f"Marché latéral avec forte volatilité ({regime}). "
             "Exploiter les oscillations de prix à court terme. "

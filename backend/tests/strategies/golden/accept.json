@@ -7,11 +7,11 @@
         "created_at": "<volatile>",
         "currency": "EUR",
         "executed_at": null,
-        "id": "<id-5>",
+        "id": "<id-12>",
         "reason": "Alpha 67.7/100 — investir 86.63€ soit ~4.7% de vos liquidités. Alpha élevé en Markdown : accumuler progressivement (contrarian)",
         "scheduled_at": "2026-10-18T12:00:00Z",
         "status": "PENDING",
-        "strategy_id": "<id-6>",
+        "strategy_id": "<id-13>",
         "symbol": "DOGE"
       }
     ],
@@ -19,9 +19,9 @@
     "confidence": 0.5,
     "created_at": "<volatile>",
     "description": "Marché en phase 'bullish' avec forte volatilité. Budget total : 87€ sur 1840€ de liquidités disponibles. Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts.",
-    "id": "<id-6>",
+    "id": "<id-13>",
     "market_regime": "bullish",
-    "name": "VCA Dynamique — 1 assets",
+    "name": "VCA Dynamique — 1 actif",
     "params": {
       "assets": [
         "DOGE"
