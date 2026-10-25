@@ -1,0 +1,90 @@
+{
+  "body": {
+    "currency": "EUR",
+    "current_value": 63600.0,
+    "final_value": 127814.46,
+    "projections": [
+      {
+        "contributions": 0.0,
+        "nominal_value": 63600.0,
+        "real_value": 63600.0,
+        "returns": 0.0,
+        "year": 0
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 68197.65,
+        "real_value": 66860.44,
+        "returns": 4597.65,
+        "year": 1
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 73127.66,
+        "real_value": 70288.03,
+        "returns": 9527.66,
+        "year": 2
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 78414.07,
+        "real_value": 73891.33,
+        "returns": 14814.07,
+        "year": 3
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 84082.63,
+        "real_value": 77679.35,
+        "returns": 20482.63,
+        "year": 4
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 90160.97,
+        "real_value": 81661.57,
+        "returns": 26560.97,
+        "year": 5
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 96678.71,
+        "real_value": 85847.93,
+        "returns": 33078.71,
+        "year": 6
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 103667.62,
+        "real_value": 90248.9,
+        "returns": 40067.62,
+        "year": 7
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 111161.76,
+        "real_value": 94875.49,
+        "returns": 47561.76,
+        "year": 8
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 119197.66,
+        "real_value": 99739.27,
+        "returns": 55597.66,
+        "year": 9
+      },
+      {
+        "contributions": 0.0,
+        "nominal_value": 127814.46,
+        "real_value": 104852.38,
+        "returns": 64214.46,
+        "year": 10
+      }
+    ],
+    "real_final_value": 104852.38,
+    "total_contributions": 0.0,
+    "total_returns": 64214.46
+  },
+  "status": 200
+}

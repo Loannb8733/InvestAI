@@ -1,0 +1,286 @@
+{
+  "body": {
+    "alert_message": "DCA insuffisant pour atteindre la cible en June 2029. Contribution mensuelle recommandée : 931 €.",
+    "current_amount": 65440.0,
+    "curve": [
+      {
+        "date_label": "Oct 2026",
+        "month": 0,
+        "projected_p25": 65440.0,
+        "projected_p50": 65440.0,
+        "projected_p75": 65440.0,
+        "target_line": 65440.0
+      },
+      {
+        "date_label": "Nov 2026",
+        "month": 1,
+        "projected_p25": 64280.52,
+        "projected_p50": 67026.0,
+        "projected_p75": 69973.99,
+        "target_line": 68082.5
+      },
+      {
+        "date_label": "Dec 2026",
+        "month": 2,
+        "projected_p25": 64662.32,
+        "projected_p50": 68492.28,
+        "projected_p75": 72776.6,
+        "target_line": 70725.0
+      },
+      {
+        "date_label": "Jan 2027",
+        "month": 3,
+        "projected_p25": 65257.92,
+        "projected_p50": 70001.51,
+        "projected_p75": 75340.08,
+        "target_line": 73367.5
+      },
+      {
+        "date_label": "Feb 2027",
+        "month": 4,
+        "projected_p25": 65812.1,
+        "projected_p50": 71354.32,
+        "projected_p75": 77790.88,
+        "target_line": 76010.0
+      },
+      {
+        "date_label": "Mar 2027",
+        "month": 5,
+        "projected_p25": 66518.23,
+        "projected_p50": 72873.1,
+        "projected_p75": 80477.62,
+        "target_line": 78652.5
+      },
+      {
+        "date_label": "Apr 2027",
+        "month": 6,
+        "projected_p25": 67442.32,
+        "projected_p50": 74356.68,
+        "projected_p75": 82577.04,
+        "target_line": 81295.0
+      },
+      {
+        "date_label": "May 2027",
+        "month": 7,
+        "projected_p25": 68519.57,
+        "projected_p50": 76254.17,
+        "projected_p75": 84799.21,
+        "target_line": 83937.5
+      },
+      {
+        "date_label": "Jun 2027",
+        "month": 8,
+        "projected_p25": 69450.15,
+        "projected_p50": 77795.61,
+        "projected_p75": 87353.0,
+        "target_line": 86580.0
+      },
+      {
+        "date_label": "Jul 2027",
+        "month": 9,
+        "projected_p25": 70008.23,
+        "projected_p50": 79470.71,
+        "projected_p75": 89604.42,
+        "target_line": 89222.5
+      },
+      {
+        "date_label": "Aug 2027",
+        "month": 10,
+        "projected_p25": 71610.0,
+        "projected_p50": 81025.86,
+        "projected_p75": 92252.4,
+        "target_line": 91865.0
+      },
+      {
+        "date_label": "Sep 2027",
+        "month": 11,
+        "projected_p25": 72661.99,
+        "projected_p50": 82929.58,
+        "projected_p75": 94514.1,
+        "target_line": 94507.5
+      },
+      {
+        "date_label": "Oct 2027",
+        "month": 12,
+        "projected_p25": 73862.42,
+        "projected_p50": 84431.45,
+        "projected_p75": 96761.24,
+        "target_line": 97150.0
+      },
+      {
+        "date_label": "Nov 2027",
+        "month": 13,
+        "projected_p25": 75580.71,
+        "projected_p50": 86840.02,
+        "projected_p75": 99943.23,
+        "target_line": 99792.5
+      },
+      {
+        "date_label": "Dec 2027",
+        "month": 14,
+        "projected_p25": 76706.79,
+        "projected_p50": 88449.31,
+        "projected_p75": 102414.65,
+        "target_line": 102435.0
+      },
+      {
+        "date_label": "Jan 2028",
+        "month": 15,
+        "projected_p25": 77600.64,
+        "projected_p50": 90092.89,
+        "projected_p75": 105175.56,
+        "target_line": 105077.5
+      },
+      {
+        "date_label": "Feb 2028",
+        "month": 16,
+        "projected_p25": 78880.8,
+        "projected_p50": 91419.5,
+        "projected_p75": 107066.86,
+        "target_line": 107720.0
+      },
+      {
+        "date_label": "Mar 2028",
+        "month": 17,
+        "projected_p25": 79410.54,
+        "projected_p50": 93017.93,
+        "projected_p75": 110536.38,
+        "target_line": 110362.5
+      },
+      {
+        "date_label": "Apr 2028",
+        "month": 18,
+        "projected_p25": 80579.82,
+        "projected_p50": 95033.31,
+        "projected_p75": 113697.9,
+        "target_line": 113005.0
+      },
+      {
+        "date_label": "May 2028",
+        "month": 19,
+        "projected_p25": 81464.17,
+        "projected_p50": 96537.9,
+        "projected_p75": 116790.42,
+        "target_line": 115647.5
+      },
+      {
+        "date_label": "Jun 2028",
+        "month": 20,
+        "projected_p25": 82662.6,
+        "projected_p50": 98843.81,
+        "projected_p75": 119569.79,
+        "target_line": 118290.0
+      },
+      {
+        "date_label": "Jul 2028",
+        "month": 21,
+        "projected_p25": 84043.87,
+        "projected_p50": 100007.82,
+        "projected_p75": 121107.65,
+        "target_line": 120932.5
+      },
+      {
+        "date_label": "Aug 2028",
+        "month": 22,
+        "projected_p25": 85146.43,
+        "projected_p50": 102303.77,
+        "projected_p75": 123981.42,
+        "target_line": 123575.0
+      },
+      {
+        "date_label": "Sep 2028",
+        "month": 23,
+        "projected_p25": 86182.43,
+        "projected_p50": 104102.71,
+        "projected_p75": 126884.45,
+        "target_line": 126217.5
+      },
+      {
+        "date_label": "Oct 2028",
+        "month": 24,
+        "projected_p25": 87909.46,
+        "projected_p50": 106088.3,
+        "projected_p75": 129541.04,
+        "target_line": 128860.0
+      },
+      {
+        "date_label": "Nov 2028",
+        "month": 25,
+        "projected_p25": 89287.7,
+        "projected_p50": 108652.43,
+        "projected_p75": 132854.67,
+        "target_line": 131502.5
+      },
+      {
+        "date_label": "Dec 2028",
+        "month": 26,
+        "projected_p25": 90164.44,
+        "projected_p50": 110647.67,
+        "projected_p75": 136349.98,
+        "target_line": 134145.0
+      },
+      {
+        "date_label": "Jan 2029",
+        "month": 27,
+        "projected_p25": 91836.57,
+        "projected_p50": 112987.5,
+        "projected_p75": 139829.27,
+        "target_line": 136787.5
+      },
+      {
+        "date_label": "Feb 2029",
+        "month": 28,
+        "projected_p25": 93812.84,
+        "projected_p50": 115137.39,
+        "projected_p75": 142616.85,
+        "target_line": 139430.0
+      },
+      {
+        "date_label": "Mar 2029",
+        "month": 29,
+        "projected_p25": 94652.59,
+        "projected_p50": 116826.57,
+        "projected_p75": 144861.08,
+        "target_line": 142072.5
+      },
+      {
+        "date_label": "Apr 2029",
+        "month": 30,
+        "projected_p25": 96091.02,
+        "projected_p50": 119968.8,
+        "projected_p75": 148173.19,
+        "target_line": 144715.0
+      },
+      {
+        "date_label": "May 2029",
+        "month": 31,
+        "projected_p25": 98563.37,
+        "projected_p50": 121790.77,
+        "projected_p75": 151461.32,
+        "target_line": 147357.5
+      },
+      {
+        "date_label": "Jun 2029",
+        "month": 32,
+        "projected_p25": 99607.72,
+        "projected_p50": 124364.67,
+        "projected_p75": 154418.65,
+        "target_line": 150000.0
+      }
+    ],
+    "eta_date": "May 2030",
+    "eta_months": 43,
+    "goal_id": "<id-0>",
+    "gold_shield_active": false,
+    "gold_shield_advice": null,
+    "months_remaining": 32,
+    "probability_label": "Faible",
+    "probability_on_track": 27.7,
+    "regime_label": "Bull",
+    "rmc": 2642.5,
+    "rmc_with_returns": 930.96,
+    "strategy_type": "aggressive",
+    "target_amount": 150000.0
+  },
+  "status": 200
+}

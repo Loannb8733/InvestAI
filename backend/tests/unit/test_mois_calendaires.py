@@ -17,7 +17,7 @@ from datetime import date, timedelta
 import pytest
 from dateutil.relativedelta import relativedelta
 
-from app.services.goal_projection_service import GoalProjectionService
+from app.domains.planning.goals.projection import GoalProjectionService
 
 
 def mois_restants(debut: date, fin: date) -> int:

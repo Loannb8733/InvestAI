@@ -8,10 +8,8 @@ from app.api.v1.endpoints import (
     cron,
     crowdfunding,
     dashboard,
-    goals,
     insights,
     notifications,
-    simulations,
     smart_insights,
     system,
     telegram_webhook,
@@ -22,6 +20,8 @@ from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
 from app.domains.journal.router import router as journal_router
+from app.domains.planning.goals.router import router as goals_router
+from app.domains.planning.simulations.router import router as simulations_router
 from app.domains.portfolio.router import assets_router, portfolios_router
 from app.domains.predictions.router import router as predictions_router
 from app.domains.reports.router import router as reports_router
@@ -46,11 +46,11 @@ api_router.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 api_router.include_router(reports_router, prefix="/reports", tags=["Reports"])
 api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
-api_router.include_router(simulations.router, prefix="/simulations", tags=["Simulations"])
+api_router.include_router(simulations_router, prefix="/simulations", tags=["Simulations"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(insights.router, prefix="/insights", tags=["Insights"])
 api_router.include_router(websocket.router, tags=["WebSocket"])
-api_router.include_router(goals.router, prefix="/goals", tags=["Goals"])
+api_router.include_router(goals_router, prefix="/goals", tags=["Goals"])
 api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
 api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
 api_router.include_router(strategies_router, prefix="/strategies", tags=["Strategies"])

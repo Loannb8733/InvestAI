@@ -9,8 +9,9 @@ from decimal import Decimal
 
 import pytest
 
-from app.api.v1.endpoints.goals import GoalCreate, GoalResponse, _build_response
-from app.models.goal import Goal, GoalPriority, GoalStatus, GoalStrategy, GoalType
+from app.domains.planning.goals.models import Goal, GoalPriority, GoalStatus, GoalStrategy, GoalType
+from app.domains.planning.goals.router import _build_response
+from app.domains.planning.goals.schemas import GoalCreate, GoalResponse
 
 
 class TestGoalCreateSchema:

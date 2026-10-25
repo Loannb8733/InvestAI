@@ -1,0 +1,12 @@
+{
+  "body": {
+    "created_at": "<volatile>",
+    "description": null,
+    "id": "<id-3>",
+    "name": "DCA",
+    "parameters": {},
+    "results": null,
+    "simulation_type": "dca"
+  },
+  "status": 201
+}

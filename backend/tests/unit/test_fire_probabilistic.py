@@ -12,7 +12,7 @@ Valide :
 
 import math
 
-from app.api.v1.endpoints.simulations import simulate_fire_probabilistic
+from app.domains.planning.simulations.fire import simulate_fire_probabilistic
 
 START_YEAR = 2026
 SEED = 42

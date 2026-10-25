@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Format de date invalide, attendu YYYY-MM-DD"
+  },
+  "status": 422
+}

@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "La valeur du portefeuille est nulle. Ajoutez des actifs d'abord."
+  },
+  "status": 400
+}

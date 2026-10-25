@@ -12,7 +12,7 @@ from datetime import date
 
 import pytest
 
-from app.services.goal_projection_service import GoalProjectionService
+from app.domains.planning.goals.projection import GoalProjectionService
 
 
 @pytest.fixture
@@ -231,9 +231,9 @@ class TestGoldShield:
 
     def test_gold_shield_reduces_volatility(self):
         """Gold Shield should dampen vol by 30%."""
-        from app.services.goal_projection_service import _ANNUAL_VOL
+        from app.domains.planning.goals.assumptions import ANNUAL_VOL
 
-        base_vol = _ANNUAL_VOL[("conservative", "stress")]
+        base_vol = ANNUAL_VOL[("conservative", "stress")]
         gold_vol = base_vol * 0.7
         assert gold_vol < base_vol
         assert gold_vol == pytest.approx(0.07, rel=0.01)
