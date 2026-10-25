@@ -13,7 +13,6 @@ from app.api.v1.endpoints import (
     notifications,
     simulations,
     smart_insights,
-    strategies,
     system,
     telegram_webhook,
     websocket,
@@ -26,6 +25,7 @@ from app.domains.journal.router import router as journal_router
 from app.domains.portfolio.router import assets_router, portfolios_router
 from app.domains.predictions.router import router as predictions_router
 from app.domains.reports.router import router as reports_router
+from app.domains.strategies.router import router as strategies_router
 from app.domains.transactions.router import router as transactions_router
 
 api_router = APIRouter()
@@ -53,5 +53,5 @@ api_router.include_router(websocket.router, tags=["WebSocket"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals"])
 api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
 api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
-api_router.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
+api_router.include_router(strategies_router, prefix="/strategies", tags=["Strategies"])
 api_router.include_router(system.router, prefix="/system", tags=["System"])

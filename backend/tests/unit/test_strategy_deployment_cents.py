@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services.strategy_service import StrategyService
+from app.domains.strategies.service import StrategyService
 
 
 @pytest.mark.asyncio

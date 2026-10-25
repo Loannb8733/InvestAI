@@ -1,5 +1,7 @@
 from typing import Any
 
+from app.domains.strategies.disclaimer import AI_DISCLAIMER
+
 
 def _level(price: float) -> str:
     if abs(price) >= 100:
@@ -104,7 +106,5 @@ def generate_recommendation(
 ) -> str:
     """Constat sur le régime (au-delà de 40 % de confiance) ou la tendance, jamais une consigne, toujours suivi
     de l'avertissement « pas un conseil en investissement »."""
-    from app.services.ai_strategy_service import AI_DISCLAIMER
-
     body = _recommendation_body(trend, trend_strength, current_price, support, resistance, regime_info)
     return f"{body}\n\n{AI_DISCLAIMER}"

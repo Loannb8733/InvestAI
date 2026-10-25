@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.strategy_service import (
+from app.domains.strategies.performance import (
     aggregate_strategy_performance,
     classify_action_direction,
     compute_action_performance,

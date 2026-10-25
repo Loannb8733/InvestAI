@@ -31,13 +31,10 @@ comments	backend/app/models/planned_order.py
 comments	backend/app/models/portfolio_snapshot.py
 comments	backend/app/models/project_audit.py
 comments	backend/app/models/project_document.py
-comments	backend/app/models/strategy.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/schemas/crowdfunding.py
-comments	backend/app/schemas/strategy.py
 comments	backend/app/services/ai/crowdfunding_analyzer.py
 comments	backend/app/services/ai/pdf_parser.py
-comments	backend/app/services/ai_strategy_service.py
 comments	backend/app/services/alert_service.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/crowdfunding_calendar_service.py
@@ -57,7 +54,6 @@ comments	backend/app/services/smart_insights_service.py
 comments	backend/app/services/smart_insights_types.py
 comments	backend/app/services/snapshot_risk.py
 comments	backend/app/services/snapshot_service.py
-comments	backend/app/services/strategy_service.py
 comments	backend/app/services/stress_test_service.py
 comments	backend/app/services/telegram_service.py
 comments	backend/app/tasks/celery_app.py
@@ -198,7 +194,6 @@ too-long	backend/app/api/v1/endpoints/dashboard.py
 too-long	backend/app/api/v1/endpoints/goals.py
 too-long	backend/app/api/v1/endpoints/simulations.py
 too-long	backend/app/api/v1/endpoints/smart_insights.py
-too-long	backend/app/api/v1/endpoints/strategies.py
 too-long	backend/app/api/v1/endpoints/telegram_webhook.py
 too-long	backend/app/api/v1/endpoints/websocket.py
 too-long	backend/app/core/redis_client.py
@@ -208,7 +203,6 @@ too-long	backend/app/ml/regime_detector.py
 too-long	backend/app/schemas/crowdfunding.py
 too-long	backend/app/services/ai/crowdfunding_analyzer.py
 too-long	backend/app/services/ai/pdf_parser.py
-too-long	backend/app/services/ai_strategy_service.py
 too-long	backend/app/services/alert_service.py
 too-long	backend/app/services/csv_parsers.py
 too-long	backend/app/services/email_service.py
@@ -221,7 +215,6 @@ too-long	backend/app/services/smart_insights_analyzers.py
 too-long	backend/app/services/smart_insights_service.py
 too-long	backend/app/services/snapshot_risk.py
 too-long	backend/app/services/snapshot_service.py
-too-long	backend/app/services/strategy_service.py
 too-long	backend/app/services/telegram_service.py
 too-long	backend/app/tasks/emails.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
