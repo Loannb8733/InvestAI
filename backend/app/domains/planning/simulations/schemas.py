@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -96,10 +96,10 @@ class ProjectionResult(BaseModel):
 
 
 class DCAParameters(BaseModel):
-    """``frequency`` : ``weekly``, ``monthly`` ou ``quarterly`` ; toute autre valeur est traitée comme mensuelle."""
+    """``frequency`` : ``weekly``, ``monthly`` ou ``quarterly``."""
 
     total_amount: float = Field(..., gt=0)
-    frequency: str = Field(default="monthly")
+    frequency: Literal["weekly", "monthly", "quarterly"] = "monthly"
     duration_months: int = Field(default=12, gt=0, le=120)
     expected_volatility: float = Field(default=20.0, ge=0, le=100)
     expected_return: float = Field(default=7.0, ge=-50, le=100)

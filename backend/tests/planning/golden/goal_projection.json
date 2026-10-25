@@ -1,10 +1,10 @@
 {
   "body": {
-    "alert_message": "DCA insuffisant pour atteindre la cible en June 2029. Contribution mensuelle recommandée : 931 €.",
+    "alert_message": "DCA insuffisant pour atteindre la cible en juin 2029. Contribution mensuelle recommandée : 931 €.",
     "current_amount": 65440.0,
     "curve": [
       {
-        "date_label": "Oct 2026",
+        "date_label": "oct. 2026",
         "month": 0,
         "projected_p25": 65440.0,
         "projected_p50": 65440.0,
@@ -12,7 +12,7 @@
         "target_line": 65440.0
       },
       {
-        "date_label": "Nov 2026",
+        "date_label": "nov. 2026",
         "month": 1,
         "projected_p25": 64711.48,
         "projected_p50": 67456.96,
@@ -20,7 +20,7 @@
         "target_line": 68082.5
       },
       {
-        "date_label": "Dec 2026",
+        "date_label": "déc. 2026",
         "month": 2,
         "projected_p25": 65502.15,
         "projected_p50": 69357.03,
@@ -28,7 +28,7 @@
         "target_line": 70725.0
       },
       {
-        "date_label": "Jan 2027",
+        "date_label": "janv. 2027",
         "month": 3,
         "projected_p25": 66551.31,
         "projected_p50": 71305.08,
@@ -36,7 +36,7 @@
         "target_line": 73367.5
       },
       {
-        "date_label": "Feb 2027",
+        "date_label": "févr. 2027",
         "month": 4,
         "projected_p25": 67515.16,
         "projected_p50": 73107.64,
@@ -44,7 +44,7 @@
         "target_line": 76010.0
       },
       {
-        "date_label": "Mar 2027",
+        "date_label": "mars 2027",
         "month": 5,
         "projected_p25": 68690.24,
         "projected_p50": 75118.32,
@@ -52,7 +52,7 @@
         "target_line": 78652.5
       },
       {
-        "date_label": "Apr 2027",
+        "date_label": "avr. 2027",
         "month": 6,
         "projected_p25": 70046.24,
         "projected_p50": 77018.45,
@@ -60,7 +60,7 @@
         "target_line": 81295.0
       },
       {
-        "date_label": "May 2027",
+        "date_label": "mai 2027",
         "month": 7,
         "projected_p25": 71562.22,
         "projected_p50": 79401.2,
@@ -68,7 +68,7 @@
         "target_line": 83937.5
       },
       {
-        "date_label": "Jun 2027",
+        "date_label": "juin 2027",
         "month": 8,
         "projected_p25": 72947.54,
         "projected_p50": 81384.94,
@@ -76,7 +76,7 @@
         "target_line": 86580.0
       },
       {
-        "date_label": "Jul 2027",
+        "date_label": "juil. 2027",
         "month": 9,
         "projected_p25": 73920.24,
         "projected_p50": 83601.17,
@@ -84,7 +84,7 @@
         "target_line": 89222.5
       },
       {
-        "date_label": "Aug 2027",
+        "date_label": "août 2027",
         "month": 10,
         "projected_p25": 75957.84,
         "projected_p50": 85558.07,
@@ -92,7 +92,7 @@
         "target_line": 91865.0
       },
       {
-        "date_label": "Sep 2027",
+        "date_label": "sept. 2027",
         "month": 11,
         "projected_p25": 77440.69,
         "projected_p50": 88048.01,
@@ -100,7 +100,7 @@
         "target_line": 94507.5
       },
       {
-        "date_label": "Oct 2027",
+        "date_label": "oct. 2027",
         "month": 12,
         "projected_p25": 79195.22,
         "projected_p50": 90187.54,
@@ -108,7 +108,7 @@
         "target_line": 97150.0
       },
       {
-        "date_label": "Nov 2027",
+        "date_label": "nov. 2027",
         "month": 13,
         "projected_p25": 81318.17,
         "projected_p50": 93004.06,
@@ -116,7 +116,7 @@
         "target_line": 99792.5
       },
       {
-        "date_label": "Dec 2027",
+        "date_label": "déc. 2027",
         "month": 14,
         "projected_p25": 82931.94,
         "projected_p50": 95295.6,
@@ -124,7 +124,7 @@
         "target_line": 102435.0
       },
       {
-        "date_label": "Jan 2028",
+        "date_label": "janv. 2028",
         "month": 15,
         "projected_p25": 84242.81,
         "projected_p50": 97263.64,
@@ -132,7 +132,7 @@
         "target_line": 105077.5
       },
       {
-        "date_label": "Feb 2028",
+        "date_label": "févr. 2028",
         "month": 16,
         "projected_p25": 85985.41,
         "projected_p50": 99099.17,
@@ -140,7 +140,7 @@
         "target_line": 107720.0
       },
       {
-        "date_label": "Mar 2028",
+        "date_label": "mars 2028",
         "month": 17,
         "projected_p25": 87062.94,
         "projected_p50": 101255.13,
@@ -148,7 +148,7 @@
         "target_line": 110362.5
       },
       {
-        "date_label": "Apr 2028",
+        "date_label": "avr. 2028",
         "month": 18,
         "projected_p25": 88715.99,
         "projected_p50": 103941.0,
@@ -156,7 +156,7 @@
         "target_line": 113005.0
       },
       {
-        "date_label": "May 2028",
+        "date_label": "mai 2028",
         "month": 19,
         "projected_p25": 89942.82,
         "projected_p50": 106123.03,
@@ -164,7 +164,7 @@
         "target_line": 115647.5
       },
       {
-        "date_label": "Jun 2028",
+        "date_label": "juin 2028",
         "month": 20,
         "projected_p25": 91626.87,
         "projected_p50": 108704.16,
@@ -172,7 +172,7 @@
         "target_line": 118290.0
       },
       {
-        "date_label": "Jul 2028",
+        "date_label": "juil. 2028",
         "month": 21,
         "projected_p25": 93520.71,
         "projected_p50": 110263.62,
@@ -180,7 +180,7 @@
         "target_line": 120932.5
       },
       {
-        "date_label": "Aug 2028",
+        "date_label": "août 2028",
         "month": 22,
         "projected_p25": 95208.95,
         "projected_p50": 113530.95,
@@ -188,7 +188,7 @@
         "target_line": 123575.0
       },
       {
-        "date_label": "Sep 2028",
+        "date_label": "sept. 2028",
         "month": 23,
         "projected_p25": 97073.33,
         "projected_p50": 115854.82,
@@ -196,7 +196,7 @@
         "target_line": 126217.5
       },
       {
-        "date_label": "Oct 2028",
+        "date_label": "oct. 2028",
         "month": 24,
         "projected_p25": 98899.31,
         "projected_p50": 118286.68,
@@ -204,7 +204,7 @@
         "target_line": 128860.0
       },
       {
-        "date_label": "Nov 2028",
+        "date_label": "nov. 2028",
         "month": 25,
         "projected_p25": 100720.77,
         "projected_p50": 121454.08,
@@ -212,7 +212,7 @@
         "target_line": 131502.5
       },
       {
-        "date_label": "Dec 2028",
+        "date_label": "déc. 2028",
         "month": 26,
         "projected_p25": 102543.04,
         "projected_p50": 124553.38,
@@ -220,7 +220,7 @@
         "target_line": 134145.0
       },
       {
-        "date_label": "Jan 2029",
+        "date_label": "janv. 2029",
         "month": 27,
         "projected_p25": 104517.89,
         "projected_p50": 127476.9,
@@ -228,7 +228,7 @@
         "target_line": 136787.5
       },
       {
-        "date_label": "Feb 2029",
+        "date_label": "févr. 2029",
         "month": 28,
         "projected_p25": 107003.59,
         "projected_p50": 129883.65,
@@ -236,7 +236,7 @@
         "target_line": 139430.0
       },
       {
-        "date_label": "Mar 2029",
+        "date_label": "mars 2029",
         "month": 29,
         "projected_p25": 108232.98,
         "projected_p50": 132356.14,
@@ -244,7 +244,7 @@
         "target_line": 142072.5
       },
       {
-        "date_label": "Apr 2029",
+        "date_label": "avr. 2029",
         "month": 30,
         "projected_p25": 110774.34,
         "projected_p50": 135724.01,
@@ -252,7 +252,7 @@
         "target_line": 144715.0
       },
       {
-        "date_label": "May 2029",
+        "date_label": "mai 2029",
         "month": 31,
         "projected_p25": 113593.93,
         "projected_p50": 138949.27,
@@ -260,7 +260,7 @@
         "target_line": 147357.5
       },
       {
-        "date_label": "Jun 2029",
+        "date_label": "juin 2029",
         "month": 32,
         "projected_p25": 114780.35,
         "projected_p50": 141814.94,
@@ -268,7 +268,7 @@
         "target_line": 150000.0
       }
     ],
-    "eta_date": "Sep 2029",
+    "eta_date": "sept. 2029",
     "eta_months": 35,
     "goal_id": "<id-0>",
     "gold_shield_active": false,
