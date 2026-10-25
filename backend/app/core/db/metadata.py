@@ -1,4 +1,6 @@
 from app.core.db.base import Base
+from app.domains.crowdfunding import models as crowdfunding_models
+from app.domains.crowdfunding.audit import models as audit_models
 from app.domains.exchanges import models as exchange_models
 from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
@@ -14,14 +16,9 @@ from app.models import (
     alert,
     audit_log,
     calendar_event,
-    crowdfunding_payment_schedule,
-    crowdfunding_project,
-    crowdfunding_repayment,
     notification,
     planned_order,
     portfolio_snapshot,
-    project_audit,
-    project_document,
 )
 
 metadata = Base.metadata
@@ -29,10 +26,9 @@ metadata = Base.metadata
 __all__ = [
     "alert",
     "audit_log",
+    "audit_models",
     "calendar_event",
-    "crowdfunding_payment_schedule",
-    "crowdfunding_project",
-    "crowdfunding_repayment",
+    "crowdfunding_models",
     "exchange_models",
     "fx_models",
     "goal_models",
@@ -45,8 +41,6 @@ __all__ = [
     "portfolio_models",
     "portfolio_snapshot",
     "prediction_models",
-    "project_audit",
-    "project_document",
     "simulation_models",
     "strategy_models",
     "transaction_models",

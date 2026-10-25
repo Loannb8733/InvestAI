@@ -1,6 +1,6 @@
 """Filet de caractérisation du stress test de crowdfunding.
 
-`stress_test_service` décale toutes les échéances d'un projet de N mois et
+`compute_stress_test` décale toutes les échéances d'un projet de N mois et
 recalcule le TRI : « et si la plateforme payait avec six mois de retard ? ».
 Le module était couvert à 43 %.
 
@@ -15,8 +15,8 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.crowdfunding_project import CrowdfundingProject, RepaymentType
-from app.services.stress_test_service import ALLOWED_DELAY_MONTHS, stress_test_service
+from app.domains.crowdfunding.models import CrowdfundingProject, RepaymentType
+from app.domains.crowdfunding.stress_test import ALLOWED_DELAY_MONTHS, compute_stress_test
 
 
 def projet(**surcharges) -> CrowdfundingProject:
@@ -40,7 +40,7 @@ def projet(**surcharges) -> CrowdfundingProject:
 
 class TestTriDeBase:
     def test_un_projet_sain_a_un_tri_positif(self):
-        res = stress_test_service.compute_stress_test(projet(), 0)
+        res = compute_stress_test(projet(), 0)
 
         assert res.base_irr is not None
         assert res.base_irr > 0
@@ -54,12 +54,12 @@ class TestTriDeBase:
         qui manque — c'est l'égalité des deux TRI qui est épinglée ici, vraie
         dans les deux cas.
         """
-        res = stress_test_service.compute_stress_test(projet(), 0)
+        res = compute_stress_test(projet(), 0)
 
         assert res.stressed_irr == res.base_irr
 
     def test_le_tri_est_rendu_en_pourcentage_arrondi_au_centieme(self):
-        res = stress_test_service.compute_stress_test(projet(), 0)
+        res = compute_stress_test(projet(), 0)
 
         assert res.base_irr == round(res.base_irr, 2)
         # Un TRI de 6 % s'exprime 6.x, pas 0.06.
@@ -68,20 +68,20 @@ class TestTriDeBase:
 
 class TestEffetDuRetard:
     def test_un_retard_degrade_le_tri(self):
-        base = stress_test_service.compute_stress_test(projet(), 0).base_irr
-        stresse = stress_test_service.compute_stress_test(projet(), 12).stressed_irr
+        base = compute_stress_test(projet(), 0).base_irr
+        stresse = compute_stress_test(projet(), 12).stressed_irr
 
         assert stresse < base
 
     def test_plus_le_retard_est_long_plus_le_tri_baisse(self):
-        tris = [stress_test_service.compute_stress_test(projet(), d).stressed_irr for d in (0, 6, 12, 24)]
+        tris = [compute_stress_test(projet(), d).stressed_irr for d in (0, 6, 12, 24)]
 
         assert tris == sorted(tris, reverse=True)
 
     def test_le_retard_ne_change_pas_le_tri_de_base(self):
         # Le point de comparaison reste le scénario contractuel.
-        sans = stress_test_service.compute_stress_test(projet(), 0)
-        avec = stress_test_service.compute_stress_test(projet(), 24)
+        sans = compute_stress_test(projet(), 0)
+        avec = compute_stress_test(projet(), 24)
 
         assert avec.base_irr == sans.base_irr
 
@@ -92,25 +92,25 @@ class TestEffetDuRetard:
         capital et les intérêts restent dus en entier, seule leur date bouge.
         La perte est donc purement actuarielle.
         """
-        sans = stress_test_service.compute_stress_test(projet(), 0)
-        avec = stress_test_service.compute_stress_test(projet(), 12)
+        sans = compute_stress_test(projet(), 0)
+        avec = compute_stress_test(projet(), 12)
 
         assert sum(c.total for c in avec.cashflows) == sum(c.total for c in sans.cashflows)
 
 
 class TestEcheancierAffiche:
     def test_les_dates_sont_decalees_du_nombre_de_mois_demande(self):
-        sans = stress_test_service.compute_stress_test(projet(), 0).cashflows
-        avec = stress_test_service.compute_stress_test(projet(), 6).cashflows
+        sans = compute_stress_test(projet(), 0).cashflows
+        avec = compute_stress_test(projet(), 6).cashflows
 
         assert date.fromisoformat(avec[-1].date) == date.fromisoformat(sans[-1].date).replace(month=7)
 
     def test_le_drapeau_de_retard_suit_le_scenario(self):
-        assert all(not c.is_delayed for c in stress_test_service.compute_stress_test(projet(), 0).cashflows)
-        assert all(c.is_delayed for c in stress_test_service.compute_stress_test(projet(), 6).cashflows)
+        assert all(not c.is_delayed for c in compute_stress_test(projet(), 0).cashflows)
+        assert all(c.is_delayed for c in compute_stress_test(projet(), 6).cashflows)
 
     def test_le_total_de_chaque_echeance_est_la_somme_capital_interets(self):
-        for flux in stress_test_service.compute_stress_test(projet(), 0).cashflows:
+        for flux in compute_stress_test(projet(), 0).cashflows:
             assert flux.total == round(flux.capital + flux.interest, 2)
 
     def test_les_interets_affiches_sont_nets_d_impot(self):
@@ -121,8 +121,8 @@ class TestEcheancierAffiche:
         connu du module : tester `if project.tax_rate` traiterait le 0 % comme
         une absence et le taxerait à 30 %.
         """
-        taxe = stress_test_service.compute_stress_test(projet(tax_rate=Decimal("30")), 0)
-        exonere = stress_test_service.compute_stress_test(projet(tax_rate=Decimal("0")), 0)
+        taxe = compute_stress_test(projet(tax_rate=Decimal("30")), 0)
+        exonere = compute_stress_test(projet(tax_rate=Decimal("0")), 0)
 
         interets_taxes = sum(c.interest for c in taxe.cashflows)
         interets_exoneres = sum(c.interest for c in exonere.cashflows)
@@ -133,15 +133,15 @@ class TestEcheancierAffiche:
 
 class TestAmortissable:
     def test_un_projet_amortissable_produit_plusieurs_echeances(self):
-        res = stress_test_service.compute_stress_test(projet(repayment_type=RepaymentType.AMORTIZABLE), 0)
+        res = compute_stress_test(projet(repayment_type=RepaymentType.AMORTIZABLE), 0)
 
         assert len(res.cashflows) > 1
         assert res.base_irr is not None
 
     def test_l_amortissable_se_degrade_aussi_avec_le_retard(self):
         amortissable = projet(repayment_type=RepaymentType.AMORTIZABLE)
-        base = stress_test_service.compute_stress_test(amortissable, 0).base_irr
-        stresse = stress_test_service.compute_stress_test(amortissable, 12).stressed_irr
+        base = compute_stress_test(amortissable, 0).base_irr
+        stresse = compute_stress_test(amortissable, 12).stressed_irr
 
         assert stresse < base
 
@@ -163,7 +163,7 @@ class TestEcheancesNulles:
         )
 
     def test_les_echeances_vides_sont_affichees_a_l_utilisateur(self):
-        res = stress_test_service.compute_stress_test(self.mensuel(annual_rate=Decimal("0")), 0)
+        res = compute_stress_test(self.mensuel(annual_rate=Decimal("0")), 0)
 
         vides = [c for c in res.cashflows if c.total == 0]
 
@@ -181,7 +181,7 @@ class TestEcheancesNulles:
         Le test ne peut donc pas tenir le garde-fou lui-même : il tient l'écart
         entre ce que l'utilisateur voit et ce qui est calculé.
         """
-        res = stress_test_service.compute_stress_test(self.mensuel(annual_rate=Decimal("0")), 0)
+        res = compute_stress_test(self.mensuel(annual_rate=Decimal("0")), 0)
 
         assert res.base_irr == pytest.approx(0.0, abs=1e-9)
         assert any(c.total == 0 for c in res.cashflows)
@@ -189,10 +189,10 @@ class TestEcheancesNulles:
 
 class TestCasLimites:
     def test_un_echeancier_vide_leve_une_erreur_explicite(self):
-        # In fine sans date de fin estimée : `_generate_in_fine` rend une liste
+        # In fine sans date de fin estimée : `in_fine_schedule` rend une liste
         # vide, et le message oriente vers la date et la durée.
         with pytest.raises(ValueError, match="échéancier vide"):
-            stress_test_service.compute_stress_test(projet(estimated_end_date=None), 0)
+            compute_stress_test(projet(estimated_end_date=None), 0)
 
     def test_l_absence_de_date_de_debut_est_signalee_apres_l_echeancier(self):
         """L'ordre des contrôles décide du message.
@@ -203,21 +203,21 @@ class TestCasLimites:
         « échéancier vide » qui l'emporte — exact, mais moins parlant.
         """
         with pytest.raises(ValueError, match="date de début"):
-            stress_test_service.compute_stress_test(projet(start_date=None), 0)
+            compute_stress_test(projet(start_date=None), 0)
 
         with pytest.raises(ValueError, match="échéancier vide"):
-            stress_test_service.compute_stress_test(projet(start_date=None, estimated_end_date=None), 0)
+            compute_stress_test(projet(start_date=None, estimated_end_date=None), 0)
 
     def test_le_service_accepte_un_retard_hors_de_la_liste_autorisee(self):
         """`ALLOWED_DELAY_MONTHS` n'est pas appliqué ici mais à l'endpoint.
 
         Appelé directement, le service calcule sans broncher un retard de trois
-        mois. La validation vit dans `crowdfunding.py` : tout autre appelant
+        mois. La validation vit dans le routeur : tout autre appelant
         contourne la liste.
         """
         assert ALLOWED_DELAY_MONTHS == {0, 6, 12, 24}
 
-        res = stress_test_service.compute_stress_test(projet(), 3)
+        res = compute_stress_test(projet(), 3)
 
         assert res.delay_months == 3
         assert res.stressed_irr is not None
@@ -225,9 +225,7 @@ class TestCasLimites:
     def test_un_retard_negatif_avance_les_echeances(self):
         # `delay_months > 0` gouverne le décalage : une valeur négative laisse
         # les dates inchangées, et le TRI stressé se recalcule à l'identique.
-        res = stress_test_service.compute_stress_test(projet(), -6)
+        res = compute_stress_test(projet(), -6)
 
-        assert [c.date for c in res.cashflows] == [
-            c.date for c in stress_test_service.compute_stress_test(projet(), 0).cashflows
-        ]
+        assert [c.date for c in res.cashflows] == [c.date for c in compute_stress_test(projet(), 0).cashflows]
         assert all(not c.is_delayed for c in res.cashflows)

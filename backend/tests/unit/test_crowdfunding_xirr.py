@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app.api.v1.endpoints.crowdfunding import compute_xirr
+from app.domains.crowdfunding.returns import compute_xirr
 
 D0 = date(2024, 1, 1)
 

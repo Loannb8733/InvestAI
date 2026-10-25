@@ -7,9 +7,9 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.domains.crowdfunding.audit import providers
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.services.ai.crowdfunding_analyzer import crowdfunding_analyzer
 from tests.crowdfunding.recorder import BASE, UNKNOWN_ID, Recorder
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
@@ -80,7 +80,7 @@ def scripted_llm(no_llm: None, monkeypatch: pytest.MonkeyPatch) -> None:
         return json.dumps(LLM_ANSWER)
 
     monkeypatch.setattr(settings, "GROQ_API_KEY", "cle-de-test")
-    monkeypatch.setattr(crowdfunding_analyzer, "_call_groq", answer)
+    monkeypatch.setattr(providers, "call_groq", answer)
 
 
 async def _setup(client: AsyncClient, db_session: AsyncSession, headers: dict[str, str]) -> str:

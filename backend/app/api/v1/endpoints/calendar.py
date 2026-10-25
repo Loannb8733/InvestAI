@@ -12,10 +12,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import get_session
+from app.domains.crowdfunding.calendar import upcoming_coupon_income
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
 from app.models.calendar_event import CalendarEvent, EventType
-from app.services.crowdfunding_calendar_service import crowdfunding_calendar_service
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +360,7 @@ async def get_passive_income(
 
     # (b) Coupons crowdfunding (déjà en EUR)
     crowdfunding_total = 0.0
-    coupon_income = await crowdfunding_calendar_service.get_upcoming_coupon_income(db, current_user.id, months_ahead=12)
+    coupon_income = await upcoming_coupon_income(db, current_user.id, months_ahead=12)
     for entry in coupon_income:
         offset = int(entry["month_offset"])
         if 0 <= offset < len(month_keys):

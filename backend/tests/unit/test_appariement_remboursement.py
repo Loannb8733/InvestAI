@@ -22,7 +22,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.reconciliation_service import ReconciliationService
+from app.domains.crowdfunding.reconciliation import match_score, reconcile_repayment
 
 
 class EcheanceFactice:
@@ -45,10 +45,9 @@ def rapprocher(echeances, jour_paiement: str, montant=None):
     l'implémentation utilisée en production, et non une copie qui resterait
     verte si le service changeait.
     """
-    service = ReconciliationService()
     paiement = date.fromisoformat(jour_paiement)
     montant_dec = Decimal(montant) if montant is not None else None
-    return min(echeances, key=lambda e: service.score_rapprochement(e, paiement, montant_dec))
+    return min(echeances, key=lambda e: match_score(e, paiement, montant_dec))
 
 
 class TestLeMontantDepartage:
@@ -112,14 +111,14 @@ class TestSignature:
     def test_le_montant_est_facultatif(self):
         import inspect
 
-        params = inspect.signature(ReconciliationService.reconcile_repayment).parameters
+        params = inspect.signature(reconcile_repayment).parameters
         assert "amount" in params, "le montant n'est plus transmissible"
         assert params["amount"].default is None, "un montant obligatoire casserait les appelants qui ne l'ont pas"
 
     def test_l_endpoint_transmet_le_montant(self):
         from pathlib import Path
 
-        import app.api.v1.endpoints.crowdfunding as module
+        import app.domains.crowdfunding.service as module
 
         source = Path(module.__file__).read_text(encoding="utf-8")
         appel = source[source.index("reconcile_repayment(") :][:400]

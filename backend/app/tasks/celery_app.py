@@ -16,7 +16,7 @@ celery_app = Celery(
         "app.tasks.snapshots",
         "app.tasks.emails",
         "app.tasks.cleanup",
-        "app.tasks.monitor_delays",
+        "app.domains.crowdfunding.tasks",
         "app.tasks.contrarian_stats",
         "app.tasks.regime_alerts",
         "app.domains.market_data.fx.tasks",
@@ -151,7 +151,7 @@ celery_app.conf.beat_schedule = {
     },
     # === Crowdfunding Delay Monitoring ===
     "check-crowdfunding-delays": {
-        "task": "app.tasks.monitor_delays.check_crowdfunding_delays",
+        "task": "app.domains.crowdfunding.tasks.check_crowdfunding_delays",
         "schedule": crontab(hour=8, minute=30),  # Daily at 08:30 UTC (09:30 Paris)
     },
     # === Contrarian (Fear & Greed) backtest stats ===
