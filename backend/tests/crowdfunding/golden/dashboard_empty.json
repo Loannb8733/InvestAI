@@ -1,0 +1,24 @@
+{
+  "body": {
+    "active_count": 0,
+    "capital_outstanding": 0.0,
+    "completed_count": 0,
+    "defaulted_count": 0,
+    "defaulted_outstanding": 0.0,
+    "delayed_count": 0,
+    "funding_count": 0,
+    "next_maturity": null,
+    "platform_breakdown": {},
+    "platform_breakdown_outstanding": {},
+    "projected_annual_interest": 0.0,
+    "projects": [],
+    "total_capital_repaid": 0.0,
+    "total_interest_net": 0.0,
+    "total_interest_received": 0.0,
+    "total_invested": 0.0,
+    "total_received": 0.0,
+    "total_referral": 0.0,
+    "weighted_average_rate": 0.0
+  },
+  "status": 200
+}

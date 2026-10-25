@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Impossible de calculer le stress test : échéancier vide (vérifiez la date de début et la durée du projet)."
+  },
+  "status": 422
+}

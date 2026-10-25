@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'interest', 'capital', 'both' or 'referral'"
+        },
+        "input": "bonus",
+        "loc": [
+          "body",
+          "payment_type"
+        ],
+        "msg": "Input should be 'interest', 'capital', 'both' or 'referral'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

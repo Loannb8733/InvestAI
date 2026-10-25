@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Fichier 'a.docx' n'est pas un PDF"
+  },
+  "status": 400
+}

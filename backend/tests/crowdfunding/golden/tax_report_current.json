@@ -1,0 +1,31 @@
+{
+  "body": {
+    "nb_payments": 3,
+    "platforms": [
+      {
+        "gross_interest": 25.0,
+        "nb_payments": 1,
+        "net_interest": 21.8,
+        "platform": "Anaxago",
+        "tax_withheld": 3.2,
+        "theoretical_pfu": 7.5,
+        "withholding_gap": true
+      },
+      {
+        "gross_interest": 13.33,
+        "nb_payments": 2,
+        "net_interest": 9.33,
+        "platform": "Homunity",
+        "tax_withheld": 4.0,
+        "theoretical_pfu": 4.0,
+        "withholding_gap": false
+      }
+    ],
+    "total_gross_interest": 38.33,
+    "total_net_interest": 31.13,
+    "total_tax_withheld": 7.2,
+    "total_theoretical_pfu": 11.5,
+    "year": 2026
+  },
+  "status": 200
+}

@@ -1,0 +1,44 @@
+{
+  "body": {
+    "actual_end_date": null,
+    "annual_rate": 11.0,
+    "asset_id": "<id-24>",
+    "created_at": "<volatile>",
+    "delay_months": 0,
+    "description": null,
+    "documents": [],
+    "duration_months": 12,
+    "estimated_end_date": "2025-06-01",
+    "id": "<id-25>",
+    "interest_earned": 0.0,
+    "interest_frequency": "at_maturity",
+    "invested_amount": 500.0,
+    "platform": "Fundimmo",
+    "progress_percent": 100.0,
+    "project_name": "Lofts Canal",
+    "project_url": null,
+    "projected_interest_gross": 55.0,
+    "projected_total_interest": 38.5,
+    "repayment_type": "in_fine",
+    "repayments": [],
+    "schedule": [
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2025-06-01",
+        "expected_capital": 500.0,
+        "expected_interest": 38.5,
+        "id": "<id-26>",
+        "is_completed": false,
+        "project_id": "<id-25>",
+        "repayment_id": null,
+        "status": "overdue"
+      }
+    ],
+    "start_date": "2024-06-01",
+    "status": "completed",
+    "tax_rate": 30.0,
+    "total_received": 0.0,
+    "updated_at": "<volatile>"
+  },
+  "status": 201
+}

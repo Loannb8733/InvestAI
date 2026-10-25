@@ -1,0 +1,32 @@
+{
+  "body": {
+    "actual_end_date": null,
+    "annual_rate": 9.0,
+    "asset_id": "<id-30>",
+    "created_at": "<volatile>",
+    "delay_months": 0,
+    "description": null,
+    "documents": [],
+    "duration_months": 36,
+    "estimated_end_date": null,
+    "id": "<id-31>",
+    "interest_earned": 0.0,
+    "interest_frequency": "at_maturity",
+    "invested_amount": 300.0,
+    "platform": "Lymo",
+    "progress_percent": 0.0,
+    "project_name": "Entrepôt",
+    "project_url": null,
+    "projected_interest_gross": 81.0,
+    "projected_total_interest": 56.7,
+    "repayment_type": "in_fine",
+    "repayments": [],
+    "schedule": [],
+    "start_date": null,
+    "status": "active",
+    "tax_rate": 30.0,
+    "total_received": 0.0,
+    "updated_at": "<volatile>"
+  },
+  "status": 200
+}

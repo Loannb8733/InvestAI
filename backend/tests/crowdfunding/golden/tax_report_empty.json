@@ -1,0 +1,12 @@
+{
+  "body": {
+    "nb_payments": 0,
+    "platforms": [],
+    "total_gross_interest": 0.0,
+    "total_net_interest": 0.0,
+    "total_tax_withheld": 0.0,
+    "total_theoretical_pfu": 0.0,
+    "year": 2026
+  },
+  "status": 200
+}

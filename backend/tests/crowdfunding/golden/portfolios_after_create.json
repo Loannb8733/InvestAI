@@ -1,0 +1,25 @@
+{
+  "body": [
+    {
+      "cash_balances": {},
+      "created_at": "<volatile>",
+      "description": "Portefeuille dédié aux investissements crowdfunding",
+      "id": "<id-34>",
+      "kind": "crowdfunding",
+      "name": "Crowdfunding",
+      "updated_at": "<volatile>",
+      "user_id": "<id-35>"
+    },
+    {
+      "cash_balances": {},
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-36>",
+      "kind": null,
+      "name": "Rapports",
+      "updated_at": "<volatile>",
+      "user_id": "<id-35>"
+    }
+  ],
+  "status": 200
+}

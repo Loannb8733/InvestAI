@@ -1,0 +1,79 @@
+{
+  "body": {
+    "admin_status": null,
+    "analysis_source": "Groq",
+    "collection_amount": 800000.0,
+    "correlation_score": 0.53,
+    "created_at": "<volatile>",
+    "diversification_impact": "neutre",
+    "document_type": "deck",
+    "duration_max": 24,
+    "duration_min": 18,
+    "equity_contribution": null,
+    "file_names": [
+      "deck.pdf"
+    ],
+    "guarantees": [
+      {
+        "description": "Sur le terrain",
+        "rank": "2ème rang",
+        "strength": "faible",
+        "type": "Hypothèque"
+      }
+    ],
+    "id": "<id-0>",
+    "investment_simulation": {
+      "duration_months": 21,
+      "gross_interest": 19.25,
+      "investment_amount": 100.0,
+      "monthly_gross_return": 0.92,
+      "net_interest": 13.47,
+      "roi_net_percent": 13.47,
+      "tax_amount": 5.77,
+      "total_at_end": 113.47,
+      "tri_percent": 11.0
+    },
+    "location": "Lyon 7e",
+    "ltc": null,
+    "ltv": 85.0,
+    "margin_percent": 8.0,
+    "operator": "Promoteur Rhône",
+    "points_forts": [
+      "Emplacement"
+    ],
+    "points_vigilance": [],
+    "portfolio_concentration": {
+      "asset_type": {
+        "detail": "Crowdfunding = 100.0% du portefeuille après investissement",
+        "score": 1.0
+      },
+      "geographic": {
+        "detail": "0% de projets dans la même zone",
+        "score": 0.0
+      },
+      "risk_return": {
+        "detail": "TRI 11% avec score risque 4/10",
+        "score": 0.44
+      }
+    },
+    "pre_sales_percent": 0.0,
+    "project_id": "<id-1>",
+    "project_name": "Les Tilleuls",
+    "red_flags": [
+      "LTV élevé (85.0%) — risque d'endettement excessif",
+      "Marge faible (8.0%) — peu de marge de sécurité",
+      "Pas de pré-commercialisation — risque de sortie",
+      "Pas d'hypothèque de 1er rang — garantie affaiblie"
+    ],
+    "risk_score": 4,
+    "score_admin": null,
+    "score_guarantees": null,
+    "score_location": null,
+    "score_operator": null,
+    "score_risk_return": null,
+    "suggested_investment": 100.0,
+    "tri": 11.0,
+    "verdict": "NE_PAS_INVESTIR"
+  },
+  "status": 201
+}

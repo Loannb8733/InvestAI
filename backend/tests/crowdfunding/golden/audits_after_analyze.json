@@ -1,0 +1,71 @@
+{
+  "body": [
+    {
+      "admin_status": null,
+      "analysis_source": "statique",
+      "collection_amount": 800000.0,
+      "correlation_score": 0.49,
+      "created_at": "<volatile>",
+      "diversification_impact": "neutre",
+      "document_type": "mixed",
+      "duration_max": 24,
+      "duration_min": 18,
+      "equity_contribution": null,
+      "file_names": [
+        "deck.pdf"
+      ],
+      "guarantees": [],
+      "id": "<id-0>",
+      "investment_simulation": {
+        "duration_months": 21,
+        "gross_interest": 16.62,
+        "investment_amount": 100.0,
+        "monthly_gross_return": 0.79,
+        "net_interest": 11.63,
+        "roi_net_percent": 11.63,
+        "tax_amount": 4.99,
+        "total_at_end": 111.63,
+        "tri_percent": 9.5
+      },
+      "location": null,
+      "ltc": null,
+      "ltv": 65.0,
+      "margin_percent": 12.0,
+      "operator": null,
+      "points_forts": [
+        "TRI attractif de 9.5%"
+      ],
+      "points_vigilance": [
+        "Analyse statique (regex) — résultats partiels, relecture recommandée"
+      ],
+      "portfolio_concentration": {
+        "asset_type": {
+          "detail": "Crowdfunding = 100.0% du portefeuille après investissement",
+          "score": 1.0
+        },
+        "geographic": {
+          "detail": "0% de projets dans la même zone",
+          "score": 0.0
+        },
+        "risk_return": {
+          "detail": "TRI 9.5% avec score risque 5/10",
+          "score": 0.32
+        }
+      },
+      "pre_sales_percent": 40.0,
+      "project_id": "<id-1>",
+      "project_name": "Analyse statique (sans IA)",
+      "red_flags": [],
+      "risk_score": 5,
+      "score_admin": 5,
+      "score_guarantees": 3,
+      "score_location": 5,
+      "score_operator": 5,
+      "score_risk_return": 5,
+      "suggested_investment": 100.0,
+      "tri": 9.5,
+      "verdict": "VIGILANCE"
+    }
+  ],
+  "status": 200
+}

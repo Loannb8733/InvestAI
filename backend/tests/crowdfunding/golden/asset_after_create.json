@@ -1,0 +1,20 @@
+{
+  "body": {
+    "asset_type": "crowdfunding",
+    "avg_buy_price": 1000.0,
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "exchange": "Anaxago",
+    "id": "<id-0>",
+    "interest_rate": 10.0,
+    "invested_amount": 1000.0,
+    "maturity_date": "2027-10-01",
+    "name": "Résidence des Tilleuls",
+    "portfolio_id": "<id-34>",
+    "project_status": "active",
+    "quantity": 1.0,
+    "symbol": "ANAXAGO-RÉSIDENCE DE",
+    "updated_at": "<volatile>"
+  },
+  "status": 200
+}

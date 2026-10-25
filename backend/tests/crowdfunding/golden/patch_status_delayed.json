@@ -1,0 +1,143 @@
+{
+  "body": {
+    "actual_end_date": null,
+    "annual_rate": 9.5,
+    "asset_id": "<id-0>",
+    "created_at": "<volatile>",
+    "delay_months": 6,
+    "description": null,
+    "documents": [],
+    "duration_months": 24,
+    "estimated_end_date": "2027-10-01",
+    "id": "<id-1>",
+    "interest_earned": 0.0,
+    "interest_frequency": "quarterly",
+    "invested_amount": 1200.0,
+    "platform": "Anaxago Capital",
+    "progress_percent": 52.2,
+    "project_name": "Les Tilleuls",
+    "project_url": "https://example.test/tilleuls",
+    "projected_interest_gross": 228.0,
+    "projected_total_interest": 159.6,
+    "repayment_type": "in_fine",
+    "repayments": [],
+    "schedule": [
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2026-01-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-51>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "overdue"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2026-04-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-52>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "overdue"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2026-07-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-53>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "overdue"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2026-10-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-54>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "overdue"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2027-01-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-55>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2027-04-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-56>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2027-07-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-57>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2027-10-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-58>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2028-01-01",
+        "expected_capital": 0.0,
+        "expected_interest": 19.95,
+        "id": "<id-59>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2028-04-01",
+        "expected_capital": 1200.0,
+        "expected_interest": 19.95,
+        "id": "<id-60>",
+        "is_completed": false,
+        "project_id": "<id-1>",
+        "repayment_id": null,
+        "status": "pending"
+      }
+    ],
+    "start_date": "2025-10-01",
+    "status": "delayed",
+    "tax_rate": 30.0,
+    "total_received": 0.0,
+    "updated_at": "<volatile>"
+  },
+  "status": 200
+}
