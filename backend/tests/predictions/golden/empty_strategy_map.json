@@ -1,0 +1,14 @@
+{
+  "body": {
+    "fear_greed": null,
+    "market_regime": "bullish",
+    "rows": [],
+    "summary": {
+      "buys": 0,
+      "holds": 0,
+      "sells": 0
+    },
+    "total_portfolio_value": 0.0
+  },
+  "status": 200
+}

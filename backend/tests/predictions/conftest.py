@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.prediction_service import prediction_service
+from app.domains.predictions.service import prediction_service
 from tests.predictions.forecaster_double import DeterministicForecaster
 
 

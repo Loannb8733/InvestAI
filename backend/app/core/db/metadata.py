@@ -5,6 +5,7 @@ from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
 from app.domains.market_data.history import models as history_models
 from app.domains.portfolio import models as portfolio_models
+from app.domains.predictions import models as prediction_models
 from app.domains.transactions import models as transaction_models
 from app.models import (
     alert,
@@ -17,7 +18,6 @@ from app.models import (
     notification,
     planned_order,
     portfolio_snapshot,
-    prediction_log,
     project_audit,
     project_document,
     simulation,
@@ -44,7 +44,7 @@ __all__ = [
     "planned_order",
     "portfolio_models",
     "portfolio_snapshot",
-    "prediction_log",
+    "prediction_models",
     "project_audit",
     "project_document",
     "simulation",

@@ -1,0 +1,21 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "le": 500.0
+        },
+        "input": 600,
+        "loc": [
+          "body",
+          "scenarios",
+          0,
+          "change_percent"
+        ],
+        "msg": "Input should be less than or equal to 500",
+        "type": "less_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

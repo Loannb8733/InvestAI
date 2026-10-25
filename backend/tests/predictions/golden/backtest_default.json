@@ -1,0 +1,59 @@
+{
+  "body": {
+    "assets": [
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "AAPL"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "ARB"
+      },
+      {
+        "avg_mape": 1.5,
+        "direction_accuracy": 33.3,
+        "samples": 3,
+        "symbol": "BTC"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "DOGE"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "ETH"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "SOL"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "UNI"
+      },
+      {
+        "avg_mape": null,
+        "direction_accuracy": null,
+        "samples": 0,
+        "symbol": "USDC"
+      }
+    ],
+    "days": 7,
+    "needs_retraining": false,
+    "overall_direction_accuracy": 33.3,
+    "overall_mape": 1.5
+  },
+  "status": 200
+}

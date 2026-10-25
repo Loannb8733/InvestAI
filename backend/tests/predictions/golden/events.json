@@ -1,0 +1,37 @@
+{
+  "body": [
+    {
+      "category": "fiscal",
+      "date": "2026-12-31",
+      "days_until": 74,
+      "description": "Clôture Q4 — rééquilibrages institutionnels",
+      "impact": "medium",
+      "title": "Fin de trimestre Q4"
+    },
+    {
+      "category": "fiscal",
+      "date": "2027-03-31",
+      "days_until": 164,
+      "description": "Clôture Q1 — rééquilibrages institutionnels",
+      "impact": "medium",
+      "title": "Fin de trimestre Q1"
+    },
+    {
+      "category": "fiscal",
+      "date": "2027-06-30",
+      "days_until": 255,
+      "description": "Clôture Q2 — rééquilibrages institutionnels",
+      "impact": "medium",
+      "title": "Fin de trimestre Q2"
+    },
+    {
+      "category": "fiscal",
+      "date": "2027-09-30",
+      "days_until": 347,
+      "description": "Clôture Q3 — rééquilibrages institutionnels",
+      "impact": "medium",
+      "title": "Fin de trimestre Q3"
+    }
+  ],
+  "status": 200
+}

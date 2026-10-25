@@ -1,0 +1,57 @@
+{
+  "body": {
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 25,
+        "extreme_greed": 75,
+        "fear": 45,
+        "greed": 55
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 2.0,
+        "strong": 4.0
+      },
+      "volatility": {
+        "extreme": 80,
+        "high": 50,
+        "low": 30.0
+      }
+    },
+    "predictions": [],
+    "summary": {
+      "bearish_assets": 0,
+      "bullish_assets": 0,
+      "days_ahead": 7,
+      "expected_change_percent": 0.0,
+      "neutral_assets": 0,
+      "overall_sentiment": "neutral",
+      "total_current_value": 0.0,
+      "total_predicted_value": 0.0
+    }
+  },
+  "status": 200
+}

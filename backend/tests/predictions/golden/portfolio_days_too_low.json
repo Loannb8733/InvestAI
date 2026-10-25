@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "ge": 1
+        },
+        "input": "0",
+        "loc": [
+          "query",
+          "days"
+        ],
+        "msg": "Input should be greater than or equal to 1",
+        "type": "greater_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

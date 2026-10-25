@@ -1,0 +1,13 @@
+{
+  "body": {
+    "action": "ACHAT",
+    "created_at": "<volatile>",
+    "id": "<id-0>",
+    "notes": null,
+    "order_eur": 250.46,
+    "source": "frontend",
+    "status": "pending",
+    "symbol": "ETH"
+  },
+  "status": 201
+}

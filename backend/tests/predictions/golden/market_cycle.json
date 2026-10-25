@@ -1,0 +1,554 @@
+{
+  "body": {
+    "btc_dominance": null,
+    "cycle_advice": [
+      {
+        "action": "PLANIFIER",
+        "description": "Tendance haussière — laissez courir vos positions mais définissez VOS niveaux de sortie maintenant. \"Be fearful when others are greedy.\" Ne soyez pas le dernier à vendre.",
+        "priority": "high",
+        "title": "Préparez la prise de profits"
+      },
+      {
+        "action": "PROTÉGER",
+        "description": "Remontez progressivement vos stop-loss pour verrouiller les gains. Un trailing stop sous l'EMA-20 protège sans couper trop tôt.",
+        "priority": "high",
+        "title": "Stop-loss progressifs"
+      },
+      {
+        "action": "ATTENDRE",
+        "description": "En marché haussier, les prix sont chers. Réduisez vos montants d'achat réguliers et gardez du cash pour accumuler au prochain creux.",
+        "priority": "medium",
+        "title": "Réduisez le DCA"
+      }
+    ],
+    "cycle_position": 42,
+    "display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.3,
+        "strong": 0.6
+      },
+      "volatility": {
+        "extreme": 2.5,
+        "high": 1.5,
+        "low": 0.9
+      }
+    },
+    "distribution_diagnostic": [
+      {
+        "dominant_regime": "bullish",
+        "name": null,
+        "rsi": 100.0,
+        "sell_priority": "high",
+        "signals": [
+          "RSI suracheté (100)"
+        ],
+        "symbol": "AAPL",
+        "top_bearish_prob": 40.3,
+        "weight_pct": 6.1
+      },
+      {
+        "dominant_regime": "bearish",
+        "name": null,
+        "rsi": 28.2,
+        "sell_priority": "medium",
+        "signals": [
+          "Probabilité baissière 38%"
+        ],
+        "symbol": "SOL",
+        "top_bearish_prob": 47.9,
+        "weight_pct": 11.5
+      },
+      {
+        "dominant_regime": "bearish",
+        "name": null,
+        "rsi": 13.8,
+        "sell_priority": "medium",
+        "signals": [
+          "Probabilité baissière 58%"
+        ],
+        "symbol": "UNI",
+        "top_bearish_prob": 70.6,
+        "weight_pct": 2.8
+      },
+      {
+        "dominant_regime": "bearish",
+        "name": null,
+        "rsi": 19.9,
+        "sell_priority": "medium",
+        "signals": [
+          "Probabilité baissière 66%"
+        ],
+        "symbol": "DOGE",
+        "top_bearish_prob": 76.6,
+        "weight_pct": 2.3
+      }
+    ],
+    "fear_greed": null,
+    "market_regime": {
+      "confidence": 0.95,
+      "description": "Mark-up — cassure de resistance, volume croissant (66%).",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.057,
+        "bottom": 0.116,
+        "bullish": 0.656,
+        "top": 0.171
+      }
+    },
+    "market_signals": [
+      {
+        "description": "RSI haussier (93)",
+        "name": "RSI 14",
+        "signal": "bullish",
+        "strength": 0.62,
+        "value": 93.3
+      },
+      {
+        "description": "MACD positif et croissant — tendance haussiere confirmee",
+        "name": "MACD",
+        "signal": "bullish",
+        "strength": 0.95,
+        "value": 207.5412
+      },
+      {
+        "description": "Prix dans la partie haute des bandes de Bollinger",
+        "name": "Bollinger Bands",
+        "signal": "bullish",
+        "strength": 0.69,
+        "value": 0.97
+      },
+      {
+        "description": "MA courte au-dessus de la MA longue (+1.2%)",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bullish",
+        "strength": 0.4,
+        "value": 1.19
+      },
+      {
+        "description": "Momentum haussier (+4.4%)",
+        "name": "Momentum 14j",
+        "signal": "bullish",
+        "strength": 0.37,
+        "value": 4.4
+      },
+      {
+        "description": "Volatilite moderee (1%) — marche stable",
+        "name": "Volatilite 14j",
+        "signal": "bullish",
+        "strength": 0.1,
+        "value": 1.0
+      }
+    ],
+    "per_asset": [
+      {
+        "asset_type": "crypto",
+        "btc_correlation": null,
+        "confidence": 0.95,
+        "dominant_regime": "bullish",
+        "drawdown_from_ath": -4.5,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.057,
+          "bottom": 0.116,
+          "bullish": 0.656,
+          "top": 0.171
+        },
+        "regime_6phase": "markup",
+        "symbol": "BTC",
+        "value": 39000.0
+      },
+      {
+        "asset_type": "crypto",
+        "btc_correlation": 0.93,
+        "confidence": 0.94,
+        "dominant_regime": "bullish",
+        "drawdown_from_ath": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.072,
+          "bottom": 0.075,
+          "bullish": 0.578,
+          "top": 0.276
+        },
+        "regime_6phase": "markup",
+        "symbol": "ETH",
+        "value": 9000.0
+      },
+      {
+        "asset_type": "crypto",
+        "btc_correlation": -0.26,
+        "confidence": 0.85,
+        "dominant_regime": "bearish",
+        "drawdown_from_ath": -8.4,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.378,
+          "bottom": 0.298,
+          "bullish": 0.223,
+          "top": 0.101
+        },
+        "regime_6phase": "markdown",
+        "symbol": "SOL",
+        "value": 7500.0
+      },
+      {
+        "asset_type": "crypto",
+        "btc_correlation": 0.54,
+        "confidence": 0.91,
+        "dominant_regime": "bullish",
+        "drawdown_from_ath": -11.4,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.101,
+          "bottom": 0.235,
+          "bullish": 0.453,
+          "top": 0.211
+        },
+        "regime_6phase": "markup",
+        "symbol": "ARB",
+        "value": 800.0
+      },
+      {
+        "asset_type": "crypto",
+        "btc_correlation": -0.02,
+        "confidence": 0.95,
+        "dominant_regime": "bearish",
+        "drawdown_from_ath": -28.5,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.583,
+          "bottom": 0.215,
+          "bullish": 0.079,
+          "top": 0.123
+        },
+        "regime_6phase": "markdown",
+        "symbol": "UNI",
+        "value": 1800.0
+      },
+      {
+        "asset_type": "crypto",
+        "btc_correlation": -0.38,
+        "confidence": 0.94,
+        "dominant_regime": "bearish",
+        "drawdown_from_ath": -37.2,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.655,
+          "bottom": 0.152,
+          "bullish": 0.082,
+          "top": 0.111
+        },
+        "regime_6phase": "markdown",
+        "symbol": "DOGE",
+        "value": 1500.0
+      },
+      {
+        "asset_type": "stock",
+        "btc_correlation": -0.76,
+        "confidence": 0.95,
+        "dominant_regime": "bullish",
+        "drawdown_from_ath": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "probabilities": {
+          "bearish": 0.091,
+          "bottom": 0.097,
+          "bullish": 0.5,
+          "top": 0.312
+        },
+        "regime_6phase": "markup",
+        "symbol": "AAPL",
+        "value": 4000.0
+      }
+    ],
+    "portfolio_regime": {
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.125,
+        "bottom": 0.1318,
+        "bullish": 0.5362,
+        "top": 0.179
+      }
+    },
+    "time_to_pivot": {
+      "confidence": 0.85,
+      "current_phase": "Expansion",
+      "cycle_position": 42,
+      "estimated_days": 65,
+      "next_phase": "Distribution"
+    },
+    "top_bottom_estimates": {
+      "btc": {
+        "current_price": 57487.6,
+        "current_regime": "bullish",
+        "cycle_position": 42,
+        "next_bottom": {
+          "confidence": 0.73,
+          "distance_pct": 5.0,
+          "estimated_date": "2026-12-23",
+          "estimated_days": 67,
+          "estimated_price": 54613.22,
+          "method": "OU mean-reversion + support clustering",
+          "support_level": 56405.19
+        },
+        "next_top": {
+          "confidence": 0.73,
+          "distance_pct": 5.0,
+          "estimated_date": "2027-03-09",
+          "estimated_days": 143,
+          "estimated_price": 60361.98,
+          "method": "OU mean-reversion + resistance clustering",
+          "resistance_level": 59652.43
+        },
+        "ou_parameters": {
+          "mu": 54453.78,
+          "sigma": 0.0025,
+          "theta": 0.001
+        },
+        "symbol": "BTC"
+      },
+      "per_asset": [
+        {
+          "current_price": 57487.6,
+          "current_regime": "bullish",
+          "cycle_position": 42,
+          "next_bottom": {
+            "confidence": 0.73,
+            "distance_pct": 5.0,
+            "estimated_date": "2026-12-23",
+            "estimated_days": 67,
+            "estimated_price": 54613.22,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 56405.19
+          },
+          "next_top": {
+            "confidence": 0.73,
+            "distance_pct": 5.0,
+            "estimated_date": "2027-03-09",
+            "estimated_days": 143,
+            "estimated_price": 60361.98,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 59652.43
+          },
+          "ou_parameters": {
+            "mu": 54453.78,
+            "sigma": 0.0025,
+            "theta": 0.001
+          },
+          "symbol": "BTC"
+        },
+        {
+          "current_price": 3212.44,
+          "current_regime": "bullish",
+          "cycle_position": 42,
+          "next_bottom": {
+            "confidence": 0.73,
+            "distance_pct": 5.0,
+            "estimated_date": "2026-12-22",
+            "estimated_days": 66,
+            "estimated_price": 3051.81,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 3200
+          },
+          "next_top": {
+            "confidence": 0.73,
+            "distance_pct": 5.3,
+            "estimated_date": "2027-03-06",
+            "estimated_days": 140,
+            "estimated_price": 3383.87,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 3300
+          },
+          "ou_parameters": {
+            "mu": 2815.18,
+            "sigma": 0.0046,
+            "theta": 0.0027
+          },
+          "symbol": "ETH"
+        },
+        {
+          "current_price": 152.14,
+          "current_regime": "bearish",
+          "cycle_position": 87,
+          "next_bottom": {
+            "confidence": 0.68,
+            "distance_pct": 6.7,
+            "estimated_date": "2026-12-24",
+            "estimated_days": 68,
+            "estimated_price": 141.96,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 150
+          },
+          "next_top": {
+            "confidence": 0.68,
+            "distance_pct": 9.5,
+            "estimated_date": "2026-12-31",
+            "estimated_days": 75,
+            "estimated_price": 166.54,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 160
+          },
+          "ou_parameters": {
+            "mu": 135.83,
+            "sigma": 0.0081,
+            "theta": 0.0016
+          },
+          "symbol": "SOL"
+        },
+        {
+          "current_price": 0.83,
+          "current_regime": "bullish",
+          "cycle_position": 42,
+          "next_bottom": {
+            "confidence": 0.72,
+            "distance_pct": 14.1,
+            "estimated_date": "2026-10-27",
+            "estimated_days": 10,
+            "estimated_price": 0.72,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 0.72
+          },
+          "next_top": {
+            "confidence": 0.72,
+            "distance_pct": 15.4,
+            "estimated_date": "2027-01-11",
+            "estimated_days": 86,
+            "estimated_price": 0.96,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 0.9
+          },
+          "ou_parameters": {
+            "mu": 0.81,
+            "sigma": 0.0132,
+            "theta": 0.0025
+          },
+          "symbol": "ARB"
+        },
+        {
+          "current_price": 6.75,
+          "current_regime": "bearish",
+          "cycle_position": 90,
+          "next_bottom": {
+            "confidence": 0.75,
+            "distance_pct": 8.8,
+            "estimated_date": "2026-10-30",
+            "estimated_days": 13,
+            "estimated_price": 6.15,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 6.5
+          },
+          "next_top": {
+            "confidence": 0.75,
+            "distance_pct": 7.8,
+            "estimated_date": "2026-11-06",
+            "estimated_days": 20,
+            "estimated_price": 7.27,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 7.0
+          },
+          "ou_parameters": {
+            "mu": 7.95,
+            "sigma": 0.0067,
+            "theta": 0.0051
+          },
+          "symbol": "UNI"
+        },
+        {
+          "current_price": 0.11,
+          "current_regime": "bearish",
+          "cycle_position": 90,
+          "next_bottom": {
+            "confidence": 0.74,
+            "distance_pct": 16.5,
+            "estimated_date": "2026-10-25",
+            "estimated_days": 8,
+            "estimated_price": 0.09,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 0.1
+          },
+          "next_top": {
+            "confidence": 0.74,
+            "distance_pct": 23.4,
+            "estimated_date": "2026-11-01",
+            "estimated_days": 15,
+            "estimated_price": 0.13,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 0.11
+          },
+          "ou_parameters": {
+            "mu": 0.13,
+            "sigma": 0.0201,
+            "theta": 0.0048
+          },
+          "symbol": "DOGE"
+        },
+        {
+          "current_price": 200.4,
+          "current_regime": "bullish",
+          "cycle_position": 42,
+          "next_bottom": {
+            "confidence": 0.73,
+            "distance_pct": 5.0,
+            "estimated_date": "2026-12-23",
+            "estimated_days": 67,
+            "estimated_price": 190.38,
+            "method": "OU mean-reversion + support clustering",
+            "support_level": 200
+          },
+          "next_top": {
+            "confidence": 0.73,
+            "distance_pct": 5.0,
+            "estimated_date": "2027-03-10",
+            "estimated_days": 144,
+            "estimated_price": 210.42,
+            "method": "OU mean-reversion + resistance clustering",
+            "resistance_level": 210
+          },
+          "ou_parameters": {
+            "mu": 186.33,
+            "sigma": 0.0009,
+            "theta": 0.001
+          },
+          "symbol": "AAPL"
+        }
+      ]
+    }
+  },
+  "status": 200
+}

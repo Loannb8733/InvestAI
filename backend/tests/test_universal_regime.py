@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from app.domains.analytics.metrics import compute_returns, var_historical
+from app.domains.predictions.strategy_map import STRATEGY_MATRIX
 from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
-from app.services.prediction_service import PredictionService
 
 # ── Synthetic price generators ───────────────────────────────────
 
@@ -88,11 +88,11 @@ class TestFlashCrash:
 
     def test_achat_fort_blocked_in_bear_without_divergence(self):
         """ACHAT FORT should be downgraded to DCA in bear without RSI divergence."""
-        action, desc, _ = PredictionService.STRATEGY_MATRIX[("high", "bottoming")]
+        action, desc, _ = STRATEGY_MATRIX[("high", "bottoming")]
         assert action == "ACHAT FORT"
         # But in get_strategy_map, bear validation at L2300-2312 downgrades:
         # We test the matrix entry for markdown which gives DCA directly
-        action, desc, _ = PredictionService.STRATEGY_MATRIX[("high", "markdown")]
+        action, desc, _ = STRATEGY_MATRIX[("high", "markdown")]
         assert action == "DCA", f"High alpha + markdown should DCA, got {action}"
 
 
@@ -172,7 +172,7 @@ class TestMoonMissionBull:
 
     def test_trailing_stop_in_markup(self):
         """Strategy rows in markup should suggest trailing stop."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("high", "markup")]
+        action, desc, impact = STRATEGY_MATRIX[("high", "markup")]
         assert action == "MAINTENIR"
         # The trailing_stop field is added in get_strategy_map when regime is markup
 
@@ -190,9 +190,9 @@ class TestMoonMissionBull:
 
     def test_strategy_takes_profits_at_top(self):
         """At top, even with high alpha → PRENDRE PROFITS."""
-        action, _, _ = PredictionService.STRATEGY_MATRIX[("high", "topping")]
+        action, _, _ = STRATEGY_MATRIX[("high", "topping")]
         assert action == "PRENDRE PROFITS"
-        action, _, _ = PredictionService.STRATEGY_MATRIX[("low", "topping")]
+        action, _, _ = STRATEGY_MATRIX[("low", "topping")]
         assert action == "VENDRE"
 
 

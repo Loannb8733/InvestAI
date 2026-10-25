@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "pattern": "^[A-Za-z0-9.\\-]{1,20}$"
+        },
+        "input": "SO L",
+        "loc": [
+          "body",
+          "symbol"
+        ],
+        "msg": "String should match pattern '^[A-Za-z0-9.\\-]{1,20}$'",
+        "type": "string_pattern_mismatch"
+      }
+    ]
+  },
+  "status": 422
+}

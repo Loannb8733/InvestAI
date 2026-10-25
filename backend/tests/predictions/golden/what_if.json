@@ -1,0 +1,74 @@
+{
+  "body": {
+    "current_value": 65440.0,
+    "impact_percent": -11.0,
+    "per_asset": [
+      {
+        "change_percent": -30.0,
+        "current_value": 39000.0,
+        "impact": -11700.0,
+        "name": null,
+        "simulated_value": 27300.0,
+        "symbol": "BTC"
+      },
+      {
+        "change_percent": 50.0,
+        "current_value": 9000.0,
+        "impact": 4500.0,
+        "name": null,
+        "simulated_value": 13500.0,
+        "symbol": "ETH"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 7500.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 7500.0,
+        "symbol": "SOL"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 800.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 800.0,
+        "symbol": "ARB"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 1800.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 1800.0,
+        "symbol": "UNI"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 1840.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 1840.0,
+        "symbol": "USDC"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 1500.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 1500.0,
+        "symbol": "DOGE"
+      },
+      {
+        "change_percent": 0.0,
+        "current_value": 4000.0,
+        "impact": 0.0,
+        "name": null,
+        "simulated_value": 4000.0,
+        "symbol": "AAPL"
+      }
+    ],
+    "simulated_value": 58240.0
+  },
+  "status": 200
+}

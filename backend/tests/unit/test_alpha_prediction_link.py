@@ -9,7 +9,7 @@ Validates that:
 
 import pytest
 
-from app.services.prediction_service import PredictionService
+from app.domains.predictions.service import PredictionService
 
 
 class TestPredictionMethodExists:

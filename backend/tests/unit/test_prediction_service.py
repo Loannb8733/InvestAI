@@ -1,124 +1,76 @@
-"""Tests for prediction service helper methods."""
+"""Tests des fonctions d'appui des prédictions : recommandation, volatilité, replis."""
 
 import pytest
 
-from app.services.prediction_service import PredictionService, PricePrediction
+from app.domains.portfolio.models import AssetType
+from app.domains.predictions.fallbacks import daily_volatility, empty_prediction, random_walk_forecast
+from app.domains.predictions.recommendation import generate_recommendation
+from app.domains.predictions.types import PricePrediction
 
 
 class TestGenerateRecommendation:
-    """Tests for _generate_recommendation."""
+    def test_strong_bullish(self):
+        assert "haussière forte" in generate_recommendation("bullish", 60, 100, 90, 110)
 
-    @pytest.fixture
-    def svc(self):
-        """Create service without initializing external dependencies."""
-        svc = object.__new__(PredictionService)
-        return svc
-
-    def test_strong_bullish(self, svc):
-        result = svc._generate_recommendation("bullish", 60, 100, 90, 110)
-        assert "haussière forte" in result
-
-    def test_disclaimer_always_appended(self, svc):
+    def test_disclaimer_always_appended(self):
         # Trust & Safety: every recommendation must carry the non-advice disclaimer.
-        result = svc._generate_recommendation("bullish", 60, 100, 90, 110)
-        assert "ne constitue pas un conseil en" in result
+        assert "ne constitue pas un conseil en" in generate_recommendation("bullish", 60, 100, 90, 110)
 
-    def test_no_prescriptive_imperatives(self, svc):
+    def test_no_prescriptive_imperatives(self):
         # Recommendations must read as observations, not orders.
         regime = {"dominant_regime": "bearish", "confidence": 0.9}
-        result = svc._generate_recommendation("bearish", 60, 100, 90, 110, regime_info=regime).lower()
+        result = generate_recommendation("bearish", 60, 100, 90, 110, regime_info=regime).lower()
         for verb in ("accumulez", "prenez des profits", "renforcez", "placez des stop", "laissez courir"):
             assert verb not in result, f"prescriptive verb leaked: {verb}"
 
-    def test_weak_bullish(self, svc):
-        result = svc._generate_recommendation("bullish", 30, 100, 90, 110)
-        assert "légèrement haussière" in result
+    def test_weak_bullish(self):
+        assert "légèrement haussière" in generate_recommendation("bullish", 30, 100, 90, 110)
 
-    def test_strong_bearish(self, svc):
-        result = svc._generate_recommendation("bearish", 60, 100, 90, 110)
-        assert "baissière forte" in result
+    def test_strong_bearish(self):
+        assert "baissière forte" in generate_recommendation("bearish", 60, 100, 90, 110)
 
-    def test_weak_bearish(self, svc):
-        result = svc._generate_recommendation("bearish", 30, 100, 90, 110)
-        assert "légèrement baissière" in result
+    def test_weak_bearish(self):
+        assert "légèrement baissière" in generate_recommendation("bearish", 30, 100, 90, 110)
 
-    def test_neutral(self, svc):
-        result = svc._generate_recommendation("neutral", 10, 100, 90, 110)
-        assert "neutre" in result
+    def test_neutral(self):
+        assert "neutre" in generate_recommendation("neutral", 10, 100, 90, 110)
 
 
-class TestGetDailyVolatility:
-    """Tests for _get_daily_volatility."""
-
-    @pytest.fixture
-    def svc(self):
-        svc = object.__new__(PredictionService)
-        return svc
-
-    @pytest.mark.asyncio
-    async def test_crypto_highest_volatility(self, svc):
-        from app.domains.portfolio.models import AssetType
-
-        crypto = await svc._get_daily_volatility("BTC", AssetType.CRYPTO)
-        stock = await svc._get_daily_volatility("AAPL", AssetType.STOCK)
-        etf = await svc._get_daily_volatility("SPY", AssetType.ETF)
+class TestDailyVolatility:
+    async def test_crypto_highest_volatility(self):
+        crypto = await daily_volatility("BTC", AssetType.CRYPTO)
+        stock = await daily_volatility("AAPL", AssetType.STOCK)
+        etf = await daily_volatility("SPY", AssetType.ETF)
         assert crypto > stock > etf
 
-    @pytest.mark.asyncio
-    async def test_unknown_type_default(self, svc):
-        result = await svc._get_daily_volatility("X", "unknown_type")
-        assert result == 0.02
+    async def test_unknown_type_default(self):
+        assert await daily_volatility("X", "unknown_type") == 0.02
 
 
-class TestRandomWalkFallback:
-    """Tests for _random_walk_fallback."""
-
-    @pytest.fixture
-    def svc(self, db_session):
-        svc = object.__new__(PredictionService)
-        return svc
-
-    @pytest.mark.asyncio
-    async def test_returns_correct_structure(self, svc):
-        from app.domains.portfolio.models import AssetType
-
-        predictions, trend, strength = await svc._random_walk_fallback("BTC", 100.0, AssetType.CRYPTO, 7)
+@pytest.mark.usefixtures("db_session")
+class TestRandomWalkForecast:
+    async def test_returns_correct_structure(self):
+        predictions, trend, strength = await random_walk_forecast("BTC", 100.0, AssetType.CRYPTO, 7)
         assert len(predictions) == 7
         assert trend in ("bullish", "bearish", "neutral")
         assert isinstance(strength, float)
 
-    @pytest.mark.asyncio
-    async def test_predictions_have_required_keys(self, svc):
-        from app.domains.portfolio.models import AssetType
-
-        predictions, _, _ = await svc._random_walk_fallback("AAPL", 100.0, AssetType.STOCK, 3)
+    async def test_predictions_have_required_keys(self):
+        predictions, _, _ = await random_walk_forecast("AAPL", 100.0, AssetType.STOCK, 3)
         for p in predictions:
-            assert "date" in p
-            assert "price" in p
-            assert "confidence_low" in p
-            assert "confidence_high" in p
+            assert {"date", "price", "confidence_low", "confidence_high"} <= set(p)
 
-    @pytest.mark.asyncio
-    async def test_no_negative_prices(self, svc):
-        from app.domains.portfolio.models import AssetType
-
+    async def test_no_negative_prices(self):
         # Run multiple times to reduce randomness
         for _ in range(10):
-            predictions, _, _ = await svc._random_walk_fallback("BTC", 1.0, AssetType.CRYPTO, 7)
+            predictions, _, _ = await random_walk_forecast("BTC", 1.0, AssetType.CRYPTO, 7)
             for p in predictions:
                 assert p["confidence_low"] >= 0
 
 
 class TestEmptyPrediction:
-    """Tests for _empty_prediction."""
-
-    @pytest.fixture
-    def svc(self):
-        svc = object.__new__(PredictionService)
-        return svc
-
-    def test_returns_prediction_object(self, svc):
-        result = svc._empty_prediction("BTC")
+    def test_returns_prediction_object(self):
+        result = empty_prediction("BTC")
         assert isinstance(result, PricePrediction)
         assert result.symbol == "BTC"
         assert result.current_price == 0

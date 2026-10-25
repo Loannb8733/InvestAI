@@ -1,0 +1,10 @@
+[
+  {
+    "alert_type": "SIGNAL_VALIDATED",
+    "chat_id": "4242",
+    "message": "⚠️ <b>Signal Alpha Non Validé : AAPL</b>\n\n📊 Score : <b>68/100</b> | Potentiel : <b>+0.6%</b>\n🛡️ Risque : Prob. Ruine 0.0% → 0.0% (<b>Stable</b>)\n✅ Concentration : <b>SÉCURISÉE</b> (6.1%)\n🚀 Verdict : <b>Achat non recommandé</b>\n✅ Précision Dashboard : <b>1840.00 €</b> d'écart\n\n📊 Raisons:\n  • Décorrélé du BTC: Corrélation -0.77 (faible = indépendant)",
+    "priority": "normal",
+    "symbol": "AAPL",
+    "user_id": "<id-0>"
+  }
+]

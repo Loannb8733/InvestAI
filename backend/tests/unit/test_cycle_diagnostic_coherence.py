@@ -7,15 +7,15 @@ Validates that:
 4. Phase boundary transitions are consistent with cycle position.
 """
 
-from app.services.prediction_service import PredictionService
+from app.domains.predictions.top_bottom import time_to_pivot
 
 
 class TestTimeToPivot:
-    """Test _estimate_time_to_pivot static method."""
+    """Test time_to_pivot."""
 
     def test_creux_phase_transitions_to_accumulation(self):
         """Cycle position 5 (Creux) → next phase = Accumulation."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=5,
             btc_regime={"dominant_regime": "bottom", "confidence": 0.7},
             btc_estimate={"ou_parameters": {"theta": 0.03}},
@@ -27,7 +27,7 @@ class TestTimeToPivot:
 
     def test_expansion_phase_transitions_to_distribution(self):
         """Cycle position 50 (Expansion) → next phase = Distribution."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=50,
             btc_regime={"dominant_regime": "bullish", "confidence": 0.6},
             btc_estimate={"ou_parameters": {"theta": 0.02}},
@@ -37,7 +37,7 @@ class TestTimeToPivot:
 
     def test_euphorie_transitions_to_creux(self):
         """Cycle position 90 (Euphorie) → next phase = Creux."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=90,
             btc_regime={"dominant_regime": "top", "confidence": 0.8},
             btc_estimate={"ou_parameters": {"theta": 0.04}},
@@ -47,7 +47,7 @@ class TestTimeToPivot:
 
     def test_distribution_transitions_to_euphorie(self):
         """Cycle position 70 (Distribution) → next phase = Euphorie."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=70,
             btc_regime={"dominant_regime": "top", "confidence": 0.5},
             btc_estimate=None,
@@ -57,12 +57,12 @@ class TestTimeToPivot:
 
     def test_high_theta_shortens_estimate(self):
         """Higher OU theta (faster mean-reversion) → fewer days to pivot."""
-        result_slow = PredictionService._estimate_time_to_pivot(
+        result_slow = time_to_pivot(
             cycle_position=50,
             btc_regime={"dominant_regime": "bullish", "confidence": 0.6},
             btc_estimate={"ou_parameters": {"theta": 0.01}},
         )
-        result_fast = PredictionService._estimate_time_to_pivot(
+        result_fast = time_to_pivot(
             cycle_position=50,
             btc_regime={"dominant_regime": "bullish", "confidence": 0.6},
             btc_estimate={"ou_parameters": {"theta": 0.05}},
@@ -72,7 +72,7 @@ class TestTimeToPivot:
     def test_estimates_bounded_3_to_90(self):
         """All estimates must be between 3 and 90 days."""
         for pos in [0, 14, 15, 39, 40, 64, 65, 84, 85, 99]:
-            result = PredictionService._estimate_time_to_pivot(
+            result = time_to_pivot(
                 cycle_position=pos,
                 btc_regime={"dominant_regime": "bullish", "confidence": 0.5},
                 btc_estimate={"ou_parameters": {"theta": 0.02}},
@@ -81,7 +81,7 @@ class TestTimeToPivot:
 
     def test_confidence_from_regime(self):
         """Confidence should reflect BTC regime confidence."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=50,
             btc_regime={"dominant_regime": "bullish", "confidence": 0.85},
             btc_estimate=None,
@@ -90,7 +90,7 @@ class TestTimeToPivot:
 
     def test_no_regime_defaults_confidence(self):
         """Without BTC regime, confidence defaults to 0.5."""
-        result = PredictionService._estimate_time_to_pivot(
+        result = time_to_pivot(
             cycle_position=50,
             btc_regime=None,
             btc_estimate=None,

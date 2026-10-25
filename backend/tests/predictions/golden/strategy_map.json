@@ -1,0 +1,100 @@
+{
+  "body": {
+    "fear_greed": null,
+    "market_regime": "bullish",
+    "rows": [
+      {
+        "action": "MAINTENIR",
+        "alpha_level": "high",
+        "alpha_score": 68.3,
+        "description": "Alpha élevé + Mark-up : laisser courir les gains",
+        "impact_eur": 0.0,
+        "impact_pct": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "predicted_7d_pct": 0.62,
+        "regime": "markup",
+        "regime_confidence": 0.95,
+        "symbol": "AAPL",
+        "trailing_stop": "EMA-20 trailing stop recommandé — remonter le stop-loss sous l'EMA-20",
+        "value": 4000.0,
+        "weight_pct": 6.1
+      },
+      {
+        "action": "DCA",
+        "alpha_level": "high",
+        "alpha_score": 67.7,
+        "description": "Alpha élevé en Markdown : accumuler progressivement (contrarian)",
+        "impact_eur": 45.0,
+        "impact_pct": 3.0,
+        "is_resilient": false,
+        "name": null,
+        "predicted_7d_pct": -26.67,
+        "regime": "markdown",
+        "regime_confidence": 0.94,
+        "symbol": "DOGE",
+        "trailing_stop": null,
+        "value": 1500.0,
+        "weight_pct": 2.3
+      },
+      {
+        "action": "ATTENDRE",
+        "alpha_level": "medium",
+        "alpha_score": 52.3,
+        "description": "Signal moyen en Markdown : patience, pas de renforcement",
+        "impact_eur": 0.0,
+        "impact_pct": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "predicted_7d_pct": -25.0,
+        "regime": "markdown",
+        "regime_confidence": 0.95,
+        "symbol": "UNI",
+        "trailing_stop": null,
+        "value": 1800.0,
+        "weight_pct": 2.8
+      },
+      {
+        "action": "ÉVITER",
+        "alpha_level": "low",
+        "alpha_score": 29.5,
+        "description": "Faible alpha en Markdown : ne pas renforcer",
+        "impact_eur": 0.0,
+        "impact_pct": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "predicted_7d_pct": -4.31,
+        "regime": "markdown",
+        "regime_confidence": 0.85,
+        "symbol": "SOL",
+        "trailing_stop": null,
+        "value": 7500.0,
+        "weight_pct": 11.5
+      },
+      {
+        "action": "CONSERVER",
+        "alpha_level": "low",
+        "alpha_score": 26.4,
+        "description": "Faible alpha en Mark-up : ne pas vendre",
+        "impact_eur": 0.0,
+        "impact_pct": 0.0,
+        "is_resilient": false,
+        "name": null,
+        "predicted_7d_pct": 15.0,
+        "regime": "markup",
+        "regime_confidence": 0.91,
+        "symbol": "ARB",
+        "trailing_stop": "EMA-20 trailing stop recommandé — remonter le stop-loss sous l'EMA-20",
+        "value": 800.0,
+        "weight_pct": 1.2
+      }
+    ],
+    "summary": {
+      "buys": 1,
+      "holds": 4,
+      "sells": 0
+    },
+    "total_portfolio_value": 65440.0
+  },
+  "status": 200
+}

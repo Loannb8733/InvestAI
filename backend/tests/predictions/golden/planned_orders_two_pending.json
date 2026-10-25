@@ -1,0 +1,33 @@
+{
+  "body": [
+    {
+      "action": "VENDRE",
+      "alpha_score": null,
+      "created_at": "<volatile>",
+      "id": "<id-1>",
+      "notes": "MPT",
+      "order_eur": "100.00",
+      "prob_ruin_after": null,
+      "prob_ruin_before": null,
+      "regime": null,
+      "source": "frontend",
+      "status": "pending",
+      "symbol": "SOL"
+    },
+    {
+      "action": "ACHAT",
+      "alpha_score": null,
+      "created_at": "<volatile>",
+      "id": "<id-0>",
+      "notes": null,
+      "order_eur": "250.46",
+      "prob_ruin_after": null,
+      "prob_ruin_before": null,
+      "regime": null,
+      "source": "frontend",
+      "status": "pending",
+      "symbol": "ETH"
+    }
+  ],
+  "status": 200
+}

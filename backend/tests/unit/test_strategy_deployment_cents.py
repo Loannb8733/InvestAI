@@ -29,7 +29,7 @@ async def test_deployment_euro_amounts_are_cent_quantized():
             new=AsyncMock(return_value=dashboard),
         ),
         patch(
-            "app.services.prediction_service.prediction_service.get_strategy_map",
+            "app.domains.predictions.service.prediction_service.get_strategy_map",
             new=AsyncMock(return_value=strategy),
         ),
     ):

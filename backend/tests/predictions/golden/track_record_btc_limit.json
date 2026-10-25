@@ -1,0 +1,36 @@
+{
+  "body": {
+    "records": [
+      {
+        "actual_price": 61800.0,
+        "ci_covered": true,
+        "confidence_high": 64000.0,
+        "confidence_low": 60000.0,
+        "date": "2026-10-01T12:00:00+00:00",
+        "direction_correct": true,
+        "mape": 0.3,
+        "predicted_price": 62000.0,
+        "target_date": "2026-10-08T12:00:00"
+      },
+      {
+        "actual_price": 60500.0,
+        "ci_covered": false,
+        "confidence_high": 60000.0,
+        "confidence_low": 57500.0,
+        "date": "2026-09-24T12:00:00+00:00",
+        "direction_correct": false,
+        "mape": 2.5,
+        "predicted_price": 59000.0,
+        "target_date": "2026-10-01T12:00:00"
+      }
+    ],
+    "summary": {
+      "avg_mape": 1.4,
+      "ci_coverage": 50.0,
+      "direction_accuracy": 50.0,
+      "total_checked": 2
+    },
+    "symbol": "BTC"
+  },
+  "status": 200
+}

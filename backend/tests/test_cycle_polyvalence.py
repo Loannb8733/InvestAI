@@ -11,8 +11,8 @@ Vérifie que le système produit les bonnes actions selon le régime :
 import numpy as np
 import pytest
 
+from app.domains.predictions.strategy_map import STRATEGY_MATRIX
 from app.ml.regime_detector import MarketRegimeDetector, _ema, _rsi
-from app.services.prediction_service import PredictionService
 from app.services.telegram_service import TelegramService
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -97,22 +97,22 @@ class TestBullMarketStrategyMatrix:
     """In mark-up phase, strategy should be MAINTENIR (let profits run)."""
 
     def test_high_alpha_markup_is_maintenir(self):
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("high", "markup")]
+        action, desc, impact = STRATEGY_MATRIX[("high", "markup")]
         assert action == "MAINTENIR"
         assert impact == 0.0
 
     def test_medium_alpha_markup_is_maintenir(self):
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("medium", "markup")]
+        action, desc, impact = STRATEGY_MATRIX[("medium", "markup")]
         assert action == "MAINTENIR"
         assert impact == 0.0
 
     def test_low_alpha_markup_is_conserver(self):
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("low", "markup")]
+        action, desc, impact = STRATEGY_MATRIX[("low", "markup")]
         assert action == "CONSERVER"
 
     def test_high_alpha_bullish_compat_is_maintenir(self):
         """Backward-compat: bullish (4-phase) → MAINTENIR."""
-        action, desc, impact = PredictionService.STRATEGY_MATRIX[("high", "bullish")]
+        action, desc, impact = STRATEGY_MATRIX[("high", "bullish")]
         assert action == "MAINTENIR"
 
 
@@ -227,13 +227,13 @@ class TestRSIOverboughtTakesProfits:
     def test_strategy_matrix_top_takes_profits(self):
         """Regardless of bull run, top/topping → PRENDRE PROFITS or ALLÉGER."""
         for phase in ("top", "topping"):
-            action, desc, impact = PredictionService.STRATEGY_MATRIX.get(("high", phase), ("UNKNOWN", "", 0))
+            action, desc, impact = STRATEGY_MATRIX.get(("high", phase), ("UNKNOWN", "", 0))
             assert "PROFIT" in action or "ALLÉGER" in action, f"High alpha + {phase} should take profits, got {action}"
 
     def test_low_alpha_top_is_vendre(self):
         """Low alpha at top → VENDRE (strongest sell signal)."""
         for phase in ("top", "topping"):
-            action, desc, impact = PredictionService.STRATEGY_MATRIX.get(("low", phase), ("UNKNOWN", "", 0))
+            action, desc, impact = STRATEGY_MATRIX.get(("low", phase), ("UNKNOWN", "", 0))
             assert action == "VENDRE", f"Low alpha + {phase} should be VENDRE, got {action}"
 
 
