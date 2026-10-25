@@ -1,0 +1,8 @@
+{
+  "body": {
+    "amount": 150.0,
+    "id": "<id-0>",
+    "status": "EXECUTED"
+  },
+  "status": 200
+}

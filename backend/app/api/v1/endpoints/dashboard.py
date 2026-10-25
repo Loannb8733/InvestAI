@@ -79,7 +79,7 @@ def _ensure_json_safe(obj):
         return obj
     if isinstance(obj, dict):
         return {k: _ensure_json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_ensure_json_safe(v) for v in obj]
     return obj
 
@@ -939,7 +939,7 @@ async def get_munitions(
     db: AsyncSession = Depends(get_session),
 ):
     """Get deployment capacity (munitions) for the current user."""
-    from app.services.strategy_service import strategy_service
+    from app.domains.strategies.service import strategy_service
 
     capacity = await strategy_service.get_deployment_capacity(
         db=db,

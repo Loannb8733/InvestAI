@@ -6,6 +6,7 @@ from app.domains.market_data.fx import models as fx_models
 from app.domains.market_data.history import models as history_models
 from app.domains.portfolio import models as portfolio_models
 from app.domains.predictions import models as prediction_models
+from app.domains.strategies import models as strategy_models
 from app.domains.transactions import models as transaction_models
 from app.models import (
     alert,
@@ -21,7 +22,6 @@ from app.models import (
     project_audit,
     project_document,
     simulation,
-    strategy,
 )
 
 metadata = Base.metadata
@@ -48,6 +48,6 @@ __all__ = [
     "project_audit",
     "project_document",
     "simulation",
-    "strategy",
+    "strategy_models",
     "transaction_models",
 ]

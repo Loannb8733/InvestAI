@@ -1,0 +1,64 @@
+{
+  "body": [
+    {
+      "actions": [],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-4>",
+      "market_regime": null,
+      "name": "Vide",
+      "params": {},
+      "source": "USER",
+      "status": "ACTIVE",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    },
+    {
+      "actions": [
+        {
+          "action": "BUY",
+          "amount": 150.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": "2026-10-17T12:00:00Z",
+          "id": "<id-0>",
+          "reason": "DCA",
+          "scheduled_at": null,
+          "status": "EXECUTED",
+          "strategy_id": "<id-1>",
+          "symbol": "BTC"
+        },
+        {
+          "action": "SELL",
+          "amount": 0.75,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-2>",
+          "reason": null,
+          "scheduled_at": null,
+          "status": "SKIPPED",
+          "strategy_id": "<id-1>",
+          "symbol": "ETH"
+        }
+      ],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": "Achat mensuel",
+      "id": "<id-1>",
+      "market_regime": null,
+      "name": "Renfort BTC v2",
+      "params": {
+        "frequency": "weekly"
+      },
+      "source": "USER",
+      "status": "PAUSED",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    }
+  ],
+  "status": 200
+}

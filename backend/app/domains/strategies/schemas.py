@@ -1,12 +1,8 @@
-"""Pydantic schemas for strategies."""
-
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-
-# --- Strategy ---
 
 
 class StrategyActionCreate(BaseModel):
@@ -66,5 +62,7 @@ class StrategyResponse(BaseModel):
 
 
 class StrategyActionUpdate(BaseModel):
-    status: str | None = None  # EXECUTED or SKIPPED
-    amount: float | None = None  # Allow user to override AI-proposed amount
+    """Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant proposé par l'IA."""
+
+    status: str | None = None
+    amount: float | None = None

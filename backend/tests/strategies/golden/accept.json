@@ -1,0 +1,45 @@
+{
+  "body": {
+    "actions": [
+      {
+        "action": "VCA",
+        "amount": 86.63,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-5>",
+        "reason": "Alpha 67.7/100 — investir 86.63€ soit ~4.7% de vos liquidités. Alpha élevé en Markdown : accumuler progressivement (contrarian)",
+        "scheduled_at": "2026-10-18T12:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-6>",
+        "symbol": "DOGE"
+      }
+    ],
+    "ai_reasoning": "La volatilité élevée crée des opportunités d'accumulation à prix réduit. Le VCA surperforme le DCA dans ces conditions car il achète automatiquement plus de quantité quand les prix baissent.\n\n⚠️ Information à but éducatif uniquement, ne constitue pas un conseil en investissement. InvestAI n'est pas un conseiller financier agréé. Les performances passées ne préjugent pas des performances futures. Faites vos propres recherches et consultez un professionnel avant toute décision.",
+    "confidence": 0.5,
+    "created_at": "<volatile>",
+    "description": "Marché en phase 'bullish' avec forte volatilité. Budget total : 87€ sur 1840€ de liquidités disponibles. Le VCA ajuste les montants : plus quand les prix sont bas, moins quand ils sont hauts.",
+    "id": "<id-6>",
+    "market_regime": "bullish",
+    "name": "VCA Dynamique — 1 assets",
+    "params": {
+      "assets": [
+        "DOGE"
+      ],
+      "available_liquidity": 1840.0,
+      "base_amount": 73.6,
+      "performance_potential": 4,
+      "proposed_pct_of_liquidity": 4.7,
+      "regime": "bullish",
+      "risk_level": 3,
+      "total_portfolio_value": 63600.0,
+      "total_proposed_amount": 86.63,
+      "type": "vca"
+    },
+    "source": "AI",
+    "status": "ACTIVE",
+    "updated_at": "<volatile>",
+    "user_id": "<id-3>"
+  },
+  "status": 200
+}

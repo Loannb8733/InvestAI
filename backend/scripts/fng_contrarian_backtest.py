@@ -2,7 +2,7 @@
 
 Measures the *real* forward return of BTC after the Crypto Fear & Greed
 Index drops below a threshold (default 25 = "extreme fear"). The figures
-quoted in ``ai_strategy_service._build_conviction_buy_strategy`` come from
+quoted in ``app.domains.strategies.builders_buy.build_conviction_buy_strategy`` come from
 running this script — they are computed from public data, not invented.
 
 Data sources
