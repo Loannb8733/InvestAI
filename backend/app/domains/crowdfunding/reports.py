@@ -32,6 +32,8 @@ ON_TRACK_RATIO = 0.9
 
 
 def _on_track(project: CrowdfundingProject, schedule: list[CrowdfundingPaymentSchedule], elapsed: float) -> bool:
+    if project.status == ProjectStatus.DEFAULTED:
+        return False
     if schedule:
         return all(schedule_status(entry) != "overdue" for entry in schedule)
     if not (project.start_date and project.repayment_type == RepaymentType.AMORTIZABLE and elapsed > 0):
@@ -46,7 +48,10 @@ def performance_row(
     repayments: list[CrowdfundingRepayment] | None,
     schedule: list[CrowdfundingPaymentSchedule],
 ) -> dict[str, Any]:
-    """Performance d'un projet : XIRR réalisé et écart au taux contractuel, avancement, échéances respectées."""
+    """Performance d'un projet : XIRR réalisé et écart au taux contractuel, avancement, échéances respectées.
+
+    Un projet en défaut n'est jamais dans les temps.
+    """
     months = int(project.duration_months)
     gross, net = projected_interest(project)
     elapsed = (date.today() - project.start_date).days / DAYS_PER_MONTH if project.start_date else 0.0
@@ -83,7 +88,7 @@ def _window(today: date) -> tuple[date, date]:
 def cashflow_months(
     projects: list[CrowdfundingProject], schedules: dict[uuid.UUID, list[CrowdfundingPaymentSchedule]]
 ) -> list[CashflowMonthResponse]:
-    """Échéances non soldées des 24 prochains mois, mois courant inclus, par mois ; les mois vides sont omis."""
+    """Échéances non soldées des 24 prochains mois, mois courant inclus, nettes d'impôt ; les mois vides sont omis."""
     names = {p.id: (p.project_name or p.platform) for p in projects}
     start, end = _window(date.today())
     buckets: dict[str, dict[str, Any]] = {}

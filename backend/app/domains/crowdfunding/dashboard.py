@@ -27,7 +27,7 @@ def _receipts(repayments: dict[uuid.UUID, list[CrowdfundingRepayment]]) -> _Rece
                 continue
             interest, capital = split_repayment(repayment)
             receipts.interest += interest
-            receipts.interest_net += max(0.0, float(repayment.amount or 0) - capital)
+            receipts.interest_net += max(0.0, interest - float(repayment.tax_amount or 0))
             capital_total += capital
         receipts.capital_by_project[project_id] = capital_total
     return receipts
@@ -35,6 +35,14 @@ def _receipts(repayments: dict[uuid.UUID, list[CrowdfundingRepayment]]) -> _Rece
 
 def _outstanding(projects: list[CrowdfundingProject], capital: dict[uuid.UUID, float]) -> dict[uuid.UUID, float]:
     return {p.id: max(0.0, float(p.invested_amount) - capital.get(p.id, 0.0)) for p in projects}
+
+
+def capital_outstanding(
+    projects: list[CrowdfundingProject], repayments: dict[uuid.UUID, list[CrowdfundingRepayment]]
+) -> float:
+    """Capital restant dû des projets hors défaut."""
+    outstanding = _outstanding(projects, _receipts(repayments).capital_by_project)
+    return sum(outstanding[p.id] for p in projects if p.status != ProjectStatus.DEFAULTED)
 
 
 def _platform_outstanding(projects: list[CrowdfundingProject], outstanding: dict[uuid.UUID, float]) -> dict[str, float]:

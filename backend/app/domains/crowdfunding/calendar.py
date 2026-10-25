@@ -1,6 +1,5 @@
 import logging
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
 from typing import Any
 
@@ -8,79 +7,35 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.crowdfunding.models import CrowdfundingProject, ProjectStatus, RepaymentType
+from app.domains.crowdfunding.models import CrowdfundingPaymentSchedule, CrowdfundingProject, ProjectStatus
+from app.domains.crowdfunding.schedule import contractual_schedule
 from app.models.calendar_event import CalendarEvent, EventType
 
 logger = logging.getLogger(__name__)
 
-MAX_EVENT_MONTHS = 60
 SYNCED_STATUSES = (ProjectStatus.ACTIVE, ProjectStatus.DELAYED)
 EVENTS = CalendarEvent.__table__.c
 
 
-@dataclass
-class _Coupon:
-    day: date
-    title: str
-    description: str
-    amount: float
-
-    @property
-    def at(self) -> datetime:
-        return datetime.combine(self.day, time(9, 0), tzinfo=UTC)
+def _at_nine_utc(day: date) -> datetime:
+    return datetime.combine(day, time(9, 0), tzinfo=UTC)
 
 
-def _in_fine_coupons(project: CrowdfundingProject) -> list[_Coupon]:
-    if not project.estimated_end_date:
-        return []
-    invested = float(project.invested_amount)
-    rate = float(project.annual_rate) / 100
-    months = int(project.duration_months)
-    interest = invested * rate * months / 12
-    total = round(invested + interest, 2)
+def _event(project: CrowdfundingProject, user_id: uuid.UUID, entry: CrowdfundingPaymentSchedule) -> CalendarEvent:
+    capital = float(entry.expected_capital)
+    interest = float(entry.expected_interest)
+    amount = round(capital + interest, 2)
     name = (project.project_name or project.platform)[:150]
-    description = (
-        f"Remboursement in fine - {project.platform}\n"
-        f"Capital : {invested:.2f} € + Intérêts : {interest:.2f} €\n"
-        f"TRI : {float(project.annual_rate):.1f}% sur {months} mois"
-    )
-    return [_Coupon(project.estimated_end_date, f"Coupon {name} : +{total:.2f} €", description, total)]
-
-
-def _amortizable_coupon(project: CrowdfundingProject, start: date, month: int, months: int, coupon: float) -> _Coupon:
-    invested = float(project.invested_amount)
-    name = (project.project_name or project.platform)[:150]
-    rate = f"TRI : {float(project.annual_rate):.1f}%"
-    day = start + relativedelta(months=month)
-    if month == months:
-        amount = round(coupon + invested, 2)
-        description = (
-            f"Dernier versement - {project.platform}\nIntérêts : {coupon:.2f} € + Capital : {invested:.2f} €\n{rate}"
-        )
-        return _Coupon(day, f"Coupon final {name} : +{amount:.2f} €", description, amount)
-    description = f"Versement mensuel - {project.platform}\nIntérêts : {coupon:.2f} € (mois {month}/{months})\n{rate}"
-    return _Coupon(day, f"Coupon {name} : +{coupon:.2f} €", description, coupon)
-
-
-def _amortizable_coupons(project: CrowdfundingProject) -> list[_Coupon]:
-    start = project.start_date
-    if not start:
-        return []
-    months = min(int(project.duration_months), MAX_EVENT_MONTHS)
-    coupon = round(float(project.invested_amount) * (float(project.annual_rate) / 100) / 12, 2)
-    return [_amortizable_coupon(project, start, month, months, coupon) for month in range(1, months + 1)]
-
-
-def _event(project: CrowdfundingProject, user_id: uuid.UUID, coupon: _Coupon) -> CalendarEvent:
+    kind = "Remboursement" if capital > 0 else "Coupon"
     return CalendarEvent(
         id=uuid.uuid4(),
         user_id=user_id,
-        title=coupon.title[:200],
-        description=coupon.description,
+        title=f"{kind} {name} : +{amount:.2f} €"[:200],
+        description=f"{project.platform}\nCapital : {capital:.2f} € + Intérêts nets : {interest:.2f} €",
         event_type=EventType.INTEREST,
-        event_date=coupon.at,
+        event_date=_at_nine_utc(entry.due_date),
         is_recurring=False,
-        amount=coupon.amount,
+        amount=amount,
         currency="EUR",
         is_completed=False,
         source_project_id=project.id,
@@ -101,7 +56,7 @@ async def _delete_future_events(db: AsyncSession, project_id: uuid.UUID) -> int:
 
 
 async def sync_project_events(db: AsyncSession, user_id: uuid.UUID, project: CrowdfundingProject) -> int:
-    """Remplace les échéances à venir du projet actif ou en retard dans le calendrier ; rend le nombre créé."""
+    """Remplace au calendrier les échéances contractuelles à venir du projet actif ou en retard ; rend leur nombre."""
     if project.status not in SYNCED_STATUSES:
         return 0
     if not project.start_date:
@@ -109,11 +64,8 @@ async def sync_project_events(db: AsyncSession, user_id: uuid.UUID, project: Cro
         return 0
     now = datetime.now(UTC)
     await _delete_future_events(db, project.id)
-    if project.repayment_type == RepaymentType.IN_FINE:
-        coupons = _in_fine_coupons(project)
-    else:
-        coupons = _amortizable_coupons(project)
-    events = [_event(project, user_id, coupon) for coupon in coupons if coupon.at >= now]
+    schedule = contractual_schedule(project)
+    events = [_event(project, user_id, entry) for entry in schedule if _at_nine_utc(entry.due_date) >= now]
     db.add_all(events)
     await db.flush()
     logger.info("Synced %d calendar events for project %s", len(events), project.id)
@@ -153,7 +105,7 @@ async def upcoming_coupon_income(db: AsyncSession, user_id: uuid.UUID, months_ah
 
 async def complete_closest_event(db: AsyncSession, project_id: uuid.UUID, payment_date: date) -> None:
     """Marque fait l'événement ouvert du projet le plus proche de la date du versement."""
-    paid_at = datetime.combine(payment_date, time(9, 0), tzinfo=UTC)
+    paid_at = _at_nine_utc(payment_date)
     event_id = await db.scalar(
         select(EVENTS.id)
         .where(EVENTS.source_project_id == project_id, EVENTS.is_completed.is_(False))

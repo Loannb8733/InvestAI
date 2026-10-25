@@ -2,14 +2,14 @@
   "body": {
     "actual_end_date": null,
     "annual_rate": 11.0,
-    "asset_id": "<id-24>",
+    "asset_id": "<id-25>",
     "created_at": "<volatile>",
     "delay_months": 0,
     "description": null,
     "documents": [],
     "duration_months": 12,
     "estimated_end_date": "2025-06-01",
-    "id": "<id-25>",
+    "id": "<id-26>",
     "interest_earned": 0.0,
     "interest_frequency": "at_maturity",
     "invested_amount": 500.0,
@@ -27,9 +27,9 @@
         "due_date": "2025-06-01",
         "expected_capital": 500.0,
         "expected_interest": 38.5,
-        "id": "<id-26>",
+        "id": "<id-27>",
         "is_completed": false,
-        "project_id": "<id-25>",
+        "project_id": "<id-26>",
         "repayment_id": null,
         "status": "overdue"
       }

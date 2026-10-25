@@ -1455,7 +1455,7 @@ export const crowdfundingApi = {
     return response.data
   },
 
-  /** Échéancier consolidé : cash-flows attendus par mois (bruts de fiscalité) sur 24 mois. */
+  /** Échéancier consolidé : cash-flows attendus par mois (nets d'impôt) sur 24 mois. */
   getCashflowSchedule: async () => {
     const response = await api.get('/crowdfunding/cashflow-schedule')
     return response.data

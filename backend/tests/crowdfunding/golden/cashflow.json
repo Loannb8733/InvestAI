@@ -2,95 +2,107 @@
   "body": [
     {
       "expected_capital": 166.67,
-      "expected_interest": 26.83,
+      "expected_interest": 24.91,
       "month": "2026-10",
       "projects": [
         {
-          "amount": 176.0,
+          "amount": 169.78,
           "name": "Bureaux Part-Dieu"
         },
         {
-          "amount": 17.5,
+          "amount": 21.8,
           "name": "Résidence des Tilleuls"
         }
       ],
-      "total": 193.5
+      "total": 191.58
     },
     {
       "expected_capital": 166.67,
-      "expected_interest": 9.33,
+      "expected_interest": 2.33,
       "month": "2026-11",
       "projects": [
         {
-          "amount": 176.0,
+          "amount": 169.0,
           "name": "Bureaux Part-Dieu"
         }
       ],
-      "total": 176.0
+      "total": 169.0
     },
     {
       "expected_capital": 166.67,
-      "expected_interest": 9.33,
+      "expected_interest": 1.56,
       "month": "2026-12",
       "projects": [
         {
-          "amount": 176.0,
+          "amount": 168.23,
           "name": "Bureaux Part-Dieu"
         }
       ],
-      "total": 176.0
+      "total": 168.23
     },
     {
       "expected_capital": 166.63,
-      "expected_interest": 26.83,
+      "expected_interest": 22.58,
       "month": "2027-01",
       "projects": [
         {
-          "amount": 175.96,
+          "amount": 167.41,
           "name": "Bureaux Part-Dieu"
         },
         {
-          "amount": 17.5,
+          "amount": 21.8,
           "name": "Résidence des Tilleuls"
         }
       ],
-      "total": 193.46
+      "total": 189.21
     },
     {
       "expected_capital": 0.0,
-      "expected_interest": 17.5,
+      "expected_interest": 21.8,
       "month": "2027-04",
       "projects": [
         {
-          "amount": 17.5,
+          "amount": 21.8,
           "name": "Résidence des Tilleuls"
         }
       ],
-      "total": 17.5
+      "total": 21.8
     },
     {
       "expected_capital": 0.0,
-      "expected_interest": 17.5,
+      "expected_interest": 21.8,
       "month": "2027-07",
       "projects": [
         {
-          "amount": 17.5,
+          "amount": 21.8,
           "name": "Résidence des Tilleuls"
         }
       ],
-      "total": 17.5
+      "total": 21.8
     },
     {
-      "expected_capital": 1000.0,
-      "expected_interest": 17.5,
+      "expected_capital": 0.0,
+      "expected_interest": 21.8,
       "month": "2027-10",
       "projects": [
         {
-          "amount": 1017.5,
+          "amount": 21.8,
           "name": "Résidence des Tilleuls"
         }
       ],
-      "total": 1017.5
+      "total": 21.8
+    },
+    {
+      "expected_capital": 1000.0,
+      "expected_interest": 21.8,
+      "month": "2028-01",
+      "projects": [
+        {
+          "amount": 1021.8,
+          "name": "Résidence des Tilleuls"
+        }
+      ],
+      "total": 1021.8
     }
   ],
   "status": 200

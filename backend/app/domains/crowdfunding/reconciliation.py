@@ -89,16 +89,6 @@ async def unreconcile_repayment(db: AsyncSession, repayment_id: uuid.UUID) -> No
         entry.repayment_id = None
 
 
-async def project_schedule(db: AsyncSession, project_id: uuid.UUID) -> list[CrowdfundingPaymentSchedule]:
-    """Échéances du projet, par date."""
-    result = await db.execute(
-        select(CrowdfundingPaymentSchedule)
-        .where(CrowdfundingPaymentSchedule.project_id == project_id)
-        .order_by(CrowdfundingPaymentSchedule.due_date)
-    )
-    return list(result.scalars().all())
-
-
 async def overdue_entries(
     db: AsyncSession, grace_days: int = 5
 ) -> list[Row[CrowdfundingPaymentSchedule, CrowdfundingProject]]:

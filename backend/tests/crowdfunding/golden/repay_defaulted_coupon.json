@@ -3,12 +3,12 @@
     "amount": 180.0,
     "capital_amount": null,
     "created_at": "<volatile>",
-    "id": "<id-42>",
+    "id": "<id-44>",
     "interest_amount": null,
     "notes": null,
     "payment_date": "2025-01-05",
     "payment_type": "interest",
-    "project_id": "<id-28>",
+    "project_id": "<id-29>",
     "tax_amount": null
   },
   "status": 201

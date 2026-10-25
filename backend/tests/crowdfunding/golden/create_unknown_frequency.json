@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'at_maturity', 'monthly', 'quarterly', 'semi_annual' or 'annual'"
+        },
+        "input": "weekly",
+        "loc": [
+          "body",
+          "interest_frequency"
+        ],
+        "msg": "Input should be 'at_maturity', 'monthly', 'quarterly', 'semi_annual' or 'annual'",
+        "type": "literal_error"
+      }
+    ]
+  },
+  "status": 422
+}

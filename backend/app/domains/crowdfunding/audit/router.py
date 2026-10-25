@@ -13,7 +13,7 @@ from app.core.rate_limit import limiter
 from app.domains.crowdfunding.audit.analyzer import analyze_documents
 from app.domains.crowdfunding.audit.models import ProjectAudit
 from app.domains.crowdfunding.audit.schemas import ProjectAuditResponse
-from app.domains.crowdfunding.audit.scoring import capital_and_cash
+from app.domains.crowdfunding.audit.scoring import portfolio_exposure
 from app.domains.crowdfunding.models import ProjectDocument
 from app.domains.crowdfunding.repository import project_for_user
 from app.domains.crowdfunding.schemas import ProjectDocumentResponse
@@ -44,6 +44,17 @@ async def _read_pdfs(files: list[UploadFile]) -> list[tuple[str, bytes]]:
     return contents
 
 
+async def _audit_quietly(
+    session: AsyncSession, contents: list[tuple[str, bytes]], user_id: uuid.UUID, project_id: uuid.UUID
+) -> uuid.UUID | None:
+    try:
+        audit = await analyze_documents(session, contents, user_id, project_id)
+    except Exception:
+        logger.warning("Auto-audit failed for project %s", project_id, exc_info=True)
+        return None
+    return audit.id
+
+
 @router.post("/analyze", response_model=ProjectAuditResponse, status_code=201)
 @limiter.limit("3/minute")
 async def analyze(
@@ -59,9 +70,9 @@ async def analyze(
     if target is not None:
         await project_for_user(session, target, user.id)
     contents = await _read_pdfs(files)
-    total_capital, cash = await capital_and_cash(session, user.id)
+    exposure = await portfolio_exposure(session, user.id)
     try:
-        audit = await analyze_documents(session, contents, user.id, target, cash, total_capital)
+        audit = await analyze_documents(session, contents, user.id, target, exposure)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
@@ -106,8 +117,10 @@ async def download_document(
 async def upload_documents(
     request: Request, project_id: uuid.UUID, files: Files, user: CurrentUser, session: Session
 ) -> list[ProjectDocument]:
-    """Joint des PDF à un projet de l'utilisateur."""
+    """Joint des PDF à un projet de l'utilisateur et les audite ; un audit en échec n'empêche pas l'envoi."""
     project = await project_for_user(session, project_id, user.id)
+    contents = await _read_pdfs(files)
+    audit_id = await _audit_quietly(session, contents, user.id, project.id)
     documents = [
         ProjectDocument(
             id=uuid.uuid4(),
@@ -116,8 +129,9 @@ async def upload_documents(
             file_name=name,
             file_data=data,
             file_size=len(data),
+            audit_id=audit_id,
         )
-        for name, data in await _read_pdfs(files)
+        for name, data in contents
     ]
     session.add_all(documents)
     await session.commit()

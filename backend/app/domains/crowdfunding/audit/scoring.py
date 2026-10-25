@@ -1,18 +1,18 @@
 import uuid
+from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.crowdfunding.models import CrowdfundingProject
-from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.crowdfunding.dashboard import capital_outstanding
+from app.domains.crowdfunding.repository import repayments_by_project, user_projects
+from app.services.metrics_service import metrics_service
 
 MAX_LTV = 80
 MIN_MARGIN = 10
 MIN_INVESTMENT = 100.0
 MAX_ALLOCATION = 0.05
 DEFAULT_ALLOCATION = 500.0
-STABLECOINS = frozenset({"USDT", "USDC", "DAI", "BUSD", "TUSD", "USDG"})
 
 
 def _append_threshold_flags(data: dict[str, Any], flags: list[str]) -> None:
@@ -46,24 +46,32 @@ def add_red_flags(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-async def _holdings(db: AsyncSession, user_id: uuid.UUID) -> tuple[float, float, list[str]]:
-    rows = await db.execute(
-        select(Asset, Portfolio).join(Portfolio, Asset.portfolio_id == Portfolio.id).where(Portfolio.user_id == user_id)
-    )
-    total = 0.0
-    crowdfunding = 0.0
-    for asset, _ in rows.all():
-        value = float(asset.current_price or 0) * float(asset.quantity or 0)
-        total += value
-        if (asset.asset_type.value if asset.asset_type else "other") == "crowdfunding":
-            crowdfunding += value
-    projects = await db.execute(
-        select(CrowdfundingProject)
-        .join(Asset, CrowdfundingProject.asset_id == Asset.id)
-        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
-        .where(Portfolio.user_id == user_id)
-    )
-    return total, crowdfunding, [project.platform for project in projects.scalars().all()]
+@dataclass
+class Exposure:
+    """Patrimoine valorisé comme le tableau de bord : marchés, liquidités et capital restant dû du crowdfunding."""
+
+    total: float = 0.0
+    cash: float = 0.0
+    crowdfunding: float = 0.0
+    platforms: list[str] = field(default_factory=list)
+
+
+async def portfolio_exposure(db: AsyncSession, user_id: uuid.UUID) -> Exposure:
+    """Patrimoine de l'utilisateur ; les plateformes de ses projets servent de zones géographiques."""
+    metrics = await metrics_service.get_user_dashboard_metrics(db, str(user_id), currency="EUR", days=0)
+    cash = float(metrics.get("available_liquidity") or 0.0)
+    projects = await user_projects(db, user_id)
+    crowdfunding = capital_outstanding(projects, await repayments_by_project(db, [p.id for p in projects]))
+    total = float(metrics.get("total_value") or 0.0) + cash + crowdfunding
+    return Exposure(total, cash, crowdfunding, [project.platform for project in projects])
+
+
+def _allocation(exposure: Exposure) -> float:
+    return exposure.total * MAX_ALLOCATION if exposure.total > 0 else DEFAULT_ALLOCATION
+
+
+def _ticket(allocation: float, cash: float) -> float:
+    return max(min(allocation, cash * 0.5) if cash > 0 else allocation, MIN_INVESTMENT)
 
 
 def _geographic(location: str, platforms: list[str]) -> float:
@@ -82,15 +90,15 @@ def _impact(correlation: float) -> str:
     return "ameliore"
 
 
-async def diversification(db: AsyncSession, user_id: uuid.UUID, data: dict[str, Any]) -> dict[str, Any]:
+def diversification(exposure: Exposure, data: dict[str, Any]) -> dict[str, Any]:
     """Impact du projet sur la diversification : concentration géographique, par type d'actif et rendement/risque.
 
-    La zone se compare à la plateforme des projets existants, faute de localisation enregistrée.
+    La part du crowdfunding ajoute le ticket que l'on suggérerait sans corrélation ; la zone se compare à la
+    plateforme des projets existants, faute de localisation enregistrée.
     """
-    total, crowdfunding, platforms = await _holdings(db, user_id)
-    geographic = _geographic((data.get("location") or "").lower(), platforms)
-    new_amount = data.get("collection_amount", 0) or 0
-    asset_type = (crowdfunding + new_amount) / (total + new_amount) if total > 0 else 0.0
+    geographic = _geographic((data.get("location") or "").lower(), exposure.platforms)
+    ticket = _ticket(_allocation(exposure), exposure.cash)
+    asset_type = (exposure.crowdfunding + ticket) / (exposure.total + ticket) if exposure.total > 0 else 0.0
     tri = data.get("tri") or 0
     risk_score = data.get("risk_score") or 5
     risk_return = min(1.0, (tri / 15.0) * (1 - risk_score / 10.0))
@@ -115,19 +123,18 @@ async def diversification(db: AsyncSession, user_id: uuid.UUID, data: dict[str, 
     }
 
 
-def suggest_investment(data: dict[str, Any], total_capital: float, cash: float) -> dict[str, Any]:
-    """Placement suggéré : 5 % du capital, réduit si le projet est corrélé au portefeuille, borné par la moitié du cash.
+def suggest_investment(data: dict[str, Any], exposure: Exposure) -> dict[str, Any]:
+    """Placement suggéré : 5 % du patrimoine, réduit si le projet est corrélé, borné par la moitié du cash.
 
     Jamais sous le ticket minimum de 100 € ; une forte corrélation est signalée en point de vigilance.
     """
-    allocation = total_capital * MAX_ALLOCATION if total_capital > 0 else DEFAULT_ALLOCATION
+    allocation = _allocation(exposure)
     correlation = data.get("correlation_score", 0)
     if correlation > 0.5:
         allocation *= 0.4
     elif correlation > 0.3:
         allocation *= 0.7
-    suggested = min(allocation, cash * 0.5) if cash > 0 else allocation
-    data["suggested_investment"] = round(max(suggested, MIN_INVESTMENT), 2)
+    data["suggested_investment"] = round(_ticket(allocation, exposure.cash), 2)
     if data.get("diversification_impact") == "degrade":
         vigilance = data.get("points_vigilance", [])
         vigilance.append(
@@ -136,18 +143,3 @@ def suggest_investment(data: dict[str, Any], total_capital: float, cash: float) 
         )
         data["points_vigilance"] = vigilance
     return data
-
-
-async def capital_and_cash(db: AsyncSession, user_id: uuid.UUID) -> tuple[float, float]:
-    """Capital total de l'utilisateur et part en stablecoins, au current_price enregistré de chaque actif."""
-    portfolios = (await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))).scalars().all()
-    total_capital = 0.0
-    cash = 0.0
-    for portfolio in portfolios:
-        assets = (await db.execute(select(Asset).where(Asset.portfolio_id == portfolio.id))).scalars().all()
-        for asset in assets:
-            value = float(asset.current_price or 0) * float(asset.quantity or 0)
-            total_capital += value
-            if asset.symbol and asset.symbol.upper() in STABLECOINS:
-                cash += value
-    return total_capital, cash

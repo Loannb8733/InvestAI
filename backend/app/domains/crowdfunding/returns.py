@@ -77,12 +77,11 @@ def schedule_status(entry: CrowdfundingPaymentSchedule) -> str:
 
 
 def interest_earned(project: CrowdfundingProject, repayments: list[CrowdfundingRepayment] | None = None) -> float:
-    """Intérêts perçus : le reçu au-delà de l'investi pour un projet terminé, sinon la somme des intérêts saisis."""
-    if project.status == ProjectStatus.COMPLETED:
+    """Intérêts perçus : ceux saisis ; à défaut, pour un projet terminé, le reçu au-delà de l'investi."""
+    recorded = float(sum((repayment.interest_amount or Decimal("0")) for repayment in repayments or []))
+    if recorded == 0 and project.status == ProjectStatus.COMPLETED:
         return max(0.0, float(project.total_received or 0) - float(project.invested_amount or 0))
-    if not repayments:
-        return 0.0
-    return float(sum((repayment.interest_amount or Decimal("0")) for repayment in repayments))
+    return recorded
 
 
 def projected_interest(project: CrowdfundingProject) -> tuple[float, float]:

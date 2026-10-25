@@ -119,12 +119,12 @@ export default function CrowdfundingDashboardPage() {
   const totalProjects =
     d.active_count + d.completed_count + d.delayed_count + d.defaulted_count + d.funding_count
 
-  // Échéancier consolidé — 12 premiers mois (montants BRUTS de fiscalité)
+  // Échéancier consolidé — 12 premiers mois (montants nets d'impôt)
   const upcomingCashflows = (cashflows ?? []).slice(0, 12)
   const cashflowChartData = upcomingCashflows.map((m) => ({
     month: m.month,
     Capital: m.expected_capital,
-    'Intérêts (bruts)': m.expected_interest,
+    'Intérêts (nets)': m.expected_interest,
   }))
   const cashflowByMonth = new Map(upcomingCashflows.map((m) => [m.month, m]))
 
@@ -359,7 +359,7 @@ export default function CrowdfundingDashboardPage() {
         <CardHeader>
           <CardTitle>Cash-flows à venir</CardTitle>
           <p className="text-xs text-muted-foreground">
-            échéances contractuelles non encaissées, montants bruts de fiscalité — 12 prochains mois
+            échéances contractuelles non encaissées, montants nets d'impôt — 12 prochains mois
           </p>
         </CardHeader>
         <CardContent>
@@ -368,7 +368,7 @@ export default function CrowdfundingDashboardPage() {
               <div className="h-[280px]">
                 <ResponsiveBar
                   data={cashflowChartData}
-                  keys={['Capital', 'Intérêts (bruts)']}
+                  keys={['Capital', 'Intérêts (nets)']}
                   indexBy="month"
                   groupMode="stacked"
                   theme={theme}
@@ -393,7 +393,7 @@ export default function CrowdfundingDashboardPage() {
                           {formatCurrency(m.total)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          capital {formatCurrency(m.expected_capital)} · intérêts bruts{' '}
+                          capital {formatCurrency(m.expected_capital)} · intérêts nets{' '}
                           {formatCurrency(m.expected_interest)}
                         </p>
                         {m.projects.length > 0 && (
@@ -438,7 +438,7 @@ export default function CrowdfundingDashboardPage() {
                 <span className="font-medium text-foreground">
                   {formatCurrency(next3MonthsTotal)}
                 </span>{' '}
-                <span className="text-xs">(bruts de fiscalité)</span>
+                <span className="text-xs">(nets d'impôt)</span>
               </p>
             </>
           ) : (

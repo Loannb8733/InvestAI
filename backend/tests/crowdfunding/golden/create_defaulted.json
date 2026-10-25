@@ -2,14 +2,14 @@
   "body": {
     "actual_end_date": null,
     "annual_rate": 12.0,
-    "asset_id": "<id-27>",
+    "asset_id": "<id-28>",
     "created_at": "<volatile>",
     "delay_months": 0,
     "description": null,
     "documents": [],
     "duration_months": 18,
     "estimated_end_date": null,
-    "id": "<id-28>",
+    "id": "<id-29>",
     "interest_earned": 0.0,
     "interest_frequency": "annual",
     "invested_amount": 1500.0,
@@ -25,11 +25,22 @@
       {
         "completed_at": "<volatile>",
         "due_date": "2025-01-01",
-        "expected_capital": 1500.0,
+        "expected_capital": 0.0,
         "expected_interest": 126.0,
-        "id": "<id-29>",
+        "id": "<id-30>",
         "is_completed": false,
-        "project_id": "<id-28>",
+        "project_id": "<id-29>",
+        "repayment_id": null,
+        "status": "overdue"
+      },
+      {
+        "completed_at": "<volatile>",
+        "due_date": "2025-07-01",
+        "expected_capital": 1500.0,
+        "expected_interest": 63.0,
+        "id": "<id-31>",
+        "is_completed": false,
+        "project_id": "<id-29>",
         "repayment_id": null,
         "status": "overdue"
       }

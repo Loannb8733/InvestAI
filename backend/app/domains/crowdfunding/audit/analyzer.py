@@ -10,7 +10,13 @@ from app.domains.crowdfunding.audit import providers
 from app.domains.crowdfunding.audit.models import ProjectAudit
 from app.domains.crowdfunding.audit.pdf_text import extract_text
 from app.domains.crowdfunding.audit.prompt import build_messages, parse_answer
-from app.domains.crowdfunding.audit.scoring import add_red_flags, diversification, suggest_investment
+from app.domains.crowdfunding.audit.scoring import (
+    Exposure,
+    add_red_flags,
+    diversification,
+    portfolio_exposure,
+    suggest_investment,
+)
 from app.domains.crowdfunding.audit.static import STATIC_SOURCE, analyze_statically
 
 logger = logging.getLogger(__name__)
@@ -93,14 +99,16 @@ async def analyze_documents(
     file_contents: list[tuple[str, bytes]],
     user_id: uuid.UUID,
     project_id: uuid.UUID | None = None,
-    cash: float = 0.0,
-    total_capital: float = 0.0,
+    exposure: Exposure | None = None,
 ) -> ProjectAudit:
     """Analyse les PDF par le premier fournisseur qui répond, sinon par expressions régulières, et enregistre l'audit.
 
+    ``exposure`` est le patrimoine de l'utilisateur, valorisé à la demande quand il n'est pas fourni.
     ``ValueError`` quand aucun PDF ne contient de texte lisible.
     """
-    messages = build_messages(_texts(file_contents), cash, total_capital)
+    texts = _texts(file_contents)
+    exposure = exposure or await portfolio_exposure(db, user_id)
+    messages = build_messages(texts, exposure.cash, exposure.total)
     data, raw_text, source = await _ask_models(messages)
     if data is None:
         logger.info("All LLM providers failed or unavailable — using static analysis")
@@ -108,8 +116,8 @@ async def analyze_documents(
         raw_text = json.dumps(data, ensure_ascii=False)
         source = STATIC_SOURCE
     data = add_red_flags(data)
-    data.update(await diversification(db, user_id, data))
-    data = suggest_investment(data, total_capital, cash)
+    data.update(diversification(exposure, data))
+    data = suggest_investment(data, exposure)
     audit = _audit(
         data,
         user_id=user_id,

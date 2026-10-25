@@ -69,12 +69,6 @@ def _files(*names: str, content: bytes | None = None) -> list[tuple[str, tuple[s
 
 
 @pytest.fixture
-def no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    for key in ("GROQ_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_URL"):
-        monkeypatch.setattr(settings, key, "")
-
-
-@pytest.fixture
 def scripted_llm(no_llm: None, monkeypatch: pytest.MonkeyPatch) -> None:
     async def answer(messages: list[dict[str, str]]) -> str:
         return json.dumps(LLM_ANSWER)
