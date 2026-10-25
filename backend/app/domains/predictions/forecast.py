@@ -105,6 +105,18 @@ def _points(result: ForecastResult) -> list[ForecastPoint]:
     ]
 
 
+def _clamped(predictions: list[ForecastPoint], current_price: float) -> list[ForecastPoint]:
+    low = current_price * (1 - MAX_MOVE_PCT / 100)
+    high = current_price * (1 + MAX_MOVE_PCT / 100)
+    return [
+        {
+            **p,
+            **{key: smart_round(min(max(p[key], low), high)) for key in ("price", "confidence_low", "confidence_high")},
+        }
+        for p in predictions
+    ]
+
+
 def _sanity_checked(
     result: ForecastResult, prices: list[float], current_price: float, days_ahead: int, symbol: str
 ) -> _Forecast:
@@ -118,10 +130,11 @@ def _sanity_checked(
                 ensemble_change_pct,
                 days_ahead,
             )
-            predictions, ema_trend, ema_strength = ema20_forecast(prices, current_price, days_ahead)
-            if predictions:
+            ema_predictions, ema_trend, ema_strength = ema20_forecast(prices, current_price, days_ahead)
+            if ema_predictions:
                 detail = [{"name": "EMA-20 (sanity fallback)", "weight_pct": 100, "mape": None, "trend": ema_trend}]
-                return _Forecast(predictions, ema_trend, ema_strength, "ema20_sanity_fallback", detail, [])
+                return _Forecast(ema_predictions, ema_trend, ema_strength, "ema20_sanity_fallback", detail, [])
+            predictions = _clamped(predictions, current_price)
     return _Forecast(
         predictions, result.trend, result.trend_strength, result.model_used, result.models_detail, result.explanations
     )

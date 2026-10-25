@@ -1359,7 +1359,6 @@ export const smartInsightsApi = {
       health_status: string
       top_insight: { title: string; message: string; severity: string; category: string } | null
       breakeven_pct: number | null
-      top_alpha: { symbol: string; alpha_score: number } | null
       anomaly_count: number
       regime: string | null
       generated_at: string

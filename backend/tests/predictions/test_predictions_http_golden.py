@@ -104,8 +104,6 @@ async def _snapshot(
         body = response.json()
     except ValueError:
         body = response.text
-    if "/backtest" in url and isinstance(body, dict):
-        body["assets"] = sorted(body.get("assets", []), key=lambda a: a["symbol"])
     return _plain({"status": response.status_code, "body": body}, ids)
 
 

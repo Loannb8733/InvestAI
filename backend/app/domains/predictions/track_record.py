@@ -144,7 +144,7 @@ class TrackRecordMixin(PredictionCore):
         portfolio_ids = await user_portfolio_ids(db, user_id)
         if not portfolio_ids:
             return _empty_backtest(days)
-        symbols = list({a.symbol.upper() for a in await held_assets(db, portfolio_ids)})
+        symbols = sorted({a.symbol.upper() for a in await held_assets(db, portfolio_ids)})
         if not symbols:
             return _empty_backtest(days)
 
