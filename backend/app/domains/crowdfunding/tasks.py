@@ -2,12 +2,10 @@ import logging
 import uuid
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.db.session import session_factory
 from app.domains.crowdfunding.models import CrowdfundingPaymentSchedule, CrowdfundingProject, ProjectStatus
 from app.domains.crowdfunding.reconciliation import overdue_entries
-from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.crowdfunding.repository import project_owner
 from app.models.notification import Notification, NotificationPriority, NotificationType
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
@@ -26,14 +24,6 @@ def _delay_message(project: CrowdfundingProject, entry: CrowdfundingPaymentSched
     )
 
 
-async def _owner(db: AsyncSession, project: CrowdfundingProject) -> uuid.UUID | None:
-    asset = await db.get(Asset, project.asset_id)
-    if not asset:
-        return None
-    portfolio = await db.get(Portfolio, asset.portfolio_id)
-    return portfolio.user_id if portfolio else None
-
-
 async def _flag_delays() -> dict[str, int]:
     async with session_factory() as db:
         rows = await overdue_entries(db, grace_days=GRACE_DAYS)
@@ -43,7 +33,7 @@ async def _flag_delays() -> dict[str, int]:
         count = 0
         for project, entry in first_overdue.values():
             project.status = ProjectStatus.DELAYED
-            user_id = await _owner(db, project)
+            user_id = await project_owner(db, project)
             if user_id is None:
                 continue
             name = project.project_name or project.platform

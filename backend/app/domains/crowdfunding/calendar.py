@@ -42,6 +42,34 @@ def _event(project: CrowdfundingProject, user_id: uuid.UUID, entry: Crowdfunding
     )
 
 
+def _upcoming_entries(project: CrowdfundingProject, now: datetime) -> list[CrowdfundingPaymentSchedule]:
+    if project.status not in SYNCED_STATUSES or not project.start_date:
+        return []
+    return [entry for entry in contractual_schedule(project) if _at_nine_utc(entry.due_date) >= now]
+
+
+def planned_events(project: CrowdfundingProject) -> list[tuple[datetime, float]]:
+    """(date, montant) des événements que la synchronisation écrirait pour le projet."""
+    entries = _upcoming_entries(project, datetime.now(UTC))
+    return [
+        (_at_nine_utc(e.due_date), round(float(e.expected_capital) + float(e.expected_interest), 2)) for e in entries
+    ]
+
+
+async def stored_events(db: AsyncSession, project_id: uuid.UUID) -> list[tuple[datetime, float]]:
+    """(date, montant) des événements à venir non faits du projet, tels qu'enregistrés."""
+    result = await db.execute(
+        select(EVENTS.event_date, EVENTS.amount)
+        .where(
+            EVENTS.source_project_id == project_id,
+            EVENTS.is_completed.is_(False),
+            EVENTS.event_date >= datetime.now(UTC),
+        )
+        .order_by(EVENTS.event_date)
+    )
+    return [(when, round(float(amount or 0), 2)) for when, amount in result.all()]
+
+
 async def _delete_future_events(db: AsyncSession, project_id: uuid.UUID) -> int:
     result = await db.execute(
         delete(CalendarEvent)
@@ -64,8 +92,7 @@ async def sync_project_events(db: AsyncSession, user_id: uuid.UUID, project: Cro
         return 0
     now = datetime.now(UTC)
     await _delete_future_events(db, project.id)
-    schedule = contractual_schedule(project)
-    events = [_event(project, user_id, entry) for entry in schedule if _at_nine_utc(entry.due_date) >= now]
+    events = [_event(project, user_id, entry) for entry in _upcoming_entries(project, now)]
     db.add_all(events)
     await db.flush()
     logger.info("Synced %d calendar events for project %s", len(events), project.id)
