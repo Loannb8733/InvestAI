@@ -174,3 +174,20 @@ async def test_another_users_portfolio_is_not_found(client: AsyncClient, regular
         ]
     response = await client.post(BASE, headers=_headers(regular_user), json={**QUARTERLY, "portfolio_id": target})
     assert response.status_code == 404
+
+
+async def test_projects_sharing_a_symbol_prefix_get_distinct_symbols(client: AsyncClient, regular_user: User) -> None:
+    headers = _headers(regular_user)
+    with time_machine.travel(FROZEN_NOW, tick=False):
+        first = await _create(client, headers, QUARTERLY)
+        second = await _create(client, headers, {**QUARTERLY, "project_name": "Résidence des Lilas"})
+        third = await _create(client, headers, {**QUARTERLY, "project_name": "Lofts"})
+        renamed = await client.patch(
+            f"{BASE}/{third['id']}", headers=headers, json={"project_name": "Résidence des Roses"}
+        )
+        symbols = [
+            (await client.get(f"/api/v1/assets/{project['asset_id']}", headers=headers)).json()["symbol"]
+            for project in (first, second, third)
+        ]
+    assert renamed.status_code == 200
+    assert symbols == ["ANAXAGO-RÉSIDENCE DE", "ANAXAGO-RÉSIDENCE-2", "ANAXAGO-RÉSIDENCE-3"]

@@ -50,10 +50,29 @@ FINANCIAL_FIELDS = frozenset(
     }
 )
 CLOSED_STATUSES = (ProjectStatus.COMPLETED, ProjectStatus.DEFAULTED)
+SYMBOL_LENGTH = 20
 
 
-def _symbol(platform: str, project_name: str | None) -> str:
-    return f"{platform}-{project_name}".upper()[:20]
+async def _free_symbol(
+    db: AsyncSession,
+    portfolio_id: uuid.UUID,
+    platform: str,
+    project_name: str | None,
+    asset_id: uuid.UUID | None = None,
+) -> str:
+    """« PLATEFORME-NOM » sur 20 caractères, suffixé -2, -3… quand un autre actif du portefeuille le porte déjà."""
+    base = f"{platform}-{project_name}".upper()
+    query = select(Asset.symbol).where(Asset.portfolio_id == portfolio_id, Asset.exchange == platform)
+    if asset_id is not None:
+        query = query.where(Asset.id != asset_id)
+    taken = set((await db.execute(query)).scalars().all())
+    symbol = base[:SYMBOL_LENGTH]
+    index = 2
+    while symbol in taken:
+        suffix = f"-{index}"
+        symbol = base[: SYMBOL_LENGTH - len(suffix)].rstrip(" -") + suffix
+        index += 1
+    return symbol
 
 
 async def _target_portfolio(db: AsyncSession, data: CrowdfundingProjectCreate, user_id: uuid.UUID) -> Portfolio:
@@ -71,7 +90,7 @@ async def create_project(db: AsyncSession, data: CrowdfundingProjectCreate, user
     asset = Asset(
         id=uuid.uuid4(),
         portfolio_id=portfolio.id,
-        symbol=_symbol(data.platform, data.project_name),
+        symbol=await _free_symbol(db, portfolio.id, data.platform, data.project_name),
         name=data.project_name,
         asset_type=AssetType.CROWDFUNDING,
         quantity=Decimal("1"),
@@ -128,8 +147,6 @@ def _sync_asset(asset: Asset, project: CrowdfundingProject, updated: set[str]) -
         asset.project_status = project.status.value
     if "platform" in updated:
         asset.exchange = project.platform
-    if updated & {"platform", "project_name"}:
-        asset.symbol = _symbol(project.platform, project.project_name)
 
 
 async def _resync_after_update(
@@ -156,6 +173,8 @@ async def update_project(
     asset = await db.get(Asset, project.asset_id)
     if asset:
         _sync_asset(asset, project, set(updates))
+        if set(updates) & {"platform", "project_name"}:
+            asset.symbol = await _free_symbol(db, asset.portfolio_id, project.platform, project.project_name, asset.id)
     await db.commit()
     await db.refresh(project)
     await _resync_after_update(db, user_id, project, set(updates))
