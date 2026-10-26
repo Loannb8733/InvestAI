@@ -66,12 +66,15 @@ class TestInFine:
 
 
 class TestAmortizable:
-    def test_equal_capital_and_interest(self):
+    def test_equal_capital_and_interest_on_outstanding(self):
         p = _project(invested_amount=Decimal("12000"), duration_months=12)
         entries = amortizable_schedule(p)
         assert len(entries) == 12
-        # 12000 * 10% / 12 = 100 gross → 70 net interest per month.
-        assert all(e.expected_interest == Decimal("70.00") for e in entries)
+        # Interest runs on the outstanding capital: 12000 * 10% / 12 * 0.70 = 70 net the first month,
+        # then 1000 less capital each month, down to 1000 * 10% / 12 * 0.70 = 5.83 the last one.
+        assert entries[0].expected_interest == Decimal("70.00")
+        assert entries[1].expected_interest == Decimal("64.17")
+        assert entries[-1].expected_interest == Decimal("5.83")
         assert sum(Decimal(str(e.expected_capital)) for e in entries) == Decimal("12000")
 
     def test_last_installment_absorbs_rounding(self):

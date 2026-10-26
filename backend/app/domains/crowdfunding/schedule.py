@@ -38,8 +38,20 @@ def _at_maturity(project: CrowdfundingProject, total_months: int) -> list[Crowdf
     return [_entry(project, due, invested, net)]
 
 
+def _coupons(start: date, step: int, horizon: int, coupon_net: Decimal) -> list[tuple[date, Decimal]]:
+    dates = [(start + relativedelta(months=month), coupon_net) for month in range(step, horizon + 1, step)]
+    remainder = horizon % step
+    if remainder:
+        partial = (coupon_net * Decimal(remainder) / Decimal(step)).quantize(CENT, rounding=ROUND_HALF_UP)
+        dates.append((start + relativedelta(months=horizon), partial))
+    return dates
+
+
 def in_fine_schedule(project: CrowdfundingProject) -> list[CrowdfundingPaymentSchedule]:
-    """Échéancier in fine : coupons nets à la fréquence choisie, capital à la fin ; le retard ajoute des périodes."""
+    """Échéancier in fine : coupons nets à la fréquence choisie, capital à la fin ; le retard ajoute des périodes.
+
+    Une dernière période incomplète porte le capital et un coupon au prorata de ses mois.
+    """
     total_months = int(project.duration_months) + int(project.delay_months or 0)
     frequency = project.interest_frequency or "at_maturity"
     if frequency not in FREQUENCY_MONTHS:
@@ -51,37 +63,32 @@ def in_fine_schedule(project: CrowdfundingProject) -> list[CrowdfundingPaymentSc
     step = FREQUENCY_MONTHS[frequency]
     coupon = invested * rate / Decimal(str(12 // step))
     coupon_net = (coupon * net_multiplier(project)).quantize(CENT, rounding=ROUND_HALF_UP)
-    periods = min(total_months // step, MAX_SCHEDULE_MONTHS // step)
+    coupons = _coupons(project.start_date, step, min(total_months, MAX_SCHEDULE_MONTHS), coupon_net)
+    last = len(coupons) - 1
     return [
-        _entry(
-            project,
-            project.start_date + relativedelta(months=step * index),
-            invested if index == periods else Decimal("0"),
-            coupon_net,
-        )
-        for index in range(1, periods + 1)
+        _entry(project, due, invested if index == last else Decimal("0"), interest)
+        for index, (due, interest) in enumerate(coupons)
     ]
 
 
 def amortizable_schedule(project: CrowdfundingProject) -> list[CrowdfundingPaymentSchedule]:
-    """Échéancier amortissable : capital constant chaque mois, la dernière échéance portant l'arrondi."""
+    """Échéancier amortissable : capital constant chaque mois, intérêts nets sur le capital restant dû.
+
+    La dernière échéance porte l'arrondi du capital.
+    """
     if not project.start_date:
         return []
     invested = Decimal(str(project.invested_amount))
-    rate = Decimal(str(project.annual_rate)) / Decimal("100")
+    monthly_rate = Decimal(str(project.annual_rate)) / Decimal("100") / Decimal("12") * net_multiplier(project)
     months = min(int(project.duration_months) + int(project.delay_months or 0), MAX_SCHEDULE_MONTHS)
-    interest = (invested * rate / Decimal("12") * net_multiplier(project)).quantize(CENT, rounding=ROUND_HALF_UP)
     capital = (invested / Decimal(str(months))).quantize(CENT, rounding=ROUND_HALF_UP)
-    last_capital = invested - capital * Decimal(str(months - 1))
-    return [
-        _entry(
-            project,
-            project.start_date + relativedelta(months=month),
-            last_capital if month == months else capital,
-            interest,
-        )
-        for month in range(1, months + 1)
-    ]
+    entries = []
+    for month in range(1, months + 1):
+        outstanding = invested - capital * Decimal(month - 1)
+        interest = (outstanding * monthly_rate).quantize(CENT, rounding=ROUND_HALF_UP)
+        repaid = outstanding if month == months else capital
+        entries.append(_entry(project, project.start_date + relativedelta(months=month), repaid, interest))
+    return entries
 
 
 def contractual_schedule(project: CrowdfundingProject) -> list[CrowdfundingPaymentSchedule]:

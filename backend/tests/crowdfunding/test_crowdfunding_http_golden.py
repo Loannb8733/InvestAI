@@ -80,8 +80,10 @@ async def _create_flow(rec: Recorder, headers: dict[str, str], other: dict[str, 
     }
     portfolios = (await rec.client.get("/api/v1/portfolios", headers=headers)).json()
     own = next(p["id"] for p in portfolios if p["name"] != "Crowdfunding")
-    explicit = {**FUNDING, "project_name": "Parking", "portfolio_id": own, "interest_frequency": "weekly"}
+    explicit = {**FUNDING, "project_name": "Parking", "portfolio_id": own, "interest_frequency": "semi_annual"}
     ids["explicit"] = (await rec.shot("create_in_own_portfolio", "POST", BASE, headers, explicit))["id"]
+    weekly = {**explicit, "project_name": "Box", "interest_frequency": "weekly"}
+    await rec.shot("create_unknown_frequency", "POST", BASE, headers, weekly)
     await rec.shot("create_other_user_portfolio", "POST", BASE, other, {**FUNDING, "portfolio_id": own})
     await rec.shot("create_unknown_portfolio", "POST", BASE, headers, {**FUNDING, "portfolio_id": UNKNOWN_ID})
     await rec.shot("create_rate_too_high", "POST", BASE, headers, {**FUNDING, "annual_rate": "101"})

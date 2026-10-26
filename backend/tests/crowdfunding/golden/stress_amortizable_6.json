@@ -1,6 +1,6 @@
 {
   "body": {
-    "base_irr": 10.72,
+    "base_irr": 5.77,
     "cashflows": [
       {
         "capital": 166.67,
@@ -12,85 +12,85 @@
       {
         "capital": 166.67,
         "date": "2026-09-15",
-        "interest": 9.33,
+        "interest": 8.56,
         "is_delayed": true,
-        "total": 176.0
+        "total": 175.23
       },
       {
         "capital": 166.67,
         "date": "2026-10-15",
-        "interest": 9.33,
+        "interest": 7.78,
         "is_delayed": true,
-        "total": 176.0
+        "total": 174.45
       },
       {
         "capital": 166.67,
         "date": "2026-11-15",
-        "interest": 9.33,
+        "interest": 7.0,
         "is_delayed": true,
-        "total": 176.0
+        "total": 173.67
       },
       {
         "capital": 166.67,
         "date": "2026-12-15",
-        "interest": 9.33,
+        "interest": 6.22,
         "is_delayed": true,
-        "total": 176.0
+        "total": 172.89
       },
       {
         "capital": 166.67,
         "date": "2027-01-15",
-        "interest": 9.33,
+        "interest": 5.44,
         "is_delayed": true,
-        "total": 176.0
+        "total": 172.11
       },
       {
         "capital": 166.67,
         "date": "2027-02-15",
-        "interest": 9.33,
+        "interest": 4.67,
         "is_delayed": true,
-        "total": 176.0
+        "total": 171.34
       },
       {
         "capital": 166.67,
         "date": "2027-03-15",
-        "interest": 9.33,
+        "interest": 3.89,
         "is_delayed": true,
-        "total": 176.0
+        "total": 170.56
       },
       {
         "capital": 166.67,
         "date": "2027-04-15",
-        "interest": 9.33,
+        "interest": 3.11,
         "is_delayed": true,
-        "total": 176.0
+        "total": 169.78
       },
       {
         "capital": 166.67,
         "date": "2027-05-15",
-        "interest": 9.33,
+        "interest": 2.33,
         "is_delayed": true,
-        "total": 176.0
+        "total": 169.0
       },
       {
         "capital": 166.67,
         "date": "2027-06-15",
-        "interest": 9.33,
+        "interest": 1.56,
         "is_delayed": true,
-        "total": 176.0
+        "total": 168.23
       },
       {
         "capital": 166.63,
         "date": "2027-07-15",
-        "interest": 9.33,
+        "interest": 0.78,
         "is_delayed": true,
-        "total": 175.96
+        "total": 167.41
       }
     ],
     "delay_months": 6,
-    "irr_delta": -5.32,
-    "project_id": "<id-11>",
-    "stressed_irr": 5.4
+    "irr_delta": -2.84,
+    "project_id": "<id-12>",
+    "stressed_irr": 2.93
   },
   "status": 200
 }

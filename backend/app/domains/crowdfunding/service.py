@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.crowdfunding import calendar
-from app.domains.crowdfunding.models import CrowdfundingProject, CrowdfundingRepayment, ProjectStatus
+from app.domains.crowdfunding.models import CrowdfundingProject, CrowdfundingRepayment, PaymentType, ProjectStatus
 from app.domains.crowdfunding.reconciliation import (
     reconcile_repayment,
     refresh_schedule,
@@ -61,7 +61,7 @@ async def _target_portfolio(db: AsyncSession, data: CrowdfundingProjectCreate, u
         return await resolve_crowdfunding_portfolio(db, user_id)
     portfolio = await db.get(Portfolio, data.portfolio_id)
     if not portfolio or portfolio.user_id != user_id:
-        raise HTTPException(403, "Portefeuille non trouvé")
+        raise HTTPException(404, "Portefeuille non trouvé")
     return portfolio
 
 
@@ -101,6 +101,8 @@ async def create_project(db: AsyncSession, data: CrowdfundingProjectCreate, user
         start_date=data.start_date,
         estimated_end_date=data.estimated_end_date,
         status=data.status,
+        tax_rate=data.tax_rate,
+        delay_months=data.delay_months,
     )
     db.add(project)
     await db.commit()
@@ -112,6 +114,12 @@ async def create_project(db: AsyncSession, data: CrowdfundingProjectCreate, user
 
 
 def _sync_asset(asset: Asset, project: CrowdfundingProject, updated: set[str]) -> None:
+    if "invested_amount" in updated:
+        asset.invested_amount = project.invested_amount
+        asset.avg_buy_price = project.invested_amount
+        asset.current_price = project.invested_amount
+    if "project_name" in updated:
+        asset.name = project.project_name
     if "annual_rate" in updated:
         asset.interest_rate = project.annual_rate
     if "estimated_end_date" in updated:
@@ -120,6 +128,7 @@ def _sync_asset(asset: Asset, project: CrowdfundingProject, updated: set[str]) -
         asset.project_status = project.status.value
     if "platform" in updated:
         asset.exchange = project.platform
+    if updated & {"platform", "project_name"}:
         asset.symbol = _symbol(project.platform, project.project_name)
 
 
@@ -138,7 +147,7 @@ async def _resync_after_update(
 async def update_project(
     db: AsyncSession, project_id: uuid.UUID, data: CrowdfundingProjectUpdate, user_id: uuid.UUID
 ) -> CrowdfundingProject:
-    """Applique les champs fournis, reporte taux, échéance, statut et plateforme sur l'actif, puis resynchronise."""
+    """Applique les champs fournis, les reporte sur l'actif, puis resynchronise calendrier et échéancier."""
     project = await project_for_user(db, project_id, user_id)
     updates = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
@@ -156,7 +165,7 @@ async def update_project(
 async def add_repayment(
     db: AsyncSession, project_id: uuid.UUID, data: RepaymentCreate, user_id: uuid.UUID
 ) -> CrowdfundingRepayment:
-    """Enregistre un versement, l'ajoute au total reçu et le rapproche du calendrier et de l'échéancier."""
+    """Enregistre un versement au total reçu et, sauf parrainage, le rapproche du calendrier et de l'échéancier."""
     project = await project_for_user(db, project_id, user_id)
     repayment = CrowdfundingRepayment(
         id=uuid.uuid4(),
@@ -173,8 +182,9 @@ async def add_repayment(
     db.add(repayment)
     await db.flush()
     project.total_received = (project.total_received or Decimal("0")) + data.amount
-    await calendar.complete_closest_event(db, project.id, data.payment_date)
-    await reconcile_repayment(db, project.id, repayment.id, data.payment_date, amount=data.amount)
+    if data.payment_type != PaymentType.REFERRAL:
+        await calendar.complete_closest_event(db, project.id, data.payment_date)
+        await reconcile_repayment(db, project.id, repayment.id, data.payment_date, amount=data.amount)
     await db.commit()
     await db.refresh(repayment)
     return repayment

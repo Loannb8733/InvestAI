@@ -1,11 +1,14 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domains.crowdfunding.models import PaymentType, ProjectStatus, RepaymentType
 from app.schemas._money import Money
+
+InterestFrequency = Literal["at_maturity", "monthly", "quarterly", "semi_annual", "annual"]
 
 
 class CrowdfundingProjectCreate(BaseModel):
@@ -20,7 +23,7 @@ class CrowdfundingProjectCreate(BaseModel):
     repayment_type: RepaymentType = RepaymentType.IN_FINE
     start_date: date | None = None
     estimated_end_date: date | None = None
-    interest_frequency: str | None = Field("at_maturity", max_length=20)
+    interest_frequency: InterestFrequency | None = "at_maturity"
     tax_rate: Money = Field(Decimal("30.00"), ge=0, le=100)
     delay_months: int = Field(0, ge=0, le=120)
     status: ProjectStatus = ProjectStatus.ACTIVE
@@ -39,7 +42,7 @@ class CrowdfundingProjectUpdate(BaseModel):
     estimated_end_date: date | None = None
     actual_end_date: date | None = None
     status: ProjectStatus | None = None
-    interest_frequency: str | None = Field(None, max_length=20)
+    interest_frequency: InterestFrequency | None = None
     tax_rate: Money | None = Field(None, ge=0, le=100)
     delay_months: int | None = Field(None, ge=0, le=120)
     total_received: Money | None = Field(None, ge=0)
@@ -161,7 +164,7 @@ class CashflowProjectAmount(BaseModel):
 
 
 class CashflowMonthResponse(BaseModel):
-    """Échéances non soldées d'un mois (« YYYY-MM »), tous projets hors défaut confondus."""
+    """Échéances non soldées d'un mois (« YYYY-MM »), projets hors défaut ; montants nets d'impôt."""
 
     month: str
     expected_capital: float = 0.0

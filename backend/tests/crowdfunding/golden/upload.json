@@ -1,20 +1,20 @@
 {
   "body": [
     {
-      "audit_id": null,
+      "audit_id": "<id-0>",
       "created_at": "<volatile>",
       "file_name": "deck.pdf",
       "file_size": "<volatile>",
-      "id": "<id-0>",
-      "project_id": "<id-1>"
+      "id": "<id-1>",
+      "project_id": "<id-2>"
     },
     {
-      "audit_id": null,
+      "audit_id": "<id-0>",
       "created_at": "<volatile>",
       "file_name": "fici %22v2%22.pdf",
       "file_size": "<volatile>",
-      "id": "<id-2>",
-      "project_id": "<id-1>"
+      "id": "<id-3>",
+      "project_id": "<id-2>"
     }
   ],
   "status": 201

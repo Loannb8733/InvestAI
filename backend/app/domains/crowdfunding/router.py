@@ -12,7 +12,6 @@ from app.domains.crowdfunding.audit.router import router as audit_router
 from app.domains.crowdfunding.dashboard import build_dashboard
 from app.domains.crowdfunding.models import CrowdfundingProject, CrowdfundingRepayment
 from app.domains.crowdfunding.presenter import project_response
-from app.domains.crowdfunding.reconciliation import project_schedule
 from app.domains.crowdfunding.reports import cashflow_months, eligible_for_cashflow, performance_row, tax_report
 from app.domains.crowdfunding.repository import (
     documents_by_project,
@@ -56,8 +55,8 @@ async def _responses(
     ]
 
 
-async def _with_schedule(session: AsyncSession, project: CrowdfundingProject) -> CrowdfundingProjectResponse:
-    return project_response(project, schedule=await project_schedule(session, project.id))
+async def _response(session: AsyncSession, project: CrowdfundingProject) -> CrowdfundingProjectResponse:
+    return (await _responses(session, [project]))[0]
 
 
 @router.get("", response_model=list[CrowdfundingProjectResponse])
@@ -73,7 +72,7 @@ async def create_project(
     request: Request, data: CrowdfundingProjectCreate, user: CurrentUser, session: Session
 ) -> CrowdfundingProjectResponse:
     """Crée un projet, dans le portefeuille indiqué ou dans le portefeuille crowdfunding de l'utilisateur."""
-    return await _with_schedule(session, await service.create_project(session, data, user.id))
+    return await _response(session, await service.create_project(session, data, user.id))
 
 
 @router.get("/dashboard", response_model=CrowdfundingDashboardResponse)
@@ -180,7 +179,7 @@ async def get_project(
     request: Request, project_id: uuid.UUID, user: CurrentUser, session: Session
 ) -> CrowdfundingProjectResponse:
     """Projet de l'utilisateur avec documents, versements et échéances."""
-    return (await _responses(session, [await project_for_user(session, project_id, user.id)]))[0]
+    return await _response(session, await project_for_user(session, project_id, user.id))
 
 
 @router.patch("/{project_id}", response_model=CrowdfundingProjectResponse)
@@ -189,7 +188,7 @@ async def update_project(
     request: Request, project_id: uuid.UUID, data: CrowdfundingProjectUpdate, user: CurrentUser, session: Session
 ) -> CrowdfundingProjectResponse:
     """Modifie un projet et resynchronise calendrier et échéancier quand ses conditions changent."""
-    return await _with_schedule(session, await service.update_project(session, project_id, data, user.id))
+    return await _response(session, await service.update_project(session, project_id, data, user.id))
 
 
 @router.delete("/{project_id}", status_code=204)

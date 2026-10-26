@@ -3,9 +3,9 @@
     "admin_status": null,
     "analysis_source": "Groq",
     "collection_amount": 800000.0,
-    "correlation_score": 0.53,
+    "correlation_score": 0.14,
     "created_at": "<volatile>",
-    "diversification_impact": "neutre",
+    "diversification_impact": "ameliore",
     "document_type": "deck",
     "duration_max": 24,
     "duration_min": 18,
@@ -24,13 +24,13 @@
     "id": "<id-0>",
     "investment_simulation": {
       "duration_months": 21,
-      "gross_interest": 19.25,
-      "investment_amount": 100.0,
-      "monthly_gross_return": 0.92,
-      "net_interest": 13.47,
-      "roi_net_percent": 13.47,
-      "tax_amount": 5.77,
-      "total_at_end": 113.47,
+      "gross_interest": 177.1,
+      "investment_amount": 920.0,
+      "monthly_gross_return": 8.43,
+      "net_interest": 123.97,
+      "roi_net_percent": 13.48,
+      "tax_amount": 53.13,
+      "total_at_end": 1043.97,
       "tri_percent": 11.0
     },
     "location": "Lyon 7e",
@@ -44,8 +44,8 @@
     "points_vigilance": [],
     "portfolio_concentration": {
       "asset_type": {
-        "detail": "Crowdfunding = 100.0% du portefeuille après investissement",
-        "score": 1.0
+        "detail": "Crowdfunding = 2.9% du portefeuille après investissement",
+        "score": 0.03
       },
       "geographic": {
         "detail": "0% de projets dans la même zone",
@@ -71,7 +71,7 @@
     "score_location": null,
     "score_operator": null,
     "score_risk_return": null,
-    "suggested_investment": 100.0,
+    "suggested_investment": 920.0,
     "tri": 11.0,
     "verdict": "NE_PAS_INVESTIR"
   },

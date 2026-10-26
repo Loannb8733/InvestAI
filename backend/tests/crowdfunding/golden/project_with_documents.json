@@ -2,31 +2,31 @@
   "body": {
     "actual_end_date": null,
     "annual_rate": 10.0,
-    "asset_id": "<id-3>",
+    "asset_id": "<id-4>",
     "created_at": "<volatile>",
     "delay_months": 0,
     "description": null,
     "documents": [
       {
-        "audit_id": null,
+        "audit_id": "<id-0>",
         "created_at": "<volatile>",
         "file_name": "deck.pdf",
         "file_size": "<volatile>",
-        "id": "<id-0>",
-        "project_id": "<id-1>"
+        "id": "<id-1>",
+        "project_id": "<id-2>"
       },
       {
-        "audit_id": null,
+        "audit_id": "<id-0>",
         "created_at": "<volatile>",
         "file_name": "fici %22v2%22.pdf",
         "file_size": "<volatile>",
-        "id": "<id-2>",
-        "project_id": "<id-1>"
+        "id": "<id-3>",
+        "project_id": "<id-2>"
       }
     ],
     "duration_months": 24,
     "estimated_end_date": "2027-10-01",
-    "id": "<id-1>",
+    "id": "<id-2>",
     "interest_earned": 0.0,
     "interest_frequency": "at_maturity",
     "invested_amount": 1000.0,
@@ -44,9 +44,9 @@
         "due_date": "2027-10-01",
         "expected_capital": 1000.0,
         "expected_interest": 140.0,
-        "id": "<id-4>",
+        "id": "<id-5>",
         "is_completed": false,
-        "project_id": "<id-1>",
+        "project_id": "<id-2>",
         "repayment_id": null,
         "status": "pending"
       }
