@@ -58,6 +58,15 @@ def _owned(query: Select[CrowdfundingProject], user_id: uuid.UUID) -> Select[Cro
     )
 
 
+async def project_owner(db: AsyncSession, project: CrowdfundingProject) -> uuid.UUID | None:
+    """Propriétaire du projet, par son actif et son portefeuille ; None si l'un manque."""
+    asset = await db.get(Asset, project.asset_id)
+    if not asset:
+        return None
+    portfolio = await db.get(Portfolio, asset.portfolio_id)
+    return portfolio.user_id if portfolio else None
+
+
 async def user_projects(db: AsyncSession, user_id: uuid.UUID) -> list[CrowdfundingProject]:
     """Projets de l'utilisateur, du plus récent au plus ancien."""
     query = _owned(select(CrowdfundingProject), user_id).order_by(CrowdfundingProject.created_at.desc())
