@@ -48,28 +48,6 @@ def _upcoming_entries(project: CrowdfundingProject, now: datetime) -> list[Crowd
     return [entry for entry in contractual_schedule(project) if _at_nine_utc(entry.due_date) >= now]
 
 
-def planned_events(project: CrowdfundingProject) -> list[tuple[datetime, float]]:
-    """(date, montant) des événements que la synchronisation écrirait pour le projet."""
-    entries = _upcoming_entries(project, datetime.now(UTC))
-    return [
-        (_at_nine_utc(e.due_date), round(float(e.expected_capital) + float(e.expected_interest), 2)) for e in entries
-    ]
-
-
-async def stored_events(db: AsyncSession, project_id: uuid.UUID) -> list[tuple[datetime, float]]:
-    """(date, montant) des événements à venir non faits du projet, tels qu'enregistrés."""
-    result = await db.execute(
-        select(EVENTS.event_date, EVENTS.amount)
-        .where(
-            EVENTS.source_project_id == project_id,
-            EVENTS.is_completed.is_(False),
-            EVENTS.event_date >= datetime.now(UTC),
-        )
-        .order_by(EVENTS.event_date)
-    )
-    return [(when, round(float(amount or 0), 2)) for when, amount in result.all()]
-
-
 async def _delete_future_events(db: AsyncSession, project_id: uuid.UUID) -> int:
     result = await db.execute(
         delete(CalendarEvent)
