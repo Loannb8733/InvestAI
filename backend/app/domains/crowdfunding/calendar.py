@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.calendar.models import CalendarEvent, EventType
 from app.domains.crowdfunding.models import CrowdfundingPaymentSchedule, CrowdfundingProject, ProjectStatus
 from app.domains.crowdfunding.schedule import contractual_schedule
+from app.domains.portfolio.models import Asset, Portfolio
 
 logger = logging.getLogger(__name__)
 
@@ -83,28 +84,37 @@ async def clear_future_events(db: AsyncSession, project_id: uuid.UUID) -> int:
     return deleted
 
 
-async def upcoming_coupon_income(db: AsyncSession, user_id: uuid.UUID, months_ahead: int = 12) -> list[dict[str, Any]]:
-    """Coupons à venir de l'utilisateur sur ``months_ahead`` mois : ``{"month_offset", "amount"}`` par événement."""
-    now = datetime.now(UTC)
+async def coupon_income(
+    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime
+) -> list[tuple[datetime, float]]:
+    """Intérêts nets des échéances non soldées des projets actifs ou en retard de l'utilisateur, dues entre ``start``
+    inclus et ``end`` exclu, datés à 9 h UTC ; le capital remboursé n'est pas un revenu.
+    """
     result = await db.execute(
-        select(CalendarEvent.event_date, CalendarEvent.amount)
+        select(CrowdfundingPaymentSchedule.due_date, CrowdfundingPaymentSchedule.expected_interest)
+        .join(CrowdfundingProject, CrowdfundingProject.id == CrowdfundingPaymentSchedule.project_id)
+        .join(Asset, CrowdfundingProject.asset_id == Asset.id)
+        .join(Portfolio, Asset.portfolio_id == Portfolio.id)
         .where(
-            CalendarEvent.user_id == user_id,
-            CalendarEvent.source_project_id.is_not(None),
-            CalendarEvent.is_completed.is_(False),
-            CalendarEvent.event_date >= now,
-            CalendarEvent.event_date <= now + relativedelta(months=months_ahead),
-            CalendarEvent.event_type == EventType.INTEREST,
+            Portfolio.user_id == user_id,
+            CrowdfundingProject.status.in_(SYNCED_STATUSES),
+            CrowdfundingPaymentSchedule.is_completed.is_(False),
+            CrowdfundingPaymentSchedule.expected_interest > 0,
+            CrowdfundingPaymentSchedule.due_date.between(start.date(), end.date()),
         )
-        .order_by(CalendarEvent.event_date)
+        .order_by(CrowdfundingPaymentSchedule.due_date)
     )
-    income: list[dict[str, Any]] = []
-    for event_date, amount in result.all():
-        if amount is None or float(amount) <= 0:
-            continue
-        offset = (event_date.year - now.year) * 12 + (event_date.month - now.month)
-        income.append({"month_offset": max(0, offset), "amount": float(amount)})
-    return income
+    dated = [(_at_nine_utc(due_date), float(interest)) for due_date, interest in result.all()]
+    return [(moment, amount) for moment, amount in dated if start <= moment < end]
+
+
+async def upcoming_coupon_income(db: AsyncSession, user_id: uuid.UUID, months_ahead: int = 12) -> list[dict[str, Any]]:
+    """Coupons à venir de l'utilisateur sur ``months_ahead`` mois : ``{"month_offset", "amount"}`` par échéance."""
+    now = datetime.now(UTC)
+    return [
+        {"month_offset": (moment.year - now.year) * 12 + moment.month - now.month, "amount": amount}
+        for moment, amount in await coupon_income(db, user_id, now, now + relativedelta(months=months_ahead))
+    ]
 
 
 async def complete_closest_event(db: AsyncSession, project_id: uuid.UUID, payment_date: date) -> None:

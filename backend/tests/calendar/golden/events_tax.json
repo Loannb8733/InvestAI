@@ -13,7 +13,7 @@
       "is_recurring": false,
       "recurrence_rule": null,
       "source_project_id": null,
-      "title": "Ouverture de la déclaration des revenus 2027"
+      "title": "Ouverture de la déclaration 2027 des revenus 2026"
     },
     {
       "amount": null,
@@ -28,7 +28,7 @@
       "is_recurring": false,
       "recurrence_rule": null,
       "source_project_id": null,
-      "title": "Date limite de déclaration en ligne 2027 (départements 50 et +)"
+      "title": "Date limite de la déclaration en ligne 2027 des revenus 2026 (départements 50 et +)"
     },
     {
       "amount": null,
@@ -43,7 +43,7 @@
       "is_recurring": false,
       "recurrence_rule": null,
       "source_project_id": null,
-      "title": "Solde de l'impôt sur le revenu 2027"
+      "title": "Solde de l'impôt sur les revenus 2026"
     }
   ],
   "status": 200

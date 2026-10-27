@@ -10,7 +10,7 @@
         "month": "2026-11"
       },
       {
-        "amount": 917.5,
+        "amount": 817.5,
         "month": "2026-12"
       },
       {
@@ -34,7 +34,7 @@
         "month": "2027-05"
       },
       {
-        "amount": 1817.5,
+        "amount": 817.5,
         "month": "2027-06"
       },
       {
@@ -51,10 +51,13 @@
       }
     ],
     "sources": {
-      "crowdfunding": 1105.0,
-      "events": 8912.5
+      "crowdfunding": 105.0,
+      "events": 8812.5
     },
-    "total_12m": 10017.5
+    "total_12m": 8917.5,
+    "unconverted_currencies": [
+      "USD"
+    ]
   },
   "status": 200
 }

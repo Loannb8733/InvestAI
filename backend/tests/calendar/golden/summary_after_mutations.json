@@ -1,11 +1,14 @@
 {
   "body": {
-    "completed_events": 1,
+    "completed_events": 2,
     "events_this_month": 4,
-    "projected_income_this_month": 0.0,
+    "projected_income_this_month": 17.5,
     "total_events": 20,
-    "total_expected_income": 3840.5,
-    "upcoming_events": 17
+    "total_expected_income": 8905.0,
+    "unconverted_currencies": [
+      "USD"
+    ],
+    "upcoming_events": 16
   },
   "status": 200
 }

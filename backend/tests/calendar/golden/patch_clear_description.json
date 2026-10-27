@@ -4,7 +4,7 @@
     "completed_at": null,
     "created_at": "<volatile>",
     "currency": "USD",
-    "description": "T4",
+    "description": null,
     "event_date": "2026-11-15T09:00:00Z",
     "event_type": "dividend",
     "id": "<id-0>",
