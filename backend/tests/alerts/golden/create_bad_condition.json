@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'price_above', 'price_below', 'change_percent_up', 'change_percent_down', 'daily_change_up', 'daily_change_down', 'target_break_even', 'volatility_spike', 'portfolio_drawdown', 'concentration_hhi' or 'allocation_drift'"
+        },
+        "input": "price_sideways",
+        "loc": [
+          "body",
+          "condition"
+        ],
+        "msg": "Input should be 'price_above', 'price_below', 'change_percent_up', 'change_percent_down', 'daily_change_up', 'daily_change_down', 'target_break_even', 'volatility_spike', 'portfolio_drawdown', 'concentration_hhi' or 'allocation_drift'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

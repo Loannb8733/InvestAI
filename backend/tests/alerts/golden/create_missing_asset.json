@@ -1,0 +1,23 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "asset_id": null,
+          "condition": "price_above",
+          "name": "X",
+          "threshold": 1
+        },
+        "loc": [
+          "body"
+        ],
+        "msg": "Value error, Un actif est requis pour cette condition",
+        "type": "value_error"
+      }
+    ]
+  },
+  "status": 422
+}

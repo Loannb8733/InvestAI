@@ -1,0 +1,53 @@
+{
+  "body": [
+    {
+      "asset_id": null,
+      "asset_name": null,
+      "asset_symbol": null,
+      "condition": "portfolio_drawdown",
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "id": "<id-15>",
+      "is_active": true,
+      "name": "Repli",
+      "notify_email": true,
+      "notify_in_app": true,
+      "threshold": 5.0,
+      "triggered_at": null,
+      "triggered_count": 0
+    },
+    {
+      "asset_id": "<id-0>",
+      "asset_name": null,
+      "asset_symbol": "BTC",
+      "condition": "volatility_spike",
+      "created_at": "<volatile>",
+      "currency": "USD",
+      "id": "<id-12>",
+      "is_active": true,
+      "name": "BTC risque",
+      "notify_email": true,
+      "notify_in_app": true,
+      "threshold": 0.0,
+      "triggered_at": null,
+      "triggered_count": 0
+    },
+    {
+      "asset_id": "<id-2>",
+      "asset_name": null,
+      "asset_symbol": "ETH",
+      "condition": "target_break_even",
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "id": "<id-11>",
+      "is_active": true,
+      "name": "ETH rentable",
+      "notify_email": true,
+      "notify_in_app": true,
+      "threshold": 0.0,
+      "triggered_at": null,
+      "triggered_count": 0
+    }
+  ],
+  "status": 200
+}

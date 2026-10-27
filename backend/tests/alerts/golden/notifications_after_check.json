@@ -1,0 +1,82 @@
+{
+  "body": [
+    {
+      "created_at": "<volatile>",
+      "id": "<id-16>",
+      "is_read": false,
+      "message": "⚠️ Concentration élevée du portefeuille (HHI 0.42, seuil 0.30). Position dominante : BTC. Envisage de diversifier.",
+      "priority": "high",
+      "reference_id": "<id-14>",
+      "reference_type": "alert",
+      "title": "Alerte: Concentration",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-17>",
+      "is_read": false,
+      "message": "🚀 ETH est redevenu rentable ! Prix actuel : 3000.00€ (Break-even : 2003.33€)",
+      "priority": "high",
+      "reference_id": "<id-11>",
+      "reference_type": "alert",
+      "title": "Alerte: ETH rentable",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-18>",
+      "is_read": false,
+      "message": "DOGE baisse journalière de 6.0% (seuil: 5.0%)",
+      "priority": "high",
+      "reference_id": "<id-10>",
+      "reference_type": "alert",
+      "title": "Alerte: DOGE jour",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-19>",
+      "is_read": false,
+      "message": "BTC hausse journalière de 3.5% (seuil: 3.0%)",
+      "priority": "high",
+      "reference_id": "<id-8>",
+      "reference_type": "alert",
+      "title": "Alerte: BTC jour",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-20>",
+      "is_read": false,
+      "message": "ARB a baissé de 33.4% (seuil: 20.0%)",
+      "priority": "high",
+      "reference_id": "<id-7>",
+      "reference_type": "alert",
+      "title": "Alerte: ARB -20",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-21>",
+      "is_read": false,
+      "message": "SOL a augmenté de 49.9% (seuil: 10.0%)",
+      "priority": "high",
+      "reference_id": "<id-5>",
+      "reference_type": "alert",
+      "title": "Alerte: SOL +10",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-22>",
+      "is_read": false,
+      "message": "BTC a dépassé 50000.0 EUR (actuel: 60000.00)",
+      "priority": "high",
+      "reference_id": "<id-1>",
+      "reference_type": "alert",
+      "title": "Alerte: BTC haut",
+      "type": "alert_triggered"
+    }
+  ],
+  "status": 200
+}

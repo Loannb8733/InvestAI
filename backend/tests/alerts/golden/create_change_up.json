@@ -1,0 +1,19 @@
+{
+  "body": {
+    "asset_id": "<id-4>",
+    "asset_name": null,
+    "asset_symbol": "SOL",
+    "condition": "change_percent_up",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "id": "<id-5>",
+    "is_active": true,
+    "name": "SOL +10",
+    "notify_email": true,
+    "notify_in_app": true,
+    "threshold": 10.0,
+    "triggered_at": null,
+    "triggered_count": 0
+  },
+  "status": 201
+}
