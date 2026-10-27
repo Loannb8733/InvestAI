@@ -12,16 +12,13 @@ from redis import Redis
 from sqlalchemy import select
 
 from app.core.db.session import session_factory
-from app.core.redis_client import redis_async_url, redis_client_kwargs
+from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url, redis_client_kwargs
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-# Redis pub/sub channel (must match the channel in websocket.py)
-PRICE_UPDATES_CHANNEL = "price_updates"
 
 
 def _get_sync_redis() -> Redis:

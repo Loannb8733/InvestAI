@@ -214,6 +214,7 @@ async def invalidate_dashboard_cache(user_id: str) -> None:
 # usable, only-slightly-stale value rather than falling back to no numbers.
 
 CONTRARIAN_STATS_KEY = "contrarian_stats:btc:fng"
+PRICE_UPDATES_CHANNEL = "price_updates"
 CONTRARIAN_STATS_TTL = 691200  # 8 days
 
 

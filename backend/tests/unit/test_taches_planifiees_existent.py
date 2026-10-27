@@ -1,7 +1,7 @@
 """Chaque tâche du planificateur doit exister et être importable.
 
 `beat_schedule` désigne ses tâches par leur nom complet
-(`app.tasks.cleanup.run_weekly_cleanup`). Rien ne relie ce texte au code : une
+(`app.domains.system.tasks.run_weekly_cleanup`). Rien ne relie ce texte au code : une
 fonction renommée, un module déplacé, et Celery échoue **à l'exécution** — dans
 ses journaux, où l'on ne regarde pas. C'est ainsi que le `TypeError` quotidien
 de NEW-42 a pu passer des mois inaperçu.

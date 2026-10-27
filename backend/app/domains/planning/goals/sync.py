@@ -88,3 +88,19 @@ async def sync_goals_for_user(db: AsyncSession, user_id: UUID, only_goal_id: UUI
 
     await db.commit()
     return synced
+
+
+async def sync_active_goals(db: AsyncSession) -> tuple[int, int]:
+    """Synchronise les objectifs actifs de chaque utilisateur ; un utilisateur en échec n'arrête pas les autres.
+
+    Rend le nombre d'utilisateurs synchronisés et celui d'objectifs synchronisés.
+    """
+    user_ids = (await db.execute(select(Goal.user_id).where(Goal.status == GoalStatus.ACTIVE).distinct())).scalars()
+    users = goals = 0
+    for user_id in user_ids.all():
+        try:
+            goals += await sync_goals_for_user(db, user_id)
+            users += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("sync-goals failed for user %s: %s", user_id, exc)
+    return users, goals

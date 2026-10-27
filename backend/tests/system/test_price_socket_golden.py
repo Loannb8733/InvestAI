@@ -10,9 +10,9 @@ import redis
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
-from app.api.v1.endpoints import websocket as price_socket
-from app.core.redis_client import redis_async_url
+from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url
 from app.domains.identity.tokens import create_token
+from app.domains.system import price_socket
 from app.main import app
 
 GOLDEN = Path(__file__).parent / "golden" / "price_socket.json"
@@ -55,7 +55,7 @@ def _refused(transcript: _Transcript, client: TestClient, first: str, shown: str
 def _publish_until_stopped(stop: threading.Event) -> None:
     publisher = redis.Redis.from_url(redis_async_url())
     while not stop.wait(0.05):
-        publisher.publish(price_socket.PRICE_UPDATES_CHANNEL, json.dumps(TICK))
+        publisher.publish(PRICE_UPDATES_CHANNEL, json.dumps(TICK))
     publisher.close()
 
 
@@ -90,11 +90,8 @@ def test_price_socket_matches_golden(monkeypatch: pytest.MonkeyPatch) -> None:
     async def binance_stream(symbols: set[str]) -> None:
         streamed.append(sorted(symbols))
 
-    monkeypatch.setattr(price_socket, "binance_price_stream", binance_stream)
-    monkeypatch.setattr(price_socket, "active_connections", {})
-    for name in ("_pubsub_task", "_pubsub_redis", "_stream_task"):
-        monkeypatch.setattr(price_socket, name, None)
-    monkeypatch.setattr(price_socket, "_current_symbols", set())
+    monkeypatch.setattr(price_socket, "binance_prices", binance_stream)
+    monkeypatch.setattr(price_socket, "price_hub", price_socket.PriceHub())
     subject = str(uuid.uuid4())
     transcript = _Transcript()
     client = TestClient(app)
