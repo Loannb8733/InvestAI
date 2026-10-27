@@ -1,4 +1,3 @@
-comments	backend/app/api/v1/endpoints/calendar.py
 comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/dashboard.py
 comments	backend/app/api/v1/endpoints/notifications.py
@@ -168,7 +167,6 @@ comments	frontend/src/types/exchanges.ts
 comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
-too-long	backend/app/api/v1/endpoints/calendar.py
 too-long	backend/app/api/v1/endpoints/dashboard.py
 too-long	backend/app/api/v1/endpoints/smart_insights.py
 too-long	backend/app/api/v1/endpoints/telegram_webhook.py

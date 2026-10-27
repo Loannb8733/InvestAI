@@ -7,14 +7,13 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.calendar.models import CalendarEvent, EventType
 from app.domains.crowdfunding.models import CrowdfundingPaymentSchedule, CrowdfundingProject, ProjectStatus
 from app.domains.crowdfunding.schedule import contractual_schedule
-from app.models.calendar_event import CalendarEvent, EventType
 
 logger = logging.getLogger(__name__)
 
 SYNCED_STATUSES = (ProjectStatus.ACTIVE, ProjectStatus.DELAYED)
-EVENTS = CalendarEvent.__table__.c
 
 
 def _at_nine_utc(day: date) -> datetime:
@@ -52,11 +51,11 @@ async def _delete_future_events(db: AsyncSession, project_id: uuid.UUID) -> int:
     result = await db.execute(
         delete(CalendarEvent)
         .where(
-            EVENTS.source_project_id == project_id,
-            EVENTS.is_completed.is_(False),
-            EVENTS.event_date >= datetime.now(UTC),
+            CalendarEvent.source_project_id == project_id,
+            CalendarEvent.is_completed.is_(False),
+            CalendarEvent.event_date >= datetime.now(UTC),
         )
-        .returning(EVENTS.id)
+        .returning(CalendarEvent.id)
     )
     return len(result.all())
 
@@ -88,16 +87,16 @@ async def upcoming_coupon_income(db: AsyncSession, user_id: uuid.UUID, months_ah
     """Coupons à venir de l'utilisateur sur ``months_ahead`` mois : ``{"month_offset", "amount"}`` par événement."""
     now = datetime.now(UTC)
     result = await db.execute(
-        select(EVENTS.event_date, EVENTS.amount)
+        select(CalendarEvent.event_date, CalendarEvent.amount)
         .where(
-            EVENTS.user_id == user_id,
-            EVENTS.source_project_id.is_not(None),
-            EVENTS.is_completed.is_(False),
-            EVENTS.event_date >= now,
-            EVENTS.event_date <= now + relativedelta(months=months_ahead),
-            EVENTS.event_type == EventType.INTEREST,
+            CalendarEvent.user_id == user_id,
+            CalendarEvent.source_project_id.is_not(None),
+            CalendarEvent.is_completed.is_(False),
+            CalendarEvent.event_date >= now,
+            CalendarEvent.event_date <= now + relativedelta(months=months_ahead),
+            CalendarEvent.event_type == EventType.INTEREST,
         )
-        .order_by(EVENTS.event_date)
+        .order_by(CalendarEvent.event_date)
     )
     income: list[dict[str, Any]] = []
     for event_date, amount in result.all():
@@ -112,13 +111,13 @@ async def complete_closest_event(db: AsyncSession, project_id: uuid.UUID, paymen
     """Marque fait l'événement ouvert du projet le plus proche de la date du versement."""
     paid_at = _at_nine_utc(payment_date)
     event_id = await db.scalar(
-        select(EVENTS.id)
-        .where(EVENTS.source_project_id == project_id, EVENTS.is_completed.is_(False))
-        .order_by(func.abs(func.extract("epoch", EVENTS.event_date - paid_at)))
+        select(CalendarEvent.id)
+        .where(CalendarEvent.source_project_id == project_id, CalendarEvent.is_completed.is_(False))
+        .order_by(func.abs(func.extract("epoch", CalendarEvent.event_date - paid_at)))
         .limit(1)
     )
     if event_id is None:
         return
     completed = {"is_completed": True, "completed_at": datetime.now(UTC)}
-    await db.execute(update(CalendarEvent).where(EVENTS.id == event_id).values(completed))
+    await db.execute(update(CalendarEvent).where(CalendarEvent.id == event_id).values(completed))
     logger.info("Marked calendar event %s as completed for project %s", event_id, project_id)

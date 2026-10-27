@@ -6,10 +6,10 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.calendar.models import CalendarEvent
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.main import app
-from app.models.calendar_event import CalendarEvent
 from tests.crowdfunding.recorder import BASE
 from tests.sample_portfolio import FROZEN_NOW
 
@@ -91,9 +91,7 @@ async def test_calendar_follows_the_contractual_schedule(
     with time_machine.travel(FROZEN_NOW, tick=False):
         project = await _create(client, _headers(regular_user), QUARTERLY)
     rows = await db_session.execute(
-        select(CalendarEvent.__table__.c.event_date, CalendarEvent.__table__.c.amount).order_by(
-            CalendarEvent.__table__.c.event_date
-        )
+        select(CalendarEvent.event_date, CalendarEvent.amount).order_by(CalendarEvent.event_date)
     )
     events = [(when.date().isoformat(), float(amount)) for when, amount in rows.all()]
     upcoming = [(e["due_date"], e["expected_capital"] + e["expected_interest"]) for e in project["schedule"]]

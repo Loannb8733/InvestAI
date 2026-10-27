@@ -3,7 +3,6 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    calendar,
     cron,
     dashboard,
     insights,
@@ -15,6 +14,7 @@ from app.api.v1.endpoints import (
 )
 from app.domains.alerts.router import router as alerts_router
 from app.domains.analytics.router import router as analytics_router
+from app.domains.calendar.router import router as calendar_router
 from app.domains.crowdfunding.router import router as crowdfunding_router
 from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
@@ -45,7 +45,7 @@ api_router.include_router(predictions_router, prefix="/predictions", tags=["Pred
 api_router.include_router(alerts_router, prefix="/alerts", tags=["Alerts"])
 api_router.include_router(reports_router, prefix="/reports", tags=["Reports"])
 api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
-api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
+api_router.include_router(calendar_router, prefix="/calendar", tags=["Calendar"])
 api_router.include_router(simulations_router, prefix="/simulations", tags=["Simulations"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(insights.router, prefix="/insights", tags=["Insights"])
