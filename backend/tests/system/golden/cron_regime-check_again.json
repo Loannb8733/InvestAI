@@ -1,0 +1,10 @@
+{
+  "body": {
+    "result": {
+      "regime": "bullish",
+      "status": "unchanged"
+    },
+    "task": "regime-check"
+  },
+  "status": 200
+}

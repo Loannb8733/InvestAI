@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Invalid cron token."
+  },
+  "status": 403
+}

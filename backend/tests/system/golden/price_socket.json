@@ -1,0 +1,113 @@
+{
+  "transcript": [
+    {
+      "sent": "pas du json"
+    },
+    {
+      "closed": 4001,
+      "reason": "Auth timeout or invalid"
+    },
+    {
+      "sent": "{\"action\": \"auth\", \"token\": \"faux\"}"
+    },
+    {
+      "received": {
+        "type": "error",
+        "message": "Unauthorized"
+      }
+    },
+    {
+      "closed": 4001,
+      "reason": "Unauthorized"
+    },
+    {
+      "sent": "{\"action\": \"auth\", \"token\": \"<refresh>\"}"
+    },
+    {
+      "received": {
+        "type": "error",
+        "message": "Unauthorized"
+      }
+    },
+    {
+      "closed": 4001,
+      "reason": "Unauthorized"
+    },
+    {
+      "sent": "{\"action\": \"auth\", \"token\": \"<access>\"}"
+    },
+    {
+      "received": {
+        "type": "auth",
+        "status": "ok"
+      }
+    },
+    {
+      "sent": "pas du json"
+    },
+    {
+      "received": {
+        "error": "Invalid JSON"
+      }
+    },
+    {
+      "sent": "{\"action\": \"subscribe\", \"symbols\": []}"
+    },
+    {
+      "received": {
+        "type": "error",
+        "message": "No symbols provided. Send {\"action\": \"subscribe\", \"symbols\": [\"BTC\", \"AAPL\"]}"
+      }
+    },
+    {
+      "sent": "{\"action\": \"subscribe\", \"symbols\": [\"btc\", \"AAPL\"]}"
+    },
+    {
+      "received": {
+        "type": "subscribed",
+        "symbols": [
+          "AAPL",
+          "BTC"
+        ]
+      }
+    },
+    {
+      "sent": "{\"action\": \"unsubscribe\", \"symbols\": [\"aapl\"]}"
+    },
+    {
+      "received": {
+        "type": "unsubscribed",
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    {
+      "sent": "{\"action\": \"dance\"}"
+    },
+    {
+      "received": {
+        "type": "error",
+        "message": "Unsupported action: dance. Use 'subscribe', 'unsubscribe', or 'pong'."
+      }
+    },
+    {
+      "sent": "{\"action\": \"pong\"}"
+    },
+    {
+      "received": {
+        "type": "price",
+        "symbol": "BTC",
+        "price": 42000.5,
+        "change_24h_percent": 1.5,
+        "asset_type": "crypto"
+      }
+    }
+  ],
+  "binance_streams": [
+    [
+      "AAPL",
+      "BTC"
+    ]
+  ]
+}

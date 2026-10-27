@@ -1,0 +1,11 @@
+{
+  "body": {
+    "result": {
+      "failed": 0,
+      "success": 0,
+      "total": 0
+    },
+    "task": "sync-exchanges"
+  },
+  "status": 200
+}

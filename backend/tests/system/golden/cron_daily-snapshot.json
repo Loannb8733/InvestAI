@@ -1,0 +1,11 @@
+{
+  "body": {
+    "result": {
+      "failed": 0,
+      "success": 1,
+      "total": 1
+    },
+    "task": "daily-snapshot"
+  },
+  "status": 200
+}

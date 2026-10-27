@@ -1,0 +1,20 @@
+{
+  "body": {
+    "celery_tasks": [
+      "update-crypto-prices (5 min)",
+      "update-stock-prices (5 min)",
+      "sync-exchanges (1 hour)",
+      "check-alerts (5 min)",
+      "create-daily-snapshots (00:00 UTC)",
+      "send-weekly-reports (Sunday 18:00 UTC)",
+      "send-monthly-reports (1st of month 08:00 UTC)",
+      "send-daily-digest (07:00 UTC)",
+      "run-weekly-cleanup (Monday 03:00 UTC)"
+    ],
+    "email_enabled": false,
+    "smtp_from": "noreply@investai.local",
+    "smtp_host": "(not configured)",
+    "smtp_port": 587
+  },
+  "status": 200
+}

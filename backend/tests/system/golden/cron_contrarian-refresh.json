@@ -1,0 +1,10 @@
+{
+  "body": {
+    "result": {
+      "error": "no network in tests: https://api.alternative.me/fng/?limit=0&format=json",
+      "status": "error"
+    },
+    "task": "contrarian-refresh"
+  },
+  "status": 200
+}
