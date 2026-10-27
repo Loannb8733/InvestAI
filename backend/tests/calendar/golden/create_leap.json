@@ -1,0 +1,18 @@
+{
+  "body": {
+    "amount": 5.0,
+    "completed_at": null,
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "description": null,
+    "event_date": "2028-02-29T09:00:00Z",
+    "event_type": "dividend",
+    "id": "<id-4>",
+    "is_completed": false,
+    "is_recurring": true,
+    "recurrence_rule": "YEARLY",
+    "source_project_id": null,
+    "title": "Bonus bissextile"
+  },
+  "status": 201
+}

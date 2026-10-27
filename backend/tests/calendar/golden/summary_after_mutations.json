@@ -1,0 +1,11 @@
+{
+  "body": {
+    "completed_events": 1,
+    "events_this_month": 4,
+    "projected_income_this_month": 0.0,
+    "total_events": 20,
+    "total_expected_income": 3840.5,
+    "upcoming_events": 17
+  },
+  "status": 200
+}

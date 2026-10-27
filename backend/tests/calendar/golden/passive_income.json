@@ -1,0 +1,60 @@
+{
+  "body": {
+    "monthly": [
+      {
+        "amount": 0.0,
+        "month": "2026-10"
+      },
+      {
+        "amount": 812.5,
+        "month": "2026-11"
+      },
+      {
+        "amount": 917.5,
+        "month": "2026-12"
+      },
+      {
+        "amount": 817.5,
+        "month": "2027-01"
+      },
+      {
+        "amount": 800.0,
+        "month": "2027-02"
+      },
+      {
+        "amount": 817.5,
+        "month": "2027-03"
+      },
+      {
+        "amount": 817.5,
+        "month": "2027-04"
+      },
+      {
+        "amount": 800.0,
+        "month": "2027-05"
+      },
+      {
+        "amount": 1817.5,
+        "month": "2027-06"
+      },
+      {
+        "amount": 817.5,
+        "month": "2027-07"
+      },
+      {
+        "amount": 800.0,
+        "month": "2027-08"
+      },
+      {
+        "amount": 800.0,
+        "month": "2027-09"
+      }
+    ],
+    "sources": {
+      "crowdfunding": 1105.0,
+      "events": 8912.5
+    },
+    "total_12m": 10017.5
+  },
+  "status": 200
+}

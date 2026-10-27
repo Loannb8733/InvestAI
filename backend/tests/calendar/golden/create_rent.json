@@ -1,0 +1,18 @@
+{
+  "body": {
+    "amount": 800.0,
+    "completed_at": null,
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "description": null,
+    "event_date": "2026-10-05T09:00:00Z",
+    "event_type": "rent",
+    "id": "<id-1>",
+    "is_completed": false,
+    "is_recurring": true,
+    "recurrence_rule": "FREQ=MONTHLY",
+    "source_project_id": null,
+    "title": "Loyer T2"
+  },
+  "status": 201
+}

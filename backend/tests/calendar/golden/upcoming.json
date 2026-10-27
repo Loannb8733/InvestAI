@@ -1,0 +1,50 @@
+{
+  "body": [
+    {
+      "amount": null,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": null,
+      "event_date": "2026-10-20T09:00:00Z",
+      "event_type": "payment_due",
+      "id": "<id-5>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Échéance nulle"
+    },
+    {
+      "amount": null,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": null,
+      "event_date": "2026-10-25T10:00:00Z",
+      "event_type": "other",
+      "id": "<id-7>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Sans fuseau"
+    },
+    {
+      "amount": 12.5,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": "T4",
+      "event_date": "2026-11-15T09:00:00Z",
+      "event_type": "dividend",
+      "id": "<id-0>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Dividende AAPL"
+    }
+  ],
+  "status": 200
+}
