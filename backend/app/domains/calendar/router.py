@@ -137,9 +137,9 @@ async def get_event(event_id: UUID, user: CurrentUser, session: Session) -> Even
 
 @router.patch("/{event_id}", response_model=EventResponse)
 async def update_event(event_id: UUID, event_in: EventUpdate, user: CurrentUser, session: Session) -> EventResponse:
-    """Modifie les champs fournis ; marquer fait ou rouvert met à jour la date de réalisation."""
+    """Modifie les champs fournis, null efface un champ facultatif ; fait ou rouvert date la réalisation."""
     event = await _owned(session, event_id, user.id)
-    changes = event_in.model_dump(exclude_none=True)
+    changes = event_in.model_dump(exclude_unset=True)
     for field, value in changes.items():
         setattr(event, field, value)
     if "is_completed" in changes:
@@ -151,8 +151,10 @@ async def update_event(event_id: UUID, event_in: EventUpdate, user: CurrentUser,
 
 @router.post("/{event_id}/complete", response_model=EventResponse)
 async def complete_event(event_id: UUID, user: CurrentUser, session: Session) -> EventResponse:
-    """Marque l'événement fait ; un événement récurrent crée son occurrence suivante."""
+    """Marque l'événement fait ; un événement récurrent crée son occurrence suivante, une seule fois."""
     event = await _owned(session, event_id, user.id)
+    if event.is_completed:
+        return EventResponse.of(event)
     event.is_completed = True
     event.completed_at = datetime.now(UTC)
     following = (

@@ -54,7 +54,8 @@
       "crowdfunding": 0.0,
       "events": 0.0
     },
-    "total_12m": 0.0
+    "total_12m": 0.0,
+    "unconverted_currencies": []
   },
   "status": 200
 }

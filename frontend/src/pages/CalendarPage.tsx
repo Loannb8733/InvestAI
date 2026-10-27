@@ -87,6 +87,7 @@ interface CalendarSummary {
   total_expected_income: number
   events_this_month: number
   projected_income_this_month: number
+  unconverted_currencies: string[]
 }
 
 interface PassiveIncomeMonth {
@@ -101,12 +102,17 @@ interface PassiveIncome {
     events: number
     crowdfunding: number
   }
+  unconverted_currencies: string[]
 }
 
 interface SeedTaxEventsResult {
   created: number
   skipped: number
   message: string
+}
+
+function unconvertedNote(currencies: string[]): string {
+  return `Montants en ${currencies.join(', ')} non comptés : taux de change indisponible.`
 }
 
 const fmtCount = (n: number) => Math.round(n).toString()
@@ -367,7 +373,7 @@ export default function CalendarPage() {
           />
           <StatCard
             className="spot-card"
-            label="Revenus attendus"
+            label="Revenus attendus (12 mois)"
             value={summary.total_expected_income}
             format={fmtEur}
           />
@@ -378,6 +384,9 @@ export default function CalendarPage() {
             format={fmtCount}
           />
         </SpotlightGroup>
+      )}
+      {summary && summary.unconverted_currencies.length > 0 && (
+        <p className="text-xs text-muted-foreground">{unconvertedNote(summary.unconverted_currencies)}</p>
       )}
 
       {/* Revenue Banner */}
@@ -446,6 +455,11 @@ export default function CalendarPage() {
               <p className="text-sm text-muted-foreground">
                 Aucun revenu passif prévu sur les 12 prochains mois. Ajoutez des événements de type
                 dividende, loyer ou intérêt, ou synchronisez vos projets crowdfunding.
+              </p>
+            )}
+            {passiveIncome.unconverted_currencies.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {unconvertedNote(passiveIncome.unconverted_currencies)}
               </p>
             )}
           </CardContent>

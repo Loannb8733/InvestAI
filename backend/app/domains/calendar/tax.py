@@ -23,20 +23,23 @@ class TaxDeadline:
 
 
 def french_tax_deadlines(year: int) -> list[TaxDeadline]:
-    """Échéances fiscales françaises indicatives : ouverture et clôture de la déclaration, solde de l'impôt."""
+    """Échéances fiscales françaises indicatives de l'année ``year``, qui portent sur les revenus de l'année
+    précédente : ouverture et clôture de la déclaration, solde de l'impôt.
+    """
+    income_year = year - 1
     return [
         TaxDeadline(
-            f"Ouverture de la déclaration des revenus {year}",
+            f"Ouverture de la déclaration {year} des revenus {income_year}",
             datetime(year, 4, 1, 9, 0, tzinfo=UTC),
             f"Ouverture du service de déclaration en ligne (généralement début avril). {NOTE}",
         ),
         TaxDeadline(
-            f"Date limite de déclaration en ligne {year} (départements 50 et +)",
+            f"Date limite de la déclaration en ligne {year} des revenus {income_year} (départements 50 et +)",
             datetime(year, 6, 8, 9, 0, tzinfo=UTC),
             f"Date limite de la déclaration en ligne pour les départements 50 à 976. {NOTE}",
         ),
         TaxDeadline(
-            f"Solde de l'impôt sur le revenu {year}",
+            f"Solde de l'impôt sur les revenus {income_year}",
             datetime(year, 9, 15, 9, 0, tzinfo=UTC),
             f"Prélèvement du solde de l'impôt sur le revenu (généralement mi-septembre). {NOTE}",
         ),
@@ -46,19 +49,19 @@ def french_tax_deadlines(year: int) -> list[TaxDeadline]:
 async def seed_tax_events(db: AsyncSession, user_id: uuid.UUID) -> SeedTaxEventsResponse:
     """Ajoute les échéances fiscales de l'année et de la suivante qui manquent, sans les échéances passées.
 
-    Une échéance existe déjà quand une échéance fiscale de l'utilisateur porte le même titre, qui contient l'année.
+    Une échéance existe déjà quand une échéance fiscale de l'utilisateur tombe au même moment.
     """
     now = datetime.now(UTC)
     existing = await db.execute(
-        select(CalendarEvent.title).where(
+        select(CalendarEvent.event_date).where(
             CalendarEvent.user_id == user_id, CalendarEvent.event_type == EventType.TAX_DEADLINE
         )
     )
-    titles = set(existing.scalars().all())
+    taken = set(existing.scalars().all())
     created = skipped = 0
     for year in (now.year, now.year + 1):
         for deadline in french_tax_deadlines(year):
-            if deadline.title in titles or deadline.date < now:
+            if deadline.date in taken or deadline.date < now:
                 skipped += 1
                 continue
             db.add(
@@ -73,7 +76,7 @@ async def seed_tax_events(db: AsyncSession, user_id: uuid.UUID) -> SeedTaxEvents
                     is_completed=False,
                 )
             )
-            titles.add(deadline.title)
+            taken.add(deadline.date)
             created += 1
     if not created:
         return SeedTaxEventsResponse(

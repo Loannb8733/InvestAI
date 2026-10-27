@@ -2,9 +2,12 @@
   "body": {
     "completed_events": 0,
     "events_this_month": 4,
-    "projected_income_this_month": 800.0,
+    "projected_income_this_month": 817.5,
     "total_events": 15,
-    "total_expected_income": 2240.0,
+    "total_expected_income": 8917.5,
+    "unconverted_currencies": [
+      "USD"
+    ],
     "upcoming_events": 12
   },
   "status": 200

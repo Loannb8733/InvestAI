@@ -1,6 +1,6 @@
 {
   "body": {
-    "amount": null,
+    "amount": 0.0,
     "completed_at": null,
     "created_at": "<volatile>",
     "currency": "EUR",
