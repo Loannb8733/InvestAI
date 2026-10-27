@@ -11,20 +11,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domains.alerts import checker
+from app.domains.alerts.checker import AlertTrigger, evaluate
+from app.domains.alerts.models import Alert, AlertCondition
+from app.domains.alerts.pricing import asset_price
+from app.domains.alerts.repository import alert_summary
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType
-from app.models.alert import Alert, AlertCondition
-from app.services.alert_service import AlertService, AlertTrigger
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def alert_service():
-    return AlertService()
 
 
 def _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO, avg_buy_price="30000.0", quantity="1.0"):
@@ -79,7 +77,7 @@ class TestPriceAboveCondition:
     """Tests for PRICE_ABOVE alert condition."""
 
     @pytest.mark.asyncio
-    async def test_triggers_when_price_above_threshold(self, alert_service):
+    async def test_triggers_when_price_above_threshold(self, monkeypatch):
         asset = _make_asset(symbol="BTC")
         alert = _make_alert(
             condition=AlertCondition.PRICE_ABOVE,
@@ -89,9 +87,9 @@ class TestPriceAboveCondition:
         db = _mock_db_with_asset(asset)
 
         # Current price is 55000, above 50000 threshold
-        alert_service._get_asset_price = AsyncMock(return_value=55000.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=55000.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
 
         assert trigger is not None
         assert isinstance(trigger, AlertTrigger)
@@ -100,7 +98,7 @@ class TestPriceAboveCondition:
         assert "dépassé" in trigger.message
 
     @pytest.mark.asyncio
-    async def test_does_not_trigger_when_price_below_threshold(self, alert_service):
+    async def test_does_not_trigger_when_price_below_threshold(self, monkeypatch):
         asset = _make_asset(symbol="BTC")
         alert = _make_alert(
             condition=AlertCondition.PRICE_ABOVE,
@@ -109,13 +107,13 @@ class TestPriceAboveCondition:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=45000.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=45000.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
     @pytest.mark.asyncio
-    async def test_does_not_trigger_at_exact_threshold(self, alert_service):
+    async def test_does_not_trigger_at_exact_threshold(self, monkeypatch):
         asset = _make_asset(symbol="BTC")
         alert = _make_alert(
             condition=AlertCondition.PRICE_ABOVE,
@@ -124,9 +122,9 @@ class TestPriceAboveCondition:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=50000.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=50000.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
 
@@ -137,7 +135,7 @@ class TestPriceBelowCondition:
     """Tests for PRICE_BELOW alert condition."""
 
     @pytest.mark.asyncio
-    async def test_triggers_when_price_below_threshold(self, alert_service):
+    async def test_triggers_when_price_below_threshold(self, monkeypatch):
         asset = _make_asset(symbol="ETH")
         alert = _make_alert(
             condition=AlertCondition.PRICE_BELOW,
@@ -146,16 +144,16 @@ class TestPriceBelowCondition:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=1800.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=1800.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
 
         assert trigger is not None
         assert trigger.symbol == "ETH"
         assert "sous" in trigger.message
 
     @pytest.mark.asyncio
-    async def test_does_not_trigger_when_price_above_threshold(self, alert_service):
+    async def test_does_not_trigger_when_price_above_threshold(self, monkeypatch):
         asset = _make_asset(symbol="ETH")
         alert = _make_alert(
             condition=AlertCondition.PRICE_BELOW,
@@ -164,9 +162,9 @@ class TestPriceBelowCondition:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=2500.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=2500.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
 
@@ -177,7 +175,7 @@ class TestChangePercentUpCondition:
     """Tests for CHANGE_PERCENT_UP alert condition."""
 
     @pytest.mark.asyncio
-    async def test_triggers_when_price_up_enough(self, alert_service):
+    async def test_triggers_when_price_up_enough(self, monkeypatch):
         asset = _make_asset(symbol="SOL", avg_buy_price="100.0")
         alert = _make_alert(
             condition=AlertCondition.CHANGE_PERCENT_UP,
@@ -187,15 +185,15 @@ class TestChangePercentUpCondition:
         db = _mock_db_with_asset(asset)
 
         # 30% gain from avg buy price of 100
-        alert_service._get_asset_price = AsyncMock(return_value=130.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=130.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
 
         assert trigger is not None
         assert "augmenté" in trigger.message
 
     @pytest.mark.asyncio
-    async def test_does_not_trigger_when_change_below_threshold(self, alert_service):
+    async def test_does_not_trigger_when_change_below_threshold(self, monkeypatch):
         asset = _make_asset(symbol="SOL", avg_buy_price="100.0")
         alert = _make_alert(
             condition=AlertCondition.CHANGE_PERCENT_UP,
@@ -205,13 +203,13 @@ class TestChangePercentUpCondition:
         db = _mock_db_with_asset(asset)
 
         # Only 10% gain
-        alert_service._get_asset_price = AsyncMock(return_value=110.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=110.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
     @pytest.mark.asyncio
-    async def test_zero_avg_buy_price_no_trigger(self, alert_service):
+    async def test_zero_avg_buy_price_no_trigger(self, monkeypatch):
         """If avg_buy_price is 0, cannot calculate change, should not trigger."""
         asset = _make_asset(symbol="FREE", avg_buy_price="0.0")
         alert = _make_alert(
@@ -221,9 +219,9 @@ class TestChangePercentUpCondition:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=50.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=50.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
 
@@ -234,7 +232,7 @@ class TestChangePercentDownCondition:
     """Tests for CHANGE_PERCENT_DOWN alert condition."""
 
     @pytest.mark.asyncio
-    async def test_triggers_when_price_down_enough(self, alert_service):
+    async def test_triggers_when_price_down_enough(self, monkeypatch):
         asset = _make_asset(symbol="ADA", avg_buy_price="2.0")
         alert = _make_alert(
             condition=AlertCondition.CHANGE_PERCENT_DOWN,
@@ -244,15 +242,15 @@ class TestChangePercentDownCondition:
         db = _mock_db_with_asset(asset)
 
         # 50% drop from avg buy price of 2.0
-        alert_service._get_asset_price = AsyncMock(return_value=1.0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=1.0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
 
         assert trigger is not None
         assert "baissé" in trigger.message
 
     @pytest.mark.asyncio
-    async def test_does_not_trigger_when_drop_too_small(self, alert_service):
+    async def test_does_not_trigger_when_drop_too_small(self, monkeypatch):
         asset = _make_asset(symbol="ADA", avg_buy_price="2.0")
         alert = _make_alert(
             condition=AlertCondition.CHANGE_PERCENT_DOWN,
@@ -262,9 +260,9 @@ class TestChangePercentDownCondition:
         db = _mock_db_with_asset(asset)
 
         # Only 10% drop
-        alert_service._get_asset_price = AsyncMock(return_value=1.8)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=1.8))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
 
@@ -275,7 +273,7 @@ class TestZeroPriceEdgeCase:
     """Tests when current price is 0."""
 
     @pytest.mark.asyncio
-    async def test_zero_price_no_trigger(self, alert_service):
+    async def test_zero_price_no_trigger(self, monkeypatch):
         asset = _make_asset(symbol="DEAD")
         alert = _make_alert(
             condition=AlertCondition.PRICE_BELOW,
@@ -284,9 +282,9 @@ class TestZeroPriceEdgeCase:
         )
         db = _mock_db_with_asset(asset)
 
-        alert_service._get_asset_price = AsyncMock(return_value=0)
+        monkeypatch.setattr(checker, "asset_price", AsyncMock(return_value=0))
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         # The service returns None when price == 0
         assert trigger is None
 
@@ -298,14 +296,14 @@ class TestMissingAsset:
     """Tests when the alert references a deleted asset."""
 
     @pytest.mark.asyncio
-    async def test_missing_asset_returns_none(self, alert_service):
+    async def test_missing_asset_returns_none(self):
         alert = _make_alert(condition=AlertCondition.PRICE_ABOVE, threshold="100.0")
         db = AsyncMock()
         result = MagicMock()
         result.scalar_one_or_none.return_value = None
         db.execute.return_value = result
 
-        trigger = await alert_service._check_single_alert(db, alert)
+        trigger = await evaluate(db, alert)
         assert trigger is None
 
 
@@ -339,21 +337,21 @@ class TestGetAssetPriceDelegation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("symbol", "asset_type"), [("BTC", AssetType.CRYPTO), ("AAPL", AssetType.STOCK)])
-    async def test_quoted_asset_uses_the_price_feed(self, alert_service, symbol, asset_type):
+    async def test_quoted_asset_uses_the_price_feed(self, symbol, asset_type):
         asset = _make_asset(symbol=symbol, asset_type=asset_type)
         quote = AsyncMock(return_value=PriceQuote(price=Decimal("175")))
         with patch.object(price_feed, "quote", quote):
-            assert await alert_service._get_asset_price(asset) == 175.0
+            assert await asset_price(asset) == 175.0
         quote.assert_awaited_once_with(symbol, asset_type)
 
     @pytest.mark.asyncio
-    async def test_real_estate_uses_avg_buy_price(self, alert_service):
+    async def test_real_estate_uses_avg_buy_price(self):
         asset = _make_asset(symbol="PROP1", asset_type=AssetType.REAL_ESTATE, avg_buy_price="250000.0")
-        result = await alert_service._get_asset_price(asset)
+        result = await asset_price(asset)
         assert result == 250000.0
 
     @pytest.mark.asyncio
-    async def test_exception_on_quoted_asset_returns_zero(self, alert_service):
+    async def test_exception_on_quoted_asset_returns_zero(self):
         """Changé le 2026-09-08 : une panne rendait `avg_buy_price` (40 000).
 
         Ce repli était indistinguable d'un vrai cours et l'appelant l'évaluait
@@ -364,15 +362,15 @@ class TestGetAssetPriceDelegation:
         """
         asset = _make_asset(symbol="BTC", asset_type=AssetType.CRYPTO, avg_buy_price="40000.0")
         with patch.object(price_feed, "quote", AsyncMock(side_effect=Exception("API error"))):
-            result = await alert_service._get_asset_price(asset)
+            result = await asset_price(asset)
         assert result == 0.0
 
     @pytest.mark.asyncio
-    async def test_exception_on_unquoted_asset_keeps_avg_buy_price(self, alert_service):
+    async def test_exception_on_unquoted_asset_keeps_avg_buy_price(self):
         """Un actif sans cotation garde sa référence : il n'y a rien à chercher."""
         asset = _make_asset(symbol="PROP1", asset_type=AssetType.REAL_ESTATE, avg_buy_price="250000.0")
 
-        result = await alert_service._get_asset_price(asset)
+        result = await asset_price(asset)
         assert result == 250000.0
 
 
@@ -383,7 +381,7 @@ class TestAlertSummary:
     """Tests for get_alert_summary."""
 
     @pytest.mark.asyncio
-    async def test_summary_counts(self, alert_service):
+    async def test_summary_counts(self):
         """Verify summary aggregation."""
         db = AsyncMock()
 
@@ -406,7 +404,7 @@ class TestAlertSummary:
         result_mock.scalars.return_value.all.return_value = [alert1, alert2, alert3]
         db.execute.return_value = result_mock
 
-        summary = await alert_service.get_alert_summary(db, "user-123")
+        summary = await alert_summary(db, "user-123")
 
         assert summary["total_alerts"] == 3
         assert summary["active_alerts"] == 2
@@ -415,13 +413,13 @@ class TestAlertSummary:
         assert summary["triggered_today"] >= 0
 
     @pytest.mark.asyncio
-    async def test_empty_alerts_summary(self, alert_service):
+    async def test_empty_alerts_summary(self):
         db = AsyncMock()
         result_mock = MagicMock()
         result_mock.scalars.return_value.all.return_value = []
         db.execute.return_value = result_mock
 
-        summary = await alert_service.get_alert_summary(db, "user-123")
+        summary = await alert_summary(db, "user-123")
 
         assert summary["total_alerts"] == 0
         assert summary["active_alerts"] == 0

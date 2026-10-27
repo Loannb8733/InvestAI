@@ -23,7 +23,11 @@ import pytest
 
 # Fichiers où un échec silencieux fausse un chiffre affiché à l'utilisateur.
 MODULES_SENSIBLES = [
-    "app.services.alert_service",
+    "app.domains.alerts.asset_rules",
+    "app.domains.alerts.checker",
+    "app.domains.alerts.pricing",
+    "app.domains.alerts.risk_weights",
+    "app.domains.alerts.tasks",
     "app.services.metrics_service",
     "app.services.smart_insights_service",
     "app.services.snapshot_service",

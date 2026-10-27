@@ -1,6 +1,6 @@
 """Filet sur les alertes et les snapshots planifiés.
 
-`app/tasks/alerts.py` et `app/tasks/snapshots.py` étaient couverts à **0 %**.
+`app/domains/alerts/tasks.py` et `app/tasks/snapshots.py` étaient couverts à **0 %**.
 Ils tournent tous les jours — les alertes toutes les quinze minutes — et NEW-42
 a montré ce qu'un module de tâche jamais exécuté peut cacher : un `TypeError`
 quotidien pendant des mois, perdu dans les journaux Celery.
@@ -131,19 +131,19 @@ class TestVerificationDesAlertes:
         la trace dans `test_pas_de_boucle_fermee`). C'est donc le service qui
         est exercé ici, sur le même chemin de code.
         """
-        from app.services.alert_service import alert_service
+        from app.domains.alerts.checker import check_all_user_alerts
 
-        res = await alert_service.check_all_user_alerts(db_session)
+        res = await check_all_user_alerts(db_session)
 
         assert res["users_checked"] == 0
         assert res["alerts_triggered"] == 0
 
     async def test_un_utilisateur_sans_alerte_est_compte_sans_declencher(self, db_session, regular_user):
-        from app.services.alert_service import alert_service
+        from app.domains.alerts.checker import check_all_user_alerts
 
         await _portefeuille_garni(db_session, regular_user)
         await db_session.commit()
 
-        res = await alert_service.check_all_user_alerts(db_session)
+        res = await check_all_user_alerts(db_session)
 
         assert res["alerts_triggered"] == 0

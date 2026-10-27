@@ -12,7 +12,7 @@ celery_app = Celery(
     include=[
         "app.tasks.price_updates",
         "app.domains.predictions.tasks",
-        "app.tasks.alerts",
+        "app.domains.alerts.tasks",
         "app.tasks.snapshots",
         "app.tasks.emails",
         "app.tasks.cleanup",
@@ -75,7 +75,7 @@ celery_app.conf.beat_schedule = {
         "schedule": 43200.0,  # Every 12 hours
     },
     "check-alerts": {
-        "task": "app.tasks.alerts.check_all_alerts",
+        "task": "app.domains.alerts.tasks.check_all_alerts",
         "schedule": 300.0,  # Every 5 minutes
     },
     "refresh-fx-rates": {
@@ -86,7 +86,7 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=16, minute=5),
     },
     "seed-risk-weight-snapshots": {
-        "task": "app.tasks.alerts.seed_risk_weight_snapshots",
+        "task": "app.domains.alerts.tasks.seed_risk_weight_snapshots",
         "schedule": crontab(hour=0, minute=5),  # Daily at 00:05 UTC
     },
     "check-prediction-accuracy": {
