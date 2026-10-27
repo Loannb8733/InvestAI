@@ -1,0 +1,10 @@
+{
+  "body": {
+    "result": {
+      "goals_synced": 1,
+      "users": 1
+    },
+    "task": "sync-goals"
+  },
+  "status": 200
+}

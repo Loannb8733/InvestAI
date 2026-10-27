@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "Cron endpoints are disabled (CRON_SECRET not configured)."
+  },
+  "status": 503
+}

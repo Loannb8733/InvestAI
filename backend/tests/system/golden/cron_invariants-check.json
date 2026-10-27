@@ -1,0 +1,20 @@
+{
+  "body": {
+    "result": {
+      "counts": {
+        "fx": 0,
+        "holdings": 0,
+        "snapshots": 0
+      },
+      "details": {
+        "fx": [],
+        "holdings": [],
+        "snapshots": []
+      },
+      "material_violations": 0,
+      "total_violations": 0
+    },
+    "task": "invariants-check"
+  },
+  "status": 200
+}
