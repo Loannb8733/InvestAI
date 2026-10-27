@@ -75,6 +75,7 @@ async def list_alerts(
 @router.post("", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(alert_in: AlertCreate, user: CurrentUser, session: Session) -> AlertResponse:
     """Crée une alerte sur un actif de l'utilisateur, ou sur son portefeuille."""
+    asset = None
     if alert_in.condition not in PORTFOLIO_CONDITIONS:
         asset = await owned_asset(session, alert_in.asset_id, user.id)
         if not asset:
@@ -104,10 +105,13 @@ async def get_alert(alert_id: UUID, user: CurrentUser, session: Session) -> Aler
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
 async def update_alert(alert_id: UUID, alert_in: AlertUpdate, user: CurrentUser, session: Session) -> AlertResponse:
-    """Modifie le nom, le seuil, l'activation ou les canaux de notification d'une alerte."""
+    """Modifie nom, seuil, activation ou canaux d'une alerte ; un nouveau seuil ou une réactivation la réarme."""
     alert = await owned_alert(session, alert_id, user.id)
-    for field, value in alert_in.model_dump(exclude_none=True).items():
+    changes = alert_in.model_dump(exclude_none=True)
+    for field, value in changes.items():
         setattr(alert, field, value)
+    if "threshold" in changes or changes.get("is_active"):
+        alert.armed = True
     await session.commit()
     await session.refresh(alert)
     return await _with_asset(session, alert)

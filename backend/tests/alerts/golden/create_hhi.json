@@ -1,6 +1,19 @@
 {
   "body": {
-    "detail": "Internal server error"
+    "asset_id": null,
+    "asset_name": null,
+    "asset_symbol": null,
+    "condition": "concentration_hhi",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "id": "<id-14>",
+    "is_active": true,
+    "name": "Concentration",
+    "notify_email": true,
+    "notify_in_app": true,
+    "threshold": 0.3,
+    "triggered_at": null,
+    "triggered_count": 0
   },
-  "status": 500
+  "status": 201
 }

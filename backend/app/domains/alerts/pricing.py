@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.prices.service import price_feed
@@ -12,18 +12,19 @@ logger = logging.getLogger(__name__)
 QUOTED_TYPES = (AssetType.CRYPTO, AssetType.STOCK, AssetType.ETF)
 
 
-async def asset_price(asset: Asset) -> float:
-    """Cours courant d'un actif coté, 0 s'il est indisponible ; le prix de revient pour un actif non coté.
+async def asset_price(asset: Asset, currency: str = "EUR") -> float:
+    """Cours d'un actif coté dans ``currency``, 0 s'il est indisponible ; le prix de revient d'un actif non coté.
 
     Le zéro signale l'absence de cours à l'appelant : rendre le prix de revient ferait comparer celui-ci à
-    lui-même, ou déclencher une alerte de baisse sur un actif qui n'a pas bougé.
+    lui-même, ou déclencher une alerte de baisse sur un actif qui n'a pas bougé. Un actif non coté n'a de
+    prix qu'en euros.
     """
     quoted = asset.asset_type in QUOTED_TYPES
     try:
         if quoted:
-            quote = await price_feed.quote(asset.symbol, asset.asset_type)
+            quote = await price_feed.quote(asset.symbol, asset.asset_type, currency)
             return float(quote.price) if quote is not None else 0.0
-        return float(asset.avg_buy_price)
+        return float(asset.avg_buy_price) if currency == "EUR" else 0.0
     except Exception as exc:  # noqa: BLE001
         logger.warning("Cours indisponible pour %s (%s) : %s — alerte non évaluée", asset.symbol, asset.asset_type, exc)
         return 0.0 if quoted else float(asset.avg_buy_price)
@@ -41,13 +42,15 @@ async def daily_change(asset: Asset) -> float | None:
 
 
 async def breakeven_price(db: AsyncSession, asset: Asset) -> float | None:
-    """Prix de rentabilité : investi au prix moyen plus tous les frais de l'actif, rapporté à la quantité."""
+    """Prix de rentabilité : prix moyen d'achat, qui contient déjà les frais d'achat, plus les frais saisis à part.
+
+    Les frais saisis à part sont les transactions FEE, rapportées à la quantité détenue.
+    """
     quantity = float(asset.quantity)
     if quantity <= 0:
         return None
-    fees = case(
-        (Transaction.transaction_type == TransactionType.FEE, Transaction.quantity * Transaction.price),
-        else_=func.coalesce(Transaction.fee, 0),
+    standalone = select(func.sum(Transaction.quantity * Transaction.price)).where(
+        Transaction.asset_id == asset.id, Transaction.transaction_type == TransactionType.FEE
     )
-    row = (await db.execute(select(func.sum(fees).label("total_fees")).where(Transaction.asset_id == asset.id))).one()
-    return (quantity * float(asset.avg_buy_price) + float(row[0] or 0)) / quantity
+    fees = float((await db.execute(standalone)).scalar() or 0)
+    return (quantity * float(asset.avg_buy_price) + fees) / quantity

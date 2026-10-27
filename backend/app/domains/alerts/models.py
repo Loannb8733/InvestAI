@@ -34,7 +34,11 @@ AUTO_THRESHOLD_CONDITIONS = frozenset({AlertCondition.TARGET_BREAK_EVEN, AlertCo
 
 
 class Alert(Base):
-    """Alerte d'un utilisateur, sur un actif ou sur son portefeuille."""
+    """Alerte d'un utilisateur, sur un actif ou sur son portefeuille.
+
+    ``armed`` vaut False après un déclenchement, tant que la condition reste vraie : l'alerte ne se
+    redéclenche qu'après être redevenue fausse.
+    """
 
     __tablename__ = "alerts"
 
@@ -53,6 +57,7 @@ class Alert(Base):
     threshold: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=8), nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="EUR", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    armed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     triggered_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     notify_email: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

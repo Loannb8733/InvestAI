@@ -7,7 +7,7 @@
       "condition": "allocation_drift",
       "created_at": "<volatile>",
       "currency": "EUR",
-      "id": "<id-13>",
+      "id": "<id-15>",
       "is_active": true,
       "name": "Dérive",
       "notify_email": true,
@@ -29,8 +29,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 0.3,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": null,
@@ -39,7 +39,7 @@
       "condition": "portfolio_drawdown",
       "created_at": "<volatile>",
       "currency": "EUR",
-      "id": "<id-15>",
+      "id": "<id-13>",
       "is_active": true,
       "name": "Repli",
       "notify_email": true,
@@ -77,8 +77,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 0.0,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": "<id-9>",
@@ -93,8 +93,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 5.0,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": "<id-0>",
@@ -109,8 +109,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 3.0,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": "<id-6>",
@@ -125,8 +125,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 20.0,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": "<id-4>",
@@ -141,8 +141,8 @@
       "notify_email": true,
       "notify_in_app": true,
       "threshold": 10.0,
-      "triggered_at": "2026-10-17T12:06:00+00:00",
-      "triggered_count": 2
+      "triggered_at": "2026-10-17T12:00:00+00:00",
+      "triggered_count": 1
     },
     {
       "asset_id": "<id-2>",

@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -18,8 +18,8 @@ from app.services.telegram_service import telegram_service
 
 logger = logging.getLogger(__name__)
 
-COOLDOWN = timedelta(minutes=5)
 PORTFOLIO_SYMBOL = "Portefeuille"
+PRICE_CONDITIONS = frozenset({AlertCondition.PRICE_ABOVE, AlertCondition.PRICE_BELOW})
 
 
 @dataclass
@@ -55,21 +55,28 @@ async def _evaluate_portfolio(db: AsyncSession, alert: Alert) -> AlertTrigger | 
     return _trigger(alert, PORTFOLIO_SYMBOL, threshold, value, message) if message else None
 
 
-async def evaluate(db: AsyncSession, alert: Alert) -> AlertTrigger | None:
-    """Déclenchement de l'alerte s'il a lieu ; sans cours disponible, une alerte d'actif ne se déclenche pas."""
+async def _assess(db: AsyncSession, alert: Alert) -> tuple[bool, AlertTrigger | None]:
     if alert.condition in PORTFOLIO_CONDITIONS:
-        return await _evaluate_portfolio(db, alert)
+        return True, await _evaluate_portfolio(db, alert)
     asset = (await db.execute(select(Asset).where(Asset.id == alert.asset_id))).scalar_one_or_none()
     if not asset:
-        return None
-    price = await asset_price(asset)
+        return False, None
+    price = await asset_price(asset, alert.currency if alert.condition in PRICE_CONDITIONS else "EUR")
     if price == 0:
-        return None
+        return False, None
     outcome = await asset_rules.RULES[alert.condition](db, alert, asset, price)
     if outcome is None:
-        return None
+        return True, None
     threshold, message = outcome
-    return _trigger(alert, asset.symbol, threshold, price, message)
+    return True, _trigger(alert, asset.symbol, threshold, price, message)
+
+
+async def evaluate(db: AsyncSession, alert: Alert) -> AlertTrigger | None:
+    """Déclenchement de l'alerte s'il a lieu ; sans cours disponible, une alerte d'actif ne se déclenche pas.
+
+    Un seuil de prix se compare au cours dans la devise de l'alerte ; les autres conditions, en euros.
+    """
+    return (await _assess(db, alert))[1]
 
 
 async def _send_telegram(user: User | None, trigger: AlertTrigger, priority: NotificationPriority) -> None:
@@ -107,20 +114,28 @@ async def _notify(db: AsyncSession, alert: Alert, trigger: AlertTrigger, user: U
 
 
 async def check_alerts(db: AsyncSession, user_id: str) -> list[AlertTrigger]:
-    """Évalue les alertes actives de l'utilisateur hors délai de répétition, notifie celles qui se déclenchent."""
+    """Évalue les alertes actives de l'utilisateur et notifie celles dont la condition vient de devenir vraie.
+
+    Une alerte déclenchée se désarme ; elle se réarme dès que sa condition est évaluée fausse, pas quand le
+    cours manque.
+    """
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     alerts = (
         (await db.execute(select(Alert).where(Alert.user_id == user_id, Alert.is_active.is_(True)))).scalars().all()
     )
     triggered = []
+    rearmed = False
     for alert in alerts:
-        if alert.triggered_at and (datetime.now(UTC) - alert.triggered_at) < COOLDOWN:
-            continue
-        trigger = await evaluate(db, alert)
-        if trigger:
+        known, trigger = await _assess(db, alert)
+        if trigger is None:
+            if known and not alert.armed:
+                alert.armed = True
+                rearmed = True
+        elif alert.armed:
+            alert.armed = False
             triggered.append(trigger)
             await _notify(db, alert, trigger, user)
-    if triggered:
+    if triggered or rearmed:
         await db.commit()
     return triggered
 
