@@ -1,0 +1,23 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "asset_id": "<id-0>",
+          "condition": "price_above",
+          "name": "X",
+          "threshold": 0
+        },
+        "loc": [
+          "body"
+        ],
+        "msg": "Value error, Le seuil doit être supérieur à 0 pour cette condition",
+        "type": "value_error"
+      }
+    ]
+  },
+  "status": 422
+}

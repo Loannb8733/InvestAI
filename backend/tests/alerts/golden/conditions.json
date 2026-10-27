@@ -1,0 +1,82 @@
+{
+  "body": [
+    {
+      "description": "Alerte quand le prix dépasse un seuil",
+      "is_portfolio": false,
+      "label": "Prix supérieur à",
+      "threshold_unit": null,
+      "value": "price_above"
+    },
+    {
+      "description": "Alerte quand le prix passe sous un seuil",
+      "is_portfolio": false,
+      "label": "Prix inférieur à",
+      "threshold_unit": null,
+      "value": "price_below"
+    },
+    {
+      "description": "Alerte quand le gain dépasse un pourcentage",
+      "is_portfolio": false,
+      "label": "Hausse de X%",
+      "threshold_unit": null,
+      "value": "change_percent_up"
+    },
+    {
+      "description": "Alerte quand la perte dépasse un pourcentage",
+      "is_portfolio": false,
+      "label": "Baisse de X%",
+      "threshold_unit": null,
+      "value": "change_percent_down"
+    },
+    {
+      "description": "Alerte sur la variation journalière positive",
+      "is_portfolio": false,
+      "label": "Hausse journalière de X%",
+      "threshold_unit": null,
+      "value": "daily_change_up"
+    },
+    {
+      "description": "Alerte sur la variation journalière négative",
+      "is_portfolio": false,
+      "label": "Baisse journalière de X%",
+      "threshold_unit": null,
+      "value": "daily_change_down"
+    },
+    {
+      "description": "Alerte quand le prix dépasse le seuil de rentabilité (calculé automatiquement)",
+      "is_portfolio": false,
+      "label": "Retour au break-even",
+      "threshold_unit": null,
+      "value": "target_break_even"
+    },
+    {
+      "description": "Alerte quand la contribution au risque augmente fortement en 24h",
+      "is_portfolio": false,
+      "label": "Pic de volatilité",
+      "threshold_unit": null,
+      "value": "volatility_spike"
+    },
+    {
+      "description": "Alerte quand le portefeuille recule de X% depuis son plus-haut historique",
+      "is_portfolio": true,
+      "label": "Repli du portefeuille (drawdown)",
+      "threshold_unit": "%",
+      "value": "portfolio_drawdown"
+    },
+    {
+      "description": "Alerte quand l'indice de concentration HHI dépasse un seuil (0 = dispersé, 1 = un seul actif)",
+      "is_portfolio": true,
+      "label": "Concentration excessive (HHI)",
+      "threshold_unit": "0-1",
+      "value": "concentration_hhi"
+    },
+    {
+      "description": "Alerte quand l'écart max vs votre allocation cible dépasse X points",
+      "is_portfolio": true,
+      "label": "Dérive d'allocation",
+      "threshold_unit": "pts",
+      "value": "allocation_drift"
+    }
+  ],
+  "status": 200
+}

@@ -1,0 +1,19 @@
+{
+  "body": {
+    "asset_id": "<id-0>",
+    "asset_name": null,
+    "asset_symbol": "BTC",
+    "condition": "price_above",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "id": "<id-1>",
+    "is_active": true,
+    "name": "BTC très haut",
+    "notify_email": true,
+    "notify_in_app": false,
+    "threshold": 70000.0,
+    "triggered_at": "2026-10-17T12:06:00+00:00",
+    "triggered_count": 2
+  },
+  "status": 200
+}

@@ -1,0 +1,75 @@
+{
+  "body": [
+    {
+      "alert_id": "<id-1>",
+      "alert_name": "BTC haut",
+      "condition": "price_above",
+      "current_value": 60000.0,
+      "message": "BTC a dépassé 50000.0 EUR (actuel: 60000.00)",
+      "symbol": "BTC",
+      "threshold": 50000.0,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-5>",
+      "alert_name": "SOL +10",
+      "condition": "change_percent_up",
+      "current_value": 150.0,
+      "message": "SOL a augmenté de 49.9% (seuil: 10.0%)",
+      "symbol": "SOL",
+      "threshold": 10.0,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-7>",
+      "alert_name": "ARB -20",
+      "condition": "change_percent_down",
+      "current_value": 0.8,
+      "message": "ARB a baissé de 33.4% (seuil: 20.0%)",
+      "symbol": "ARB",
+      "threshold": 20.0,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-8>",
+      "alert_name": "BTC jour",
+      "condition": "daily_change_up",
+      "current_value": 60000.0,
+      "message": "BTC hausse journalière de 3.5% (seuil: 3.0%)",
+      "symbol": "BTC",
+      "threshold": 3.0,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-10>",
+      "alert_name": "DOGE jour",
+      "condition": "daily_change_down",
+      "current_value": 0.15,
+      "message": "DOGE baisse journalière de 6.0% (seuil: 5.0%)",
+      "symbol": "DOGE",
+      "threshold": 5.0,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-11>",
+      "alert_name": "ETH rentable",
+      "condition": "target_break_even",
+      "current_value": 3000.0,
+      "message": "🚀 ETH est redevenu rentable ! Prix actuel : 3000.00€ (Break-even : 2003.33€)",
+      "symbol": "ETH",
+      "threshold": 2003.3333,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    },
+    {
+      "alert_id": "<id-14>",
+      "alert_name": "Concentration",
+      "condition": "concentration_hhi",
+      "current_value": 0.4154,
+      "message": "⚠️ Concentration élevée du portefeuille (HHI 0.42, seuil 0.30). Position dominante : BTC. Envisage de diversifier.",
+      "symbol": "Portefeuille",
+      "threshold": 0.3,
+      "triggered_at": "2026-10-17T12:00:00+00:00"
+    }
+  ],
+  "status": 200
+}

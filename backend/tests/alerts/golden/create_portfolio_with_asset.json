@@ -1,0 +1,23 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "asset_id": "<id-0>",
+          "condition": "portfolio_drawdown",
+          "name": "X",
+          "threshold": 5
+        },
+        "loc": [
+          "body"
+        ],
+        "msg": "Value error, Une alerte de portefeuille ne cible pas un actif",
+        "type": "value_error"
+      }
+    ]
+  },
+  "status": 422
+}

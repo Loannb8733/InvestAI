@@ -1,0 +1,19 @@
+{
+  "body": {
+    "asset_id": "<id-9>",
+    "asset_name": null,
+    "asset_symbol": "DOGE",
+    "condition": "daily_change_down",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "id": "<id-10>",
+    "is_active": true,
+    "name": "DOGE jour",
+    "notify_email": true,
+    "notify_in_app": true,
+    "threshold": 5.0,
+    "triggered_at": null,
+    "triggered_count": 0
+  },
+  "status": 201
+}

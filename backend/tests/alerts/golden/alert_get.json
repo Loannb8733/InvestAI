@@ -1,0 +1,19 @@
+{
+  "body": {
+    "asset_id": "<id-0>",
+    "asset_name": null,
+    "asset_symbol": "BTC",
+    "condition": "price_above",
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "id": "<id-1>",
+    "is_active": true,
+    "name": "BTC haut",
+    "notify_email": true,
+    "notify_in_app": true,
+    "threshold": 50000.0,
+    "triggered_at": null,
+    "triggered_count": 0
+  },
+  "status": 200
+}
