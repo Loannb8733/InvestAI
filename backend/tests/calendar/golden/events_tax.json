@@ -1,0 +1,50 @@
+{
+  "body": [
+    {
+      "amount": null,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": "Ouverture du service de déclaration en ligne (généralement début avril). Date indicative — vérifiez le calendrier officiel sur impots.gouv.fr. Concerne notamment les formulaires 2042 (déclaration des revenus) et 2086 (plus-values sur actifs numériques).",
+      "event_date": "2027-04-01T09:00:00Z",
+      "event_type": "tax_deadline",
+      "id": "<id-17>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Ouverture de la déclaration des revenus 2027"
+    },
+    {
+      "amount": null,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": "Date limite de la déclaration en ligne pour les départements 50 à 976. Date indicative — vérifiez le calendrier officiel sur impots.gouv.fr. Concerne notamment les formulaires 2042 (déclaration des revenus) et 2086 (plus-values sur actifs numériques).",
+      "event_date": "2027-06-08T09:00:00Z",
+      "event_type": "tax_deadline",
+      "id": "<id-18>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Date limite de déclaration en ligne 2027 (départements 50 et +)"
+    },
+    {
+      "amount": null,
+      "completed_at": null,
+      "created_at": "<volatile>",
+      "currency": "EUR",
+      "description": "Prélèvement du solde de l'impôt sur le revenu (généralement mi-septembre). Date indicative — vérifiez le calendrier officiel sur impots.gouv.fr. Concerne notamment les formulaires 2042 (déclaration des revenus) et 2086 (plus-values sur actifs numériques).",
+      "event_date": "2027-09-15T09:00:00Z",
+      "event_type": "tax_deadline",
+      "id": "<id-19>",
+      "is_completed": false,
+      "is_recurring": false,
+      "recurrence_rule": null,
+      "source_project_id": null,
+      "title": "Solde de l'impôt sur le revenu 2027"
+    }
+  ],
+  "status": 200
+}

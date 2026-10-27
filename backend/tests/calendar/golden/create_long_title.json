@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "max_length": 200
+        },
+        "input": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "loc": [
+          "body",
+          "title"
+        ],
+        "msg": "String should have at most 200 characters",
+        "type": "string_too_long"
+      }
+    ]
+  },
+  "status": 422
+}

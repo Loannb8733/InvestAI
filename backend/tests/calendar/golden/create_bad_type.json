@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'dividend', 'rent', 'interest', 'payment_due', 'rebalance', 'tax_deadline', 'reminder' or 'other'"
+        },
+        "input": "birthday",
+        "loc": [
+          "body",
+          "event_type"
+        ],
+        "msg": "Input should be 'dividend', 'rent', 'interest', 'payment_due', 'rebalance', 'tax_deadline', 'reminder' or 'other'",
+        "type": "enum"
+      }
+    ]
+  },
+  "status": 422
+}

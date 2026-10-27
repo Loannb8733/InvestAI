@@ -1,0 +1,45 @@
+{
+  "body": [
+    {
+      "color": "#22c55e",
+      "label": "Dividende",
+      "value": "dividend"
+    },
+    {
+      "color": "#3b82f6",
+      "label": "Loyer",
+      "value": "rent"
+    },
+    {
+      "color": "#8b5cf6",
+      "label": "Interet",
+      "value": "interest"
+    },
+    {
+      "color": "#ef4444",
+      "label": "Echeance",
+      "value": "payment_due"
+    },
+    {
+      "color": "#f59e0b",
+      "label": "Reequilibrage",
+      "value": "rebalance"
+    },
+    {
+      "color": "#ec4899",
+      "label": "Echeance fiscale",
+      "value": "tax_deadline"
+    },
+    {
+      "color": "#6b7280",
+      "label": "Rappel",
+      "value": "reminder"
+    },
+    {
+      "color": "#71717a",
+      "label": "Autre",
+      "value": "other"
+    }
+  ],
+  "status": 200
+}

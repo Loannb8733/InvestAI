@@ -1,0 +1,8 @@
+{
+  "body": {
+    "created": 0,
+    "message": "Aucune échéance à ajouter : elles existent déjà ou sont passées.",
+    "skipped": 6
+  },
+  "status": 200
+}

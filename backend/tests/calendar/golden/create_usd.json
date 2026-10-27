@@ -1,0 +1,18 @@
+{
+  "body": {
+    "amount": 100.0,
+    "completed_at": null,
+    "created_at": "<volatile>",
+    "currency": "USD",
+    "description": null,
+    "event_date": "2026-12-01T09:00:00Z",
+    "event_type": "interest",
+    "id": "<id-2>",
+    "is_completed": false,
+    "is_recurring": false,
+    "recurrence_rule": null,
+    "source_project_id": null,
+    "title": "Coupon US"
+  },
+  "status": 201
+}

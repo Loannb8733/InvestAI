@@ -1,0 +1,8 @@
+{
+  "body": {
+    "created": 3,
+    "message": "3 échéance(s) fiscale(s) ajoutée(s). Dates indicatives — vérifiez sur impots.gouv.fr.",
+    "skipped": 3
+  },
+  "status": 200
+}

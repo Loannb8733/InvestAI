@@ -1,0 +1,18 @@
+{
+  "body": {
+    "amount": 50.0,
+    "completed_at": null,
+    "created_at": "<volatile>",
+    "currency": "EUR",
+    "description": null,
+    "event_date": "2026-09-01T09:00:00Z",
+    "event_type": "interest",
+    "id": "<id-6>",
+    "is_completed": false,
+    "is_recurring": false,
+    "recurrence_rule": null,
+    "source_project_id": null,
+    "title": "Intérêts septembre"
+  },
+  "status": 201
+}
