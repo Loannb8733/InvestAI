@@ -1,10 +1,10 @@
 """Filet sur les deux tâches de nettoyage qui **écrivent** en base.
 
-`app/tasks/cleanup.py` était couvert à **0 %**. Deux de ses fonctions ne se
+`app/domains/system/maintenance.py` était couvert à **0 %**. Deux de ses fonctions ne se
 contentent pas de lire :
 
-- `_cleanup_duplicate_transactions_async` **supprime** des transactions ;
-- `_validate_portfolio_consistency_async` **réécrit** la quantité d'un actif
+- `remove_duplicate_transactions` **supprime** des transactions ;
+- `check_holdings` **réécrit** la quantité d'un actif
   cold-wallet à partir de la somme de ses transactions.
 
 Le projet garde la mémoire de ce que ce genre d'écriture peut coûter : NEW-06
@@ -24,9 +24,9 @@ from decimal import Decimal
 import pytest
 
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.system import maintenance
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
-from app.tasks import cleanup
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def session_de_test(db_session, monkeypatch):
     async def _flush_seulement():
         await db_session.flush()
 
-    monkeypatch.setattr(cleanup, "session_factory", _fabrique)
+    monkeypatch.setattr(maintenance, "session_factory", _fabrique)
     monkeypatch.setattr(db_session, "commit", _flush_seulement)
     return db_session
 
@@ -99,7 +99,7 @@ class TestDeduplicationDeTransactions:
         session_de_test.add(_tx(btc, externe="binance-42", quantite="99"))
         await session_de_test.flush()
 
-        res = await cleanup._cleanup_duplicate_transactions_async()
+        res = await maintenance.remove_duplicate_transactions()
 
         assert res["deleted_duplicates"] == 1
         restantes = (
@@ -127,7 +127,7 @@ class TestDeduplicationDeTransactions:
         session_de_test.add(_tx(btc))
         await session_de_test.flush()
 
-        res = await cleanup._cleanup_duplicate_transactions_async()
+        res = await maintenance.remove_duplicate_transactions()
 
         assert res["deleted_duplicates"] == 0
 
@@ -138,7 +138,7 @@ class TestDeduplicationDeTransactions:
         session_de_test.add(_tx(btc, externe="b"))
         await session_de_test.flush()
 
-        res = await cleanup._cleanup_duplicate_transactions_async()
+        res = await maintenance.remove_duplicate_transactions()
 
         assert res["deleted_duplicates"] == 0
 
@@ -150,7 +150,7 @@ class TestCoherenceDesQuantites:
         session_de_test.add(_tx(froid, quantite="3"))
         await session_de_test.flush()
 
-        res = await cleanup._validate_portfolio_consistency_async()
+        res = await maintenance.check_holdings()
 
         assert len(res["healed"]) == 1
         assert float(froid.quantity) == 3.0
@@ -167,7 +167,7 @@ class TestCoherenceDesQuantites:
         session_de_test.add(_tx(chaud, quantite="3"))
         await session_de_test.flush()
 
-        res = await cleanup._validate_portfolio_consistency_async()
+        res = await maintenance.check_holdings()
 
         assert len(res["details"]) == 1
         assert res["healed"] == []
@@ -184,7 +184,7 @@ class TestCoherenceDesQuantites:
         session_de_test.add(_tx(froid, type_tx=TransactionType.SELL, quantite="4"))
         await session_de_test.flush()
 
-        res = await cleanup._validate_portfolio_consistency_async()
+        res = await maintenance.check_holdings()
 
         assert res["healed"] == []
         assert float(froid.quantity) == 1.0
@@ -197,7 +197,7 @@ class TestCoherenceDesQuantites:
         session_de_test.add(_tx(froid, quantite="1"))
         await session_de_test.flush()
 
-        res = await cleanup._validate_portfolio_consistency_async()
+        res = await maintenance.check_holdings()
 
         assert res["details"] == []
         assert res["healed"] == []
@@ -208,7 +208,7 @@ class TestCoherenceDesQuantites:
         session_de_test.add(_tx(froid, quantite="2"))
         await session_de_test.flush()
 
-        res = await cleanup._validate_portfolio_consistency_async()
+        res = await maintenance.check_holdings()
 
         assert res["details"] == []
         assert res["healed"] == []
@@ -234,6 +234,6 @@ class TestPurgesParAnciennete:
         session_de_test.add(recente)
         await session_de_test.flush()
 
-        res = await cleanup._cleanup_old_predictions_async(days_to_keep=90)
+        res = await maintenance.purge_old_predictions(days_to_keep=90)
 
         assert res["deleted_predictions"] == 1

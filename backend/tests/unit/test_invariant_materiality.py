@@ -20,7 +20,7 @@ from decimal import Decimal as D
 
 import pytest
 
-from scripts.check_invariants import MATERIALITY_DIFF_VALUE, MATERIALITY_VALUE, classify_holdings_gap
+from app.domains.system.invariants import MATERIALITY_DIFF_VALUE, MATERIALITY_VALUE, classify_holdings_gap
 
 
 class TestPositionSoldee:

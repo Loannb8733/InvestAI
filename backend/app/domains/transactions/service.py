@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import DomainError, NotFoundError
 from app.domains.portfolio.models import Asset
 from app.domains.portfolio.repository import AssetRepository
+from app.domains.system.audit import log_audit
 from app.domains.transactions import ledger
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
 from app.domains.transactions.schemas import TransactionCreate, TransactionUpdate
 from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
-from app.services.audit_service import log_audit
 
 TRANSACTION_NOT_FOUND = "Transaction non trouvée"
 ASSET_NOT_FOUND = "Actif non trouvé"
@@ -52,7 +52,7 @@ class TransactionService:
         await log_audit(
             self._session,
             action=action,
-            user_id=str(requester.user_id),
+            user_id=requester.user_id,
             resource_type="transaction",
             resource_id=str(resource_id),
             details=details,

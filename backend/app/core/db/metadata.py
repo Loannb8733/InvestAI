@@ -13,9 +13,9 @@ from app.domains.planning.simulations import models as simulation_models
 from app.domains.portfolio import models as portfolio_models
 from app.domains.predictions import models as prediction_models
 from app.domains.strategies import models as strategy_models
+from app.domains.system import models as system_models
 from app.domains.transactions import models as transaction_models
 from app.models import (
-    audit_log,
     notification,
     planned_order,
     portfolio_snapshot,
@@ -25,7 +25,6 @@ metadata = Base.metadata
 
 __all__ = [
     "alert_models",
-    "audit_log",
     "audit_models",
     "calendar_models",
     "crowdfunding_models",
@@ -43,5 +42,6 @@ __all__ = [
     "prediction_models",
     "simulation_models",
     "strategy_models",
+    "system_models",
     "transaction_models",
 ]

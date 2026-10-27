@@ -49,11 +49,7 @@ from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.services.materialite_invariants import (  # noqa: F401 — réexportés pour les tests
-    MATERIALITY_DIFF_VALUE,
-    MATERIALITY_VALUE,
-    classify_holdings_gap,
-)
+from app.domains.system.invariants import classify_holdings_gap
 
 # Conservative tolerances. Money columns are Numeric(18,2) so any drift above a
 # rounding cent is a real bug.

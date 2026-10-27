@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
+from app.domains.system.models import AuditLog
 from app.domains.transactions.models import Transaction
-from app.models.audit_log import AuditLog
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 URL = "/api/v1/transactions"

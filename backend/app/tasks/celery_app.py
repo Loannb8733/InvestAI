@@ -15,7 +15,7 @@ celery_app = Celery(
         "app.domains.alerts.tasks",
         "app.tasks.snapshots",
         "app.tasks.emails",
-        "app.tasks.cleanup",
+        "app.domains.system.tasks",
         "app.domains.crowdfunding.tasks",
         "app.tasks.contrarian_stats",
         "app.tasks.regime_alerts",
@@ -142,11 +142,11 @@ celery_app.conf.beat_schedule = {
     },
     # === Data Cleanup ===
     "run-weekly-cleanup": {
-        "task": "app.tasks.cleanup.run_weekly_cleanup",
+        "task": "app.domains.system.tasks.run_weekly_cleanup",
         "schedule": crontab(hour=3, minute=0, day_of_week=1),  # Monday at 03:00 UTC
     },
     "validate-portfolio-consistency": {
-        "task": "app.tasks.cleanup.validate_portfolio_consistency",
+        "task": "app.domains.system.tasks.validate_portfolio_consistency",
         "schedule": crontab(hour=4, minute=0),  # Every day at 04:00 UTC
     },
     # === Crowdfunding Delay Monitoring ===

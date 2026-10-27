@@ -1,9 +1,7 @@
-comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/dashboard.py
 comments	backend/app/api/v1/endpoints/notifications.py
 comments	backend/app/api/v1/endpoints/smart_insights.py
 comments	backend/app/api/v1/endpoints/telegram_webhook.py
-comments	backend/app/api/v1/endpoints/websocket.py
 comments	backend/app/core/config.py
 comments	backend/app/core/finance_constants.py
 comments	backend/app/core/logging.py
@@ -26,7 +24,6 @@ comments	backend/app/services/csv_parsers.py
 comments	backend/app/services/email_service.py
 comments	backend/app/services/fifo_replay.py
 comments	backend/app/services/insights_service.py
-comments	backend/app/services/materialite_invariants.py
 comments	backend/app/services/metrics_cost_basis.py
 comments	backend/app/services/metrics_service.py
 comments	backend/app/services/notification_service.py
@@ -38,7 +35,6 @@ comments	backend/app/services/snapshot_risk.py
 comments	backend/app/services/snapshot_service.py
 comments	backend/app/services/telegram_service.py
 comments	backend/app/tasks/celery_app.py
-comments	backend/app/tasks/cleanup.py
 comments	backend/app/tasks/emails.py
 comments	backend/app/tasks/price_updates.py
 comments	backend/app/tasks/snapshots.py
@@ -170,7 +166,6 @@ comments	frontend/src/types/simulations.ts
 too-long	backend/app/api/v1/endpoints/dashboard.py
 too-long	backend/app/api/v1/endpoints/smart_insights.py
 too-long	backend/app/api/v1/endpoints/telegram_webhook.py
-too-long	backend/app/api/v1/endpoints/websocket.py
 too-long	backend/app/core/redis_client.py
 too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
