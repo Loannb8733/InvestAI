@@ -1,6 +1,6 @@
 """Ce que devient une alerte quand le cours n'est pas disponible.
 
-`_get_asset_price` rattrape toute erreur du service de prix et retombe sur
+`asset_price` rattrape toute erreur du service de prix et retombe sur
 `avg_buy_price`. Ce repli est indistinguable d'un cours réel : le garde
 `if current_price == 0: return None` ne se déclenche jamais, puisque le prix de
 revient n'est pas nul.
@@ -22,20 +22,16 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.alerts.checker import evaluate
+from app.domains.alerts.models import Alert, AlertCondition
+from app.domains.alerts.pricing import asset_price
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.alert import Alert, AlertCondition
-from app.services.alert_service import AlertService
 
 
 @pytest.fixture
-def service():
-    return AlertService()
-
-
-@pytest.fixture
-def cours(monkeypatch, service):
+def cours(monkeypatch):
     """Cours renvoyé par le service de prix ; `None` simule une panne."""
     etat = {"valeur": None, "panne": False}
 
@@ -76,24 +72,24 @@ async def actif_et_alerte(db_session, user, condition, seuil, prix_revient="100"
 
 
 class TestCoursDisponible:
-    async def test_une_baisse_reelle_declenche_l_alerte(self, db_session, regular_user, service, cours):
+    async def test_une_baisse_reelle_declenche_l_alerte(self, db_session, regular_user, cours):
         actif, alerte = await actif_et_alerte(db_session, regular_user, AlertCondition.CHANGE_PERCENT_DOWN, 20)
         cours["valeur"] = 50.0  # -50 % depuis 100
 
-        resultat = await service._check_single_alert(db_session, alerte)
+        resultat = await evaluate(db_session, alerte)
 
         assert resultat is not None
 
-    async def test_une_baisse_sous_le_seuil_ne_declenche_pas(self, db_session, regular_user, service, cours):
+    async def test_une_baisse_sous_le_seuil_ne_declenche_pas(self, db_session, regular_user, cours):
         actif, alerte = await actif_et_alerte(db_session, regular_user, AlertCondition.CHANGE_PERCENT_DOWN, 20)
         cours["valeur"] = 90.0  # -10 %, sous le seuil de 20
 
-        assert await service._check_single_alert(db_session, alerte) is None
+        assert await evaluate(db_session, alerte) is None
 
 
 class TestCoursIndisponible:
     async def test_une_panne_du_fournisseur_ne_declenche_aucune_alerte_de_variation(
-        self, db_session, regular_user, service, cours
+        self, db_session, regular_user, cours
     ):
         """Sans cours, la variation est inconnue — l'alerte doit se taire.
 
@@ -105,9 +101,9 @@ class TestCoursIndisponible:
         actif, alerte = await actif_et_alerte(db_session, regular_user, AlertCondition.CHANGE_PERCENT_DOWN, 20)
         cours["panne"] = True
 
-        assert await service._check_single_alert(db_session, alerte) is None
+        assert await evaluate(db_session, alerte) is None
 
-    async def test_une_panne_ne_doit_pas_declencher_une_alerte_de_seuil(self, db_session, regular_user, service, cours):
+    async def test_une_panne_ne_doit_pas_declencher_une_alerte_de_seuil(self, db_session, regular_user, cours):
         """Le cœur du défaut : `PRICE_BELOW` se déclenchait sur le prix de revient.
 
         Un actif acheté 100 avec une alerte « sous 150 » : le cours réel est
@@ -120,19 +116,19 @@ class TestCoursIndisponible:
         )
         cours["panne"] = True
 
-        assert await service._check_single_alert(db_session, alerte) is None
+        assert await evaluate(db_session, alerte) is None
 
-    async def test_un_cours_nul_est_traite_comme_une_panne(self, db_session, regular_user, service, cours):
+    async def test_un_cours_nul_est_traite_comme_une_panne(self, db_session, regular_user, cours):
         actif, alerte = await actif_et_alerte(
             db_session, regular_user, AlertCondition.PRICE_BELOW, 150, prix_revient="100"
         )
         cours["valeur"] = 0.0
 
-        assert await service._check_single_alert(db_session, alerte) is None
+        assert await evaluate(db_session, alerte) is None
 
 
 class TestActifsNonCotes:
-    async def test_un_actif_sans_cotation_garde_son_prix_de_revient(self, db_session, regular_user, service):
+    async def test_un_actif_sans_cotation_garde_son_prix_de_revient(self, db_session, regular_user):
         """Immobilier, crowdfunding : il n'y a pas de cours à chercher.
 
         Pour ces types, `avg_buy_price` **est** la valeur de référence, et le
@@ -152,4 +148,4 @@ class TestActifsNonCotes:
         db_session.add(bien)
         await db_session.commit()
 
-        assert await service._get_asset_price(bien) == 100.0
+        assert await asset_price(bien) == 100.0

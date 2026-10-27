@@ -23,7 +23,9 @@ import pytest
 from app.core.db.session import is_worker_process
 from app.tasks.async_runner import run_async
 
-_TASKS = Path(__file__).resolve().parents[2] / "app" / "tasks"
+_APP = Path(__file__).resolve().parents[2] / "app"
+# Les tâches Celery vivent dans app/tasks et, depuis la refonte, dans le tasks.py de chaque domaine.
+_TASK_FILES = sorted([*(_APP / "tasks").glob("*.py"), *(_APP / "domains").rglob("tasks.py")])
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +55,7 @@ class TestExecuteurUnique:
     def test_aucune_tache_ne_redefinit_run_async(self):
         coupables = [
             f.name
-            for f in _TASKS.glob("*.py")
+            for f in _TASK_FILES
             if f.name != "async_runner.py" and re.search(r"^def _?run_async\(", f.read_text(encoding="utf-8"), re.M)
         ]
         assert not coupables, f"helper dupliqué dans {coupables} — importer app.tasks.async_runner"
@@ -61,14 +63,14 @@ class TestExecuteurUnique:
     def test_aucune_tache_ne_cree_sa_propre_boucle(self):
         coupables = [
             f.name
-            for f in _TASKS.glob("*.py")
+            for f in _TASK_FILES
             if f.name != "async_runner.py" and "new_event_loop" in f.read_text(encoding="utf-8")
         ]
         assert not coupables, f"new_event_loop hors du module unique dans {coupables}"
 
     def test_le_scan_voit_bien_les_fichiers(self):
         # Sans ce garde-fou, les deux tests ci-dessus passeraient à vide.
-        assert len(list(_TASKS.glob("*.py"))) >= 10
+        assert len(_TASK_FILES) >= 10
 
 
 class TestComportement:

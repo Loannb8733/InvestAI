@@ -16,7 +16,7 @@ n'est pas silencieux.
 import ast
 import inspect
 
-from app.services import alert_service as module
+from app.domains.alerts import checker as module
 
 
 def _gestionnaires_autour_de(appel: str) -> list[ast.ExceptHandler]:

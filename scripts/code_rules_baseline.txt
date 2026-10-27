@@ -1,4 +1,3 @@
-comments	backend/app/api/v1/endpoints/alerts.py
 comments	backend/app/api/v1/endpoints/calendar.py
 comments	backend/app/api/v1/endpoints/cron.py
 comments	backend/app/api/v1/endpoints/dashboard.py
@@ -20,11 +19,9 @@ comments	backend/app/ml/forecaster.py
 comments	backend/app/ml/hyperparameter_tuner.py
 comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
-comments	backend/app/models/alert.py
 comments	backend/app/models/planned_order.py
 comments	backend/app/models/portfolio_snapshot.py
 comments	backend/app/schemas/_money.py
-comments	backend/app/services/alert_service.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
 comments	backend/app/services/email_service.py
@@ -171,7 +168,6 @@ comments	frontend/src/types/exchanges.ts
 comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
-too-long	backend/app/api/v1/endpoints/alerts.py
 too-long	backend/app/api/v1/endpoints/calendar.py
 too-long	backend/app/api/v1/endpoints/dashboard.py
 too-long	backend/app/api/v1/endpoints/smart_insights.py
@@ -181,7 +177,6 @@ too-long	backend/app/core/redis_client.py
 too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
 too-long	backend/app/ml/regime_detector.py
-too-long	backend/app/services/alert_service.py
 too-long	backend/app/services/csv_parsers.py
 too-long	backend/app/services/email_service.py
 too-long	backend/app/services/fifo_replay.py

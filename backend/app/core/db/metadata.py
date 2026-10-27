@@ -1,4 +1,5 @@
 from app.core.db.base import Base
+from app.domains.alerts import models as alert_models
 from app.domains.crowdfunding import models as crowdfunding_models
 from app.domains.crowdfunding.audit import models as audit_models
 from app.domains.exchanges import models as exchange_models
@@ -13,7 +14,6 @@ from app.domains.predictions import models as prediction_models
 from app.domains.strategies import models as strategy_models
 from app.domains.transactions import models as transaction_models
 from app.models import (
-    alert,
     audit_log,
     calendar_event,
     notification,
@@ -24,7 +24,7 @@ from app.models import (
 metadata = Base.metadata
 
 __all__ = [
-    "alert",
+    "alert_models",
     "audit_log",
     "audit_models",
     "calendar_event",
