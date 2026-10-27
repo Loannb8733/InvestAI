@@ -55,9 +55,9 @@
       "alert_name": "ETH rentable",
       "condition": "target_break_even",
       "current_value": 3000.0,
-      "message": "🚀 ETH est redevenu rentable ! Prix actuel : 3000.00€ (Break-even : 2003.33€)",
+      "message": "🚀 ETH est redevenu rentable ! Prix actuel : 3000.00€ (Break-even : 2001.00€)",
       "symbol": "ETH",
-      "threshold": 2003.3333,
+      "threshold": 2001.0,
       "triggered_at": "2026-10-17T12:00:00+00:00"
     },
     {

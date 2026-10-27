@@ -342,7 +342,7 @@ class TestGetAssetPriceDelegation:
         quote = AsyncMock(return_value=PriceQuote(price=Decimal("175")))
         with patch.object(price_feed, "quote", quote):
             assert await asset_price(asset) == 175.0
-        quote.assert_awaited_once_with(symbol, asset_type)
+        quote.assert_awaited_once_with(symbol, asset_type, "EUR")
 
     @pytest.mark.asyncio
     async def test_real_estate_uses_avg_buy_price(self):

@@ -7,7 +7,7 @@
       "condition": "portfolio_drawdown",
       "created_at": "<volatile>",
       "currency": "EUR",
-      "id": "<id-15>",
+      "id": "<id-13>",
       "is_active": true,
       "name": "Repli",
       "notify_email": true,

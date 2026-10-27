@@ -12,8 +12,8 @@
     "notify_email": true,
     "notify_in_app": false,
     "threshold": 70000.0,
-    "triggered_at": "2026-10-17T12:06:00+00:00",
-    "triggered_count": 2
+    "triggered_at": "2026-10-17T12:00:00+00:00",
+    "triggered_count": 1
   },
   "status": 200
 }

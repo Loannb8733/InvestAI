@@ -35,7 +35,7 @@ def cours(monkeypatch):
     """Cours renvoyé par le service de prix ; `None` simule une panne."""
     etat = {"valeur": None, "panne": False}
 
-    async def _quote(symbol, asset_type):
+    async def _quote(symbol, asset_type, currency="EUR"):
         if etat["panne"]:
             raise RuntimeError("fournisseur indisponible")
         return PriceQuote(price=Decimal(str(etat["valeur"]))) if etat["valeur"] is not None else None
