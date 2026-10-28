@@ -6,12 +6,12 @@ from typing import Any
 
 import httpx
 
-from app.core.symbol_map import COINGECKO_SYMBOL_MAP
+from app.domains.market_data.coingecko_api import BASE_URL, coingecko_headers
 from app.domains.market_data.history.series import PriceSeries
+from app.domains.market_data.prices.service import price_feed
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://api.coingecko.com/api/v3"
 TIMEOUT_S = 30.0
 MIN_SPACING_S = 1.2
 ATTEMPTS = 3
@@ -36,7 +36,7 @@ class CoinGeckoHistory:
     """Historique CoinGecko pour les tâches de fond : un appel à la fois, espacés, 429 respectés."""
 
     def __init__(self) -> None:
-        self._client = httpx.AsyncClient(timeout=TIMEOUT_S, headers={"Accept": "application/json"})
+        self._client = httpx.AsyncClient(timeout=TIMEOUT_S, headers=coingecko_headers())
         self._lock = asyncio.Lock()
         self._last_call = 0.0
 
@@ -68,7 +68,9 @@ class CoinGeckoHistory:
 
     async def daily(self, symbol: str, days: int) -> PriceSeries:
         """Clôtures quotidiennes en EUR et volumes sur ``days`` jours (365 au plus en offre gratuite)."""
-        coin = COINGECKO_SYMBOL_MAP.get(symbol, symbol.lower())
+        coin = await price_feed.coingecko_id(symbol)
+        if coin is None:
+            return PriceSeries()
         data = await self._get(
             f"/coins/{coin}/market_chart", {"vs_currency": "eur", "days": str(days), "interval": "daily"}
         )
@@ -76,7 +78,9 @@ class CoinGeckoHistory:
 
     async def between(self, symbol: str, start: datetime, end: datetime) -> PriceSeries:
         """Cours en EUR entre deux instants."""
-        coin = COINGECKO_SYMBOL_MAP.get(symbol, symbol.lower())
+        coin = await price_feed.coingecko_id(symbol)
+        if coin is None:
+            return PriceSeries()
         params = {"vs_currency": "eur", "from": str(int(start.timestamp())), "to": str(int(end.timestamp()))}
         data = await self._get(f"/coins/{coin}/market_chart/range", params)
         return _series(data) if data else PriceSeries()
