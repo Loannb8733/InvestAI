@@ -206,6 +206,7 @@ class Settings(BaseSettings):
     # sans elle, chaque appel repart en 401 et le repli n'a jamais fonctionné.
     # Vide par défaut — le code s'abstient alors d'appeler plutôt que d'échouer.
     CRYPTOCOMPARE_API_KEY: str = ""
+    COINGECKO_API_KEY: str = ""
 
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""

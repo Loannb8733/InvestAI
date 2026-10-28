@@ -95,6 +95,10 @@ class PriceService:
         """Part du bitcoin dans la capitalisation totale des cryptomonnaies, en pourcentage."""
         return await self._coingecko.btc_dominance()
 
+    async def coingecko_id(self, symbol: str) -> str | None:
+        """Identifiant CoinGecko d'une cryptomonnaie ; None si CoinGecko ne la liste pas."""
+        return await self._coingecko.coin_id(symbol.upper())
+
     async def crypto_on(self, symbol: str, day: date, currency: str = "EUR") -> Decimal | None:
         """Cours d'une cryptomonnaie un jour passé."""
         return await self._coingecko.price_on(symbol.upper(), day, currency)
