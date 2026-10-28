@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from celery.schedules import BaseSchedule, maybe_schedule
+from celery.schedules import BaseSchedule, maybe_schedule, schedule
 
 from app.core.redis_client import _get_redis_txt
 from app.domains.system.jobs import HEAVY_PREFIX, JOBS, Job
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 STATE_KEY = "scheduler:tasks"
 TICK_S = 30
+SAVED_FROM = timedelta(hours=1)
 ERROR_LENGTH = 500
 RESULT_LENGTH = 500
 
@@ -26,7 +27,7 @@ def _stamp(value: str | None) -> datetime | None:
 
 @dataclass
 class JobState:
-    """Dernière exécution d'une tâche planifiée, conservée dans Redis d'un démarrage à l'autre."""
+    """Dernière exécution d'une tâche planifiée ; gardée dans Redis entre deux démarrages si l'entrée l'exige."""
 
     last_run_at: datetime | None = None
     last_success_at: datetime | None = None
@@ -72,6 +73,12 @@ class Entry:
     task: str
     schedule: BaseSchedule
     job: Job
+
+    @property
+    def saved(self) -> bool:
+        """Vrai quand un redémarrage pourrait lui faire manquer son passage : horaire fixe ou rythme d'une heure et
+        plus. Les autres repassent dans l'heure ; leur état reste en mémoire, sans commande Redis."""
+        return not isinstance(self.schedule, schedule) or self.schedule.run_every >= SAVED_FROM
 
     @property
     def heavy(self) -> bool:
@@ -125,7 +132,8 @@ class Scheduler:
                 self.states[name] = JobState.loads(stored[name])
             else:
                 self.states[name] = JobState(last_run_at=now)
-                await _store(name, self.states[name])
+                if self.entries[name].saved:
+                    await _store(name, self.states[name])
 
     def next_run_at(self, name: str) -> datetime | None:
         """Prochaine exécution prévue, None tant que les états ne sont pas chargés."""
@@ -162,7 +170,8 @@ class Scheduler:
             state.last_result = json.dumps(result, default=str, ensure_ascii=False)[:RESULT_LENGTH]
         finally:
             state.running, state.last_duration_s = False, round(time.monotonic() - started, 1)
-            await _store(name, state)
+            if entry.saved:
+                await _store(name, state)
         return state
 
     def start(self, name: str) -> asyncio.Task[JobState]:
