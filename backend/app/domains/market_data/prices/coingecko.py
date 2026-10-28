@@ -18,6 +18,15 @@ ID_TTL_S = 7 * 24 * 3600
 HISTORICAL_TTL_S = 24 * 3600
 
 
+async def _cached_id(key: str) -> str | None:
+    try:
+        cached = await (await _get_redis_txt()).get(key)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cache des identifiants CoinGecko illisible : %s", exc)
+        return None
+    return str(cached) if cached else None
+
+
 class CoinGecko:
     """Client CoinGecko : identifiant d'un symbole, cours courants, cours d'un jour passé."""
 
@@ -31,22 +40,30 @@ class CoinGecko:
         return response.json()
 
     async def coin_id(self, symbol: str) -> str:
-        """Identifiant CoinGecko : table connue, Redis, recherche ; à défaut le symbole en minuscules."""
+        """Identifiant CoinGecko : table connue, Redis, recherche ; à défaut le symbole en minuscules.
+
+        Redis indisponible, la recherche a quand même lieu.
+        """
         if symbol in self._ids:
             return self._ids[symbol]
         key = f"coingecko_id:{symbol}"
-        found: str | None = None
-        try:
-            redis = await _get_redis_txt()
-            cached = await redis.get(key)
-            found = str(cached) if cached else await self._search(symbol)
-            if found:
-                await redis.set(key, found, ex=ID_TTL_S)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Identifiant CoinGecko introuvable pour %s : %s", symbol, exc)
+        found = await _cached_id(key) or await self._searched_id(symbol, key)
         if not found:
             return symbol.lower()
         self._ids[symbol] = found
+        return found
+
+    async def _searched_id(self, symbol: str, key: str) -> str | None:
+        try:
+            found = await self._search(symbol)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Identifiant CoinGecko introuvable pour %s : %s", symbol, exc)
+            return None
+        if found:
+            try:
+                await (await _get_redis_txt()).set(key, found, ex=ID_TTL_S)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Identifiant CoinGecko de %s non mis en cache : %s", symbol, exc)
         return found
 
     async def _search(self, symbol: str) -> str | None:

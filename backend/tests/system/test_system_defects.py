@@ -30,6 +30,7 @@ from tests.sample_portfolio import FROZEN_NOW
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 SECRET = "jeton-des-defauts"
 FIVE_MINUTES = maybe_schedule(300.0, app=celery_app)
+HOURLY = maybe_schedule(3600.0, app=celery_app)
 
 
 def _entry(name: str, job: Any, task: str = "app.tasks.demo.job", schedule: Any = FIVE_MINUTES) -> Entry:
@@ -63,7 +64,7 @@ async def test_due_tasks_follow_their_celery_schedule() -> None:
 
 
 async def test_runs_are_recorded_and_survive_a_restart() -> None:
-    entries = {"good": _entry("good", _ok), "bad": _entry("bad", _boom), "new": _entry("new", _ok)}
+    entries = {name: _entry(name, job, schedule=HOURLY) for name, job in (("good", _ok), ("bad", _boom), ("new", _ok))}
     with time_machine.travel(FROZEN_NOW, tick=False):
         first = Scheduler(entries)
         good, bad = await first.run("good"), await first.run("bad")
