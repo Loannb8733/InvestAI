@@ -79,37 +79,5 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
 
-  # Celery Worker (requires Upstash Redis)
-  - type: worker
-    name: investai-worker
-    runtime: docker
-    region: frankfurt
-    plan: free
-    dockerfilePath: ./backend/Dockerfile.render
-    # Sans heartbeat, gossip ni mingle : ces échanges entre workers publient
-    # dans Redis toutes les 2 s et épuisaient le quota Upstash (cf. celery_app.py).
-    startCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1 --without-heartbeat --without-gossip --without-mingle
-    # Même image que l'API : les trois services doivent avancer ensemble, sans
-    # quoi un worker exécuterait du code plus ancien que celui qui l'appelle.
-    autoDeploy: true
-    branch: main
-    envVars:
-      - fromGroup: investai-shared
-
-  # Celery Beat (Scheduler)
-  - type: worker
-    name: investai-beat
-    runtime: docker
-    region: frankfurt
-    plan: free
-    dockerfilePath: ./backend/Dockerfile.render
-    startCommand: celery -A app.tasks.celery_app beat --loglevel=info
-    # Même image que l'API : les trois services doivent avancer ensemble, sans
-    # quoi un worker exécuterait du code plus ancien que celui qui l'appelle.
-    autoDeploy: true
-    branch: main
-    envVars:
-      - fromGroup: investai-shared
-
 # No Render database — using Supabase PostgreSQL (external, free tier)
 # No Render Redis — using Upstash Redis (external, free tier)

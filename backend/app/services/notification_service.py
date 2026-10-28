@@ -1,5 +1,6 @@
 """Notification service for email and in-app notifications."""
 
+import asyncio
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -14,6 +15,15 @@ from app.domains.identity.models import User
 from app.models.notification import Notification, NotificationPriority, NotificationType
 
 logger = logging.getLogger(__name__)
+
+
+def _deliver(to_email: str, message: str) -> None:
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        if settings.SMTP_TLS:
+            server.starttls()
+        if settings.SMTP_USER and settings.SMTP_PASSWORD:
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.sendmail(settings.SMTP_FROM_EMAIL, to_email, message)
 
 
 class NotificationService:
@@ -273,13 +283,7 @@ Ne répondez pas à cet email.
             msg.attach(MIMEText(text_content, "plain", "utf-8"))
             msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-            # Send email
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                if settings.SMTP_TLS:
-                    server.starttls()
-                if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())
+            await asyncio.to_thread(_deliver, to_email, msg.as_string())
 
             logger.info(f"Email sent to {to_email}: {subject}")
             return True

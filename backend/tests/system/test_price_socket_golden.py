@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import threading
@@ -89,8 +90,13 @@ def test_price_socket_matches_golden(monkeypatch: pytest.MonkeyPatch) -> None:
 
     async def binance_stream(symbols: set[str]) -> None:
         streamed.append(sorted(symbols))
+        await asyncio.sleep(3600)
+
+    async def held_crypto(symbols: set[str]) -> set[str]:
+        return symbols & {"BTC"}
 
     monkeypatch.setattr(price_socket, "binance_prices", binance_stream)
+    monkeypatch.setattr(price_socket, "crypto_symbols", held_crypto)
     monkeypatch.setattr(price_socket, "price_hub", price_socket.PriceHub())
     subject = str(uuid.uuid4())
     transcript = _Transcript()

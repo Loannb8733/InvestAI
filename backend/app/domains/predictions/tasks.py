@@ -107,12 +107,12 @@ async def _detect_anomalies() -> None:
 @celery_app.task(name="app.domains.predictions.tasks.check_prediction_accuracy")  # type: ignore[untyped-decorator]
 def check_prediction_accuracy() -> None:
     """Confronte les prédictions échues au cours réel : MAPE, direction, couverture de l'intervalle, alerte de dérive
-    au-delà de 20 % (crypto) ou 10 % de MAPE."""
+    au-delà de 20 % (crypto) ou 10 % de MAPE. Échéance et date de contrôle sont stockées en UTC sans fuseau."""
     run_async(_check_prediction_accuracy())
 
 
 async def _check_prediction_accuracy() -> None:
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)
     async with session_factory() as db:
         result = await db.execute(
             select(PredictionLog)

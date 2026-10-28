@@ -1,6 +1,6 @@
 {
   "body": {
-    "detail": "Accès administrateur requis"
+    "detail": "Admin access required"
   },
   "status": 403
 }

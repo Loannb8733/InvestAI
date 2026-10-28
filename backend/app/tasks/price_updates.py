@@ -5,6 +5,7 @@ to the Redis pub/sub channel ``price_updates`` so that the WebSocket endpoint
 can broadcast them to connected clients in real time.
 """
 
+import asyncio
 import json
 import logging
 
@@ -130,11 +131,8 @@ async def _maj_crypto():
             quotes = await price_feed.crypto(batch)
             for symbol, quote in quotes.items():
                 updated_count += 1
-                publish_price_update(
-                    symbol=symbol,
-                    price=float(quote.price),
-                    change_24h_percent=quote.change_percent_24h,
-                    asset_type="crypto",
+                await asyncio.to_thread(
+                    publish_price_update, symbol, float(quote.price), quote.change_percent_24h, "crypto"
                 )
             logger.info(f"Batch {i // batch_size + 1}: Updated {len(quotes)} prices")
         except Exception as e:
@@ -162,11 +160,8 @@ async def _maj_actions():
             stock_quote = (await price_feed.stocks([symbol])).get(symbol.upper())
             if stock_quote is not None:
                 updated_count += 1
-                publish_price_update(
-                    symbol=symbol,
-                    price=float(stock_quote.price),
-                    change_24h_percent=stock_quote.change_percent_24h,
-                    asset_type="stock",
+                await asyncio.to_thread(
+                    publish_price_update, symbol, float(stock_quote.price), stock_quote.change_percent_24h, "stock"
                 )
         except Exception as e:
             logger.warning(f"Error fetching price for {symbol}: {e}")
@@ -176,11 +171,8 @@ async def _maj_actions():
             stock_quote = (await price_feed.stocks([symbol])).get(symbol.upper())
             if stock_quote is not None:
                 updated_count += 1
-                publish_price_update(
-                    symbol=symbol,
-                    price=float(stock_quote.price),
-                    change_24h_percent=stock_quote.change_percent_24h,
-                    asset_type="etf",
+                await asyncio.to_thread(
+                    publish_price_update, symbol, float(stock_quote.price), stock_quote.change_percent_24h, "etf"
                 )
         except Exception as e:
             logger.warning(f"Error fetching price for {symbol}: {e}")
