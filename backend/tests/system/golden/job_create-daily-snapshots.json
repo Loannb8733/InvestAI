@@ -1,0 +1,16 @@
+{
+  "body": {
+    "last_duration_s": "<volatile>",
+    "last_error": null,
+    "last_error_at": null,
+    "last_result": "{\"total\": 1, \"success\": 1, \"failed\": 0}",
+    "last_run_at": "2026-10-17T12:00:00Z",
+    "last_success_at": "2026-10-17T12:00:00Z",
+    "name": "create-daily-snapshots",
+    "next_run_at": "2026-10-18T00:00:00Z",
+    "running": false,
+    "schedule": "<crontab: 0 0 * * * (m/h/dM/MY/d)>",
+    "task": "app.tasks.snapshots.create_daily_snapshots"
+  },
+  "status": 200
+}

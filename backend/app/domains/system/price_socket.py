@@ -7,10 +7,13 @@ import aiohttp
 import jwt
 import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 
 from app.core.config import settings
+from app.core.db.session import session_factory
 from app.core.logging import get_logger
 from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url, redis_ssl_kwargs
+from app.domains.portfolio.models import Asset, AssetType
 
 logger = get_logger(__name__)
 
@@ -108,8 +111,9 @@ class PriceHub:
         return set().union(*self.clients.values())
 
     async def stream(self, symbols: set[str]) -> None:
-        """Relance le flux Binance quand des symboles s'ajoutent ou que le flux s'est arrêté."""
-        if not symbols - self._streamed and self._stream and not self._stream.done():
+        """Aligne le flux Binance sur ``symbols`` : relancé quand la liste change ou que le flux s'est arrêté, coupé
+        quand elle est vide."""
+        if symbols == self._streamed and self._stream and not self._stream.done():
             return
         self._streamed = set(symbols)
         if self._stream and not self._stream.done():
@@ -121,6 +125,20 @@ class PriceHub:
 
 
 price_hub = PriceHub()
+
+
+async def crypto_symbols(symbols: set[str]) -> set[str]:
+    """Symboles qui désignent une crypto détenue dans l'application : seuls ceux-là ont un cours Binance."""
+    if not symbols:
+        return set()
+    upper = func.upper(Asset.symbol)
+    query = select(upper).where(Asset.asset_type == AssetType.CRYPTO, upper.in_(symbols)).distinct()
+    async with session_factory() as db:
+        return set((await db.execute(query)).scalars().all())
+
+
+async def _follow_clients() -> None:
+    await price_hub.stream(await crypto_symbols(price_hub.watched()))
 
 
 async def _relay_ticker(data: dict[str, Any]) -> None:
@@ -181,7 +199,7 @@ async def _subscribe(websocket: WebSocket, symbols: set[str]) -> None:
         return
     price_hub.clients[websocket].update(symbols)
     await websocket.send_text(json.dumps({"type": "subscribed", "symbols": list(price_hub.clients[websocket])}))
-    await price_hub.stream(price_hub.watched())
+    await _follow_clients()
 
 
 async def _handle(websocket: WebSocket, text: str) -> None:
@@ -197,6 +215,7 @@ async def _handle(websocket: WebSocket, text: str) -> None:
     elif action == "unsubscribe":
         price_hub.clients[websocket] -= symbols
         await websocket.send_text(json.dumps({"type": "unsubscribed", "symbols": list(symbols)}))
+        await _follow_clients()
     elif action != "pong":
         unsupported = f"Unsupported action: {action}. Use 'subscribe', 'unsubscribe', or 'pong'."
         await websocket.send_text(json.dumps({"type": "error", "message": unsupported}))
@@ -224,3 +243,4 @@ async def websocket_prices(websocket: WebSocket) -> None:
     finally:
         heartbeat.cancel()
         price_hub.clients.pop(websocket, None)
+        await _follow_clients()

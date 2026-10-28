@@ -1,0 +1,16 @@
+{
+  "body": {
+    "last_duration_s": "<volatile>",
+    "last_error": null,
+    "last_error_at": null,
+    "last_result": "{\"status\": \"seed\", \"regime\": \"bullish\"}",
+    "last_run_at": "2026-10-17T12:00:00Z",
+    "last_success_at": "2026-10-17T12:00:00Z",
+    "name": "check-regime-mutation",
+    "next_run_at": "2026-10-18T00:00:00Z",
+    "running": false,
+    "schedule": "<freq: 12.00 hours>",
+    "task": "app.tasks.regime_alerts.check_regime_mutation"
+  },
+  "status": 200
+}

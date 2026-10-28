@@ -27,7 +27,8 @@ def test_les_resultats_de_taches_ne_sont_pas_ecrits():
     assert celery_app.conf.task_track_started is False
 
 
-def test_le_worker_de_production_ne_publie_pas_de_battement():
+def test_un_worker_declare_en_production_ne_publie_pas_de_battement():
+    """La prod n'a pas de worker (l'API exécute la planification) ; s'il en revient un, il reste sobre."""
     chemin = _RACINE / "render.yaml"
     if not chemin.exists():
         # Le conteneur de développement ne monte que backend/ ; la CI, elle,
@@ -36,7 +37,6 @@ def test_le_worker_de_production_ne_publie_pas_de_battement():
     render = chemin.read_text(encoding="utf-8")
     commandes = [ligne for ligne in render.splitlines() if "celery_app worker" in ligne]
 
-    assert commandes, "commande du worker introuvable dans render.yaml"
     for commande in commandes:
         for option in ("--without-heartbeat", "--without-gossip", "--without-mingle"):
             assert option in commande, f"{option} manquant : {commande.strip()}"

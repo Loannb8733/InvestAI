@@ -1,27 +1,15 @@
-name: Scheduled Tasks (no worker)
-
-# The free tier has no Celery worker/beat, so these jobs replace Celery beat:
-# GitHub Actions cron POSTs to the token-protected /api/v1/cron/* endpoints,
-# which run the task inline in the web process.
-#
-# Required GitHub repo secret: CRON_SECRET (must equal the CRON_SECRET env var
-# set on the Render web service). Backend URL matches scripts/keep_warm.py.
+name: Scheduled Tasks
 
 on:
   schedule:
-    - cron: "0 * * * *" # hourly — exchange sync
-    - cron: "0 0 * * *" # 00:00 UTC — daily portfolio snapshot
-    - cron: "10 0 * * *" # 00:10 UTC — sync des jauges d'objectifs (après le snapshot)
-    - cron: "15 2 * * *" # 02:15 UTC — contrarian (Fear & Greed) stats refresh
-    - cron: "0 */12 * * *" # every 12h — market-regime mutation check
+    - cron: "10 0 * * *"
   workflow_dispatch:
     inputs:
       task:
-        description: "Task to trigger manually"
+        description: "sync-goals, invariants-check, ou jobs/<tâche de la planification> (ex. jobs/check-alerts)"
         required: true
-        default: sync-exchanges
-        type: choice
-        options: [sync-exchanges, daily-snapshot, sync-goals, contrarian-refresh, regime-check]
+        default: sync-goals
+        type: string
 
 env:
   BASE_URL: https://investai-api.onrender.com/api/v1/cron
@@ -30,30 +18,13 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve task(s) for this trigger
-        id: plan
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tasks=${{ github.event.inputs.task }}" >> "$GITHUB_OUTPUT"
-          else
-            case "${{ github.event.schedule }}" in
-              "0 * * * *")    echo "tasks=sync-exchanges"     >> "$GITHUB_OUTPUT" ;;
-              "0 0 * * *")    echo "tasks=daily-snapshot"     >> "$GITHUB_OUTPUT" ;;
-              "10 0 * * *")   echo "tasks=sync-goals"         >> "$GITHUB_OUTPUT" ;;
-              "15 2 * * *")   echo "tasks=contrarian-refresh" >> "$GITHUB_OUTPUT" ;;
-              "0 */12 * * *") echo "tasks=regime-check"       >> "$GITHUB_OUTPUT" ;;
-              *)              echo "tasks="                   >> "$GITHUB_OUTPUT" ;;
-            esac
-          fi
-
       - name: Trigger task
-        if: steps.plan.outputs.tasks != ''
+        env:
+          TASK: ${{ github.event.inputs.task || 'sync-goals' }}
         run: |
-          task="${{ steps.plan.outputs.tasks }}"
-          echo "Triggering $task"
-          code=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" --max-time 280 \
-            -X POST "${BASE_URL}/${task}" \
+          echo "Triggering $TASK"
+          code=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" --max-time 1800 \
+            -X POST "${BASE_URL}/${TASK}" \
             -H "X-Cron-Token: ${{ secrets.CRON_SECRET }}")
           echo "HTTP $code"; cat /tmp/resp.txt
-          # 2xx only; anything else fails the job
           [ "$code" -ge 200 ] && [ "$code" -lt 300 ]

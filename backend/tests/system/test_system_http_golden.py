@@ -15,23 +15,19 @@ from app.core.config import settings
 from app.core.db import session as db_session_module
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.system import router
+from app.domains.system.scheduler import Scheduler, beat_entries
 from tests.conftest import TestSessionLocal, test_engine
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-VOLATILE_KEYS = frozenset({"created_at", "updated_at"})
+VOLATILE_KEYS = frozenset({"created_at", "updated_at", "last_duration_s"})
 CRON = "/api/v1/cron"
 SECRET = "jeton-de-caracterisation"
-CRON_ROUTES = (
-    "sync-exchanges",
-    "sync-goals",
-    "daily-snapshot",
-    "contrarian-refresh",
-    "regime-check",
-    "invariants-check",
-)
+CRON_ROUTES = ("sync-goals", "invariants-check")
+JOBS = ("sync-exchanges", "create-daily-snapshots", "refresh-contrarian-stats", "check-regime-mutation")
 SESSION_FACTORY_USERS = (
     "app.core.db.session",
     "app.domains.exchanges.sync.runner",
@@ -85,15 +81,17 @@ def cron_on_test_db(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(db_session_module, "engine", test_engine)
     for module in SESSION_FACTORY_USERS:
         monkeypatch.setattr(f"{module}.session_factory", TestSessionLocal)
+    monkeypatch.setattr(settings, "CELERY_WORKER_AVAILABLE", False)
+    monkeypatch.setattr(router, "api_scheduler", Scheduler({entry.name: entry for entry in beat_entries()}))
 
 
 async def _guard_flow(rec: _Recorder, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as disabled:
         disabled.setattr(settings, "CRON_SECRET", "")
-        await rec.shot("cron_disabled", "POST", f"{CRON}/sync-exchanges", {"X-Cron-Token": SECRET})
-    await rec.shot("cron_without_token", "POST", f"{CRON}/sync-exchanges", {})
-    await rec.shot("cron_wrong_token", "POST", f"{CRON}/sync-exchanges", {"X-Cron-Token": "faux"})
-    await rec.shot("cron_get", "GET", f"{CRON}/sync-exchanges", {"X-Cron-Token": SECRET})
+        await rec.shot("cron_disabled", "POST", f"{CRON}/sync-goals", {"X-Cron-Token": SECRET})
+    await rec.shot("cron_without_token", "POST", f"{CRON}/sync-goals", {})
+    await rec.shot("cron_wrong_token", "POST", f"{CRON}/sync-goals", {"X-Cron-Token": "faux"})
+    await rec.shot("cron_get", "GET", f"{CRON}/sync-goals", {"X-Cron-Token": SECRET})
 
 
 async def _seed(client: AsyncClient, db: AsyncSession, headers: dict[str, str]) -> None:
@@ -107,8 +105,11 @@ async def _cron_flow(rec: _Recorder) -> None:
     token = {"X-Cron-Token": SECRET}
     for route in CRON_ROUTES:
         await rec.shot(f"cron_{route}", "POST", f"{CRON}/{route}", token)
-    await rec.shot("cron_daily-snapshot_again", "POST", f"{CRON}/daily-snapshot", token)
-    await rec.shot("cron_regime-check_again", "POST", f"{CRON}/regime-check", token)
+    for job in JOBS:
+        await rec.shot(f"job_{job}", "POST", f"{CRON}/jobs/{job}", token)
+    await rec.shot("job_create-daily-snapshots_again", "POST", f"{CRON}/jobs/create-daily-snapshots", token)
+    await rec.shot("job_check-regime-mutation_again", "POST", f"{CRON}/jobs/check-regime-mutation", token)
+    await rec.shot("job_unknown", "POST", f"{CRON}/jobs/inconnue", token)
 
 
 async def _status_flow(rec: _Recorder, admin: dict[str, str], regular: dict[str, str]) -> None:

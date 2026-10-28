@@ -1,5 +1,6 @@
 """Email service for sending notifications and reports."""
 
+import asyncio
 import logging
 import smtplib
 import ssl
@@ -149,6 +150,18 @@ class EmailService:
 </html>
 """
 
+    def _deliver(self, to_email: str, message: str) -> None:
+        context = ssl.create_default_context()
+        if self.use_tls:
+            with smtplib.SMTP(self.host, self.port) as server:
+                server.starttls(context=context)
+                server.login(self.user, self.password)
+                server.sendmail(self.from_email, to_email, message)
+        else:
+            with smtplib.SMTP_SSL(self.host, self.port, context=context) as server:
+                server.login(self.user, self.password)
+                server.sendmail(self.from_email, to_email, message)
+
     async def send_email(
         self,
         to_email: str,
@@ -201,18 +214,7 @@ class EmailService:
                     )
                     msg.attach(part)
 
-            # Send email
-            context = ssl.create_default_context()
-
-            if self.use_tls:
-                with smtplib.SMTP(self.host, self.port) as server:
-                    server.starttls(context=context)
-                    server.login(self.user, self.password)
-                    server.sendmail(self.from_email, to_email, msg.as_string())
-            else:
-                with smtplib.SMTP_SSL(self.host, self.port, context=context) as server:
-                    server.login(self.user, self.password)
-                    server.sendmail(self.from_email, to_email, msg.as_string())
+            await asyncio.to_thread(self._deliver, to_email, msg.as_string())
 
             logger.info(f"Email sent successfully to {to_email}: {subject}")
             return True

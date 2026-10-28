@@ -1,0 +1,16 @@
+{
+  "body": {
+    "last_duration_s": "<volatile>",
+    "last_error": null,
+    "last_error_at": null,
+    "last_result": "\"SyncSummary(total=0, success=0, failed=0)\"",
+    "last_run_at": "2026-10-17T12:00:00Z",
+    "last_success_at": "2026-10-17T12:00:00Z",
+    "name": "sync-exchanges",
+    "next_run_at": "2026-10-17T13:00:00Z",
+    "running": false,
+    "schedule": "<freq: 1.00 hour>",
+    "task": "app.domains.exchanges.sync.tasks.sync_all_exchanges"
+  },
+  "status": 200
+}

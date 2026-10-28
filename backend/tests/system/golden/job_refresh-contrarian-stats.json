@@ -1,0 +1,6 @@
+{
+  "body": {
+    "detail": "refresh-contrarian-stats : ServiceUnavailableError: Statistiques contrarian non rafraîchies : no network in tests: https://api.alternative.me/fng/?limit=0&format=json"
+  },
+  "status": 502
+}
