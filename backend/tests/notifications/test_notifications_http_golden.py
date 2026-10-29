@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.notification import Notification, NotificationPriority, NotificationType
-from app.models.planned_order import PlannedOrder
+from app.domains.notifications.models import Notification, NotificationPriority, NotificationType
+from app.domains.predictions.models import PlannedOrder
 from tests.notifications.conftest import TELEGRAM_SECRET
 from tests.notifications.recording import Recorder, Telegram
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio

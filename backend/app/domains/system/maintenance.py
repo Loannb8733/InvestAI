@@ -6,12 +6,12 @@ from typing import Any
 from sqlalchemy import delete, func, select
 
 from app.core.db.session import session_factory
+from app.domains.notifications.models import Notification
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.predictions.models import PredictionLog
 from app.domains.system.invariants import ledger_quantity
 from app.domains.transactions.models import Transaction
 from app.domains.transactions.transfers import COLD_WALLET_DESTINATION
-from app.models.notification import Notification
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,9 @@
 import logging
 from typing import Any
 
+from app.domains.notifications.telegram.client import telegram_service
+from app.domains.notifications.telegram.messages import alpha_keyboard
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,8 +24,6 @@ async def send_cycle_alert(
 ) -> None:
     """Alerte Telegram sur un conseil de cycle actionnable ; un échec d'envoi est journalisé, jamais levé."""
     try:
-        from app.services.telegram_service import telegram_service
-
         fg_str = f" | Fear & Greed: {fear_greed}" if fear_greed is not None else ""
         message = (
             f"🎯 <b>{advice['title']}</b>\n\n"
@@ -51,8 +52,6 @@ async def send_euphoria_alert(
 ) -> None:
     """Alerte Telegram d'entrée en zone d'euphorie (BTC en régime sommet et Fear & Greed > 80)."""
     try:
-        from app.services.telegram_service import telegram_service
-
         message = (
             "⚠️ <b>Alerte Cycle : Zone d'Euphorie</b>\n\n"
             "Le marché entre en zone d'Euphorie (BTC en régime Sommet, "
@@ -87,8 +86,6 @@ async def send_alpha_alert(
 ) -> None:
     """Alerte Telegram d'un signal alpha fort, avec les boutons de simulation et de planification."""
     try:
-        from app.services.telegram_service import telegram_service
-
         sign = "+" if predicted_pct >= 0 else ""
         message = (
             f"🚀 <b>Signal Alpha : {symbol}</b>\n\n"
@@ -98,7 +95,7 @@ async def send_alpha_alert(
             f"📊 Raisons:\n{_reason_lines(reasons)}"
         )
 
-        keyboard = telegram_service.build_alpha_keyboard(user_id, symbol, order_eur)
+        keyboard = alpha_keyboard(user_id, symbol, order_eur)
 
         await telegram_service.send_smart_alert(
             message=message,
@@ -121,8 +118,6 @@ async def send_concentration_alert(
 ) -> None:
     """Alerte Telegram quand un actif dépasse 60 % du portefeuille."""
     try:
-        from app.services.telegram_service import telegram_service
-
         message = (
             f"⚠️ <b>Risque de Concentration : {symbol}</b>\n\n"
             f"Poids dans le portefeuille : <b>{weight_pct:.1f}%</b>\n"
@@ -183,8 +178,6 @@ def _signal_message(result: dict[str, Any]) -> str:
 async def send_signal_report(chat_id: str, user_id: str, result: dict[str, Any]) -> None:
     """Rapport Telegram détaillé d'un signal alpha, validé ou rejeté."""
     try:
-        from app.services.telegram_service import telegram_service
-
         message = _signal_message(result)
 
         await telegram_service.send_smart_alert(
@@ -208,8 +201,6 @@ async def send_strategy_recap(
 ) -> None:
     """Récapitulatif Telegram hebdomadaire des achats, ventes et maintiens suggérés."""
     try:
-        from app.services.telegram_service import telegram_service
-
         buy_rows = [r for r in rows if "ACHAT" in r["action"] or r["action"] == "DCA"]
         sell_rows = [r for r in rows if "VENDRE" in r["action"] or "PROFITS" in r["action"] or "ALLÉGER" in r["action"]]
 

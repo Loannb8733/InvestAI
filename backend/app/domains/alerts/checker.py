@@ -11,10 +11,11 @@ from app.domains.alerts import asset_rules, portfolio_rules
 from app.domains.alerts.models import PORTFOLIO_CONDITIONS, Alert, AlertCondition
 from app.domains.alerts.pricing import asset_price
 from app.domains.identity.models import User
+from app.domains.notifications.models import NotificationPriority
+from app.domains.notifications.repository import NotificationRepository
+from app.domains.notifications.service import NotificationService
+from app.domains.notifications.telegram.client import telegram_service
 from app.domains.portfolio.models import Asset
-from app.models.notification import NotificationPriority
-from app.services.notification_service import notification_service
-from app.services.telegram_service import telegram_service
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +100,9 @@ async def _notify(db: AsyncSession, alert: Alert, trigger: AlertTrigger, user: U
     alert.triggered_count = (alert.triggered_count or 0) + 1
     urgent = alert.condition == AlertCondition.VOLATILITY_SPIKE
     priority = NotificationPriority.URGENT if urgent else NotificationPriority.HIGH
-    await notification_service.send_alert_notification(
-        db=db,
+    await NotificationService(NotificationRepository(db)).send_alert(
         user_id=alert.user_id,
         alert_name=alert.name,
-        symbol=trigger.symbol,
         message=trigger.message,
         alert_id=alert.id,
         notify_email=alert.notify_email,

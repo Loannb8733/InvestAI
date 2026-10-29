@@ -2,7 +2,7 @@ import logging
 
 from app.core.config import settings
 from app.domains.identity.models import User
-from app.services.notification_service import NotificationService
+from app.domains.notifications.mail import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +15,7 @@ def _frontend_url() -> str:
 
 async def _send(user: User, subject: str, body: str) -> None:
     try:
-        await NotificationService()._send_email(
-            to_email=user.email, to_name=user.first_name or "", subject=subject, body=body
-        )
+        await send_email(to_email=user.email, to_name=user.first_name or "", subject=subject, body=body)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Email « %s » non envoyé : %s", subject, exc)
 

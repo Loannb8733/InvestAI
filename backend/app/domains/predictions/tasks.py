@@ -12,6 +12,7 @@ from app.core.redis_client import cache_hyperparams
 from app.domains.identity.models import User
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
+from app.domains.notifications.telegram.client import telegram_service
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.predictions.accuracy import record_outcome
 from app.domains.predictions.models import PredictionLog
@@ -19,7 +20,6 @@ from app.domains.predictions.service import prediction_service
 from app.domains.predictions.types import AnomalyDetection
 from app.ml.drift_detector import check_drift
 from app.ml.hyperparameter_tuner import tune_prophet, tune_xgboost
-from app.services.telegram_service import telegram_service
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 

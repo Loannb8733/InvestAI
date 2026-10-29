@@ -14,7 +14,7 @@ celery_app = Celery(
         "app.domains.predictions.tasks",
         "app.domains.alerts.tasks",
         "app.tasks.snapshots",
-        "app.tasks.emails",
+        "app.domains.notifications.tasks",
         "app.domains.system.tasks",
         "app.domains.crowdfunding.tasks",
         "app.tasks.contrarian_stats",
@@ -124,15 +124,15 @@ celery_app.conf.beat_schedule = {
     },
     # === Email Reports ===
     "send-weekly-reports": {
-        "task": "app.tasks.emails.send_weekly_reports",
+        "task": "app.domains.notifications.tasks.send_weekly_reports",
         "schedule": crontab(hour=18, minute=0, day_of_week=0),  # Sunday at 18:00 UTC (19:00 Paris)
     },
     "send-monthly-reports": {
-        "task": "app.tasks.emails.send_monthly_reports",
+        "task": "app.domains.notifications.tasks.send_monthly_reports",
         "schedule": crontab(hour=8, minute=0, day_of_month=1),  # 1st of month at 08:00 UTC
     },
     "send-daily-digest": {
-        "task": "app.tasks.emails.send_daily_digest",
+        "task": "app.domains.notifications.tasks.send_daily_digest",
         "schedule": crontab(hour=7, minute=0),  # Every day at 07:00 UTC (08:00 Paris)
     },
     # === Regime Mutation Detection ===

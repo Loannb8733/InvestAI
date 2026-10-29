@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.notifications.telegram.client import telegram_service
 from app.services.regime_alert_service import regime_alert_service
-from app.services.telegram_service import telegram_service
 
 
 def _redis_en_panne(cible):
@@ -58,11 +58,11 @@ class TestPauseEntreDeuxAlertes:
         Un doublon se remarque et s'ignore ; un silence sur une alerte de prix
         ne se voit pas. La panne ne doit donc pas retenir le message.
         """
-        with _redis_en_panne("app.services.telegram_service._get_redis"):
+        with _redis_en_panne("app.domains.notifications.telegram.client.get_redis"):
             assert await telegram_service._is_on_cooldown("alerte:BTC") is False
 
     async def test_poser_la_pause_ne_leve_pas(self):
-        with _redis_en_panne("app.services.telegram_service._get_redis"):
+        with _redis_en_panne("app.domains.notifications.telegram.client.get_redis"):
             assert await telegram_service._set_cooldown("alerte:BTC") is None
 
     @pytest.mark.parametrize("presente,attendu", [(1, True), (0, False)])
@@ -77,5 +77,5 @@ class TestPauseEntreDeuxAlertes:
         client = AsyncMock()
         client.exists = AsyncMock(return_value=presente)
 
-        with patch("app.services.telegram_service._get_redis", new=AsyncMock(return_value=client)):
+        with patch("app.domains.notifications.telegram.client.get_redis", new=AsyncMock(return_value=client)):
             assert await telegram_service._is_on_cooldown("alerte:BTC") is attendu

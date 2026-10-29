@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.notification import Notification, NotificationPriority, NotificationType
+from app.domains.notifications.models import Notification, NotificationPriority, NotificationType
 
 
 async def _create_notification(db: AsyncSession, user_id, title: str = "Test Alert") -> Notification:

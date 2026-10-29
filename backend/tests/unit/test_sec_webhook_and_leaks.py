@@ -16,8 +16,8 @@ simplement 200 à un inconnu.
 
 from pathlib import Path
 
-_ENDPOINTS = Path(__file__).resolve().parents[2] / "app" / "api" / "v1" / "endpoints"
-_WEBHOOK = (_ENDPOINTS / "telegram_webhook.py").read_text(encoding="utf-8")
+_TELEGRAM = Path(__file__).resolve().parents[2] / "app" / "domains" / "notifications" / "telegram"
+_WEBHOOK = (_TELEGRAM / "webhook.py").read_text(encoding="utf-8")
 _BACKGROUND = (Path(__file__).resolve().parents[2] / "app" / "domains" / "exchanges" / "background.py").read_text(
     encoding="utf-8"
 )

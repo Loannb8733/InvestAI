@@ -8,6 +8,7 @@ from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
 from app.domains.market_data.fx import models as fx_models
 from app.domains.market_data.history import models as history_models
+from app.domains.notifications import models as notification_models
 from app.domains.planning.goals import models as goal_models
 from app.domains.planning.simulations import models as simulation_models
 from app.domains.portfolio import models as portfolio_models
@@ -15,11 +16,7 @@ from app.domains.predictions import models as prediction_models
 from app.domains.strategies import models as strategy_models
 from app.domains.system import models as system_models
 from app.domains.transactions import models as transaction_models
-from app.models import (
-    notification,
-    planned_order,
-    portfolio_snapshot,
-)
+from app.models import portfolio_snapshot
 
 metadata = Base.metadata
 
@@ -35,8 +32,7 @@ __all__ = [
     "identity_models",
     "journal_models",
     "metadata",
-    "notification",
-    "planned_order",
+    "notification_models",
     "portfolio_models",
     "portfolio_snapshot",
     "prediction_models",
