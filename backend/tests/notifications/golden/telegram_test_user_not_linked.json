@@ -1,0 +1,7 @@
+{
+  "body": {
+    "detail": "Telegram non configuré pour votre compte. Ajoutez votre chat_id dans votre profil."
+  },
+  "status": 400,
+  "telegram": []
+}

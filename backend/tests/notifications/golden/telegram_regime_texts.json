@@ -1,0 +1,13 @@
+{
+  "accumulation": "<b>📈 Signal d'Accumulation — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Phase d'entrée progressive — Smart Money en action.</i>",
+  "bearish": "<b>📉 Marché Baissier — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Conservation recommandée — préparez votre watchlist.</i>",
+  "bottom": "<b>🔎 Opportunité de Creux détectée — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Zone sécurisée pour accumulation progressive.</i>",
+  "bottoming": "<b>🔎 Opportunité de Creux détectée — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Zone sécurisée pour accumulation progressive.</i>",
+  "bullish": "<b>🚀 Signal de Momentum confirmé — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Phase d'Expansion — conditions favorables.</i>",
+  "distribution": "<b>🚨 Phase de Distribution — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Prenez vos profits avant le retournement.</i>",
+  "inconnu": "<b>🔔 Alerte Stratégie — BTC</b>\nAction : ACHAT\nDescription.\n\n<i></i>",
+  "markdown": "<b>📉 Marché en Markdown — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Patience — attendez les signaux de creux pour accumuler.</i>",
+  "markup": "<b>🚀 Signal de Momentum confirmé — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Phase d'Expansion — laissez courir vos positions.</i>",
+  "top": "<b>⚠️ Sommet potentiel — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Prudence — sécurisez vos gains.</i>",
+  "topping": "<b>⚠️ Surchauffe détectée — BTC</b>\nAction : ACHAT\nDescription.\n\n<i>Prudence — sécurisez une partie de vos gains.</i>"
+}

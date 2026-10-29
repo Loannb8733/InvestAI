@@ -1,0 +1,21 @@
+{
+  "mails": [],
+  "results": {
+    "alert": false,
+    "digest": {
+      "failed": 0,
+      "sent": 0,
+      "skipped": "email_not_configured"
+    },
+    "monthly": {
+      "failed": 0,
+      "sent": 0,
+      "skipped": "email_not_configured"
+    },
+    "weekly": {
+      "failed": 0,
+      "sent": 0,
+      "skipped": "email_not_configured"
+    }
+  }
+}

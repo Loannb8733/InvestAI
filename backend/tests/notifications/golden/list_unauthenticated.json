@@ -1,0 +1,7 @@
+{
+  "body": {
+    "detail": "Not authenticated"
+  },
+  "status": 401,
+  "telegram": []
+}

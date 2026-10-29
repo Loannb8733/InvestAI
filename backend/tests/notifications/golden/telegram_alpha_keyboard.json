@@ -1,0 +1,14 @@
+{
+  "inline_keyboard": [
+    [
+      {
+        "callback_data": "sim_ruin:alpha:u1:SOL:250.5",
+        "text": "🔍 Simuler Impact Ruine"
+      },
+      {
+        "callback_data": "plan_order:alpha:u1:SOL:250.5",
+        "text": "✅ Marquer comme Planifié"
+      }
+    ]
+  ]
+}

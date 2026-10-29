@@ -1,0 +1,28 @@
+{
+  "body": [
+    {
+      "created_at": "<volatile>",
+      "id": "<id-0>",
+      "is_read": false,
+      "message": "Détail : Alerte: BTC au-dessus de 60000",
+      "priority": "high",
+      "reference_id": "<id-1>",
+      "reference_type": "alert",
+      "title": "Alerte: BTC au-dessus de 60000",
+      "type": "alert_triggered"
+    },
+    {
+      "created_at": "<volatile>",
+      "id": "<id-2>",
+      "is_read": false,
+      "message": "Détail : Rapport prêt",
+      "priority": "normal",
+      "reference_id": null,
+      "reference_type": null,
+      "title": "Rapport prêt",
+      "type": "report_ready"
+    }
+  ],
+  "status": 200,
+  "telegram": []
+}

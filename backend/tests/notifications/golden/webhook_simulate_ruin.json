@@ -1,0 +1,27 @@
+{
+  "body": {
+    "ok": true
+  },
+  "status": 200,
+  "telegram": [
+    {
+      "body": {
+        "callback_query_id": "cb-1",
+        "show_alert": false,
+        "text": "Simulation Monte Carlo en cours..."
+      },
+      "method": "answerCallbackQuery"
+    },
+    {
+      "body": {
+        "chat_id": "777",
+        "disable_web_page_preview": true,
+        "message_id": 9,
+        "parse_mode": "HTML",
+        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"\\u2705 Marquer comme Planifi\\u00e9\", \"callback_data\": \"plan_order:alpha:<id-0>:BTC:500.0\"}]]}",
+        "text": "⚠️ <b>InvestAI</b>\n\n🚀 <b>Signal Alpha : BTC</b>\nOrdre suggéré: <b>500.00 €</b>\n\n📊 <b>Simulation Monte Carlo</b>\nRuine: <b>0.0%</b> ➡️ <b>0.0%</b>\nRendement: -2.4% ➡️ -2.5%\nP(positif): 8.5% ➡️ 8.4%\n\n🟰 Verdict: <b>NEUTRE</b>"
+      },
+      "method": "editMessageText"
+    }
+  ]
+}
