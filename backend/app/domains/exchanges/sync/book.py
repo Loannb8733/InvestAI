@@ -13,6 +13,7 @@ from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions import ledger
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
+from app.domains.transactions.transfers import SAME_TRANSFER_TOLERANCE
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,42 @@ class Book:
             Transaction.executed_at.between(moment - WITHDRAWAL_WINDOW, moment + WITHDRAWAL_WINDOW),
         )
         return list((await self.session.execute(query)).scalars())
+
+    async def balance_drop(self, asset: Asset, moment: datetime, quantity: Decimal) -> Transaction | None:
+        """Ajustement de solde sortant, sans miroir, de la taille d'un retrait : sa trace quand une synchronisation
+        l'a vu encore en attente."""
+        query = select(Transaction).where(
+            Transaction.asset_id == asset.id,
+            Transaction.transaction_type == TransactionType.TRANSFER_OUT,
+            Transaction.related_transaction_id.is_(None),
+            Transaction.external_id.startswith(f"{self.exchange}_sync_"),
+            Transaction.executed_at.between(moment - WITHDRAWAL_WINDOW, moment + WITHDRAWAL_WINDOW),
+        )
+        rows = (await self.session.execute(query)).scalars()
+        return next((r for r in rows if abs(r.quantity - quantity) <= quantity * SAME_TRANSFER_TOLERANCE), None)
+
+    def settle(
+        self,
+        drop: Transaction,
+        price: Decimal,
+        *,
+        executed_at: datetime,
+        external_id: str,
+        fee: Decimal,
+        fee_currency: str,
+        notes: str,
+    ) -> Transaction:
+        """Requalifie en retrait l'ajustement qui l'a précédé ; la quantité déjà sortie ne bouge pas."""
+        drop.price = price
+        drop.executed_at = executed_at
+        drop.external_id = external_id
+        drop.fee = fee
+        drop.fee_currency = fee_currency
+        drop.notes = notes
+        drop.compute_hash()
+        self._seen.add(external_id)
+        self.written += 1
+        return drop
 
     async def refresh_cost(self, asset: Asset) -> None:
         await self.session.flush()

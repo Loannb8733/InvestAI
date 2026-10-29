@@ -317,6 +317,34 @@ class TestLaterSyncs:
         assert ("BTC", "binance", TransactionType.TRANSFER_OUT, Decimal("0.4")) in rows
         assert ("BTC", "Ledger", TransactionType.TRANSFER_IN, Decimal("0.4")) in rows
 
+    async def test_a_withdrawal_still_pending_at_a_sync_reaches_the_cold_wallet_at_the_next(
+        self, db_session: AsyncSession, regular_user: User, client: FullClient
+    ) -> None:
+        client.trades = [_trade("t1", "BTCEUR", "buy", "1", "50000")]
+        client.balances = [_balance("BTC", "1")]
+        key = await _key(db_session, regular_user)
+        await _sync(key)
+        withdrawal = ExchangeWithdrawal(
+            withdrawal_id="w1",
+            symbol="BTC",
+            amount=Decimal("0.3999"),
+            fee=Decimal("0.0001"),
+            timestamp=datetime.now(UTC),
+            status="pending",
+        )
+        client.withdrawals = [withdrawal]
+        client.balances = [_balance("BTC", "0.6")]
+        await _sync(key)
+        withdrawal.status = "completed"
+        await _sync(key)
+        assets = await _assets(db_session)
+        assert (assets[("BTC", "binance")][0], assets[("BTC", "Tangem")]) == (
+            Decimal("0.6"),
+            (Decimal("0.3999"), Decimal("50000")),
+        )
+        outs = [(q, x) for _, e, k, q, _, _, x in await _rows(db_session) if k == TransactionType.TRANSFER_OUT]
+        assert outs == [(Decimal("0.4"), "withdrawal_w1")]
+
     async def test_an_asset_gone_from_the_exchange_is_zeroed_at_cost(
         self, db_session: AsyncSession, regular_user: User, client: FullClient
     ) -> None:
