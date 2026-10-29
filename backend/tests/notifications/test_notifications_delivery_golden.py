@@ -17,26 +17,13 @@ from app.domains.notifications.report_mailer import report_mailer
 from app.domains.notifications.repository import NotificationRepository
 from app.domains.notifications.service import NotificationService
 from app.domains.notifications.telegram.client import telegram_service
-from app.domains.notifications.telegram.messages import alpha_keyboard, regime_alert_text
+from app.domains.notifications.telegram.messages import alpha_keyboard
 from tests.conftest import TestSessionLocal
 from tests.notifications.recording import Mailbox, Recorder, Telegram
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 ALERT_ID = UUID("11111111-1111-1111-1111-111111111111")
-REGIMES = (
-    "bottoming",
-    "accumulation",
-    "markup",
-    "topping",
-    "distribution",
-    "markdown",
-    "bottom",
-    "bearish",
-    "bullish",
-    "top",
-    "inconnu",
-)
 
 
 async def _rows(db: AsyncSession, user: User) -> list[dict[str, Any]]:
@@ -88,8 +75,6 @@ async def _typed_alerts(rec: Recorder, telegram: Telegram) -> None:
         await telegram_service.alert_bottom_zone("ETH", 2000.0, 1800.0, 0.5, 11.1),
     ]
     rec.check("telegram_bottom_zones", {"results": bottoms, "calls": telegram.drain()})
-    regimes = {r: regime_alert_text("BTC", "ACHAT", r, "Description.") for r in REGIMES}
-    rec.check("telegram_regime_texts", regimes)
     rec.check("telegram_alpha_keyboard", alpha_keyboard("u1", "SOL", 250.5))
 
 
@@ -109,11 +94,6 @@ async def test_telegram_alerts_match_golden(telegram: Telegram, monkeypatch: pyt
 
 
 async def _report_mails(rec: Recorder, mailbox: Mailbox) -> None:
-    sent = [
-        await report_mailer.send_alert_notification("a@test.com", "Haut", "BTC", 61000.123, 60000, "above"),
-        await report_mailer.send_alert_notification("a@test.com", "Bas", "ETH", 1999.5, 2000, "below", "USD"),
-    ]
-    rec.check("mail_alerts", {"sent": sent, "mails": mailbox.drain()})
     top = [{"symbol": "SOL", "change_pct": 12.345}, {"symbol": "BTC", "change_pct": 3.2}]
     worst = [{"symbol": "DOGE", "change_pct": -7.89}]
     weekly = [
@@ -127,12 +107,8 @@ async def _report_mails(rec: Recorder, mailbox: Mailbox) -> None:
         await report_mailer.send_monthly_report("a@test.com", "Ada", 9000, -50, -0.5, -10, [], pdf_content=b"%PDF"),
     ]
     rec.check("mail_monthly", {"sent": monthly, "mails": mailbox.drain()})
-    alerts = [{"symbol": "BTC", "message": "Seuil franchi"}]
-    predictions = [{"symbol": "ETH", "predicted_change": -3.21, "confidence": 71.6}]
-    digests = [
-        await report_mailer.send_digest("a@test.com", "Ada", alerts, predictions, ["Rééquilibrer"]),
-        await report_mailer.send_digest("a@test.com", "Ada", [], [], []),
-    ]
+    alerts = [{"title": "Alerte: BTC > 60k", "message": "Seuil franchi"}]
+    digests = [await report_mailer.send_digest("a@test.com", "Ada", alerts)]
     rec.check("mail_digest", {"sent": digests, "mails": mailbox.drain()})
 
 
@@ -142,7 +118,7 @@ async def test_report_emails_match_golden(mailbox: Mailbox, monkeypatch: pytest.
         await _report_mails(rec, mailbox)
         with monkeypatch.context() as off:
             off.setattr(settings, "SMTP_HOST", "")
-            unsent = await report_mailer.send_digest("a@test.com", "Ada", [], [], [])
+            unsent = await report_mailer.send_digest("a@test.com", "Ada", [])
     rec.check("mail_without_smtp", {"sent": unsent, "mails": mailbox.drain()})
     assert not rec.mismatches, f"golden courriels différent : {rec.mismatches} (GOLDEN_UPDATE=1 pour accepter)"
 
@@ -176,9 +152,7 @@ async def test_email_tasks_match_golden(
         await seed_history(db_session)
         await seed_portfolio(client, {"Authorization": f"Bearer {create_token(str(regular_user.id))}"})
         await _recent(db_session, regular_user)
-        uid = str(regular_user.id)
         results = {
-            "alert": await notification_tasks.run_alert_email(uid, "Haut", "BTC", 61000.0, 60000.0, "above"),
             "weekly": await notification_tasks.run_weekly_reports(),
             "monthly": await notification_tasks.run_monthly_reports(),
             "digest": await notification_tasks.run_daily_digest(),
@@ -187,7 +161,6 @@ async def test_email_tasks_match_golden(
         with monkeypatch.context() as off:
             off.setattr(settings, "SMTP_HOST", "")
             skipped = {
-                "alert": await notification_tasks.run_alert_email(uid, "Haut", "BTC", 61000.0, 60000.0, "above"),
                 "weekly": await notification_tasks.run_weekly_reports(),
                 "monthly": await notification_tasks.run_monthly_reports(),
                 "digest": await notification_tasks.run_daily_digest(),

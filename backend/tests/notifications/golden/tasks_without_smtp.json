@@ -1,7 +1,6 @@
 {
   "mails": [],
   "results": {
-    "alert": false,
     "digest": {
       "failed": 0,
       "sent": 0,

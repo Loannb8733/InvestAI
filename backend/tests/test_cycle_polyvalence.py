@@ -11,7 +11,6 @@ Vérifie que le système produit les bonnes actions selon le régime :
 import numpy as np
 import pytest
 
-from app.domains.notifications.telegram.messages import regime_alert_text
 from app.domains.predictions.strategy_map import STRATEGY_MATRIX
 from app.ml.regime_detector import MarketRegimeDetector, _ema, _rsi
 
@@ -235,44 +234,3 @@ class TestRSIOverboughtTakesProfits:
         for phase in ("top", "topping"):
             action, desc, impact = STRATEGY_MATRIX.get(("low", phase), ("UNKNOWN", "", 0))
             assert action == "VENDRE", f"Low alpha + {phase} should be VENDRE, got {action}"
-
-
-# ── Point 3: Telegram Alert Tone ────────────────────────────────
-
-
-class TestTelegramAlertTone:
-    """Telegram alerts should adapt their tone to the market regime."""
-
-    def test_format_regime_alert_bear(self):
-        """Bear regime → tone should mention 'Creux' or 'sécurisé'."""
-        msg = regime_alert_text(
-            symbol="BTC",
-            action="DCA",
-            regime="bottoming",
-            description="Alpha élevé + Bottoming",
-        )
-        assert "creux" in msg.lower() or "bottom" in msg.lower() or "sécuris" in msg.lower(), (
-            f"Bear alert should mention creux/sécurisé: {msg}"
-        )
-
-    def test_format_regime_alert_bull(self):
-        """Bull regime → tone should mention 'momentum' or 'expansion'."""
-        msg = regime_alert_text(
-            symbol="BTC",
-            action="MAINTENIR",
-            regime="markup",
-            description="Alpha élevé + Mark-up",
-        )
-        assert "momentum" in msg.lower() or "expansion" in msg.lower() or "mark-up" in msg.lower(), (
-            f"Bull alert should mention momentum/expansion: {msg}"
-        )
-
-    def test_format_regime_alert_top(self):
-        """Top regime → tone should mention 'profits' or 'prudence'."""
-        msg = regime_alert_text(
-            symbol="BTC",
-            action="PRENDRE PROFITS",
-            regime="topping",
-            description="Alpha élevé mais Topping",
-        )
-        assert "profit" in msg.lower() or "prudence" in msg.lower(), f"Top alert should mention profits/prudence: {msg}"
