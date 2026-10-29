@@ -1,5 +1,7 @@
 import logging
 
+from app.domains.notifications.telegram.client import telegram_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,8 +33,6 @@ async def send_ruin_alert(
 ) -> None:
     """Alerte Telegram critique sur une probabilité de ruine élevée ; un échec d'envoi est journalisé, jamais levé."""
     try:
-        from app.services.telegram_service import telegram_service
-
         await telegram_service.send_smart_alert(
             message=_ruin_message(prob_ruin, horizon_days, withdrawal_rate, ter, monthly_wd),
             chat_id=chat_id,

@@ -259,7 +259,7 @@ class TestCheckConstraints:
 
     def test_planned_order_has_amount_check(self):
         """PlannedOrder model should have ck_planned_orders_amount_positive."""
-        from app.models.planned_order import PlannedOrder
+        from app.domains.predictions.models import PlannedOrder
 
         constraint_names = {c.name for c in PlannedOrder.__table__.constraints if hasattr(c, "name") and c.name}
         assert "ck_planned_orders_amount_positive" in constraint_names

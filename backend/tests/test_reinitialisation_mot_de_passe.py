@@ -45,10 +45,10 @@ async def _demander_reinitialisation(client, email: str, monkeypatch):
     """L'envoi d'email est doublé : la route ne doit pas dépendre du courrier."""
     envois = []
 
-    async def _faux_envoi(self, to_email, to_name, subject, body):
+    async def _faux_envoi(to_email, to_name, subject, body):
         envois.append({"to": to_email, "body": body})
 
-    monkeypatch.setattr("app.services.notification_service.NotificationService._send_email", _faux_envoi)
+    monkeypatch.setattr("app.domains.identity.emails.send_email", _faux_envoi)
     reponse = await client.post("/api/v1/auth/forgot-password", json={"email": email})
     return reponse, envois
 
@@ -116,10 +116,10 @@ class TestDemandeDeReinitialisation:
         de messagerie, au prix d'un message trompeur en cas de panne.
         """
 
-        async def _envoi_en_panne(self, **kwargs):
+        async def _envoi_en_panne(**kwargs):
             raise RuntimeError("SMTP indisponible")
 
-        monkeypatch.setattr("app.services.notification_service.NotificationService._send_email", _envoi_en_panne)
+        monkeypatch.setattr("app.domains.identity.emails.send_email", _envoi_en_panne)
 
         reponse = await client.post("/api/v1/auth/forgot-password", json={"email": compte.email})
 

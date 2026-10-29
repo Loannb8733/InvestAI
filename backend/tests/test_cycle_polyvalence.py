@@ -11,9 +11,9 @@ Vérifie que le système produit les bonnes actions selon le régime :
 import numpy as np
 import pytest
 
+from app.domains.notifications.telegram.messages import regime_alert_text
 from app.domains.predictions.strategy_map import STRATEGY_MATRIX
 from app.ml.regime_detector import MarketRegimeDetector, _ema, _rsi
-from app.services.telegram_service import TelegramService
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ class TestTelegramAlertTone:
 
     def test_format_regime_alert_bear(self):
         """Bear regime → tone should mention 'Creux' or 'sécurisé'."""
-        msg = TelegramService.format_regime_alert(
+        msg = regime_alert_text(
             symbol="BTC",
             action="DCA",
             regime="bottoming",
@@ -257,7 +257,7 @@ class TestTelegramAlertTone:
 
     def test_format_regime_alert_bull(self):
         """Bull regime → tone should mention 'momentum' or 'expansion'."""
-        msg = TelegramService.format_regime_alert(
+        msg = regime_alert_text(
             symbol="BTC",
             action="MAINTENIR",
             regime="markup",
@@ -269,7 +269,7 @@ class TestTelegramAlertTone:
 
     def test_format_regime_alert_top(self):
         """Top regime → tone should mention 'profits' or 'prudence'."""
-        msg = TelegramService.format_regime_alert(
+        msg = regime_alert_text(
             symbol="BTC",
             action="PRENDRE PROFITS",
             regime="topping",

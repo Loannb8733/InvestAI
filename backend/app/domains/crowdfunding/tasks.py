@@ -6,7 +6,7 @@ from app.core.db.session import session_factory
 from app.domains.crowdfunding.models import CrowdfundingPaymentSchedule, CrowdfundingProject, ProjectStatus
 from app.domains.crowdfunding.reconciliation import overdue_entries
 from app.domains.crowdfunding.repository import project_owner
-from app.models.notification import Notification, NotificationPriority, NotificationType
+from app.domains.notifications.models import Notification, NotificationPriority, NotificationType
 from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 

@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.notifications import reports as notification_reports
+from app.domains.notifications import tasks as notification_tasks
 from app.domains.reports.service import report_service
-from app.tasks import emails
 from tests.sample_portfolio import FROZEN_NOW, TARGETS, seed_history, seed_portfolio
 
 USDC_VALUE = 2000 * 0.92
@@ -30,10 +31,10 @@ async def test_monthly_email_attaches_the_performance_pdf(
     client: AsyncClient, db_session: AsyncSession, regular_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mailer = MagicMock(is_configured=True, send_monthly_report=AsyncMock(return_value=True))
-    monkeypatch.setattr(emails, "email_service", mailer)
+    monkeypatch.setattr(notification_reports, "report_mailer", mailer)
     with time_machine.travel(FROZEN_NOW, tick=False):
         await _seed(client, db_session, regular_user)
-        assert await emails._send_monthly_reports_async() == {"sent": 1, "failed": 0}
+        assert await notification_tasks.run_monthly_reports() == {"sent": 1, "failed": 0}
     pdf = mailer.send_monthly_report.await_args.kwargs["pdf_content"]
     assert pdf is not None and pdf.startswith(b"%PDF")
 

@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
+from app.domains.notifications.telegram.client import telegram_service
+from app.domains.predictions import alerts as prediction_alerts
 from app.domains.predictions.models import PredictionLog
-from app.services.telegram_service import telegram_service
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
@@ -203,7 +204,7 @@ async def test_predictions_telegram_alerts_match_golden(
 ) -> None:
     sent = AsyncMock(return_value=True)
     monkeypatch.setattr(telegram_service, "send_smart_alert", sent)
-    monkeypatch.setattr(telegram_service, "build_alpha_keyboard", MagicMock(return_value={"keyboard": "alpha"}))
+    monkeypatch.setattr(prediction_alerts, "alpha_keyboard", MagicMock(return_value={"keyboard": "alpha"}))
     regular_user.telegram_enabled = True
     regular_user.telegram_chat_id = "4242"
     await db_session.commit()

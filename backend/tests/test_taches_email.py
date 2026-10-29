@@ -18,9 +18,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.domains.notifications import reports, tasks
+from app.domains.notifications.models import Notification, NotificationType
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.notification import Notification, NotificationType
-from app.tasks import emails
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def session_de_test(db_session, monkeypatch):
     async def _fabrique():
         yield db_session
 
-    monkeypatch.setattr(emails, "session_factory", _fabrique)
+    monkeypatch.setattr(tasks, "session_factory", _fabrique)
     return db_session
 
 
@@ -42,10 +42,10 @@ def poste(monkeypatch):
         envois.append({"args": args, "kwargs": kwargs})
         return True
 
-    monkeypatch.setattr(type(emails.email_service), "is_configured", property(lambda self: True))
+    monkeypatch.setattr(type(reports.report_mailer), "is_configured", property(lambda self: True))
     for methode in ("send_weekly_report", "send_monthly_report", "send_daily_digest", "send_email"):
-        if hasattr(emails.email_service, methode):
-            monkeypatch.setattr(emails.email_service, methode, AsyncMock(side_effect=_envoyer))
+        if hasattr(reports.report_mailer, methode):
+            monkeypatch.setattr(reports.report_mailer, methode, AsyncMock(side_effect=_envoyer))
     return envois
 
 
@@ -56,12 +56,12 @@ class TestGardeDeConfiguration:
         Le motif de retour le dit explicitement (`skipped`), plutôt que de
         rendre un « 0 envoyé » qu'on confondrait avec « personne à prévenir ».
         """
-        monkeypatch.setattr(type(emails.email_service), "is_configured", property(lambda self: False))
+        monkeypatch.setattr(type(reports.report_mailer), "is_configured", property(lambda self: False))
 
         for tache in (
-            emails._send_weekly_reports_async,
-            emails._send_monthly_reports_async,
-            emails._send_daily_digest_async,
+            tasks.run_weekly_reports,
+            tasks.run_monthly_reports,
+            tasks.run_daily_digest,
         ):
             res = await tache()
             assert res.get("skipped") == "email_not_configured"
@@ -76,9 +76,9 @@ class TestSansDestinataire:
         la requête, avant même de toucher la base.
         """
         for tache in (
-            emails._send_weekly_reports_async,
-            emails._send_monthly_reports_async,
-            emails._send_daily_digest_async,
+            tasks.run_weekly_reports,
+            tasks.run_monthly_reports,
+            tasks.run_daily_digest,
         ):
             res = await tache()
             assert res["sent"] == 0
@@ -105,7 +105,7 @@ class TestAvecDestinataires:
         )
         await session_de_test.flush()
 
-        res = await emails._send_weekly_reports_async()
+        res = await tasks.run_weekly_reports()
 
         assert res["sent"] + res["failed"] == 1
 
@@ -119,7 +119,7 @@ class TestAvecDestinataires:
         session_de_test.add(Portfolio(user_id=regular_user.id, name="P"))
         await session_de_test.flush()
 
-        res = await emails._send_weekly_reports_async()
+        res = await tasks.run_weekly_reports()
 
         assert res["sent"] == 0
         assert poste == []
@@ -141,13 +141,13 @@ class TestAvecDestinataires:
         )
         await session_de_test.flush()
 
-        res = await emails._send_daily_digest_async()
+        res = await tasks.run_daily_digest()
 
         assert res["sent"] == 0
 
     async def test_un_utilisateur_sans_portefeuille_n_est_pas_sollicite(self, session_de_test, regular_user, poste):
         # Aucun portefeuille : rien à rapporter, donc pas de courrier.
-        res = await emails._send_weekly_reports_async()
+        res = await tasks.run_weekly_reports()
 
         assert res["sent"] == 0
 
@@ -187,9 +187,9 @@ class TestEchecIsole:
                 raise RuntimeError("serveur SMTP injoignable")
             return True
 
-        monkeypatch.setattr(emails.email_service, "send_weekly_report", AsyncMock(side_effect=_capricieux))
+        monkeypatch.setattr(reports.report_mailer, "send_weekly_report", AsyncMock(side_effect=_capricieux))
 
-        res = await emails._send_weekly_reports_async()
+        res = await tasks.run_weekly_reports()
 
         assert res["sent"] + res["failed"] == 2
         assert res["failed"] >= 1

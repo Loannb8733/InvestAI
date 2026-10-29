@@ -29,5 +29,9 @@ class TooManyRequestsError(DomainError):
     status_code: ClassVar[int] = 429
 
 
+class BadGatewayError(DomainError):
+    status_code: ClassVar[int] = 502
+
+
 class ServiceUnavailableError(DomainError):
     status_code: ClassVar[int] = 503

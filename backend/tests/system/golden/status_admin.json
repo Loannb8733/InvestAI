@@ -225,7 +225,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<crontab: 0 18 * * 0 (m/h/dM/MY/d)>",
-        "task": "app.tasks.emails.send_weekly_reports"
+        "task": "app.domains.notifications.tasks.send_weekly_reports"
       },
       {
         "last_duration_s": "<volatile>",
@@ -238,7 +238,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<crontab: 0 8 1 * * (m/h/dM/MY/d)>",
-        "task": "app.tasks.emails.send_monthly_reports"
+        "task": "app.domains.notifications.tasks.send_monthly_reports"
       },
       {
         "last_duration_s": "<volatile>",
@@ -251,7 +251,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<crontab: 0 7 * * * (m/h/dM/MY/d)>",
-        "task": "app.tasks.emails.send_daily_digest"
+        "task": "app.domains.notifications.tasks.send_daily_digest"
       },
       {
         "last_duration_s": "<volatile>",

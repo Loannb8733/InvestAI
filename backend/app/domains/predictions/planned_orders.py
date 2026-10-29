@@ -1,11 +1,12 @@
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.predictions.models import PlannedOrder, PlannedOrderStatus
 from app.domains.predictions.schemas import PlannedOrderCreate
-from app.models.planned_order import PlannedOrder, PlannedOrderStatus
 
 SETTABLE_STATUSES = ("executed", "cancelled")
 
@@ -80,6 +81,21 @@ async def find_owned(db: AsyncSession, order_id: UUID, user_id: UUID) -> Planned
 async def apply_status(db: AsyncSession, order: PlannedOrder, new_status: Any) -> dict[str, Any]:
     """Seuls ``executed`` et ``cancelled`` modifient l'ordre ; tout autre statut est ignoré sans erreur."""
     if new_status in SETTABLE_STATUSES:
-        order.status = PlannedOrderStatus(new_status)  # type: ignore[assignment]
+        order.status = PlannedOrderStatus(new_status)
         await db.commit()
     return {"id": str(order.id), "status": order.status.value}
+
+
+async def add_telegram_order(db: AsyncSession, user_id: str, symbol: str, order_eur: float, chat_id: str) -> None:
+    """Ajoute l'achat planifié depuis le bouton d'une alerte Telegram, sans le valider."""
+    db.add(
+        PlannedOrder(
+            user_id=UUID(user_id),
+            symbol=symbol,
+            action="ACHAT",
+            order_eur=Decimal(str(order_eur)),
+            source="telegram",
+            status=PlannedOrderStatus.PENDING,
+            notes=f"Planifié via Telegram (chat {chat_id})",
+        )
+    )
