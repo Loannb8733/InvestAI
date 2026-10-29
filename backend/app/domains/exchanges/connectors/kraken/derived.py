@@ -96,7 +96,8 @@ class KrakenDerived(KrakenLedgers):
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)
 
     async def get_rewards(self, limit: int = 500, ledgers: list[dict[str, Any]] | None = None) -> list[ExchangeTrade]:
-        """Récompenses positives du grand livre (staking, earn, airdrop, bonus...), en achats à prix nul."""
+        """Récompenses du grand livre (staking, earn, airdrop, bonus...), nettes de la commission Kraken, en achats à
+        prix nul."""
         trades: list[ExchangeTrade] = []
 
         if ledgers is None:
@@ -107,14 +108,14 @@ class KrakenDerived(KrakenLedgers):
         for entry in ledgers:
             entry_type = entry["type"]
             subtype = entry.get("subtype", "").lower()
-            amount = entry["amount"]
+            net = entry["amount"] - entry["fee"]
             asset = entry["asset"]
 
             if asset in ["EUR", "USD", "GBP", "CAD", "JPY"]:
                 continue
 
             is_reward = entry_type in reward_types or subtype in reward_types
-            if is_reward and amount > 0:
+            if is_reward and net > 0:
                 is_airdrop = entry_type in ("airdrop", "bonus") or subtype in (
                     "airdrop",
                     "bonus",
@@ -126,13 +127,13 @@ class KrakenDerived(KrakenLedgers):
                         trade_id=f"{reward_prefix}{entry['ledger_id']}",
                         symbol=f"{asset}EUR",
                         side="buy",
-                        quantity=amount,
+                        quantity=net,
                         price=Decimal("0"),
                         fee=entry["fee"],
-                        fee_currency="EUR",
+                        fee_currency=asset,
                         timestamp=entry["time"],
                     )
                 )
-                logger.debug(f"Kraken reward: {entry_type}/{subtype} - {amount} {asset}")
+                logger.debug(f"Kraken reward: {entry_type}/{subtype} - {net} {asset}")
 
         return sorted(trades, key=lambda x: x.timestamp, reverse=True)

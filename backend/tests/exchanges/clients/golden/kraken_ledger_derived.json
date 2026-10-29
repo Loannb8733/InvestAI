@@ -355,7 +355,7 @@
     "result": [
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "CHF",
         "price": "0",
         "quantity": "0.2",
         "side": "buy",
@@ -365,7 +365,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "SOL",
         "price": "0",
         "quantity": "0.02",
         "side": "buy",
@@ -375,7 +375,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "BTC",
         "price": "0",
         "quantity": "0.00005",
         "side": "buy",
@@ -385,7 +385,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "FLR",
         "price": "0",
         "quantity": "4E+1",
         "side": "buy",
@@ -395,7 +395,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "ETH",
         "price": "0",
         "quantity": "0.003",
         "side": "buy",
@@ -405,7 +405,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "DOT",
         "price": "0",
         "quantity": "0.12",
         "side": "buy",
@@ -420,7 +420,7 @@
     "result": [
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "CHF",
         "price": "0",
         "quantity": "0.2",
         "side": "buy",
@@ -430,7 +430,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "SOL",
         "price": "0",
         "quantity": "0.02",
         "side": "buy",
@@ -440,7 +440,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "BTC",
         "price": "0",
         "quantity": "0.00005",
         "side": "buy",
@@ -450,7 +450,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "FLR",
         "price": "0",
         "quantity": "4E+1",
         "side": "buy",
@@ -460,7 +460,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "ETH",
         "price": "0",
         "quantity": "0.003",
         "side": "buy",
@@ -470,7 +470,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "DOT",
         "price": "0",
         "quantity": "0.12",
         "side": "buy",
@@ -493,7 +493,7 @@
     "result": [
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "BTC",
         "price": "0",
         "quantity": "0.00005",
         "side": "buy",
@@ -503,7 +503,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "FLR",
         "price": "0",
         "quantity": "4E+1",
         "side": "buy",
@@ -513,7 +513,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "ETH",
         "price": "0",
         "quantity": "0.003",
         "side": "buy",
@@ -523,7 +523,7 @@
       },
       {
         "fee": "0",
-        "fee_currency": "EUR",
+        "fee_currency": "DOT",
         "price": "0",
         "quantity": "0.12",
         "side": "buy",
