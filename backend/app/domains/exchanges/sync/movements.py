@@ -7,7 +7,7 @@ from app.domains.exchanges.sync.pricing import market_price
 from app.domains.exchanges.sync.rules import CREDITED, SENT, as_utc, cold_wallet_for, has_status
 from app.domains.exchanges.sync.symbols import FIATS, base_symbol, conversion_base
 from app.domains.portfolio.models import Asset
-from app.domains.transactions.models import TransactionType
+from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.transfers import SAME_TRANSFER_TOLERANCE, create_mirror_transfer_in
 
 SELL_PREFIX = "convert_sell_"
@@ -81,10 +81,51 @@ async def _entered_by_hand(book: Book, asset: Asset, moment: datetime, amount: D
     )
 
 
+async def _withdrawn(
+    book: Book,
+    asset: Asset,
+    withdrawal: ExchangeWithdrawal,
+    drop: Transaction | None,
+    *,
+    external_id: str,
+    moment: datetime,
+    destination: str,
+) -> tuple[Transaction | None, bool]:
+    fee = withdrawal.fee or Decimal("0")
+    notes = f"Retrait {book.exchange} → {destination}"
+    if drop is not None:
+        settled = book.settle(
+            drop,
+            asset.avg_buy_price,
+            executed_at=moment,
+            external_id=external_id,
+            fee=fee,
+            fee_currency=asset.symbol,
+            notes=notes,
+        )
+        return settled, False
+    recorded = await book.record(
+        asset,
+        TransactionType.TRANSFER_OUT,
+        withdrawal.amount,
+        asset.avg_buy_price,
+        executed_at=moment,
+        external_id=external_id,
+        fee=fee,
+        fee_currency=asset.symbol,
+        notes=notes,
+    )
+    return recorded, True
+
+
 async def import_withdrawals(
     book: Book, withdrawals: list[ExchangeWithdrawal], *, after: datetime, wallets: dict[str, str]
 ) -> None:
-    """Retraits postérieurs à la dernière synchronisation : sortie de l'exchange et entrée miroir au wallet froid."""
+    """Retraits postérieurs à ``after`` : sortie de l'exchange et entrée miroir au wallet froid.
+
+    Un retrait encore en attente lors d'une synchronisation n'y a laissé qu'un ajustement de solde : celui-ci devient
+    le retrait, et reçoit son miroir.
+    """
     for withdrawal in withdrawals:
         external_id = f"withdrawal_{withdrawal.withdrawal_id}"
         moment = as_utc(withdrawal.timestamp)
@@ -93,21 +134,14 @@ async def import_withdrawals(
         asset = book.held(withdrawal.symbol) if withdrawal.symbol else None
         if asset is None or asset.symbol in FIATS or withdrawal.amount <= 0:
             continue
-        if await _entered_by_hand(book, asset, moment, withdrawal.amount):
+        pending = await book.balance_drop(asset, moment, withdrawal.amount + (withdrawal.fee or Decimal("0")))
+        if pending is None and await _entered_by_hand(book, asset, moment, withdrawal.amount):
             book.remember(external_id)
             continue
         await book.refresh_cost(asset)
         destination = cold_wallet_for(withdrawal.address, wallets)
-        transaction = await book.record(
-            asset,
-            TransactionType.TRANSFER_OUT,
-            withdrawal.amount,
-            asset.avg_buy_price,
-            executed_at=moment,
-            external_id=external_id,
-            fee=withdrawal.fee or Decimal("0"),
-            fee_currency=asset.symbol,
-            notes=f"Retrait {book.exchange} → {destination}",
+        transaction, net = await _withdrawn(
+            book, asset, withdrawal, pending, external_id=external_id, moment=moment, destination=destination
         )
         if transaction is not None:
-            await create_mirror_transfer_in(book.session, transaction, asset, destination, amount_is_net=True)
+            await create_mirror_transfer_in(book.session, transaction, asset, destination, amount_is_net=net)

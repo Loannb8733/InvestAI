@@ -28,6 +28,7 @@ from app.services.metrics_service import invalidate_dashboard_cache
 logger = logging.getLogger(__name__)
 
 CONVERT_OVERLAP = timedelta(days=30)
+WITHDRAWAL_OVERLAP = timedelta(days=7)
 UNKNOWN_KEY = "API key not found or inactive"
 FAILED = "sync_failed"
 
@@ -72,7 +73,8 @@ async def _run(session: AsyncSession, key: APIKey, heal_fx: bool) -> SyncOutcome
     await import_rewards(book, feed.rewards)
     await import_deposits(book, feed.deposits)
     wallets = await _wallets(session, key.user_id)
-    await import_withdrawals(book, feed.withdrawals, after=last_sync or now(), wallets=wallets)
+    after = last_sync - WITHDRAWAL_OVERLAP if last_sync else now()
+    await import_withdrawals(book, feed.withdrawals, after=after, wallets=wallets)
     await reconcile(book, holdings(balances))
     await book.close()
     return SyncOutcome(success=True, synced=book.written)
