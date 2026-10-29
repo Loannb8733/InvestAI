@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import re
 import time
 from decimal import Decimal
 from typing import Any, ClassVar
@@ -12,6 +13,19 @@ import httpx
 from app.domains.exchanges.connectors.base import BaseExchangeService, ExchangeBalance
 
 logger = logging.getLogger(__name__)
+
+BALANCE_SUFFIXES = ("2.S", ".S", ".M", ".F", ".P", ".B")
+BONDED = re.compile(r"([A-Z]{2,})\d{2}")
+
+
+def _balance_asset(code: str) -> str:
+    """Actif d'un code de solde Kraken : suffixe retiré, et durée de blocage d'un staking lié (SOL03.S : SOL)."""
+    for suffix in BALANCE_SUFFIXES:
+        if code.endswith(suffix):
+            stripped = code[: -len(suffix)]
+            bonded = BONDED.fullmatch(stripped) if suffix == ".S" else None
+            return bonded.group(1) if bonded else stripped
+    return code
 
 
 class KrakenCore(BaseExchangeService):
@@ -59,11 +73,7 @@ class KrakenCore(BaseExchangeService):
         return "Kraken"
 
     def _normalize_asset(self, asset: str) -> str:
-        for suffix in ["2.S", ".S", ".M", ".F", ".P", ".B"]:
-            if asset.endswith(suffix):
-                asset = asset[: -len(suffix)]
-                break
-
+        asset = _balance_asset(asset)
         if asset in self.ASSET_MAP:
             return self.ASSET_MAP[asset]
 

@@ -53,7 +53,7 @@ class KrakenDerived(KrakenLedgers):
                 elif amount > 0:
                     buy_entry = entry
 
-            if sell_entry and buy_entry:
+            if sell_entry and buy_entry and sell_entry["asset"] != buy_entry["asset"]:
                 sell_amount = abs(sell_entry["amount"])
                 buy_amount = abs(buy_entry["amount"])
                 sell_asset = sell_entry["asset"]
