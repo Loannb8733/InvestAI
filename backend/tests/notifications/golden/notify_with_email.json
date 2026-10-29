@@ -1,0 +1,103 @@
+{
+  "mails": [
+    {
+      "envelope": [
+        "noreply@investai.local",
+        "user@test.com"
+      ],
+      "headers": {
+        "From": "InvestAI <noreply@investai.local>",
+        "MIME-Version": "1.0",
+        "Subject": "[InvestAI] Priorité normal",
+        "To": "Regular User <user@test.com>"
+      },
+      "parts": [
+        {
+          "text": "\nPriorité normal\n\nCorps du message\n\n---\nCeci est un message automatique de InvestAI.\nNe répondez pas à cet email.\n",
+          "type": "text/plain"
+        },
+        {
+          "text": "\n<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"utf-8\">\n    <style>\n        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n        .header { background: #1a1a2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }\n        .content { background: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }\n        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>InvestAI</h1>\n        </div>\n        <div class=\"content\">\n            <h2>Priorité normal</h2>\n            <p>Corps du message</p>\n        </div>\n        <div class=\"footer\">\n            <p>Ceci est un message automatique de InvestAI.<br>Ne répondez pas à cet email.</p>\n        </div>\n    </div>\n</body>\n</html>\n",
+          "type": "text/html"
+        }
+      ]
+    },
+    {
+      "envelope": [
+        "noreply@investai.local",
+        "user@test.com"
+      ],
+      "headers": {
+        "From": "InvestAI <noreply@investai.local>",
+        "MIME-Version": "1.0",
+        "Subject": "[InvestAI] Priorité high",
+        "To": "Regular User <user@test.com>",
+        "X-MSMail-Priority": "High",
+        "X-Priority": "2"
+      },
+      "parts": [
+        {
+          "text": "\nPriorité high\n\nCorps du message\n\n---\nCeci est un message automatique de InvestAI.\nNe répondez pas à cet email.\n",
+          "type": "text/plain"
+        },
+        {
+          "text": "\n<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"utf-8\">\n    <style>\n        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n        .header { background: #1a1a2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }\n        .content { background: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }\n        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>InvestAI</h1>\n        </div>\n        <div class=\"content\">\n            <h2>Priorité high</h2>\n            <p>Corps du message</p>\n        </div>\n        <div class=\"footer\">\n            <p>Ceci est un message automatique de InvestAI.<br>Ne répondez pas à cet email.</p>\n        </div>\n    </div>\n</body>\n</html>\n",
+          "type": "text/html"
+        }
+      ]
+    },
+    {
+      "envelope": [
+        "noreply@investai.local",
+        "user@test.com"
+      ],
+      "headers": {
+        "From": "InvestAI <noreply@investai.local>",
+        "MIME-Version": "1.0",
+        "Subject": "[InvestAI] Priorité urgent",
+        "To": "Regular User <user@test.com>",
+        "X-MSMail-Priority": "High",
+        "X-Priority": "1"
+      },
+      "parts": [
+        {
+          "text": "\nPriorité urgent\n\nCorps du message\n\n---\nCeci est un message automatique de InvestAI.\nNe répondez pas à cet email.\n",
+          "type": "text/plain"
+        },
+        {
+          "text": "\n<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"utf-8\">\n    <style>\n        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n        .header { background: #1a1a2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }\n        .content { background: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }\n        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>InvestAI</h1>\n        </div>\n        <div class=\"content\">\n            <h2>Priorité urgent</h2>\n            <p>Corps du message</p>\n        </div>\n        <div class=\"footer\">\n            <p>Ceci est un message automatique de InvestAI.<br>Ne répondez pas à cet email.</p>\n        </div>\n    </div>\n</body>\n</html>\n",
+          "type": "text/html"
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "is_read": false,
+      "message": "Corps du message",
+      "priority": "high",
+      "reference_id": null,
+      "reference_type": null,
+      "title": "Priorité high",
+      "type": "system"
+    },
+    {
+      "is_read": false,
+      "message": "Corps du message",
+      "priority": "normal",
+      "reference_id": null,
+      "reference_type": null,
+      "title": "Priorité normal",
+      "type": "system"
+    },
+    {
+      "is_read": false,
+      "message": "Corps du message",
+      "priority": "urgent",
+      "reference_id": null,
+      "reference_type": null,
+      "title": "Priorité urgent",
+      "type": "system"
+    }
+  ]
+}

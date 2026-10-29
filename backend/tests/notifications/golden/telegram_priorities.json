@@ -1,0 +1,47 @@
+[
+  {
+    "body": {
+      "chat_id": "777",
+      "disable_web_page_preview": true,
+      "parse_mode": "HTML",
+      "text": "🚨 <b>InvestAI</b>\n\nMessage critical"
+    },
+    "method": "sendMessage"
+  },
+  {
+    "body": {
+      "chat_id": "777",
+      "disable_web_page_preview": true,
+      "parse_mode": "HTML",
+      "text": "⚠️ <b>InvestAI</b>\n\nMessage high"
+    },
+    "method": "sendMessage"
+  },
+  {
+    "body": {
+      "chat_id": "777",
+      "disable_web_page_preview": true,
+      "parse_mode": "HTML",
+      "text": "🔔 <b>InvestAI</b>\n\nMessage normal"
+    },
+    "method": "sendMessage"
+  },
+  {
+    "body": {
+      "chat_id": "777",
+      "disable_web_page_preview": true,
+      "parse_mode": "HTML",
+      "text": "💬 <b>InvestAI</b>\n\nMessage low"
+    },
+    "method": "sendMessage"
+  },
+  {
+    "body": {
+      "chat_id": "777",
+      "disable_web_page_preview": true,
+      "parse_mode": "HTML",
+      "text": "🔔 <b>InvestAI</b>\n\nMessage autre"
+    },
+    "method": "sendMessage"
+  }
+]

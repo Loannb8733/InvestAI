@@ -1,0 +1,37 @@
+{
+  "calls": [
+    {
+      "body": {
+        "chat_id": "777",
+        "disable_web_page_preview": true,
+        "parse_mode": "HTML",
+        "text": "🚨 <b>InvestAI</b>\n\n<b>Anomalie détectée — BTC</b>\nType : volume\nSévérité : high\nVariation : +12.3%\n\nVolume x5"
+      },
+      "method": "sendMessage"
+    },
+    {
+      "body": {
+        "chat_id": "777",
+        "disable_web_page_preview": true,
+        "parse_mode": "HTML",
+        "text": "⚠️ <b>InvestAI</b>\n\n<b>Anomalie détectée — ETH</b>\nType : prix\nSévérité : medium\nVariation : -8.0%\n\nChute brutale"
+      },
+      "method": "sendMessage"
+    },
+    {
+      "body": {
+        "chat_id": "777",
+        "disable_web_page_preview": true,
+        "parse_mode": "HTML",
+        "text": "🔔 <b>InvestAI</b>\n\n<b>Anomalie détectée — SOL</b>\nType : prix\nSévérité : low\nVariation : 0.0%\n\nLéger écart"
+      },
+      "method": "sendMessage"
+    }
+  ],
+  "results": [
+    true,
+    true,
+    true,
+    false
+  ]
+}

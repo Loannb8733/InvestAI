@@ -1,0 +1,17 @@
+{
+  "calls": [
+    {
+      "body": {
+        "chat_id": "777",
+        "disable_web_page_preview": true,
+        "parse_mode": "HTML",
+        "text": "🚨 <b>InvestAI</b>\n\n<b>Zone de Bottom détectée — BTC</b>\nPrix actuel : 58,000.50 €\nBottom estimé : 55,000.00 €\nDistance : 5.5%\nConfiance : 82%\n\nOpportunité d'achat potentielle."
+      },
+      "method": "sendMessage"
+    }
+  ],
+  "results": [
+    true,
+    false
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "body": {
+    "detail": "Le bot Telegram n'est pas configuré (TELEGRAM_BOT_TOKEN manquant)."
+  },
+  "status": 400,
+  "telegram": []
+}

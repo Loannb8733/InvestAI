@@ -1,0 +1,17 @@
+{
+  "body": [
+    {
+      "created_at": "<volatile>",
+      "id": "<id-2>",
+      "is_read": false,
+      "message": "Détail : Rapport prêt",
+      "priority": "normal",
+      "reference_id": null,
+      "reference_type": null,
+      "title": "Rapport prêt",
+      "type": "report_ready"
+    }
+  ],
+  "status": 200,
+  "telegram": []
+}

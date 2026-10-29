@@ -1,0 +1,12 @@
+[
+  {
+    "action": "ACHAT",
+    "alpha_score": null,
+    "notes": "Planifié via Telegram (chat 777)",
+    "order_eur": "250.50",
+    "regime": null,
+    "source": "telegram",
+    "status": "pending",
+    "symbol": "SOL"
+  }
+]
