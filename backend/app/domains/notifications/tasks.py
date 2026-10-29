@@ -6,13 +6,6 @@ from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
 
 
-async def run_alert_email(
-    user_id: str, alert_name: str, asset_symbol: str, current_price: float, target_price: float, condition: str
-) -> bool:
-    async with session_factory() as db:
-        return await reports.alert_email(db, user_id, alert_name, asset_symbol, current_price, target_price, condition)
-
-
 async def run_weekly_reports() -> dict[str, Any]:
     async with session_factory() as db:
         return await reports.weekly_reports(db)
@@ -26,21 +19,6 @@ async def run_monthly_reports() -> dict[str, Any]:
 async def run_daily_digest() -> dict[str, Any]:
     async with session_factory() as db:
         return await reports.daily_digest(db)
-
-
-@celery_app.task(  # type: ignore[untyped-decorator]
-    name="app.domains.notifications.tasks.send_alert_email",
-    autoretry_for=(Exception,),
-    max_retries=3,
-    default_retry_delay=60,
-    retry_backoff=True,
-)
-def send_alert_email(
-    user_id: str, alert_name: str, asset_symbol: str, current_price: float, target_price: float, condition: str
-) -> bool:
-    """Courriel d'un seuil de prix franchi, retenté trois fois en cas d'erreur."""
-    sent: bool = run_async(run_alert_email(user_id, alert_name, asset_symbol, current_price, target_price, condition))
-    return sent
 
 
 @celery_app.task(name="app.domains.notifications.tasks.send_weekly_reports")  # type: ignore[untyped-decorator]

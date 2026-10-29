@@ -2,10 +2,10 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.notifications.models import NotificationType
 from app.domains.notifications.report_mailer import report_mailer
 from app.domains.notifications.repository import NotificationRepository, Recipient
 from app.domains.reports.performance_pdf import render_performance_pdf
@@ -82,8 +82,12 @@ async def _performance_pdf(db: AsyncSession, recipient: Recipient) -> bytes | No
         return None
 
 
+def _performers(ranked: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{"symbol": asset["symbol"], "change_pct": asset["gain_loss_percent"]} for asset in ranked]
+
+
 async def _weekly(db: AsyncSession, recipient: Recipient) -> bool | None:
-    metrics = await metrics_service.get_user_dashboard_metrics(db, str(recipient.id))
+    metrics = await metrics_service.get_user_dashboard_metrics(db, str(recipient.id), days=WEEK_DAYS)
     if metrics["total_value"] == 0:
         return None
     change, change_pct = await _period_change(db, str(recipient.id), metrics["total_value"], WEEK_DAYS)
@@ -93,8 +97,8 @@ async def _weekly(db: AsyncSession, recipient: Recipient) -> bool | None:
         total_value=metrics["total_value"],
         week_change=change,
         week_change_pct=change_pct,
-        top_performers=[],
-        worst_performers=[],
+        top_performers=_performers(metrics["top_performers"]),
+        worst_performers=_performers(metrics["worst_performers"]),
     )
 
 
@@ -140,38 +144,12 @@ async def daily_digest(db: AsyncSession) -> dict[str, Any]:
     async def digest(session: AsyncSession, recipient: Recipient) -> bool | None:
         notifications = await NotificationRepository(session).received_since(recipient.id, since)
         alerts = [
-            {"symbol": n.title.split()[-1] if n.title else "?", "message": n.message}
+            {"title": n.title, "message": n.message}
             for n in notifications
-            if "alert" in n.type.lower()
+            if n.type == NotificationType.ALERT_TRIGGERED
         ]
-        insights = [n.message for n in notifications if "insight" in n.type.lower() or "tip" in n.type.lower()]
-        if not (alerts or insights):
+        if not alerts:
             return None
-        return await report_mailer.send_digest(recipient.email, _display_name(recipient), alerts, [], insights)
+        return await report_mailer.send_digest(recipient.email, _display_name(recipient), alerts)
 
     return await _send_each(db, await NotificationRepository(db).notified_since(since), digest, "Daily digest")
-
-
-async def alert_email(
-    db: AsyncSession,
-    user_id: str,
-    alert_name: str,
-    asset_symbol: str,
-    current_price: float,
-    target_price: float,
-    condition: str,
-) -> bool:
-    """Courriel d'un seuil de prix franchi à l'utilisateur ; False sans SMTP ou sans adresse."""
-    if not report_mailer.is_configured:
-        return False
-    recipient = await NotificationRepository(db).recipient(UUID(user_id))
-    if not recipient or not recipient.email:
-        return False
-    return await report_mailer.send_alert_notification(
-        to_email=recipient.email,
-        alert_name=alert_name,
-        asset_symbol=asset_symbol,
-        current_price=current_price,
-        target_price=target_price,
-        condition=condition,
-    )

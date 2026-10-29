@@ -1,4 +1,5 @@
 import logging
+from html import escape
 from uuid import UUID
 
 from app.core.config import settings
@@ -70,7 +71,7 @@ class NotificationService:
         recipient = await self._repository.recipient(user_id)
         if recipient and recipient.email:
             name = f"{recipient.first_name or ''} {recipient.last_name or ''}".strip() or recipient.email
-            await send_email(recipient.email, name, title, message, priority)
+            await send_email(recipient.email, name, title, escape(message), priority)
 
     async def send_alert(
         self,

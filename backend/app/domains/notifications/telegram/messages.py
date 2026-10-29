@@ -1,5 +1,7 @@
 from typing import Any
 
+from app.domains.notifications.formatting import amount, percent
+
 PRIORITY_PREFIXES = {
     "critical": "\U0001f6a8",
     "high": "⚠️",
@@ -8,20 +10,6 @@ PRIORITY_PREFIXES = {
 }
 DEFAULT_PREFIX = "\U0001f514"
 
-REGIME_TONES = {
-    "bottoming": ("\U0001f50e Opportunité de Creux détectée", "Zone sécurisée pour accumulation progressive."),
-    "accumulation": ("\U0001f4c8 Signal d'Accumulation", "Phase d'entrée progressive — Smart Money en action."),
-    "markup": ("\U0001f680 Signal de Momentum confirmé", "Phase d'Expansion — laissez courir vos positions."),
-    "topping": ("⚠️ Surchauffe détectée", "Prudence — sécurisez une partie de vos gains."),
-    "distribution": ("\U0001f6a8 Phase de Distribution", "Prenez vos profits avant le retournement."),
-    "markdown": ("\U0001f4c9 Marché en Markdown", "Patience — attendez les signaux de creux pour accumuler."),
-    "bottom": ("\U0001f50e Opportunité de Creux détectée", "Zone sécurisée pour accumulation progressive."),
-    "bearish": ("\U0001f4c9 Marché Baissier", "Conservation recommandée — préparez votre watchlist."),
-    "bullish": ("\U0001f680 Signal de Momentum confirmé", "Phase d'Expansion — conditions favorables."),
-    "top": ("⚠️ Sommet potentiel", "Prudence — sécurisez vos gains."),
-}
-DEFAULT_TONE = ("\U0001f514 Alerte Stratégie", "")
-
 
 def smart_alert_text(message: str, priority: str) -> str:
     """Message d'alerte précédé de l'emoji de sa priorité et de l'en-tête InvestAI."""
@@ -29,12 +17,11 @@ def smart_alert_text(message: str, priority: str) -> str:
 
 
 def anomaly_text(symbol: str, anomaly_type: str, severity: str, description: str, price_change_pct: float) -> str:
-    sign = "+" if price_change_pct > 0 else ""
     return (
         f"<b>Anomalie détectée — {symbol}</b>\n"
         f"Type : {anomaly_type}\n"
         f"Sévérité : {severity}\n"
-        f"Variation : {sign}{price_change_pct:.1f}%\n\n"
+        f"Variation : {percent(price_change_pct, signed=price_change_pct > 0)}\n\n"
         f"{description}"
     )
 
@@ -44,18 +31,12 @@ def bottom_zone_text(
 ) -> str:
     return (
         f"<b>Zone de Bottom détectée — {symbol}</b>\n"
-        f"Prix actuel : {current_price:,.2f} €\n"
-        f"Bottom estimé : {estimated_bottom:,.2f} €\n"
-        f"Distance : {distance_pct:.1f}%\n"
-        f"Confiance : {confidence * 100:.0f}%\n\n"
+        f"Prix actuel : {amount(current_price, '€')}\n"
+        f"Bottom estimé : {amount(estimated_bottom, '€')}\n"
+        f"Distance : {percent(distance_pct)}\n"
+        f"Confiance : {percent(confidence * 100, decimals=0)}\n\n"
         f"Opportunité d'achat potentielle."
     )
-
-
-def regime_alert_text(symbol: str, action: str, regime: str, description: str) -> str:
-    """Alerte de stratégie dont le titre et le conseil suivent la phase de marché."""
-    title, hint = REGIME_TONES.get(regime, DEFAULT_TONE)
-    return f"<b>{title} — {symbol}</b>\nAction : {action}\n{description}\n\n<i>{hint}</i>"
 
 
 def alpha_keyboard(user_id: str, symbol: str, order_eur: float) -> dict[str, Any]:

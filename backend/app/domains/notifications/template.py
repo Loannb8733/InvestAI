@@ -1,8 +1,10 @@
 from datetime import datetime
 
+from app.core.config import settings
+
 
 def wrap(content: str, title: str) -> str:
-    """Page HTML des courriels de rapport : en-tête au titre du courriel, contenu, pied InvestAI."""
+    """Page HTML de tous les courriels : en-tête au titre du courriel, contenu, pied du message automatique."""
     return f"""
 <!DOCTYPE html>
 <html lang="fr">
@@ -110,8 +112,8 @@ def wrap(content: str, title: str) -> str:
             {content}
         </div>
         <div class="footer">
-            <p>Cet email a ete envoye automatiquement par InvestAI.</p>
-            <p>&copy; {datetime.now().year} InvestAI - Votre assistant d'investissement</p>
+            <p>Ceci est un message automatique de {settings.APP_NAME}. Ne répondez pas à cet email.</p>
+            <p>&copy; {datetime.now().year} {settings.APP_NAME} - Votre assistant d'investissement</p>
         </div>
     </div>
 </body>
