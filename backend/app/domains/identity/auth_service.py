@@ -50,8 +50,8 @@ class AuthService:
     async def refresh(self, refresh_token: str | None, user_agent: str) -> TokenPair:
         if not refresh_token:
             raise UnauthorizedError("Aucun token de rafraîchissement fourni")
-        user, _ = await authenticate(refresh_token, "refresh", user_agent, self._users)
-        return issue_pair(str(user.id), user_agent, user.token_version)
+        user, payload = await authenticate(refresh_token, "refresh", user_agent, self._users)
+        return issue_pair(str(user.id), user_agent, user.token_version, remember_me=bool(payload.get("rm")))
 
     async def logout(self, tokens: list[tuple[str, int]]) -> None:
         """Révoque chaque jeton fourni, avec son plafond de durée de révocation."""

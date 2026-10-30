@@ -29,8 +29,9 @@ def create_token(
     lifetime: timedelta | None = None,
     user_agent_fingerprint: str | None = None,
     token_version: int = 0,
+    remember_me: bool = False,
 ) -> str:
-    """JWT signé portant le sujet, le type, la génération (``tv``), un ``jti`` et l'empreinte éventuelle."""
+    """JWT signé portant le sujet, le type, la génération (``tv``), un ``jti``, l'empreinte et le ``rm`` éventuels."""
     default = (
         timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         if kind == "access"
@@ -45,6 +46,8 @@ def create_token(
     }
     if user_agent_fingerprint:
         claims["fp"] = user_agent_fingerprint
+    if remember_me:
+        claims["rm"] = True
     encoded: str = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded
 
@@ -82,6 +85,7 @@ def issue_pair(subject: str, user_agent: str, token_version: int, *, remember_me
             lifetime=timedelta(days=days),
             user_agent_fingerprint=fp,
             token_version=token_version,
+            remember_me=remember_me,
         ),
         refresh_days=days,
     )
