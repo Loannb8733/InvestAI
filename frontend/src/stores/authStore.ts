@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authApi } from '@/services/api'
@@ -31,6 +32,11 @@ interface AuthState {
   setTokens: (accessToken: string, refreshToken: string) => void
   fetchUser: () => Promise<void>
   clearError: () => void
+}
+
+function isSessionRejected(error: unknown): boolean {
+  const status = (error as AxiosError | undefined)?.response?.status
+  return status === 401 || status === 403
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -87,8 +93,9 @@ export const useAuthStore = create<AuthState>()(
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
           })
-        } catch {
-          get().logout()
+        } catch (error) {
+          if (isSessionRejected(error)) get().logout()
+          throw error
         }
       },
 
@@ -108,8 +115,8 @@ export const useAuthStore = create<AuthState>()(
               telegramEnabled: user.telegram_enabled ?? false,
             },
           })
-        } catch {
-          get().logout()
+        } catch (error) {
+          if (isSessionRejected(error)) get().logout()
         }
       },
 
@@ -122,13 +129,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isHydrating: true })
         try {
           // Try to refresh using the httpOnly cookie.
-          // refreshAccessToken() calls logout() internally on failure,
-          // so we just check the result.
           await get().refreshAccessToken()
           // If refresh succeeded (still authenticated), fetch fresh user data
           if (get().isAuthenticated && get().accessToken) {
             await get().fetchCurrentUser()
           }
+        } catch {
+          // Session refusée : déjà fermée. Panne passagère : la prochaine requête retente.
         } finally {
           set({ isHydrating: false })
         }

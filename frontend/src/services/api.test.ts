@@ -22,13 +22,16 @@ import type { AxiosRequestConfig } from 'axios'
 
 const rafraichir = vi.hoisted(() => vi.fn())
 const deconnecter = vi.hoisted(() => vi.fn())
-const etatAuth = vi.hoisted(() => ({ accessToken: null as string | null }))
+const chargerUtilisateur = vi.hoisted(() => vi.fn())
+const etatAuth = vi.hoisted(() => ({ accessToken: null as string | null, user: null as { id: string } | null }))
 const toastMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: {
     getState: () => ({
       accessToken: etatAuth.accessToken,
+      user: etatAuth.user,
+      fetchCurrentUser: chargerUtilisateur,
       refreshAccessToken: rafraichir,
       logout: deconnecter,
     }),
@@ -66,6 +69,7 @@ beforeEach(() => {
   scenario = []
   requetes = []
   etatAuth.accessToken = null
+  etatAuth.user = { id: '1' }
   vi.clearAllMocks()
   // @ts-expect-error — l'adaptateur d'axios accepte une fonction
   api.defaults.adapter = transport
@@ -189,14 +193,43 @@ describe('rafraîchissement du jeton', () => {
     expect(rafraichir).toHaveBeenCalledTimes(1)
   })
 
-  it('déconnecte quand le rafraîchissement échoue', async () => {
-    rafraichir.mockRejectedValue(new Error('refresh token expiré'))
+  it("laisse le store décider de la déconnexion quand le rafraîchissement échoue", async () => {
+    // Une panne passagère ne ferme pas la session : seul le store, qui voit
+    // la réponse du serveur, sait si elle a été refusée.
+    const panne = new Error('Network Error')
+    rafraichir.mockRejectedValue(panne)
     scenario = [{ status: 401 }]
 
-    await api.get('/portfolios').catch(() => undefined)
+    const promesse = api.get('/portfolios').catch((e) => e)
     await laisserPasser()
 
-    expect(deconnecter).toHaveBeenCalled()
+    await expect(promesse).resolves.toBe(panne)
+    expect(deconnecter).not.toHaveBeenCalled()
+  })
+
+  it("charge l'utilisateur quand le rafraîchissement rattrape un démarrage en panne", async () => {
+    // Le refresh du chargement de la page a échoué : la session a survécu,
+    // mais sans utilisateur, et rien d'autre ne le chargera.
+    etatAuth.user = null
+    rafraichir.mockImplementation(async () => {
+      etatAuth.accessToken = 'jeton-neuf'
+    })
+    scenario = [{ status: 401 }, { status: 200 }]
+
+    await api.get('/portfolios')
+
+    expect(chargerUtilisateur).toHaveBeenCalledTimes(1)
+  })
+
+  it("ne recharge pas un utilisateur déjà connu", async () => {
+    rafraichir.mockImplementation(async () => {
+      etatAuth.accessToken = 'jeton-neuf'
+    })
+    scenario = [{ status: 401 }, { status: 200 }]
+
+    await api.get('/portfolios')
+
+    expect(chargerUtilisateur).not.toHaveBeenCalled()
   })
 
   it("déconnecte aussi quand le rafraîchissement ne rend aucun jeton", async () => {
@@ -224,7 +257,6 @@ describe('rafraîchissement du jeton', () => {
     await api.get('/portfolios').catch(() => undefined)
     await laisserPasser()
 
-    expect(deconnecter).toHaveBeenCalled()
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Session expirée', variant: 'destructive' }),
     )
@@ -239,7 +271,6 @@ describe('rafraîchissement du jeton', () => {
     await api.get('/portfolios').catch(() => undefined)
     await laisserPasser()
 
-    expect(deconnecter).toHaveBeenCalled()
     expect(toastMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Session expirée' }),
     )

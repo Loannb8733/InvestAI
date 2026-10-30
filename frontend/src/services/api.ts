@@ -101,10 +101,11 @@ api.interceptors.response.use(
 
       try {
         await useAuthStore.getState().refreshAccessToken()
-        const token = useAuthStore.getState().accessToken
+        const { accessToken: token, user, fetchCurrentUser } = useAuthStore.getState()
 
         if (token) {
           processQueue(null, token)
+          if (!user) void fetchCurrentUser()
           originalRequest.headers.Authorization = `Bearer ${token}`
           return api(originalRequest)
         } else {
@@ -113,7 +114,6 @@ api.interceptors.response.use(
         }
       } catch (refreshError) {
         processQueue(refreshError, null)
-        useAuthStore.getState().logout()
         // Une session coupée par un changement de mot de passe (NEW-65) se
         // solde par une déconnexion silencieuse : l'utilisateur se retrouve
         // devant l'écran de connexion sans savoir pourquoi. Le serveur, lui,
