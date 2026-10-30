@@ -1,0 +1,108 @@
+{
+  "body": {
+    "active_alerts": [],
+    "advanced_metrics": {
+      "concentration": {
+        "hhi": 0.0,
+        "interpretation": "N/A",
+        "is_concentrated": false,
+        "top_asset": null,
+        "top_concentration": null
+      },
+      "pnl_breakdown": {
+        "net_pnl": 0.0,
+        "realized_pnl": 0.0,
+        "total_fees": 0.0,
+        "total_pnl": 0.0,
+        "unrealized_pnl": 0.0
+      },
+      "risk_metrics": {
+        "alpha": null,
+        "beta": null,
+        "max_drawdown": {
+          "max_drawdown_percent": 0.0,
+          "peak_date": null,
+          "peak_value": null,
+          "trough_date": null,
+          "trough_value": null
+        },
+        "sharpe_ratio": 0.0,
+        "var_95": {
+          "confidence_level": 0.95,
+          "var_amount": 0.0,
+          "var_percent": 0.0
+        },
+        "volatility": 0.0
+      },
+      "roi_annualized": null,
+      "stress_tests": [
+        {
+          "current_value": 0.0,
+          "potential_loss": 0.0,
+          "potential_loss_percent": 20.0,
+          "scenario_name": "Correction -20%",
+          "stressed_value": 0.0
+        },
+        {
+          "current_value": 0.0,
+          "potential_loss": 0.0,
+          "potential_loss_percent": 40.0,
+          "scenario_name": "Correction -40%",
+          "stressed_value": 0.0
+        }
+      ]
+    },
+    "allocation": [],
+    "asset_allocation": [],
+    "assets_count": 0,
+    "available_liquidity": 0.0,
+    "currency_exposure": [],
+    "daily_change": 0.0,
+    "daily_change_percent": 0.0,
+    "earn_summary": null,
+    "forex_stale": false,
+    "historical_data": [],
+    "index_comparison": [
+      {
+        "change_percent": 5.9402,
+        "name": "Bitcoin",
+        "price": 60000.0,
+        "symbol": "BTC"
+      },
+      {
+        "change_percent": 20.3841,
+        "name": "Ethereum",
+        "price": 3000.0,
+        "symbol": "ETH"
+      },
+      {
+        "change_percent": -1.4948,
+        "name": "Solana",
+        "price": 150.0,
+        "symbol": "SOL"
+      }
+    ],
+    "is_data_estimated": true,
+    "last_updated": "2026-10-17T12:00:00+00:00",
+    "net_capital": 0.0,
+    "net_gain_loss": 0.0,
+    "net_gain_loss_percent": 0.0,
+    "period_change": 0.0,
+    "period_change_percent": 0.0,
+    "period_days": 30,
+    "period_label": "Depuis le début",
+    "period_twr_percent": null,
+    "portfolios_count": 0,
+    "recent_transactions": [],
+    "top_performers": [],
+    "total_dividend_income": 0.0,
+    "total_gain_loss": 0.0,
+    "total_gain_loss_percent": 0.0,
+    "total_invested": 0.0,
+    "total_return": 0.0,
+    "total_value": 0.0,
+    "upcoming_events": [],
+    "worst_performers": []
+  },
+  "status": 200
+}

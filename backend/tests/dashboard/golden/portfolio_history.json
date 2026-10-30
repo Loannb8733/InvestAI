@@ -1,0 +1,13 @@
+{
+  "body": {
+    "current_holdings_count": 7,
+    "realized_gains": 4858.0247,
+    "sold_assets": [],
+    "sold_assets_count": 0,
+    "total_fees": 35.0,
+    "total_invested_all_time": 47640.0,
+    "total_sold": 10500.0,
+    "total_sold_fiat": 10500.0
+  },
+  "status": 200
+}

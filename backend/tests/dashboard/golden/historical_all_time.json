@@ -1,0 +1,437 @@
+{
+  "body": [
+    {
+      "date": "04/01",
+      "full_date": "2025-01-04T00:00:00",
+      "gain_loss": 0.0,
+      "invested": 0.0,
+      "is_estimated": false,
+      "net_capital": 0.0,
+      "value": 0.0
+    },
+    {
+      "date": "18/01",
+      "full_date": "2025-01-18T00:00:00",
+      "gain_loss": 4980.0,
+      "invested": 16860.0,
+      "is_estimated": false,
+      "net_capital": 16860.0,
+      "value": 21840.0
+    },
+    {
+      "date": "01/02",
+      "full_date": "2025-02-01T00:00:00",
+      "gain_loss": 4980.0,
+      "invested": 16860.0,
+      "is_estimated": false,
+      "net_capital": 16860.0,
+      "value": 21840.0
+    },
+    {
+      "date": "15/02",
+      "full_date": "2025-02-15T00:00:00",
+      "gain_loss": 6594.54,
+      "invested": 24860.0,
+      "is_estimated": false,
+      "net_capital": 24860.0,
+      "value": 31454.54
+    },
+    {
+      "date": "01/03",
+      "full_date": "2025-03-01T00:00:00",
+      "gain_loss": 6559.56,
+      "invested": 26060.0,
+      "is_estimated": false,
+      "net_capital": 26060.0,
+      "value": 32619.56
+    },
+    {
+      "date": "15/03",
+      "full_date": "2025-03-15T00:00:00",
+      "gain_loss": 6559.56,
+      "invested": 26060.0,
+      "is_estimated": false,
+      "net_capital": 26060.0,
+      "value": 32619.56
+    },
+    {
+      "date": "29/03",
+      "full_date": "2025-03-29T00:00:00",
+      "gain_loss": 6559.56,
+      "invested": 26060.0,
+      "is_estimated": false,
+      "net_capital": 26060.0,
+      "value": 32619.56
+    },
+    {
+      "date": "12/04",
+      "full_date": "2025-04-12T00:00:00",
+      "gain_loss": 6673.33,
+      "invested": 31060.0,
+      "is_estimated": false,
+      "net_capital": 31060.0,
+      "value": 37733.33
+    },
+    {
+      "date": "26/04",
+      "full_date": "2025-04-26T00:00:00",
+      "gain_loss": 6673.33,
+      "invested": 31060.0,
+      "is_estimated": false,
+      "net_capital": 31060.0,
+      "value": 37733.33
+    },
+    {
+      "date": "10/05",
+      "full_date": "2025-05-10T00:00:00",
+      "gain_loss": 6673.33,
+      "invested": 31060.0,
+      "is_estimated": false,
+      "net_capital": 31060.0,
+      "value": 37733.33
+    },
+    {
+      "date": "24/05",
+      "full_date": "2025-05-24T00:00:00",
+      "gain_loss": 6636.62,
+      "invested": 34460.0,
+      "is_estimated": false,
+      "net_capital": 34460.0,
+      "value": 41096.62
+    },
+    {
+      "date": "07/06",
+      "full_date": "2025-06-07T00:00:00",
+      "gain_loss": 6886.52,
+      "invested": 35860.0,
+      "is_estimated": false,
+      "net_capital": 35860.0,
+      "value": 42746.52
+    },
+    {
+      "date": "21/06",
+      "full_date": "2025-06-21T00:00:00",
+      "gain_loss": 6886.52,
+      "invested": 35860.0,
+      "is_estimated": false,
+      "net_capital": 35860.0,
+      "value": 42746.52
+    },
+    {
+      "date": "05/07",
+      "full_date": "2025-07-05T00:00:00",
+      "gain_loss": 6886.52,
+      "invested": 35860.0,
+      "is_estimated": false,
+      "net_capital": 35860.0,
+      "value": 42746.52
+    },
+    {
+      "date": "19/07",
+      "full_date": "2025-07-19T00:00:00",
+      "gain_loss": 6886.52,
+      "invested": 35860.0,
+      "is_estimated": false,
+      "net_capital": 35860.0,
+      "value": 42746.52
+    },
+    {
+      "date": "02/08",
+      "full_date": "2025-08-02T00:00:00",
+      "gain_loss": 4386.52,
+      "invested": 48360.0,
+      "is_estimated": false,
+      "net_capital": 48360.0,
+      "value": 52746.52
+    },
+    {
+      "date": "16/08",
+      "full_date": "2025-08-16T00:00:00",
+      "gain_loss": 4386.52,
+      "invested": 48360.0,
+      "is_estimated": false,
+      "net_capital": 48360.0,
+      "value": 52746.52
+    },
+    {
+      "date": "30/08",
+      "full_date": "2025-08-30T00:00:00",
+      "gain_loss": 5501.76,
+      "invested": 48360.0,
+      "is_estimated": false,
+      "net_capital": 48360.0,
+      "value": 53861.76
+    },
+    {
+      "date": "13/09",
+      "full_date": "2025-09-13T00:00:00",
+      "gain_loss": 6217.31,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 49360.0,
+      "value": 55577.31
+    },
+    {
+      "date": "27/09",
+      "full_date": "2025-09-27T00:00:00",
+      "gain_loss": 6257.61,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 49360.0,
+      "value": 55617.61
+    },
+    {
+      "date": "11/10",
+      "full_date": "2025-10-11T00:00:00",
+      "gain_loss": 6211.34,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 49360.0,
+      "value": 55571.34
+    },
+    {
+      "date": "25/10",
+      "full_date": "2025-10-25T00:00:00",
+      "gain_loss": 6065.35,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 49360.0,
+      "value": 55425.35
+    },
+    {
+      "date": "08/11",
+      "full_date": "2025-11-08T00:00:00",
+      "gain_loss": 5937.95,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 49360.0,
+      "value": 55297.95
+    },
+    {
+      "date": "22/11",
+      "full_date": "2025-11-22T00:00:00",
+      "gain_loss": 1798.8,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 51158.8
+    },
+    {
+      "date": "06/12",
+      "full_date": "2025-12-06T00:00:00",
+      "gain_loss": 1953.39,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 51313.39
+    },
+    {
+      "date": "20/12",
+      "full_date": "2025-12-20T00:00:00",
+      "gain_loss": 2383.01,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 51743.01
+    },
+    {
+      "date": "03/01",
+      "full_date": "2026-01-03T00:00:00",
+      "gain_loss": 3987.65,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 53347.65
+    },
+    {
+      "date": "17/01",
+      "full_date": "2026-01-17T00:00:00",
+      "gain_loss": 6332.82,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 55692.82
+    },
+    {
+      "date": "31/01",
+      "full_date": "2026-01-31T00:00:00",
+      "gain_loss": 8045.69,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 57405.69
+    },
+    {
+      "date": "14/02",
+      "full_date": "2026-02-14T00:00:00",
+      "gain_loss": 8313.59,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 57673.59
+    },
+    {
+      "date": "28/02",
+      "full_date": "2026-02-28T00:00:00",
+      "gain_loss": 8356.17,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 42360.0,
+      "value": 57716.17
+    },
+    {
+      "date": "14/03",
+      "full_date": "2026-03-14T00:00:00",
+      "gain_loss": 6760.2,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 56120.2
+    },
+    {
+      "date": "28/03",
+      "full_date": "2026-03-28T00:00:00",
+      "gain_loss": 7879.61,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 57239.61
+    },
+    {
+      "date": "11/04",
+      "full_date": "2026-04-11T00:00:00",
+      "gain_loss": 7693.12,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 57053.12
+    },
+    {
+      "date": "25/04",
+      "full_date": "2026-04-25T00:00:00",
+      "gain_loss": 6306.85,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 55666.85
+    },
+    {
+      "date": "09/05",
+      "full_date": "2026-05-09T00:00:00",
+      "gain_loss": 5324.13,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 54684.13
+    },
+    {
+      "date": "23/05",
+      "full_date": "2026-05-23T00:00:00",
+      "gain_loss": 5803.88,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 55163.88
+    },
+    {
+      "date": "06/06",
+      "full_date": "2026-06-06T00:00:00",
+      "gain_loss": 7795.49,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 57155.49
+    },
+    {
+      "date": "20/06",
+      "full_date": "2026-06-20T00:00:00",
+      "gain_loss": 11042.93,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 60402.93
+    },
+    {
+      "date": "04/07",
+      "full_date": "2026-07-04T00:00:00",
+      "gain_loss": 14565.91,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 63925.91
+    },
+    {
+      "date": "18/07",
+      "full_date": "2026-07-18T00:00:00",
+      "gain_loss": 16337.79,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 65697.79
+    },
+    {
+      "date": "01/08",
+      "full_date": "2026-08-01T00:00:00",
+      "gain_loss": 15177.23,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 64537.23
+    },
+    {
+      "date": "15/08",
+      "full_date": "2026-08-15T00:00:00",
+      "gain_loss": 12539.69,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 61899.69
+    },
+    {
+      "date": "29/08",
+      "full_date": "2026-08-29T00:00:00",
+      "gain_loss": 10935.35,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 60295.35
+    },
+    {
+      "date": "12/09",
+      "full_date": "2026-09-12T00:00:00",
+      "gain_loss": 11096.87,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 60456.87
+    },
+    {
+      "date": "26/09",
+      "full_date": "2026-09-26T00:00:00",
+      "gain_loss": 12114.04,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 61474.04
+    },
+    {
+      "date": "10/10",
+      "full_date": "2026-10-10T00:00:00",
+      "gain_loss": 13559.11,
+      "invested": 49360.0,
+      "is_estimated": false,
+      "net_capital": 38860.0,
+      "value": 62919.11
+    },
+    {
+      "date": "17/10",
+      "full_date": "2026-10-17T00:00:00",
+      "gain_loss": 14553.43,
+      "invested": 49500.0,
+      "is_estimated": false,
+      "net_capital": 39000.0,
+      "value": 64053.43
+    }
+  ],
+  "status": 200
+}
