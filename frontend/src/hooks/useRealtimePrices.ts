@@ -13,6 +13,13 @@ const BASE_DELAY = 1_000   // 1s initial retry
 const MAX_DELAY = 60_000   // 60s cap
 const BACKOFF_FACTOR = 2
 
+export function pricesSocketUrl(): string {
+  const base = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || '/api/v1'
+  if (!base.startsWith('/')) return `${base.replace(/^http/, 'ws')}/ws/prices`
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}${base}/ws/prices`
+}
+
 export function useRealtimePrices(symbols: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceUpdate>>({})
   const [connected, setConnected] = useState(false)
@@ -47,13 +54,7 @@ export function useRealtimePrices(symbols: string[]) {
     // Don't open a second socket
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
 
-    const apiUrl = import.meta.env.VITE_API_URL || '/api/v1'
-    const wsBase = apiUrl.replace(/^http/, 'ws')
-    const url = apiUrl.startsWith('http')
-      ? `${wsBase}/ws/prices`
-      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${apiUrl}/ws/prices`
-
-    const ws = new WebSocket(url)
+    const ws = new WebSocket(pricesSocketUrl())
     wsRef.current = ws
 
     ws.onopen = () => {
