@@ -15,6 +15,13 @@ import { authApi } from '@/services/api'
 
 const mockedAuthApi = vi.mocked(authApi)
 
+const rejected = { response: { status: 401, data: {} } }
+const transientFailures: Array<[string, unknown]> = [
+  ['429', { response: { status: 429, data: {} } }],
+  ['503', { response: { status: 503, data: {} } }],
+  ['panne réseau', new Error('Network Error')],
+]
+
 describe('authStore', () => {
   beforeEach(() => {
     // Reset store state
@@ -146,29 +153,23 @@ describe('authStore', () => {
       expect(state.refreshToken).toBe('new-refresh')
     })
 
-    it('logs out when no refresh token and refresh fails', async () => {
-      useAuthStore.setState({
-        refreshToken: null,
-        isAuthenticated: true,
-        accessToken: 'some-token',
-      })
-      mockedAuthApi.refresh.mockRejectedValue(new Error('no token'))
+    it('logs out and reports the failure when the server rejects the session', async () => {
+      useAuthStore.setState({ isAuthenticated: true })
+      mockedAuthApi.refresh.mockRejectedValue(rejected)
 
-      await useAuthStore.getState().refreshAccessToken()
+      await expect(useAuthStore.getState().refreshAccessToken()).rejects.toBe(rejected)
 
-      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+      await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
     })
 
-    it('logs out on refresh failure', async () => {
-      useAuthStore.setState({
-        refreshToken: 'old-refresh',
-        isAuthenticated: true,
-      })
-      mockedAuthApi.refresh.mockRejectedValue(new Error('expired'))
+    it.each(transientFailures)('keeps the session and reports the failure on %s', async (_, failure) => {
+      useAuthStore.setState({ isAuthenticated: true })
+      mockedAuthApi.refresh.mockRejectedValue(failure)
 
-      await useAuthStore.getState().refreshAccessToken()
+      await expect(useAuthStore.getState().refreshAccessToken()).rejects.toBe(failure)
 
-      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(useAuthStore.getState().isAuthenticated).toBe(true)
     })
   })
 
@@ -194,13 +195,46 @@ describe('authStore', () => {
       expect(user?.mfaEnabled).toBe(true)
     })
 
-    it('logs out on failure', async () => {
+    it('logs out when the server rejects the session', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.getCurrentUser.mockRejectedValue(new Error('unauthorized'))
+      mockedAuthApi.getCurrentUser.mockRejectedValue(rejected)
 
       await useAuthStore.getState().fetchCurrentUser()
 
-      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+      await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
+    })
+
+    it.each(transientFailures)('keeps the session on %s', async (_, failure) => {
+      useAuthStore.setState({ isAuthenticated: true })
+      mockedAuthApi.getCurrentUser.mockRejectedValue(failure)
+
+      await useAuthStore.getState().fetchCurrentUser()
+
+      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    })
+  })
+
+  describe('hydrateSession', () => {
+    it('closes a session the server rejects when the page loads', async () => {
+      useAuthStore.setState({ isAuthenticated: true })
+      mockedAuthApi.refresh.mockRejectedValue(rejected)
+
+      await useAuthStore.getState().hydrateSession()
+
+      await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
+      expect(useAuthStore.getState().isHydrating).toBe(false)
+    })
+
+    it.each(transientFailures)('keeps the session and stops waiting on %s', async (_, failure) => {
+      useAuthStore.setState({ isAuthenticated: true })
+      mockedAuthApi.refresh.mockRejectedValue(failure)
+
+      await useAuthStore.getState().hydrateSession()
+
+      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(useAuthStore.getState().isAuthenticated).toBe(true)
+      expect(useAuthStore.getState().isHydrating).toBe(false)
     })
   })
 })
