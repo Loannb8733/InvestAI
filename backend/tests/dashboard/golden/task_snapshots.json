@@ -1,0 +1,30 @@
+{
+  "first": {
+    "failed": 0,
+    "success": 1,
+    "total": 1
+  },
+  "rows": [
+    {
+      "currency": "EUR",
+      "scope": "global",
+      "snapshot_date": "2026-10-17T12:00:00+00:00",
+      "total_gain_loss": "16100.00",
+      "total_invested": "47500.00",
+      "total_value": "63600.00"
+    },
+    {
+      "currency": "EUR",
+      "scope": "portfolio",
+      "snapshot_date": "2026-10-17T12:00:00+00:00",
+      "total_gain_loss": "21078.00",
+      "total_invested": "42522.00",
+      "total_value": "63600.00"
+    }
+  ],
+  "second": {
+    "failed": 0,
+    "success": 0,
+    "total": 1
+  }
+}

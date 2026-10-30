@@ -1,0 +1,831 @@
+{
+  "body": {
+    "active_alerts": [
+      {
+        "condition": "price_above",
+        "current_price": 60000.0,
+        "id": "<id>",
+        "name": "BTC haut",
+        "symbol": "BTC",
+        "threshold": 80000.0
+      },
+      {
+        "condition": "price_below",
+        "current_price": 3000.0,
+        "id": "<id>",
+        "name": "ETH bas",
+        "symbol": "ETH",
+        "threshold": 1000.0
+      }
+    ],
+    "advanced_metrics": {
+      "concentration": {
+        "hhi": 4106.0,
+        "interpretation": "Forte concentration",
+        "is_concentrated": true,
+        "top_asset": "BTC",
+        "top_concentration": 60.8
+      },
+      "pnl_breakdown": {
+        "net_pnl": 16425.0,
+        "realized_pnl": 4858.0247,
+        "total_fees": 35.0,
+        "total_pnl": 16460.0,
+        "unrealized_pnl": 11601.9753
+      },
+      "risk_metrics": {
+        "alpha": null,
+        "beta": null,
+        "max_drawdown": {
+          "max_drawdown_percent": 8.34,
+          "peak_date": "2026-07-17T00:00:00",
+          "peak_value": 65668.52,
+          "trough_date": "2026-09-04T00:00:00",
+          "trough_value": 60188.54
+        },
+        "sharpe_ratio": 2.47,
+        "var_95": {
+          "confidence_level": 0.95,
+          "var_amount": 1139.21,
+          "var_percent": 1.78
+        },
+        "volatility": 10.18
+      },
+      "roi_annualized": 28.64,
+      "stress_tests": [
+        {
+          "current_value": 64100.0,
+          "potential_loss": 12820.0,
+          "potential_loss_percent": 20.0,
+          "scenario_name": "Correction -20%",
+          "stressed_value": 51280.0
+        },
+        {
+          "current_value": 64100.0,
+          "potential_loss": 25640.0,
+          "potential_loss_percent": 40.0,
+          "scenario_name": "Correction -40%",
+          "stressed_value": 38460.0
+        }
+      ]
+    },
+    "allocation": [
+      {
+        "percentage": 93.4477,
+        "type": "crypto",
+        "value": 59900.0
+      },
+      {
+        "percentage": 6.5523,
+        "type": "stock",
+        "value": 4200.0
+      }
+    ],
+    "asset_allocation": [
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 37712.3077,
+        "gain_loss_percent": 27.85,
+        "name": null,
+        "percentage": 60.84,
+        "staked_quantity": null,
+        "symbol": "BTC",
+        "value": 39000.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 1968.1967,
+        "gain_loss_percent": 54.2,
+        "name": null,
+        "percentage": 14.27,
+        "staked_quantity": 0.75,
+        "symbol": "ETH",
+        "value": 9150.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 100.8235,
+        "gain_loss_percent": 57.4,
+        "name": null,
+        "percentage": 11.93,
+        "staked_quantity": null,
+        "symbol": "SOL",
+        "value": 7650.0
+      },
+      {
+        "asset_type": "stock",
+        "avg_buy_price": 161.9524,
+        "gain_loss_percent": 15.32,
+        "name": null,
+        "percentage": 6.55,
+        "staked_quantity": null,
+        "symbol": "AAPL",
+        "value": 4200.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 7.005,
+        "gain_loss_percent": 14.85,
+        "name": null,
+        "percentage": 2.81,
+        "staked_quantity": null,
+        "symbol": "UNI",
+        "value": 1800.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 0.1001,
+        "gain_loss_percent": -13.81,
+        "name": null,
+        "percentage": 2.34,
+        "staked_quantity": null,
+        "symbol": "DOGE",
+        "value": 1500.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 1.201,
+        "gain_loss_percent": -4.92,
+        "name": null,
+        "percentage": 1.25,
+        "staked_quantity": null,
+        "symbol": "ARB",
+        "value": 800.0
+      }
+    ],
+    "assets_count": 7,
+    "available_liquidity": 1849.2,
+    "currency_exposure": [
+      {
+        "currency": "USD",
+        "percentage": 93.4,
+        "value": 59900.0
+      },
+      {
+        "currency": "EUR",
+        "percentage": 6.6,
+        "value": 4200.0
+      }
+    ],
+    "daily_change": 0.0,
+    "daily_change_percent": 0.0,
+    "earn_summary": {
+      "apr": 7.42,
+      "assets": [
+        {
+          "current_value": 2250.0,
+          "staked_quantity": 0.75,
+          "symbol": "ETH"
+        },
+        {
+          "current_value": 460.0,
+          "staked_quantity": 500.0,
+          "symbol": "USDC"
+        }
+      ],
+      "total_rewards": 159.2,
+      "total_staked_value": 2710.0
+    },
+    "forex_stale": true,
+    "historical_data": [
+      {
+        "date": "17/10",
+        "full_date": "2025-10-17T00:00:00",
+        "gain_loss": 6161.44,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 49360.0,
+        "value": 55521.44
+      },
+      {
+        "date": "24/10",
+        "full_date": "2025-10-24T00:00:00",
+        "gain_loss": 6078.18,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 49360.0,
+        "value": 55438.18
+      },
+      {
+        "date": "31/10",
+        "full_date": "2025-10-31T00:00:00",
+        "gain_loss": 5993.63,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 49360.0,
+        "value": 55353.63
+      },
+      {
+        "date": "07/11",
+        "full_date": "2025-11-07T00:00:00",
+        "gain_loss": 5941.46,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 49360.0,
+        "value": 55301.46
+      },
+      {
+        "date": "14/11",
+        "full_date": "2025-11-14T00:00:00",
+        "gain_loss": 5937.69,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 49360.0,
+        "value": 55297.69
+      },
+      {
+        "date": "21/11",
+        "full_date": "2025-11-21T00:00:00",
+        "gain_loss": 1786.13,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 51146.13
+      },
+      {
+        "date": "28/11",
+        "full_date": "2025-11-28T00:00:00",
+        "gain_loss": 1868.34,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 51228.34
+      },
+      {
+        "date": "05/12",
+        "full_date": "2025-12-05T00:00:00",
+        "gain_loss": 1941.38,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 51301.38
+      },
+      {
+        "date": "12/12",
+        "full_date": "2025-12-12T00:00:00",
+        "gain_loss": 2058.46,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 51418.46
+      },
+      {
+        "date": "19/12",
+        "full_date": "2025-12-19T00:00:00",
+        "gain_loss": 2325.52,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 51685.52
+      },
+      {
+        "date": "26/12",
+        "full_date": "2025-12-26T00:00:00",
+        "gain_loss": 2857.28,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 52217.28
+      },
+      {
+        "date": "02/01",
+        "full_date": "2026-01-02T00:00:00",
+        "gain_loss": 3841.72,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 53201.72
+      },
+      {
+        "date": "09/01",
+        "full_date": "2026-01-09T00:00:00",
+        "gain_loss": 4956.83,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 54316.83
+      },
+      {
+        "date": "16/01",
+        "full_date": "2026-01-16T00:00:00",
+        "gain_loss": 6165.89,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 55525.89
+      },
+      {
+        "date": "23/01",
+        "full_date": "2026-01-23T00:00:00",
+        "gain_loss": 7237.15,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 56597.15
+      },
+      {
+        "date": "30/01",
+        "full_date": "2026-01-30T00:00:00",
+        "gain_loss": 7973.92,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 57333.92
+      },
+      {
+        "date": "06/02",
+        "full_date": "2026-02-06T00:00:00",
+        "gain_loss": 8305.35,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 57665.35
+      },
+      {
+        "date": "13/02",
+        "full_date": "2026-02-13T00:00:00",
+        "gain_loss": 8324.49,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 57684.49
+      },
+      {
+        "date": "20/02",
+        "full_date": "2026-02-20T00:00:00",
+        "gain_loss": 8249.54,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 57609.54
+      },
+      {
+        "date": "27/02",
+        "full_date": "2026-02-27T00:00:00",
+        "gain_loss": 8322.9,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 42360.0,
+        "value": 57682.9
+      },
+      {
+        "date": "06/03",
+        "full_date": "2026-03-06T00:00:00",
+        "gain_loss": 6145.37,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 55505.37
+      },
+      {
+        "date": "13/03",
+        "full_date": "2026-03-13T00:00:00",
+        "gain_loss": 6670.32,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 56030.32
+      },
+      {
+        "date": "20/03",
+        "full_date": "2026-03-20T00:00:00",
+        "gain_loss": 7312.96,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 56672.96
+      },
+      {
+        "date": "27/03",
+        "full_date": "2026-03-27T00:00:00",
+        "gain_loss": 7829.74,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 57189.74
+      },
+      {
+        "date": "03/04",
+        "full_date": "2026-04-03T00:00:00",
+        "gain_loss": 8007.69,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 57367.69
+      },
+      {
+        "date": "10/04",
+        "full_date": "2026-04-10T00:00:00",
+        "gain_loss": 7760.62,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 57120.62
+      },
+      {
+        "date": "17/04",
+        "full_date": "2026-04-17T00:00:00",
+        "gain_loss": 7163.18,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 56523.18
+      },
+      {
+        "date": "24/04",
+        "full_date": "2026-04-24T00:00:00",
+        "gain_loss": 6412.58,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 55772.58
+      },
+      {
+        "date": "01/05",
+        "full_date": "2026-05-01T00:00:00",
+        "gain_loss": 5744.73,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 55104.73
+      },
+      {
+        "date": "08/05",
+        "full_date": "2026-05-08T00:00:00",
+        "gain_loss": 5350.87,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 54710.87
+      },
+      {
+        "date": "15/05",
+        "full_date": "2026-05-15T00:00:00",
+        "gain_loss": 5334.1,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 54694.1
+      },
+      {
+        "date": "22/05",
+        "full_date": "2026-05-22T00:00:00",
+        "gain_loss": 5717.34,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 55077.34
+      },
+      {
+        "date": "29/05",
+        "full_date": "2026-05-29T00:00:00",
+        "gain_loss": 6482.84,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 55842.84
+      },
+      {
+        "date": "05/06",
+        "full_date": "2026-06-05T00:00:00",
+        "gain_loss": 7606.98,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 56966.98
+      },
+      {
+        "date": "12/06",
+        "full_date": "2026-06-12T00:00:00",
+        "gain_loss": 9062.02,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 58422.02
+      },
+      {
+        "date": "19/06",
+        "full_date": "2026-06-19T00:00:00",
+        "gain_loss": 10782.67,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60142.67
+      },
+      {
+        "date": "26/06",
+        "full_date": "2026-06-26T00:00:00",
+        "gain_loss": 12623.7,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 61983.7
+      },
+      {
+        "date": "03/07",
+        "full_date": "2026-07-03T00:00:00",
+        "gain_loss": 14346.41,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63706.41
+      },
+      {
+        "date": "10/07",
+        "full_date": "2026-07-10T00:00:00",
+        "gain_loss": 15659.58,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 65019.58
+      },
+      {
+        "date": "17/07",
+        "full_date": "2026-07-17T00:00:00",
+        "gain_loss": 16308.52,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 65668.52
+      },
+      {
+        "date": "24/07",
+        "full_date": "2026-07-24T00:00:00",
+        "gain_loss": 16175.38,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 65535.38
+      },
+      {
+        "date": "31/07",
+        "full_date": "2026-07-31T00:00:00",
+        "gain_loss": 15340.18,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 64700.18
+      },
+      {
+        "date": "07/08",
+        "full_date": "2026-08-07T00:00:00",
+        "gain_loss": 14067.42,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63427.42
+      },
+      {
+        "date": "14/08",
+        "full_date": "2026-08-14T00:00:00",
+        "gain_loss": 12718.02,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 62078.02
+      },
+      {
+        "date": "21/08",
+        "full_date": "2026-08-21T00:00:00",
+        "gain_loss": 11624.49,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60984.49
+      },
+      {
+        "date": "28/08",
+        "full_date": "2026-08-28T00:00:00",
+        "gain_loss": 10985.89,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60345.89
+      },
+      {
+        "date": "04/09",
+        "full_date": "2026-09-04T00:00:00",
+        "gain_loss": 10828.54,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60188.54
+      },
+      {
+        "date": "11/09",
+        "full_date": "2026-09-11T00:00:00",
+        "gain_loss": 11044.64,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60404.64
+      },
+      {
+        "date": "18/09",
+        "full_date": "2026-09-18T00:00:00",
+        "gain_loss": 11481.26,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 60841.26
+      },
+      {
+        "date": "25/09",
+        "full_date": "2026-09-25T00:00:00",
+        "gain_loss": 12029.1,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 61389.1
+      },
+      {
+        "date": "02/10",
+        "full_date": "2026-10-02T00:00:00",
+        "gain_loss": 12665.35,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 62025.35
+      },
+      {
+        "date": "09/10",
+        "full_date": "2026-10-09T00:00:00",
+        "gain_loss": 13434.85,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 62794.85
+      },
+      {
+        "date": "16/10",
+        "full_date": "2026-10-16T00:00:00",
+        "gain_loss": 14402.68,
+        "invested": 49500.0,
+        "is_estimated": false,
+        "net_capital": 39000.0,
+        "value": 63902.68
+      },
+      {
+        "date": "17/10",
+        "full_date": "2026-10-17T00:00:00",
+        "gain_loss": 14553.43,
+        "invested": 49500.0,
+        "is_estimated": false,
+        "net_capital": 39000.0,
+        "value": 64053.43
+      }
+    ],
+    "index_comparison": [
+      {
+        "change_percent": 27.847,
+        "name": "Bitcoin",
+        "price": 60000.0,
+        "symbol": "BTC"
+      },
+      {
+        "change_percent": 54.2007,
+        "name": "Ethereum",
+        "price": 3000.0,
+        "symbol": "ETH"
+      },
+      {
+        "change_percent": 57.3986,
+        "name": "Solana",
+        "price": 150.0,
+        "symbol": "SOL"
+      }
+    ],
+    "is_data_estimated": false,
+    "last_updated": "2026-10-17T12:00:00+00:00",
+    "net_capital": 37140.0,
+    "net_gain_loss": 18309.2,
+    "net_gain_loss_percent": 38.4324,
+    "period_change": 20874.9591,
+    "period_change_percent": 32.5662,
+    "period_days": 365,
+    "period_label": "1 an",
+    "period_twr_percent": 39.12,
+    "portfolios_count": 1,
+    "recent_transactions": [
+      {
+        "asset_type": "crypto",
+        "executed_at": "2026-10-15T10:00:00+00:00",
+        "id": "<id>",
+        "price": 140.0,
+        "quantity": 1.0,
+        "symbol": "SOL",
+        "total": 140.0,
+        "transaction_type": "buy"
+      },
+      {
+        "asset_type": "stock",
+        "executed_at": "2026-09-20T10:00:00+00:00",
+        "id": "<id>",
+        "price": 20.0,
+        "quantity": 1.0,
+        "symbol": "AAPL",
+        "total": 20.0,
+        "transaction_type": "dividend"
+      },
+      {
+        "asset_type": "crypto",
+        "executed_at": "2026-03-01T10:00:00+00:00",
+        "id": "<id>",
+        "price": 0.0,
+        "quantity": 10.0,
+        "symbol": "USDC",
+        "total": 0.0,
+        "transaction_type": "staking_reward"
+      },
+      {
+        "asset_type": "crypto",
+        "executed_at": "2026-03-01T10:00:00+00:00",
+        "id": "<id>",
+        "price": 3500.0,
+        "quantity": 1.0,
+        "symbol": "ETH",
+        "total": 3500.0,
+        "transaction_type": "sell"
+      },
+      {
+        "asset_type": "crypto",
+        "executed_at": "2026-02-01T10:00:00+00:00",
+        "id": "<id>",
+        "price": 0.0,
+        "quantity": 500.0,
+        "symbol": "USDC",
+        "total": 0.0,
+        "transaction_type": "staking"
+      }
+    ],
+    "top_performers": [
+      {
+        "asset_type": "crypto",
+        "current_value": 39000.0,
+        "gain_loss_percent": 27.85,
+        "name": null,
+        "symbol": "BTC"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 9150.0,
+        "gain_loss_percent": 54.2,
+        "name": null,
+        "symbol": "ETH"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 7650.0,
+        "gain_loss_percent": 57.4,
+        "name": null,
+        "symbol": "SOL"
+      },
+      {
+        "asset_type": "stock",
+        "current_value": 4200.0,
+        "gain_loss_percent": 15.32,
+        "name": null,
+        "symbol": "AAPL"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 1800.0,
+        "gain_loss_percent": 14.85,
+        "name": null,
+        "symbol": "UNI"
+      }
+    ],
+    "total_dividend_income": 20.0,
+    "total_gain_loss": 18309.2,
+    "total_gain_loss_percent": 38.4324,
+    "total_invested": 47640.0,
+    "total_return": 18329.2,
+    "total_value": 64100.0,
+    "upcoming_events": [
+      {
+        "amount": 20.0,
+        "event_date": "2026-11-01T09:00:00+00:00",
+        "event_type": "dividend",
+        "id": "<id>",
+        "title": "Dividende AAPL"
+      }
+    ],
+    "worst_performers": [
+      {
+        "asset_type": "crypto",
+        "current_value": 1500.0,
+        "gain_loss_percent": -13.81,
+        "name": null,
+        "symbol": "DOGE"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 800.0,
+        "gain_loss_percent": -4.92,
+        "name": null,
+        "symbol": "ARB"
+      }
+    ]
+  },
+  "status": 200
+}

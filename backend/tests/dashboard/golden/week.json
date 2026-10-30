@@ -1,0 +1,362 @@
+{
+  "body": {
+    "active_alerts": [
+      {
+        "condition": "price_above",
+        "current_price": 60000.0,
+        "id": "<id>",
+        "name": "BTC haut",
+        "symbol": "BTC",
+        "threshold": 80000.0
+      },
+      {
+        "condition": "price_below",
+        "current_price": 3000.0,
+        "id": "<id>",
+        "name": "ETH bas",
+        "symbol": "ETH",
+        "threshold": 1000.0
+      }
+    ],
+    "advanced_metrics": {
+      "concentration": {
+        "hhi": 4106.0,
+        "interpretation": "Forte concentration",
+        "is_concentrated": true,
+        "top_asset": "BTC",
+        "top_concentration": 60.8
+      },
+      "pnl_breakdown": {
+        "net_pnl": 16425.0,
+        "realized_pnl": 4858.0247,
+        "total_fees": 35.0,
+        "total_pnl": 16460.0,
+        "unrealized_pnl": 11601.9753
+      },
+      "risk_metrics": {
+        "alpha": null,
+        "beta": null,
+        "max_drawdown": {
+          "max_drawdown_percent": 0.0,
+          "peak_date": null,
+          "peak_value": null,
+          "trough_date": null,
+          "trough_value": null
+        },
+        "sharpe_ratio": 80.4,
+        "var_95": {
+          "confidence_level": 0.95,
+          "var_amount": 0.0,
+          "var_percent": 0.0
+        },
+        "volatility": 0.31
+      },
+      "roi_annualized": 28.64,
+      "stress_tests": [
+        {
+          "current_value": 64100.0,
+          "potential_loss": 12820.0,
+          "potential_loss_percent": 20.0,
+          "scenario_name": "Correction -20%",
+          "stressed_value": 51280.0
+        },
+        {
+          "current_value": 64100.0,
+          "potential_loss": 25640.0,
+          "potential_loss_percent": 40.0,
+          "scenario_name": "Correction -40%",
+          "stressed_value": 38460.0
+        }
+      ]
+    },
+    "allocation": [
+      {
+        "percentage": 93.4477,
+        "type": "crypto",
+        "value": 59900.0
+      },
+      {
+        "percentage": 6.5523,
+        "type": "stock",
+        "value": 4200.0
+      }
+    ],
+    "asset_allocation": [
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 37712.3077,
+        "gain_loss_percent": 2.48,
+        "name": null,
+        "percentage": 60.84,
+        "staked_quantity": null,
+        "symbol": "BTC",
+        "value": 39000.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 1968.1967,
+        "gain_loss_percent": 4.6,
+        "name": null,
+        "percentage": 14.27,
+        "staked_quantity": 0.75,
+        "symbol": "ETH",
+        "value": 9150.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 100.8235,
+        "gain_loss_percent": -5.65,
+        "name": null,
+        "percentage": 11.93,
+        "staked_quantity": null,
+        "symbol": "SOL",
+        "value": 7650.0
+      },
+      {
+        "asset_type": "stock",
+        "avg_buy_price": 161.9524,
+        "gain_loss_percent": 0.41,
+        "name": null,
+        "percentage": 6.55,
+        "staked_quantity": null,
+        "symbol": "AAPL",
+        "value": 4200.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 7.005,
+        "gain_loss_percent": 0.72,
+        "name": null,
+        "percentage": 2.81,
+        "staked_quantity": null,
+        "symbol": "UNI",
+        "value": 1800.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 0.1001,
+        "gain_loss_percent": 0.08,
+        "name": null,
+        "percentage": 2.34,
+        "staked_quantity": null,
+        "symbol": "DOGE",
+        "value": 1500.0
+      },
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 1.201,
+        "gain_loss_percent": 9.94,
+        "name": null,
+        "percentage": 1.25,
+        "staked_quantity": null,
+        "symbol": "ARB",
+        "value": 800.0
+      }
+    ],
+    "assets_count": 7,
+    "available_liquidity": 1849.2,
+    "currency_exposure": [
+      {
+        "currency": "USD",
+        "percentage": 93.4,
+        "value": 59900.0
+      },
+      {
+        "currency": "EUR",
+        "percentage": 6.6,
+        "value": 4200.0
+      }
+    ],
+    "daily_change": 0.0,
+    "daily_change_percent": 0.0,
+    "earn_summary": {
+      "apr": 7.42,
+      "assets": [
+        {
+          "current_value": 2250.0,
+          "staked_quantity": 0.75,
+          "symbol": "ETH"
+        },
+        {
+          "current_value": 460.0,
+          "staked_quantity": 500.0,
+          "symbol": "USDC"
+        }
+      ],
+      "total_rewards": 159.2,
+      "total_staked_value": 2710.0
+    },
+    "forex_stale": true,
+    "historical_data": [
+      {
+        "date": "Sam 10",
+        "full_date": "2026-10-10T00:00:00",
+        "gain_loss": 13559.11,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 62919.11
+      },
+      {
+        "date": "Dim 11",
+        "full_date": "2026-10-11T00:00:00",
+        "gain_loss": 13687.34,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63047.34
+      },
+      {
+        "date": "Lun 12",
+        "full_date": "2026-10-12T00:00:00",
+        "gain_loss": 13819.58,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63179.58
+      },
+      {
+        "date": "Mar 13",
+        "full_date": "2026-10-13T00:00:00",
+        "gain_loss": 13955.9,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63315.9
+      },
+      {
+        "date": "Mer 14",
+        "full_date": "2026-10-14T00:00:00",
+        "gain_loss": 14096.27,
+        "invested": 49360.0,
+        "is_estimated": false,
+        "net_capital": 38860.0,
+        "value": 63456.27
+      },
+      {
+        "date": "Jeu 15",
+        "full_date": "2026-10-15T00:00:00",
+        "gain_loss": 14255.75,
+        "invested": 49500.0,
+        "is_estimated": false,
+        "net_capital": 39000.0,
+        "value": 63755.75
+      },
+      {
+        "date": "Ven 16",
+        "full_date": "2026-10-16T00:00:00",
+        "gain_loss": 14402.68,
+        "invested": 49500.0,
+        "is_estimated": false,
+        "net_capital": 39000.0,
+        "value": 63902.68
+      },
+      {
+        "date": "Sam 17",
+        "full_date": "2026-10-17T00:00:00",
+        "gain_loss": 14553.43,
+        "invested": 49500.0,
+        "is_estimated": false,
+        "net_capital": 39000.0,
+        "value": 64053.43
+      }
+    ],
+    "index_comparison": [
+      {
+        "change_percent": 2.481,
+        "name": "Bitcoin",
+        "price": 60000.0,
+        "symbol": "BTC"
+      },
+      {
+        "change_percent": 4.6029,
+        "name": "Ethereum",
+        "price": 3000.0,
+        "symbol": "ETH"
+      },
+      {
+        "change_percent": -5.6548,
+        "name": "Solana",
+        "price": 150.0,
+        "symbol": "SOL"
+      }
+    ],
+    "is_data_estimated": false,
+    "last_updated": "2026-10-17T12:00:00+00:00",
+    "net_capital": 37140.0,
+    "net_gain_loss": 18309.2,
+    "net_gain_loss_percent": 38.4324,
+    "period_change": 1067.1596,
+    "period_change_percent": 1.6648,
+    "period_days": 7,
+    "period_label": "7j",
+    "period_twr_percent": 1.58,
+    "portfolios_count": 1,
+    "recent_transactions": [
+      {
+        "asset_type": "crypto",
+        "executed_at": "2026-10-15T10:00:00+00:00",
+        "id": "<id>",
+        "price": 140.0,
+        "quantity": 1.0,
+        "symbol": "SOL",
+        "total": 140.0,
+        "transaction_type": "buy"
+      }
+    ],
+    "top_performers": [
+      {
+        "asset_type": "crypto",
+        "current_value": 39000.0,
+        "gain_loss_percent": 2.48,
+        "name": null,
+        "symbol": "BTC"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 9150.0,
+        "gain_loss_percent": 4.6,
+        "name": null,
+        "symbol": "ETH"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 800.0,
+        "gain_loss_percent": 9.94,
+        "name": null,
+        "symbol": "ARB"
+      },
+      {
+        "asset_type": "stock",
+        "current_value": 4200.0,
+        "gain_loss_percent": 0.41,
+        "name": null,
+        "symbol": "AAPL"
+      },
+      {
+        "asset_type": "crypto",
+        "current_value": 1800.0,
+        "gain_loss_percent": 0.72,
+        "name": null,
+        "symbol": "UNI"
+      }
+    ],
+    "total_dividend_income": 20.0,
+    "total_gain_loss": 18309.2,
+    "total_gain_loss_percent": 38.4324,
+    "total_invested": 47640.0,
+    "total_return": 18329.2,
+    "total_value": 64100.0,
+    "upcoming_events": [],
+    "worst_performers": [
+      {
+        "asset_type": "crypto",
+        "current_value": 7650.0,
+        "gain_loss_percent": -5.65,
+        "name": null,
+        "symbol": "SOL"
+      }
+    ]
+  },
+  "status": 200
+}

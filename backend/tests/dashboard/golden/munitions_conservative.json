@@ -1,0 +1,18 @@
+{
+  "body": {
+    "available_liquidity": 1849.2,
+    "can_execute": true,
+    "deploy_to_risk": 0.0,
+    "invested_pct": 97.1,
+    "keep_in_reserve": 0.0,
+    "liquidity_pct": 2.9,
+    "message": null,
+    "next_signal_action": null,
+    "next_signal_amount": 0.0,
+    "next_signal_symbol": null,
+    "profile": "conservative",
+    "shortfall": 0.0,
+    "total_value": 64100.0
+  },
+  "status": 200
+}
