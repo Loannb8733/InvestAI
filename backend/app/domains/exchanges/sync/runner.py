@@ -1,4 +1,3 @@
-import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
@@ -24,8 +23,6 @@ from app.domains.exchanges.sync.pricing import TradeFx
 from app.domains.exchanges.sync.rules import as_utc
 from app.domains.exchanges.sync.symbols import holdings
 from app.services.metrics_service import invalidate_dashboard_cache
-
-logger = logging.getLogger(__name__)
 
 CONVERT_OVERLAP = timedelta(days=30)
 WITHDRAWAL_OVERLAP = timedelta(days=7)
@@ -97,8 +94,7 @@ async def sync_account(api_key_id: UUID | str, *, heal_fx: bool = False) -> Sync
             key.last_sync_at = now()
             key.mark_success()
             await session.commit()
-        except Exception as exc:
-            logger.exception("Synchronisation de la clé %s en échec", key_id)
+        except Exception as exc:  # noqa: BLE001
             await rollback_and_mark(session, key_id, exc)
             return SyncOutcome(success=False, error=FAILED)
     invalidate_dashboard_cache(str(user_id))

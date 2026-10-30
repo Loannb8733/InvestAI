@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -11,7 +10,7 @@ from app.core.errors import DomainError, NotFoundError
 from app.core.security import encrypt_api_key
 from app.domains.exchanges.clients import crypto_portfolio, open_client
 from app.domains.exchanges.connectors.registry import SUPPORTED_EXCHANGES
-from app.domains.exchanges.failures import rollback_and_mark
+from app.domains.exchanges.failures import describe, rollback_and_mark
 from app.domains.exchanges.models import APIKey, ColdWalletAddress
 from app.domains.exchanges.schemas import (
     APIKeyCreate,
@@ -22,8 +21,6 @@ from app.domains.exchanges.schemas import (
 )
 from app.domains.exchanges.sync.symbols import holdings
 from app.domains.portfolio.models import Asset, AssetType
-
-logger = logging.getLogger(__name__)
 
 KEY_NOT_FOUND = "Clé API non trouvée"
 SHOWN_BALANCES = 10
@@ -103,7 +100,7 @@ class ExchangeAccounts:
                 return ConnectionTestResult(success=True, message="Connexion réussie", balance=shown or None)
             detail = await client.connection_error() or "Échec de la connexion"
         except Exception as exc:  # noqa: BLE001
-            key.last_error = str(exc)[:500]
+            key.last_error = describe(exc)
             return ConnectionTestResult(
                 success=False, message="Erreur de connexion. Vérifiez vos identifiants et réessayez."
             )
@@ -148,7 +145,6 @@ class ExchangeAccounts:
             key.mark_success()
             await self._session.flush()
         except Exception as exc:
-            logger.exception("Sync error for API key %s", key_id)
             await rollback_and_mark(self._session, key_id, exc)
             raise SyncFailedError(
                 "La synchronisation a échoué. Réessayez ; si le problème persiste, contactez le support."
