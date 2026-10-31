@@ -54,6 +54,16 @@
     ],
     "assets_count": 2,
     "available_liquidity": 0.0,
+    "by_exchange": {
+      "Autre": {
+        "cost_sold": 0.0,
+        "realized": 0.0
+      },
+      "Golden": {
+        "cost_sold": 1984.15,
+        "realized": 1370.85
+      }
+    },
     "cash_from_fiat": 0.0,
     "cash_from_stablecoins": 0.0,
     "fiat_assets": [],

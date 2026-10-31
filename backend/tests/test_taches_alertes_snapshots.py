@@ -96,7 +96,6 @@ class TestSnapshotsQuotidiens:
                     snapshot_date=maintenant - timedelta(days=jours),
                     total_value=Decimal("100"),
                     total_invested=Decimal("100"),
-                    total_gain_loss=Decimal("0"),
                 )
             )
         await session_snapshots.flush()
@@ -112,7 +111,6 @@ class TestSnapshotsQuotidiens:
                 snapshot_date=datetime.now(UTC),
                 total_value=Decimal("100"),
                 total_invested=Decimal("100"),
-                total_gain_loss=Decimal("0"),
             )
         )
         await session_snapshots.flush()

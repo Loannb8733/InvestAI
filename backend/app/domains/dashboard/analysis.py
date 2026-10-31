@@ -26,7 +26,7 @@ _MIN_ELAPSED_DAYS = 30
 _MAX_SUBPERIOD_RATIO = 10.0
 _RISK_UNAVAILABLE: dict[str, Any] = {
     "volatility": 0.0,
-    "sharpe_ratio": 0.0,
+    "sharpe_ratio": None,
     "max_drawdown": {"max_drawdown_percent": 0.0},
     "var_95": {"var_percent": 0.0, "var_amount": 0.0, "confidence_level": 95},
     "concentration": {"hhi": 0.0, "interpretation": "Indisponible", "is_concentrated": False},
@@ -80,7 +80,6 @@ async def _risk_figures(
     allocation: list[AssetAllocation],
     days: int,
     history: list[dict[str, Any]],
-    roi: float | None,
 ) -> dict[str, Any]:
     try:
         return await snapshot_service.get_all_risk_metrics(
@@ -90,7 +89,6 @@ async def _risk_figures(
             [{"symbol": asset.symbol, "value": asset.value} for asset in allocation],
             days,
             history=history,
-            roi_annualized=roi,
         )
     except Exception:
         logger.exception("Métriques de risque indisponibles (user=%s, days=%s)", user_id, days)
@@ -137,7 +135,7 @@ async def build_advanced_metrics(
     roi: float | None,
 ) -> AdvancedMetrics:
     """Assemble risque, concentration, scénarios et gains ; une panne du risque laisse des valeurs neutres."""
-    risk = await _risk_figures(db, user_id, metrics, allocation, days, history, roi)
+    risk = await _risk_figures(db, user_id, metrics, allocation, days, history)
     concentration = risk["concentration"]
     return AdvancedMetrics(
         roi_annualized=round(roi, 2) if roi is not None else None,

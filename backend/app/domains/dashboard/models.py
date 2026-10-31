@@ -24,7 +24,6 @@ class PortfolioSnapshot(Base):
     snapshot_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     total_value: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2), nullable=False)
     total_invested: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2), nullable=False)
-    total_gain_loss: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2), nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="EUR", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

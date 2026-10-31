@@ -1,4 +1,6 @@
+from dataclasses import replace
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +11,7 @@ from app.domains.analytics.metrics import calmar, sharpe, sortino
 from app.domains.analytics.portfolio_risk import portfolio_risk
 from app.domains.analytics.results import AssetPerformance, PortfolioAnalytics
 from app.domains.analytics.scoring import build_interpretations, diversification_score, hhi
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, Portfolio
 
 
@@ -120,6 +123,14 @@ def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RIS
     )
 
 
+def _with_gain(analytics: PortfolioAnalytics, figures: dict[str, Any]) -> PortfolioAnalytics:
+    return replace(
+        analytics,
+        total_gain_loss=figures["total_gain_loss"],
+        total_gain_loss_percent=figures["total_gain_loss_percent"],
+    )
+
+
 class AnalyticsPortfolio(AnalyticsCore):
     async def get_portfolio_analytics(
         self,
@@ -128,15 +139,16 @@ class AnalyticsPortfolio(AnalyticsCore):
         currency: str = "EUR",
         days: int = 60,
     ) -> PortfolioAnalytics:
-        """Analyse d'un portefeuille ; `currency` est ignorée, les montants restent ceux des cours en base."""
+        """Analyse d'un portefeuille ; `currency` ne vaut que pour le gain, le reste suit les cours en base."""
+        gain = await metrics_service.get_portfolio_performance(db, portfolio_id, currency)
         result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0))
         assets = result.scalars().all()
         if not assets:
-            return self._empty_analytics()
+            return _with_gain(self._empty_analytics(), gain)
 
         risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
-        return _assemble_analytics(asset_data, risk_free_rate=risk_free_rate)
+        return _with_gain(_assemble_analytics(asset_data, risk_free_rate=risk_free_rate), gain)
 
     async def get_user_analytics(
         self,
@@ -150,15 +162,16 @@ class AnalyticsPortfolio(AnalyticsCore):
         if not portfolios:
             return self._empty_analytics()
 
+        gain = await metrics_service.get_user_dashboard_metrics(db, user_id, currency, days)
         portfolio_ids = [p.id for p in portfolios]
         result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids), Asset.quantity > 0))
         assets = result.scalars().all()
         if not assets:
-            return self._empty_analytics()
+            return _with_gain(self._empty_analytics(), gain)
 
         risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
-        return _assemble_analytics(_aggregate_by_symbol(asset_data), risk_free_rate=risk_free_rate)
+        return _with_gain(_assemble_analytics(_aggregate_by_symbol(asset_data), risk_free_rate=risk_free_rate), gain)
 
     def _empty_analytics(self) -> PortfolioAnalytics:
         return PortfolioAnalytics(

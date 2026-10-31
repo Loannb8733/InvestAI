@@ -168,7 +168,6 @@ async def insert_global_snapshot(
     moment: datetime,
     value: Decimal,
     invested: Decimal,
-    gain_loss: Decimal,
     currency: str,
 ) -> None:
     """Pose l'instantané du compte ; s'il existe déjà pour ce jour, la base le conserve."""
@@ -181,7 +180,6 @@ async def insert_global_snapshot(
             snapshot_date=moment,
             total_value=value,
             total_invested=invested,
-            total_gain_loss=gain_loss,
             currency=currency,
         )
         .on_conflict_do_nothing()

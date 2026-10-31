@@ -11,6 +11,7 @@ from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.dashboard.snapshots.service import snapshot_service
 from app.domains.portfolio.classification import is_safe_haven
 from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.reports.platforms import platform_analysis
 from app.domains.transactions.models import Transaction
 
 logger = logging.getLogger(__name__)
@@ -78,14 +79,12 @@ def _empty_report(year: int | None) -> dict[str, Any]:
 def _portfolio_summary(portfolio: Portfolio, pm: dict[str, Any]) -> PortfolioSummary:
     p_value = pm["total_value"]
     p_invested = pm["total_invested"]
-    p_gain = p_value - p_invested
-    p_gain_pct = (p_gain / p_invested * 100) if p_invested > 0 else 0
     return PortfolioSummary(
         name=portfolio.name,
         total_value=p_value,
         total_invested=p_invested,
-        gain_loss=p_gain,
-        gain_loss_percent=p_gain_pct,
+        gain_loss=pm["total_gain_loss"],
+        gain_loss_percent=pm["total_gain_loss_percent"],
         asset_count=pm.get("assets_count", len(pm.get("assets", []))),
     )
 
@@ -111,17 +110,22 @@ def _asset_report(a: dict[str, Any]) -> AssetReport:
 
 async def _collect_portfolios(
     db: AsyncSession, portfolios: Sequence[Portfolio], currency: str
-) -> tuple[list[PortfolioSummary], list[AssetReport], list[str]]:
+) -> tuple[list[PortfolioSummary], list[AssetReport], list[str], dict[str, dict[str, float]]]:
     summaries: list[PortfolioSummary] = []
     asset_reports: list[AssetReport] = []
     asset_ids: list[str] = []
+    sales: dict[str, dict[str, float]] = {}
     for portfolio in portfolios:
-        pm = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), currency=currency)
+        pm = await metrics_service.get_portfolio_performance(db, str(portfolio.id), currency)
         summaries.append(_portfolio_summary(portfolio, pm))
+        for exchange, figures in pm["by_exchange"].items():
+            total = sales.setdefault(exchange, {"realized": 0.0, "cost_sold": 0.0})
+            total["realized"] += figures["realized"]
+            total["cost_sold"] += figures["cost_sold"]
         for a in pm.get("assets", []):
             asset_ids.append(a["id"])
             asset_reports.append(_asset_report(a))
-    return summaries, asset_reports, asset_ids
+    return summaries, asset_reports, asset_ids, sales
 
 
 async def _load_transactions(db: AsyncSession, asset_ids: list[str], year: int | None) -> list[TaxTransaction]:
@@ -189,33 +193,6 @@ async def _risk_metrics(
         return {}
 
 
-def _platform_analysis(asset_reports: list[AssetReport]) -> list[dict[str, Any]]:
-    platform_map: dict[str, dict[str, Any]] = {}
-    for ar in asset_reports:
-        ex = ar.exchange or "Autre"
-        if ex not in platform_map:
-            platform_map[ex] = {
-                "exchange": ex,
-                "total_value": 0.0,
-                "total_invested": 0.0,
-                "total_fees": 0.0,
-                "count": 0,
-            }
-        platform_map[ex]["total_value"] += ar.current_value
-        platform_map[ex]["total_invested"] += ar.total_invested
-        platform_map[ex]["total_fees"] += ar.total_fees
-        platform_map[ex]["count"] += 1
-
-    platform_analysis = []
-    for p in platform_map.values():
-        invested = p["total_invested"]
-        p["roi_percent"] = ((p["total_value"] - invested) / invested * 100) if invested > 0 else 0
-        p["net_pnl"] = p["total_value"] - invested
-        platform_analysis.append(p)
-    platform_analysis.sort(key=lambda x: x["total_value"], reverse=True)
-    return platform_analysis
-
-
 def _attribution(asset_reports: list[AssetReport], liquidity: float) -> dict[str, float]:
     attribution = {
         "alpha": 0.0,
@@ -259,7 +236,7 @@ class ReportDataMixin:
     ) -> dict[str, Any]:
         """Remet en forme les chiffres de metrics_service et snapshot_service sans rien recalculer.
 
-        Les frais d'achat étant inclus dans le montant investi, le P&L net par plateforme ne les retranche pas une
+        Les frais d'achat étant inclus dans le coût, le P&L net par plateforme ne les retranche pas une
         seconde fois ; seuls les achats et ventes comptent comme flux de trésorerie, pas les transferts.
         """
         dashboard = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency)
@@ -269,7 +246,7 @@ class ReportDataMixin:
         if not portfolios:
             return _empty_report(year)
 
-        portfolio_summaries, asset_reports, asset_ids = await _collect_portfolios(db, portfolios, currency)
+        portfolio_summaries, asset_reports, asset_ids, sales = await _collect_portfolios(db, portfolios, currency)
         tax_transactions = await _load_transactions(db, asset_ids, year)
         risk_metrics = await _risk_metrics(db, user_id, dashboard, asset_ids)
 
@@ -285,7 +262,7 @@ class ReportDataMixin:
             },
             "pnl_data": dashboard.get("pnl_data", {}),
             "risk_metrics": risk_metrics,
-            "platform_analysis": _platform_analysis(asset_reports),
+            "platform_analysis": platform_analysis(asset_reports, sales),
             "attribution": _attribution(asset_reports, dashboard.get("available_liquidity", 0.0)),
             "cash_flows": _cash_flows(tax_transactions),
             "generated_at": datetime.now(UTC),
