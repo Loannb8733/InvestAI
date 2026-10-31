@@ -104,7 +104,7 @@ interface StressTest {
 
 interface RiskMetrics {
   volatility: number
-  sharpe_ratio: number
+  sharpe_ratio: number | null
   max_drawdown: MaxDrawdown
   var_95: ValueAtRisk
   beta?: number
