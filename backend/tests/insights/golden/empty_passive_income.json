@@ -1,0 +1,13 @@
+{
+  "body": {
+    "avg_monthly": 0,
+    "by_asset": {},
+    "by_month": {},
+    "by_type": {},
+    "history": [],
+    "nb_events": 0,
+    "projected_annual": 0,
+    "total_income": 0
+  },
+  "status": 200
+}

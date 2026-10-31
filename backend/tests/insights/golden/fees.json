@@ -1,0 +1,162 @@
+{
+  "body": {
+    "avg_monthly_fee": 2.15,
+    "by_asset": {
+      "AAPL": 1.0,
+      "ARB": 1.5,
+      "BTC": 27.5,
+      "DOGE": 1.0,
+      "ETH": 7.0,
+      "SOL": 4.0,
+      "UNI": 1.0
+    },
+    "by_exchange": {
+      "Binance": 30.0,
+      "Kraken": 8.0,
+      "Tangem": 4.0,
+      "Trade Republic": 1.0
+    },
+    "by_month": {
+      "2025-01": 10.0,
+      "2025-02": 4.0,
+      "2025-03": 1.0,
+      "2025-04": 2.0,
+      "2025-05": 1.0,
+      "2025-06": 1.0,
+      "2025-08": 5.0,
+      "2025-09": 1.0,
+      "2025-11": 7.0,
+      "2026-03": 3.0,
+      "2026-06": 2.0,
+      "2026-07": 5.5,
+      "2026-08": 0.5
+    },
+    "by_type": {
+      "buy": 33.0,
+      "sell": 10.0
+    },
+    "nb_frais_non_convertis": 1,
+    "nb_transactions_with_fees": 13,
+    "recent_fees": [
+      {
+        "date": "2026-08-01T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 0.5,
+        "fee_convertie": false,
+        "fee_currency": "BNB",
+        "symbol": "ARB",
+        "type": "buy"
+      },
+      {
+        "date": "2026-07-01T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 5.5,
+        "fee_convertie": true,
+        "fee_currency": "BTC",
+        "symbol": "BTC",
+        "type": "buy"
+      },
+      {
+        "date": "2026-06-15T10:00:00+00:00",
+        "exchange": "Tangem",
+        "fee": 2.0,
+        "fee_convertie": true,
+        "fee_currency": "USD",
+        "symbol": "SOL",
+        "type": "buy"
+      },
+      {
+        "date": "2026-03-01T10:00:00+00:00",
+        "exchange": "Kraken",
+        "fee": 3.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "ETH",
+        "type": "sell"
+      },
+      {
+        "date": "2025-11-15T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 7.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "BTC",
+        "type": "sell"
+      },
+      {
+        "date": "2025-09-01T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 1.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "DOGE",
+        "type": "buy"
+      },
+      {
+        "date": "2025-08-01T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 5.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "BTC",
+        "type": "buy"
+      },
+      {
+        "date": "2025-06-01T10:00:00+00:00",
+        "exchange": "Kraken",
+        "fee": 1.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "UNI",
+        "type": "buy"
+      },
+      {
+        "date": "2025-05-20T10:00:00+00:00",
+        "exchange": "Trade Republic",
+        "fee": 1.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "AAPL",
+        "type": "buy"
+      },
+      {
+        "date": "2025-04-01T10:00:00+00:00",
+        "exchange": "Tangem",
+        "fee": 2.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "SOL",
+        "type": "buy"
+      },
+      {
+        "date": "2025-03-01T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 1.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "ARB",
+        "type": "buy"
+      },
+      {
+        "date": "2025-02-15T10:00:00+00:00",
+        "exchange": "Kraken",
+        "fee": 4.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "ETH",
+        "type": "buy"
+      },
+      {
+        "date": "2025-01-10T10:00:00+00:00",
+        "exchange": "Binance",
+        "fee": 10.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "BTC",
+        "type": "buy"
+      }
+    ],
+    "total_fees": 43.0
+  },
+  "status": 200
+}

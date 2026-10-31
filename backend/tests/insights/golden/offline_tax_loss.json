@@ -1,0 +1,24 @@
+{
+  "body": {
+    "estimated_tax_saving": 6.0,
+    "nb_candidates": 1,
+    "note": "Vendre ces positions cristallise les moins-values, réduisant l'impôt sur les plus-values. Attention au wash sale — ne rachetez pas immédiatement le même actif.",
+    "opportunities": [
+      {
+        "asset_type": "crypto",
+        "avg_buy_price": 0.93,
+        "cost_basis": 1860.0,
+        "current_price": 0.92,
+        "current_value": 1840.0,
+        "name": null,
+        "potential_tax_saving": 6.0,
+        "quantity": 2000.0,
+        "symbol": "USDC",
+        "unrealized_loss": -20.0,
+        "unrealized_loss_pct": -1.08
+      }
+    ],
+    "total_harvestable": -20.0
+  },
+  "status": 200
+}

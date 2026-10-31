@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "ge": 2010
+        },
+        "input": "2009",
+        "loc": [
+          "query",
+          "start_year"
+        ],
+        "msg": "Input should be greater than or equal to 2010",
+        "type": "greater_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

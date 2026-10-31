@@ -1,0 +1,13 @@
+{
+  "body": {
+    "avg_monthly_fee": 0,
+    "by_asset": {},
+    "by_exchange": {},
+    "by_month": {},
+    "by_type": {},
+    "nb_transactions_with_fees": 0,
+    "recent_fees": [],
+    "total_fees": 0
+  },
+  "status": 200
+}

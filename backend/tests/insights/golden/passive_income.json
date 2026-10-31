@@ -1,0 +1,48 @@
+{
+  "body": {
+    "avg_monthly": 33.0,
+    "by_asset": {
+      "ETH": 125.0,
+      "UNI": 40.0
+    },
+    "by_month": {
+      "2026-01": 125.0,
+      "2026-04": 0,
+      "2026-05": 40.0
+    },
+    "by_type": {
+      "airdrop": 40.0,
+      "staking_reward": 125.0
+    },
+    "history": [
+      {
+        "date": "2026-05-10T10:00:00+00:00",
+        "price": 8.0,
+        "quantity": 5.0,
+        "symbol": "UNI",
+        "type": "airdrop",
+        "value": 40.0
+      },
+      {
+        "date": "2026-04-01T10:00:00+00:00",
+        "price": 0,
+        "quantity": 0.01,
+        "symbol": "ETH",
+        "type": "staking_reward",
+        "value": 0
+      },
+      {
+        "date": "2026-01-01T10:00:00+00:00",
+        "price": 2500.0,
+        "quantity": 0.05,
+        "symbol": "ETH",
+        "type": "staking_reward",
+        "value": 125.0
+      }
+    ],
+    "nb_events": 3,
+    "projected_annual": 660.0,
+    "total_income": 165.0
+  },
+  "status": 200
+}

@@ -1,0 +1,17 @@
+{
+  "body": {
+    "anomaly_count": 1,
+    "breakeven_pct": 47.1,
+    "generated_at": "2026-10-17T12:00:00+00:00",
+    "health_score": 90,
+    "health_status": "excellent",
+    "regime": "bullish",
+    "top_insight": {
+      "category": "diversification",
+      "message": "BTC représente 60% de votre portfolio. C'est trop concentré.",
+      "severity": "critical",
+      "title": "Concentration excessive"
+    }
+  },
+  "status": 200
+}

@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "le": 365
+        },
+        "input": "366",
+        "loc": [
+          "query",
+          "days"
+        ],
+        "msg": "Input should be less than or equal to 365",
+        "type": "less_than_equal"
+      }
+    ]
+  },
+  "status": 422
+}

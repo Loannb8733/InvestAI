@@ -1,0 +1,85 @@
+{
+  "body": [
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 4.4% (score anomalie: -0.00)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": 1658.0574,
+      "position_value_eur": 37941.8169,
+      "price_change_percent": 4.37,
+      "severity": "low",
+      "symbol": "BTC"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 6.6% (score anomalie: -0.09)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": -649.7664,
+      "position_value_eur": 9830.0521,
+      "price_change_percent": -6.61,
+      "severity": "low",
+      "symbol": "ETH"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 33.4% (score anomalie: -0.08)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": 459.4839,
+      "position_value_eur": 1376.5247,
+      "price_change_percent": 33.38,
+      "severity": "low",
+      "symbol": "UNI"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Mouvement anormal détecté par Isolation Forest: hausse de 37.7% (score anomalie: -0.10)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": 414.8752,
+      "position_value_eur": 1100.1728,
+      "price_change_percent": 37.71,
+      "severity": "low",
+      "symbol": "DOGE"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 1.4% (score anomalie: -0.02)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": -109.4042,
+      "position_value_eur": 7759.1621,
+      "price_change_percent": -1.41,
+      "severity": "low",
+      "symbol": "SOL"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 4.0% (score anomalie: -0.08)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": -36.762,
+      "position_value_eur": 916.7576,
+      "price_change_percent": -4.01,
+      "severity": "low",
+      "symbol": "ARB"
+    },
+    {
+      "anomaly_type": "price_drop",
+      "description": "Mouvement anormal détecté par Isolation Forest: baisse de 0.2% (score anomalie: -0.06)",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": -8.0159,
+      "position_value_eur": 4007.9688,
+      "price_change_percent": -0.2,
+      "severity": "low",
+      "symbol": "AAPL"
+    },
+    {
+      "anomaly_type": "price_spike",
+      "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
+      "detected_at": "2026-10-17T12:00:00+00:00",
+      "impact_eur": 1.1033,
+      "position_value_eur": 1838.878,
+      "price_change_percent": 0.06,
+      "severity": "low",
+      "symbol": "USDC"
+    }
+  ],
+  "status": 200
+}

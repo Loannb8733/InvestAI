@@ -1,0 +1,19 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "pattern": "^[A-Z0-9.\\-]{1,20}$"
+        },
+        "input": "btc",
+        "loc": [
+          "query",
+          "symbol"
+        ],
+        "msg": "String should match pattern '^[A-Z0-9.\\-]{1,20}$'",
+        "type": "string_pattern_mismatch"
+      }
+    ]
+  },
+  "status": 422
+}
