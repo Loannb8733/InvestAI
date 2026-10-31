@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from app.domains.dashboard.metrics.aggregate import (
     aggregate_by_symbol,
     apply_period_changes,
     build_dashboard_summary,
+    gain_figures,
     symbols_by_type,
 )
 from app.domains.dashboard.metrics.cache import (
@@ -34,6 +36,7 @@ logger = logging.getLogger(__name__)
 _LOCK_TTL = 20
 _PEER_WAIT = 3.0
 _PEER_POLL = 0.15
+_CACHE_SECTION = "metrics"
 
 
 class MetricsService:
@@ -50,9 +53,23 @@ class MetricsService:
         """Métriques complètes d'un portefeuille."""
         return await compute_portfolio_metrics(db, portfolio_id, currency, include_zero_quantity, min_value_eur)
 
-    async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str) -> dict[str, Any]:
+    async def get_portfolio_history(self, db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> dict[str, Any]:
         """Historique d'investissement d'un portefeuille."""
-        return await compute_portfolio_history(db, portfolio_id)
+        return await compute_portfolio_history(db, portfolio_id, currency)
+
+    async def get_portfolio_performance(
+        self, db: AsyncSession, portfolio_id: str, currency: str = "EUR"
+    ) -> dict[str, Any]:
+        """Métriques d'un portefeuille et son gain total, comme l'agrégat du compte."""
+        metrics = await self.get_portfolio_metrics(db, portfolio_id, currency)
+        history = await self.get_portfolio_history(db, portfolio_id, currency)
+        gain = gain_figures(
+            Decimal(str(metrics["unrealized_gain"])),
+            Decimal(str(history["realized_gains"])),
+            Decimal(str(history["total_invested_all_time"])),
+            Decimal(str(metrics["total_dividend_income"])),
+        )
+        return {**metrics, **gain}
 
     async def fetch_period_changes(self, symbols: dict[str, list[str]], days: int) -> dict[str, float]:
         """Variation en pourcentage sur `days` jours ; un symbole sans deux cours connus est absent."""
@@ -90,13 +107,13 @@ class MetricsService:
 
     async def _shared_or_computed(self, db: AsyncSession, user_id: str, currency: str, days: int) -> dict[str, Any]:
         key = (user_id, days, currency)
-        shared = await redis_client.get_cached_dashboard(user_id, days, currency)
+        shared = await redis_client.get_cached_dashboard(user_id, days, currency, section=_CACHE_SECTION)
         if shared is not None:
             put_dashboard(key, (time.time(), shared))
             return shared
         result = await self._compute_dashboard_cross_worker(db, user_id, currency, days)
         put_dashboard(key, (time.time(), result))
-        await redis_client.cache_dashboard(user_id, days, currency, result)
+        await redis_client.cache_dashboard(user_id, days, currency, result, section=_CACHE_SECTION)
         return result
 
     async def _compute_dashboard_cross_worker(
@@ -108,7 +125,7 @@ class MetricsService:
             deadline = time.time() + _PEER_WAIT
             while time.time() < deadline:
                 await asyncio.sleep(_PEER_POLL)
-                shared = await redis_client.get_cached_dashboard(user_id, days, currency)
+                shared = await redis_client.get_cached_dashboard(user_id, days, currency, section=_CACHE_SECTION)
                 if shared is not None:
                     return shared
         try:
@@ -126,7 +143,7 @@ class MetricsService:
             logger.exception("get_portfolio_metrics failed for portfolio %s", portfolio.id)
             return None
         try:
-            history = await self.get_portfolio_history(db, str(portfolio.id))
+            history = await self.get_portfolio_history(db, str(portfolio.id), currency)
         except Exception:
             logger.exception("get_portfolio_history failed for portfolio %s", portfolio.id)
             history = HISTORY_UNAVAILABLE

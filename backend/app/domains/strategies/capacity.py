@@ -68,10 +68,10 @@ async def compute_deployment_capacity(
     db: AsyncSession, user_id: str, monthly_dca: float, profile: str
 ) -> DeploymentCapacity:
     """Liquidité (cash + stablecoins) face au premier signal ACHAT/DCA de la table de stratégie, et répartition du DCA
-    mensuel entre risque et réserve selon le profil (``moderate`` si inconnu) ; montants arrondis au centime."""
+    mensuel entre risque et réserve selon le profil ; montants arrondis au centime."""
     available_liquidity, total_value = await _liquidity_and_value(db, user_id)
     liquidity_pct = round(available_liquidity / total_value * 100, 1) if total_value > 0 else 0.0
-    invested_pct = round(100 - liquidity_pct, 1)
+    invested_pct = round(100 - liquidity_pct, 1) if total_value > 0 else 0.0
 
     next_symbol, next_action, next_amount = await _next_buy_signal(db, user_id)
 
@@ -84,7 +84,7 @@ async def compute_deployment_capacity(
             f"({next_amount:.2f} € requis, {available_liquidity:.2f} € disponible)."
         )
 
-    alloc = PROFILE_ALLOCATION.get(profile, PROFILE_ALLOCATION["moderate"])
+    alloc = PROFILE_ALLOCATION[profile]
     deploy_risk = round(monthly_dca * alloc["risk_pct"] / 100, 2)
     keep_reserve = round(monthly_dca * alloc["reserve_pct"] / 100, 2)
 

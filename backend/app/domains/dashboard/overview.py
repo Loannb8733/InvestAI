@@ -30,19 +30,18 @@ from app.domains.transactions.cost_basis.context import aware
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PERIOD_DAYS = 30
 _MIN_ALL_TIME_DAYS = 7
-_MAX_EVENT_DAYS = 90
+_EVENT_DAYS = 90
 _SHORT_PERIOD_DAYS = 7
 _MIN_COVERAGE = 0.3
 
 
 def resolve_period_days(days: int, first_transaction: datetime | None) -> int:
-    """`days=0` signifie « Tout » : du premier jour de l'historique à aujourd'hui."""
+    """`days=0` signifie « Tout » : du premier jour de l'historique à aujourd'hui ; sans historique, aucune période."""
     if days != 0:
         return days
     if not first_transaction:
-        return _DEFAULT_PERIOD_DAYS
+        return 0
     return max((datetime.now(UTC) - first_transaction).days + 1, _MIN_ALL_TIME_DAYS)
 
 
@@ -70,13 +69,8 @@ def _flag_estimated(history: list[dict[str, Any]], days: int) -> bool:
 
 
 def _apply_all_time_change(metrics: dict[str, Any]) -> None:
-    invested = metrics["total_invested"]
-    if invested > 0:
-        metrics["period_change"] = metrics["total_value"] - invested
-        metrics["period_change_percent"] = round(((metrics["total_value"] - invested) / invested) * 100, 2)
-    else:
-        metrics["period_change"] = 0.0
-        metrics["period_change_percent"] = 0.0
+    metrics["period_change"] = metrics["total_gain_loss"]
+    metrics["period_change_percent"] = round(metrics["total_gain_loss_percent"], 2)
 
 
 def _asset_allocation(metrics: dict[str, Any], staked: dict[str, float]) -> list[AssetAllocation]:
@@ -151,7 +145,7 @@ async def build_overview(days: int, current_user: User, db: AsyncSession) -> Enh
     history, indices = await _charts(db, user_id, period)
     transactions = await recent_transactions(db, account_id, days=period)
     alerts = await active_alerts(db, account_id)
-    events = await upcoming_events(db, account_id, min(period, _MAX_EVENT_DAYS) if period > 0 else _MAX_EVENT_DAYS)
+    events = await upcoming_events(db, account_id, _EVENT_DAYS)
     estimated = _flag_estimated(history, period)
     if days == 0:
         _apply_all_time_change(metrics)
@@ -194,5 +188,6 @@ async def build_overview(days: int, current_user: User, db: AsyncSession) -> Enh
         period_days=period,
         period_label=get_period_label_fr(days),
         forex_stale=metrics.get("forex_stale", False),
+        unpriced_symbols=metrics.get("unpriced_symbols", []),
         last_updated=datetime.now(UTC).isoformat(),
     )

@@ -24,7 +24,7 @@ async def _snapshot_portfolio(
 ) -> None:
     if await repository.has_portfolio_snapshot(db, user_id, portfolio.id, start, end):
         return
-    metrics = await metrics_service.get_portfolio_metrics(db, str(portfolio.id), "EUR")
+    metrics = await metrics_service.get_portfolio_performance(db, str(portfolio.id), "EUR")
     if metrics.get("total_value", 0) <= 0:
         return
     db.add(

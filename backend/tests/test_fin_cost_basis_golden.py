@@ -135,7 +135,7 @@ async def test_usd_buy_cost_basis_converted_to_eur(db_session, regular_user):
 
     assert result["total_invested"] == pytest.approx(92.0, abs=0.01)
     assert result["total_value"] == pytest.approx(100.0, abs=0.01)
-    assert result["total_gain_loss"] == pytest.approx(8.0, abs=0.01)
+    assert result["unrealized_gain"] == pytest.approx(8.0, abs=0.01)
     # Displayed per-asset PRU must also be in EUR (CUMP path), not the raw 100 USD.
     # Pins the compute_cump_pru FX conversion so PRU stays consistent with G/L.
     assert result["assets"][0]["avg_buy_price"] == pytest.approx(92.0, abs=0.01)
@@ -158,7 +158,7 @@ async def test_eur_buy_no_conversion_is_unchanged(db_session, regular_user):
 
     assert result["total_invested"] == pytest.approx(100.0, abs=0.01)
     assert result["total_value"] == pytest.approx(120.0, abs=0.01)
-    assert result["total_gain_loss"] == pytest.approx(20.0, abs=0.01)
+    assert result["unrealized_gain"] == pytest.approx(20.0, abs=0.01)
 
 
 @pytest.mark.asyncio
@@ -181,7 +181,7 @@ async def test_mixed_currency_portfolio_aggregates_in_eur(db_session, regular_us
     # BTC invested 92 EUR + ETH invested 80 EUR = 172 ; value 100 + 100 = 200.
     assert result["total_invested"] == pytest.approx(172.0, abs=0.01)
     assert result["total_value"] == pytest.approx(200.0, abs=0.01)
-    assert result["total_gain_loss"] == pytest.approx(28.0, abs=0.01)
+    assert result["unrealized_gain"] == pytest.approx(28.0, abs=0.01)
 
 
 @pytest.mark.asyncio
@@ -248,4 +248,4 @@ async def test_unmatched_transfer_in_uses_avg_buy_price_not_zero(db_session, reg
 
     assert result["total_invested"] == pytest.approx(80.0, abs=0.01)
     assert result["total_value"] == pytest.approx(100.0, abs=0.01)
-    assert result["total_gain_loss"] == pytest.approx(20.0, abs=0.01)
+    assert result["unrealized_gain"] == pytest.approx(20.0, abs=0.01)

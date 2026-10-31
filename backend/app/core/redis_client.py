@@ -166,15 +166,15 @@ _DASHBOARD_TTL = 300  # 5 minutes safety cap (invalidated eagerly on writes)
 _DASHBOARD_KEY_PREFIX = "dashboard:"
 
 
-def _dashboard_key(user_id: str, days: int, currency: str) -> str:
-    return f"{_DASHBOARD_KEY_PREFIX}{user_id}:{days}:{currency}"
+def _dashboard_key(user_id: str, section: str, days: int, currency: str) -> str:
+    return f"{_DASHBOARD_KEY_PREFIX}{user_id}:{section}:{days}:{currency}"
 
 
-async def get_cached_dashboard(user_id: str, days: int, currency: str) -> dict | None:
+async def get_cached_dashboard(user_id: str, days: int, currency: str, section: str = "screen") -> dict | None:
     """Get cached dashboard response dict, or None on miss/error."""
     try:
         r = await _get_redis_txt()
-        data = await r.get(_dashboard_key(user_id, days, currency))
+        data = await r.get(_dashboard_key(user_id, section, days, currency))
         if data:
             return json.loads(data)
     except Exception as e:
@@ -182,12 +182,14 @@ async def get_cached_dashboard(user_id: str, days: int, currency: str) -> dict |
     return None
 
 
-async def cache_dashboard(user_id: str, days: int, currency: str, payload: dict, ttl: int = _DASHBOARD_TTL) -> None:
+async def cache_dashboard(
+    user_id: str, days: int, currency: str, payload: dict, ttl: int = _DASHBOARD_TTL, section: str = "screen"
+) -> None:
     """Cache a dashboard response dict (JSON, default 5min TTL)."""
     try:
         r = await _get_redis_txt()
         await r.setex(
-            _dashboard_key(user_id, days, currency),
+            _dashboard_key(user_id, section, days, currency),
             ttl,
             json.dumps(payload, default=str),
         )

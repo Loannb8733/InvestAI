@@ -64,32 +64,32 @@
     "historical_data": [],
     "index_comparison": [
       {
-        "change_percent": 5.9402,
+        "change_percent": 0.7514,
         "name": "Bitcoin",
         "price": 60000.0,
         "symbol": "BTC"
       },
       {
-        "change_percent": 20.3841,
+        "change_percent": 1.2063,
         "name": "Ethereum",
         "price": 3000.0,
         "symbol": "ETH"
       },
       {
-        "change_percent": -1.4948,
+        "change_percent": -1.8814,
         "name": "Solana",
         "price": 150.0,
         "symbol": "SOL"
       }
     ],
-    "is_data_estimated": true,
+    "is_data_estimated": false,
     "last_updated": "2026-10-17T12:00:00+00:00",
     "net_capital": 0.0,
     "net_gain_loss": 0.0,
     "net_gain_loss_percent": 0.0,
     "period_change": 0.0,
     "period_change_percent": 0.0,
-    "period_days": 30,
+    "period_days": 0,
     "period_label": "Depuis le début",
     "period_twr_percent": null,
     "portfolios_count": 0,
@@ -101,6 +101,7 @@
     "total_invested": 0.0,
     "total_return": 0.0,
     "total_value": 0.0,
+    "unpriced_symbols": [],
     "upcoming_events": [],
     "worst_performers": []
   },

@@ -19,8 +19,8 @@ from app.domains.transactions.cost_basis.layers import ZERO
 EMPTY_PORTFOLIO: dict[str, Any] = {
     "total_value": 0.0,
     "total_invested": 0.0,
-    "total_gain_loss": 0.0,
-    "total_gain_loss_percent": 0.0,
+    "unrealized_gain": 0.0,
+    "total_dividend_income": 0.0,
     "assets_count": 0,
     "assets": [],
     "cash_from_stablecoins": 0.0,
@@ -65,16 +65,12 @@ def _assemble(
     total_dividends: float,
     forex_stale: bool,
 ) -> dict[str, Any]:
-    gain_loss = positions.total_value - positions.total_invested
-    invested = positions.total_invested
     projects = positions.projects
     result: dict[str, Any] = {
         "total_value": float(positions.total_value),
-        "total_invested": float(invested),
-        "total_gain_loss": float(gain_loss),
-        "total_gain_loss_percent": float(gain_loss / invested * 100) if invested > 0 else 0.0,
+        "total_invested": float(positions.total_invested),
+        "unrealized_gain": float(positions.total_value - positions.total_invested),
         "total_dividend_income": round(total_dividends, 2),
-        "total_return": round(float(gain_loss) + total_dividends, 2),
         "assets_count": len(positions.entries),
         "assets": positions.entries,
         "cash_from_stablecoins": float(stablecoins.total),
@@ -83,6 +79,7 @@ def _assemble(
         "fiat_assets": fiat.entries,
         "available_liquidity": float(stablecoins.total + fiat.total),
         "forex_stale": forex_stale,
+        "unpriced_symbols": sorted(positions.unpriced),
     }
     if projects.active > 0 or projects.completed > 0:
         result["crowdfunding_summary"] = projects.summary()

@@ -10,11 +10,11 @@
         "top_concentration": 57.6
       },
       "pnl_breakdown": {
-        "net_pnl": -5013.0,
-        "realized_pnl": 4833.3333,
+        "net_pnl": 5487.0,
+        "realized_pnl": 5487.0,
         "total_fees": 35.0,
-        "total_pnl": -4978.0,
-        "unrealized_pnl": -9811.3333
+        "total_pnl": 5487.0,
+        "unrealized_pnl": 0.0
       },
       "risk_metrics": {
         "alpha": null,
@@ -592,10 +592,10 @@
     "is_data_estimated": false,
     "last_updated": "2026-10-17T12:00:00+00:00",
     "net_capital": 37000.0,
-    "net_gain_loss": -3138.0,
-    "net_gain_loss_percent": -6.6063,
-    "period_change": -4978.0,
-    "period_change_percent": -10.48,
+    "net_gain_loss": 5487.0,
+    "net_gain_loss_percent": 11.5516,
+    "period_change": 5487.0,
+    "period_change_percent": 11.55,
     "period_days": 651,
     "period_label": "Depuis le début",
     "period_twr_percent": 46.0,
@@ -683,11 +683,20 @@
       }
     ],
     "total_dividend_income": 0.0,
-    "total_gain_loss": -3138.0,
-    "total_gain_loss_percent": -6.6063,
+    "total_gain_loss": 5487.0,
+    "total_gain_loss_percent": 11.5516,
     "total_invested": 47500.0,
-    "total_return": -3138.0,
+    "total_return": 5487.0,
     "total_value": 42522.0,
+    "unpriced_symbols": [
+      "AAPL",
+      "ARB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "SOL",
+      "UNI"
+    ],
     "upcoming_events": [],
     "worst_performers": [
       {

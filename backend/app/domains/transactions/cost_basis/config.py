@@ -78,6 +78,7 @@ class ReplayEvent:
     dest_symbol: str | None = None
     dest_qty: Decimal = ZERO
     dest_cost: Decimal = ZERO
+    dest_layer_cost: Decimal = ZERO
 
 
 @dataclass

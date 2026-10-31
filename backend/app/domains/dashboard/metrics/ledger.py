@@ -1,7 +1,7 @@
 """Coût de revient d'un portefeuille, dérivé du rejeu FIFO de ses transactions."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.dashboard.metrics import repository
 from app.domains.dashboard.metrics.quotes import RateResolver
 from app.domains.portfolio.models import Asset
-from app.domains.transactions.cost_basis.config import ReplayConfig, ReplayResult
+from app.domains.transactions.cost_basis.config import ReplayConfig, ReplayEvent, ReplayResult
 from app.domains.transactions.cost_basis.layers import ZERO, FifoKey, Layer
 from app.domains.transactions.cost_basis.replay import replay, sort_transactions
 from app.domains.transactions.cost_basis.weighted_average import compute_cump_pru
@@ -90,12 +90,20 @@ async def _apply_pending_conversions(
         converted = amount * Decimal(str(await rates.tracked_rate(entry_currency, currency)))
         if isinstance(entry, str) and entry.startswith(_DIVIDEND_PREFIX):
             symbol = entry[len(_DIVIDEND_PREFIX) :]
-            for key in dividends:
-                if key[0] == symbol:
-                    dividends[key] += converted
-                    break
+            key = next((known for known in dividends if known[0] == symbol), (symbol, ""))
+            dividends[key] = dividends.get(key, ZERO) + converted
         else:
             costs[entry] = costs.get(entry, ZERO) + converted
+
+
+def _dividends_by_position(income: dict[FifoKey, Decimal], assets: list[Asset]) -> dict[FifoKey, Decimal]:
+    positions = {asset_key(asset) for asset in assets}
+    by_symbol = {asset.symbol.upper(): asset_key(asset) for asset in assets}
+    placed: dict[FifoKey, Decimal] = {}
+    for key, amount in income.items():
+        position = key if key in positions else by_symbol.get(key[0], key)
+        placed[position] = placed.get(position, ZERO) + amount
+    return placed
 
 
 def _layer_totals(fifo: dict[FifoKey, list[Layer]]) -> tuple[dict[FifoKey, Decimal], dict[str, Decimal]]:
@@ -140,6 +148,26 @@ def _foreign_layers(fifo: dict[FifoKey, list[Layer]], currency: str) -> dict[Fif
     return foreign
 
 
+def replay_assets(
+    transactions: list[Any],
+    assets: Sequence[Asset],
+    currency: str,
+    usd_to_target: float | None = None,
+    on_event: Callable[[ReplayEvent], None] | None = None,
+) -> ReplayResult:
+    """Rejeu d'affichage des transactions de ces actifs, leurs prix moyens servant aux arrivées sans sortie."""
+    symbols, _, asset_prices, symbol_prices = _average_prices(assets)
+    return replay(
+        sort_transactions(transactions),
+        symbols,
+        ReplayConfig(portfolio_currency=currency, seed_stablecoin_layers=True),
+        aid_to_avg_price=asset_prices,
+        sym_avg_price=symbol_prices,
+        usd_to_portfolio=usd_to_target,
+        on_event=on_event,
+    )
+
+
 async def load_cost_book(
     db: AsyncSession, assets: list[Asset], currency: str, usd_to_target: float, rates: RateResolver
 ) -> CostBook:
@@ -152,15 +180,8 @@ async def load_cost_book(
     fees = await repository.fees_by_asset(db, asset_ids)
     transactions = sort_transactions(list(await repository.portfolio_transactions(db, portfolio_id)))
     every_asset = await repository.portfolio_assets(db, portfolio_id)
-    symbols, exchanges, asset_prices, symbol_prices = _average_prices(every_asset)
-    replayed = replay(
-        transactions,
-        symbols,
-        ReplayConfig(portfolio_currency=currency, seed_stablecoin_layers=True),
-        aid_to_avg_price=asset_prices,
-        sym_avg_price=symbol_prices,
-        usd_to_portfolio=usd_to_target,
-    )
+    symbols, exchanges, _, _ = _average_prices(every_asset)
+    replayed = replay_assets(transactions, every_asset, currency, usd_to_target)
     _log_btc_layers(replayed)
     costs, paid_by_symbol = _layer_totals(replayed.fifo)
     seen_keys = set(replayed.fifo)
@@ -174,6 +195,6 @@ async def load_cost_book(
         pru_by_key=compute_cump_pru(transactions, symbols, exchanges),
         fees=fees,
         first_dates=first_dates,
-        dividends=replayed.dividend_income,
+        dividends=_dividends_by_position(replayed.dividend_income, assets),
         foreign_layers=_foreign_layers(replayed.fifo, currency.upper()),
     )

@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from app.domains.planning.goals.months import SHORT_MONTHS
+
 _DAY_NAMES = ("Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim")
 
 
@@ -10,7 +12,7 @@ def format_date_for_period(moment: datetime, days: int) -> str:
     if days <= 7:
         return f"{_DAY_NAMES[moment.weekday()]} {moment.day}"
     if days <= 30:
-        return moment.strftime("%d %b")
+        return f"{moment.day:02d} {SHORT_MONTHS[moment.month - 1]}"
     return moment.strftime("%d/%m")
 
 

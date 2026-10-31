@@ -20,18 +20,18 @@
     ],
     "advanced_metrics": {
       "concentration": {
-        "hhi": 4106.0,
+        "hhi": 4128.0,
         "interpretation": "Forte concentration",
         "is_concentrated": true,
         "top_asset": "BTC",
-        "top_concentration": 60.8
+        "top_concentration": 61.0
       },
       "pnl_breakdown": {
-        "net_pnl": 16425.0,
-        "realized_pnl": 4858.0247,
+        "net_pnl": 26725.0,
+        "realized_pnl": 5487.0,
         "total_fees": 35.0,
-        "total_pnl": 16460.0,
-        "unrealized_pnl": 11601.9753
+        "total_pnl": 26725.0,
+        "unrealized_pnl": 21238.0
       },
       "risk_metrics": {
         "alpha": null,
@@ -43,7 +43,7 @@
           "trough_date": null,
           "trough_value": null
         },
-        "sharpe_ratio": 80.4,
+        "sharpe_ratio": 79.78,
         "var_95": {
           "confidence_level": 0.95,
           "var_amount": 0.0,
@@ -51,34 +51,34 @@
         },
         "volatility": 0.31
       },
-      "roi_annualized": 28.64,
+      "roi_annualized": 28.44,
       "stress_tests": [
         {
-          "current_value": 64100.0,
-          "potential_loss": 12820.0,
+          "current_value": 63900.0,
+          "potential_loss": 12780.0,
           "potential_loss_percent": 20.0,
           "scenario_name": "Correction -20%",
-          "stressed_value": 51280.0
+          "stressed_value": 51120.0
         },
         {
-          "current_value": 64100.0,
-          "potential_loss": 25640.0,
+          "current_value": 63900.0,
+          "potential_loss": 25560.0,
           "potential_loss_percent": 40.0,
           "scenario_name": "Correction -40%",
-          "stressed_value": 38460.0
+          "stressed_value": 38340.0
         }
       ]
     },
     "allocation": [
       {
-        "percentage": 93.4477,
+        "percentage": 93.7402,
         "type": "crypto",
         "value": 59900.0
       },
       {
-        "percentage": 6.5523,
+        "percentage": 6.2598,
         "type": "stock",
-        "value": 4200.0
+        "value": 4000.0
       }
     ],
     "asset_allocation": [
@@ -87,7 +87,7 @@
         "avg_buy_price": 37712.3077,
         "gain_loss_percent": 2.48,
         "name": null,
-        "percentage": 60.84,
+        "percentage": 61.03,
         "staked_quantity": null,
         "symbol": "BTC",
         "value": 39000.0
@@ -97,7 +97,7 @@
         "avg_buy_price": 1968.1967,
         "gain_loss_percent": 4.6,
         "name": null,
-        "percentage": 14.27,
+        "percentage": 14.32,
         "staked_quantity": 0.75,
         "symbol": "ETH",
         "value": 9150.0
@@ -107,27 +107,27 @@
         "avg_buy_price": 100.8235,
         "gain_loss_percent": -5.65,
         "name": null,
-        "percentage": 11.93,
+        "percentage": 11.97,
         "staked_quantity": null,
         "symbol": "SOL",
         "value": 7650.0
       },
       {
         "asset_type": "stock",
-        "avg_buy_price": 161.9524,
+        "avg_buy_price": 170.05,
         "gain_loss_percent": 0.41,
         "name": null,
-        "percentage": 6.55,
+        "percentage": 6.26,
         "staked_quantity": null,
         "symbol": "AAPL",
-        "value": 4200.0
+        "value": 4000.0
       },
       {
         "asset_type": "crypto",
         "avg_buy_price": 7.005,
         "gain_loss_percent": 0.72,
         "name": null,
-        "percentage": 2.81,
+        "percentage": 2.82,
         "staked_quantity": null,
         "symbol": "UNI",
         "value": 1800.0
@@ -137,7 +137,7 @@
         "avg_buy_price": 0.1001,
         "gain_loss_percent": 0.08,
         "name": null,
-        "percentage": 2.34,
+        "percentage": 2.35,
         "staked_quantity": null,
         "symbol": "DOGE",
         "value": 1500.0
@@ -158,13 +158,13 @@
     "currency_exposure": [
       {
         "currency": "USD",
-        "percentage": 93.4,
+        "percentage": 93.7,
         "value": 59900.0
       },
       {
         "currency": "EUR",
-        "percentage": 6.6,
-        "value": 4200.0
+        "percentage": 6.3,
+        "value": 4000.0
       }
     ],
     "daily_change": 0.0,
@@ -284,10 +284,10 @@
     "is_data_estimated": false,
     "last_updated": "2026-10-17T12:00:00+00:00",
     "net_capital": 37140.0,
-    "net_gain_loss": 18309.2,
-    "net_gain_loss_percent": 38.4324,
-    "period_change": 1067.1596,
-    "period_change_percent": 1.6648,
+    "net_gain_loss": 26725.0,
+    "net_gain_loss_percent": 56.0978,
+    "period_change": 1066.3303,
+    "period_change_percent": 1.6687,
     "period_days": 7,
     "period_label": "7j",
     "period_twr_percent": 1.58,
@@ -328,7 +328,7 @@
       },
       {
         "asset_type": "stock",
-        "current_value": 4200.0,
+        "current_value": 4000.0,
         "gain_loss_percent": 0.41,
         "name": null,
         "symbol": "AAPL"
@@ -342,12 +342,21 @@
       }
     ],
     "total_dividend_income": 20.0,
-    "total_gain_loss": 18309.2,
-    "total_gain_loss_percent": 38.4324,
+    "total_gain_loss": 26725.0,
+    "total_gain_loss_percent": 56.0978,
     "total_invested": 47640.0,
-    "total_return": 18329.2,
-    "total_value": 64100.0,
-    "upcoming_events": [],
+    "total_return": 26745.0,
+    "total_value": 63900.0,
+    "unpriced_symbols": [],
+    "upcoming_events": [
+      {
+        "amount": 20.0,
+        "event_date": "2026-11-01T09:00:00+00:00",
+        "event_type": "dividend",
+        "id": "<id>",
+        "title": "Dividende AAPL"
+      }
+    ],
     "worst_performers": [
       {
         "asset_type": "crypto",

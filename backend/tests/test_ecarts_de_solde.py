@@ -226,22 +226,22 @@ class TestTousLesTypesQuiDeplacentLaQuantite:
     tombaient dans le `ELSE 0`**, alors que les listes de `create_transaction`
     et de l'import CSV les comptent bien.
 
-    Un dividende versé en jetons augmentait la quantité détenue sans entrer dans
-    la somme : l'écart qui en résultait était proposé au crédit, et `credit-all`
-    aurait créé un AIRDROP par-dessus le dividende — la même quantité comptée
-    deux fois dans l'historique.
-
-    Aucune transaction de ces types n'existe aujourd'hui en base : le trou était
-    latent, comme l'était celui du « W » avant lui.
+    Un intérêt versé en jetons augmente la quantité détenue : hors de la somme,
+    l'écart serait proposé au crédit et `credit-all` créerait un AIRDROP par-dessus.
+    Un dividende est un revenu en numéraire : il ne déplace aucune quantité.
     """
 
-    @pytest.mark.parametrize("type_", [TransactionType.DIVIDEND, TransactionType.INTEREST])
-    async def test_un_revenu_percu_en_nature_entre_dans_la_somme(
-        self, client, entetes, db_session, portefeuille, type_
-    ):
+    async def test_un_interet_percu_en_nature_entre_dans_la_somme(self, client, entetes, db_session, portefeuille):
         actif = await _actif(db_session, portefeuille, detenu="1.5")
         await _mouvement(db_session, actif, TransactionType.BUY, "1")
-        await _mouvement(db_session, actif, type_, "0.5")
+        await _mouvement(db_session, actif, TransactionType.INTEREST, "0.5")
+
+        assert (await _ecarts(client, entetes))["count"] == 0
+
+    async def test_un_dividende_reste_hors_de_la_somme(self, client, entetes, db_session, portefeuille):
+        actif = await _actif(db_session, portefeuille, detenu="1")
+        await _mouvement(db_session, actif, TransactionType.BUY, "1")
+        await _mouvement(db_session, actif, TransactionType.DIVIDEND, "0.5")
 
         assert (await _ecarts(client, entetes))["count"] == 0
 

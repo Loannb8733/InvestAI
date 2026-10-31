@@ -92,6 +92,7 @@ class Positions:
     entries: list[dict[str, Any]] = field(default_factory=list)
     total_value: Decimal = ZERO
     total_invested: Decimal = ZERO
+    unpriced: set[str] = field(default_factory=set)
     projects: ProjectTally = field(default_factory=ProjectTally)
 
 
@@ -202,6 +203,8 @@ def build_positions(
         metrics = (
             _project_metrics(asset, positions.projects) if valued_at_cost else _market_metrics(asset, book, quotes)
         )
+        if not valued_at_cost and quotes.prices.get(asset.symbol.upper()) is None:
+            positions.unpriced.add(asset.symbol.upper())
         is_dust = metrics["current_value"] < min_value and metrics["total_invested"] < min_value
         if not valued_at_cost and not include_zero and is_dust:
             continue
