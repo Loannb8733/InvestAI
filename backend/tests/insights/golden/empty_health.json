@@ -1,0 +1,123 @@
+{
+  "body": {
+    "anomaly_impacts": [],
+    "generated_at": "2026-10-17T12:00:00+00:00",
+    "insights": [
+      {
+        "actions": [],
+        "category": "performance",
+        "current_value": 0.0,
+        "message": "Votre ratio de Sharpe (0.00) est faible. Le rendement ne compense pas suffisamment le risque pris.",
+        "metric_name": "sharpe_ratio",
+        "potential_improvement": "Ciblez un Sharpe > 1.0 via une meilleure allocation.",
+        "severity": "warning",
+        "target_value": 1.0,
+        "title": "Performance à améliorer"
+      },
+      {
+        "actions": [],
+        "category": "diversification",
+        "current_value": 0.0,
+        "message": "Votre portfolio est bien diversifié (HHI: 0.00).",
+        "metric_name": "hhi",
+        "potential_improvement": null,
+        "severity": "info",
+        "target_value": null,
+        "title": "Bonne diversification"
+      },
+      {
+        "actions": [],
+        "category": "opportunity",
+        "current_value": 0.607,
+        "message": "Le marche est en tendance haussiere (61%). Conditions favorables pour vos positions. Preparez vos niveaux de prise de profits.",
+        "metric_name": "market_regime",
+        "potential_improvement": null,
+        "severity": "info",
+        "target_value": null,
+        "title": "Marche haussier"
+      }
+    ],
+    "market_regime": {
+      "generated_at": "2026-10-17T12:00:00",
+      "market": {
+        "confidence": 0.94,
+        "description": "Mark-up — cassure de resistance, volume croissant (61%).",
+        "dominant_regime": "bullish",
+        "probabilities": {
+          "bearish": 0.069,
+          "bottom": 0.103,
+          "bullish": 0.607,
+          "top": 0.22
+        },
+        "signals": [
+          {
+            "description": "RSI haussier (93)",
+            "name": "RSI 14",
+            "signal": "bullish",
+            "strength": 0.62,
+            "value": 93.3
+          },
+          {
+            "description": "MACD positif et croissant — tendance haussiere confirmee",
+            "name": "MACD",
+            "signal": "bullish",
+            "strength": 0.95,
+            "value": 208.7843
+          },
+          {
+            "description": "Prix au-dessus de la bande haute de Bollinger — surachat",
+            "name": "Bollinger Bands",
+            "signal": "top",
+            "strength": 0.37,
+            "value": 0.97
+          },
+          {
+            "description": "MA courte au-dessus de la MA longue (+1.2%)",
+            "name": "MA Cross (SMA20/SMA50)",
+            "signal": "bullish",
+            "strength": 0.4,
+            "value": 1.19
+          },
+          {
+            "description": "Momentum haussier (+4.4%)",
+            "name": "Momentum 14j",
+            "signal": "bullish",
+            "strength": 0.75,
+            "value": 4.4
+          },
+          {
+            "description": "Volatilite moderee (1%) — marche stable",
+            "name": "Volatilite 14j",
+            "signal": "bullish",
+            "strength": 0.1,
+            "value": 1.0
+          }
+        ],
+        "symbol": "BTC (Marche)"
+      },
+      "per_asset": []
+    },
+    "metrics_summary": {
+      "avg_top5_correlation": 0.0,
+      "hhi": 0.0,
+      "max_drawdown": 0.0,
+      "regime_config": {
+        "alpha_threshold": 60,
+        "gold_relevance": "low",
+        "mode_label": "Mode Expansion",
+        "risk_multiplier": 0.8,
+        "vol_regime": "low"
+      },
+      "risk_clusters": null,
+      "sharpe_ratio": 0.0,
+      "sortino_ratio": 0.0,
+      "total_value": 0.0,
+      "var_95": 0.0,
+      "volatility": 0.0
+    },
+    "overall_score": 80,
+    "overall_status": "excellent",
+    "rebalancing_orders": []
+  },
+  "status": 200
+}

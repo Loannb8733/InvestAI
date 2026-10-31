@@ -1,0 +1,657 @@
+{
+  "body": {
+    "anomaly_impacts": [
+      {
+        "anomaly_type": "price_spike",
+        "description": "Mouvement anormal détecté par Isolation Forest: hausse de 4.4% (score anomalie: -0.00)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": 1658.0574,
+        "position_value_eur": 37941.8169,
+        "price_change_percent": 4.37,
+        "severity": "low",
+        "symbol": "BTC"
+      },
+      {
+        "anomaly_type": "price_drop",
+        "description": "Mouvement anormal détecté par Isolation Forest: baisse de 6.6% (score anomalie: -0.09)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": -649.7664,
+        "position_value_eur": 9830.0521,
+        "price_change_percent": -6.61,
+        "severity": "low",
+        "symbol": "ETH"
+      },
+      {
+        "anomaly_type": "price_spike",
+        "description": "Mouvement anormal détecté par Isolation Forest: hausse de 33.4% (score anomalie: -0.08)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": 459.4839,
+        "position_value_eur": 1376.5247,
+        "price_change_percent": 33.38,
+        "severity": "low",
+        "symbol": "UNI"
+      },
+      {
+        "anomaly_type": "price_spike",
+        "description": "Mouvement anormal détecté par Isolation Forest: hausse de 37.7% (score anomalie: -0.10)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": 414.8752,
+        "position_value_eur": 1100.1728,
+        "price_change_percent": 37.71,
+        "severity": "low",
+        "symbol": "DOGE"
+      },
+      {
+        "anomaly_type": "price_drop",
+        "description": "Mouvement anormal détecté par Isolation Forest: baisse de 1.4% (score anomalie: -0.02)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": -109.4042,
+        "position_value_eur": 7759.1621,
+        "price_change_percent": -1.41,
+        "severity": "low",
+        "symbol": "SOL"
+      },
+      {
+        "anomaly_type": "price_drop",
+        "description": "Mouvement anormal détecté par Isolation Forest: baisse de 4.0% (score anomalie: -0.08)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": -36.762,
+        "position_value_eur": 916.7576,
+        "price_change_percent": -4.01,
+        "severity": "low",
+        "symbol": "ARB"
+      },
+      {
+        "anomaly_type": "price_drop",
+        "description": "Mouvement anormal détecté par Isolation Forest: baisse de 0.2% (score anomalie: -0.06)",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": -8.0159,
+        "position_value_eur": 4007.9688,
+        "price_change_percent": -0.2,
+        "severity": "low",
+        "symbol": "AAPL"
+      },
+      {
+        "anomaly_type": "price_spike",
+        "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
+        "detected_at": "2026-10-17T12:00:00+00:00",
+        "impact_eur": 1.1033,
+        "position_value_eur": 1838.878,
+        "price_change_percent": 0.06,
+        "severity": "low",
+        "symbol": "USDC"
+      }
+    ],
+    "generated_at": "2026-10-17T12:00:00+00:00",
+    "insights": [
+      {
+        "actions": [
+          {
+            "amount_eur": null,
+            "reason": "Réduire la concentration",
+            "symbol": "BTC",
+            "type": "sell"
+          }
+        ],
+        "category": "diversification",
+        "current_value": 0.6029,
+        "message": "BTC représente 60% de votre portfolio. C'est trop concentré.",
+        "metric_name": "top_holding_weight",
+        "potential_improvement": "Réduisez BTC à max 25% et diversifiez.",
+        "severity": "critical",
+        "target_value": 0.25,
+        "title": "Concentration excessive"
+      },
+      {
+        "actions": [],
+        "category": "diversification",
+        "current_value": 0.4081,
+        "message": "Votre indice HHI (0.41) indique une concentration élevée.",
+        "metric_name": "hhi",
+        "potential_improvement": "Ajoutez des actifs décorrélés (actions, ETF, or).",
+        "severity": "warning",
+        "target_value": 0.15,
+        "title": "Portfolio peu diversifié"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": 1658.0574,
+        "message": "Mouvement anormal détecté par Isolation Forest: hausse de 4.4% (score anomalie: -0.00). Impact: +1,658€ (+4.4%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur BTC"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": -649.7664,
+        "message": "Mouvement anormal détecté par Isolation Forest: baisse de 6.6% (score anomalie: -0.09). Impact: -650€ (-6.6%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur ETH"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": 459.4839,
+        "message": "Mouvement anormal détecté par Isolation Forest: hausse de 33.4% (score anomalie: -0.08). Impact: +459€ (+33.4%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur UNI"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": 414.8752,
+        "message": "Mouvement anormal détecté par Isolation Forest: hausse de 37.7% (score anomalie: -0.10). Impact: +415€ (+37.7%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur DOGE"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": -109.4042,
+        "message": "Mouvement anormal détecté par Isolation Forest: baisse de 1.4% (score anomalie: -0.02). Impact: -109€ (-1.4%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur SOL"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": -36.762,
+        "message": "Mouvement anormal détecté par Isolation Forest: baisse de 4.0% (score anomalie: -0.08). Impact: -37€ (-4.0%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur ARB"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": -8.0159,
+        "message": "Mouvement anormal détecté par Isolation Forest: baisse de 0.2% (score anomalie: -0.06). Impact: -8€ (-0.2%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur AAPL"
+      },
+      {
+        "actions": [],
+        "category": "anomaly",
+        "current_value": 1.1033,
+        "message": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%. Impact: +1€ (+0.1%)",
+        "metric_name": "impact_eur",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Anomalie détectée sur USDC"
+      },
+      {
+        "actions": [],
+        "category": "risk",
+        "current_value": 1.0,
+        "message": "Les actifs BTC, UNI forment un cluster (corrélation moyenne : 100%). En cas de chute, ils baisseront simultanément.",
+        "metric_name": "risk_cluster_corr",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Cluster de risque détecté"
+      },
+      {
+        "actions": [],
+        "category": "risk",
+        "current_value": 1.0,
+        "message": "Les actifs AAPL, SOL forment un cluster (corrélation moyenne : 100%). En cas de chute, ils baisseront simultanément.",
+        "metric_name": "risk_cluster_corr",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Cluster de risque détecté"
+      },
+      {
+        "actions": [],
+        "category": "risk",
+        "current_value": 0.981,
+        "message": "Les actifs ARB, ETH forment un cluster (corrélation moyenne : 98%). En cas de chute, ils baisseront simultanément.",
+        "metric_name": "risk_cluster_corr",
+        "potential_improvement": null,
+        "severity": "warning",
+        "target_value": null,
+        "title": "Cluster de risque détecté"
+      },
+      {
+        "actions": [],
+        "category": "performance",
+        "current_value": 134.34,
+        "message": "Votre ratio de Sharpe (134.34) est excellent. Votre rendement ajusté au risque est très bon.",
+        "metric_name": "sharpe_ratio",
+        "potential_improvement": null,
+        "severity": "info",
+        "target_value": null,
+        "title": "Excellente performance"
+      },
+      {
+        "actions": [],
+        "category": "opportunity",
+        "current_value": 0.607,
+        "message": "Le marche est en tendance haussiere (61%). Conditions favorables pour vos positions. Preparez vos niveaux de prise de profits.",
+        "metric_name": "market_regime",
+        "potential_improvement": null,
+        "severity": "info",
+        "target_value": null,
+        "title": "Marche haussier"
+      },
+      {
+        "actions": [],
+        "category": "diversification",
+        "current_value": -0.7553,
+        "message": "L'or (PAXG/XAU) affiche une correlation moyenne de -76% avec vos positions, confirmant son role de couverture. En regime baissier, cette decorrelation stabilise la volatilite globale de votre portefeuille.",
+        "metric_name": "gold_avg_correlation",
+        "potential_improvement": null,
+        "severity": "info",
+        "target_value": null,
+        "title": "Or : couverture naturelle active"
+      }
+    ],
+    "market_regime": {
+      "generated_at": "2026-10-17T12:00:00",
+      "market": {
+        "confidence": 0.94,
+        "description": "Mark-up — cassure de resistance, volume croissant (61%).",
+        "dominant_regime": "bullish",
+        "probabilities": {
+          "bearish": 0.069,
+          "bottom": 0.103,
+          "bullish": 0.607,
+          "top": 0.22
+        },
+        "signals": [
+          {
+            "description": "RSI haussier (93)",
+            "name": "RSI 14",
+            "signal": "bullish",
+            "strength": 0.62,
+            "value": 93.3
+          },
+          {
+            "description": "MACD positif et croissant — tendance haussiere confirmee",
+            "name": "MACD",
+            "signal": "bullish",
+            "strength": 0.95,
+            "value": 208.7843
+          },
+          {
+            "description": "Prix au-dessus de la bande haute de Bollinger — surachat",
+            "name": "Bollinger Bands",
+            "signal": "top",
+            "strength": 0.37,
+            "value": 0.97
+          },
+          {
+            "description": "MA courte au-dessus de la MA longue (+1.2%)",
+            "name": "MA Cross (SMA20/SMA50)",
+            "signal": "bullish",
+            "strength": 0.4,
+            "value": 1.19
+          },
+          {
+            "description": "Momentum haussier (+4.4%)",
+            "name": "Momentum 14j",
+            "signal": "bullish",
+            "strength": 0.75,
+            "value": 4.4
+          },
+          {
+            "description": "Volatilite moderee (1%) — marche stable",
+            "name": "Volatilite 14j",
+            "signal": "bullish",
+            "strength": 0.1,
+            "value": 1.0
+          }
+        ],
+        "symbol": "BTC (Marche)"
+      },
+      "per_asset": [
+        {
+          "confidence": 0.94,
+          "description": "Mark-up — cassure de resistance, volume croissant (61%).",
+          "dominant_regime": "bullish",
+          "probabilities": {
+            "bearish": 0.069,
+            "bottom": 0.103,
+            "bullish": 0.607,
+            "top": 0.22
+          },
+          "signals": [
+            {
+              "description": "RSI haussier (93)",
+              "name": "RSI 14",
+              "signal": "bullish",
+              "strength": 0.62,
+              "value": 93.3
+            },
+            {
+              "description": "MACD positif et croissant — tendance haussiere confirmee",
+              "name": "MACD",
+              "signal": "bullish",
+              "strength": 0.95,
+              "value": 208.7843
+            },
+            {
+              "description": "Prix au-dessus de la bande haute de Bollinger — surachat",
+              "name": "Bollinger Bands",
+              "signal": "top",
+              "strength": 0.37,
+              "value": 0.97
+            },
+            {
+              "description": "MA courte au-dessus de la MA longue (+1.2%)",
+              "name": "MA Cross (SMA20/SMA50)",
+              "signal": "bullish",
+              "strength": 0.4,
+              "value": 1.19
+            },
+            {
+              "description": "Momentum haussier (+4.4%)",
+              "name": "Momentum 14j",
+              "signal": "bullish",
+              "strength": 0.75,
+              "value": 4.4
+            },
+            {
+              "description": "Volatilite moderee (1%) — marche stable",
+              "name": "Volatilite 14j",
+              "signal": "bullish",
+              "strength": 0.1,
+              "value": 1.0
+            }
+          ],
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.94,
+          "description": "Mark-up — cassure de resistance, volume croissant (58%), avec signes de distribution.",
+          "dominant_regime": "bullish",
+          "probabilities": {
+            "bearish": 0.072,
+            "bottom": 0.075,
+            "bullish": 0.578,
+            "top": 0.276
+          },
+          "signals": [
+            {
+              "description": "RSI haussier (97)",
+              "name": "RSI 14",
+              "signal": "bullish",
+              "strength": 0.67,
+              "value": 97.1
+            },
+            {
+              "description": "MACD positif mais ralentit — possible sommet",
+              "name": "MACD",
+              "signal": "top",
+              "strength": 0.95,
+              "value": 14.4332
+            },
+            {
+              "description": "Prix dans la partie haute des bandes de Bollinger",
+              "name": "Bollinger Bands",
+              "signal": "bullish",
+              "strength": 0.68,
+              "value": 0.91
+            },
+            {
+              "description": "MA courte au-dessus de la MA longue (+7.2%)",
+              "name": "MA Cross (SMA20/SMA50)",
+              "signal": "bullish",
+              "strength": 0.9,
+              "value": 7.2
+            },
+            {
+              "description": "Momentum haussier (+9.9%)",
+              "name": "Momentum 14j",
+              "signal": "bullish",
+              "strength": 0.5,
+              "value": 9.9
+            },
+            {
+              "description": "Volatilite moderee (1%) — marche stable",
+              "name": "Volatilite 14j",
+              "signal": "bullish",
+              "strength": 0.1,
+              "value": 1.0
+            }
+          ],
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.85,
+          "description": "Markdown — structure de prix descendante (Lower Highs) (38%), avec signes d'accumulation.",
+          "dominant_regime": "bearish",
+          "probabilities": {
+            "bearish": 0.378,
+            "bottom": 0.298,
+            "bullish": 0.223,
+            "top": 0.101
+          },
+          "signals": [
+            {
+              "description": "RSI neutre (28)",
+              "name": "RSI 14",
+              "signal": "bearish",
+              "strength": 0.15,
+              "value": 28.2
+            },
+            {
+              "description": "MACD negatif et decroissant — tendance baissiere confirmee",
+              "name": "MACD",
+              "signal": "bearish",
+              "strength": 0.95,
+              "value": -2.1288
+            },
+            {
+              "description": "Prix sous la bande basse de Bollinger — survente",
+              "name": "Bollinger Bands",
+              "signal": "bottom",
+              "strength": 1.0,
+              "value": -0.04
+            },
+            {
+              "description": "MA courte au-dessus de la MA longue (+6.2%)",
+              "name": "MA Cross (SMA20/SMA50)",
+              "signal": "bullish",
+              "strength": 0.74,
+              "value": 6.17
+            },
+            {
+              "description": "Momentum baissier (-8.3%)",
+              "name": "Momentum 14j",
+              "signal": "bearish",
+              "strength": 0.33,
+              "value": -8.3
+            },
+            {
+              "description": "Volatilite moderee (5%) — marche stable",
+              "name": "Volatilite 14j",
+              "signal": "bearish",
+              "strength": 0.1,
+              "value": 5.0
+            }
+          ],
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.95,
+          "description": "Mark-up — cassure de resistance, volume croissant (50%), avec signes de distribution.",
+          "dominant_regime": "bullish",
+          "probabilities": {
+            "bearish": 0.091,
+            "bottom": 0.097,
+            "bullish": 0.5,
+            "top": 0.312
+          },
+          "signals": [
+            {
+              "description": "RSI haussier (100)",
+              "name": "RSI 14",
+              "signal": "bullish",
+              "strength": 0.7,
+              "value": 100.0
+            },
+            {
+              "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+              "name": "MACD",
+              "signal": "top",
+              "strength": 0.95,
+              "value": -0.137
+            },
+            {
+              "description": "Prix dans la partie haute des bandes de Bollinger",
+              "name": "Bollinger Bands",
+              "signal": "bullish",
+              "strength": 0.52,
+              "value": 0.85
+            },
+            {
+              "description": "MA courte au-dessus de la MA longue (+1.8%)",
+              "name": "MA Cross (SMA20/SMA50)",
+              "signal": "bullish",
+              "strength": 0.61,
+              "value": 1.83
+            },
+            {
+              "description": "Momentum haussier (+1.0%)",
+              "name": "Momentum 14j",
+              "signal": "bullish",
+              "strength": 0.22,
+              "value": 1.0
+            },
+            {
+              "description": "Volatilite moderee (0%) — marche stable",
+              "name": "Volatilite 14j",
+              "signal": "bullish",
+              "strength": 0.1,
+              "value": 0.0
+            }
+          ],
+          "symbol": "AAPL"
+        },
+        {
+          "confidence": 0.95,
+          "description": "Markdown — structure de prix descendante (Lower Highs) (58%).",
+          "dominant_regime": "bearish",
+          "probabilities": {
+            "bearish": 0.583,
+            "bottom": 0.215,
+            "bullish": 0.079,
+            "top": 0.123
+          },
+          "signals": [
+            {
+              "description": "RSI baissier (14)",
+              "name": "RSI 14",
+              "signal": "bearish",
+              "strength": 0.53,
+              "value": 13.8
+            },
+            {
+              "description": "MACD negatif, histogram remonte — possible creux (bear rally)",
+              "name": "MACD",
+              "signal": "bottom",
+              "strength": 0.19,
+              "value": 0.0556
+            },
+            {
+              "description": "Prix au milieu des bandes de Bollinger — neutre",
+              "name": "Bollinger Bands",
+              "signal": "bearish",
+              "strength": 0.1,
+              "value": 0.39
+            },
+            {
+              "description": "MA courte sous la MA longue (-10.2%)",
+              "name": "MA Cross (SMA20/SMA50)",
+              "signal": "bearish",
+              "strength": 0.9,
+              "value": -10.19
+            },
+            {
+              "description": "Momentum neutre (-1.5%)",
+              "name": "Momentum 14j",
+              "signal": "bearish",
+              "strength": 0.2,
+              "value": -1.5
+            },
+            {
+              "description": "Volatilite elevee (5%) — marche incertain",
+              "name": "Volatilite 14j",
+              "signal": "bearish",
+              "strength": 0.4,
+              "value": 5.0
+            }
+          ],
+          "symbol": "UNI"
+        }
+      ]
+    },
+    "metrics_summary": {
+      "avg_top5_correlation": -0.2,
+      "hhi": 0.4081,
+      "max_drawdown": 0.0,
+      "regime_config": {
+        "alpha_threshold": 60,
+        "gold_relevance": "low",
+        "mode_label": "Mode Expansion",
+        "risk_multiplier": 0.8,
+        "vol_regime": "low"
+      },
+      "risk_clusters": [
+        {
+          "assets": [
+            "BTC",
+            "UNI"
+          ],
+          "avg_corr": 1.0
+        },
+        {
+          "assets": [
+            "AAPL",
+            "SOL"
+          ],
+          "avg_corr": 1.0
+        },
+        {
+          "assets": [
+            "ARB",
+            "ETH"
+          ],
+          "avg_corr": 0.981
+        }
+      ],
+      "sharpe_ratio": 134.34,
+      "sortino_ratio": 0.0,
+      "total_value": 62932.455,
+      "var_95": -81.81,
+      "volatility": 0.007
+    },
+    "overall_score": 75,
+    "overall_status": "good",
+    "rebalancing_orders": []
+  },
+  "status": 200
+}
