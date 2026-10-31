@@ -10,10 +10,11 @@ import { WifiOff, AlertTriangle } from 'lucide-react'
 interface StalePriceBadgeProps {
   wsConnected: boolean
   forexStale?: boolean
+  unpricedSymbols?: string[]
 }
 
-export default function StalePriceBadge({ wsConnected, forexStale }: StalePriceBadgeProps) {
-  if (wsConnected && !forexStale) return null
+export default function StalePriceBadge({ wsConnected, forexStale, unpricedSymbols = [] }: StalePriceBadgeProps) {
+  if (wsConnected && !forexStale && unpricedSymbols.length === 0) return null
 
   return (
     <div className="flex items-center gap-2">
@@ -43,6 +44,21 @@ export default function StalePriceBadge({ wsConnected, forexStale }: StalePriceB
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-sm">Les taux de change datent de plus de 24h. Les montants convertis sont approximatifs.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {unpricedSymbols.length > 0 && (
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
+                <AlertTriangle className="h-3 w-3" />
+                Cours indisponibles
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-sm">Valorisés à leur coût, sans gain latent : {unpricedSymbols.join(', ')}.</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

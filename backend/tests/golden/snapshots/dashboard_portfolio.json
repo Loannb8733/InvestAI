@@ -60,11 +60,16 @@
     "forex_stale": true,
     "stablecoins": [],
     "total_dividend_income": 0.0,
-    "total_gain_loss": 0.0,
-    "total_gain_loss_percent": 0.0,
+    "total_gain_loss": 1370.85,
+    "total_gain_loss_percent": 28.559375,
     "total_invested": 2824.85,
-    "total_return": 0.0,
-    "total_value": 2824.85
+    "total_return": 1370.85,
+    "total_value": 2824.85,
+    "unpriced_symbols": [
+      "GLDCOIN",
+      "GLDTOKEN"
+    ],
+    "unrealized_gain": 0.0
   },
   "status": 200
 }

@@ -34,7 +34,7 @@ def ensure_json_safe(value: Any) -> Any:
     return value
 
 
-async def require_owned_portfolio(db: AsyncSession, portfolio_id: str, user_id: UUID) -> None:
+async def require_owned_portfolio(db: AsyncSession, portfolio_id: UUID, user_id: UUID) -> None:
     """Lève une erreur 404 si le portefeuille n'appartient pas à l'utilisateur."""
     if not await repository.owns_portfolio(db, portfolio_id, user_id):
         raise NotFoundError("Portefeuille non trouvé")
@@ -68,12 +68,16 @@ async def portfolio_sparklines(db: AsyncSession, portfolio_id: str, days: int) -
     return sparklines
 
 
-async def historical_points(db: AsyncSession, user_id: UUID, days: int) -> list[HistoricalDataPoint]:
-    """Courbe de valeur du compte ; `days=0` couvre tout l'historique."""
+async def _account_series(db: AsyncSession, user_id: UUID, days: int) -> list[dict[str, Any]]:
     period = days
     if days == 0:
         period = resolve_period_days(0, aware(await repository.first_transaction_date(db, user_id)))
-    series = await snapshot_service.build_portfolio_value_series(db, str(user_id), period)
+    return await snapshot_service.build_portfolio_value_series(db, str(user_id), period)
+
+
+async def historical_points(db: AsyncSession, user_id: UUID, days: int) -> list[HistoricalDataPoint]:
+    """Courbe de valeur du compte ; `days=0` couvre tout l'historique."""
+    series = await _account_series(db, user_id, days)
     for point in series:
         point["is_estimated"] = False
     return [HistoricalDataPoint(**point) for point in series]
@@ -94,9 +98,9 @@ async def benchmark_series(db: AsyncSession, user_id: UUID, days: int) -> list[B
             for day, price in zip(history.dates, history.prices, strict=True)
         ]
         result.append(BenchmarkSeries(name=name, symbol=symbol, data=points))
-    series = await snapshot_service.build_portfolio_value_series(db, str(user_id), days)
+    series = await _account_series(db, user_id, days)
     if len(series) > 1:
         base = series[0].get("value", 1) or 1
-        points = [BenchmarkDataPoint(date=p["date"], value=round(p["value"] / base * 100, 2)) for p in series]
+        points = [BenchmarkDataPoint(date=p["full_date"][:10], value=round(p["value"] / base * 100, 2)) for p in series]
         result.append(BenchmarkSeries(name="Mon portefeuille", symbol="PORTFOLIO", data=points))
     return result

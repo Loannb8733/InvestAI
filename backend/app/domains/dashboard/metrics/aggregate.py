@@ -26,6 +26,17 @@ EMPTY_DASHBOARD: dict[str, Any] = {
     "worst_performers": [],
 }
 
+
+def gain_figures(unrealized: Decimal, realized: Decimal, invested: Decimal, dividends: Decimal) -> dict[str, float]:
+    """Gain total, frais déduits : latent (valeur moins coût restant) et réalisé (ventes moins coût sorti)."""
+    gain = unrealized + realized
+    return {
+        "total_gain_loss": float(gain),
+        "total_gain_loss_percent": float(gain / invested * 100) if invested > 0 else 0.0,
+        "total_return": float(gain + dividends),
+    }
+
+
 HISTORY_UNAVAILABLE: dict[str, float] = {
     "total_invested_all_time": 0.0,
     "total_sold_fiat": 0.0,
@@ -39,7 +50,7 @@ class DashboardTotals:
     """Cumul des métriques et historiques de chaque portefeuille."""
 
     value: Decimal = ZERO
-    pnl_value: Decimal = ZERO
+    unrealized: Decimal = ZERO
     invested: Decimal = ZERO
     sold: Decimal = ZERO
     realized: Decimal = ZERO
@@ -47,15 +58,15 @@ class DashboardTotals:
     liquidity: Decimal = ZERO
     dividends: Decimal = ZERO
     forex_stale: bool = False
+    unpriced: set[str] = field(default_factory=set)
     assets: list[dict[str, Any]] = field(default_factory=list)
     stablecoins: list[dict[str, Any]] = field(default_factory=list)
 
     def add(self, portfolio: Portfolio, metrics: dict[str, Any], history: dict[str, Any]) -> None:
-        """Ajoute un portefeuille : sa valeur P&L compte stablecoins et fiat, ses soldes en espèces la liquidité."""
-        value = Decimal(str(metrics["total_value"]))
-        self.value += value
-        self.pnl_value += value + Decimal(str(metrics.get("cash_from_stablecoins", 0)))
-        self.pnl_value += Decimal(str(metrics.get("cash_from_fiat", 0)))
+        """Ajoute un portefeuille ; ses soldes en espèces comptent dans la liquidité."""
+        self.value += Decimal(str(metrics["total_value"]))
+        self.unrealized += Decimal(str(metrics["unrealized_gain"]))
+        self.unpriced.update(metrics.get("unpriced_symbols", []))
         self.invested += Decimal(str(history["total_invested_all_time"]))
         self.sold += Decimal(str(history.get("total_sold_fiat", 0)))
         self.realized += Decimal(str(history.get("realized_gains", 0)))
@@ -157,13 +168,13 @@ def project_aggregated_assets(aggregated: list[dict[str, Any]], total_value: flo
 
 
 def _pnl_breakdown(totals: DashboardTotals) -> dict[str, Any]:
-    total = totals.value - totals.invested
+    total = totals.unrealized + totals.realized
     return {
         "realized_pnl": float(totals.realized),
-        "unrealized_pnl": float(total - totals.realized),
+        "unrealized_pnl": float(totals.unrealized),
         "total_pnl": float(total),
         "total_fees": float(totals.fees),
-        "net_pnl": float(total - totals.fees),
+        "net_pnl": float(total),
         "is_all_time": True,
     }
 
@@ -184,8 +195,7 @@ def build_dashboard_summary(
 ) -> dict[str, Any]:
     """Assemble les chiffres du tableau de bord ; meilleurs et moins bons sont classés en euros de la période."""
     total_value = float(totals.value)
-    gain_loss = totals.pnl_value - totals.invested
-    gain_percent = float(gain_loss / totals.invested * 100) if totals.invested > 0 else 0.0
+    gain = gain_figures(totals.unrealized, totals.realized, totals.invested, totals.dividends)
     period_percent = _weighted_period_change(aggregated, total_value)
     gainers = sorted((e for e in aggregated if e["period_change_percent"] > 0), key=_period_amount, reverse=True)
     losers = sorted((e for e in aggregated if e["period_change_percent"] < 0), key=_period_amount)
@@ -194,10 +204,11 @@ def build_dashboard_summary(
         "total_value": total_value,
         "total_invested": float(totals.invested),
         "net_capital": float(totals.invested - totals.sold),
-        "total_gain_loss": float(gain_loss),
-        "total_gain_loss_percent": gain_percent,
-        "net_gain_loss": float(gain_loss),
-        "net_gain_loss_percent": gain_percent,
+        "total_gain_loss": gain["total_gain_loss"],
+        "total_gain_loss_percent": gain["total_gain_loss_percent"],
+        "total_return": gain["total_return"],
+        "net_gain_loss": gain["total_gain_loss"],
+        "net_gain_loss_percent": gain["total_gain_loss_percent"],
         "daily_change": sum(a["current_value"] * a.get("change_percent_24h", 0) / 100 for a in assets),
         "daily_change_percent": (
             sum((a["current_value"] / total_value) * a.get("change_percent_24h", 0) for a in assets)
@@ -215,9 +226,9 @@ def build_dashboard_summary(
         "assets": assets,
         "stablecoins": totals.stablecoins,
         "total_dividend_income": float(totals.dividends),
-        "total_return": float(gain_loss + totals.dividends),
         "period_changes": period_changes,
         "aggregated_assets": project_aggregated_assets(aggregated, total_value),
         "pnl_data": _pnl_breakdown(totals),
         "forex_stale": totals.forex_stale,
+        "unpriced_symbols": sorted(totals.unpriced),
     }

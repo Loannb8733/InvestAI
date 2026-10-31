@@ -8,8 +8,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.dashboard.metrics import repository
+from app.domains.dashboard.metrics.ledger import replay_assets
 from app.domains.portfolio.classification import is_cash_like
 from app.domains.portfolio.models import Asset
+from app.domains.transactions.cost_basis.config import ReplayEvent
 from app.domains.transactions.cost_basis.context import ONE
 from app.domains.transactions.cost_basis.layers import ZERO
 from app.domains.transactions.models import Transaction, TransactionType
@@ -20,7 +22,6 @@ _INFLOWS = {
     TransactionType.AIRDROP,
     TransactionType.STAKING_REWARD,
     TransactionType.CONVERSION_IN,
-    TransactionType.DIVIDEND,
     TransactionType.INTEREST,
 }
 _DISPOSALS = {TransactionType.SELL, TransactionType.CONVERSION_OUT}
@@ -47,6 +48,7 @@ class _AssetHistory:
     sold_value: Decimal = ZERO
     sold_fiat_value: Decimal = ZERO
     fees: Decimal = ZERO
+    realized: Decimal = ZERO
     first: datetime | None = None
     last: datetime | None = None
 
@@ -57,13 +59,6 @@ class _AssetHistory:
             self.last = moment
         if self.first is None or moment < self.first:
             self.first = moment
-
-    def realized_gain(self) -> float:
-        if self.sold <= 0:
-            return 0.0
-        if self.bought_fiat_value > 0 and self.bought > 0:
-            return float(self.sold_value - self.bought_fiat_value * self.sold / self.bought)
-        return float(self.sold_value)
 
     def is_mostly_sold(self) -> bool:
         quantity = float(self.asset.quantity)
@@ -85,7 +80,7 @@ class _AssetHistory:
             "total_sold": float(self.sold),
             "total_sold_value": float(self.sold_value),
             "total_fees": float(self.fees),
-            "realized_gain": self.realized_gain(),
+            "realized_gain": float(self.realized),
             "first_transaction": self.first.isoformat() if self.first else None,
             "last_transaction": self.last.isoformat() if self.last else None,
         }
@@ -155,6 +150,15 @@ def _replay(transactions: list[Transaction], histories: dict[str, _AssetHistory]
             _record_disposal(history, tx, prices.resolve(tx, symbol))
 
 
+def _realize(event: ReplayEvent, histories: dict[str, _AssetHistory], prices: _Prices) -> None:
+    history = histories[str(event.tx.asset_id)]
+    if event.kind == "SELL":
+        proceeds = event.quantity * prices.resolve(event.tx, event.symbol) - event.fee
+        history.realized += proceeds - event.cost_removed
+    elif event.kind == "CONVERSION_OUT" and event.matched:
+        history.realized += event.dest_layer_cost - event.cost_removed
+
+
 def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
     invested = sold = sold_fiat = fees = ZERO
     holdings: list[dict[str, Any]] = []
@@ -187,13 +191,15 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
     }
 
 
-async def compute_portfolio_history(db: AsyncSession, portfolio_id: str) -> dict[str, Any]:
-    """Montants investis et vendus, frais et gains réalisés, hors crowdfunding et liquidités."""
+async def compute_portfolio_history(db: AsyncSession, portfolio_id: str, currency: str = "EUR") -> dict[str, Any]:
+    """Montants investis et vendus, frais et gains réalisés au coût FIFO, hors crowdfunding et liquidités."""
     assets = await repository.non_crowdfunding_assets(db, portfolio_id)
     if not assets:
         return {**EMPTY_HISTORY, "sold_assets": []}
     transactions = list(await repository.transactions_of_assets(db, [asset.id for asset in assets]))
     histories = {str(asset.id): _AssetHistory(asset) for asset in assets}
     symbols = {str(asset.id): asset.symbol.upper() for asset in assets}
-    _replay(transactions, histories, await _load_prices(db, transactions, symbols))
+    prices = await _load_prices(db, transactions, symbols)
+    _replay(transactions, histories, prices)
+    replay_assets(transactions, assets, currency, on_event=lambda event: _realize(event, histories, prices))
     return _summarize(histories)

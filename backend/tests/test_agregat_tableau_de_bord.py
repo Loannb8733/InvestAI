@@ -170,8 +170,8 @@ class TestResolutionDeLaPeriode:
 
         assert (await appeler(db_session, regular_user, jours=0)).period_days == 7
 
-    async def test_sans_aucune_transaction_la_periode_vaut_trente_jours(self, db_session, regular_user, portefeuille):
-        assert (await appeler(db_session, regular_user, jours=0)).period_days == 30
+    async def test_sans_aucune_transaction_il_n_y_a_pas_de_periode(self, db_session, regular_user, portefeuille):
+        assert (await appeler(db_session, regular_user, jours=0)).period_days == 0
 
     async def test_une_periode_explicite_est_conservee(self, db_session, regular_user, portefeuille):
         reponse = await appeler(db_session, regular_user, jours=90)
@@ -181,14 +181,20 @@ class TestResolutionDeLaPeriode:
 
 
 class TestVariationDeLaPeriode:
-    async def test_depuis_le_debut_compare_le_patrimoine_a_l_investi(self, db_session, regular_user, portefeuille):
+    async def test_depuis_le_debut_la_variation_est_le_gain_total(self, db_session, regular_user, portefeuille):
         """Sur « tout », la variation est le vrai gain, non une moyenne de cours.
 
         Pour les autres périodes, le service de métriques rend une moyenne
         pondérée des variations de prix ; sur l'ensemble de l'historique, cette
         moyenne n'aurait aucun sens face aux dépôts successifs.
         """
-        mesures = metriques(total_value=15000.0, total_invested=10000.0, assets_count=1)
+        mesures = metriques(
+            total_value=15000.0,
+            total_invested=10000.0,
+            assets_count=1,
+            total_gain_loss=5000.0,
+            total_gain_loss_percent=50.0,
+        )
 
         reponse = await appeler(db_session, regular_user, jours=0, mesures=mesures)
 

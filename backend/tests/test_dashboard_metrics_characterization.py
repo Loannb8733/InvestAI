@@ -45,8 +45,7 @@ def _metriques(actifs, cash_stable=0.0, cash_fiat=0.0):
     return {
         "total_value": valeur,
         "total_invested": investi,
-        "total_gain_loss": valeur - investi,
-        "total_gain_loss_percent": ((valeur - investi) / investi * 100) if investi else 0.0,
+        "unrealized_gain": valeur - investi,
         "asset_count": len(actifs),
         "assets": actifs,
         "cash_from_stablecoins": cash_stable,
@@ -140,6 +139,7 @@ class TestFormeDeLaReponse:
             "total_gain_loss_percent",
             "total_invested",
             "total_value",
+            "unpriced_symbols",
             "worst_performers",
         }
 

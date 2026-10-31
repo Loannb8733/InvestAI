@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 MIN_QUANTITY = Decimal("1e-8")
 MAX_REPORTED_ERRORS = 50
-IMPORTABLE = {t.value: t for t in ledger.INFLOWS | ledger.OUTFLOWS}
+IMPORTABLE = {t.value: t for t in ledger.INFLOWS | ledger.OUTFLOWS | {TransactionType.DIVIDEND}}
 UNKNOWN_FORMAT = "Format CSV non reconnu. Veuillez spécifier la plateforme."
 
 DedupKey = tuple[str, str, str, str, int]

@@ -101,6 +101,7 @@
     "total_invested": 0.0,
     "total_return": 0.0,
     "total_value": 0.0,
+    "unpriced_symbols": [],
     "upcoming_events": [],
     "worst_performers": []
   },

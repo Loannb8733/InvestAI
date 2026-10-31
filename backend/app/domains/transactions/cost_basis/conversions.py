@@ -89,9 +89,9 @@ def _destination_unit_cost(ctx: ReplayContext, cost_removed: Decimal, match: Con
 
 def _add_destination_layer(
     ctx: ReplayContext, row: ReplayRow, match: ConversionMatch, cost_removed: Decimal, rate: Decimal
-) -> Decimal:
+) -> tuple[Decimal, Decimal]:
     if match.symbol is None or match.quantity <= 0:
-        return ZERO
+        return ZERO, ZERO
     key: FifoKey = (match.symbol, match.exchange or (row.tx.exchange or "").strip())
     paid = cost_removed > 0
     unit_cost = _destination_unit_cost(ctx, cost_removed, match) if paid else ZERO
@@ -107,7 +107,7 @@ def _add_destination_layer(
             acquired_at=row.executed_at,
         ),
     )
-    return cost_removed if paid else ZERO
+    return (cost_removed if paid else ZERO), match.quantity * unit_cost
 
 
 def apply_conversion_out(ctx: ReplayContext, row: ReplayRow) -> None:
@@ -139,7 +139,7 @@ def apply_conversion_out(ctx: ReplayContext, row: ReplayRow) -> None:
     cost_removed, oldest = consume_layers(_prepare_source_pool(ctx, row, match), row.quantity)
     event.cost_removed = cost_removed
     event.oldest_acquired_at = aware(oldest)
-    event.dest_cost = _add_destination_layer(ctx, row, match, cost_removed, rate)
+    event.dest_cost, event.dest_layer_cost = _add_destination_layer(ctx, row, match, cost_removed, rate)
     event.matched = match.symbol is not None
     event.dest_symbol = match.symbol
     event.dest_qty = match.quantity if match.symbol is not None else ZERO

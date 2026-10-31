@@ -1,5 +1,6 @@
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
@@ -68,7 +69,7 @@ async def get_munitions(
     db: Session,
     request: Request,
     monthly_dca: float = Query(300.0, ge=0, description="Monthly DCA budget (€)"),
-    profile: str = Query("moderate", description="Investment profile: aggressive/moderate/conservative"),
+    profile: Literal["aggressive", "moderate", "conservative"] = Query("moderate"),
 ) -> MunitionsResponse:
     """Capacité de déploiement de l'utilisateur."""
     capacity = await strategy_service.get_deployment_capacity(
@@ -97,23 +98,23 @@ async def get_portfolio_dashboard(
     current_user: CurrentUser,
     db: Session,
     request: Request,
-    portfolio_id: str,
+    portfolio_id: UUID,
 ) -> Any:
     """Métriques d'un portefeuille."""
     await require_owned_portfolio(db, portfolio_id, current_user.id)
     currency = current_user.preferred_currency or "EUR"
-    return ensure_json_safe(await metrics_service.get_portfolio_metrics(db, portfolio_id, currency=currency))
+    return ensure_json_safe(await metrics_service.get_portfolio_performance(db, str(portfolio_id), currency))
 
 
 @router.get("/portfolio/{portfolio_id}/history")
 async def get_portfolio_history(
     current_user: CurrentUser,
     db: Session,
-    portfolio_id: str,
+    portfolio_id: UUID,
 ) -> dict[str, Any]:
     """Historique d'investissement d'un portefeuille, actifs soldés compris."""
     await require_owned_portfolio(db, portfolio_id, current_user.id)
-    return await metrics_service.get_portfolio_history(db, portfolio_id)
+    return await metrics_service.get_portfolio_history(db, str(portfolio_id), current_user.preferred_currency or "EUR")
 
 
 @router.get("/portfolio/{portfolio_id}/sparklines", response_model=list[SparklineData])
@@ -122,12 +123,12 @@ async def get_portfolio_sparklines(
     current_user: CurrentUser,
     db: Session,
     request: Request,
-    portfolio_id: str,
+    portfolio_id: UUID,
     days: int = Query(30, ge=7, le=90),
 ) -> list[SparklineData]:
     """Mini-courbes des actifs d'un portefeuille."""
     await require_owned_portfolio(db, portfolio_id, current_user.id)
-    return await portfolio_sparklines(db, portfolio_id, days)
+    return await portfolio_sparklines(db, str(portfolio_id), days)
 
 
 @router.get("/historical-data", response_model=list[HistoricalDataPoint])

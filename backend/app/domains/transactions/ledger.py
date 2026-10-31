@@ -12,7 +12,6 @@ INFLOWS = frozenset(
         TransactionType.CONVERSION_IN,
         TransactionType.AIRDROP,
         TransactionType.STAKING_REWARD,
-        TransactionType.DIVIDEND,
         TransactionType.INTEREST,
     }
 )

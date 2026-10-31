@@ -134,7 +134,7 @@ async def upcoming_events(
     return result.scalars().all()
 
 
-async def owns_portfolio(db: AsyncSession, portfolio_id: str, user_id: UUID) -> bool:
+async def owns_portfolio(db: AsyncSession, portfolio_id: UUID, user_id: UUID) -> bool:
     """Dit si le portefeuille appartient à l'utilisateur."""
     result = await db.execute(select(Portfolio).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
     return result.scalar_one_or_none() is not None

@@ -200,6 +200,7 @@ class EnhancedDashboardResponse(BaseModel):
     total_return: float = 0.0
     period_days: int = 30
     period_label: str = "30j"
+    unpriced_symbols: list[str] = []
     forex_stale: bool = False
     last_updated: str
 

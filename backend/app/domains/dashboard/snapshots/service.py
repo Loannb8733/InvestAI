@@ -38,15 +38,13 @@ class SnapshotService:
         metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency)
         if metrics["assets_count"] == 0:
             return None
-        value = Decimal(str(metrics["total_value"]))
-        invested = Decimal(str(metrics["total_invested"]))
         snapshot = PortfolioSnapshot(
             user_id=user_id,
             portfolio_id=None,
             snapshot_date=datetime.now(UTC),
-            total_value=value,
-            total_invested=invested,
-            total_gain_loss=value - invested,
+            total_value=Decimal(str(metrics["total_value"])),
+            total_invested=Decimal(str(metrics["total_invested"])),
+            total_gain_loss=Decimal(str(metrics["total_gain_loss"])),
             currency=currency,
         )
         db.add(snapshot)

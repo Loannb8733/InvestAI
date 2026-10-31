@@ -186,7 +186,7 @@ async def test_multibuy_partial_sells_metrics_and_tax_agree(db_session, regular_
     # Remaining FIFO layers: 1 BTC @ 30000 (lot 3 only).
     assert result["total_invested"] == pytest.approx(30000.0, abs=1e-6)
     assert result["total_value"] == pytest.approx(40000.0, abs=1e-6)
-    assert result["total_gain_loss"] == pytest.approx(10000.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(10000.0, abs=1e-6)
     entry = _asset_entry(result, "BTC", "binance")
     assert entry["total_invested"] == pytest.approx(30000.0, abs=1e-6)
     # Displayed PRU is CUMP (fee-inclusive weighted average of all buys): 60000/3.
@@ -278,7 +278,7 @@ async def test_conversion_chain_dest_basis_diverges(db_session, regular_user):
     #   (10 ETH @ 2600) -> after selling 5, remaining basis = 5 * 2600 = 13000.
     assert result["total_invested"] == pytest.approx(13000.0, abs=1e-6)
     assert result["total_value"] == pytest.approx(15000.0, abs=1e-6)
-    assert result["total_gain_loss"] == pytest.approx(2000.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(2000.0, abs=1e-6)
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
     assert summary.nb_cessions == 2
@@ -343,7 +343,7 @@ async def test_unmatched_conversion_out_diverges(db_session, regular_user):
     # position whose quantity is 0 (latent G/L shows -20000).
     assert result["total_invested"] == pytest.approx(20000.0, abs=1e-6)
     assert result["total_value"] == pytest.approx(0.0, abs=1e-9)
-    assert result["total_gain_loss"] == pytest.approx(-20000.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(-20000.0, abs=1e-6)
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
 
@@ -586,7 +586,7 @@ async def test_unmatched_transfer_in_diverges(db_session, regular_user):
     #   (2 @ 80); after selling 1 -> remaining basis 80, latent gain 20.
     assert result["total_invested"] == pytest.approx(80.0, abs=1e-6)
     assert result["total_value"] == pytest.approx(100.0, abs=1e-6)
-    assert result["total_gain_loss"] == pytest.approx(20.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(20.0, abs=1e-6)
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
     assert summary.nb_cessions == 1
@@ -619,7 +619,7 @@ async def test_staking_reward_basis_diverges(db_session, regular_user):
     # metrics: layer priced at the recorded market value at receipt
     #   (2 @ 1000); after selling 1 -> remaining basis 1000, latent gain 500.
     assert result["total_invested"] == pytest.approx(1000.0, abs=1e-6)
-    assert result["total_gain_loss"] == pytest.approx(500.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(500.0, abs=1e-6)
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
     assert summary.nb_cessions == 1
@@ -705,4 +705,4 @@ async def test_estimate_rebalancing_tax_applies_conversion_rate(db_session, regu
     # Rebalancing estimate and metrics now agree on the 92 EUR cost basis.
     result = await _metrics(db_session, portfolio, {"BTC": 150.0}, forex={("USD", "EUR"): 0.92})
     assert result["total_invested"] == pytest.approx(92.0, abs=1e-6)
-    assert result["total_gain_loss"] == pytest.approx(58.0, abs=1e-6)
+    assert result["unrealized_gain"] == pytest.approx(58.0, abs=1e-6)
