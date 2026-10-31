@@ -15,13 +15,18 @@ dashboard_inflight: dict[DashboardKey, asyncio.Future[dict[str, Any]]] = {}
 _background_tasks: set[asyncio.Task[Any]] = set()
 
 
+def put_bounded(cache: dict[Any, tuple[float, Any]], key: Any, value: tuple[float, Any], max_size: int) -> None:
+    """Range une entrée horodatée en retirant le plus ancien quart quand le cache est plein."""
+    if len(cache) >= max_size:
+        oldest_first = sorted(cache, key=lambda cached: cache[cached][0])
+        for cached in oldest_first[: max(1, max_size // 4)]:
+            del cache[cached]
+    cache[key] = value
+
+
 def put_dashboard(key: DashboardKey, value: tuple[float, dict[str, Any]]) -> None:
-    """Range une entrée en retirant le plus ancien quart quand le cache est plein."""
-    if len(dashboard_cache) >= _MAX_DASHBOARD_CACHE:
-        oldest_first = sorted(dashboard_cache, key=lambda cached: dashboard_cache[cached][0])
-        for cached in oldest_first[: max(1, _MAX_DASHBOARD_CACHE // 4)]:
-            del dashboard_cache[cached]
-    dashboard_cache[key] = value
+    """Range un agrégat dans le cache du tableau de bord."""
+    put_bounded(dashboard_cache, key, value, _MAX_DASHBOARD_CACHE)
 
 
 def invalidate_dashboard_cache(user_id: str) -> None:

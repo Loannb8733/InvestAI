@@ -13,7 +13,7 @@ celery_app = Celery(
         "app.tasks.price_updates",
         "app.domains.predictions.tasks",
         "app.domains.alerts.tasks",
-        "app.tasks.snapshots",
+        "app.domains.dashboard.snapshots.tasks",
         "app.domains.notifications.tasks",
         "app.domains.system.tasks",
         "app.domains.crowdfunding.tasks",
@@ -115,11 +115,11 @@ celery_app.conf.beat_schedule = {
     },
     # === Snapshots ===
     "create-daily-snapshots": {
-        "task": "app.tasks.snapshots.create_daily_snapshots",
+        "task": "app.domains.dashboard.snapshots.tasks.create_daily_snapshots",
         "schedule": crontab(hour=0, minute=0),  # Every day at 00:00 UTC
     },
     "cleanup-old-snapshots": {
-        "task": "app.tasks.snapshots.cleanup_old_snapshots",
+        "task": "app.domains.dashboard.snapshots.tasks.cleanup_old_snapshots",
         "schedule": crontab(hour=1, minute=0, day_of_month=1),  # 1st of each month at 01:00 UTC
     },
     # === Email Reports ===

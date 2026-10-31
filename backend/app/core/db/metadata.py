@@ -3,6 +3,7 @@ from app.domains.alerts import models as alert_models
 from app.domains.calendar import models as calendar_models
 from app.domains.crowdfunding import models as crowdfunding_models
 from app.domains.crowdfunding.audit import models as audit_models
+from app.domains.dashboard import models as dashboard_models
 from app.domains.exchanges import models as exchange_models
 from app.domains.identity import models as identity_models
 from app.domains.journal import models as journal_models
@@ -16,7 +17,6 @@ from app.domains.predictions import models as prediction_models
 from app.domains.strategies import models as strategy_models
 from app.domains.system import models as system_models
 from app.domains.transactions import models as transaction_models
-from app.models import portfolio_snapshot
 
 metadata = Base.metadata
 
@@ -25,6 +25,7 @@ __all__ = [
     "audit_models",
     "calendar_models",
     "crowdfunding_models",
+    "dashboard_models",
     "exchange_models",
     "fx_models",
     "goal_models",
@@ -34,7 +35,6 @@ __all__ = [
     "metadata",
     "notification_models",
     "portfolio_models",
-    "portfolio_snapshot",
     "prediction_models",
     "simulation_models",
     "strategy_models",

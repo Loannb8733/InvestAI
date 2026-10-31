@@ -18,6 +18,9 @@ from app.core.redis_client import cache_dashboard, get_cached_dashboard
 from app.domains.alerts.models import Alert
 from app.domains.calendar.models import CalendarEvent
 from app.domains.dashboard.metrics.service import metrics_service
+from app.domains.dashboard.models import PortfolioSnapshot
+from app.domains.dashboard.snapshots.periods import data_point_interval
+from app.domains.dashboard.snapshots.service import snapshot_service
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
 from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
@@ -25,8 +28,6 @@ from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction
-from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.services.snapshot_service import snapshot_service
 
 router = APIRouter()
 
@@ -435,7 +436,7 @@ async def _get_dashboard_impl(
     upcoming_events = await get_upcoming_events_internal(db, current_user, events_window)
 
     # Data quality: check actual coverage vs expected data points.
-    data_interval = snapshot_service._get_data_point_interval(days)
+    data_interval = data_point_interval(days)
     expected_points = max(days // data_interval, 5)
     coverage_ratio = len(historical_data) / expected_points if expected_points > 0 else 1.0
     is_data_estimated = coverage_ratio < 0.3 and days > 7

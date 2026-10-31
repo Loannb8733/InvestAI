@@ -152,7 +152,7 @@ def test_le_contrat_de_la_serie_de_valeur(cle):
     `net_capital` et `full_date` ; `alert_service`, les emails hebdomadaires et
     `system.py` se contentent de `value` et `full_date`.
     """
-    produites = _cles_de("app.services.snapshot_service", "_compute_portfolio_value_series")
+    produites = _cles_de("app.domains.dashboard.snapshots.series", "value_point")
 
     assert cle in produites
 

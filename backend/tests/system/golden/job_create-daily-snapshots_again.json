@@ -10,7 +10,7 @@
     "next_run_at": "2026-10-18T00:00:00Z",
     "running": false,
     "schedule": "<crontab: 0 0 * * * (m/h/dM/MY/d)>",
-    "task": "app.tasks.snapshots.create_daily_snapshots"
+    "task": "app.domains.dashboard.snapshots.tasks.create_daily_snapshots"
   },
   "status": 200
 }

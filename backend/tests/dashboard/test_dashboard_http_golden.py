@@ -12,10 +12,10 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.models import PortfolioSnapshot
+from app.domains.dashboard.snapshots import tasks as snapshot_tasks
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.tasks import snapshots as snapshot_tasks
 from tests.conftest import TestSessionLocal
 from tests.sample_portfolio import ASSETS, FROZEN_NOW, seed_history, seed_portfolio
 
@@ -264,12 +264,12 @@ async def test_snapshot_tasks_match_golden(
     with time_machine.travel(FROZEN_NOW, tick=False):
         await seed_history(db_session)
         await seed_portfolio(client, _auth(regular_user))
-        first = await snapshot_tasks._create_all_snapshots_async()
-        second = await snapshot_tasks._create_all_snapshots_async()
+        first = await snapshot_tasks.create_all_snapshots()
+        second = await snapshot_tasks.create_all_snapshots()
         rows = (await db_session.execute(select(PortfolioSnapshot))).scalars().all()
         rec.compare("task_snapshots", {"first": first, "second": second, "rows": _snapshot_rows(list(rows))})
-        kept = await snapshot_tasks._cleanup_old_snapshots_async(365)
+        kept = await snapshot_tasks.delete_old_snapshots(365)
     with time_machine.travel(FROZEN_NOW + timedelta(days=366), tick=False):
-        purged = await snapshot_tasks._cleanup_old_snapshots_async(365)
+        purged = await snapshot_tasks.delete_old_snapshots(365)
     rec.compare("task_cleanup", {"kept": kept, "purged": purged})
     assert not rec.mismatches, f"golden dashboard différent : {rec.mismatches} (GOLDEN_UPDATE=1 pour accepter)"

@@ -31,7 +31,7 @@ JOBS = ("sync-exchanges", "create-daily-snapshots", "refresh-contrarian-stats", 
 SESSION_FACTORY_USERS = (
     "app.core.db.session",
     "app.domains.exchanges.sync.runner",
-    "app.tasks.snapshots",
+    "app.domains.dashboard.snapshots.tasks",
     "app.services.regime_alert_service",
 )
 

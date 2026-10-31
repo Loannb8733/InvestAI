@@ -199,7 +199,7 @@
         "next_run_at": "2026-10-18T00:00:00Z",
         "running": false,
         "schedule": "<crontab: 0 0 * * * (m/h/dM/MY/d)>",
-        "task": "app.tasks.snapshots.create_daily_snapshots"
+        "task": "app.domains.dashboard.snapshots.tasks.create_daily_snapshots"
       },
       {
         "last_duration_s": "<volatile>",
@@ -212,7 +212,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<crontab: 0 1 1 * * (m/h/dM/MY/d)>",
-        "task": "app.tasks.snapshots.cleanup_old_snapshots"
+        "task": "app.domains.dashboard.snapshots.tasks.cleanup_old_snapshots"
       },
       {
         "last_duration_s": "<volatile>",

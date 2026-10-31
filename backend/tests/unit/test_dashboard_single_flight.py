@@ -13,8 +13,8 @@ import pytest
 
 from app.domains.dashboard.metrics import cache as ms
 from app.domains.dashboard.metrics.service import MetricsService
-from app.services import snapshot_service as ss
-from app.services.snapshot_service import SnapshotService
+from app.domains.dashboard.snapshots import service as ss
+from app.domains.dashboard.snapshots.service import SnapshotService
 
 
 @contextmanager
@@ -78,13 +78,13 @@ async def test_failure_propagates_and_clears_inflight():
 
 @pytest.mark.asyncio
 async def test_value_series_concurrent_misses_compute_once():
-    ss._series_cache.clear()
-    ss._series_inflight.clear()
+    ss.series_cache.clear()
+    ss.series_inflight.clear()
     svc = SnapshotService()
 
     calls = {"n": 0}
 
-    async def slow_compute(db, user_id, days, portfolio_id):
+    async def slow_compute(db, user_id, days):
         calls["n"] += 1
         await asyncio.sleep(0.05)
         return [{"date": "2026-01-01", "value": 1.0}]
@@ -95,5 +95,5 @@ async def test_value_series_concurrent_misses_compute_once():
 
     assert calls["n"] == 1  # single-flight: history replayed once for 10 concurrent misses
     assert all(r == [{"date": "2026-01-01", "value": 1.0}] for r in results)
-    assert ("u1", 30) not in ss._series_inflight
-    assert ("u1", 30) in ss._series_cache
+    assert ("u1", 30) not in ss.series_inflight
+    assert ("u1", 30) in ss.series_cache

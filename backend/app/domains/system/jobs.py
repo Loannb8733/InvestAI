@@ -5,6 +5,7 @@ from typing import Any
 from app.domains.alerts.tasks import _check as check_alerts
 from app.domains.alerts.tasks import _seed as seed_risk_weights
 from app.domains.crowdfunding.tasks import _flag_delays as flag_crowdfunding_delays
+from app.domains.dashboard.snapshots.tasks import create_all_snapshots, delete_old_snapshots
 from app.domains.exchanges.sync.runner import sync_all
 from app.domains.market_data.fx.tasks import refresh_reference_rates
 from app.domains.market_data.history.tasks import backfill_all, refresh_all
@@ -12,7 +13,7 @@ from app.domains.notifications.tasks import run_daily_digest, run_monthly_report
 from app.domains.predictions import tasks as predictions
 from app.domains.system.maintenance import check_holdings, weekly_cleanup
 from app.services.regime_alert_service import regime_alert_service
-from app.tasks import price_updates, snapshots
+from app.tasks import price_updates
 from app.tasks.contrarian_stats import refresh_contrarian_stats
 
 Job = Callable[[], Awaitable[Any]]
@@ -37,8 +38,8 @@ JOBS: dict[str, Job] = {
     "app.domains.predictions.tasks.tune_hyperparameters": predictions._tune_hyperparameters,
     "app.domains.predictions.tasks.check_data_drift": predictions._check_data_drift,
     "app.domains.predictions.tasks.check_bottom_zones": predictions._check_bottom_zones,
-    "app.tasks.snapshots.create_daily_snapshots": snapshots._create_all_snapshots_async,
-    "app.tasks.snapshots.cleanup_old_snapshots": snapshots._cleanup_old_snapshots_async,
+    "app.domains.dashboard.snapshots.tasks.create_daily_snapshots": create_all_snapshots,
+    "app.domains.dashboard.snapshots.tasks.cleanup_old_snapshots": delete_old_snapshots,
     "app.domains.notifications.tasks.send_weekly_reports": run_weekly_reports,
     "app.domains.notifications.tasks.send_monthly_reports": run_monthly_reports,
     "app.domains.notifications.tasks.send_daily_digest": run_daily_digest,

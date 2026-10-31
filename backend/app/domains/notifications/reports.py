@@ -6,12 +6,12 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.dashboard.metrics.service import metrics_service
+from app.domains.dashboard.snapshots.service import snapshot_service
 from app.domains.notifications.models import NotificationType
 from app.domains.notifications.report_mailer import report_mailer
 from app.domains.notifications.repository import NotificationRepository, Recipient
 from app.domains.reports.performance_pdf import render_performance_pdf
 from app.domains.reports.service import report_service
-from app.services.snapshot_service import snapshot_service
 
 logger = logging.getLogger(__name__)
 
