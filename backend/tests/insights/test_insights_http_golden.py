@@ -14,9 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.market_data.history import reader
-from app.services.smart_insights_service import smart_insights_service
 from tests.conftest import TestSessionLocal
-from tests.forecaster_double import DeterministicForecaster
 from tests.sample_portfolio import ASSETS, FROZEN_NOW, seed_history, seed_portfolio
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
@@ -172,10 +170,9 @@ async def _enrich(client: AsyncClient, headers: dict[str, str]) -> None:
 @pytest.fixture
 def isolated_insights(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(reader, "session_factory", TestSessionLocal)
-    monkeypatch.setattr(smart_insights_service.prediction_service, "forecaster", DeterministicForecaster())
 
 
-@pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes", "isolated_insights")
+@pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes", "deterministic_forecaster", "isolated_insights")
 async def test_insights_routes_match_golden(
     client: AsyncClient, db_session: AsyncSession, regular_user: User, admin_user: User
 ) -> None:
@@ -191,7 +188,7 @@ async def test_insights_routes_match_golden(
     assert not rec.mismatches, f"golden insights différent : {rec.mismatches} (GOLDEN_UPDATE=1 pour accepter)"
 
 
-@pytest.mark.usefixtures("empty_test_redis", "offline", "isolated_insights")
+@pytest.mark.usefixtures("empty_test_redis", "offline", "deterministic_forecaster", "isolated_insights")
 async def test_insights_without_live_quotes_match_golden(
     client: AsyncClient, db_session: AsyncSession, regular_user: User
 ) -> None:

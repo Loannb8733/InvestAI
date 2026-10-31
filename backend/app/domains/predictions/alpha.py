@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.domains.market_data.prices.stablecoins import peg_quote
@@ -26,7 +27,6 @@ from app.domains.predictions.forecast import ForecastMixin
 from app.domains.predictions.holdings import group_holdings
 from app.domains.predictions.strategy_map import strategy_map
 from app.domains.predictions.types import PricePrediction
-from app.services.market_sentiment import fetch_fear_greed_index
 
 logger = logging.getLogger(__name__)
 

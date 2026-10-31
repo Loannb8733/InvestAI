@@ -1,6 +1,6 @@
 """Filet de caractérisation des analyseurs d'insights et du score de santé.
 
-`smart_insights_analyzers.py` — les règles qui produisent les conseils affichés
+`domains/insights/rules` — les règles qui produisent les conseils affichés
 à l'utilisateur — est couvert à **8 %**, et `_calculate_overall_score`, la note
 de 0 à 100 du portefeuille, ne l'est guère mieux. Ce sont des fonctions pures :
 elles prennent des scalaires et rendent des recommandations.
@@ -15,9 +15,13 @@ sans qu'aucune suite ne bronche.
 Comportement actuel épinglé, pas spécification approuvée.
 """
 
+from app.domains.insights.results import InsightSeverity
+from app.domains.insights.rules.correlation import correlation_insights
+from app.domains.insights.rules.diversification import diversification_insights
+from app.domains.insights.rules.performance import sharpe_insights
+from app.domains.insights.rules.risk import risk_insights
+from app.domains.insights.score import overall_score
 from app.ml import adaptive_thresholds as adaptive_th
-from app.services.smart_insights_service import smart_insights_service as svc
-from app.services.smart_insights_types import InsightSeverity
 
 
 def titres(insights):
@@ -44,27 +48,27 @@ class TestSeuilsDeReference:
 
 class TestAnalyseDuSharpe:
     def test_un_sharpe_negatif_est_critique(self):
-        insights = svc._analyze_sharpe(-0.5, 0.0)
+        insights = sharpe_insights(-0.5)
 
         assert titres(insights) == ["Performance très faible"]
         assert severites(insights) == [InsightSeverity.CRITICAL]
 
     def test_un_sharpe_sous_le_seuil_correct_est_un_avertissement(self):
-        assert titres(svc._analyze_sharpe(0.3, 0.0)) == ["Performance à améliorer"]
+        assert titres(sharpe_insights(0.3)) == ["Performance à améliorer"]
 
     def test_un_sharpe_entre_correct_et_bon_est_informatif(self):
-        assert titres(svc._analyze_sharpe(0.8, 0.0)) == ["Performance correcte"]
+        assert titres(sharpe_insights(0.8)) == ["Performance correcte"]
 
     def test_un_sharpe_au_dessus_du_bon_seuil_est_excellent(self):
         # Le libellé bascule à `>= 1.0`, pas à 1,5 : « excellent » couvre donc
         # aussi ce que la classification appelle « bon ».
-        assert titres(svc._analyze_sharpe(1.0, 0.0)) == ["Excellente performance"]
-        assert titres(svc._analyze_sharpe(2.5, 0.0)) == ["Excellente performance"]
+        assert titres(sharpe_insights(1.0)) == ["Excellente performance"]
+        assert titres(sharpe_insights(2.5)) == ["Excellente performance"]
 
     def test_un_sharpe_exactement_nul_n_est_pas_critique(self):
         # Le test est `< 0.0`, strict : un Sharpe nul tombe dans la branche
         # suivante, « à améliorer ».
-        assert titres(svc._analyze_sharpe(0.0, 0.0)) == ["Performance à améliorer"]
+        assert titres(sharpe_insights(0.0)) == ["Performance à améliorer"]
 
 
 class TestAnalyseDuRisque:
@@ -75,29 +79,29 @@ class TestAnalyseDuRisque:
         déclencherait l'alerte extrême sur n'importe quel portefeuille. C'est
         exactement ce que la division par 100 de l'appelant empêche.
         """
-        calme = svc._analyze_risk(volatility=0.30, var_95=0.0, max_drawdown=0.0)
-        extreme = svc._analyze_risk(volatility=0.85, var_95=0.0, max_drawdown=0.0)
-        mal_convertie = svc._analyze_risk(volatility=30.0, var_95=0.0, max_drawdown=0.0)
+        calme = risk_insights(volatility=0.30, var_95=0.0, max_drawdown=0.0)
+        extreme = risk_insights(volatility=0.85, var_95=0.0, max_drawdown=0.0)
+        mal_convertie = risk_insights(volatility=30.0, var_95=0.0, max_drawdown=0.0)
 
         assert titres(calme) == []
         assert titres(extreme) == ["Volatilité extrême"]
         assert titres(mal_convertie) == ["Volatilité extrême"]
 
     def test_une_volatilite_elevee_sans_etre_extreme_avertit(self):
-        assert titres(svc._analyze_risk(0.60, 0.0, 0.0)) == ["Volatilité élevée"]
+        assert titres(risk_insights(0.60, 0.0, 0.0)) == ["Volatilité élevée"]
 
     def test_la_var_declenche_a_dix_puis_quinze_pour_cent(self):
-        assert titres(svc._analyze_risk(0.0, 0.12, 0.0)) == ["VaR à surveiller"]
-        assert titres(svc._analyze_risk(0.0, 0.20, 0.0)) == ["Risque de perte élevé"]
+        assert titres(risk_insights(0.0, 0.12, 0.0)) == ["VaR à surveiller"]
+        assert titres(risk_insights(0.0, 0.20, 0.0)) == ["Risque de perte élevé"]
 
     def test_le_drawdown_declenche_a_quinze_puis_vingt_cinq_pour_cent(self):
-        assert titres(svc._analyze_risk(0.0, 0.0, 0.18)) == ["Drawdown important"]
-        assert titres(svc._analyze_risk(0.0, 0.0, 0.30)) == ["Drawdown severe"]
+        assert titres(risk_insights(0.0, 0.0, 0.18)) == ["Drawdown important"]
+        assert titres(risk_insights(0.0, 0.0, 0.30)) == ["Drawdown severe"]
 
     def test_les_trois_metriques_s_accumulent(self):
         # Un portefeuille en mauvaise posture reçoit les trois alertes, pas la
         # plus grave seulement.
-        insights = svc._analyze_risk(volatility=0.85, var_95=0.20, max_drawdown=0.30)
+        insights = risk_insights(volatility=0.85, var_95=0.20, max_drawdown=0.30)
 
         assert len(insights) == 3
 
@@ -106,12 +110,12 @@ class TestAnalyseDeLaDiversification:
     def test_le_poids_de_la_premiere_ligne_est_lu_en_fraction(self):
         # 0,45 = 45 % du portefeuille. L'appelant divise par 100 les poids que
         # lui donne `allocation_by_asset`, exprimés en pourcentages.
-        lourd = svc._analyze_diversification(hhi=0.15, top_holdings=[{"symbol": "BTC", "weight": 0.45}])
+        lourd = diversification_insights(hhi=0.15, top_holdings=[{"symbol": "BTC", "weight": 0.45}])
 
         assert titres(lourd) == ["Concentration excessive"]
 
     def test_entre_vingt_cinq_et_quarante_pour_cent_l_alerte_est_moderee(self):
-        insights = svc._analyze_diversification(0.15, [{"symbol": "BTC", "weight": 0.30}])
+        insights = diversification_insights(0.15, [{"symbol": "BTC", "weight": 0.30}])
 
         assert titres(insights) == ["Concentration élevée"]
         assert severites(insights) == [InsightSeverity.WARNING]
@@ -126,18 +130,18 @@ class TestAnalyseDeLaDiversification:
         convention antitrust. Les intervertir ferait déclarer « concentration
         élevée » à tout portefeuille, y compris parfaitement diversifié.
         """
-        concentre = svc._analyze_diversification(hhi=0.50, top_holdings=[])
-        diversifie = svc._analyze_diversification(hhi=0.05, top_holdings=[])
+        concentre = diversification_insights(hhi=0.50, top_holdings=[])
+        diversifie = diversification_insights(hhi=0.05, top_holdings=[])
 
         assert titres(concentre) == ["Portfolio peu diversifié"]
         assert titres(diversifie) == ["Bonne diversification"]
 
     def test_un_hhi_intermediaire_ne_dit_rien(self):
         # Entre 0,10 et 0,25 : ni alerte, ni félicitation.
-        assert svc._analyze_diversification(hhi=0.18, top_holdings=[]) == []
+        assert diversification_insights(hhi=0.18, top_holdings=[]) == []
 
     def test_sans_ligne_ni_hhi_aucun_insight(self):
-        assert svc._analyze_diversification(hhi=0.15, top_holdings=[]) == []
+        assert diversification_insights(hhi=0.15, top_holdings=[]) == []
 
 
 class TestScoreDeSante:
@@ -151,7 +155,7 @@ class TestScoreDeSante:
             "max_drawdown": 0.0,
         }
         params.update(surcharges)
-        return svc._calculate_overall_score(**params)
+        return overall_score(**params)
 
     def test_un_portefeuille_ideal_depasse_cent_et_se_fait_brider(self):
         # 100 de base + 10 de bonus Sharpe = 110, ramené à 100.
@@ -218,7 +222,7 @@ class TestAnalyseDesCorrelations:
         return [{"symbol": s, "weight": 0.2} for s in symboles]
 
     def test_moins_de_deux_actifs_ne_dit_rien(self):
-        insights, moyenne, clusters = svc._analyze_correlation(self.donnees(["BTC"], [[1.0]]), self.lignes("BTC"))
+        insights, moyenne, clusters = correlation_insights(self.donnees(["BTC"], [[1.0]]), self.lignes("BTC"))
 
         assert (insights, moyenne, clusters) == ([], 0.0, [])
 
@@ -234,14 +238,14 @@ class TestAnalyseDesCorrelations:
             [[1.0, 0.9, 0.1], [0.9, 1.0, 0.1], [0.1, 0.1, 1.0]],
         )
 
-        _, moyenne, _ = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        _, moyenne, _ = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert moyenne == 0.9
 
     def test_une_correlation_moyenne_elevee_signale_une_diversification_illusoire(self):
         corr = self.donnees(["BTC", "ETH"], [[1.0, 0.75], [0.75, 1.0]])
 
-        insights, _, _ = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        insights, _, _ = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert titres(insights) == ["Diversification illusoire"]
         assert severites(insights) == [InsightSeverity.WARNING]
@@ -249,14 +253,14 @@ class TestAnalyseDesCorrelations:
     def test_au_dela_de_085_l_alerte_devient_critique(self):
         corr = self.donnees(["BTC", "ETH"], [[1.0, 0.95], [0.95, 1.0]])
 
-        insights, _, _ = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        insights, _, _ = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert severites(insights)[0] == InsightSeverity.CRITICAL
 
     def test_sous_07_aucune_alerte_de_diversification(self):
         corr = self.donnees(["BTC", "ETH"], [[1.0, 0.5], [0.5, 1.0]])
 
-        insights, moyenne, _ = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        insights, moyenne, _ = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert moyenne == 0.5
         assert titres(insights) == []
@@ -264,7 +268,7 @@ class TestAnalyseDesCorrelations:
     def test_les_paires_fortement_correlees_forment_un_cluster(self):
         corr = self.donnees(["BTC", "ETH"], [[1.0, 0.91], [0.91, 1.0]], fortes=[("BTC", "ETH", 0.91)])
 
-        _, _, clusters = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        _, _, clusters = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert len(clusters) == 1
         assert set(clusters[0]["assets"]) == {"BTC", "ETH"}
@@ -279,7 +283,7 @@ class TestAnalyseDesCorrelations:
             fortes=[("BTC", "ETH", 0.91), ("ETH", "SOL", 0.90)],
         )
 
-        _, _, clusters = svc._analyze_correlation(corr, self.lignes("BTC", "ETH", "SOL"))
+        _, _, clusters = correlation_insights(corr, self.lignes("BTC", "ETH", "SOL"))
 
         assert len(clusters) == 1
         assert set(clusters[0]["assets"]) == {"BTC", "ETH", "SOL"}
@@ -306,7 +310,7 @@ class TestAnalyseDesCorrelations:
             fortes=[("BTC", "ETH", 0.91), ("SOL", "ADA", 0.92), ("ETH", "SOL", 0.90)],
         )
 
-        _, _, clusters = svc._analyze_correlation(corr, self.lignes(*symboles))
+        _, _, clusters = correlation_insights(corr, self.lignes(*symboles))
 
         assert len(clusters) == 1
         assert set(clusters[0]["assets"]) == {"BTC", "ETH", "SOL", "ADA"}
@@ -316,6 +320,6 @@ class TestAnalyseDesCorrelations:
         # `strongly_correlated` sans pour autant former un cluster.
         corr = self.donnees(["BTC", "ETH"], [[1.0, 0.80], [0.80, 1.0]], fortes=[("BTC", "ETH", 0.80)])
 
-        _, _, clusters = svc._analyze_correlation(corr, self.lignes("BTC", "ETH"))
+        _, _, clusters = correlation_insights(corr, self.lignes("BTC", "ETH"))
 
         assert clusters == []

@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.analytics.service import analytics_service
+from app.domains.insights.market_regime import current_vol_regime
 from app.domains.notifications.telegram.client import get_redis, telegram_service
 from app.domains.predictions.planned_orders import add_telegram_order
-from app.services.smart_insights_service import smart_insights_service
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def _verdict(ruin_delta: float) -> tuple[str, str]:
 
 
 async def _simulation_text(db: AsyncSession, callback: Callback) -> str:
-    vol_regime = await smart_insights_service.get_current_vol_regime(db, callback.user_id)
+    vol_regime = await current_vol_regime()
     before = await analytics_service.monte_carlo(
         db,
         callback.user_id,

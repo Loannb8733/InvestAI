@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.smart_insights_service import smart_insights_service
+from app.domains.insights import market_regime
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ async def current_vol_regime(db: AsyncSession, user_id: str) -> tuple[str, str]:
     """Régime de volatilité (``stress``, ``normal``, ``low``) et son libellé (``Bear``, ``Normal``, ``Bull``) ;
     ``normal`` si la détection échoue."""
     try:
-        vol_regime = await smart_insights_service.get_current_vol_regime(db, user_id)
+        vol_regime = await market_regime.current_vol_regime()
     except Exception as exc:  # noqa: BLE001
         logger.debug("Vol-regime lookup failed, defaulting to 'normal': %s", exc)
         return "normal", "Normal"

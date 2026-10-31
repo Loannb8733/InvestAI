@@ -1,28 +1,23 @@
-"""Smart-insights value types (severity/category enums + result dataclasses).
-
-Separate module so both smart_insights_service and smart_insights_analyzers can
-import them without a circular import.
-"""
-
-from __future__ import annotations
+"""Résultats de l'analyse de santé d'un portefeuille."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Any
 
 from app.ml.regime_detector import MarketRegime
 
 
-class InsightSeverity(str, Enum):
-    """Severity level for insights."""
+class InsightSeverity(StrEnum):
+    """Gravité d'un conseil."""
 
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
 
 
-class InsightCategory(str, Enum):
-    """Category of insight."""
+class InsightCategory(StrEnum):
+    """Famille d'un conseil."""
 
     PERFORMANCE = "performance"
     RISK = "risk"
@@ -34,7 +29,7 @@ class InsightCategory(str, Enum):
 
 @dataclass
 class SmartInsight:
-    """A single smart insight/recommendation."""
+    """Un conseil ; chaque action porte `type`, `symbol` et, selon le cas, `amount_eur` et `reason`."""
 
     category: InsightCategory
     severity: InsightSeverity
@@ -44,28 +39,27 @@ class SmartInsight:
     current_value: float | None = None
     target_value: float | None = None
     potential_improvement: str | None = None
-    actions: list[dict] = field(default_factory=list)
-    # Actions format: [{"type": "buy/sell/hold", "symbol": "BTC", "amount_eur": 500, "reason": "..."}]
+    actions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class RebalancingOrder:
-    """A suggested rebalancing order."""
+    """Un ordre de rééquilibrage suggéré ; `action` vaut buy, sell ou hold."""
 
     symbol: str
     name: str
-    action: str  # "buy" or "sell"
+    action: str
     current_weight: float
     target_weight: float
     current_value_eur: float
     target_value_eur: float
-    amount_eur: float  # Amount to buy (positive) or sell (negative)
+    amount_eur: float
     reason: str
 
 
 @dataclass
 class AnomalyImpact:
-    """Anomaly with calculated EUR impact."""
+    """Une anomalie de cours et son effet en euros sur la position."""
 
     symbol: str
     anomaly_type: str
@@ -73,19 +67,19 @@ class AnomalyImpact:
     description: str
     price_change_percent: float
     position_value_eur: float
-    impact_eur: float  # Gain or loss in EUR
+    impact_eur: float
     detected_at: datetime
 
 
 @dataclass
 class PortfolioHealthReport:
-    """Complete portfolio health analysis."""
+    """Rapport de santé complet ; `overall_score` va de 0 à 100."""
 
-    overall_score: int  # 0-100
-    overall_status: str  # "excellent", "good", "fair", "poor", "critical"
+    overall_score: int
+    overall_status: str
     insights: list[SmartInsight]
     rebalancing_orders: list[RebalancingOrder]
     anomaly_impacts: list[AnomalyImpact]
-    metrics_summary: dict[str, float]
+    metrics_summary: dict[str, Any]
+    generated_at: datetime
     market_regime: MarketRegime | None = None
-    generated_at: datetime = field(default_factory=datetime.utcnow)

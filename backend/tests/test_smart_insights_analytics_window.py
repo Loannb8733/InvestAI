@@ -5,14 +5,13 @@ import time_machine
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.analytics.service import analytics_service
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.services.smart_insights_service import smart_insights_service
-from tests.forecaster_double import DeterministicForecaster
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 
-@pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes")
+@pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes", "deterministic_forecaster")
 @pytest.mark.parametrize("route", ["health", "summary"])
 async def test_smart_insights_give_analytics_the_requested_window(
     client: AsyncClient,
@@ -22,16 +21,14 @@ async def test_smart_insights_give_analytics_the_requested_window(
     caplog: pytest.LogCaptureFixture,
     route: str,
 ) -> None:
-    analytics = smart_insights_service.analytics_service
-    build_asset_data = analytics._build_asset_data
+    build_asset_data = analytics_service._build_asset_data
     windows: list[int] = []
 
     async def spy(assets: Any, days: int) -> Any:
         windows.append(days)
         return await build_asset_data(assets, days=days)
 
-    monkeypatch.setattr(analytics, "_build_asset_data", spy)
-    monkeypatch.setattr(smart_insights_service.prediction_service, "forecaster", DeterministicForecaster())
+    monkeypatch.setattr(analytics_service, "_build_asset_data", spy)
     headers = {"Authorization": f"Bearer {create_token(str(regular_user.id))}"}
     with time_machine.travel(FROZEN_NOW, tick=False):
         await seed_history(db_session)

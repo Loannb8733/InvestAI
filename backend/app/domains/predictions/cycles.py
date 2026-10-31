@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.domains.market_data.prices.stablecoins import peg_quote
@@ -26,7 +27,6 @@ from app.domains.predictions.top_bottom import time_to_pivot, top_bottom_estimat
 from app.domains.predictions.types import HISTORY_DAYS
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext, compute_market_context
-from app.services.market_sentiment import fetch_fear_greed_index
 
 EXTERNAL_CALL_BUDGET = 12.0
 

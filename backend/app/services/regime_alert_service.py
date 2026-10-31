@@ -13,10 +13,10 @@ from sqlalchemy import select
 from app.core.db.session import session_factory
 from app.core.redis_client import _get_redis_txt
 from app.domains.identity.models import User
+from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.notifications.telegram.client import telegram_service
 from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig
-from app.services.market_sentiment import fetch_fear_greed_index
 
 logger = logging.getLogger(__name__)
 
