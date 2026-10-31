@@ -82,7 +82,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
 
         # Get portfolio analytics
         try:
-            analytics = await self.analytics_service.get_user_analytics(db, user_id, days)
+            analytics = await self.analytics_service.get_user_analytics(db, user_id, days=days)
         except Exception as e:
             logger.error(f"Failed to get analytics: {e}")
             return PortfolioHealthReport(
@@ -1026,7 +1026,7 @@ class SmartInsightsService(SmartInsightAnalyzersMixin):
         total_value = report.metrics_summary.get("total_value", 0)
         breakeven_pct = None
         try:
-            analytics = await self.analytics_service.get_user_analytics(db, user_id, days)
+            analytics = await self.analytics_service.get_user_analytics(db, user_id, days=days)
             net_capital = getattr(analytics, "net_capital", None) or getattr(analytics, "total_invested", 0)
             if net_capital and net_capital > 0:
                 breakeven_pct = round(((total_value / net_capital) - 1) * 100, 2)
