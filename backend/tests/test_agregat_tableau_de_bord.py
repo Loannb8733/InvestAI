@@ -20,8 +20,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import func, select
 
-from app.api.v1.endpoints.dashboard import _get_dashboard_impl
 from app.domains.dashboard.models import PortfolioSnapshot
+from app.domains.dashboard.overview import build_overview
 from app.domains.identity.models import User
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions.models import Transaction, TransactionType
@@ -87,24 +87,24 @@ async def appeler(db_session, utilisateur, *, jours=30, mesures=None, historique
     historique = historique if historique is not None else []
     with (
         patch(
-            "app.api.v1.endpoints.dashboard.metrics_service.get_user_dashboard_metrics",
+            "app.domains.dashboard.overview.metrics_service.get_user_dashboard_metrics",
             new=AsyncMock(return_value=mesures),
         ),
         patch(
-            "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series",
+            "app.domains.dashboard.overview.snapshot_service.build_portfolio_value_series",
             new=AsyncMock(return_value=historique),
         ),
-        patch("app.api.v1.endpoints.dashboard.get_index_comparison", new=AsyncMock(return_value=[])),
+        patch("app.domains.dashboard.overview.get_index_comparison", new=AsyncMock(return_value=[])),
         patch(
-            "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics",
+            "app.domains.dashboard.overview.snapshot_service.get_all_risk_metrics",
             new=AsyncMock(return_value=RISQUES),
         ),
         patch(
-            "app.api.v1.endpoints.dashboard.spot_rates.get",
+            "app.domains.dashboard.earn.spot_rates.get",
             new=AsyncMock(return_value=taux_usd),
         ),
     ):
-        return await _get_dashboard_impl(None, jours, utilisateur, db_session)
+        return await build_overview(jours, utilisateur, db_session)
 
 
 @pytest.fixture
@@ -458,7 +458,7 @@ class TestInstantaneQuotidien:
         await self._poser_une_course(db_session, regular_user, monkeypatch)
         mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=1, total_gain_loss=1000.0)
 
-        with caplog.at_level(logging.WARNING, logger="app.api.v1.endpoints.dashboard"):
+        with caplog.at_level(logging.WARNING, logger="app.domains.dashboard.overview"):
             await appeler(db_session, regular_user, mesures=mesures)
 
         assert "snapshot creation failed" not in caplog.text
@@ -492,7 +492,7 @@ class TestInstantaneQuotidien:
         monkeypatch.setattr(db_session, "rollback", rollback_espion)
         mesures = metriques(total_value=5000.0, total_invested=4000.0, assets_count=1, total_gain_loss=1000.0)
 
-        with caplog.at_level(logging.WARNING, logger="app.api.v1.endpoints.dashboard"):
+        with caplog.at_level(logging.WARNING, logger="app.domains.dashboard.overview"):
             reponse = await appeler(db_session, regular_user, mesures=mesures)
 
         assert reponse.total_value == 5000.0
@@ -609,20 +609,20 @@ class TestResistanceDesBlocsSecondaires:
     async def _appeler_avec_panne(self, db_session, utilisateur, cible, **surcharges):
         mesures = surcharges.pop("mesures", None) or metriques()
         patches = {
-            "app.api.v1.endpoints.dashboard.metrics_service.get_user_dashboard_metrics": AsyncMock(
+            "app.domains.dashboard.overview.metrics_service.get_user_dashboard_metrics": AsyncMock(
                 return_value=mesures
             ),
-            "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series": AsyncMock(return_value=[]),
-            "app.api.v1.endpoints.dashboard.get_index_comparison": AsyncMock(return_value=[]),
-            "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics": AsyncMock(return_value=RISQUES),
-            "app.api.v1.endpoints.dashboard.spot_rates.get": AsyncMock(return_value=0.92),
+            "app.domains.dashboard.overview.snapshot_service.build_portfolio_value_series": AsyncMock(return_value=[]),
+            "app.domains.dashboard.overview.get_index_comparison": AsyncMock(return_value=[]),
+            "app.domains.dashboard.overview.snapshot_service.get_all_risk_metrics": AsyncMock(return_value=RISQUES),
+            "app.domains.dashboard.earn.spot_rates.get": AsyncMock(return_value=0.92),
         }
         patches[cible] = AsyncMock(side_effect=RuntimeError("panne simulée"))
         contextes = [patch(nom, new=double) for nom, double in patches.items()]
         for c in contextes:
             c.__enter__()
         try:
-            return await _get_dashboard_impl(None, 30, utilisateur, db_session)
+            return await build_overview(30, utilisateur, db_session)
         finally:
             for c in reversed(contextes):
                 c.__exit__(None, None, None)
@@ -633,7 +633,7 @@ class TestResistanceDesBlocsSecondaires:
         reponse = await self._appeler_avec_panne(
             db_session,
             regular_user,
-            "app.api.v1.endpoints.dashboard.snapshot_service.build_portfolio_value_series",
+            "app.domains.dashboard.overview.snapshot_service.build_portfolio_value_series",
             mesures=mesures,
         )
 
@@ -647,7 +647,7 @@ class TestResistanceDesBlocsSecondaires:
         reponse = await self._appeler_avec_panne(
             db_session,
             regular_user,
-            "app.api.v1.endpoints.dashboard.get_index_comparison",
+            "app.domains.dashboard.overview.get_index_comparison",
             mesures=mesures,
         )
 
@@ -667,7 +667,7 @@ class TestResistanceDesBlocsSecondaires:
         reponse = await self._appeler_avec_panne(
             db_session,
             regular_user,
-            "app.api.v1.endpoints.dashboard.snapshot_service.get_all_risk_metrics",
+            "app.domains.dashboard.overview.snapshot_service.get_all_risk_metrics",
             mesures=mesures,
         )
 
@@ -686,5 +686,5 @@ class TestResistanceDesBlocsSecondaires:
             await self._appeler_avec_panne(
                 db_session,
                 regular_user,
-                "app.api.v1.endpoints.dashboard.metrics_service.get_user_dashboard_metrics",
+                "app.domains.dashboard.overview.metrics_service.get_user_dashboard_metrics",
             )

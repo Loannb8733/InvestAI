@@ -28,7 +28,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.api.v1.endpoints.dashboard import get_recent_transactions_internal
+from app.domains.dashboard.feed import recent_transactions
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
@@ -94,7 +94,7 @@ class TestPanneauRecent:
         await _mouvement(db_session, actif, "hier", quand=MAINTENANT - timedelta(days=1))
         await _mouvement(db_session, actif, "aujourd'hui", quand=MAINTENANT)
 
-        recentes = await get_recent_transactions_internal(db_session, regular_user, limit=2)
+        recentes = await recent_transactions(db_session, regular_user.id, limit=2)
 
         symboles = [t.executed_at for t in recentes]
         assert len(recentes) == 2
@@ -109,7 +109,7 @@ class TestPanneauRecent:
             )
         await _mouvement(db_session, actif, "achat récent", quand=MAINTENANT)
 
-        recentes = await get_recent_transactions_internal(db_session, regular_user, limit=1)
+        recentes = await recent_transactions(db_session, regular_user.id, limit=1)
 
         assert len(recentes) == 1
         transaction = (
@@ -121,12 +121,12 @@ class TestPanneauRecent:
         await _mouvement(db_session, actif, "ancien", quand=MAINTENANT - timedelta(days=10))
         await _mouvement(db_session, actif, "recent", quand=MAINTENANT - timedelta(days=1))
 
-        recentes = await get_recent_transactions_internal(db_session, regular_user, limit=5)
+        recentes = await recent_transactions(db_session, regular_user.id, limit=5)
 
         assert [t.executed_at for t in recentes] == sorted([t.executed_at for t in recentes], reverse=True)
 
     async def test_sans_portefeuille_la_liste_est_vide(self, db_session, admin_user):
-        assert await get_recent_transactions_internal(db_session, admin_user) == []
+        assert await recent_transactions(db_session, admin_user.id) == []
 
 
 class TestListeDesTransactions:

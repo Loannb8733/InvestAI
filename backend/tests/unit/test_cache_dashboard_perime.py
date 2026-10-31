@@ -22,7 +22,8 @@ import inspect
 import pytest
 from pydantic import ValidationError
 
-from app.api.v1.endpoints import dashboard as module_dashboard
+from app.domains.dashboard import router as module_dashboard
+from app.domains.dashboard.schemas import EnhancedDashboardResponse
 
 
 class TestFiletSurLeCache:
@@ -47,8 +48,6 @@ class TestFiletSurLeCache:
 
     def test_le_schema_refuse_bien_un_dict_incomplet(self):
         """Le filet n'a de sens que si Pydantic rejette réellement l'ancien format."""
-        from app.api.v1.endpoints.dashboard import EnhancedDashboardResponse
-
         with pytest.raises(ValidationError):
             EnhancedDashboardResponse(**{"total_value": 2849.06, "forex_stale": False})
 
