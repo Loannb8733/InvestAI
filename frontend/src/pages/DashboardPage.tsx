@@ -196,6 +196,7 @@ interface DashboardMetrics {
   period_days?: number
   period_label?: string
   forex_stale?: boolean
+  unpriced_symbols?: string[]
   last_updated: string
 }
 
@@ -497,7 +498,7 @@ export default function DashboardPage() {
                 Live
               </Badge>
             )}
-            <StalePriceBadge wsConnected={wsConnected} forexStale={metrics.forex_stale} />
+            <StalePriceBadge wsConnected={wsConnected} forexStale={metrics.forex_stale} unpricedSymbols={metrics.unpriced_symbols} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
