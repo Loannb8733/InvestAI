@@ -16,13 +16,10 @@ from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.classification import is_cash_like, is_fiat, is_stablecoin
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.cost_basis.config import ReplayConfig
+from app.domains.transactions.cost_basis.replay import replay, sort_transactions
+from app.domains.transactions.cost_basis.weighted_average import compute_cump_pru
 from app.domains.transactions.models import Transaction
-from app.services import fifo_replay
-from app.services.metrics_cost_basis import (  # noqa: F401 — compute_cump_pru used; helpers re-exported for tests
-    _ci_price_in_portfolio_ccy,
-    _conversion_dest_unit_cost,
-    compute_cump_pru,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -368,7 +365,7 @@ class MetricsService:
             # Canonical deterministic replay ordering (TRANSFER_OUT before a
             # same-timestamp TRANSFER_IN, str(id) tie-break) — shared with the
             # tax replay via the unified engine.
-            all_txs = fifo_replay.sort_transactions(all_txs)
+            all_txs = sort_transactions(all_txs)
 
             # Fetch ALL portfolio assets (including qty=0) for FIFO symbol/exchange
             # lookups — zero-qty assets may have TRANSFER_OUT transactions whose
@@ -407,10 +404,10 @@ class MetricsService:
             # destinations, F-06 transfer-in recovery, unmatched conversions
             # preserved, fee_currency-aware fees, network-fee trim, external_id
             # conversion fallback); only stablecoin seeding is opt-in.
-            _replay_res = fifo_replay.replay(
+            _replay_res = replay(
                 all_txs,
                 aid_to_symbol,
-                fifo_replay.ReplayConfig(
+                ReplayConfig(
                     portfolio_currency=currency,
                     seed_stablecoin_layers=True,
                 ),

@@ -9,17 +9,16 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
-from app.domains.transactions.models import TransactionType as TxType
-from app.services.fifo_replay import (
+from app.domains.transactions.cost_basis.config import (
     ConversionDestBasis,
     FeeHandling,
     ReplayConfig,
     RewardBasis,
     UnmatchedConversionOutPolicy,
     UnmatchedTransferInPolicy,
-    replay,
-    sort_transactions,
 )
+from app.domains.transactions.cost_basis.replay import replay, sort_transactions
+from app.domains.transactions.models import TransactionType as TxType
 
 D = Decimal
 T0 = datetime(2024, 1, 1, tzinfo=UTC)

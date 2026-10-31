@@ -18,9 +18,7 @@ comments	backend/app/models/portfolio_snapshot.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
-comments	backend/app/services/fifo_replay.py
 comments	backend/app/services/insights_service.py
-comments	backend/app/services/metrics_cost_basis.py
 comments	backend/app/services/metrics_service.py
 comments	backend/app/services/regime_alert_service.py
 comments	backend/app/services/smart_insights_analyzers.py
@@ -163,7 +161,6 @@ too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
 too-long	backend/app/ml/regime_detector.py
 too-long	backend/app/services/csv_parsers.py
-too-long	backend/app/services/fifo_replay.py
 too-long	backend/app/services/insights_service.py
 too-long	backend/app/services/metrics_service.py
 too-long	backend/app/services/smart_insights_analyzers.py

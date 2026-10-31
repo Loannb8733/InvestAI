@@ -10,12 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.domains.portfolio.classification import FIAT_SYMBOLS, STABLECOIN_SYMBOLS, is_cash_like, is_fiat, is_stablecoin
-from app.services.metrics_service import (
-    MetricsService,
-    _ci_price_in_portfolio_ccy,
-    _conversion_dest_unit_cost,
-    compute_cump_pru,
-)
+from app.domains.transactions.cost_basis.conversions import conversion_dest_unit_cost
+from app.domains.transactions.cost_basis.matching import price_in_portfolio_currency
+from app.domains.transactions.cost_basis.weighted_average import compute_cump_pru
+from app.services.metrics_service import MetricsService
 
 
 class TestConversionDestUnitCost:
@@ -31,25 +29,25 @@ class TestConversionDestUnitCost:
     def test_uses_recorded_price_when_available(self):
         # Recorded BTC price at conversion is the acquisition cost, regardless of
         # what the source carry would have produced.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.0003"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.0003"), Decimal("88000"))
         assert u == pytest.approx(88000.0)
 
     def test_recorded_price_overrides_inflated_carry(self):
         # Source carry would give 2.64M EUR/BTC; recorded price wins.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.00001"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.00001"), Decimal("88000"))
         assert float(u) == pytest.approx(88000.0)
 
     def test_recorded_price_overrides_even_a_modest_carry(self):
         # Carry would give ~90721; recorded 88000 is still the truth.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.000291"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.000291"), Decimal("88000"))
         assert float(u) == pytest.approx(88000.0)
 
     def test_zero_qty_returns_zero(self):
-        assert _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0"), Decimal("88000")) == Decimal("0")
+        assert conversion_dest_unit_cost(Decimal("26.4"), Decimal("0"), Decimal("88000")) == Decimal("0")
 
     def test_falls_back_to_carry_when_no_recorded_price(self):
         # No recorded dest price (0) -> legacy carry: cost_removed / matched_qty.
-        u = _conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
+        u = conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
         assert float(u) == pytest.approx(500000.0)
 
 
@@ -59,14 +57,14 @@ class TestCiPriceInPortfolioCcy:
 
     def test_eur_leg_unchanged(self):
         # conversion_rate None => price already in portfolio ccy.
-        assert _ci_price_in_portfolio_ccy(Decimal("88000"), None) == Decimal("88000")
+        assert price_in_portfolio_currency(Decimal("88000"), None) == Decimal("88000")
 
     def test_usd_leg_converted(self):
         # 88000 USD at 0.92 EUR/USD => 80960 EUR.
-        assert _ci_price_in_portfolio_ccy(Decimal("88000"), Decimal("0.92")) == Decimal("80960.00")
+        assert price_in_portfolio_currency(Decimal("88000"), Decimal("0.92")) == Decimal("80960.00")
 
     def test_none_price_is_zero(self):
-        assert _ci_price_in_portfolio_ccy(None, Decimal("0.92")) == Decimal("0")
+        assert price_in_portfolio_currency(None, Decimal("0.92")) == Decimal("0")
 
 
 # ---------------------------------------------------------------------------

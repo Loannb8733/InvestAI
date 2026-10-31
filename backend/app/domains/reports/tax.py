@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.transactions.cost_basis import config as replay_config
+from app.domains.transactions.cost_basis.replay import replay, sort_transactions
 from app.domains.transactions.models import Transaction, TransactionType
-from app.services import fifo_replay
 
 _ZERO = Decimal("0")
 
@@ -72,18 +73,18 @@ class TaxMode:
     conversions, frais réseau des transferts non rognés, CONVERSION_OUT non apparié consommé et taxé (pas de sursis).
     """
 
-    config: fifo_replay.ReplayConfig
+    config: replay_config.ReplayConfig
     canonical_sort: bool
 
 
 def _tax_mode(converged: bool) -> TaxMode:
-    policy = fifo_replay.UnmatchedConversionOutPolicy
-    config = fifo_replay.ReplayConfig(
+    policy = replay_config.UnmatchedConversionOutPolicy
+    config = replay_config.ReplayConfig(
         portfolio_currency="EUR",
-        reward_basis=fifo_replay.RewardBasis.ZERO,
-        conversion_dest_basis=fifo_replay.ConversionDestBasis.CARRY_COST,
-        unmatched_transfer_in=fifo_replay.UnmatchedTransferInPolicy.ZERO,
-        fee_handling=fifo_replay.FeeHandling.TX_CURRENCY,
+        reward_basis=replay_config.RewardBasis.ZERO,
+        conversion_dest_basis=replay_config.ConversionDestBasis.CARRY_COST,
+        unmatched_transfer_in=replay_config.UnmatchedTransferInPolicy.ZERO,
+        fee_handling=replay_config.FeeHandling.TX_CURRENCY,
         seed_stablecoin_layers=False,
         skip_null_executed_at=True,
         unmatched_conversion_out=policy.PRESERVE if converged else policy.CONSUME,
@@ -109,7 +110,7 @@ class _CessionLedger:
     events: list[TaxEvent2086] = field(default_factory=list)
     cession_dates: set[date] = field(default_factory=set)
 
-    def on_event(self, ev: fifo_replay.ReplayEvent) -> None:
+    def on_event(self, ev: replay_config.ReplayEvent) -> None:
         if ev.kind == "BUY":
             self.total_acquisition_cost += ev.total_cost
             return
@@ -126,7 +127,7 @@ class _CessionLedger:
             self.cession_dates.add(tx_dt.date())
             self.events.append(self._event(ev, tx_dt))
 
-    def _event(self, ev: fifo_replay.ReplayEvent, tx_dt: datetime) -> TaxEvent2086:
+    def _event(self, ev: replay_config.ReplayEvent, tx_dt: datetime) -> TaxEvent2086:
         tx = cast(Transaction, ev.tx)
         cession_price = ev.quantity * ev.price - ev.fee
         long_term = ev.oldest_acquired_at and (tx_dt - ev.oldest_acquired_at).days >= _LONG_TERM_DAYS
@@ -286,10 +287,10 @@ class TaxMixin:
             .order_by(Transaction.executed_at.asc())
         )
         all_transactions = list(trans_result.scalars().all())
-        replay_txs = fifo_replay.sort_transactions(all_transactions) if mode.canonical_sort else all_transactions
+        replay_txs = sort_transactions(all_transactions) if mode.canonical_sort else all_transactions
 
         ledger = _CessionLedger(datetime(year, 1, 1, tzinfo=UTC), datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC))
-        fifo_replay.replay(replay_txs, aid_to_symbol, mode.config, on_event=ledger.on_event)
+        replay(replay_txs, aid_to_symbol, mode.config, on_event=ledger.on_event)
 
         all_symbols_ever = set(aid_to_symbol.values())
         price_cache: PriceCache = {}

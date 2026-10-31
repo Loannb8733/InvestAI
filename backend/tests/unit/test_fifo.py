@@ -1,13 +1,8 @@
-"""Unit tests for the shared FIFO primitives (HIGH — cost-basis unification).
-
-These functions are now the single source of truth consumed by both
-metrics_service (displayed P&L) and report_service (tax 2086 / sell estimates),
-so pinning them here guards against the two engines diverging.
-"""
+"""Unit tests for the FIFO layer primitives shared by displayed P&L and the 2086 replay."""
 
 from decimal import Decimal
 
-from app.services.fifo import consume_fifo, consume_fifo_with_dates, extract_fifo_layers
+from app.domains.transactions.cost_basis.layers import consume_layers, extract_layers
 
 
 def _layers():
@@ -17,38 +12,38 @@ def _layers():
     ]
 
 
-class TestConsumeFifo:
+class TestConsumeLayers:
     def test_partial_first_layer(self):
         layers = _layers()
-        cost = consume_fifo(layers, Decimal("1"))
+        cost, _ = consume_layers(layers, Decimal("1"))
         assert cost == Decimal("100")  # 1 @ 100
         assert layers[0]["qty"] == Decimal("1")  # layer decremented in place
 
     def test_crosses_layers(self):
         layers = _layers()
-        cost = consume_fifo(layers, Decimal("4"))  # 2@100 + 2@200
+        cost, _ = consume_layers(layers, Decimal("4"))  # 2@100 + 2@200
         assert cost == Decimal("600")
         assert len(layers) == 1 and layers[0]["qty"] == Decimal("1")
 
     def test_full_then_underflow_is_graceful(self):
         layers = _layers()
-        cost = consume_fifo(layers, Decimal("10"))  # only 5 available
+        cost, _ = consume_layers(layers, Decimal("10"))  # only 5 available
         assert cost == Decimal("800")  # 2@100 + 3@200
         assert layers == []
 
 
-class TestConsumeFifoWithDates:
+class TestConsumeLayersDates:
     def test_returns_oldest_acquired_at(self):
         layers = _layers()
-        cost, oldest = consume_fifo_with_dates(layers, Decimal("3"))
+        cost, oldest = consume_layers(layers, Decimal("3"))
         assert cost == Decimal("400")  # 2@100 + 1@200
         assert oldest == "2026-01-01"
 
 
-class TestExtractFifoLayers:
+class TestExtractLayers:
     def test_extract_preserves_unit_costs_and_keys(self):
         layers = _layers()
-        extracted = extract_fifo_layers(layers, Decimal("3"))
+        extracted = extract_layers(layers, Decimal("3"))
         # 2 @100 (whole) + 1 @200 (partial)
         assert [(e["qty"], e["unit_cost"]) for e in extracted] == [
             (Decimal("2"), Decimal("100")),
@@ -58,10 +53,10 @@ class TestExtractFifoLayers:
         assert layers[0]["qty"] == Decimal("2")  # remainder stays as one layer
 
     def test_consume_and_extract_remove_same_quantity(self):
-        # Cross-engine guarantee: cost removed by consume_fifo equals the summed
-        # cost of the layers extracted by extract_fifo_layers for the same qty.
+        # Cross-engine guarantee: cost removed by consume_layers equals the summed
+        # cost of the layers extracted by extract_layers for the same qty.
         a, b = _layers(), _layers()
-        cost = consume_fifo(a, Decimal("4"))
-        extracted = extract_fifo_layers(b, Decimal("4"))
+        cost, _ = consume_layers(a, Decimal("4"))
+        extracted = extract_layers(b, Decimal("4"))
         extracted_cost = sum(e["qty"] * e["unit_cost"] for e in extracted)
         assert cost == extracted_cost == Decimal("600")

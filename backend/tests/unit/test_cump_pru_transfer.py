@@ -7,8 +7,8 @@ NOT dilute it toward zero. Mirrors the FIFO engine's unmatched-transfer recovery
 
 from decimal import Decimal
 
+from app.domains.transactions.cost_basis.weighted_average import compute_cump_pru
 from app.domains.transactions.models import TransactionType
-from app.services.metrics_service import compute_cump_pru
 
 
 class _Tx:
