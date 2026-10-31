@@ -17,6 +17,7 @@ _MIN_VAR_POINTS = 5
 _MIN_VAR_RETURNS = 20
 _HHI_DIVERSIFIED = 1500
 _HHI_MODERATE = 2500
+_MIN_SHARPE_DAYS = 90
 
 
 def estimate_interval_days(history: History) -> float:
@@ -68,21 +69,19 @@ def calculate_volatility(history: History) -> float:
     return round(deviation * 100, 2)
 
 
-def calculate_sharpe_ratio(
-    history: History, risk_free_rate: float = RISK_FREE_RATE, roi_annualized: float | None = None
-) -> float:
-    """Ratio de Sharpe : le rendement annualisé fourni prime sur celui de la série."""
-    if len(history) < 2:
-        return 0.0
+def calculate_sharpe_ratio(history: History, risk_free_rate: float = RISK_FREE_RATE) -> float | None:
+    """Ratio de Sharpe, rendement et volatilité lus sur la même série ; rien sous trois mois, trop court."""
+    interval = estimate_interval_days(history)
+    if interval * (len(history) - 1) < _MIN_SHARPE_DAYS:
+        return None
     returns = twr_log_returns(history)
     if len(returns) < 2:
-        return 0.0
-    periods_per_year = CALENDAR_DAYS_PER_YEAR / estimate_interval_days(history)
+        return None
+    periods_per_year = CALENDAR_DAYS_PER_YEAR / interval
     deviation, mean = _annualized_deviation(returns, periods_per_year)
     if deviation == 0:
         return 0.0
-    annual_return = roi_annualized / 100.0 if roi_annualized is not None else mean * periods_per_year
-    return round((annual_return - risk_free_rate) / deviation, 2)
+    return round((mean * periods_per_year - risk_free_rate) / deviation, 2)
 
 
 def calculate_max_drawdown(history: History) -> dict[str, Any]:

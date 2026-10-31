@@ -69,7 +69,7 @@ class MetricsService:
             Decimal(str(history["total_invested_all_time"])),
             Decimal(str(metrics["total_dividend_income"])),
         )
-        return {**metrics, **gain}
+        return {**metrics, **gain, "by_exchange": history["by_exchange"]}
 
     async def fetch_period_changes(self, symbols: dict[str, list[str]], days: int) -> dict[str, float]:
         """Variation en pourcentage sur `days` jours ; un symbole sans deux cours connus est absent."""

@@ -143,36 +143,26 @@ class TestVolatilite:
 
 
 class TestSharpe:
-    @pytest.mark.asyncio
-    async def test_un_cagr_negatif_donne_un_sharpe_negatif(self):
-        # C'est la raison d'être du paramètre `roi_annualized` : la moyenne des
-        # log-rendements pouvait rester positive sur un portefeuille en perte.
-        sharpe = calculate_sharpe_ratio(history=serie([100, 110, 105, 120, 90]), roi_annualized=-30.0)
+    def test_une_serie_en_perte_donne_un_sharpe_negatif(self):
+        assert calculate_sharpe_ratio(history=serie([100, 110, 105, 120, 90], pas_jours=30)) < 0
 
-        assert sharpe < 0
-
-    @pytest.mark.asyncio
-    async def test_le_cagr_est_lu_en_pourcentage_et_converti_en_decimal(self):
-        """`roi_annualized=100` signifie +100 %, soit 1,0 en décimal.
-
-        Vérifier le seul signe ne suffit pas : oublier la division par 100
-        laisse un Sharpe négatif négatif et un positif positif. C'est
-        l'amplitude qui trahit l'unité, ici recoupée avec la volatilité que
-        `calculate_volatility` annonce pour la même série.
-        """
+    def test_rendement_et_volatilite_viennent_de_la_meme_serie(self):
         from app.core.finance_constants import RISK_FREE_RATE
 
-        histoire = serie([100, 110, 105, 120, 115, 130])
-        volatilite = calculate_volatility(history=histoire)
-        sharpe = calculate_sharpe_ratio(history=histoire, roi_annualized=100.0)
+        histoire = serie([100, 110, 105, 120, 115, 130], pas_jours=30)
+        rendements = twr_log_returns(histoire)
+        rendement_annuel = sum(rendements) / len(rendements) * 365 / 30
+        volatilite = calculate_volatility(history=histoire) / 100
 
-        assert sharpe == pytest.approx((1.0 - RISK_FREE_RATE) / (volatilite / 100), rel=1e-2)
+        assert calculate_sharpe_ratio(history=histoire) == pytest.approx(
+            (rendement_annuel - RISK_FREE_RATE) / volatilite, rel=1e-2
+        )
 
-    @pytest.mark.asyncio
-    async def test_une_volatilite_nulle_rend_zero_et_non_l_infini(self):
-        sharpe = calculate_sharpe_ratio(history=serie([100, 100, 100, 100]), roi_annualized=50.0)
+    def test_sous_trois_mois_il_n_y_a_pas_de_sharpe(self):
+        assert calculate_sharpe_ratio(history=serie([100, 110, 105, 120], pas_jours=7)) is None
 
-        assert sharpe == 0.0
+    def test_une_volatilite_nulle_rend_zero_et_non_l_infini(self):
+        assert calculate_sharpe_ratio(history=serie([100, 100, 100, 100], pas_jours=30)) == 0.0
 
 
 class TestDrawdown:

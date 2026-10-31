@@ -32,7 +32,7 @@ def value_point(moment: datetime, days: int, value: float, invested: float, net_
         "value": round(value, 2),
         "invested": round(invested, 2),
         "net_capital": round(net_capital, 2),
-        "gain_loss": round(value - invested, 2),
+        "gain_loss": round(value - net_capital, 2),
     }
 
 
@@ -44,7 +44,7 @@ def _snapshot_point(snapshot: PortfolioSnapshot, days: int) -> dict[str, Any]:
         float(snapshot.total_invested),
         float(snapshot.total_invested),
     )
-    return {**point, "gain_loss": round(float(snapshot.total_gain_loss), 2)}
+    return {**point, "gain_loss": None}
 
 
 async def _stablecoin_rate() -> float:

@@ -228,7 +228,6 @@ async def test_daily_snapshot_is_written_once(
                 "snapshot_date": row.snapshot_date,
                 "total_value": row.total_value,
                 "total_invested": row.total_invested,
-                "total_gain_loss": row.total_gain_loss,
                 "currency": row.currency,
             }
             for row in rows
@@ -245,7 +244,6 @@ def _snapshot_rows(rows: list[PortfolioSnapshot]) -> list[dict[str, Any]]:
             "snapshot_date": row.snapshot_date,
             "total_value": row.total_value,
             "total_invested": row.total_invested,
-            "total_gain_loss": row.total_gain_loss,
             "currency": row.currency,
         }
         for row in ordered

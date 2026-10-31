@@ -83,8 +83,8 @@
       "max_drawdown": -0.11,
       "sharpe_ratio": 0.0,
       "sortino_ratio": 0.0,
-      "total_gain_loss": 22446.9975,
-      "total_gain_loss_percent": 53.5459,
+      "total_gain_loss": 1496.0,
+      "total_gain_loss_percent": 3.4077,
       "total_value": 64367.9975,
       "volatility": 0.0
     },

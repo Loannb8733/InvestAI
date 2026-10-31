@@ -103,7 +103,6 @@ async def _record_daily_snapshot(db: AsyncSession, user_id: str, metrics: dict[s
                 datetime.now(UTC),
                 Decimal(str(metrics["total_value"])),
                 Decimal(str(metrics["total_invested"])),
-                Decimal(str(metrics["total_gain_loss"])),
                 currency,
             )
             await db.commit()

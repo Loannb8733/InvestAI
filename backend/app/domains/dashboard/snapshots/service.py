@@ -44,7 +44,6 @@ class SnapshotService:
             snapshot_date=datetime.now(UTC),
             total_value=Decimal(str(metrics["total_value"])),
             total_invested=Decimal(str(metrics["total_invested"])),
-            total_gain_loss=Decimal(str(metrics["total_gain_loss"])),
             currency=currency,
         )
         db.add(snapshot)
@@ -89,13 +88,12 @@ class SnapshotService:
         allocations: list[dict[str, Any]],
         days: int = 30,
         history: list[dict[str, Any]] | None = None,
-        roi_annualized: float | None = None,
     ) -> dict[str, Any]:
         """Tous les indicateurs de risque, sur une seule série de valeur."""
         series = history if history is not None else await self.build_portfolio_value_series(db, user_id, days)
         return {
             "volatility": calculate_volatility(series),
-            "sharpe_ratio": calculate_sharpe_ratio(series, roi_annualized=roi_annualized),
+            "sharpe_ratio": calculate_sharpe_ratio(series),
             "max_drawdown": calculate_max_drawdown(series),
             "var_95": calculate_var(series, 0.95, current_value),
             "concentration": calculate_hhi(allocations),

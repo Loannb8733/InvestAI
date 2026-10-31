@@ -11,13 +11,10 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import get_cached_dashboard
-from app.domains.dashboard.models import PortfolioSnapshot
-from app.domains.dashboard.snapshots import tasks as snapshot_tasks
 from app.domains.dashboard.snapshots.periods import format_date_for_period
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset
-from tests.conftest import TestSessionLocal
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 BASE = "/api/v1/dashboard"
@@ -100,28 +97,6 @@ class TestWithLiveQuotes:
             portfolio_id = (await client.get("/api/v1/portfolios", headers=headers)).json()[0]["id"]
             body = (await client.get(f"{BASE}/portfolio/{portfolio_id}", headers=headers)).json()
         assert body["total_gain_loss"] == pytest.approx(EXPECTED_GAIN)
-
-    async def test_route_and_task_snapshots_record_the_same_gain(
-        self,
-        client: AsyncClient,
-        db_session: AsyncSession,
-        regular_user: User,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr(snapshot_tasks, "session_factory", TestSessionLocal)
-        headers = _auth(regular_user)
-        with time_machine.travel(FROZEN_NOW, tick=False):
-            await seed_history(db_session)
-            await seed_portfolio(client, headers)
-            await snapshot_tasks.create_all_snapshots()
-            rows = (await db_session.execute(select(PortfolioSnapshot))).scalars().all()
-            assert {float(row.total_gain_loss) for row in rows} == {EXPECTED_GAIN}
-            await db_session.execute(text("DELETE FROM portfolio_snapshots"))
-            await db_session.commit()
-            db_session.expire_all()
-            await client.get(BASE, headers=headers)
-            rows = (await db_session.execute(select(PortfolioSnapshot))).scalars().all()
-        assert [float(row.total_gain_loss) for row in rows] == [EXPECTED_GAIN]
 
     async def test_benchmark_portfolio_series_uses_iso_dates_and_covers_all_time(
         self, client: AsyncClient, db_session: AsyncSession, regular_user: User

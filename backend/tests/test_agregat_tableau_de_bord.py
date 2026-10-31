@@ -413,7 +413,6 @@ class TestInstantaneQuotidien:
                 snapshot_date=datetime.now(UTC),
                 total_value=4900,
                 total_invested=4000,
-                total_gain_loss=900,
             )
         )
         await db_session.commit()
@@ -526,7 +525,6 @@ class TestInstantaneQuotidien:
                     snapshot_date=maintenant,
                     total_value=1,
                     total_invested=1,
-                    total_gain_loss=0,
                 )
             )
 

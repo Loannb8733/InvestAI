@@ -148,7 +148,7 @@ class RiskMetrics(BaseModel):
     """Indicateurs de risque."""
 
     volatility: float
-    sharpe_ratio: float
+    sharpe_ratio: float | None
     max_drawdown: MaxDrawdown
     var_95: ValueAtRisk
     beta: float | None = None

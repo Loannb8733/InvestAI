@@ -8,7 +8,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.dashboard.metrics import repository
-from app.domains.dashboard.metrics.ledger import replay_assets
+from app.domains.dashboard.metrics.ledger import asset_key, replay_assets
+from app.domains.dashboard.metrics.quotes import RateResolver
 from app.domains.portfolio.classification import is_cash_like
 from app.domains.portfolio.models import Asset
 from app.domains.transactions.cost_basis.config import ReplayEvent
@@ -35,6 +36,7 @@ EMPTY_HISTORY: dict[str, Any] = {
     "current_holdings_count": 0,
     "sold_assets_count": 0,
     "sold_assets": [],
+    "by_exchange": {},
 }
 
 
@@ -49,6 +51,7 @@ class _AssetHistory:
     sold_fiat_value: Decimal = ZERO
     fees: Decimal = ZERO
     realized: Decimal = ZERO
+    cost_sold: Decimal = ZERO
     first: datetime | None = None
     last: datetime | None = None
 
@@ -155,14 +158,27 @@ def _realize(event: ReplayEvent, histories: dict[str, _AssetHistory], prices: _P
     if event.kind == "SELL":
         proceeds = event.quantity * prices.resolve(event.tx, event.symbol) - event.fee
         history.realized += proceeds - event.cost_removed
+        history.cost_sold += event.cost_removed
     elif event.kind == "CONVERSION_OUT" and event.matched:
         history.realized += event.dest_layer_cost - event.cost_removed
+        history.cost_sold += event.cost_removed
+
+
+async def _charge_sold_out_fees(
+    pending: list[tuple[Any, Decimal, str]], histories: dict[str, _AssetHistory], rates: RateResolver, currency: str
+) -> None:
+    by_key = {asset_key(history.asset): history for history in histories.values()}
+    for entry, amount, entry_currency in pending:
+        history = by_key.get(entry)
+        if history is not None and history.asset.quantity <= 0:
+            history.realized -= amount * Decimal(str(await rates.tracked_rate(entry_currency, currency)))
 
 
 def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
     invested = sold = sold_fiat = fees = ZERO
     holdings: list[dict[str, Any]] = []
     sold_assets: list[dict[str, Any]] = []
+    by_exchange: dict[str, dict[str, float]] = {}
     for history in histories.values():
         if is_cash_like(history.asset.symbol):
             continue
@@ -170,6 +186,9 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
         sold += history.sold_value
         sold_fiat += history.sold_fiat_value
         fees += history.fees
+        sales = by_exchange.setdefault(history.asset.exchange or "Autre", {"realized": 0.0, "cost_sold": 0.0})
+        sales["realized"] += float(history.realized)
+        sales["cost_sold"] += float(history.cost_sold)
         if float(history.asset.quantity) <= 0:
             if history.sold > 0:
                 sold_assets.append(history.as_dict())
@@ -188,6 +207,7 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
         "current_holdings_count": len(holdings),
         "sold_assets_count": len(sold_assets),
         "sold_assets": sold_assets,
+        "by_exchange": by_exchange,
     }
 
 
@@ -201,5 +221,6 @@ async def compute_portfolio_history(db: AsyncSession, portfolio_id: str, currenc
     symbols = {str(asset.id): asset.symbol.upper() for asset in assets}
     prices = await _load_prices(db, transactions, symbols)
     _replay(transactions, histories, prices)
-    replay_assets(transactions, assets, currency, on_event=lambda event: _realize(event, histories, prices))
+    replayed = replay_assets(transactions, assets, currency, on_event=lambda event: _realize(event, histories, prices))
+    await _charge_sold_out_fees(replayed.pending_fee_conversions, histories, RateResolver(db), currency.upper())
     return _summarize(histories)

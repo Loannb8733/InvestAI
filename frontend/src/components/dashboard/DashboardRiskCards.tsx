@@ -50,7 +50,7 @@ interface ValueAtRisk {
 
 interface RiskMetrics {
   volatility: number
-  sharpe_ratio: number
+  sharpe_ratio: number | null
   max_drawdown: MaxDrawdown
   var_95: ValueAtRisk
   beta?: number
@@ -67,6 +67,9 @@ interface DashboardRiskCardsProps {
 export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabel, privacyMode }: DashboardRiskCardsProps) {
   const st = thresholds?.sharpe ?? DEFAULT_DISPLAY_THRESHOLDS.sharpe
   if (!riskMetrics) return null
+  const sharpe = riskMetrics.sharpe_ratio
+  const sharpeClass = sharpe === null ? '' : sharpe >= st.good ? 'text-gain' : sharpe >= st.neutral ? 'text-warning' : 'text-loss'
+  const sharpeLabel = sharpe === null ? '3 mois minimum' : sharpe >= st.good ? 'Bon' : sharpe >= st.neutral ? 'Moyen' : 'Faible'
   return (
     <SpotlightGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card elevation="raised" className="spot-card">
@@ -86,8 +89,8 @@ export default function DashboardRiskCards({ riskMetrics, thresholds, periodLabe
           <div className="flex items-center justify-between">
             <div>
               <MetricTooltip content="Rendement ajusté au risque. >1 = bon, >2 = très bon, <0 = mauvais"><p className="text-sm text-muted-foreground">Ratio de Sharpe</p></MetricTooltip>
-              <p className={`text-xl font-bold ${riskMetrics.sharpe_ratio >= st.good ? 'text-gain' : riskMetrics.sharpe_ratio >= st.neutral ? 'text-warning' : 'text-loss'}`}>{riskMetrics.sharpe_ratio.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">{riskMetrics.sharpe_ratio >= st.good ? 'Bon' : riskMetrics.sharpe_ratio >= st.neutral ? 'Moyen' : 'Faible'}</p>
+              <p className={`text-xl font-bold ${sharpeClass}`}>{sharpe === null ? '—' : sharpe.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">{sharpeLabel}</p>
             </div>
             <Zap className="h-8 w-8 text-muted-foreground" />
           </div>

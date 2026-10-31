@@ -1,5 +1,23 @@
 {
   "body": {
+    "by_exchange": {
+      "Binance": {
+        "cost_sold": 3002.0,
+        "realized": 3991.0
+      },
+      "Kraken": {
+        "cost_sold": 2001.0,
+        "realized": 1496.0
+      },
+      "Tangem": {
+        "cost_sold": 0.0,
+        "realized": 0.0
+      },
+      "Trade Republic": {
+        "cost_sold": 0.0,
+        "realized": 0.0
+      }
+    },
     "current_holdings_count": 7,
     "realized_gains": 5487.0,
     "sold_assets": [],
