@@ -136,6 +136,7 @@ class AnalyticsPortfolio(AnalyticsCore):
         self,
         db: AsyncSession,
         portfolio_id: str,
+        *,
         currency: str = "EUR",
         days: int = 60,
     ) -> PortfolioAnalytics:
@@ -154,6 +155,7 @@ class AnalyticsPortfolio(AnalyticsCore):
         self,
         db: AsyncSession,
         user_id: str,
+        *,
         currency: str = "EUR",
         days: int = 60,
     ) -> PortfolioAnalytics:
