@@ -10,10 +10,10 @@ from app.domains.analytics.core import AnalyticsCore, last_known_price
 from app.domains.analytics.metrics import compute_returns
 from app.domains.analytics.scoring import calc_beta, interpret_beta
 from app.domains.analytics.xirr import build_xirr_cashflows, xirr
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions.models import Transaction
-from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
 

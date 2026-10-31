@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import session_factory
+from app.domains.dashboard.metrics.cache import invalidate_dashboard_cache
 from app.domains.exchanges.clients import crypto_portfolio, open_client
 from app.domains.exchanges.failures import rollback_and_mark
 from app.domains.exchanges.models import APIKey, ColdWalletAddress
@@ -22,7 +23,6 @@ from app.domains.exchanges.sync.orders import import_orders, orders, repair_orde
 from app.domains.exchanges.sync.pricing import TradeFx
 from app.domains.exchanges.sync.rules import as_utc
 from app.domains.exchanges.sync.symbols import holdings
-from app.services.metrics_service import invalidate_dashboard_cache
 
 CONVERT_OVERLAP = timedelta(days=30)
 WITHDRAWAL_OVERLAP = timedelta(days=7)

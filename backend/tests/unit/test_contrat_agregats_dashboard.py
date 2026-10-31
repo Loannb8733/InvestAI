@@ -22,21 +22,15 @@ complet demanderait toute la chaîne, alors que la régression à verrouiller es
 déclarative : une clé disparaît de la projection sans que son lecteur bronche.
 """
 
-import re
 from pathlib import Path
 
 import pytest
 
-import app.services.metrics_service as module_metrics
+AGREGAT = "app.domains.dashboard.metrics.aggregate"
 
 
 def cles_projetees() -> set[str]:
-    source = Path(module_metrics.__file__).read_text()
-    debut = source.index('"aggregated_assets": [')
-    # Borne : la clause `for` de la compréhension. Un `],` naïf tomberait sur
-    # le premier `a["symbol"]` venu.
-    bloc = source[debut : source.index("for a in aggregated", debut)]
-    return set(re.findall(r'"(\w+)":', bloc)) - {"aggregated_assets"}
+    return _cles_de(AGREGAT, "project_aggregated_assets")
 
 
 # Clés lues par les consommateurs, relevées à la main dans le code appelant.
@@ -77,11 +71,7 @@ def test_le_prix_unitaire_du_resume_earn_est_calculable():
 
 def cles_racine() -> set[str]:
     """Clés du dictionnaire que `get_user_dashboard_metrics` retourne."""
-    lignes = Path(module_metrics.__file__).read_text().split("\n")
-    i = next(i for i, l in enumerate(lignes) if '"aggregated_assets": [' in l)
-    debut = max(j for j in range(i) if lignes[j].strip().startswith("return {"))
-    fin = next(j for j in range(i, len(lignes)) if lignes[j].rstrip() == "        }")
-    return set(re.findall(r'^\s+"(\w+)":', "\n".join(lignes[debut : fin + 1]), re.M))
+    return _cles_de(AGREGAT, "build_dashboard_summary")
 
 
 # Clés du dictionnaire racine lues par ses sept consommateurs.

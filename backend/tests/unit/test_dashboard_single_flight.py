@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services import metrics_service as ms
+from app.domains.dashboard.metrics import cache as ms
+from app.domains.dashboard.metrics.service import MetricsService
 from app.services import snapshot_service as ss
-from app.services.metrics_service import MetricsService
 from app.services.snapshot_service import SnapshotService
 
 
@@ -33,8 +33,8 @@ def _isolate_l2_redis():
 
 @pytest.mark.asyncio
 async def test_concurrent_misses_compute_once():
-    ms._dashboard_cache.clear()
-    ms._dashboard_inflight.clear()
+    ms.dashboard_cache.clear()
+    ms.dashboard_inflight.clear()
     svc = MetricsService()
 
     calls = {"n": 0}
@@ -52,14 +52,14 @@ async def test_concurrent_misses_compute_once():
     assert calls["n"] == 1  # single-flight: computed exactly once for 10 concurrent misses
     assert all(r == {"total_value": 42.0} for r in results)
     # After completion the in-flight entry is cleared and the result is cached.
-    assert ("u1", 30, "EUR") not in ms._dashboard_inflight
-    assert ("u1", 30, "EUR") in ms._dashboard_cache
+    assert ("u1", 30, "EUR") not in ms.dashboard_inflight
+    assert ("u1", 30, "EUR") in ms.dashboard_cache
 
 
 @pytest.mark.asyncio
 async def test_failure_propagates_and_clears_inflight():
-    ms._dashboard_cache.clear()
-    ms._dashboard_inflight.clear()
+    ms.dashboard_cache.clear()
+    ms.dashboard_inflight.clear()
     svc = MetricsService()
 
     async def boom(db, user_id, currency, days):
@@ -72,8 +72,8 @@ async def test_failure_propagates_and_clears_inflight():
         await asyncio.gather(*[svc.get_user_dashboard_metrics(None, "u2", "EUR", 30) for _ in range(3)])
 
     # No leaked in-flight future, nothing cached on failure.
-    assert ("u2", 30, "EUR") not in ms._dashboard_inflight
-    assert ("u2", 30, "EUR") not in ms._dashboard_cache
+    assert ("u2", 30, "EUR") not in ms.dashboard_inflight
+    assert ("u2", 30, "EUR") not in ms.dashboard_cache
 
 
 @pytest.mark.asyncio

@@ -6,12 +6,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.reports.classes import CRYPTO_ASSET_CLASSES, CRYPTO_CLASS_LABELS
 from app.domains.reports.tax import TAX_MODE
 from app.domains.transactions.cost_basis.replay import replay, sort_transactions
 from app.domains.transactions.models import Transaction
-from app.services.metrics_service import metrics_service
 
 _ZERO = Decimal("0")
 _DUST_VALUE = 0.10

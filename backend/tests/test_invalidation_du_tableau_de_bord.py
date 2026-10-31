@@ -22,9 +22,9 @@ import pytest
 from httpx import AsyncClient
 
 from app.core import redis_client
+from app.domains.dashboard.metrics import cache as metrics_cache
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.services import metrics_service
 
 
 @pytest.fixture
@@ -37,11 +37,11 @@ def cache_amorce(regular_user: User):
     """Place une entrée pour l'utilisateur et une pour un tiers dans le cache en mémoire."""
     moi = (str(regular_user.id), 30)
     tiers = (str(uuid.uuid4()), 30)
-    metrics_service._dashboard_cache[moi] = (time.time(), {"total_value": 1})
-    metrics_service._dashboard_cache[tiers] = (time.time(), {"total_value": 2})
+    metrics_cache.dashboard_cache[moi] = (time.time(), {"total_value": 1})
+    metrics_cache.dashboard_cache[tiers] = (time.time(), {"total_value": 2})
     yield moi, tiers
-    metrics_service._dashboard_cache.pop(moi, None)
-    metrics_service._dashboard_cache.pop(tiers, None)
+    metrics_cache.dashboard_cache.pop(moi, None)
+    metrics_cache.dashboard_cache.pop(tiers, None)
 
 
 @pytest.fixture
@@ -69,8 +69,8 @@ async def test_l_ecriture_vide_le_cache_en_memoire_de_son_auteur(
 
     assert await _creer_portefeuille(client, entetes) == 201
 
-    assert moi not in metrics_service._dashboard_cache, "le tableau de bord de l'auteur doit être recalculé"
-    assert tiers in metrics_service._dashboard_cache, "le cache d'un autre utilisateur n'est pas concerné"
+    assert moi not in metrics_cache.dashboard_cache, "le tableau de bord de l'auteur doit être recalculé"
+    assert tiers in metrics_cache.dashboard_cache, "le cache d'un autre utilisateur n'est pas concerné"
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_une_lecture_ne_purge_rien(client: AsyncClient, regular_user: User
     reponse = await client.get("/api/v1/portfolios", headers=entetes)
 
     assert reponse.status_code == 200
-    assert moi in metrics_service._dashboard_cache
+    assert moi in metrics_cache.dashboard_cache
     assert purges_redis == []
 
 
@@ -112,7 +112,7 @@ async def test_un_echec_d_invalidation_se_voit_sans_casser_l_ecriture(
 
     assert await _creer_portefeuille(client, entetes) == 201
 
-    assert moi not in metrics_service._dashboard_cache, "une panne Redis ne doit pas épargner le cache en mémoire"
+    assert moi not in metrics_cache.dashboard_cache, "une panne Redis ne doit pas épargner le cache en mémoire"
     avertissements = [
         r.getMessage()
         for r in caplog.records

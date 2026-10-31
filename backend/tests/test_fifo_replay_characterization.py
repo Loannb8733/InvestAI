@@ -44,6 +44,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.dashboard.metrics.service import MetricsService
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
@@ -51,7 +52,6 @@ from app.domains.reports.rebalancing import RebalanceOrder
 from app.domains.reports.service import ReportService
 from app.domains.reports.tax import TAX_MODE_LEGACY
 from app.domains.transactions.models import Transaction, TransactionType
-from app.services.metrics_service import MetricsService
 
 TxType = TransactionType
 
@@ -151,7 +151,10 @@ def _asset_entry(result, symbol, exchange):
 
 async def _metrics(db_session, portfolio, crypto_prices, forex=None, **kwargs):
     ps = _fake_price_service(crypto_prices, forex or {})
-    with patch("app.services.metrics_service.price_feed", ps), patch.object(spot_rates, "get", ps.get_forex_rate):
+    with (
+        patch("app.domains.dashboard.metrics.quotes.price_feed", ps),
+        patch.object(spot_rates, "get", ps.get_forex_rate),
+    ):
         return await MetricsService().get_portfolio_metrics(db_session, str(portfolio.id), currency="EUR", **kwargs)
 
 

@@ -1,50 +1,60 @@
-"""Conversion des frais réglés en crypto, et fiabilité du flag `forex_stale`.
+"""Résolution des taux : change, puis cours crypto, puis 1 signalé comme périmé.
 
-Les frais d'exchange sont souvent payés en crypto (BTC, ETH, BNB…). Or
-`_get_rate_with_cache` interrogeait un convertisseur **forex**, qui ne connaît que
-les monnaies fiat et renvoie None pour BTC. Le code retombait alors sur la constante
-de dernier recours — 1,0 — donc 0,0001 BTC était compté 0,0001 € au lieu de ~6,80 €,
-et `forex_stale` restait levé en permanence.
-
-Un flag toujours allumé ne signale plus rien : il ne pouvait plus servir à avertir
-d'un vrai incident de change. Mesuré avant/après sur des données réelles :
-True -> False, pour un impact de moins d'un euro sur le P&L.
-
-Ordre des correctifs : la devise des frais a été assainie AVANT de brancher la
-conversion crypto. Une transaction Bitstack portait `fee = 0,29` avec
-`fee_currency = 'BTC'` sur un achat de 0,0001234 BTC — soit 2 350 fois la quantité
-achetée. C'étaient 0,29 €. Convertir d'abord aurait valorisé ces frais à ~19 700 €.
+Les frais d'exchange sont souvent payés en crypto. Un convertisseur de change ne connaît que les monnaies
+fiat : sans repli sur le cours crypto, 0,0001 BTC de frais comptait 0,0001 € et `forex_stale` restait levé
+en permanence, ce qui ne signalait plus rien.
 """
 
-from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
-_SRC = (Path(__file__).resolve().parents[2] / "app" / "services" / "metrics_service.py").read_text(encoding="utf-8")
+import pytest
 
+from app.domains.dashboard.metrics.quotes import RateResolver
+from app.domains.market_data.fx.service import FxService
 
-class TestConversionCrypto:
-    def test_le_prix_crypto_est_tente_avant_la_constante(self):
-        # L'ordre compte : la constante 1,0 est le dernier recours, pas le premier.
-        avant_constante = _SRC.split("_HARDCODED_FALLBACK_RATES.get(from_ccy")[0]
-        assert "_crypto_unit_price(from_ccy, to_ccy)" in avant_constante
-
-    def test_un_prix_de_marche_n_est_pas_marque_perime(self):
-        bloc = _SRC.split("crypto_rate = await _crypto_unit_price")[1][:400]
-        assert "return crypto_rate, False" in bloc, (
-            "un prix crypto temps réel est une donnée fraîche : le marquer stale rendrait le flag inutilisable"
-        )
-
-    def test_il_demande_un_prix_crypto_a_la_facade(self):
-        helper = _SRC.split("async def _crypto_unit_price")[1].split("async def _get_rate_with_cache")[0]
-        assert 'price_feed.quote(symbol, "crypto", to_ccy)' in helper
-        assert "return float(quote.price) if quote is not None else None" in helper
+QUOTES = "app.domains.dashboard.metrics.quotes.price_feed"
 
 
-class TestOrdreDeResolution:
-    def test_la_chaine_complete_est_respectee(self):
-        """taux de change (comptant, BCE, démarrage) -> prix crypto -> montant non converti."""
-        bloc = _SRC.split("async def _get_rate_with_cache")[1].split("if target != ")[0]
-        positions = [bloc.index("fx_service.latest"), bloc.index("_crypto_unit_price"), bloc.index("return 1.0, True")]
-        assert positions == sorted(positions), "l'ordre de repli des taux a changé"
+def _resolver() -> RateResolver:
+    return RateResolver(db=None)
 
-    def test_l_absence_de_taux_reste_marquee_perimee(self):
-        assert "return 1.0, True" in _SRC.split("async def _get_rate_with_cache")[1].split("if target != ")[0]
+
+@pytest.mark.asyncio
+async def test_le_change_prime_sur_le_cours_crypto():
+    feed = AsyncMock()
+    with (
+        patch.object(FxService, "latest", new=AsyncMock(return_value=SimpleNamespace(rate=0.9, stale=True))),
+        patch(QUOTES, feed),
+    ):
+        assert await _resolver().rate("USD", "EUR") == (0.9, True)
+    feed.quote.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_un_cours_crypto_est_une_donnee_fraiche():
+    feed = AsyncMock()
+    feed.quote.return_value = SimpleNamespace(price=68000)
+    with patch.object(FxService, "latest", new=AsyncMock(return_value=None)), patch(QUOTES, feed):
+        assert await _resolver().rate("BTC", "EUR") == (68000.0, False)
+    feed.quote.assert_awaited_once_with("BTC", "crypto", "EUR")
+
+
+@pytest.mark.asyncio
+async def test_sans_aucun_taux_le_montant_reste_non_converti_et_perime():
+    feed = AsyncMock()
+    feed.quote.return_value = None
+    with patch.object(FxService, "latest", new=AsyncMock(return_value=None)), patch(QUOTES, feed):
+        assert await _resolver().rate("XYZ", "EUR") == (1.0, True)
+
+
+@pytest.mark.asyncio
+async def test_seul_le_taux_suivi_marque_la_resolution_perimee():
+    feed = AsyncMock()
+    feed.quote.return_value = None
+    with patch.object(FxService, "latest", new=AsyncMock(return_value=None)), patch(QUOTES, feed):
+        resolver = _resolver()
+        await resolver.rate("XYZ", "EUR")
+        assert resolver.stale is False
+        assert await resolver.tracked_rate("XYZ", "EUR") == 1.0
+        assert resolver.stale is True

@@ -17,6 +17,7 @@ from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.redis_client import cache_dashboard, get_cached_dashboard
 from app.domains.alerts.models import Alert
 from app.domains.calendar.models import CalendarEvent
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.identity.dependencies import get_current_user
 from app.domains.identity.models import User
 from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
@@ -25,7 +26,6 @@ from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
 router = APIRouter()
@@ -1134,7 +1134,7 @@ async def get_index_comparison(days: int = 30) -> list[IndexComparison]:
 
         # Fetch period-specific changes
         period_changes = await asyncio.wait_for(
-            metrics_service._fetch_period_changes({"crypto": [s for s, _ in index_symbols]}, days),
+            metrics_service.fetch_period_changes({"crypto": [s for s, _ in index_symbols]}, days),
             timeout=5.0,
         )
 
@@ -1201,8 +1201,7 @@ async def get_portfolio_history(
     if not portfolio_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Portefeuille non trouvé")
 
-    currency = getattr(current_user, "preferred_currency", "EUR") or "EUR"
-    history = await metrics_service.get_portfolio_history(db, portfolio_id, currency=currency)
+    history = await metrics_service.get_portfolio_history(db, portfolio_id)
     return history
 
 

@@ -7,10 +7,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.classification import is_safe_haven
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction
-from app.services.metrics_service import metrics_service
 from app.services.snapshot_service import snapshot_service
 
 logger = logging.getLogger(__name__)

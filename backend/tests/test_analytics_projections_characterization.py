@@ -193,7 +193,9 @@ class TestTestsDeResistance:
     async def test_la_valeur_totale_est_la_somme_des_lignes(self, service, db_session, regular_user):
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         assert resultat["total_value"] == pytest.approx(100000.0)
@@ -207,7 +209,9 @@ class TestTestsDeResistance:
         """
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         par_id = {s["id"]: s for s in resultat["scenarios"]}
@@ -217,7 +221,9 @@ class TestTestsDeResistance:
     async def test_les_scenarios_de_crise_appauvrissent(self, service, db_session, regular_user):
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         crises = [s for s in resultat["scenarios"] if s["id"] != "bull_run_2021"]
@@ -230,7 +236,9 @@ class TestTestsDeResistance:
     async def test_le_pire_scenario_est_celui_du_plus_fort_recul(self, service, db_session, regular_user):
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         pire = resultat["max_drawdown"]
@@ -252,7 +260,9 @@ class TestTestsDeResistance:
         """
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         assert resultat["max_drawdown"]["value"] == pytest.approx(60.0)
@@ -264,7 +274,9 @@ class TestTestsDeResistance:
     async def test_le_detail_par_actif_couvre_toutes_les_lignes(self, service, db_session, regular_user):
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id))
 
         for scenario in resultat["scenarios"]:
@@ -274,7 +286,9 @@ class TestTestsDeResistance:
     async def test_un_filtre_de_scenarios_est_respecte(self, service, db_session, regular_user):
         await _portefeuille(db_session, regular_user)
 
-        with patch("app.services.metrics_service.metrics_service.get_portfolio_metrics", self._metriques_figees()):
+        with patch(
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics", self._metriques_figees()
+        ):
             resultat = await service.stress_test(db_session, str(regular_user.id), scenario_ids=["luna_ftx_2022"])
 
         assert [s["id"] for s in resultat["scenarios"]] == ["luna_ftx_2022"]
@@ -283,7 +297,7 @@ class TestTestsDeResistance:
         await _portefeuille(db_session, regular_user)
 
         with patch(
-            "app.services.metrics_service.metrics_service.get_portfolio_metrics",
+            "app.domains.dashboard.metrics.service.metrics_service.get_portfolio_metrics",
             new=AsyncMock(return_value={"assets": []}),
         ):
             resultat = await service.stress_test(db_session, str(regular_user.id))

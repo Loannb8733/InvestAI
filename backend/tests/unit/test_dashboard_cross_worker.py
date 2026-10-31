@@ -7,17 +7,18 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import app.services.metrics_service as ms
-from app.services.metrics_service import MetricsService, invalidate_dashboard_cache
+import app.domains.dashboard.metrics.cache as ms
+from app.domains.dashboard.metrics.cache import invalidate_dashboard_cache
+from app.domains.dashboard.metrics.service import MetricsService
 
 
 @pytest.fixture(autouse=True)
 def _clear_cache():
-    ms._dashboard_cache.clear()
-    ms._dashboard_inflight.clear()
+    ms.dashboard_cache.clear()
+    ms.dashboard_inflight.clear()
     yield
-    ms._dashboard_cache.clear()
-    ms._dashboard_inflight.clear()
+    ms.dashboard_cache.clear()
+    ms.dashboard_inflight.clear()
 
 
 @pytest.mark.asyncio
@@ -71,6 +72,6 @@ async def test_lock_loser_reuses_peer_result_without_recomputing():
 
 def test_invalidate_is_safe_without_a_running_loop():
     # Sync context (no event loop): clears L1 and swallows the Redis scheduling.
-    ms._dashboard_cache[("u4", 30, "EUR")] = (0.0, {"total_value": 1.0})
+    ms.dashboard_cache[("u4", 30, "EUR")] = (0.0, {"total_value": 1.0})
     invalidate_dashboard_cache("u4")
-    assert not any(k[0] == "u4" for k in ms._dashboard_cache)
+    assert not any(k[0] == "u4" for k in ms.dashboard_cache)

@@ -7,8 +7,8 @@ import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import redis_async_url, redis_client_kwargs
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset
-from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
 

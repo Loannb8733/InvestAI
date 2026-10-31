@@ -10,7 +10,7 @@ MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 async def _invalidate_dashboard(user_id: str) -> None:
     from app.core.redis_client import invalidate_dashboard_cache as invalidate_redis_dashboard
-    from app.services.metrics_service import invalidate_dashboard_cache as invalidate_inmem_dashboard
+    from app.domains.dashboard.metrics.cache import invalidate_dashboard_cache as invalidate_inmem_dashboard
 
     invalidate_inmem_dashboard(user_id)
     await invalidate_redis_dashboard(user_id)

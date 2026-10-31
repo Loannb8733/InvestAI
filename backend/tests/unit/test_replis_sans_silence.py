@@ -28,7 +28,9 @@ MODULES_SENSIBLES = [
     "app.domains.alerts.pricing",
     "app.domains.alerts.risk_weights",
     "app.domains.alerts.tasks",
-    "app.services.metrics_service",
+    "app.domains.dashboard.metrics.cash",
+    "app.domains.dashboard.metrics.positions",
+    "app.domains.dashboard.metrics.service",
     "app.services.smart_insights_service",
     "app.services.snapshot_service",
 ]

@@ -14,7 +14,7 @@ import pytest
 from app.domains.transactions.models import TransactionType as TxType
 from tests.test_fifo_replay_characterization import _dt, _make_asset, _make_portfolio, _metrics, _tx
 
-_JOURNAL = "app.services.metrics_service"
+_JOURNAL = "app.domains.dashboard.metrics"
 
 
 async def _portefeuille_btc(db_session, regular_user):
@@ -27,7 +27,9 @@ async def _portefeuille_btc(db_session, regular_user):
 
 def _dumps(caplog, niveau_min):
     return [
-        r for r in caplog.records if r.name == _JOURNAL and r.levelno >= niveau_min and "[FIFO_DEBUG]" in r.getMessage()
+        r
+        for r in caplog.records
+        if r.name.startswith(_JOURNAL) and r.levelno >= niveau_min and "[FIFO_DEBUG]" in r.getMessage()
     ]
 
 

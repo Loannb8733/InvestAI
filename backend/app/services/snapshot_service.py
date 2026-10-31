@@ -10,13 +10,13 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.market_data.fx.cold_start import USD_EUR as COLD_START_USD_EUR
 from app.domains.market_data.fx.spot import spot_rates
 from app.domains.portfolio.classification import STABLECOIN_PEGS, STABLECOIN_SYMBOLS
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction, TransactionType
 from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.services.metrics_service import metrics_service
 from app.services.snapshot_risk import SnapshotRiskMixin
 
 logger = logging.getLogger(__name__)

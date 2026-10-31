@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import get_session
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.identity.dependencies import CurrentUser
 from app.domains.identity.models import User
 from app.domains.planning.simulations.dca import simulate_dca_paths
@@ -23,7 +24,6 @@ from app.domains.planning.simulations.schemas import (
     SimulationResponse,
 )
 from app.domains.portfolio.models import Portfolio
-from app.services.metrics_service import metrics_service
 
 router = APIRouter()
 

@@ -327,13 +327,11 @@ class TestContratDesAgregats:
         """
         from pathlib import Path
 
-        import app.services.metrics_service as module_metrics
+        from app.domains.dashboard.metrics import aggregate as module_agregat
 
-        source = Path(module_metrics.__file__).read_text()
-        debut = source.index('"aggregated_assets": [')
-        # La borne est la clause `for` de la compréhension : un `],` naïf
-        # tomberait sur le premier `a["symbol"]` venu.
-        projection = source[debut : source.index("for a in aggregated", debut)]
+        source = Path(module_agregat.__file__).read_text()
+        debut = source.index("def project_aggregated_assets")
+        projection = source[debut : source.index("for entry in aggregated", debut)]
 
         for cle in ("symbol", "asset_type", "current_value", "current_price"):
             assert f'"{cle}"' in projection, f"`{cle}` a disparu des agrégats du dashboard"
@@ -351,8 +349,8 @@ class TestQuantiteAgregee:
         """
         from decimal import Decimal
 
+        from app.domains.dashboard.metrics.service import metrics_service
         from app.domains.portfolio.models import Asset, AssetType, Portfolio
-        from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")
         db_session.add(pf)
@@ -392,8 +390,8 @@ class TestQuantiteAgregee:
         """
         from decimal import Decimal
 
+        from app.domains.dashboard.metrics.service import metrics_service
         from app.domains.portfolio.models import Asset, AssetType, Portfolio
-        from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")
         db_session.add(pf)
@@ -433,9 +431,9 @@ class TestQuantiteAgregee:
         from datetime import datetime
         from decimal import Decimal
 
+        from app.domains.dashboard.metrics.service import metrics_service
         from app.domains.portfolio.models import Asset, AssetType, Portfolio
         from app.domains.transactions.models import Transaction, TransactionType
-        from app.services.metrics_service import metrics_service
 
         pf = Portfolio(user_id=regular_user.id, name="P")
         db_session.add(pf)
