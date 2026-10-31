@@ -25,8 +25,8 @@ from app.domains.analytics.schemas import (
 )
 from app.domains.analytics.service import analytics_service
 from app.domains.identity.dependencies import CurrentUser
+from app.domains.insights.market_regime import current_vol_regime
 from app.domains.portfolio.models import Portfolio
-from app.services.smart_insights_service import smart_insights_service
 
 router = APIRouter()
 
@@ -193,7 +193,7 @@ async def get_monte_carlo(
 ) -> MonteCarloResponse:
     """Monte-Carlo au régime de volatilité courant ; au-delà de 20 % de probabilité de ruine, une alerte Telegram part
     en tâche de fond."""
-    vol_regime = await smart_insights_service.get_current_vol_regime(session, str(user.id))
+    vol_regime = await current_vol_regime()
     result = await analytics_service.monte_carlo(
         session,
         str(user.id),

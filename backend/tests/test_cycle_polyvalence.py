@@ -162,10 +162,9 @@ class TestGoldBonusSuppressedInBull:
         )
         market_regime = MarketRegime(market=regime_result, per_asset=[])
 
-        from app.services.smart_insights_service import SmartInsightsService
+        from app.domains.insights.score import overall_score
 
-        svc = SmartInsightsService()
-        score, status = svc._calculate_overall_score(
+        score, status = overall_score(
             sharpe=0.3,  # poor sharpe → penalty
             volatility=0.50,  # high volatility → penalty
             var_95=0.06,  # elevated VaR → penalty

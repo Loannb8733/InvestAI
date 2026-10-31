@@ -1,6 +1,6 @@
 """Filet de caractérisation des frais payés et des revenus passifs.
 
-Deux méthodes d'`insights_service` que l'utilisateur consulte pour savoir ce
+Deux méthodes d'`domains/insights` que l'utilisateur consulte pour savoir ce
 que lui coûte sa gestion et ce qu'elle lui rapporte. Le module était couvert à
 31 % après le filet sur l'optimisation fiscale.
 
@@ -13,17 +13,12 @@ mesurés y sont nommés sans être corrigés.
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import pytest
-
+from app.domains.insights.fees import fee_analysis
+from app.domains.insights.passive_income import passive_income
 from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions.models import Transaction, TransactionType
-from app.services.insights_service import InsightsService
-
-
-@pytest.fixture
-def service():
-    return InsightsService()
 
 
 async def portefeuille(db_session, user, nom="Test") -> Portfolio:
@@ -71,28 +66,28 @@ def mouvement(
 
 
 class TestAnalyseDesFrais:
-    async def test_sans_portefeuille_le_resultat_est_vide(self, db_session, regular_user, service):
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+    async def test_sans_portefeuille_le_resultat_est_vide(self, db_session, regular_user):
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 0
         assert res["by_exchange"] == {}
 
-    async def test_un_portefeuille_sans_actif_rend_le_meme_vide(self, db_session, regular_user, service):
+    async def test_un_portefeuille_sans_actif_rend_le_meme_vide(self, db_session, regular_user):
         await portefeuille(db_session, regular_user)
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 0
 
-    async def test_les_frais_sont_ventiles_par_plateforme_actif_type_et_mois(self, db_session, regular_user, service):
+    async def test_les_frais_sont_ventiles_par_plateforme_actif_type_et_mois(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf, "BTC")
         db_session.add(mouvement(btc, frais="10", quand="2026-01-10"))
         db_session.add(mouvement(btc, frais="5", quand="2026-02-10", exchange="Kraken"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 15.0
         assert res["nb_transactions_with_fees"] == 2
@@ -100,27 +95,27 @@ class TestAnalyseDesFrais:
         assert res["by_asset"] == {"BTC": 15.0}
         assert res["by_month"] == {"2026-01": 10.0, "2026-02": 5.0}
 
-    async def test_une_transaction_sans_frais_est_ignoree(self, db_session, regular_user, service):
+    async def test_une_transaction_sans_frais_est_ignoree(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="0"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["nb_transactions_with_fees"] == 0
 
-    async def test_une_plateforme_absente_devient_inconnu(self, db_session, regular_user, service):
+    async def test_une_plateforme_absente_devient_inconnu(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="3", exchange=""))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["by_exchange"] == {"Inconnu": 3.0}
 
-    async def test_les_ventilations_sont_triees_par_montant_decroissant(self, db_session, regular_user, service):
+    async def test_les_ventilations_sont_triees_par_montant_decroissant(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf, "BTC")
         eth = await actif(db_session, pf, "ETH")
@@ -128,12 +123,12 @@ class TestAnalyseDesFrais:
         db_session.add(mouvement(eth, frais="9", exchange="B"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert list(res["by_exchange"]) == ["B", "A"]
         assert list(res["by_asset"]) == ["ETH", "BTC"]
 
-    async def test_la_moyenne_mensuelle_porte_sur_la_duree_couverte(self, db_session, regular_user, service):
+    async def test_la_moyenne_mensuelle_porte_sur_la_duree_couverte(self, db_session, regular_user):
         """Corrigé le 2026-09-08 (NEW-27) : le diviseur était le nombre de mois
         **ayant porté des frais**, pas la durée.
 
@@ -151,23 +146,23 @@ class TestAnalyseDesFrais:
         db_session.add(mouvement(btc, frais="6", quand="2026-12-10"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 12.0
         assert res["avg_monthly_fee"] == 1.0
 
-    async def test_un_mois_unique_reste_son_propre_denominateur(self, db_session, regular_user, service):
+    async def test_un_mois_unique_reste_son_propre_denominateur(self, db_session, regular_user):
         # Rien à étaler : la durée couverte vaut un mois.
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="12", quand="2026-01-10"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["avg_monthly_fee"] == 12.0
 
-    async def test_une_transaction_sans_date_ne_fausse_pas_la_duree(self, db_session, regular_user, service):
+    async def test_une_transaction_sans_date_ne_fausse_pas_la_duree(self, db_session, regular_user):
         """Les mouvements non datés tombent dans un mois « ? ».
 
         Cette clé ne situe rien sur l'axe du temps : elle est écartée du calcul
@@ -181,13 +176,11 @@ class TestAnalyseDesFrais:
         db_session.add(mouvement(btc, frais="8", quand="2026-01-10"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["avg_monthly_fee"] == 12.0
 
-    async def test_les_frais_sont_ramenes_en_euros_avant_d_etre_sommes(
-        self, db_session, regular_user, service, monkeypatch
-    ):
+    async def test_les_frais_sont_ramenes_en_euros_avant_d_etre_sommes(self, db_session, regular_user, monkeypatch):
         """Corrigé le 2026-09-08 (NEW-21) : le total sommait des devises brutes.
 
         « 1 EUR + 1 USDC + 0,001 BTC = 2,001 » mélangeait trois unités. Chaque
@@ -201,12 +194,11 @@ class TestAnalyseDesFrais:
 
         Le cours est fixé ici : sans cela, le test dépendrait du marché du jour.
         """
-        from app.services import insights_service as module
 
         async def cours(symbole, type_actif):
             return PriceQuote(price=Decimal("0.9")) if symbole.upper() == "USDC" else None
 
-        monkeypatch.setattr(module.price_feed, "quote", cours)
+        monkeypatch.setattr(price_feed, "quote", cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
@@ -215,39 +207,36 @@ class TestAnalyseDesFrais:
         db_session.add(mouvement(btc, frais="0.001", devise_frais="BTC"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 41.9  # 1 + 0,9 + 40
         assert res["nb_frais_non_convertis"] == 0
 
-    async def test_un_frais_sans_cours_reste_signale_plutot_qu_efface(
-        self, db_session, regular_user, service, monkeypatch
-    ):
+    async def test_un_frais_sans_cours_reste_signale_plutot_qu_efface(self, db_session, regular_user, monkeypatch):
         """Faute de cours, le montant est gardé tel quel et compté à part.
 
         Le remettre à zéro minorerait silencieusement les frais — le défaut
         qu'on vient de corriger, dans l'autre sens. `nb_frais_non_convertis`
         dit combien de lignes restent hétérogènes.
         """
-        from app.services import insights_service as module
 
         async def aucun_cours(symbole, type_actif):
             return None
 
-        monkeypatch.setattr(module.price_feed, "quote", aucun_cours)
+        monkeypatch.setattr(price_feed, "quote", aucun_cours)
 
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         db_session.add(mouvement(btc, frais="2", devise_frais="BNB"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 2.0
         assert res["nb_frais_non_convertis"] == 1
         assert res["recent_fees"][0]["fee_convertie"] is False
 
-    async def test_un_frais_fiat_suit_le_taux_capte_a_l_execution(self, db_session, regular_user, service):
+    async def test_un_frais_fiat_suit_le_taux_capte_a_l_execution(self, db_session, regular_user):
         """Des frais en USD sur une transaction en USD prennent son taux.
 
         C'est le taux du jour de l'opération, pas celui d'aujourd'hui : les
@@ -261,11 +250,11 @@ class TestAnalyseDesFrais:
         db_session.add(tx)
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["total_fees"] == 9.2
 
-    async def test_la_ventilation_par_actif_est_tronquee_aux_dix_premiers(self, db_session, regular_user, service):
+    async def test_la_ventilation_par_actif_est_tronquee_aux_dix_premiers(self, db_session, regular_user):
         # Le total reste complet : la somme des dix lignes affichées ne le
         # retrouve donc pas sur un portefeuille plus large.
         pf = await portefeuille(db_session, regular_user)
@@ -274,46 +263,46 @@ class TestAnalyseDesFrais:
             db_session.add(mouvement(a, frais=str(i + 1)))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert len(res["by_asset"]) == 10
         assert res["total_fees"] == 78.0  # 1+2+…+12
         assert sum(res["by_asset"].values()) == 75.0  # les deux plus petites manquent
 
-    async def test_les_frais_recents_sont_limites_a_vingt(self, db_session, regular_user, service):
+    async def test_les_frais_recents_sont_limites_a_vingt(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         btc = await actif(db_session, pf)
         for i in range(25):
             db_session.add(mouvement(btc, frais="1", quand=f"2026-01-{i % 28 + 1:02d}"))
         await db_session.commit()
 
-        res = await service.get_fee_analysis(db_session, str(regular_user.id))
+        res = await fee_analysis(db_session, str(regular_user.id))
 
         assert res["nb_transactions_with_fees"] == 25
         assert len(res["recent_fees"]) == 20
 
 
 class TestRevenusPassifs:
-    async def test_sans_portefeuille_le_resultat_est_vide(self, db_session, regular_user, service):
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+    async def test_sans_portefeuille_le_resultat_est_vide(self, db_session, regular_user):
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["total_income"] == 0
         assert res["nb_events"] == 0
 
-    async def test_les_recompenses_de_staking_et_airdrops_sont_comptes(self, db_session, regular_user, service):
+    async def test_les_recompenses_de_staking_et_airdrops_sont_comptes(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         eth = await actif(db_session, pf, "ETH")
         db_session.add(mouvement(eth, type_tx=TransactionType.STAKING_REWARD, quantite="0.1", prix="2000"))
         db_session.add(mouvement(eth, type_tx=TransactionType.AIRDROP, quantite="10", prix="5"))
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["total_income"] == 250.0  # 200 + 50
         assert res["nb_events"] == 2
         assert res["by_type"] == {"staking_reward": 200.0, "airdrop": 50.0}
 
-    async def test_les_dividendes_et_interets_ne_sont_pas_comptes(self, db_session, regular_user, service):
+    async def test_les_dividendes_et_interets_ne_sont_pas_comptes(self, db_session, regular_user):
         """La docstring annonce « dividends, staking rewards, interest ».
 
         `passive_types` ne contient pourtant que `STAKING_REWARD` et `AIRDROP` :
@@ -333,12 +322,12 @@ class TestRevenusPassifs:
         db_session.add(mouvement(aapl, type_tx=TransactionType.INTEREST, quantite="1", prix="50"))
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["total_income"] == 0
         assert res["nb_events"] == 0
 
-    async def test_un_revenu_sans_prix_est_valorise_a_zero(self, db_session, regular_user, service):
+    async def test_un_revenu_sans_prix_est_valorise_a_zero(self, db_session, regular_user):
         # Un airdrop de jeton non coté compte comme un événement mais
         # n'augmente pas le revenu.
         pf = await portefeuille(db_session, regular_user)
@@ -346,12 +335,12 @@ class TestRevenusPassifs:
         db_session.add(mouvement(tok, type_tx=TransactionType.AIRDROP, quantite="100", prix="0"))
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["nb_events"] == 1
         assert res["total_income"] == 0
 
-    async def test_le_filtre_par_annee_restreint_la_periode(self, db_session, regular_user, service):
+    async def test_le_filtre_par_annee_restreint_la_periode(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         eth = await actif(db_session, pf, "ETH")
         db_session.add(
@@ -362,15 +351,13 @@ class TestRevenusPassifs:
         )
         await db_session.commit()
 
-        tout = await service.get_passive_income(db_session, str(regular_user.id))
-        en_2026 = await service.get_passive_income(db_session, str(regular_user.id), year=2026)
+        tout = await passive_income(db_session, str(regular_user.id))
+        en_2026 = await passive_income(db_session, str(regular_user.id), year=2026)
 
         assert tout["total_income"] == 300.0
         assert en_2026["total_income"] == 200.0
 
-    async def test_la_projection_annuelle_extrapole_les_trois_derniers_mois_percus(
-        self, db_session, regular_user, service
-    ):
+    async def test_la_projection_annuelle_extrapole_les_trois_derniers_mois_percus(self, db_session, regular_user):
         """Les « trois derniers mois » sont les trois derniers **ayant produit un
         revenu**, non les trois derniers mois calendaires.
 
@@ -391,13 +378,13 @@ class TestRevenusPassifs:
             )
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["projected_annual"] == 1200.0  # 100 x 12, le mois maigre écarté
         # 310 EUR sur quatre mois couverts (janvier à avril) : 77,5.
         assert res["avg_monthly"] == 77.5
 
-    async def test_la_moyenne_des_revenus_porte_aussi_sur_la_duree_couverte(self, db_session, regular_user, service):
+    async def test_la_moyenne_des_revenus_porte_aussi_sur_la_duree_couverte(self, db_session, regular_user):
         # Même correction que pour les frais : deux versements espacés d'un an
         # couvrent treize mois, pas deux.
         pf = await portefeuille(db_session, regular_user)
@@ -408,12 +395,12 @@ class TestRevenusPassifs:
             )
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["total_income"] == 1300.0
         assert res["avg_monthly"] == 100.0  # 1300 / 13
 
-    async def test_l_historique_est_limite_a_trente_evenements(self, db_session, regular_user, service):
+    async def test_l_historique_est_limite_a_trente_evenements(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         eth = await actif(db_session, pf, "ETH")
         for i in range(35):
@@ -428,7 +415,7 @@ class TestRevenusPassifs:
             )
         await db_session.commit()
 
-        res = await service.get_passive_income(db_session, str(regular_user.id))
+        res = await passive_income(db_session, str(regular_user.id))
 
         assert res["nb_events"] == 35
         assert len(res["history"]) == 30

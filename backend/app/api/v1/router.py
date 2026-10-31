@@ -2,10 +2,6 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import (
-    insights,
-    smart_insights,
-)
 from app.domains.alerts.router import router as alerts_router
 from app.domains.analytics.router import router as analytics_router
 from app.domains.calendar.router import router as calendar_router
@@ -14,6 +10,8 @@ from app.domains.dashboard.router import router as dashboard_router
 from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
+from app.domains.insights.router import router as insights_router
+from app.domains.insights.router import smart_router as smart_insights_router
 from app.domains.journal.router import router as journal_router
 from app.domains.notifications.router import router as notifications_router
 from app.domains.notifications.telegram.webhook import router as telegram_router
@@ -47,10 +45,10 @@ api_router.include_router(journal_router, prefix="/notes", tags=["Notes"])
 api_router.include_router(calendar_router, prefix="/calendar", tags=["Calendar"])
 api_router.include_router(simulations_router, prefix="/simulations", tags=["Simulations"])
 api_router.include_router(notifications_router, prefix="/notifications", tags=["Notifications"])
-api_router.include_router(insights.router, prefix="/insights", tags=["Insights"])
+api_router.include_router(insights_router, prefix="/insights", tags=["Insights"])
 api_router.include_router(price_socket_router, tags=["WebSocket"])
 api_router.include_router(goals_router, prefix="/goals", tags=["Goals"])
-api_router.include_router(smart_insights.router, prefix="/smart-insights", tags=["Smart Insights"])
+api_router.include_router(smart_insights_router, prefix="/smart-insights", tags=["Smart Insights"])
 api_router.include_router(crowdfunding_router, prefix="/crowdfunding", tags=["Crowdfunding"])
 api_router.include_router(strategies_router, prefix="/strategies", tags=["Strategies"])
 api_router.include_router(status_router, prefix="/system", tags=["System"])

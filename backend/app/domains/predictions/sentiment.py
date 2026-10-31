@@ -5,11 +5,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType
 from app.domains.predictions.core import PredictionCore, held_assets, user_portfolio_ids
 from app.domains.predictions.types import MarketSentiment
-from app.services.market_sentiment import fetch_fear_greed_index
 
 logger = logging.getLogger(__name__)
 

@@ -11,6 +11,7 @@ from app.core.redis_client import (
     get_cached_ensemble,
     get_cached_prediction,
 )
+from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import AssetType
@@ -30,7 +31,6 @@ from app.domains.predictions.types import HISTORY_DAYS, ForecastPoint, PricePred
 from app.ml import adaptive_thresholds as at
 from app.ml.forecaster import ForecastResult
 from app.ml.market_context import MarketContext, compute_market_context
-from app.services.market_sentiment import fetch_fear_greed_index
 
 logger = logging.getLogger(__name__)
 

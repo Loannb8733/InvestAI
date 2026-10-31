@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 """Ce que dit le diagnostic quand l'analyse de diversification échoue.
 
 `_generate_portfolio_health` rattrape toute erreur de
@@ -13,7 +15,10 @@ Le score de santé s'en ressent aussi — un HHI nul n'entraîne aucune pénalit
 concentration, alors qu'on ne sait rien de la concentration réelle.
 """
 
-from app.services.smart_insights_service import smart_insights_service as svc
+from app.domains.analytics.service import analytics_service
+from app.domains.insights.health import _concentration
+from app.domains.insights.rules.diversification import diversification_insights
+from app.domains.insights.score import overall_score
 
 
 def titres(insights):
@@ -22,12 +27,12 @@ def titres(insights):
 
 class TestDiversificationConnue:
     def test_un_portefeuille_disperse_est_felicite(self):
-        insights = svc._analyze_diversification(hhi=0.05, top_holdings=[])
+        insights = diversification_insights(hhi=0.05, top_holdings=[])
 
         assert titres(insights) == ["Bonne diversification"]
 
     def test_un_portefeuille_concentre_est_signale(self):
-        insights = svc._analyze_diversification(hhi=0.50, top_holdings=[])
+        insights = diversification_insights(hhi=0.50, top_holdings=[])
 
         assert titres(insights) == ["Portfolio peu diversifié"]
 
@@ -40,7 +45,7 @@ class TestDiversificationInconnue:
         `hhi < 0.10` traduisait en « Bonne diversification » — la conclusion la
         plus rassurante possible, tirée d'une absence de donnée.
         """
-        insights = svc._analyze_diversification(hhi=None, top_holdings=[])
+        insights = diversification_insights(hhi=None, top_holdings=[])
 
         assert insights == []
 
@@ -51,15 +56,15 @@ class TestDiversificationInconnue:
         si l'une échoue et pas l'autre, l'alerte de concentration doit
         subsister.
         """
-        insights = svc._analyze_diversification(hhi=None, top_holdings=[{"symbol": "BTC", "weight": 0.45}])
+        insights = diversification_insights(hhi=None, top_holdings=[{"symbol": "BTC", "weight": 0.45}])
 
         assert titres(insights) == ["Concentration excessive"]
 
     def test_le_score_de_sante_ne_penalise_pas_une_mesure_absente(self):
         # On ne pénalise pas ce qu'on ignore — mais on ne félicite pas non plus,
         # ce que la correction assure côté insights.
-        connu, _ = svc._calculate_overall_score(sharpe=1.0, volatility=0.1, var_95=0.0, hhi=0.0, anomaly_count=0)
-        inconnu, _ = svc._calculate_overall_score(sharpe=1.0, volatility=0.1, var_95=0.0, hhi=None, anomaly_count=0)
+        connu, _ = overall_score(sharpe=1.0, volatility=0.1, var_95=0.0, hhi=0.0, anomaly_count=0)
+        inconnu, _ = overall_score(sharpe=1.0, volatility=0.1, var_95=0.0, hhi=None, anomaly_count=0)
 
         assert connu == inconnu
 
@@ -78,26 +83,13 @@ class TestLaSourceDeclareSonEchec:
     (`test_pas_de_boucle_fermee`, `test_pas_de_commit_sans_rollback`).
     """
 
-    def test_l_echec_de_l_analyse_assigne_none_et_non_un_nombre(self):
-        import ast
-        from pathlib import Path
+    async def test_l_echec_de_l_analyse_rend_none_et_non_un_nombre(self, monkeypatch):
+        async def echec(*_args, **_kwargs):
+            raise RuntimeError("analyse indisponible")
 
-        import app.services.smart_insights_service as module
+        monkeypatch.setattr(analytics_service, "get_diversification_analysis", echec)
 
-        arbre = ast.parse(Path(module.__file__).read_text())
-        assignations = []
-        for n in ast.walk(arbre):
-            if not isinstance(n, ast.ExceptHandler):
-                continue
-            for c in ast.walk(n):
-                if isinstance(c, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "hhi" for t in c.targets):
-                    assignations.append(c.value)
+        hhi, lignes = await _concentration(None, "utilisateur", SimpleNamespace(allocation_by_asset={"BTC": 100.0}))
 
-        assert assignations, "le gestionnaire qui retombe sur `hhi` a disparu"
-        for valeur in assignations:
-            est_none = isinstance(valeur, ast.Constant) and valeur.value is None
-            assert est_none, (
-                "un échec d'analyse de diversification doit donner `hhi = None`, "
-                "pas un nombre : un zéro passe le seuil de 0,10 et produit "
-                "« Bonne diversification » sur une mesure inexistante."
-            )
+        assert hhi is None
+        assert lignes == []

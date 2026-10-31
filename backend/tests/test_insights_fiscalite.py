@@ -1,7 +1,7 @@
 """Filet de caractérisation de l'optimisation fiscale (`get_tax_loss_harvesting`).
 
 Le service recense les positions en moins-value latente qu'il serait fiscalement
-intéressant de vendre. `insights_service` était couvert à **13 %**.
+intéressant de vendre. `domains/insights` était couvert à **13 %**.
 
 Contrairement aux filets précédents, cette fonction lit la base : elle s'appuie
 donc sur la fixture `db_session` du projet. Le prix courant, lui, vient du
@@ -15,10 +15,10 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.insights.tax_loss import tax_loss_opportunities
 from app.domains.market_data.prices.quote import PriceQuote
+from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.services import insights_service as module_insights
-from app.services.insights_service import InsightsService
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def prix(monkeypatch):
         valeur = cotations.get(symbol.upper())
         return PriceQuote(price=Decimal(str(valeur))) if valeur is not None else None
 
-    monkeypatch.setattr(module_insights.price_feed, "quote", _quote)
+    monkeypatch.setattr(price_feed, "quote", _quote)
     return cotations
 
 
@@ -53,14 +53,9 @@ async def portefeuille_avec(db_session, user, *actifs) -> Portfolio:
     return pf
 
 
-@pytest.fixture
-def service():
-    return InsightsService()
-
-
 class TestSansPortefeuille:
-    async def test_un_utilisateur_sans_portefeuille_recoit_un_resultat_vide(self, db_session, regular_user, service):
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+    async def test_un_utilisateur_sans_portefeuille_recoit_un_resultat_vide(self, db_session, regular_user):
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
         assert res["total_harvestable"] == 0
@@ -71,40 +66,40 @@ class TestSansPortefeuille:
 
 
 class TestDetectionDesMoinsValues:
-    async def test_une_position_en_perte_devient_une_opportunite(self, db_session, regular_user, service, prix):
+    async def test_une_position_en_perte_devient_une_opportunite(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000))
         prix["BTC"] = 40000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["nb_candidates"] == 1
         opp = res["opportunities"][0]
         assert opp["unrealized_loss"] == -10000.0
         assert opp["unrealized_loss_pct"] == -20.0
 
-    async def test_une_position_en_gain_est_ignoree(self, db_session, regular_user, service, prix):
+    async def test_une_position_en_gain_est_ignoree(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 40000))
         prix["BTC"] = 50000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
         assert res["nb_candidates"] == 0
 
-    async def test_une_position_a_l_equilibre_est_ignoree(self, db_session, regular_user, service, prix):
+    async def test_une_position_a_l_equilibre_est_ignoree(self, db_session, regular_user, prix):
         # Le test est `< 0` strict : une plus-value nulle n'ouvre aucun droit.
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 40000))
         prix["BTC"] = 40000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
 
-    async def test_les_opportunites_sont_triees_par_perte_decroissante(self, db_session, regular_user, service, prix):
+    async def test_les_opportunites_sont_triees_par_perte_decroissante(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000), ("ETH", 10, 3000), ("SOL", 100, 200))
         prix.update({"BTC": 45000.0, "ETH": 2000.0, "SOL": 150.0})
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         pertes = [o["unrealized_loss"] for o in res["opportunities"]]
         assert pertes == sorted(pertes)  # la plus lourde en tête
@@ -112,7 +107,7 @@ class TestDetectionDesMoinsValues:
 
 
 class TestCalculFiscal:
-    async def test_l_economie_est_estimee_a_trente_pour_cent(self, db_session, regular_user, service, prix):
+    async def test_l_economie_est_estimee_a_trente_pour_cent(self, db_session, regular_user, prix):
         """La flat tax française est codée en dur à 30 %.
 
         Ni le taux du profil investisseur ni celui d'un projet ne sont
@@ -122,32 +117,32 @@ class TestCalculFiscal:
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000))
         prix["BTC"] = 40000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["estimated_tax_saving"] == 3000.0
         assert res["opportunities"][0]["potential_tax_saving"] == 3000.0
 
-    async def test_le_montant_recoltable_est_negatif_l_economie_positive(self, db_session, regular_user, service, prix):
+    async def test_le_montant_recoltable_est_negatif_l_economie_positive(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000), ("ETH", 10, 3000))
         prix.update({"BTC": 45000.0, "ETH": 2500.0})
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["total_harvestable"] == -10000.0
         assert res["estimated_tax_saving"] == 3000.0
 
-    async def test_sans_moins_value_l_economie_reste_nulle(self, db_session, regular_user, service, prix):
+    async def test_sans_moins_value_l_economie_reste_nulle(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 40000))
         prix["BTC"] = 50000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["total_harvestable"] == 0
         assert res["estimated_tax_saving"] == 0
 
 
 class TestPrixIndisponible:
-    async def test_un_prix_absent_fait_disparaitre_l_opportunite(self, db_session, regular_user, service, prix):
+    async def test_un_prix_absent_fait_disparaitre_l_opportunite(self, db_session, regular_user, prix):
         """Sans cours, le prix courant retombe sur le prix de revient.
 
         La position affiche alors une plus-value **exactement nulle** et sort
@@ -158,21 +153,21 @@ class TestPrixIndisponible:
         await portefeuille_avec(db_session, regular_user, ("XYZ", 1, 50000))
         # `prix` reste vide : le double rend None.
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
 
 
 class TestPositionsEcartees:
-    async def test_une_position_soldee_est_ecartee(self, db_session, regular_user, service, prix):
+    async def test_une_position_soldee_est_ecartee(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 0, 50000))
         prix["BTC"] = 40000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
 
-    async def test_un_prix_de_revient_nul_est_ecarte(self, db_session, regular_user, service, prix):
+    async def test_un_prix_de_revient_nul_est_ecarte(self, db_session, regular_user, prix):
         """Sans prix de revient, il n'y a pas de moins-value à constater.
 
         Un airdrop reçu gratuitement ne se solde pas fiscalement à perte.
@@ -190,7 +185,7 @@ class TestPositionsEcartees:
         await portefeuille_avec(db_session, regular_user, ("FREE", 100, 0))
         prix["FREE"] = 1.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert res["opportunities"] == []
 
@@ -237,7 +232,7 @@ class TestPositionsEcartees:
 
 
 class TestAvertissement:
-    async def test_la_note_met_en_garde_contre_le_rachat_immediat(self, db_session, regular_user, service, prix):
+    async def test_la_note_met_en_garde_contre_le_rachat_immediat(self, db_session, regular_user, prix):
         """La note cite le « wash sale », règle **américaine**.
 
         Le droit français ne connaît pas cette interdiction pour les
@@ -247,7 +242,7 @@ class TestAvertissement:
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000))
         prix["BTC"] = 40000.0
 
-        res = await service.get_tax_loss_harvesting(db_session, str(regular_user.id))
+        res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
         assert "wash sale" in res["note"]
         assert "moins-values" in res["note"]

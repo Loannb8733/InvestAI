@@ -1,4 +1,3 @@
-comments	backend/app/api/v1/endpoints/smart_insights.py
 comments	backend/app/core/config.py
 comments	backend/app/core/finance_constants.py
 comments	backend/app/core/logging.py
@@ -16,11 +15,7 @@ comments	backend/app/ml/regime_detector.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
-comments	backend/app/services/insights_service.py
 comments	backend/app/services/regime_alert_service.py
-comments	backend/app/services/smart_insights_analyzers.py
-comments	backend/app/services/smart_insights_service.py
-comments	backend/app/services/smart_insights_types.py
 comments	backend/app/tasks/celery_app.py
 comments	backend/app/tasks/price_updates.py
 comments	frontend/src/App.tsx
@@ -148,15 +143,11 @@ comments	frontend/src/types/exchanges.ts
 comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
-too-long	backend/app/api/v1/endpoints/smart_insights.py
 too-long	backend/app/core/redis_client.py
 too-long	backend/app/ml/adaptive_thresholds.py
 too-long	backend/app/ml/forecaster.py
 too-long	backend/app/ml/regime_detector.py
 too-long	backend/app/services/csv_parsers.py
-too-long	backend/app/services/insights_service.py
-too-long	backend/app/services/smart_insights_analyzers.py
-too-long	backend/app/services/smart_insights_service.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
 too-long	frontend/src/components/dashboard/IASummaryWidget.tsx
 too-long	frontend/src/components/exchanges/exchange-guides.ts

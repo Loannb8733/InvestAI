@@ -221,9 +221,7 @@ class TestAlphaThresholdEnforcement:
 
     def test_gold_relevance_scales_bonus(self):
         """gold_relevance high → 1.5× bonus, low → 0.5× bonus."""
-        from app.services.smart_insights_service import SmartInsightsService
-
-        svc = SmartInsightsService()
+        from app.domains.insights.score import overall_score
 
         # Bear: gold_relevance="high" → 1.5× multiplier
         bear_regime = MarketRegime(
@@ -238,7 +236,7 @@ class TestAlphaThresholdEnforcement:
             per_asset=[],
         )
         # Use penalizing params so bonus is visible below cap
-        score_bear, _ = svc._calculate_overall_score(
+        score_bear, _ = overall_score(
             sharpe=0.3,
             volatility=0.50,
             var_95=0.06,
@@ -261,7 +259,7 @@ class TestAlphaThresholdEnforcement:
             ),
             per_asset=[],
         )
-        score_bottom, _ = svc._calculate_overall_score(
+        score_bottom, _ = overall_score(
             sharpe=0.3,
             volatility=0.50,
             var_95=0.06,
@@ -273,7 +271,7 @@ class TestAlphaThresholdEnforcement:
         )
 
         # No regime bonus baseline
-        score_none, _ = svc._calculate_overall_score(
+        score_none, _ = overall_score(
             sharpe=0.3,
             volatility=0.50,
             var_95=0.06,
@@ -309,9 +307,8 @@ class TestTotalValueParity:
 
     def test_score_does_not_alter_inputs(self):
         """_calculate_overall_score should not mutate the total_value."""
-        from app.services.smart_insights_service import SmartInsightsService
+        from app.domains.insights.score import overall_score
 
-        svc = SmartInsightsService()
         total = 863.90
         regime_result = RegimeResult(
             symbol="BTC",
@@ -323,7 +320,7 @@ class TestTotalValueParity:
         )
         mr = MarketRegime(market=regime_result, per_asset=[])
         # Compute score — should not change total
-        score, status = svc._calculate_overall_score(
+        score, status = overall_score(
             sharpe=0.5,
             volatility=0.40,
             var_95=0.05,

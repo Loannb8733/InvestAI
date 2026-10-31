@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.analytics.results import MonteCarloResult
 from app.domains.analytics.service import analytics_service
+from app.domains.insights.market_regime import current_vol_regime
 from app.domains.predictions.service import prediction_service
-from app.services.smart_insights_service import smart_insights_service
 
 MC_HORIZON_DAYS = 90
 MC_SIMULATIONS = 2000
@@ -86,7 +86,7 @@ def _mc_summary(mc: MonteCarloResult) -> dict[str, Any]:
 async def _monte_carlo_pair(
     db: AsyncSession, user_id: str, symbol: str, order_eur: float
 ) -> tuple[MonteCarloResult, MonteCarloResult]:
-    vol_regime = await smart_insights_service.get_current_vol_regime(db, user_id)
+    vol_regime = await current_vol_regime()
     before = await analytics_service.monte_carlo(
         db, user_id, horizon_days=MC_HORIZON_DAYS, num_simulations=MC_SIMULATIONS, vol_regime=vol_regime
     )
