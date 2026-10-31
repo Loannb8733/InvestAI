@@ -25,7 +25,7 @@ async def test_deployment_euro_amounts_are_cent_quantized():
 
     with (
         patch(
-            "app.services.metrics_service.metrics_service.get_user_dashboard_metrics",
+            "app.domains.dashboard.metrics.service.metrics_service.get_user_dashboard_metrics",
             new=AsyncMock(return_value=dashboard),
         ),
         patch(

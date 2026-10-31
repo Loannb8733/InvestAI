@@ -21,8 +21,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.services.metrics_service import metrics_service
 
 
 def _actif(symbole, valeur, investi, quantite=1.0, type_actif="crypto"):
@@ -88,7 +88,7 @@ def _figer(metriques, historique, variations=None):
     return (
         patch.object(metrics_service, "get_portfolio_metrics", new=AsyncMock(return_value=metriques)),
         patch.object(metrics_service, "get_portfolio_history", new=AsyncMock(return_value=historique)),
-        patch.object(metrics_service, "_fetch_period_changes", new=AsyncMock(return_value=variations or {})),
+        patch.object(metrics_service, "fetch_period_changes", new=AsyncMock(return_value=variations or {})),
     )
 
 

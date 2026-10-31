@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.analytics.core import AnalyticsCore
 from app.domains.analytics.scenarios import HISTORICAL_SCENARIOS, CrisisScenario
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Portfolio
-from app.services.metrics_service import metrics_service
 
 DEFAULT_SHOCK = -10
 

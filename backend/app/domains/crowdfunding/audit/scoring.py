@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.crowdfunding.dashboard import capital_outstanding
 from app.domains.crowdfunding.repository import repayments_by_project, user_projects
-from app.services.metrics_service import metrics_service
+from app.domains.dashboard.metrics.service import metrics_service
 
 MAX_LTV = 80
 MIN_MARGIN = 10

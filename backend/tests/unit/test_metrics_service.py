@@ -9,13 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.domains.dashboard.metrics.positions import compute_asset_metrics
 from app.domains.portfolio.classification import FIAT_SYMBOLS, STABLECOIN_SYMBOLS, is_cash_like, is_fiat, is_stablecoin
-from app.services.metrics_service import (
-    MetricsService,
-    _ci_price_in_portfolio_ccy,
-    _conversion_dest_unit_cost,
-    compute_cump_pru,
-)
+from app.domains.transactions.cost_basis.conversions import conversion_dest_unit_cost
+from app.domains.transactions.cost_basis.matching import price_in_portfolio_currency
+from app.domains.transactions.cost_basis.weighted_average import compute_cump_pru
 
 
 class TestConversionDestUnitCost:
@@ -31,25 +29,25 @@ class TestConversionDestUnitCost:
     def test_uses_recorded_price_when_available(self):
         # Recorded BTC price at conversion is the acquisition cost, regardless of
         # what the source carry would have produced.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.0003"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.0003"), Decimal("88000"))
         assert u == pytest.approx(88000.0)
 
     def test_recorded_price_overrides_inflated_carry(self):
         # Source carry would give 2.64M EUR/BTC; recorded price wins.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.00001"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.00001"), Decimal("88000"))
         assert float(u) == pytest.approx(88000.0)
 
     def test_recorded_price_overrides_even_a_modest_carry(self):
         # Carry would give ~90721; recorded 88000 is still the truth.
-        u = _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.000291"), Decimal("88000"))
+        u = conversion_dest_unit_cost(Decimal("26.4"), Decimal("0.000291"), Decimal("88000"))
         assert float(u) == pytest.approx(88000.0)
 
     def test_zero_qty_returns_zero(self):
-        assert _conversion_dest_unit_cost(Decimal("26.4"), Decimal("0"), Decimal("88000")) == Decimal("0")
+        assert conversion_dest_unit_cost(Decimal("26.4"), Decimal("0"), Decimal("88000")) == Decimal("0")
 
     def test_falls_back_to_carry_when_no_recorded_price(self):
         # No recorded dest price (0) -> legacy carry: cost_removed / matched_qty.
-        u = _conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
+        u = conversion_dest_unit_cost(Decimal("5"), Decimal("0.00001"), Decimal("0"))
         assert float(u) == pytest.approx(500000.0)
 
 
@@ -59,25 +57,19 @@ class TestCiPriceInPortfolioCcy:
 
     def test_eur_leg_unchanged(self):
         # conversion_rate None => price already in portfolio ccy.
-        assert _ci_price_in_portfolio_ccy(Decimal("88000"), None) == Decimal("88000")
+        assert price_in_portfolio_currency(Decimal("88000"), None) == Decimal("88000")
 
     def test_usd_leg_converted(self):
         # 88000 USD at 0.92 EUR/USD => 80960 EUR.
-        assert _ci_price_in_portfolio_ccy(Decimal("88000"), Decimal("0.92")) == Decimal("80960.00")
+        assert price_in_portfolio_currency(Decimal("88000"), Decimal("0.92")) == Decimal("80960.00")
 
     def test_none_price_is_zero(self):
-        assert _ci_price_in_portfolio_ccy(None, Decimal("0.92")) == Decimal("0")
+        assert price_in_portfolio_currency(None, Decimal("0.92")) == Decimal("0")
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def metrics_service():
-    """Create a MetricsService instance."""
-    return MetricsService()
 
 
 def _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="30000.0", asset_type_val="crypto"):
@@ -150,9 +142,9 @@ class TestGetAssetMetrics:
     """Tests for get_asset_metrics."""
 
     @pytest.mark.asyncio
-    async def test_with_current_price_gain(self, metrics_service):
+    async def test_with_current_price_gain(self):
         asset = _make_asset(quantity="2.0", avg_buy_price="100.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=Decimal("150"))
+        result = compute_asset_metrics(asset, current_price=Decimal("150"))
 
         assert result["quantity"] == 2.0
         assert result["avg_buy_price"] == 100.0
@@ -163,18 +155,18 @@ class TestGetAssetMetrics:
         assert pytest.approx(result["gain_loss_percent"]) == 50.0
 
     @pytest.mark.asyncio
-    async def test_with_current_price_loss(self, metrics_service):
+    async def test_with_current_price_loss(self):
         asset = _make_asset(quantity="2.0", avg_buy_price="100.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=Decimal("50"))
+        result = compute_asset_metrics(asset, current_price=Decimal("50"))
 
         assert result["current_value"] == 100.0
         assert result["gain_loss"] == -100.0
         assert pytest.approx(result["gain_loss_percent"]) == -50.0
 
     @pytest.mark.asyncio
-    async def test_without_current_price(self, metrics_service):
+    async def test_without_current_price(self):
         asset = _make_asset(quantity="2.0", avg_buy_price="100.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=None)
+        result = compute_asset_metrics(asset, current_price=None)
 
         assert result["current_price"] is None
         assert result["current_value"] == 200.0  # Falls back to total_invested
@@ -182,9 +174,9 @@ class TestGetAssetMetrics:
         assert result["gain_loss_percent"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_zero_quantity(self, metrics_service):
+    async def test_zero_quantity(self):
         asset = _make_asset(quantity="0.0", avg_buy_price="100.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=Decimal("150"))
+        result = compute_asset_metrics(asset, current_price=Decimal("150"))
 
         assert result["quantity"] == 0.0
         assert result["total_invested"] == 0.0
@@ -193,10 +185,10 @@ class TestGetAssetMetrics:
         assert result["gain_loss_percent"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_zero_avg_buy_price(self, metrics_service):
+    async def test_zero_avg_buy_price(self):
         """When avg_buy_price is 0 (e.g., airdrop), gain_loss_percent should be 0."""
         asset = _make_asset(quantity="10.0", avg_buy_price="0.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=Decimal("5.0"))
+        result = compute_asset_metrics(asset, current_price=Decimal("5.0"))
 
         assert result["total_invested"] == 0.0
         assert result["current_value"] == 50.0
@@ -204,31 +196,31 @@ class TestGetAssetMetrics:
         assert result["gain_loss_percent"] == 0.0  # Cannot divide by 0
 
     @pytest.mark.asyncio
-    async def test_fractional_quantities(self, metrics_service):
+    async def test_fractional_quantities(self):
         """Handle crypto-style fractional quantities."""
         asset = _make_asset(quantity="0.00050000", avg_buy_price="45000.12345678")
-        result = await metrics_service.get_asset_metrics(asset, current_price=Decimal("50000"))
+        result = compute_asset_metrics(asset, current_price=Decimal("50000"))
 
         assert result["quantity"] == 0.0005
         assert result["current_value"] == pytest.approx(25.0)
 
     @pytest.mark.asyncio
-    async def test_current_price_passed_as_float(self, metrics_service):
+    async def test_current_price_passed_as_float(self):
         """current_price should be cast from float to Decimal internally."""
         asset = _make_asset(quantity="1.0", avg_buy_price="100.0")
-        result = await metrics_service.get_asset_metrics(asset, current_price=150.0)
+        result = compute_asset_metrics(asset, current_price=150.0)
 
         assert result["current_price"] == 150.0
         assert result["current_value"] == 150.0
 
     @pytest.mark.asyncio
-    async def test_actual_invested_takes_priority_over_buy_pra(self, metrics_service):
+    async def test_actual_invested_takes_priority_over_buy_pra(self):
         """FIFO actual_invested must override buy_pra for G/L so that assets bought
         at different prices on different exchanges aren't blended incorrectly."""
         # Kraken PAXG: 0.003 units bought at 3200€ → actual invested = 9.6€
         # Blended symbol buy_pra = 2550€ (contaminated by a cheaper exchange)
         asset = _make_asset(quantity="0.003", avg_buy_price="3200.0")
-        result = await metrics_service.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("2850"),
             actual_invested=9.6,
@@ -241,7 +233,7 @@ class TestGetAssetMetrics:
         assert pytest.approx(result["gain_loss"], rel=1e-4) == 8.55 - 9.6
 
     @pytest.mark.asyncio
-    async def test_avg_buy_price_excludes_fees_from_display(self, metrics_service):
+    async def test_avg_buy_price_excludes_fees_from_display(self):
         """When actual_invested includes transaction fees, avg_buy_price must show
         the fee-exclusive DB value (asset.avg_buy_price) so the displayed PRA matches
         what the user expects. Fees raise G/L cost but must not inflate the PRA column.
@@ -249,7 +241,7 @@ class TestGetAssetMetrics:
         # PAXG Kraken: DB avg = 4086.82€ (fee-exclusive)
         # actual_invested = 4.31385€ (includes fees) > 0.001 × 4086.82 = 4.08682€
         asset = _make_asset(quantity="0.001", avg_buy_price="4086.82")
-        result = await metrics_service.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("3800"),
             actual_invested=4.31385,
@@ -264,10 +256,10 @@ class TestGetAssetMetrics:
         assert pytest.approx(result["avg_buy_price"], rel=1e-4) == 4086.82
 
     @pytest.mark.asyncio
-    async def test_buy_pra_used_as_fallback_when_no_actual_invested(self, metrics_service):
+    async def test_buy_pra_used_as_fallback_when_no_actual_invested(self):
         """buy_pra should be the fallback when FIFO actual_invested is unavailable."""
         asset = _make_asset(quantity="2.0", avg_buy_price="50.0")
-        result = await metrics_service.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("80"),
             actual_invested=None,
@@ -280,10 +272,10 @@ class TestGetAssetMetrics:
         assert result["gain_loss"] == -40.0
 
     @pytest.mark.asyncio
-    async def test_actual_invested_zero_gains_treated_as_free_tokens(self, metrics_service):
+    async def test_actual_invested_zero_gains_treated_as_free_tokens(self):
         """When actual_invested=0 (all free/airdrop), gain_loss equals current_value."""
         asset = _make_asset(quantity="5.0", avg_buy_price="0.0")
-        result = await metrics_service.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("10"),
             actual_invested=0.0,
@@ -468,9 +460,8 @@ class TestCumpPruInAssetMetrics:
     async def test_cump_pru_overrides_db_avg_buy_price(self):
         """When cump_pru is provided it replaces the DB avg_buy_price for display."""
         asset = _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="72000.0")
-        ms = MetricsService()
         # Fee-inclusive CUMP is 73000 (e.g., two buys with fees)
-        result = await ms.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("80000"),
             actual_invested=73000.0,  # FIFO cost (matches cump)
@@ -484,8 +475,7 @@ class TestCumpPruInAssetMetrics:
     async def test_cump_pru_zero_falls_back_to_db(self):
         """A zero/None cump_pru falls back to DB avg_buy_price."""
         asset = _make_asset(symbol="BTC", quantity="1.0", avg_buy_price="72000.0")
-        ms = MetricsService()
-        result = await ms.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("80000"),
             actual_invested=72000.0,
@@ -498,8 +488,7 @@ class TestCumpPruInAssetMetrics:
         """Sanity check: USDC quantity 470 × ~0.92 EUR/USDC ≈ 432 EUR (backend correct)."""
         asset = _make_asset(symbol="USDC", quantity="470.0", avg_buy_price="0.869")
         asset.symbol = "USDC"
-        ms = MetricsService()
-        result = await ms.get_asset_metrics(
+        result = compute_asset_metrics(
             asset,
             current_price=Decimal("0.9265"),  # typical USDC/EUR rate
             actual_invested=None,

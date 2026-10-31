@@ -3,7 +3,6 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    dashboard,
     insights,
     smart_insights,
 )
@@ -11,6 +10,7 @@ from app.domains.alerts.router import router as alerts_router
 from app.domains.analytics.router import router as analytics_router
 from app.domains.calendar.router import router as calendar_router
 from app.domains.crowdfunding.router import router as crowdfunding_router
+from app.domains.dashboard.router import router as dashboard_router
 from app.domains.exchanges.router import keys_router, wallets_router
 from app.domains.identity.admin_router import router as users_router
 from app.domains.identity.router import router as auth_router
@@ -32,7 +32,7 @@ api_router = APIRouter()
 api_router.include_router(telegram_router, prefix="/bot", tags=["Telegram Bot"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users_router, prefix="/users", tags=["Users"])
-api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+api_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(portfolios_router, prefix="/portfolios", tags=["Portfolios"])
 api_router.include_router(assets_router, prefix="/assets", tags=["Assets"])
 api_router.include_router(transactions_router, prefix="/transactions", tags=["Transactions"])

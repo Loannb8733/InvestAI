@@ -10,8 +10,8 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.domains.dashboard.snapshots.holdings import replay_daily_holdings
 from app.domains.transactions.models import TransactionType
-from app.services.snapshot_service import SnapshotService
 
 
 def _tx(symbol, ttype, qty, price, when):
@@ -28,7 +28,6 @@ def _tx(symbol, ttype, qty, price, when):
 
 class TestConversionNeutrality:
     def test_swap_does_not_drain_net_capital(self):
-        svc = SnapshotService()
         day1 = datetime(2026, 6, 1)
         day2 = datetime(2026, 6, 2)
         txs = [
@@ -37,7 +36,7 @@ class TestConversionNeutrality:
             _tx("PEPE", TransactionType.CONVERSION_OUT, 1000.0, 0.001, day2),
             _tx("PAXG", TransactionType.CONVERSION_IN, 0.0003, 0.0, day2),
         ]
-        _, _, daily_net_capital, _ = svc._replay_transactions_to_daily_holdings(txs, day1, day2)
+        _, _, daily_net_capital, _ = replay_daily_holdings(txs, day1, day2)
         # Net capital after the swap must equal what it was before (≈1.0), not drained.
         assert abs(daily_net_capital["2026-06-01"] - 1.0) < 1e-9
         assert abs(daily_net_capital["2026-06-02"] - 1.0) < 1e-9
@@ -45,13 +44,12 @@ class TestConversionNeutrality:
 
 class TestIntradayOrdering:
     def test_in_applied_before_out_same_timestamp(self):
-        svc = SnapshotService()
         day = datetime(2026, 6, 1)
         # Same timestamp: a SELL listed before the BUY that funds it.
         txs = [
             _tx("BTC", TransactionType.SELL, 1.0, 50000.0, day),
             _tx("BTC", TransactionType.BUY, 2.0, 50000.0, day),
         ]
-        daily_holdings, _, _, _ = svc._replay_transactions_to_daily_holdings(txs, day, day)
+        daily_holdings, _, _, _ = replay_daily_holdings(txs, day, day)
         # IN-first → 2 bought then 1 sold = 1 held (not clamped to wrong value).
         assert abs(daily_holdings["2026-06-01"].get("BTC", 0.0) - 1.0) < 1e-9

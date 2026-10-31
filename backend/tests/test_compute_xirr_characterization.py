@@ -70,7 +70,7 @@ async def _portefeuille_avec_achat(db_session, user, quantite="1", prix="10000",
 def _valeur_courante(montant: float):
     """Fige la valeur du patrimoine rendue par `metrics_service`."""
     return patch(
-        "app.services.metrics_service.metrics_service.get_user_dashboard_metrics",
+        "app.domains.dashboard.metrics.service.metrics_service.get_user_dashboard_metrics",
         new=AsyncMock(return_value={"total_value": montant}),
     )
 
@@ -257,7 +257,7 @@ class TestRepliSurLesPrixDesActifs:
 
         with (
             patch(
-                "app.services.metrics_service.metrics_service.get_user_dashboard_metrics",
+                "app.domains.dashboard.metrics.service.metrics_service.get_user_dashboard_metrics",
                 new=AsyncMock(side_effect=Exception("indisponible")),
             ),
             patch.object(service, "_get_asset_price", new=AsyncMock(return_value=20000.0)),

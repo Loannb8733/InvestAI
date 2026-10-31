@@ -1,6 +1,6 @@
 """Filet sur les alertes et les snapshots planifiés.
 
-`app/domains/alerts/tasks.py` et `app/tasks/snapshots.py` étaient couverts à **0 %**.
+`app/domains/alerts/tasks.py` et `app/domains/dashboard/snapshots/tasks.py` étaient couverts à **0 %**.
 Ils tournent tous les jours — les alertes toutes les quinze minutes — et NEW-42
 a montré ce qu'un module de tâche jamais exécuté peut cacher : un `TypeError`
 quotidien pendant des mois, perdu dans les journaux Celery.
@@ -17,9 +17,9 @@ from decimal import Decimal
 
 import pytest
 
+from app.domains.dashboard.models import PortfolioSnapshot
+from app.domains.dashboard.snapshots import tasks as taches_snapshots
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.models.portfolio_snapshot import PortfolioSnapshot
-from app.tasks import snapshots as taches_snapshots
 
 
 @pytest.fixture
@@ -63,14 +63,14 @@ class TestSnapshotsQuotidiens:
         celles qui lèvent avant d'atteindre la base, comme le `func.case` de
         NEW-42.
         """
-        res = await taches_snapshots._create_all_snapshots_async()
+        res = await taches_snapshots.create_all_snapshots()
 
         assert res == {"total": 0, "success": 0, "failed": 0}
 
     async def test_un_utilisateur_avec_portefeuille_obtient_son_instantane(self, session_snapshots, regular_user):
         await _portefeuille_garni(session_snapshots, regular_user)
 
-        res = await taches_snapshots._create_all_snapshots_async()
+        res = await taches_snapshots.create_all_snapshots()
 
         assert res["success"] >= 1
 
@@ -82,8 +82,8 @@ class TestSnapshotsQuotidiens:
         """
         await _portefeuille_garni(session_snapshots, regular_user)
 
-        await taches_snapshots._create_all_snapshots_async()
-        second = await taches_snapshots._create_all_snapshots_async()
+        await taches_snapshots.create_all_snapshots()
+        second = await taches_snapshots.create_all_snapshots()
 
         assert second["success"] == 0
 
@@ -101,7 +101,7 @@ class TestSnapshotsQuotidiens:
             )
         await session_snapshots.flush()
 
-        res = await taches_snapshots._cleanup_old_snapshots_async(days_to_keep=365)
+        res = await taches_snapshots.delete_old_snapshots(days_to_keep=365)
 
         assert res["deleted"] == 1
 
@@ -117,7 +117,7 @@ class TestSnapshotsQuotidiens:
         )
         await session_snapshots.flush()
 
-        res = await taches_snapshots._cleanup_old_snapshots_async(days_to_keep=365)
+        res = await taches_snapshots.delete_old_snapshots(days_to_keep=365)
 
         assert res["deleted"] == 0
 

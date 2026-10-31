@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.predictions.service import prediction_service
-from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
 

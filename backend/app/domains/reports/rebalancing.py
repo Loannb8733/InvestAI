@@ -6,12 +6,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.reports.classes import CRYPTO_ASSET_CLASSES, CRYPTO_CLASS_LABELS
 from app.domains.reports.tax import TAX_MODE
+from app.domains.transactions.cost_basis.replay import replay, sort_transactions
 from app.domains.transactions.models import Transaction
-from app.services import fifo_replay
-from app.services.metrics_service import metrics_service
 
 _ZERO = Decimal("0")
 _DUST_VALUE = 0.10
@@ -266,8 +266,8 @@ class RebalancingMixin:
             select(Transaction).where(Transaction.asset_id.in_(crypto_ids)).order_by(Transaction.executed_at.asc())
         )
         all_txs = list(trans_result.scalars().all())
-        fifo: FifoLayers = fifo_replay.replay(
-            fifo_replay.sort_transactions(all_txs),
+        fifo: FifoLayers = replay(
+            sort_transactions(all_txs),
             aid_to_symbol,
             TAX_MODE.config,
         ).fifo

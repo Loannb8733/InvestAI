@@ -28,9 +28,16 @@ MODULES_SENSIBLES = [
     "app.domains.alerts.pricing",
     "app.domains.alerts.risk_weights",
     "app.domains.alerts.tasks",
-    "app.services.metrics_service",
+    "app.domains.dashboard.analysis",
+    "app.domains.dashboard.feed",
+    "app.domains.dashboard.metrics.cash",
+    "app.domains.dashboard.overview",
+    "app.domains.dashboard.metrics.positions",
+    "app.domains.dashboard.metrics.service",
     "app.services.smart_insights_service",
-    "app.services.snapshot_service",
+    "app.domains.dashboard.snapshots.risk",
+    "app.domains.dashboard.snapshots.series",
+    "app.domains.dashboard.snapshots.tasks",
 ]
 
 _JOURNALISATION = {"error", "warning", "exception", "info", "debug"}

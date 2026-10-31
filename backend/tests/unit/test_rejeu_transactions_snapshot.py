@@ -1,9 +1,9 @@
-"""Filet de caractérisation de `_replay_transactions_to_daily_holdings`.
+"""Filet de caractérisation de `replay_daily_holdings`.
 
 Cette fonction rejoue les transactions jour par jour pour reconstruire les
 avoirs, le capital investi et le capital net. Tout l'historique du patrimoine en
 découle : la courbe du dashboard, les alertes de variation, les emails
-hebdomadaires et le TWR. `snapshot_service` est couvert à 24 % et n'a aucun
+hebdomadaires et le TWR. le module `holdings` est couvert à 24 % et n'a aucun
 fichier de test propre.
 
 Ces tests épinglent le comportement **actuel**. Ce ne sont pas des tests de
@@ -18,8 +18,8 @@ avec de simples doubles de transaction.
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.domains.dashboard.snapshots.holdings import replay_daily_holdings
 from app.domains.transactions.models import TransactionType
-from app.services.snapshot_service import snapshot_service
 
 
 def tx(
@@ -45,7 +45,7 @@ def tx(
 
 
 def rejouer(transactions, debut="2026-01-01", fin="2026-01-03"):
-    return snapshot_service._replay_transactions_to_daily_holdings(
+    return replay_daily_holdings(
         transactions,
         datetime.fromisoformat(debut),
         datetime.fromisoformat(fin),

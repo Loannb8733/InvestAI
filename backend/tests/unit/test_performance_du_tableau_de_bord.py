@@ -1,21 +1,20 @@
 """Filet sur les deux fonctions pures du tableau de bord.
 
-`_compute_period_twr` produit **le** chiffre de performance affiché en tête du
+`compute_period_twr` produit **le** chiffre de performance affiché en tête du
 tableau de bord : le rendement pondéré dans le temps, celui qui neutralise les
 dépôts et les retraits pour ne montrer que ce que les placements ont rapporté.
-`_ensure_json_safe` est ce qui empêche un `NaN` sorti d'une division de traverser
+`ensure_json_safe` est ce qui empêche un `NaN` sorti d'une division de traverser
 la réponse et de casser le rendu côté navigateur.
 
-`endpoints/dashboard.py` est couvert à 36 %, et aucun test ne nommait ces deux
-fonctions. Elles ne touchent ni la base ni le réseau : rien ne justifiait qu'elles
-restent muettes.
+Elles ne touchent ni la base ni le réseau : rien ne justifie qu'elles restent muettes.
 """
 
 from decimal import Decimal
 
 import pytest
 
-from app.api.v1.endpoints.dashboard import _compute_period_twr, _ensure_json_safe
+from app.domains.dashboard.analysis import compute_period_twr
+from app.domains.dashboard.charts import ensure_json_safe
 
 
 def serie(*couples) -> list:
@@ -31,15 +30,15 @@ class TestSerieTropCourte:
         `None` plutôt que `0.0` : l'écran distingue « pas encore mesurable » de
         « n'a rien rapporté ».
         """
-        assert _compute_period_twr(points) is None
+        assert compute_period_twr(points) is None
 
 
 class TestSansMouvementDeCapital:
     def test_une_hausse_simple_se_lit_directement(self):
-        assert _compute_period_twr(serie((100, 0), (110, 0))) == 10.0
+        assert compute_period_twr(serie((100, 0), (110, 0))) == 10.0
 
     def test_une_baisse_aussi(self):
-        assert _compute_period_twr(serie((100, 0), (80, 0))) == -20.0
+        assert compute_period_twr(serie((100, 0), (80, 0))) == -20.0
 
     def test_les_sous_periodes_se_composent_au_lieu_de_s_additionner(self):
         """+10 % puis +10 % font +21 %, non +20 %.
@@ -47,11 +46,11 @@ class TestSansMouvementDeCapital:
         C'est toute la raison d'être d'un rendement pondéré dans le temps :
         chaque sous-période s'applique au capital que la précédente a laissé.
         """
-        assert _compute_period_twr(serie((100, 0), (110, 0), (121, 0))) == 21.0
+        assert compute_period_twr(serie((100, 0), (110, 0), (121, 0))) == 21.0
 
     def test_une_hausse_suivie_d_une_baisse_symetrique_ne_revient_pas_a_zero(self):
         # +50 % puis −50 % laissent −25 % : la baisse porte sur un capital plus gros.
-        assert _compute_period_twr(serie((100, 0), (150, 0), (75, 0))) == -25.0
+        assert compute_period_twr(serie((100, 0), (150, 0), (75, 0))) == -25.0
 
 
 class TestAvecFluxExternes:
@@ -62,19 +61,19 @@ class TestAvecFluxExternes:
         performance n'est que de 10 %. Sans retrait du flux, l'écran annoncerait
         +110 % pour un simple virement.
         """
-        assert _compute_period_twr(serie((100, 100), (210, 200))) == 10.0
+        assert compute_period_twr(serie((100, 100), (210, 200))) == 10.0
 
     def test_un_retrait_non_plus(self):
         # 100 → 60 après un retrait de 50 : la performance est de +10 %, pas −40 %.
-        assert _compute_period_twr(serie((100, 100), (60, 50))) == 10.0
+        assert compute_period_twr(serie((100, 100), (60, 50))) == 10.0
 
     def test_un_versement_sans_gain_ne_rapporte_rien(self):
-        assert _compute_period_twr(serie((100, 100), (150, 150))) == 0.0
+        assert compute_period_twr(serie((100, 100), (150, 150))) == 0.0
 
     def test_le_flux_se_lit_sur_la_variation_du_capital_net_pas_sur_sa_valeur(self):
         # Deux séries de même performance mais de capital net différent doivent
         # rendre le même chiffre : seule la variation compte.
-        assert _compute_period_twr(serie((100, 0), (110, 0))) == _compute_period_twr(serie((100, 5000), (110, 5000)))
+        assert compute_period_twr(serie((100, 0), (110, 0))) == compute_period_twr(serie((100, 5000), (110, 5000)))
 
 
 class TestGardeFous:
@@ -85,7 +84,7 @@ class TestGardeFous:
         pour rester visible à l'écran comme une anomalie, pas assez pour rendre
         le chiffre absurde.
         """
-        assert _compute_period_twr(serie((100, 0), (5000, 0))) == 900.0
+        assert compute_period_twr(serie((100, 0), (5000, 0))) == 900.0
 
     def test_un_instantane_a_zero_est_ecarte_au_lieu_de_tout_annuler(self):
         """NEW-63 : on ne mesure pas ce qu'on n'a pas observé.
@@ -99,7 +98,7 @@ class TestGardeFous:
         lendemain : c'est un défaut de collecte, et la sous-période est écartée.
         Ici, la seule mesure exploitable va de 100 à 200 — soit +100 %.
         """
-        assert _compute_period_twr(serie((100, 0), (0, 0), (100, 0), (200, 0))) == 100.0
+        assert compute_period_twr(serie((100, 0), (0, 0), (100, 0), (200, 0))) == 100.0
 
     def test_une_perte_reelle_reste_comptee(self):
         """La limite de la règle : seul le **zéro** est écarté.
@@ -107,35 +106,35 @@ class TestGardeFous:
         Une baisse de 90 % est une perte, pas un trou de mesure — la confondre
         avec un instantané manquant effacerait des pertes réelles du calcul.
         """
-        assert _compute_period_twr(serie((100, 0), (10, 0))) == -90.0
+        assert compute_period_twr(serie((100, 0), (10, 0))) == -90.0
 
     def test_une_valeur_de_depart_nulle_fait_sauter_la_sous_periode(self):
         # Sans cette garde, la division par zéro remonterait en erreur 500.
         # La garde s'écrit `> 0` là où `!= 0` suffirait : la valeur d'un
         # portefeuille n'est jamais négative, les deux formes se valent ici.
-        assert _compute_period_twr(serie((0, 0), (100, 0), (110, 0))) == 10.0
+        assert compute_period_twr(serie((0, 0), (100, 0), (110, 0))) == 10.0
 
     def test_une_sous_periode_negative_est_ecartee(self):
         # Un retrait mal horodaté peut rendre (valeur − flux) négatif : une
         # valeur impossible, donc une mesure à ignorer, non une perte à compter.
         # Sans autre sous-période exploitable, il n'y a rien à mesurer.
-        assert _compute_period_twr(serie((100, 0), (10, 200))) == 0.0
+        assert compute_period_twr(serie((100, 0), (10, 200))) == 0.0
 
     def test_une_cle_absente_vaut_zero(self):
-        assert _compute_period_twr([{"value": 100}, {"value": 110}]) == 10.0
+        assert compute_period_twr([{"value": 100}, {"value": 110}]) == 10.0
 
     def test_une_cle_nulle_vaut_zero(self):
-        assert _compute_period_twr([{"value": 100, "net_capital": None}, {"value": 110, "net_capital": None}]) == 10.0
+        assert compute_period_twr([{"value": 100, "net_capital": None}, {"value": 110, "net_capital": None}]) == 10.0
 
     def test_le_resultat_est_arrondi_au_centieme(self):
-        assert _compute_period_twr(serie((100, 0), (103.33333, 0))) == 3.33
+        assert compute_period_twr(serie((100, 0), (103.33333, 0))) == 3.33
 
 
 class TestReponseJsonSaine:
     def test_un_decimal_devient_un_nombre(self):
         """`json.dumps` refuse un `Decimal` : la réponse partirait en erreur 500."""
-        assert _ensure_json_safe(Decimal("12.34")) == 12.34
-        assert isinstance(_ensure_json_safe(Decimal("12.34")), float)
+        assert ensure_json_safe(Decimal("12.34")) == 12.34
+        assert isinstance(ensure_json_safe(Decimal("12.34")), float)
 
     @pytest.mark.parametrize("valeur", [float("nan"), float("inf"), float("-inf")])
     def test_un_nombre_non_fini_devient_zero(self, valeur):
@@ -145,25 +144,25 @@ class TestReponseJsonSaine:
         le navigateur reçoit une réponse illisible et le tableau de bord reste
         vide, sans message.
         """
-        assert _ensure_json_safe(valeur) == 0.0
+        assert ensure_json_safe(valeur) == 0.0
 
     def test_les_nombres_finis_traversent_intacts(self):
-        assert _ensure_json_safe(3.14) == 3.14
-        assert _ensure_json_safe(-0.0) == 0.0
+        assert ensure_json_safe(3.14) == 3.14
+        assert ensure_json_safe(-0.0) == 0.0
 
     def test_la_conversion_descend_dans_les_structures_imbriquees(self):
         entree = {"total": Decimal("10"), "lignes": [{"perf": float("nan")}, {"perf": Decimal("2.5")}]}
 
-        assert _ensure_json_safe(entree) == {"total": 10.0, "lignes": [{"perf": 0.0}, {"perf": 2.5}]}
+        assert ensure_json_safe(entree) == {"total": 10.0, "lignes": [{"perf": 0.0}, {"perf": 2.5}]}
 
     def test_un_tuple_devient_une_liste(self):
         # JSON n'a pas de tuple ; le rendre tel quel laisserait le sérialiseur
         # s'en charger, ou échouer selon l'implémentation.
-        resultat = _ensure_json_safe((Decimal("1"), Decimal("2")))
+        resultat = ensure_json_safe((Decimal("1"), Decimal("2")))
 
         assert resultat == [1.0, 2.0]
         assert isinstance(resultat, list)
 
     @pytest.mark.parametrize("valeur", ["texte", None, True, 42])
     def test_les_autres_types_ne_sont_pas_touches(self, valeur):
-        assert _ensure_json_safe(valeur) is valeur
+        assert ensure_json_safe(valeur) is valeur

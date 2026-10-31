@@ -5,9 +5,9 @@ from sqlalchemy import ColumnElement, Date, String, case, cast, func, or_, selec
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.db import session
+from app.domains.dashboard.models import PortfolioSnapshot
 from app.domains.portfolio.models import Asset, AssetType
 from app.domains.transactions.models import Transaction, TransactionType
-from app.models.portfolio_snapshot import PortfolioSnapshot
 
 MATERIALITY_VALUE = Decimal("1.00")
 MATERIALITY_DIFF_VALUE = Decimal("0.01")
