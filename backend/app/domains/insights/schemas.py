@@ -78,7 +78,7 @@ class MetricsSummaryResponse(BaseModel):
     volatility: float
     var_95: float
     max_drawdown: float
-    hhi: float
+    hhi: float | None
     total_value: float
     regime_config: RegimeConfigResponse | None = None
     avg_top5_correlation: float | None = None

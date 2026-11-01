@@ -92,7 +92,11 @@ def _orders(
 
 
 async def rebalancing_orders(
-    db: AsyncSession, user_id: str, total_value: float, market_regime: MarketRegime | None, days: int
+    db: AsyncSession,
+    user_id: str,
+    total_value: float,
+    market_regime: MarketRegime | None,
+    allocation: dict[str, float],
 ) -> list[RebalancingOrder]:
     """Ordres triés par montant ; en marché baissier, écart exigé doublé, ventes différées et réserve de liquidités."""
     if total_value <= 0:
@@ -101,13 +105,12 @@ async def rebalancing_orders(
         optimization = await analytics_service.optimize_portfolio(db, user_id, objective="max_sharpe")
         if not optimization or not optimization.weights:
             return []
-        analytics = await analytics_service.get_user_analytics(db, user_id, days=days)
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to get optimization: %s", exc)
         return []
     confidence = _bear_confidence(market_regime)
     optimal_weights = {symbol: weight / 100 for symbol, weight in optimization.weights.items()}
-    orders = _orders(optimal_weights, analytics.allocation_by_asset or {}, total_value, confidence)
+    orders = _orders(optimal_weights, allocation, total_value, confidence)
     if confidence is not None:
         orders.insert(0, _cash_reserve_order(total_value, confidence))
     orders.sort(key=lambda order: order.amount_eur, reverse=True)

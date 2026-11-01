@@ -1,7 +1,10 @@
 {
   "body": {
-    "estimated_tax_saving": 0,
+    "estimated_tax_saving": 0.0,
+    "nb_candidates": 0,
+    "note": "Vendre ces positions cristallise les moins-values. Elles ne réduisent l'impôt que sur des plus-values imposables : sur les cryptomonnaies, uniquement celles de la même année.",
     "opportunities": [],
+    "realized_gains_this_year": 0.0,
     "total_harvestable": 0
   },
   "status": 200

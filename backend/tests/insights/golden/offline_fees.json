@@ -1,6 +1,6 @@
 {
   "body": {
-    "avg_monthly_fee": 2.15,
+    "avg_monthly_fee": 2.6,
     "by_asset": {
       "AAPL": 1.0,
       "ARB": 1.5,
@@ -8,11 +8,11 @@
       "DOGE": 1.0,
       "ETH": 7.0,
       "SOL": 4.0,
-      "UNI": 1.0
+      "UNI": 10.0
     },
     "by_exchange": {
       "Binance": 30.0,
-      "Kraken": 8.0,
+      "Kraken": 17.0,
       "Tangem": 4.0,
       "Trade Republic": 1.0
     },
@@ -29,15 +29,25 @@
       "2026-03": 3.0,
       "2026-06": 2.0,
       "2026-07": 5.5,
-      "2026-08": 0.5
+      "2026-08": 9.5
     },
     "by_type": {
       "buy": 33.0,
+      "fee": 9.0,
       "sell": 10.0
     },
-    "nb_frais_non_convertis": 1,
-    "nb_transactions_with_fees": 13,
+    "nb_frais_non_convertis": 2,
+    "nb_transactions_with_fees": 14,
     "recent_fees": [
+      {
+        "date": "2026-08-15T10:00:00+00:00",
+        "exchange": "Kraken",
+        "fee": 9.0,
+        "fee_convertie": true,
+        "fee_currency": "EUR",
+        "symbol": "UNI",
+        "type": "fee"
+      },
       {
         "date": "2026-08-01T10:00:00+00:00",
         "exchange": "Binance",
@@ -60,7 +70,7 @@
         "date": "2026-06-15T10:00:00+00:00",
         "exchange": "Tangem",
         "fee": 2.0,
-        "fee_convertie": true,
+        "fee_convertie": false,
         "fee_currency": "USD",
         "symbol": "SOL",
         "type": "buy"
@@ -156,7 +166,7 @@
         "type": "buy"
       }
     ],
-    "total_fees": 43.0
+    "total_fees": 52.0
   },
   "status": 200
 }

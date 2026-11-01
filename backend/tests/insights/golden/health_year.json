@@ -70,16 +70,6 @@
         "price_change_percent": -0.2,
         "severity": "low",
         "symbol": "AAPL"
-      },
-      {
-        "anomaly_type": "price_spike",
-        "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
-        "detected_at": "2026-10-17T12:00:00+00:00",
-        "impact_eur": 1.1033,
-        "position_value_eur": 1838.878,
-        "price_change_percent": 0.06,
-        "severity": "low",
-        "symbol": "USDC"
       }
     ],
     "generated_at": "2026-10-17T12:00:00+00:00",
@@ -189,17 +179,6 @@
         "severity": "warning",
         "target_value": null,
         "title": "Anomalie détectée sur AAPL"
-      },
-      {
-        "actions": [],
-        "category": "anomaly",
-        "current_value": 1.1033,
-        "message": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%. Impact: +1€ (+0.1%)",
-        "metric_name": "impact_eur",
-        "potential_improvement": null,
-        "severity": "warning",
-        "target_value": null,
-        "title": "Anomalie détectée sur USDC"
       },
       {
         "actions": [],

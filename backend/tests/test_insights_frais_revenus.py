@@ -302,20 +302,7 @@ class TestRevenusPassifs:
         assert res["nb_events"] == 2
         assert res["by_type"] == {"staking_reward": 200.0, "airdrop": 50.0}
 
-    async def test_les_dividendes_et_interets_ne_sont_pas_comptes(self, db_session, regular_user):
-        """La docstring annonce « dividends, staking rewards, interest ».
-
-        `passive_types` ne contient pourtant que `STAKING_REWARD` et `AIRDROP` :
-        un dividende d'action ou un intérêt obligataire n'apparaît nulle part
-        dans le suivi des revenus passifs. Les deux types existent, et tout le
-        reste du code les traite bien comme des revenus — ils comptent dans les
-        entrées du TRI (`app.domains.analytics.xirr._INFLOW_TYPES`) et créditent les
-        quantités à l'import.
-
-        Exposition mesurée : **zéro transaction** de ces deux types en base de
-        développement — l'écart est réel mais dormant. Il se réveillerait au
-        premier dividende d'action enregistré.
-        """
+    async def test_les_dividendes_et_interets_sont_comptes(self, db_session, regular_user):
         pf = await portefeuille(db_session, regular_user)
         aapl = await actif(db_session, pf, "AAPL")
         db_session.add(mouvement(aapl, type_tx=TransactionType.DIVIDEND, quantite="1", prix="100"))
@@ -324,8 +311,8 @@ class TestRevenusPassifs:
 
         res = await passive_income(db_session, str(regular_user.id))
 
-        assert res["total_income"] == 0
-        assert res["nb_events"] == 0
+        assert res["total_income"] == 150
+        assert res["nb_events"] == 2
 
     async def test_un_revenu_sans_prix_est_valorise_a_zero(self, db_session, regular_user):
         # Un airdrop de jeton non coté compte comme un événement mais

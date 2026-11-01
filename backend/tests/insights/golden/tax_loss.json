@@ -1,8 +1,8 @@
 {
   "body": {
-    "estimated_tax_saving": 132.45,
-    "nb_candidates": 2,
-    "note": "Vendre ces positions cristallise les moins-values, réduisant l'impôt sur les plus-values. Attention au wash sale — ne rachetez pas immédiatement le même actif.",
+    "estimated_tax_saving": 126.45,
+    "nb_candidates": 1,
+    "note": "Vendre ces positions cristallise les moins-values. Elles ne réduisent l'impôt que sur des plus-values imposables : sur les cryptomonnaies, uniquement celles de la même année.",
     "opportunities": [
       {
         "asset_type": "crypto",
@@ -16,22 +16,10 @@
         "symbol": "ARB",
         "unrealized_loss": -421.5,
         "unrealized_loss_pct": -32.39
-      },
-      {
-        "asset_type": "crypto",
-        "avg_buy_price": 0.93,
-        "cost_basis": 1860.0,
-        "current_price": 0.92,
-        "current_value": 1840.0,
-        "name": null,
-        "potential_tax_saving": 6.0,
-        "quantity": 2000.0,
-        "symbol": "USDC",
-        "unrealized_loss": -20.0,
-        "unrealized_loss_pct": -1.08
       }
     ],
-    "total_harvestable": -441.5
+    "realized_gains_this_year": 1496.0,
+    "total_harvestable": -421.5
   },
   "status": 200
 }

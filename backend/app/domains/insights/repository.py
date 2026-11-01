@@ -4,13 +4,18 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import extract, select
+from sqlalchemy import extract, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.portfolio.models import Asset, Portfolio
 from app.domains.transactions.models import Transaction, TransactionType
 
-_PASSIVE_TYPES = (TransactionType.STAKING_REWARD, TransactionType.AIRDROP)
+_PASSIVE_TYPES = (
+    TransactionType.STAKING_REWARD,
+    TransactionType.AIRDROP,
+    TransactionType.DIVIDEND,
+    TransactionType.INTEREST,
+)
 
 
 async def portfolio_ids(db: AsyncSession, user_id: str) -> list[UUID]:
@@ -32,17 +37,20 @@ async def held_assets(db: AsyncSession, ids: list[UUID]) -> Sequence[Asset]:
 
 
 async def transactions_with_fee(db: AsyncSession, asset_ids: list[Any]) -> Sequence[Transaction]:
-    """Transactions portant des frais, la plus récente en tête."""
+    """Transactions de frais ou portant des frais, la plus récente en tête."""
     result = await db.execute(
         select(Transaction)
-        .where(Transaction.asset_id.in_(asset_ids), Transaction.fee > 0)
+        .where(
+            Transaction.asset_id.in_(asset_ids),
+            or_(Transaction.fee > 0, Transaction.transaction_type == TransactionType.FEE),
+        )
         .order_by(Transaction.executed_at.desc())
     )
     return result.scalars().all()
 
 
 async def passive_transactions(db: AsyncSession, asset_ids: list[Any], year: int | None) -> Sequence[Transaction]:
-    """Récompenses et airdrops, éventuellement d'une seule année, le plus récent en tête."""
+    """Récompenses, airdrops, dividendes et intérêts, éventuellement d'une seule année, le plus récent en tête."""
     query = select(Transaction).where(
         Transaction.asset_id.in_(asset_ids), Transaction.transaction_type.in_(_PASSIVE_TYPES)
     )

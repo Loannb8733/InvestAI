@@ -14,6 +14,8 @@ from app.domains.analytics.scoring import build_interpretations, diversification
 from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, Portfolio
 
+_MIN_RATIO_DAYS = 90
+
 
 def _aggregate_by_symbol(asset_data: list[AssetData]) -> list[AssetData]:
     aggregated: dict[str, AssetData] = {}
@@ -43,10 +45,9 @@ def _allocations(real_assets: list[AssetData], total_value: float) -> tuple[dict
     return allocation_by_type, allocation_by_asset
 
 
-def _performance(d: AssetData, risk_free_rate: float) -> AssetPerformance:
+def _performance(d: AssetData, ratio_entry: AssetData, risk_free_rate: float) -> AssetPerformance:
     a = d["asset"]
-    v = d["volatility"]
-    ann_r = d.get("annualized_return", 0.0)
+    ann_r = ratio_entry.get("annualized_return", 0.0)
     return AssetPerformance(
         symbol=a.symbol,
         name=a.name or a.symbol,
@@ -57,14 +58,18 @@ def _performance(d: AssetData, risk_free_rate: float) -> AssetPerformance:
         gain_loss_percent=d["gain_loss_percent"],
         weight=d["weight"],
         daily_return=round(d["daily_return"], 2),
-        volatility_30d=round(v, 1),
-        sharpe_ratio=sharpe(ann_r, v, risk_free_rate),
-        sortino_ratio=sortino(ann_r, d["downside_dev"], risk_free_rate),
+        volatility_30d=round(d["volatility"], 1),
+        sharpe_ratio=sharpe(ann_r, ratio_entry["volatility"], risk_free_rate),
+        sortino_ratio=sortino(ann_r, ratio_entry["downside_dev"], risk_free_rate),
         max_drawdown=round(d["max_drawdown"], 2),
     )
 
 
-def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RISK_FREE_RATE) -> PortfolioAnalytics:
+def _assemble_analytics(
+    asset_data: list[AssetData],
+    risk_free_rate: float = RISK_FREE_RATE,
+    ratio_data: list[AssetData] | None = None,
+) -> PortfolioAnalytics:
     real_assets = [d for d in asset_data if not d.get("is_stablecoin", False)]
 
     total_value_dec = sum((Decimal(str(d["current_value"])) for d in real_assets), Decimal("0"))
@@ -75,16 +80,19 @@ def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RIS
     allocation_by_type, allocation_by_asset = _allocations(real_assets, total_value)
     pm = portfolio_risk(real_assets, total_value)
     vol = pm["volatility"]
-    ann_ret = pm["annualized_return"]
     max_dd = pm["max_drawdown"]
-    var95_pct = pm["var_95_pct"]
-    sharpe_ratio = sharpe(ann_ret, vol, risk_free_rate)
-    sortino_ratio = sortino(ann_ret, pm["downside_dev"], risk_free_rate)
-    calmar_ratio = calmar(ann_ret, max_dd)
+    ratio_assets = real_assets if ratio_data is None else [d for d in ratio_data if not d.get("is_stablecoin", False)]
+    ratio_pm = pm if ratio_data is None else portfolio_risk(ratio_assets, total_value)
+    ann_ret = ratio_pm["annualized_return"]
+    var95_pct = max(pm["var_95_pct"], 0.0)
+    sharpe_ratio = sharpe(ann_ret, ratio_pm["volatility"], risk_free_rate)
+    sortino_ratio = sortino(ann_ret, ratio_pm["downside_dev"], risk_free_rate)
+    calmar_ratio = calmar(ann_ret, ratio_pm["max_drawdown"])
 
     var_95_eur = round(total_value * var95_pct / 100, 2)
     concentration = hhi(allocation_by_asset)
-    perfs = [_performance(d, risk_free_rate) for d in real_assets]
+    ratio_entries = {d["asset"].symbol: d for d in ratio_assets}
+    perfs = [_performance(d, ratio_entries.get(d["asset"].symbol, d), risk_free_rate) for d in real_assets]
     sorted_p = sorted(perfs, key=lambda x: x.gain_loss_percent, reverse=True)
 
     return PortfolioAnalytics(
@@ -98,7 +106,7 @@ def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RIS
         calmar_ratio=calmar_ratio,
         max_drawdown=max_dd,
         var_95=var_95_eur,
-        cvar_95=round(total_value * pm["cvar_95_pct"] / 100, 2),
+        cvar_95=round(total_value * max(pm["cvar_95_pct"], 0.0) / 100, 2),
         var_95_description=(
             (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR ({var95_pct:.2f}% du portefeuille)")
             if var95_pct > 0
@@ -140,7 +148,7 @@ class AnalyticsPortfolio(AnalyticsCore):
         currency: str = "EUR",
         days: int = 60,
     ) -> PortfolioAnalytics:
-        """Analyse d'un portefeuille ; `currency` ne vaut que pour le gain, le reste suit les cours en base."""
+        """Analyse d'un portefeuille, ratios sur 90 jours au moins ; `currency` ne vaut que pour le gain."""
         gain = await metrics_service.get_portfolio_performance(db, portfolio_id, currency)
         result = await db.execute(select(Asset).where(Asset.portfolio_id == portfolio_id, Asset.quantity > 0))
         assets = result.scalars().all()
@@ -149,7 +157,8 @@ class AnalyticsPortfolio(AnalyticsCore):
 
         risk_free_rate = await self._fetch_risk_free_rate()
         asset_data = await self._build_asset_data(assets, days=days)
-        return _with_gain(_assemble_analytics(asset_data, risk_free_rate=risk_free_rate), gain)
+        ratio_data = await self._build_asset_data(assets, days=_MIN_RATIO_DAYS) if days < _MIN_RATIO_DAYS else None
+        return _with_gain(_assemble_analytics(asset_data, risk_free_rate, ratio_data), gain)
 
     async def get_user_analytics(
         self,
@@ -159,7 +168,7 @@ class AnalyticsPortfolio(AnalyticsCore):
         currency: str = "EUR",
         days: int = 60,
     ) -> PortfolioAnalytics:
-        """Analyse de tous les portefeuilles de l'utilisateur, positions regroupées par symbole."""
+        """Analyse de tous les portefeuilles, positions regroupées par symbole, ratios sur 90 jours au moins."""
         portfolios = (await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))).scalars().all()
         if not portfolios:
             return self._empty_analytics()
@@ -172,8 +181,11 @@ class AnalyticsPortfolio(AnalyticsCore):
             return _with_gain(self._empty_analytics(), gain)
 
         risk_free_rate = await self._fetch_risk_free_rate()
-        asset_data = await self._build_asset_data(assets, days=days)
-        return _with_gain(_assemble_analytics(_aggregate_by_symbol(asset_data), risk_free_rate=risk_free_rate), gain)
+        asset_data = _aggregate_by_symbol(await self._build_asset_data(assets, days=days))
+        ratio_data = None
+        if days < _MIN_RATIO_DAYS:
+            ratio_data = _aggregate_by_symbol(await self._build_asset_data(assets, days=_MIN_RATIO_DAYS))
+        return _with_gain(_assemble_analytics(asset_data, risk_free_rate, ratio_data), gain)
 
     def _empty_analytics(self) -> PortfolioAnalytics:
         return PortfolioAnalytics(

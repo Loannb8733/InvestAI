@@ -12,7 +12,7 @@ from app.domains.insights.periods import covered_months
 from app.domains.market_data.fx.spot import FIAT_CURRENCIES
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset
-from app.domains.transactions.models import Transaction
+from app.domains.transactions.models import Transaction, TransactionType
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ _RECENT_FEES = 20
 EMPTY_FEES: dict[str, Any] = {
     "total_fees": 0,
     "nb_transactions_with_fees": 0,
+    "nb_frais_non_convertis": 0,
     "avg_monthly_fee": 0,
     "by_exchange": {},
     "by_asset": {},
@@ -49,12 +50,12 @@ def fee_in_portfolio_currency(amount: float, fee_currency: str, context: FeeCont
     currency = (fee_currency or "EUR").upper()
     if currency == "EUR":
         return amount, True
-    rate = float(context.conversion_rate) if context.conversion_rate else 1.0
+    tx_currency = (context.currency or "EUR").upper()
+    rate = float(context.conversion_rate) if context.conversion_rate else (1.0 if tx_currency == "EUR" else None)
     if currency in FIAT_CURRENCIES:
-        converted = currency == (context.currency or "EUR").upper()
-        return (amount * rate, True) if converted else (amount, False)
+        return (amount * rate, True) if currency == tx_currency and rate is not None else (amount, False)
     if currency == (context.asset_symbol or "").upper():
-        return (amount * context.price * rate, True) if context.price > 0 else (amount, False)
+        return (amount * context.price * rate, True) if context.price > 0 and rate is not None else (amount, False)
     token_price = context.token_prices.get(currency, 0.0)
     return (amount * token_price, True) if token_price > 0 else (amount, False)
 
@@ -84,6 +85,12 @@ async def _token_prices(tokens: set[str]) -> dict[str, float]:
     return prices
 
 
+def _amount_of(tx: Transaction, context: FeeContext) -> tuple[float, bool]:
+    if tx.transaction_type != TransactionType.FEE:
+        return fee_in_portfolio_currency(float(tx.fee or 0), tx.fee_currency or "EUR", context)
+    return fee_in_portfolio_currency(float(tx.quantity) * float(tx.price or 0), context.currency, context)
+
+
 @dataclass
 class _Tally:
     total: float = 0.0
@@ -103,7 +110,7 @@ class _Tally:
             conversion_rate=float(tx.conversion_rate) if tx.conversion_rate else None,
             token_prices=token_prices,
         )
-        fee, converted = fee_in_portfolio_currency(float(tx.fee or 0), tx.fee_currency or "EUR", context)
+        fee, converted = _amount_of(tx, context)
         self.unconverted += 0 if converted else 1
         self.total += fee
         exchange = tx.exchange or "Inconnu"

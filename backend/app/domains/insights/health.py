@@ -67,11 +67,30 @@ def _unavailable_report() -> PortfolioHealthReport:
     )
 
 
+def _empty_report() -> PortfolioHealthReport:
+    return PortfolioHealthReport(
+        overall_score=0,
+        overall_status="unknown",
+        insights=[
+            SmartInsight(
+                category=InsightCategory.PERFORMANCE,
+                severity=InsightSeverity.INFO,
+                title="Portefeuille vide",
+                message="Ajoutez vos premiers actifs pour obtenir une analyse.",
+            )
+        ],
+        rebalancing_orders=[],
+        anomaly_impacts=[],
+        metrics_summary={},
+        generated_at=datetime.now(UTC),
+    )
+
+
 async def _concentration(
-    db: AsyncSession, user_id: str, analytics: PortfolioAnalytics
+    db: AsyncSession, user_id: str, analytics: PortfolioAnalytics, days: int
 ) -> tuple[float | None, list[dict[str, Any]]]:
     try:
-        diversification = await analytics_service.get_diversification_analysis(db, user_id)
+        diversification = await analytics_service.get_diversification_analysis(db, user_id, days=days)
         allocation = analytics.allocation_by_asset or {}
         top_holdings = [
             {"symbol": symbol, "weight": _finite(weight) / 100, "name": symbol}
@@ -145,19 +164,21 @@ def _regime_config(market_regime: MarketRegime | None) -> dict[str, Any] | None:
 
 
 async def portfolio_health(db: AsyncSession, user_id: str, days: int = 30) -> PortfolioHealthReport:
-    """Rapport complet sur `days` jours ; métriques en fractions, sauf la VaR et le patrimoine en euros."""
+    """Rapport sur `days` jours, ratios sur 90 jours au moins ; VaR et patrimoine en euros, le reste en fractions."""
     try:
         analytics = await analytics_service.get_user_analytics(db, user_id, days=days)
+        total_value = _finite(analytics.total_value)
+        if total_value <= 0:
+            return _empty_report()
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to get analytics: %s", exc)
         return _unavailable_report()
     sharpe = _finite(analytics.sharpe_ratio)
-    total_value = _finite(analytics.total_value)
     volatility = _finite(analytics.portfolio_volatility) / 100.0
     max_drawdown = abs(_finite(analytics.max_drawdown)) / 100.0
     var_95_eur = _finite(analytics.var_95)
     var_95 = var_95_eur / total_value if total_value > 0 else 0.0
-    hhi, top_holdings = await _concentration(db, user_id, analytics)
+    hhi, top_holdings = await _concentration(db, user_id, analytics, days)
     insights = [
         *sharpe_insights(sharpe),
         *risk_insights(volatility, var_95, max_drawdown),
@@ -168,7 +189,7 @@ async def portfolio_health(db: AsyncSession, user_id: str, days: int = 30) -> Po
         from_regime = regime_insight(market_regime.market)
         if from_regime:
             insights.append(from_regime)
-    orders = await rebalancing_orders(db, user_id, total_value, market_regime, days)
+    orders = await rebalancing_orders(db, user_id, total_value, market_regime, analytics.allocation_by_asset or {})
     if orders:
         insights.append(_rebalancing_insight(orders))
     impacts = await anomaly_impacts(db, user_id)
@@ -203,6 +224,7 @@ async def portfolio_health(db: AsyncSession, user_id: str, days: int = 30) -> Po
             "max_drawdown": max_drawdown,
             "hhi": hhi,
             "total_value": total_value,
+            "total_invested": _finite(analytics.total_invested),
             "regime_config": _regime_config(market_regime),
             "avg_top5_correlation": round(avg_top5, 3) if clusters is not None else None,
             "risk_clusters": clusters,
@@ -225,18 +247,12 @@ async def dashboard_summary(db: AsyncSession, user_id: str, days: int = 30) -> d
             "category": best.category.value,
         }
     total_value = report.metrics_summary.get("total_value", 0)
-    breakeven_pct = None
-    try:
-        analytics = await analytics_service.get_user_analytics(db, user_id, days=days)
-        if analytics.total_invested and analytics.total_invested > 0:
-            breakeven_pct = round(((total_value / analytics.total_invested) - 1) * 100, 2)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("Breakeven distance computation failed for dashboard summary: %s", exc)
+    invested = report.metrics_summary.get("total_invested", 0)
     return {
         "health_score": report.overall_score,
         "health_status": report.overall_status,
         "top_insight": top_insight,
-        "breakeven_pct": breakeven_pct,
+        "breakeven_pct": round((total_value / invested - 1) * 100, 2) if invested > 0 else None,
         "anomaly_count": len(report.anomaly_impacts),
         "regime": report.market_regime.market.dominant_regime if report.market_regime else None,
         "generated_at": report.generated_at.isoformat(),

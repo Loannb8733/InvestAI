@@ -9,6 +9,7 @@ from app.domains.insights import repository
 from app.domains.insights.results import AnomalyImpact
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
+from app.domains.portfolio.classification import is_cash_like
 from app.domains.portfolio.models import AssetType
 from app.domains.predictions.service import prediction_service
 from app.domains.predictions.types import AnomalyDetection
@@ -77,6 +78,10 @@ async def anomaly_impacts(db: AsyncSession, user_id: str) -> list[AnomalyImpact]
         logger.error("Failed to detect anomalies: %s", exc)
         return []
     positions = await _positions(db, user_id)
-    impacts = [await _impact(anomaly, positions) for anomaly in anomalies if anomaly.is_anomaly]
+    impacts = [
+        await _impact(anomaly, positions)
+        for anomaly in anomalies
+        if anomaly.is_anomaly and not is_cash_like(anomaly.symbol)
+    ]
     impacts.sort(key=lambda impact: abs(impact.impact_eur), reverse=True)
     return impacts

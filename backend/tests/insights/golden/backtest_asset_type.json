@@ -1,6 +1,19 @@
 {
   "body": {
-    "detail": "Internal server error"
+    "detail": [
+      {
+        "ctx": {
+          "expected": "'crypto', 'stock', 'etf', 'real_estate', 'bond', 'crowdfunding' or 'other'"
+        },
+        "input": "nimporte",
+        "loc": [
+          "query",
+          "asset_type"
+        ],
+        "msg": "Input should be 'crypto', 'stock', 'etf', 'real_estate', 'bond', 'crowdfunding' or 'other'",
+        "type": "enum"
+      }
+    ]
   },
-  "status": 500
+  "status": 422
 }

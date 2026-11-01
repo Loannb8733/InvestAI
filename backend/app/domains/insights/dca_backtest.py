@@ -46,8 +46,8 @@ def _monthly_buys(
 async def backtest_dca(
     symbol: str, asset_type: str, monthly_amount: float, start_year: int, start_month: int = 1
 ) -> dict[str, Any]:
-    """Ce que vaudrait aujourd'hui un achat mensuel de `monthly_amount` ; un cas impossible rend une clé `error`."""
-    now = datetime.now(UTC)
+    """Valeur d'un achat mensuel fixe, dès le premier mois coté ; un cas impossible rend une clé `error`."""
+    now = datetime.now(UTC).replace(tzinfo=None)
     start = datetime(start_year, start_month, 1)
     total_months = (now.year - start.year) * 12 + (now.month - start.month)
     if total_months <= 0:
@@ -66,7 +66,7 @@ async def backtest_dca(
     return {
         "symbol": symbol,
         "monthly_amount": monthly_amount,
-        "start_date": start.strftime("%Y-%m"),
+        "start_date": buys[0]["month"],
         "nb_months": len(buys),
         "total_invested": round(invested, 2),
         "total_units": round(units, 8),

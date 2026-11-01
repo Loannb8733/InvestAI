@@ -10,7 +10,7 @@ import { useNivoTheme } from '@/components/charts/nivo-theme'
 import { Loader, SectionEmptyState } from './shared'
 
 /**
- * Revenus passifs (staking, airdrops) : synthèse, projection annuelle et
+ * Revenus passifs (staking, airdrops, dividendes, intérêts) : synthèse, projection annuelle et
  * répartitions par mois / type / actif.
  */
 export default function PassiveIncomeSection() {
@@ -24,7 +24,7 @@ export default function PassiveIncomeSection() {
   if (isLoading) return <Loader />
 
   if (!data || data.nb_events === 0) {
-    return <SectionEmptyState message="Aucun revenu passif enregistré (staking, airdrops)" />
+    return <SectionEmptyState message="Aucun revenu passif enregistré" />
   }
 
   const monthlyData = Object.entries((data.by_month ?? {}) as Record<string, number>).map(([month, value]) => ({
@@ -35,6 +35,8 @@ export default function PassiveIncomeSection() {
   const typeLabels: Record<string, string> = {
     staking_reward: 'Reward',
     airdrop: 'Airdrops',
+    dividend: 'Dividendes',
+    interest: 'Intérêts',
   }
 
   return (
@@ -46,7 +48,10 @@ export default function PassiveIncomeSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-serif font-medium text-gain">{formatCurrency(data.total_income)}</div>
-            <p className="text-xs text-muted-foreground">{data.nb_events} versements</p>
+            <p className="text-xs text-muted-foreground">
+              {data.nb_events} versements
+              {data.nb_sans_cours > 0 && ` dont ${data.nb_sans_cours} sans cours, non comptés`}
+            </p>
           </CardContent>
         </Card>
         <StatCard

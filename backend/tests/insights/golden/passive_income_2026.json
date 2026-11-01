@@ -1,20 +1,40 @@
 {
   "body": {
-    "avg_monthly": 33.0,
+    "avg_monthly": 22.22,
     "by_asset": {
+      "AAPL": 20.0,
+      "DOGE": 15.0,
       "ETH": 125.0,
       "UNI": 40.0
     },
     "by_month": {
       "2026-01": 125.0,
-      "2026-04": 0,
-      "2026-05": 40.0
+      "2026-05": 40.0,
+      "2026-09": 35.0
     },
     "by_type": {
       "airdrop": 40.0,
+      "dividend": 20.0,
+      "interest": 15.0,
       "staking_reward": 125.0
     },
     "history": [
+      {
+        "date": "2026-09-25T10:00:00+00:00",
+        "price": 0.15,
+        "quantity": 100.0,
+        "symbol": "DOGE",
+        "type": "interest",
+        "value": 15.0
+      },
+      {
+        "date": "2026-09-20T10:00:00+00:00",
+        "price": 20.0,
+        "quantity": 1.0,
+        "symbol": "AAPL",
+        "type": "dividend",
+        "value": 20.0
+      },
       {
         "date": "2026-05-10T10:00:00+00:00",
         "price": 8.0,
@@ -29,7 +49,7 @@
         "quantity": 0.01,
         "symbol": "ETH",
         "type": "staking_reward",
-        "value": 0
+        "value": 0.0
       },
       {
         "date": "2026-01-01T10:00:00+00:00",
@@ -40,9 +60,10 @@
         "value": 125.0
       }
     ],
-    "nb_events": 3,
-    "projected_annual": 660.0,
-    "total_income": 165.0
+    "nb_events": 5,
+    "nb_sans_cours": 1,
+    "projected_annual": 960.0,
+    "total_income": 200.0
   },
   "status": 200
 }

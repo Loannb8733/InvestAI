@@ -5,6 +5,7 @@
     "by_exchange": {},
     "by_month": {},
     "by_type": {},
+    "nb_frais_non_convertis": 0,
     "nb_transactions_with_fees": 0,
     "recent_fees": [],
     "total_fees": 0
