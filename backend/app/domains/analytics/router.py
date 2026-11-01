@@ -140,7 +140,7 @@ async def get_performance_summary(
     period: Annotated[str, Query(pattern="^(1d|7d|30d|90d|1y|all)$")] = "30d",
     portfolio_id: PortfolioFilter = None,
 ) -> dict[str, Any]:
-    days = PERIOD_DAYS.get(period, 60)
+    days = _window(PERIOD_DAYS.get(period, 60))
     if portfolio_id:
         analytics = await analytics_service.get_portfolio_analytics(session, portfolio_id, days=days)
     else:

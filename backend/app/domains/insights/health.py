@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 _TOP_HOLDINGS = 5
 _TOP_ACTIONS = 3
 _CROSS_ASSET_DAYS = 60
-_MIN_RATIO_DAYS = 90
 _SEVERITY_ORDER = {InsightSeverity.CRITICAL: 0, InsightSeverity.WARNING: 1, InsightSeverity.INFO: 2}
 
 
@@ -171,13 +170,10 @@ async def portfolio_health(db: AsyncSession, user_id: str, days: int = 30) -> Po
         total_value = _finite(analytics.total_value)
         if total_value <= 0:
             return _empty_report()
-        ratios = analytics
-        if days < _MIN_RATIO_DAYS:
-            ratios = await analytics_service.get_user_analytics(db, user_id, days=_MIN_RATIO_DAYS)
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to get analytics: %s", exc)
         return _unavailable_report()
-    sharpe = _finite(ratios.sharpe_ratio)
+    sharpe = _finite(analytics.sharpe_ratio)
     volatility = _finite(analytics.portfolio_volatility) / 100.0
     max_drawdown = abs(_finite(analytics.max_drawdown)) / 100.0
     var_95_eur = _finite(analytics.var_95)
@@ -222,7 +218,7 @@ async def portfolio_health(db: AsyncSession, user_id: str, days: int = 30) -> Po
         anomaly_impacts=impacts,
         metrics_summary={
             "sharpe_ratio": sharpe,
-            "sortino_ratio": _finite(ratios.sortino_ratio),
+            "sortino_ratio": _finite(analytics.sortino_ratio),
             "volatility": volatility,
             "var_95": var_95_eur,
             "max_drawdown": max_drawdown,
