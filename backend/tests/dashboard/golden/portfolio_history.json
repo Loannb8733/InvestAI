@@ -19,6 +19,10 @@
       }
     },
     "current_holdings_count": 7,
+    "realized_by_year": {
+      "2025": 3991.0,
+      "2026": 1496.0
+    },
     "realized_gains": 5487.0,
     "sold_assets": [],
     "sold_assets_count": 0,

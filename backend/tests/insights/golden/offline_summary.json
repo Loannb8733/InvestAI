@@ -1,16 +1,16 @@
 {
   "body": {
-    "anomaly_count": 1,
+    "anomaly_count": 0,
     "breakeven_pct": 47.1,
     "generated_at": "2026-10-17T12:00:00+00:00",
-    "health_score": 90,
-    "health_status": "excellent",
+    "health_score": 55,
+    "health_status": "fair",
     "regime": "bullish",
     "top_insight": {
-      "category": "diversification",
-      "message": "BTC représente 60% de votre portfolio. C'est trop concentré.",
+      "category": "performance",
+      "message": "Votre ratio de Sharpe (-3.54) est négatif. Votre portfolio sous-performe un placement sans risque.",
       "severity": "critical",
-      "title": "Concentration excessive"
+      "title": "Performance très faible"
     }
   },
   "status": 200

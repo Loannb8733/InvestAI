@@ -89,7 +89,7 @@ class TestLaSourceDeclareSonEchec:
 
         monkeypatch.setattr(analytics_service, "get_diversification_analysis", echec)
 
-        hhi, lignes = await _concentration(None, "utilisateur", SimpleNamespace(allocation_by_asset={"BTC": 100.0}))
+        hhi, lignes = await _concentration(None, "utilisateur", SimpleNamespace(allocation_by_asset={"BTC": 100.0}), 30)
 
         assert hhi is None
         assert lignes == []

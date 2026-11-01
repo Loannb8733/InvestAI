@@ -1,6 +1,6 @@
 """Historique d'investissement d'un portefeuille, actifs soldés compris."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -37,6 +37,7 @@ EMPTY_HISTORY: dict[str, Any] = {
     "sold_assets_count": 0,
     "sold_assets": [],
     "by_exchange": {},
+    "realized_by_year": {},
 }
 
 
@@ -52,6 +53,7 @@ class _AssetHistory:
     fees: Decimal = ZERO
     realized: Decimal = ZERO
     cost_sold: Decimal = ZERO
+    realized_by_year: dict[str, Decimal] = field(default_factory=dict)
     first: datetime | None = None
     last: datetime | None = None
 
@@ -157,11 +159,16 @@ def _realize(event: ReplayEvent, histories: dict[str, _AssetHistory], prices: _P
     history = histories[str(event.tx.asset_id)]
     if event.kind == "SELL":
         proceeds = event.quantity * prices.resolve(event.tx, event.symbol) - event.fee
-        history.realized += proceeds - event.cost_removed
-        history.cost_sold += event.cost_removed
+        gain = proceeds - event.cost_removed
     elif event.kind == "CONVERSION_OUT" and event.matched:
-        history.realized += event.dest_layer_cost - event.cost_removed
-        history.cost_sold += event.cost_removed
+        gain = event.dest_layer_cost - event.cost_removed
+    else:
+        return
+    history.realized += gain
+    history.cost_sold += event.cost_removed
+    if event.tx_dt is not None:
+        year = str(event.tx_dt.year)
+        history.realized_by_year[year] = history.realized_by_year.get(year, ZERO) + gain
 
 
 async def _charge_sold_out_fees(
@@ -179,6 +186,7 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
     holdings: list[dict[str, Any]] = []
     sold_assets: list[dict[str, Any]] = []
     by_exchange: dict[str, dict[str, float]] = {}
+    by_year: dict[str, float] = {}
     for history in histories.values():
         if is_cash_like(history.asset.symbol):
             continue
@@ -189,6 +197,8 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
         sales = by_exchange.setdefault(history.asset.exchange or "Autre", {"realized": 0.0, "cost_sold": 0.0})
         sales["realized"] += float(history.realized)
         sales["cost_sold"] += float(history.cost_sold)
+        for year, gain in history.realized_by_year.items():
+            by_year[year] = by_year.get(year, 0.0) + float(gain)
         if float(history.asset.quantity) <= 0:
             if history.sold > 0:
                 sold_assets.append(history.as_dict())
@@ -208,6 +218,7 @@ def _summarize(histories: dict[str, _AssetHistory]) -> dict[str, Any]:
         "sold_assets_count": len(sold_assets),
         "sold_assets": sold_assets,
         "by_exchange": by_exchange,
+        "realized_by_year": by_year,
     }
 
 

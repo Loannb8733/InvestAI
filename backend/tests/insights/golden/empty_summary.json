@@ -3,14 +3,14 @@
     "anomaly_count": 0,
     "breakeven_pct": null,
     "generated_at": "2026-10-17T12:00:00+00:00",
-    "health_score": 80,
-    "health_status": "excellent",
-    "regime": "bullish",
+    "health_score": 0,
+    "health_status": "unknown",
+    "regime": null,
     "top_insight": {
       "category": "performance",
-      "message": "Votre ratio de Sharpe (0.00) est faible. Le rendement ne compense pas suffisamment le risque pris.",
-      "severity": "warning",
-      "title": "Performance à améliorer"
+      "message": "Ajoutez vos premiers actifs pour obtenir une analyse.",
+      "severity": "info",
+      "title": "Portefeuille vide"
     }
   },
   "status": 200

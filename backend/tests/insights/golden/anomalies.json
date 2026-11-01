@@ -69,16 +69,6 @@
       "price_change_percent": -0.2,
       "severity": "low",
       "symbol": "AAPL"
-    },
-    {
-      "anomaly_type": "price_spike",
-      "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
-      "detected_at": "2026-10-17T12:00:00+00:00",
-      "impact_eur": 1.1033,
-      "position_value_eur": 1838.878,
-      "price_change_percent": 0.06,
-      "severity": "low",
-      "symbol": "USDC"
     }
   ],
   "status": 200

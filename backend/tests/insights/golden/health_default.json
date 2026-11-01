@@ -70,20 +70,21 @@
         "price_change_percent": -0.2,
         "severity": "low",
         "symbol": "AAPL"
-      },
-      {
-        "anomaly_type": "price_spike",
-        "description": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%",
-        "detected_at": "2026-10-17T12:00:00+00:00",
-        "impact_eur": 1.1033,
-        "position_value_eur": 1838.878,
-        "price_change_percent": 0.06,
-        "severity": "low",
-        "symbol": "USDC"
       }
     ],
     "generated_at": "2026-10-17T12:00:00+00:00",
     "insights": [
+      {
+        "actions": [],
+        "category": "performance",
+        "current_value": -3.54,
+        "message": "Votre ratio de Sharpe (-3.54) est négatif. Votre portfolio sous-performe un placement sans risque.",
+        "metric_name": "sharpe_ratio",
+        "potential_improvement": "Diversifiez vers des actifs moins corrélés ou réduisez les positions perdantes.",
+        "severity": "critical",
+        "target_value": 1.0,
+        "title": "Performance très faible"
+      },
       {
         "actions": [
           {
@@ -192,17 +193,6 @@
       },
       {
         "actions": [],
-        "category": "anomaly",
-        "current_value": 1.1033,
-        "message": "Z-score anormal (2.7): hausse de 0.1% vs moyenne 0.00%. Impact: +1€ (+0.1%)",
-        "metric_name": "impact_eur",
-        "potential_improvement": null,
-        "severity": "warning",
-        "target_value": null,
-        "title": "Anomalie détectée sur USDC"
-      },
-      {
-        "actions": [],
         "category": "risk",
         "current_value": 1.0,
         "message": "Les actifs BTC, UNI forment un cluster (corrélation moyenne : 100%). En cas de chute, ils baisseront simultanément.",
@@ -233,17 +223,6 @@
         "severity": "warning",
         "target_value": null,
         "title": "Cluster de risque détecté"
-      },
-      {
-        "actions": [],
-        "category": "performance",
-        "current_value": 134.34,
-        "message": "Votre ratio de Sharpe (134.34) est excellent. Votre rendement ajusté au risque est très bon.",
-        "metric_name": "sharpe_ratio",
-        "potential_improvement": null,
-        "severity": "info",
-        "target_value": null,
-        "title": "Excellente performance"
       },
       {
         "actions": [],
@@ -643,14 +622,14 @@
           "avg_corr": 0.981
         }
       ],
-      "sharpe_ratio": 134.34,
-      "sortino_ratio": 0.0,
+      "sharpe_ratio": -3.54,
+      "sortino_ratio": -3.05,
       "total_value": 62932.455,
-      "var_95": -81.81,
+      "var_95": 0.0,
       "volatility": 0.007
     },
-    "overall_score": 75,
-    "overall_status": "good",
+    "overall_score": 35,
+    "overall_status": "poor",
     "rebalancing_orders": []
   },
   "status": 200

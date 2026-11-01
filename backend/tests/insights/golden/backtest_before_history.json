@@ -1,6 +1,123 @@
 {
   "body": {
-    "detail": "Internal server error"
+    "avg_buy_price": 49615.048,
+    "current_price": 57487.6014,
+    "current_value": 4345.02,
+    "gain_loss": 595.02,
+    "gain_loss_pct": 15.87,
+    "monthly_amount": 250.0,
+    "monthly_history": [
+      {
+        "invested": 250.0,
+        "month": "2025-08",
+        "price": 41485.2067,
+        "units": 0.006,
+        "value": 250.0
+      },
+      {
+        "invested": 500.0,
+        "month": "2025-09",
+        "price": 45158.8472,
+        "units": 0.0055,
+        "value": 522.14
+      },
+      {
+        "invested": 750.0,
+        "month": "2025-10",
+        "price": 43800.9752,
+        "units": 0.0057,
+        "value": 756.44
+      },
+      {
+        "invested": 1000.0,
+        "month": "2025-11",
+        "price": 41465.7716,
+        "units": 0.006,
+        "value": 966.11
+      },
+      {
+        "invested": 1250.0,
+        "month": "2025-12",
+        "price": 44057.6137,
+        "units": 0.0057,
+        "value": 1276.5
+      },
+      {
+        "invested": 1500.0,
+        "month": "2026-01",
+        "price": 50236.5325,
+        "units": 0.005,
+        "value": 1705.52
+      },
+      {
+        "invested": 1750.0,
+        "month": "2026-02",
+        "price": 52741.3696,
+        "units": 0.0047,
+        "value": 2040.56
+      },
+      {
+        "invested": 2000.0,
+        "month": "2026-03",
+        "price": 49993.816,
+        "units": 0.005,
+        "value": 2184.26
+      },
+      {
+        "invested": 2250.0,
+        "month": "2026-04",
+        "price": 47872.9832,
+        "units": 0.0052,
+        "value": 2341.6
+      },
+      {
+        "invested": 2500.0,
+        "month": "2026-05",
+        "price": 52024.8301,
+        "units": 0.0048,
+        "value": 2794.67
+      },
+      {
+        "invested": 2750.0,
+        "month": "2026-06",
+        "price": 58516.0136,
+        "units": 0.0043,
+        "value": 3393.37
+      },
+      {
+        "invested": 3000.0,
+        "month": "2026-07",
+        "price": 59771.9528,
+        "units": 0.0042,
+        "value": 3716.2
+      },
+      {
+        "invested": 3250.0,
+        "month": "2026-08",
+        "price": 55644.9195,
+        "units": 0.0045,
+        "value": 3709.61
+      },
+      {
+        "invested": 3500.0,
+        "month": "2026-09",
+        "price": 54735.9364,
+        "units": 0.0046,
+        "value": 3899.01
+      },
+      {
+        "invested": 3750.0,
+        "month": "2026-10",
+        "price": 57487.6014,
+        "units": 0.0043,
+        "value": 4345.02
+      }
+    ],
+    "nb_months": 15,
+    "start_date": "2025-08",
+    "symbol": "BTC",
+    "total_invested": 3750.0,
+    "total_units": 0.0756
   },
-  "status": 500
+  "status": 200
 }

@@ -77,7 +77,7 @@ def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RIS
     vol = pm["volatility"]
     ann_ret = pm["annualized_return"]
     max_dd = pm["max_drawdown"]
-    var95_pct = pm["var_95_pct"]
+    var95_pct = max(pm["var_95_pct"], 0.0)
     sharpe_ratio = sharpe(ann_ret, vol, risk_free_rate)
     sortino_ratio = sortino(ann_ret, pm["downside_dev"], risk_free_rate)
     calmar_ratio = calmar(ann_ret, max_dd)
@@ -98,7 +98,7 @@ def _assemble_analytics(asset_data: list[AssetData], risk_free_rate: float = RIS
         calmar_ratio=calmar_ratio,
         max_drawdown=max_dd,
         var_95=var_95_eur,
-        cvar_95=round(total_value * pm["cvar_95_pct"] / 100, 2),
+        cvar_95=round(total_value * max(pm["cvar_95_pct"], 0.0) / 100, 2),
         var_95_description=(
             (f"Perte journalière maximale attendue (95%): {var_95_eur:.2f} EUR ({var95_pct:.2f}% du portefeuille)")
             if var95_pct > 0

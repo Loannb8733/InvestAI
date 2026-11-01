@@ -1,4 +1,4 @@
-"""Filet de caractérisation de l'optimisation fiscale (`get_tax_loss_harvesting`).
+"""Filet de l'optimisation fiscale (`tax_loss_opportunities`).
 
 Le service recense les positions en moins-value latente qu'il serait fiscalement
 intéressant de vendre. `domains/insights` était couvert à **13 %**.
@@ -11,10 +11,12 @@ jour.
 Comportement actuel épinglé, pas spécification approuvée.
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
+from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.insights.tax_loss import tax_loss_opportunities
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.market_data.prices.service import price_feed
@@ -30,8 +32,25 @@ def prix(monkeypatch):
         valeur = cotations.get(symbol.upper())
         return PriceQuote(price=Decimal(str(valeur))) if valeur is not None else None
 
+    async def _lot(symbols, currency="EUR"):
+        return {
+            s.upper(): PriceQuote(price=Decimal(str(cotations[s.upper()]))) for s in symbols if s.upper() in cotations
+        }
+
     monkeypatch.setattr(price_feed, "quote", _quote)
+    monkeypatch.setattr(price_feed, "crypto", _lot)
+    monkeypatch.setattr(price_feed, "stocks", _lot)
     return cotations
+
+
+@pytest.fixture
+def plus_values(monkeypatch):
+    """Plus-values réalisées de l'année, assez grandes pour ne rien plafonner."""
+
+    async def _historique(*_args):
+        return {"realized_by_year": {str(datetime.now(UTC).year): 1_000_000.0}}
+
+    monkeypatch.setattr(metrics_service, "get_portfolio_history", _historique)
 
 
 async def portefeuille_avec(db_session, user, *actifs) -> Portfolio:
@@ -60,9 +79,8 @@ class TestSansPortefeuille:
         assert res["opportunities"] == []
         assert res["total_harvestable"] == 0
         assert res["estimated_tax_saving"] == 0
-        # Le raccourci sans portefeuille ne passe pas par la même sortie que le
-        # cas nominal : il n'expose ni `nb_candidates` ni `note`.
-        assert "nb_candidates" not in res
+        assert res["nb_candidates"] == 0
+        assert "note" in res
 
 
 class TestDetectionDesMoinsValues:
@@ -107,7 +125,7 @@ class TestDetectionDesMoinsValues:
 
 
 class TestCalculFiscal:
-    async def test_l_economie_est_estimee_a_trente_pour_cent(self, db_session, regular_user, prix):
+    async def test_l_economie_est_estimee_a_trente_pour_cent(self, db_session, regular_user, prix, plus_values):
         """La flat tax française est codée en dur à 30 %.
 
         Ni le taux du profil investisseur ni celui d'un projet ne sont
@@ -122,7 +140,9 @@ class TestCalculFiscal:
         assert res["estimated_tax_saving"] == 3000.0
         assert res["opportunities"][0]["potential_tax_saving"] == 3000.0
 
-    async def test_le_montant_recoltable_est_negatif_l_economie_positive(self, db_session, regular_user, prix):
+    async def test_le_montant_recoltable_est_negatif_l_economie_positive(
+        self, db_session, regular_user, prix, plus_values
+    ):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000), ("ETH", 10, 3000))
         prix.update({"BTC": 45000.0, "ETH": 2500.0})
 
@@ -143,13 +163,7 @@ class TestCalculFiscal:
 
 class TestPrixIndisponible:
     async def test_un_prix_absent_fait_disparaitre_l_opportunite(self, db_session, regular_user, prix):
-        """Sans cours, le prix courant retombe sur le prix de revient.
-
-        La position affiche alors une plus-value **exactement nulle** et sort
-        de la liste : l'utilisateur ne voit pas la ligne, et rien ne lui dit que
-        le cours manquait. Une position réellement en moins-value passe donc
-        inaperçue plutôt que d'être signalée comme non valorisable.
-        """
+        """Sans cours, une position est valorisée à son coût : aucune moins-value ne s'en déduit."""
         await portefeuille_avec(db_session, regular_user, ("XYZ", 1, 50000))
         # `prix` reste vide : le double rend None.
 
@@ -232,17 +246,11 @@ class TestPositionsEcartees:
 
 
 class TestAvertissement:
-    async def test_la_note_met_en_garde_contre_le_rachat_immediat(self, db_session, regular_user, prix):
-        """La note cite le « wash sale », règle **américaine**.
-
-        Le droit français ne connaît pas cette interdiction pour les
-        particuliers ; la mise en garde reste prudente mais le terme est
-        dépaysé. Épinglé tel quel — la formulation relève du produit.
-        """
+    async def test_la_note_rappelle_la_limite_a_la_meme_annee(self, db_session, regular_user, prix):
         await portefeuille_avec(db_session, regular_user, ("BTC", 1, 50000))
         prix["BTC"] = 40000.0
 
         res = await tax_loss_opportunities(db_session, str(regular_user.id))
 
-        assert "wash sale" in res["note"]
+        assert "même année" in res["note"]
         assert "moins-values" in res["note"]
