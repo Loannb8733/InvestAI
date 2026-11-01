@@ -227,7 +227,7 @@ export interface MetricsSummary {
   var_95: number
   var_95_window?: number
   max_drawdown: number
-  hhi: number
+  hhi: number | null
   total_value: number
   days?: number
   gold_exposure?: number
