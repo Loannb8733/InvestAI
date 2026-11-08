@@ -1,0 +1,15 @@
+{
+  "published": [],
+  "requests": {
+    "api.coingecko.com/api/v3/search?query=ZZZ": 1,
+    "api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana,zzz": 1
+  },
+  "result": {
+    "symbols": [
+      "BTC",
+      "SOL",
+      "ZZZ"
+    ],
+    "updated": 0
+  }
+}
