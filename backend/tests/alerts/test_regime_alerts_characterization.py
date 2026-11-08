@@ -11,10 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.redis_client import redis_async_url
+from app.domains.alerts import regime
 from app.domains.identity.models import User
 from app.domains.market_data.history import reader
 from app.domains.notifications.telegram import client as telegram
-from app.services import regime_alert_service as service
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 from tests.sample_portfolio import FROZEN_NOW, seed_history
@@ -53,7 +53,7 @@ def _telegram(status: int) -> Any:
 
 @pytest.fixture
 def background(monkeypatch: pytest.MonkeyPatch, http_stub: HttpStub) -> HttpStub:
-    monkeypatch.setattr(service, "session_factory", TestSessionLocal)
+    monkeypatch.setattr(regime, "session_factory", TestSessionLocal)
     monkeypatch.setattr(reader, "session_factory", TestSessionLocal)
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "jeton")
     monkeypatch.setattr(telegram, "_redis", None)
@@ -98,7 +98,7 @@ def _sent(http_stub: HttpStub) -> list[dict[str, Any]]:
 async def _run(http_stub: HttpStub) -> dict[str, Any]:
     http_stub.requests.clear()
     with time_machine.travel(FROZEN_NOW, tick=False):
-        result = await service.regime_alert_service.check_and_alert()
+        result = await regime.check_regime_mutation()
     return {"result": result, "sent": _sent(http_stub), "redis": await _redis_state()}
 
 
