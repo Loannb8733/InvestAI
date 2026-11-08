@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { usePageVisibility } from '@/hooks/usePageVisibility'
 
@@ -7,6 +7,7 @@ export interface PriceUpdate {
   price: number
   change_24h_percent: number
   asset_type?: string
+  currency: string
 }
 
 const BASE_DELAY = 1_000   // 1s initial retry
@@ -20,7 +21,7 @@ export function pricesSocketUrl(): string {
   return `${protocol}//${window.location.host}${base}/ws/prices`
 }
 
-export function useRealtimePrices(symbols: string[]) {
+export function useRealtimePrices(symbols: string[], currency: string) {
   const [prices, setPrices] = useState<Record<string, PriceUpdate>>({})
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
@@ -68,7 +69,7 @@ export function useRealtimePrices(symbols: string[]) {
 
         if (data.type === 'auth' && data.status === 'ok') {
           setConnected(true)
-          ws.send(JSON.stringify({ action: 'subscribe', symbols }))
+          ws.send(JSON.stringify({ action: 'subscribe', symbols, currency }))
         } else if (data.type === 'price') {
           setPrices((prev) => ({
             ...prev,
@@ -77,6 +78,7 @@ export function useRealtimePrices(symbols: string[]) {
               price: data.price,
               change_24h_percent: data.change_24h_percent,
               asset_type: data.asset_type,
+              currency: data.currency,
             },
           }))
         } else if (data.type === 'ping') {
@@ -100,7 +102,7 @@ export function useRealtimePrices(symbols: string[]) {
       ws.close()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, symbols.join(','), clearReconnectTimer])
+  }, [token, symbols.join(','), currency, clearReconnectTimer])
 
   // Pause WS when tab is hidden, reconnect when visible
   useEffect(() => {
@@ -113,5 +115,10 @@ export function useRealtimePrices(symbols: string[]) {
     return () => disconnect()
   }, [pageVisible, connect, disconnect])
 
-  return { prices, connected }
+  const pricesInCurrency = useMemo(
+    () => Object.fromEntries(Object.entries(prices).filter(([, update]) => update.currency === currency)),
+    [prices, currency],
+  )
+
+  return { prices: pricesInCurrency, connected }
 }

@@ -98,12 +98,12 @@ async def upcoming_events(db: AsyncSession, user_id: UUID, days: int = 30) -> li
     ]
 
 
-async def get_index_comparison(days: int = 30) -> list[IndexComparison]:
-    """Variation de Bitcoin, Ethereum et Solana sur la période ; vide si les cours manquent."""
+async def get_index_comparison(days: int = 30, currency: str = "EUR") -> list[IndexComparison]:
+    """Variation de Bitcoin, Ethereum et Solana sur la période, cours en ``currency`` ; vide sans cours."""
     symbols = [symbol for symbol, _ in _INDEX_SYMBOLS]
     indices: list[IndexComparison] = []
     try:
-        quotes = await asyncio.wait_for(price_feed.crypto(symbols), timeout=_QUOTE_TIMEOUT)
+        quotes = await asyncio.wait_for(price_feed.crypto(symbols, currency), timeout=_QUOTE_TIMEOUT)
         changes = await asyncio.wait_for(
             metrics_service.fetch_period_changes({"crypto": symbols}, days), timeout=_QUOTE_TIMEOUT
         )

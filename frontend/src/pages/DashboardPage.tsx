@@ -393,7 +393,7 @@ export default function DashboardPage() {
     return metrics.asset_allocation.map((a) => a.symbol)
   }, [metrics?.asset_allocation])
 
-  const { prices: livePrices, connected: wsConnected } = useRealtimePrices(portfolioSymbols)
+  const { prices: livePrices, connected: wsConnected } = useRealtimePrices(portfolioSymbols, currency)
 
   // Helper: get live price for a symbol, falling back to the static value
   const getLivePrice = (symbol: string, fallbackValue: number): number => {
@@ -401,7 +401,7 @@ export default function DashboardPage() {
     return live ? live.price : fallbackValue
   }
 
-  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val)
+  const pc = (val: number) => privacyMode ? '••••••' : formatCurrency(val, currency)
 
   if (isLoading) {
     return (

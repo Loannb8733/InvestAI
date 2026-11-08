@@ -195,12 +195,12 @@ export default function AddTransactionForm({
 
   // Real-time price for selected asset
   const symbolsToWatch = useMemo(
-    () => (selectedAsset?.symbol ? [selectedAsset.symbol] : []),
+    () => (selectedAsset?.symbol ? [selectedAsset.symbol.toUpperCase()] : []),
     [selectedAsset?.symbol],
   )
-  const { prices: realtimePrices } = useRealtimePrices(symbolsToWatch)
+  const { prices: realtimePrices } = useRealtimePrices(symbolsToWatch, preferredCurrency)
   const currentMarketPrice = selectedAsset?.symbol
-    ? realtimePrices[selectedAsset.symbol]?.price ?? undefined
+    ? realtimePrices[selectedAsset.symbol.toUpperCase()]?.price ?? undefined
     : undefined
 
   // Bidirectional total calculation

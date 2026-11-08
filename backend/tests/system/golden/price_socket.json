@@ -100,7 +100,8 @@
         "symbol": "BTC",
         "price": 42000.5,
         "change_24h_percent": 1.5,
-        "asset_type": "crypto"
+        "asset_type": "crypto",
+        "currency": "EUR"
       }
     }
   ],

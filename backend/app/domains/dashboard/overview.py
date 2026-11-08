@@ -45,10 +45,12 @@ def resolve_period_days(days: int, first_transaction: datetime | None) -> int:
     return max((datetime.now(UTC) - first_transaction).days + 1, _MIN_ALL_TIME_DAYS)
 
 
-async def _charts(db: AsyncSession, user_id: str, days: int) -> tuple[list[dict[str, Any]], list[IndexComparison]]:
+async def _charts(
+    db: AsyncSession, user_id: str, days: int, currency: str
+) -> tuple[list[dict[str, Any]], list[IndexComparison]]:
     history, indices = await asyncio.gather(
         snapshot_service.build_portfolio_value_series(db, user_id, days),
-        get_index_comparison(days),
+        get_index_comparison(days, currency),
         return_exceptions=True,
     )
     if isinstance(history, BaseException):
@@ -141,7 +143,7 @@ async def build_overview(days: int, current_user: User, db: AsyncSession) -> Enh
     first_transaction = aware(await repository.first_transaction_date(db, account_id))
     period = resolve_period_days(days, first_transaction)
     metrics = await metrics_service.get_user_dashboard_metrics(db, user_id, currency=currency, days=period)
-    history, indices = await _charts(db, user_id, period)
+    history, indices = await _charts(db, user_id, period, currency)
     transactions = await recent_transactions(db, account_id, days=period)
     alerts = await active_alerts(db, account_id)
     events = await upcoming_events(db, account_id, _EVENT_DAYS)

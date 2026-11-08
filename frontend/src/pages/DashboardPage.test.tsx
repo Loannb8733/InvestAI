@@ -22,6 +22,8 @@ const obtenirMetriques = vi.hoisted(() => vi.fn())
 const obtenirBenchmarks = vi.hoisted(() => vi.fn())
 const tableauCrowdfunding = vi.hoisted(() => vi.fn())
 const pageVisible = vi.hoisted(() => ({ valeur: true }))
+const devise = vi.hoisted(() => ({ valeur: 'EUR' }))
+const coursEnDirect = vi.hoisted(() => vi.fn(() => ({ prices: {}, connected: false })))
 
 // Mock partiel : les panneaux du tableau de bord importent une dizaine d'autres
 // exports du module (`reportsApi`, `investorProfileQueryKey`…). Les omettre fait
@@ -31,13 +33,11 @@ vi.mock('@/services/api', async (importOriginal) => ({
   dashboardApi: { getMetrics: obtenirMetriques, getBenchmarks: obtenirBenchmarks },
   crowdfundingApi: { getDashboard: tableauCrowdfunding },
 }))
-vi.mock('@/hooks/useRealtimePrices', () => ({
-  useRealtimePrices: () => ({ prices: {}, connected: false }),
-}))
+vi.mock('@/hooks/useRealtimePrices', () => ({ useRealtimePrices: coursEnDirect }))
 vi.mock('@/hooks/usePageVisibility', () => ({ usePageVisibility: () => pageVisible.valeur }))
 vi.mock('@/hooks/useExportPdf', () => ({ useExportPdf: () => ({ exportToPdf: vi.fn() }) }))
 vi.mock('@/stores/authStore', () => ({
-  useAuthStore: (selecteur: (e: unknown) => unknown) => selecteur({ user: { preferredCurrency: 'EUR' } }),
+  useAuthStore: (selecteur: (e: unknown) => unknown) => selecteur({ user: { preferredCurrency: devise.valeur } }),
 }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 
@@ -93,6 +93,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   pageVisible.valeur = true
+  devise.valeur = 'EUR'
   obtenirMetriques.mockResolvedValue(metriques())
   obtenirBenchmarks.mockResolvedValue([])
   tableauCrowdfunding.mockResolvedValue({ total_invested: 0, projects_count: 0 })
@@ -153,6 +154,16 @@ describe('le panneau des transactions récentes', () => {
     const montants = Array.from(document.querySelectorAll('p')).map((n) => n.textContent ?? '')
     expect(montants.some((t) => t.startsWith('+') && t.includes('15'))).toBe(true)
     expect(montants.some((t) => t.startsWith('-') && t.includes('4'))).toBe(true)
+  })
+
+  it('montre les montants et demande les cours en direct dans la devise de l’utilisateur', async () => {
+    devise.valeur = 'USD'
+    afficher()
+    await screen.findByText(/Transactions récentes/i)
+
+    const montants = Array.from(document.querySelectorAll('p')).map((n) => n.textContent ?? '')
+    expect(montants.some((t) => t.startsWith('+') && t.includes('$'))).toBe(true)
+    expect(coursEnDirect).toHaveBeenLastCalledWith([], 'USD')
   })
 
   it('annonce l’absence de mouvement plutôt qu’un panneau vide', async () => {

@@ -3,12 +3,14 @@
     {
       "asset_type": "stock",
       "change_24h_percent": 80.0,
+      "currency": "EUR",
       "price": 180.0,
       "symbol": "AAPL"
     },
     {
       "asset_type": "etf",
       "change_24h_percent": 400.0,
+      "currency": "EUR",
       "price": 500.0,
       "symbol": "SPY"
     }
