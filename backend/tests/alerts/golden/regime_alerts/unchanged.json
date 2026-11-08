@@ -1,0 +1,14 @@
+{
+  "redis": {
+    "cooldowns": 0,
+    "keys": {
+      "regime:global:last": "bullish"
+    },
+    "regime_ttl_set": true
+  },
+  "result": {
+    "regime": "bullish",
+    "status": "unchanged"
+  },
+  "sent": []
+}
