@@ -18,7 +18,6 @@ celery_app = Celery(
         "app.domains.system.tasks",
         "app.domains.crowdfunding.tasks",
         "app.tasks.contrarian_stats",
-        "app.tasks.regime_alerts",
         "app.domains.market_data.fx.tasks",
         "app.domains.market_data.history.tasks",
         "app.domains.exchanges.sync.tasks",
@@ -137,7 +136,7 @@ celery_app.conf.beat_schedule = {
     },
     # === Regime Mutation Detection ===
     "check-regime-mutation": {
-        "task": "app.tasks.regime_alerts.check_regime_mutation",
+        "task": "app.domains.alerts.tasks.check_regime_mutation",
         "schedule": 43200.0,  # Every 12 hours
     },
     # === Data Cleanup ===

@@ -15,7 +15,6 @@ comments	backend/app/ml/regime_detector.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
-comments	backend/app/services/regime_alert_service.py
 comments	backend/app/tasks/celery_app.py
 comments	frontend/src/App.tsx
 comments	frontend/src/components/analytics/CorrelationMatrix.tsx

@@ -32,7 +32,7 @@ SESSION_FACTORY_USERS = (
     "app.core.db.session",
     "app.domains.exchanges.sync.runner",
     "app.domains.dashboard.snapshots.tasks",
-    "app.services.regime_alert_service",
+    "app.domains.alerts.regime",
 )
 
 

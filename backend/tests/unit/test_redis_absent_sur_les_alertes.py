@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.alerts import regime
 from app.domains.notifications.telegram.client import telegram_service
-from app.services.regime_alert_service import regime_alert_service
 
 
 def _redis_en_panne(cible):
@@ -25,12 +25,12 @@ class TestMemoireDuRegime:
     """Sans mémoire du régime précédent, aucun changement ne peut être établi."""
 
     async def test_la_lecture_rend_none_au_lieu_de_lever(self):
-        with _redis_en_panne("app.services.regime_alert_service._get_redis_txt"):
-            assert await regime_alert_service._get_last_regime() is None
+        with _redis_en_panne("app.domains.alerts.regime._get_redis_txt"):
+            assert await regime.last_regime() is None
 
     async def test_l_ecriture_ne_leve_pas_non_plus(self):
-        with _redis_en_panne("app.services.regime_alert_service._get_redis_txt"):
-            assert await regime_alert_service._set_last_regime("bullish") is None
+        with _redis_en_panne("app.domains.alerts.regime._get_redis_txt"):
+            assert await regime.remember_regime("bullish") is None
 
     async def test_aucune_alerte_n_est_emise_faute_de_memoire(self):
         """Le comportement d'ensemble, et le seul qui compte pour l'utilisateur.
@@ -41,10 +41,10 @@ class TestMemoireDuRegime:
         à signaler qu'on a oublié le précédent.
         """
         with (
-            _redis_en_panne("app.services.regime_alert_service._get_redis_txt"),
-            patch.object(regime_alert_service, "_get_current_regime", new=AsyncMock(return_value="bearish")),
+            _redis_en_panne("app.domains.alerts.regime._get_redis_txt"),
+            patch.object(regime, "current_regime", new=AsyncMock(return_value="bearish")),
         ):
-            resultat = await regime_alert_service.check_and_alert()
+            resultat = await regime.check_regime_mutation()
 
         assert resultat["status"] == "seed"
 

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.session import session_factory
+from app.domains.alerts import regime
 from app.domains.alerts.checker import check_all_user_alerts
 from app.domains.alerts.risk_weights import risk_weights
 from app.domains.identity.models import User
@@ -65,3 +66,12 @@ def seed_risk_weight_snapshots() -> dict[str, int]:
     count: int = run_async(_seed())
     logger.info("Risk weight seeding complete: %d snapshots cached", count)
     return {"seeded": count}
+
+
+@celery_app.task(name="app.domains.alerts.tasks.check_regime_mutation")  # type: ignore[untyped-decorator]
+def check_regime_mutation() -> dict[str, Any]:
+    """Détecte un changement de régime du marché et l'annonce sur Telegram."""
+    logger.info("Checking for regime mutation...")
+    result: dict[str, Any] = run_async(regime.check_regime_mutation())
+    logger.info("Regime check: %s", result)
+    return result

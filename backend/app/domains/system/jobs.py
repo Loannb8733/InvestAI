@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from app.domains.alerts.regime import check_regime_mutation
 from app.domains.alerts.tasks import _check as check_alerts
 from app.domains.alerts.tasks import _seed as seed_risk_weights
 from app.domains.crowdfunding.tasks import _flag_delays as flag_crowdfunding_delays
@@ -13,7 +14,6 @@ from app.domains.market_data.prices.tasks import publish_crypto_prices, publish_
 from app.domains.notifications.tasks import run_daily_digest, run_monthly_reports, run_weekly_reports
 from app.domains.predictions import tasks as predictions
 from app.domains.system.maintenance import check_holdings, weekly_cleanup
-from app.services.regime_alert_service import regime_alert_service
 from app.tasks.contrarian_stats import refresh_contrarian_stats
 
 Job = Callable[[], Awaitable[Any]]
@@ -43,7 +43,7 @@ JOBS: dict[str, Job] = {
     "app.domains.notifications.tasks.send_weekly_reports": run_weekly_reports,
     "app.domains.notifications.tasks.send_monthly_reports": run_monthly_reports,
     "app.domains.notifications.tasks.send_daily_digest": run_daily_digest,
-    "app.tasks.regime_alerts.check_regime_mutation": regime_alert_service.check_and_alert,
+    "app.domains.alerts.tasks.check_regime_mutation": check_regime_mutation,
     "app.domains.system.tasks.run_weekly_cleanup": weekly_cleanup,
     "app.domains.system.tasks.validate_portfolio_consistency": check_holdings,
     "app.domains.crowdfunding.tasks.check_crowdfunding_delays": flag_crowdfunding_delays,

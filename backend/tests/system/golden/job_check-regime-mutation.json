@@ -10,7 +10,7 @@
     "next_run_at": "2026-10-18T00:00:00Z",
     "running": false,
     "schedule": "<freq: 12.00 hours>",
-    "task": "app.tasks.regime_alerts.check_regime_mutation"
+    "task": "app.domains.alerts.tasks.check_regime_mutation"
   },
   "status": 200
 }
