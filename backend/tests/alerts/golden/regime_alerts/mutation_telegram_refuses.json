@@ -2,15 +2,15 @@
   "redis": {
     "cooldowns": 0,
     "keys": {
-      "regime:global:last": "bullish"
+      "regime:global:last": "bearish"
     },
-    "regime_ttl_set": true
+    "regime_ttl_set": false
   },
   "result": {
     "new_regime": "bullish",
     "old_regime": "bearish",
     "status": "mutation",
-    "users_notified": 2
+    "users_notified": 0
   },
   "sent": [
     {

@@ -1,6 +1,6 @@
 {
   "redis": {
-    "cooldowns": 2,
+    "cooldowns": 0,
     "keys": {
       "regime:global:last": "bullish"
     },
