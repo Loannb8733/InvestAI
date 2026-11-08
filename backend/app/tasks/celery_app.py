@@ -10,7 +10,7 @@ celery_app = Celery(
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
     include=[
-        "app.tasks.price_updates",
+        "app.domains.market_data.prices.tasks",
         "app.domains.predictions.tasks",
         "app.domains.alerts.tasks",
         "app.domains.dashboard.snapshots.tasks",
@@ -55,11 +55,11 @@ celery_app.conf.update(
 # Scheduled tasks (Celery Beat)
 celery_app.conf.beat_schedule = {
     "update-crypto-prices": {
-        "task": "app.tasks.price_updates.update_crypto_prices",
+        "task": "app.domains.market_data.prices.tasks.update_crypto_prices",
         "schedule": 300.0,  # Every 5 minutes (was 60s, too aggressive for free tier)
     },
     "update-stock-prices": {
-        "task": "app.tasks.price_updates.update_stock_prices",
+        "task": "app.domains.market_data.prices.tasks.update_stock_prices",
         "schedule": 300.0,  # Every 5 minutes
     },
     "sync-exchanges": {

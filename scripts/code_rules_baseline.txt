@@ -17,7 +17,6 @@ comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
 comments	backend/app/services/regime_alert_service.py
 comments	backend/app/tasks/celery_app.py
-comments	backend/app/tasks/price_updates.py
 comments	frontend/src/App.tsx
 comments	frontend/src/components/analytics/CorrelationMatrix.tsx
 comments	frontend/src/components/charts/CurrencyExposureChart.tsx

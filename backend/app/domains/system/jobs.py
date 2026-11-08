@@ -9,11 +9,11 @@ from app.domains.dashboard.snapshots.tasks import create_all_snapshots, delete_o
 from app.domains.exchanges.sync.runner import sync_all
 from app.domains.market_data.fx.tasks import refresh_reference_rates
 from app.domains.market_data.history.tasks import backfill_all, refresh_all
+from app.domains.market_data.prices.tasks import publish_crypto_prices, publish_stock_prices
 from app.domains.notifications.tasks import run_daily_digest, run_monthly_reports, run_weekly_reports
 from app.domains.predictions import tasks as predictions
 from app.domains.system.maintenance import check_holdings, weekly_cleanup
 from app.services.regime_alert_service import regime_alert_service
-from app.tasks import price_updates
 from app.tasks.contrarian_stats import refresh_contrarian_stats
 
 Job = Callable[[], Awaitable[Any]]
@@ -24,8 +24,8 @@ async def _contrarian_stats() -> dict[str, Any]:
 
 
 JOBS: dict[str, Job] = {
-    "app.tasks.price_updates.update_crypto_prices": price_updates._maj_crypto,
-    "app.tasks.price_updates.update_stock_prices": price_updates._maj_actions,
+    "app.domains.market_data.prices.tasks.update_crypto_prices": publish_crypto_prices,
+    "app.domains.market_data.prices.tasks.update_stock_prices": publish_stock_prices,
     "app.domains.exchanges.sync.tasks.sync_all_exchanges": sync_all,
     "app.domains.predictions.tasks.run_daily_predictions": predictions._run_daily_predictions,
     "app.domains.predictions.tasks.detect_anomalies": predictions._detect_anomalies,
