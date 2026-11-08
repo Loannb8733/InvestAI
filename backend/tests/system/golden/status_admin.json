@@ -17,7 +17,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<freq: 5.00 minutes>",
-        "task": "app.tasks.price_updates.update_crypto_prices"
+        "task": "app.domains.market_data.prices.tasks.update_crypto_prices"
       },
       {
         "last_duration_s": "<volatile>",
@@ -30,7 +30,7 @@
         "next_run_at": null,
         "running": false,
         "schedule": "<freq: 5.00 minutes>",
-        "task": "app.tasks.price_updates.update_stock_prices"
+        "task": "app.domains.market_data.prices.tasks.update_stock_prices"
       },
       {
         "last_duration_s": "<volatile>",

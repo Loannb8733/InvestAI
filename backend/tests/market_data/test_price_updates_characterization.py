@@ -13,7 +13,7 @@ from httpx import AsyncClient
 from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.tasks import price_updates
+from app.domains.market_data.prices import tasks
 from tests.conftest import TestSessionLocal
 from tests.http_stubs import HttpStub
 
@@ -26,7 +26,7 @@ COINS = {
     "solana": ("SOL", {"eur": 150, "eur_24h_change": -1.5}),
 }
 STOCKS = {"AAPL": 180.0, "SPY": 500.0, "NOPE": None}
-JOBS = {"crypto": price_updates._maj_crypto, "stocks": price_updates._maj_actions}
+JOBS = {"crypto": tasks.publish_crypto_prices, "stocks": tasks.publish_stock_prices}
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
 
@@ -136,7 +136,7 @@ def _check(name: str, observed: dict[str, Any]) -> None:
 
 @pytest.fixture
 def background(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(price_updates, "session_factory", TestSessionLocal)
+    monkeypatch.setattr(tasks, "session_factory", TestSessionLocal)
 
 
 @pytest.mark.usefixtures("db_session", "background")

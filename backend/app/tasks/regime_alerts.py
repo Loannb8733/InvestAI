@@ -7,8 +7,8 @@ and sends priority Telegram alerts on transition.
 import logging
 
 from app.services.regime_alert_service import regime_alert_service
+from app.tasks.async_runner import run_async
 from app.tasks.celery_app import celery_app
-from app.tasks.price_updates import run_async
 
 logger = logging.getLogger(__name__)
 
