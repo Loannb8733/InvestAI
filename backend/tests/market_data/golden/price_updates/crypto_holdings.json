@@ -1,0 +1,28 @@
+{
+  "published": [
+    {
+      "asset_type": "crypto",
+      "change_24h_percent": 2.0,
+      "price": 50000.0,
+      "symbol": "BTC"
+    },
+    {
+      "asset_type": "crypto",
+      "change_24h_percent": -1.5,
+      "price": 150.0,
+      "symbol": "SOL"
+    }
+  ],
+  "requests": {
+    "api.coingecko.com/api/v3/search?query=ZZZ": 1,
+    "api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana": 1
+  },
+  "result": {
+    "symbols": [
+      "BTC",
+      "SOL",
+      "ZZZ"
+    ],
+    "updated": 2
+  }
+}

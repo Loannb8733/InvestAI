@@ -1,0 +1,29 @@
+{
+  "published": [
+    {
+      "asset_type": "stock",
+      "change_24h_percent": 80.0,
+      "price": 180.0,
+      "symbol": "AAPL"
+    },
+    {
+      "asset_type": "etf",
+      "change_24h_percent": 400.0,
+      "price": 500.0,
+      "symbol": "SPY"
+    }
+  ],
+  "requests": {
+    "query1.finance.yahoo.com/v8/finance/chart/AAPL": 1,
+    "query1.finance.yahoo.com/v8/finance/chart/NOPE": 1,
+    "query1.finance.yahoo.com/v8/finance/chart/SPY": 1
+  },
+  "result": {
+    "symbols": [
+      "AAPL",
+      "NOPE",
+      "SPY"
+    ],
+    "updated": 2
+  }
+}

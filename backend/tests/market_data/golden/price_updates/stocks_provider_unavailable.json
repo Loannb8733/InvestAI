@@ -1,0 +1,16 @@
+{
+  "published": [],
+  "requests": {
+    "query1.finance.yahoo.com/v8/finance/chart/AAPL": 1,
+    "query1.finance.yahoo.com/v8/finance/chart/NOPE": 1,
+    "query1.finance.yahoo.com/v8/finance/chart/SPY": 1
+  },
+  "result": {
+    "symbols": [
+      "AAPL",
+      "NOPE",
+      "SPY"
+    ],
+    "updated": 0
+  }
+}
