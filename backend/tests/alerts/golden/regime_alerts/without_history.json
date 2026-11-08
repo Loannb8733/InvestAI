@@ -1,0 +1,12 @@
+{
+  "redis": {
+    "cooldowns": 0,
+    "keys": {},
+    "regime_ttl_set": false
+  },
+  "result": {
+    "reason": "detection_failed",
+    "status": "skip"
+  },
+  "sent": []
+}
