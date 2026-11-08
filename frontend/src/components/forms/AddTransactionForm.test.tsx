@@ -24,6 +24,7 @@ const listeActifs = vi.hoisted(() => vi.fn())
 const listePortefeuilles = vi.hoisted(() => vi.fn())
 const creerTransaction = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => vi.fn())
+const coursEnDirect = vi.hoisted(() => vi.fn(() => ({ prices: { BTC: { price: 45000, currency: 'EUR' } } })))
 
 vi.mock('@/services/api', () => ({
   assetsApi: { list: listeActifs, create: vi.fn() },
@@ -31,9 +32,7 @@ vi.mock('@/services/api', () => ({
   transactionsApi: { create: creerTransaction },
 }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
-vi.mock('@/hooks/useRealtimePrices', () => ({
-  useRealtimePrices: () => ({ prices: { BTC: { price: 45000 } } }),
-}))
+vi.mock('@/hooks/useRealtimePrices', () => ({ useRealtimePrices: coursEnDirect }))
 vi.mock('@/lib/invalidate-queries', () => ({ invalidateAllFinancialData: vi.fn() }))
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: (selecteur: (e: unknown) => unknown) =>
@@ -79,6 +78,14 @@ function boutonEnvoyer(): HTMLButtonElement {
 }
 
 describe('rendu', () => {
+  it('suit le cours en direct sous le symbole en majuscules, dans la devise de l’utilisateur', async () => {
+    listeActifs.mockResolvedValue([{ ...ACTIF, symbol: 'btc' }])
+    afficher()
+
+    expect(await screen.findByTitle(/Prix actuel/)).toBeInTheDocument()
+    expect(coursEnDirect).toHaveBeenLastCalledWith(['BTC'], 'EUR')
+  })
+
   it('propose les types de mouvement', async () => {
     afficher()
 

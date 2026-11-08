@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import json
+from decimal import Decimal
 from typing import Any
 
 import aiohttp
@@ -13,6 +14,7 @@ from app.core.config import settings
 from app.core.db.session import session_factory
 from app.core.logging import get_logger
 from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url, redis_ssl_kwargs
+from app.domains.market_data.fx.spot import FIAT_CURRENCIES, spot_rates
 from app.domains.portfolio.models import Asset, AssetType
 
 logger = get_logger(__name__)
@@ -23,6 +25,8 @@ BINANCE_STREAM_URL = "wss://stream.binance.com:9443/stream?streams={streams}"
 HEARTBEAT_S = 30
 AUTH_TIMEOUT_S = 10
 LISTENER_RETRY_S = 5
+DEFAULT_CURRENCY = "EUR"
+BINANCE_CURRENCY = "USD"
 SUBSCRIBE_HELP = 'No symbols provided. Send {"action": "subscribe", "symbols": ["BTC", "AAPL"]}'
 
 
@@ -40,31 +44,48 @@ class PriceHub:
 
     def __init__(self) -> None:
         self.clients: dict[WebSocket, set[str]] = {}
+        self.currencies: dict[WebSocket, str] = {}
         self._redis: aioredis.Redis | None = None
         self._listener: asyncio.Task[None] | None = None
         self._stream: asyncio.Task[None] | None = None
         self._streamed: set[str] = set()
 
-    async def broadcast(self, symbol: str, price: float, change_24h_percent: float, asset_type: str) -> None:
-        """Envoie un cours aux clients abonnés au symbole ; un client injoignable est retiré."""
-        payload = json.dumps(
-            {
+    def drop(self, client: WebSocket) -> None:
+        """Oublie un client, ses symboles et sa devise."""
+        self.clients.pop(client, None)
+        self.currencies.pop(client, None)
+
+    async def broadcast(
+        self, symbol: str, price: float, change_24h_percent: float, asset_type: str, currency: str
+    ) -> None:
+        """Envoie un cours coté en ``currency`` aux clients abonnés au symbole, converti dans la devise de chacun.
+
+        Sans taux de change, le client ne reçoit rien ; un client injoignable est retiré."""
+        rates: dict[str, Decimal | None] = {}
+        gone = []
+        for client, symbols in list(self.clients.items()):
+            if symbol not in symbols:
+                continue
+            target = self.currencies.get(client, DEFAULT_CURRENCY)
+            if target not in rates:
+                rates[target] = await spot_rates.get(currency, target)
+            rate = rates[target]
+            if rate is None:
+                continue
+            payload = {
                 "type": "price",
                 "symbol": symbol,
-                "price": price,
+                "price": float(Decimal(str(price)) * rate),
                 "change_24h_percent": change_24h_percent,
                 "asset_type": asset_type,
+                "currency": target,
             }
-        )
-        gone = []
-        for client, symbols in self.clients.items():
-            if symbol in symbols:
-                try:
-                    await client.send_text(payload)
-                except Exception:  # noqa: BLE001
-                    gone.append(client)
+            try:
+                await client.send_text(json.dumps(payload))
+            except Exception:  # noqa: BLE001
+                gone.append(client)
         for client in gone:
-            self.clients.pop(client, None)
+            self.drop(client)
 
     async def _relay(self, message: dict[str, Any]) -> None:
         try:
@@ -72,11 +93,12 @@ class PriceHub:
             symbol = data.get("symbol", "").upper()
             price = float(data.get("price", 0))
             change = float(data.get("change_24h_percent", 0))
+            currency = str(data.get("currency", DEFAULT_CURRENCY)).upper()
         except (json.JSONDecodeError, ValueError, KeyError) as exc:
             logger.debug("Invalid pub/sub message: %s", exc)
             return
         if symbol and price > 0:
-            await self.broadcast(symbol, price, change, data.get("asset_type", "crypto"))
+            await self.broadcast(symbol, price, change, data.get("asset_type", "crypto"), currency)
 
     async def _redis_client(self) -> aioredis.Redis:
         if self._redis is None:
@@ -144,7 +166,7 @@ async def _follow_clients() -> None:
 async def _relay_ticker(data: dict[str, Any]) -> None:
     ticker = data["data"]
     symbol = ticker.get("s", "").replace("USDT", "")
-    await price_hub.broadcast(symbol, float(ticker.get("c", 0)), float(ticker.get("P", 0)), "crypto")
+    await price_hub.broadcast(symbol, float(ticker.get("c", 0)), float(ticker.get("P", 0)), "crypto", BINANCE_CURRENCY)
 
 
 async def binance_prices(symbols: set[str]) -> None:
@@ -193,7 +215,13 @@ async def _authenticate(websocket: WebSocket) -> bool:
     return True
 
 
-async def _subscribe(websocket: WebSocket, symbols: set[str]) -> None:
+async def _subscribe(websocket: WebSocket, symbols: set[str], currency: object) -> None:
+    if currency is not None:
+        code = str(currency).upper()
+        if code not in FIAT_CURRENCIES:
+            await websocket.send_text(json.dumps({"type": "error", "message": f"Unsupported currency: {currency}"}))
+            return
+        price_hub.currencies[websocket] = code
     if not symbols:
         await websocket.send_text(json.dumps({"type": "error", "message": SUBSCRIBE_HELP}))
         return
@@ -211,7 +239,7 @@ async def _handle(websocket: WebSocket, text: str) -> None:
     action = message.get("action")
     symbols = {symbol.upper() for symbol in message.get("symbols", [])}
     if action == "subscribe":
-        await _subscribe(websocket, symbols)
+        await _subscribe(websocket, symbols, message.get("currency"))
     elif action == "unsubscribe":
         price_hub.clients[websocket] -= symbols
         await websocket.send_text(json.dumps({"type": "unsubscribed", "symbols": list(symbols)}))
@@ -226,8 +254,9 @@ async def websocket_prices(websocket: WebSocket) -> None:
     """Cours en temps réel, tous types d'actifs.
 
     Le premier message authentifie : ``{"action": "auth", "token": JWT}``. Ensuite ``subscribe`` et ``unsubscribe``
-    avec ``symbols``, et ``pong`` en réponse au ``{"type": "ping"}`` envoyé toutes les 30 s. Chaque cours arrive en
-    ``{"type": "price", "symbol", "price", "change_24h_percent", "asset_type"}``.
+    avec ``symbols`` (``subscribe`` accepte une ``currency``, EUR par défaut), et ``pong`` en réponse au
+    ``{"type": "ping"}`` envoyé toutes les 30 s. Chaque cours arrive converti dans cette devise, en
+    ``{"type": "price", "symbol", "price", "change_24h_percent", "asset_type", "currency"}``.
     """
     await websocket.accept()
     if not await _authenticate(websocket):
@@ -242,5 +271,5 @@ async def websocket_prices(websocket: WebSocket) -> None:
         pass
     finally:
         heartbeat.cancel()
-        price_hub.clients.pop(websocket, None)
+        price_hub.drop(websocket)
         await _follow_clients()
