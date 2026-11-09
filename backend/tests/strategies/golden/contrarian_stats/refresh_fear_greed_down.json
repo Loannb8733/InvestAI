@@ -1,0 +1,8 @@
+{
+  "cache_ttl_is_8_days": false,
+  "cached": null,
+  "error": "ServiceUnavailableError: Statistiques contrarian non rafraîchies : Server error '503 Service Unavailable' for url 'https://api.alternative.me/fng/?limit=0&format=json'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503",
+  "requests": [
+    "api.alternative.me/fng/"
+  ]
+}
