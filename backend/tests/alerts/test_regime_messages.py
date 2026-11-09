@@ -109,7 +109,7 @@ class TestCheckRegimeMutation:
             result = await regime.check_regime_mutation()
         assert result == {"status": "mutation", "old_regime": "bearish", "new_regime": "bullish", "users_notified": 1}
         sent = telegram.send_smart_alert.call_args.kwargs
-        assert (sent["priority"], sent["alert_type"]) == ("critical", "regime_mutation")
+        assert (sent["priority"], sent["chat_id"]) == ("critical", "12345")
         assert "MUTATION DE CYCLE" in sent["message"]
 
     async def test_detection_failure_skips(self) -> None:

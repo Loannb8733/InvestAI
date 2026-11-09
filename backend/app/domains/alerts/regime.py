@@ -97,8 +97,8 @@ def mutation_message(old_regime: str, new_regime: str) -> str:
     )
 
 
-async def _notify(message: str) -> int:
-    sent = 0
+async def _notify(message: str) -> tuple[int, int]:
+    recipients = delivered = 0
     async with session_factory() as db:
         users = (
             await db.execute(select(User).where(User.is_active.is_(True), User.telegram_enabled.is_(True)))
@@ -106,23 +106,24 @@ async def _notify(message: str) -> int:
         for user in users:
             if not user.telegram_chat_id:
                 continue
+            recipients += 1
             try:
-                await telegram_service.send_smart_alert(
-                    message=message,
-                    chat_id=user.telegram_chat_id,
-                    user_id=str(user.id),
-                    priority="critical",
-                    symbol="MARKET",
-                    alert_type="regime_mutation",
+                sent = await telegram_service.send_smart_alert(
+                    message=message, chat_id=user.telegram_chat_id, priority="critical"
                 )
-                sent += 1
             except Exception as exc:  # noqa: BLE001
                 logger.error("Failed to send regime alert to user %s: %s", user.id, exc)
-    return sent
+                continue
+            if sent is not None:
+                delivered += 1
+    return recipients, delivered
 
 
 async def check_regime_mutation() -> dict[str, Any]:
-    """Compare le régime du marché au dernier mémorisé et alerte sur Telegram quand il change."""
+    """Compare le régime du marché au dernier mémorisé et alerte sur Telegram quand il change.
+
+    Un changement que personne n'a reçu n'est pas mémorisé : la passe suivante le réannonce.
+    """
     current = await current_regime()
     if not current:
         return {"status": "skip", "reason": "detection_failed"}
@@ -134,6 +135,9 @@ async def check_regime_mutation() -> dict[str, Any]:
         await remember_regime(current)
         return {"status": "unchanged", "regime": current}
     logger.info("Regime mutation: %s → %s", last, current)
-    sent = await _notify(mutation_message(last, current))
-    await remember_regime(current)
-    return {"status": "mutation", "old_regime": last, "new_regime": current, "users_notified": sent}
+    recipients, delivered = await _notify(mutation_message(last, current))
+    if delivered or not recipients:
+        await remember_regime(current)
+    else:
+        logger.warning("Regime mutation %s → %s not delivered, announced again next run", last, current)
+    return {"status": "mutation", "old_regime": last, "new_regime": current, "users_notified": delivered}

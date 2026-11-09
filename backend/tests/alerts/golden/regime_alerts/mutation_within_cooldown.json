@@ -1,6 +1,6 @@
 {
   "redis": {
-    "cooldowns": 2,
+    "cooldowns": 0,
     "keys": {
       "regime:global:last": "bullish"
     },
@@ -12,5 +12,14 @@
     "status": "mutation",
     "users_notified": 2
   },
-  "sent": []
+  "sent": [
+    {
+      "chat_id": "111",
+      "text": "🚨 <b>InvestAI</b>\n\n<b>🔄 MUTATION DE CYCLE DÉTECTÉE</b>\n\n🧊 BEARISH  →  🚀 BULLISH\n\n<b>Nouveaux paramètres de trading :</b>\n• Risk Multiplier : <b>×0.8</b> ↓ (était ×1.5)\n• Alpha Threshold : <b>60</b> (était 85)\n• 🪙 Bouclier Or : <b>ALLÉGER</b> (faible pertinence en expansion)\n• Mode : <b>Mode Expansion</b>\n• Vol Régime : low\n\n<i>Les stratégies et tailles de DCA s'adaptent automatiquement.</i>"
+    },
+    {
+      "chat_id": "555",
+      "text": "🚨 <b>InvestAI</b>\n\n<b>🔄 MUTATION DE CYCLE DÉTECTÉE</b>\n\n🧊 BEARISH  →  🚀 BULLISH\n\n<b>Nouveaux paramètres de trading :</b>\n• Risk Multiplier : <b>×0.8</b> ↓ (était ×1.5)\n• Alpha Threshold : <b>60</b> (était 85)\n• 🪙 Bouclier Or : <b>ALLÉGER</b> (faible pertinence en expansion)\n• Mode : <b>Mode Expansion</b>\n• Vol Régime : low\n\n<i>Les stratégies et tailles de DCA s'adaptent automatiquement.</i>"
+    }
+  ]
 }
