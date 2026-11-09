@@ -1,0 +1,9 @@
+{
+  "cache_ttl_is_8_days": false,
+  "cached": null,
+  "error": "ServiceUnavailableError: Statistiques contrarian non rafraîchies : Backtest produced no 12-month samples",
+  "requests": [
+    "api.alternative.me/fng/",
+    "query1.finance.yahoo.com/v8/finance/chart/BTC-USD"
+  ]
+}

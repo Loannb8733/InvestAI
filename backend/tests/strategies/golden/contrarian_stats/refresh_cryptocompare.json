@@ -1,0 +1,37 @@
+{
+  "cache_ttl_is_8_days": true,
+  "cached": {
+    "as_of": "2022-03-01T12:00:00+00:00",
+    "horizon_days": 365,
+    "max_12m_pct": 35.9,
+    "mean_12m_pct": 23.7,
+    "median_12m_pct": 23.6,
+    "median_90d_pct": -0.3,
+    "min_12m_pct": 13.4,
+    "n": 343,
+    "period_end": "2022-01-30",
+    "period_start": "2018-02-01",
+    "threshold": 25,
+    "win_rate_12m_pct": 100
+  },
+  "requests": [
+    "api.alternative.me/fng/",
+    "query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
+    "min-api.cryptocompare.com/data/v2/histoday"
+  ],
+  "result": {
+    "as_of": "2022-03-01T12:00:00+00:00",
+    "horizon_days": 365,
+    "max_12m_pct": 35.9,
+    "mean_12m_pct": 23.7,
+    "median_12m_pct": 23.6,
+    "median_90d_pct": -0.3,
+    "min_12m_pct": 13.4,
+    "n": 343,
+    "period_end": "2022-01-30",
+    "period_start": "2018-02-01",
+    "status": "ok",
+    "threshold": 25,
+    "win_rate_12m_pct": 100
+  }
+}

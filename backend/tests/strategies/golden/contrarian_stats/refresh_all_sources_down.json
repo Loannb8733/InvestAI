@@ -1,0 +1,12 @@
+{
+  "cache_ttl_is_8_days": false,
+  "cached": {
+    "median_12m_pct": 42.0
+  },
+  "error": "ServiceUnavailableError: Statistiques contrarian non rafraîchies : All BTC daily sources failed: yahoo: HTTPStatusError Server error '503 Service Unavailable' for url 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?period1=1501545600&period2=1646136000&interval=1d'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503 | cryptocompare: HTTPStatusError Server error '503 Service Unavailable' for url 'https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=1646136000'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503",
+  "requests": [
+    "api.alternative.me/fng/",
+    "query1.finance.yahoo.com/v8/finance/chart/BTC-USD",
+    "min-api.cryptocompare.com/data/v2/histoday"
+  ]
+}
