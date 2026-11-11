@@ -132,17 +132,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpq-dev postgresql-client
-
       - name: Create test database
-        env:
-          PGPASSWORD: test
-        run: |
-          # conftest connects to "<POSTGRES_DB>_test"; create it once here.
-          psql -h localhost -U test -d investai -c "CREATE DATABASE investai_test;"
+        run: docker exec ${{ job.services.postgres.id }} psql -U test -d investai -c "CREATE DATABASE investai_test;"
 
       - name: Install Python dependencies
         run: |
