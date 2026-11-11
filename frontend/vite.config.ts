@@ -11,26 +11,17 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        // Split heavy, stable vendors into their own long-cacheable chunks so
-        // the entry bundle (and the login page) no longer ships charts/motion.
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id))
-            return 'react-vendor'
-          if (id.includes('@tanstack')) return 'query'
-          // Deux librairies de graphiques cohabitent (ADR-010) : Nivo pour les
-          // graphiques analytiques, Lightweight Charts pour l'unique série
-          // temporelle navigable du dashboard. Les fusionner dans un chunk
-          // `charts` faisait payer 597 kB à toute page affichant le moindre
-          // camembert, Lightweight Charts compris — et annulait le `lazy()`
-          // qui protégeait déjà `PortfolioAreaChart`.
-          if (/[\\/]node_modules[\\/](@nivo|d3-)/.test(id)) return 'charts-nivo'
-          if (/[\\/]node_modules[\\/]lightweight-charts/.test(id)) return 'charts-timeseries'
-          if (/[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/.test(id)) return 'motion'
-          if (id.includes('@radix-ui')) return 'radix'
-          return undefined
+        codeSplitting: {
+          groups: [
+            { name: 'react-vendor', test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 50 },
+            { name: 'query', test: /[\\/]node_modules[\\/]@tanstack[\\/]/, priority: 40 },
+            { name: 'charts-nivo', test: /[\\/]node_modules[\\/](@nivo|d3-)/, priority: 30 },
+            { name: 'charts-timeseries', test: /[\\/]node_modules[\\/]lightweight-charts/, priority: 30 },
+            { name: 'motion', test: /[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/, priority: 30 },
+            { name: 'radix', test: /[\\/]node_modules[\\/]@radix-ui[\\/]/, priority: 20 },
+          ],
         },
       },
     },

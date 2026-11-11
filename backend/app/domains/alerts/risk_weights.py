@@ -7,6 +7,7 @@ import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import redis_async_url, redis_client_kwargs
+from app.core.redis_guard import GuardedRedis
 from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset
 
@@ -23,7 +24,7 @@ class RiskWeights:
 
     def _client(self) -> aioredis.Redis:
         if self._redis is None:
-            self._redis = aioredis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
+            self._redis = GuardedRedis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
         return self._redis
 
     async def store(self, symbol: str, day: str, risk_weight: float) -> None:

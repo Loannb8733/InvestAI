@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -44,8 +45,8 @@ def profile_of(user: User) -> ProfileResponse:
     )
 
 
-def _new_generation(user: User, password: str) -> None:
-    user.password_hash = hash_password(password)
+async def _new_generation(user: User, password: str) -> None:
+    user.password_hash = await asyncio.to_thread(hash_password, password)
     user.token_version += 1
 
 
@@ -57,7 +58,7 @@ class AccountService:
 
     async def register(self, data: RegisterRequest) -> None:
         """Même effet observable que l'adresse soit libre ou prise : le hachage précède la branche."""
-        password_hash = hash_password(data.password)
+        password_hash = await asyncio.to_thread(hash_password, data.password)
         existing = await self._users.by_email(data.email)
         if existing is not None:
             await emails.send_registration_attempt_notice(existing)
@@ -68,9 +69,9 @@ class AccountService:
 
     async def change_password(self, user: User, current: str, new: str, user_agent: str) -> TokenPair:
         """Change le mot de passe, coupe toutes les sessions et rend des jetons neufs à la session courante."""
-        if not verify_password(current, user.password_hash):
+        if not await asyncio.to_thread(verify_password, current, user.password_hash):
             raise DomainError("Mot de passe actuel incorrect")
-        _new_generation(user, new)
+        await _new_generation(user, new)
         await self._users.save(user)
         return issue_pair(str(user.id), user_agent, user.token_version)
 
@@ -95,7 +96,7 @@ class AccountService:
         if expires is None or datetime.now(UTC) > expires:
             await self._users.save(user)
             return ResetOutcome.EXPIRED
-        _new_generation(user, new_password)
+        await _new_generation(user, new_password)
         await self._users.save(user)
         return ResetOutcome.DONE
 
@@ -109,7 +110,7 @@ class AccountService:
     async def start_mfa(self, user: User) -> MfaSetupResponse:
         if user.mfa_enabled:
             raise DomainError("MFA is already enabled")
-        enrollment = mfa.enroll(user.email)
+        enrollment = await asyncio.to_thread(mfa.enroll, user.email)
         user.mfa_secret = enrollment.stored_secret
         user.mfa_backup_codes = enrollment.stored_backup_codes
         await self._users.save(user)
