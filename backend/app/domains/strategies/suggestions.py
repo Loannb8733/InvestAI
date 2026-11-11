@@ -19,7 +19,7 @@ from app.domains.strategies.builders_sell import (
     build_progressive_profit_plan,
     build_rotation_strategy,
 )
-from app.domains.strategies.contrarian import cached_contrarian_stats
+from app.domains.strategies.contrarian import EXTREME_FEAR, cached_contrarian_stats
 from app.domains.strategies.disclaimer import AI_DISCLAIMER
 from app.domains.strategies.models import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
 from app.domains.strategies.service import strategy_service
@@ -80,10 +80,11 @@ async def _load_capacity(db: AsyncSession, user_id: str) -> tuple[float, float]:
 
 
 def _accumulation_candidates(assets: list[AssetRow], fear_greed: Any) -> list[AssetRow]:
-    min_alpha = 15 if (fear_greed and fear_greed < 25) else 30
+    extreme_fear = fear_greed is not None and fear_greed < EXTREME_FEAR
+    min_alpha = 15 if extreme_fear else 30
     top_alpha = sorted(assets, key=lambda a: a.get("alpha_score", 0), reverse=True)
     candidates = [a for a in top_alpha if a.get("alpha_score", 0) >= min_alpha][:5]
-    if not candidates and fear_greed and fear_greed < 15:
+    if not candidates and extreme_fear and fear_greed < 15:
         return top_alpha[:3]
     return candidates
 

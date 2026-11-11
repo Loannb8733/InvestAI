@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.domains.strategies.contrarian import format_reasoning
+from app.domains.strategies.contrarian import EXTREME_FEAR, format_reasoning
 from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion, asset_count
 
 
@@ -180,9 +180,9 @@ def build_conviction_buy_strategy(
     liquidity: float,
     contrarian_stats: dict[str, Any] | None = None,
 ) -> Suggestion | None:
-    """Achat conviction si Fear & Greed ≤ 25 en phase baissière : 8 % de la liquidité modulés par l'alpha ; le
+    """Achat conviction si Fear & Greed < 25 en phase baissière : 8 % de la liquidité modulés par l'alpha ; le
     raisonnement cite les statistiques contrariennes en cache, sinon une phrase qualitative sans chiffres."""
-    if not fear_greed or fear_greed > 25:
+    if fear_greed is None or fear_greed >= EXTREME_FEAR:
         return None
     if regime not in ("bearish", "bottom", "bottoming", "markdown"):
         return None
