@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.core.db.session import session_factory
 from app.core.redis_client import PRICE_UPDATES_CHANNEL, redis_async_url, redis_client_kwargs
+from app.core.redis_guard import GuardedSyncRedis
 from app.domains.market_data.prices.quote import PriceQuote
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType
@@ -26,7 +27,7 @@ _publisher: Redis | None = None
 
 def sync_redis() -> Redis:
     """Client Redis synchrone construit depuis REDIS_URL, comme tous les clients de l'application."""
-    return Redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
+    return GuardedSyncRedis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
 
 
 def _shared_publisher() -> Redis:

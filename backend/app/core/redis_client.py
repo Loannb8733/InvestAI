@@ -10,6 +10,7 @@ from typing import Any
 import redis.asyncio as aioredis
 
 from app.core.config import settings
+from app.core.redis_guard import GuardedRedis
 
 
 def redis_async_url() -> str:
@@ -85,7 +86,7 @@ async def _get_redis_bin() -> aioredis.Redis:
     """Binary Redis client for pickle-serialized objects (models)."""
     global _redis_bin
     if _redis_bin is None:
-        _redis_bin = aioredis.from_url(
+        _redis_bin = GuardedRedis.from_url(
             redis_async_url(),
             encoding=None,
             decode_responses=False,
@@ -98,7 +99,7 @@ async def _get_redis_txt() -> aioredis.Redis:
     """Text Redis client for JSON-serialized data."""
     global _redis_txt
     if _redis_txt is None:
-        _redis_txt = aioredis.from_url(
+        _redis_txt = GuardedRedis.from_url(
             redis_async_url(),
             encoding="utf-8",
             decode_responses=True,

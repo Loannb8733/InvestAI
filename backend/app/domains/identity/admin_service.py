@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Sequence
 from uuid import UUID
 
@@ -29,7 +30,7 @@ class AdminService:
         return await self._users.add(
             User(
                 email=data.email,
-                password_hash=hash_password(data.password),
+                password_hash=await asyncio.to_thread(hash_password, data.password),
                 role=data.role,
                 first_name=data.first_name,
                 last_name=data.last_name,
@@ -50,7 +51,7 @@ class AdminService:
             raise DomainError(EMAIL_TAKEN)
         password = changes.pop("password", None)
         if password is not None:
-            user.password_hash = hash_password(password)
+            user.password_hash = await asyncio.to_thread(hash_password, password)
             user.token_version += 1
         for field, value in changes.items():
             setattr(user, field, value)

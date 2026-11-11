@@ -1,3 +1,5 @@
+import asyncio
+
 from app.core.errors import DomainError, UnauthorizedError
 from app.domains.identity import guards, mfa
 from app.domains.identity.models import User
@@ -23,7 +25,7 @@ class AuthService:
         if user is not None:
             await guards.ensure_not_locked(user.id)
         hashed = user.password_hash if user is not None else TIMING_EQUALIZER_HASH
-        if not verify_password(credentials.password, hashed) or user is None:
+        if not await asyncio.to_thread(verify_password, credentials.password, hashed) or user is None:
             if user is not None:
                 await guards.record_failure(user.id)
             raise UnauthorizedError(INVALID_CREDENTIALS)
@@ -41,7 +43,7 @@ class AuthService:
         if mfa.totp_matches(user.mfa_secret, code):
             await guards.mark_totp_used(user.id, code)
             return
-        remaining = mfa.consume_backup_code(user.mfa_backup_codes, code)
+        remaining = await asyncio.to_thread(mfa.consume_backup_code, user.mfa_backup_codes, code)
         if remaining is None:
             raise UnauthorizedError(INVALID_MFA_CODE)
         user.mfa_backup_codes = remaining

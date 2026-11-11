@@ -160,6 +160,13 @@ def deterministic_forecaster(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(prediction_service, "forecaster", DeterministicForecaster())
 
 
+@pytest.fixture(autouse=True)
+def _redis_not_paused(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core import redis_guard
+
+    monkeypatch.setattr(redis_guard, "_paused_until", 0.0)
+
+
 @pytest.fixture
 def http_stub(monkeypatch: pytest.MonkeyPatch) -> HttpStub:
     return install_http_stub(monkeypatch)

@@ -7,6 +7,7 @@ import redis.asyncio as aioredis
 
 from app.core.config import settings
 from app.core.redis_client import redis_async_url, redis_client_kwargs
+from app.core.redis_guard import GuardedRedis
 from app.domains.notifications.telegram.messages import anomaly_text, bottom_zone_text, smart_alert_text
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ async def get_redis() -> aioredis.Redis:
     """Client Redis partagé du bot : pauses entre alertes et limite des simulations."""
     global _redis
     if _redis is None:
-        _redis = aioredis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
+        _redis = GuardedRedis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs())
     return _redis
 
 

@@ -1,5 +1,6 @@
 """Rate limiting configuration using slowapi."""
 
+import jwt
 from slowapi import Limiter
 from starlette.requests import Request
 
@@ -28,6 +29,20 @@ def _get_real_client_ip(request: Request) -> str:
     if real_ip:
         return real_ip.strip()
     return request.client.host if request.client else "127.0.0.1"
+
+
+def _rate_limit_key(request: Request) -> str:
+    """Utilisateur du jeton d'accès s'il est valide : derrière le relais Vercel, toutes les requêtes partagent une
+    adresse. Sans jeton valide, l'adresse du client."""
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            subject = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]).get("sub")
+        except jwt.InvalidTokenError:
+            subject = None
+        if subject:
+            return f"user:{subject}"
+    return _get_real_client_ip(request)
 
 
 def _limiter_storage_uri() -> str:
@@ -68,7 +83,7 @@ def _limiter_storage_options() -> dict:
 # outage fails closed instead of degrading to per-instance counters that an
 # attacker can bypass by striping requests across replicas.
 limiter = Limiter(
-    key_func=_get_real_client_ip,
+    key_func=_rate_limit_key,
     default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"],
     storage_uri=_limiter_storage_uri(),
     storage_options=_limiter_storage_options(),

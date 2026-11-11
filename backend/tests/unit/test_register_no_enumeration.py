@@ -85,10 +85,7 @@ def test_le_hachage_precede_la_branche_sur_l_existence():
     index_if = None
     index_hash = None
     for i, instr in enumerate(reg.body):
-        if index_hash is None and any(
-            isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "hash_password"
-            for n in ast.walk(instr)
-        ):
+        if index_hash is None and any(isinstance(n, ast.Name) and n.id == "hash_password" for n in ast.walk(instr)):
             index_hash = i
         if index_if is None and isinstance(instr, ast.If):
             index_if = i

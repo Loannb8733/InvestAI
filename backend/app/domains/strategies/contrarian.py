@@ -6,10 +6,10 @@ from typing import Any
 
 import httpx
 import pandas as pd
-from redis import Redis
 
 from app.core.errors import ServiceUnavailableError
 from app.core.redis_client import _get_redis_txt, redis_async_url, redis_client_kwargs
+from app.core.redis_guard import GuardedSyncRedis
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ def refresh_contrarian_stats() -> dict[str, Any]:
     cache."""
     try:
         stats = compute_contrarian_stats()
-        Redis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs()).setex(
+        GuardedSyncRedis.from_url(redis_async_url(), decode_responses=True, **redis_client_kwargs()).setex(
             CACHE_KEY, CACHE_TTL_S, json.dumps(stats)
         )
     except Exception as exc:

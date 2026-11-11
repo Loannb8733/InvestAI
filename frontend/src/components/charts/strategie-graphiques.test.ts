@@ -57,10 +57,10 @@ describe('stratégie des librairies de graphiques', () => {
 
   it('les deux librairies restent dans des chunks distincts', () => {
     const config = readFileSync(join(RACINE, '..', 'vite.config.ts'), 'utf8')
-    const chunks = [...config.matchAll(/return '(charts-[a-z]+)'/g)].map((m) => m[1])
+    const chunks = [...config.matchAll(/name: '(charts-[a-z]+)'/g)].map((m) => m[1])
 
     expect(new Set(chunks).size, `chunks de graphiques déclarés : ${chunks.join(', ')}`).toBe(2)
-    expect(config).toMatch(/@nivo\|d3-\)\/\.test\(id\)\) return 'charts-nivo'/)
-    expect(config).toMatch(/lightweight-charts\/\.test\(id\)\) return 'charts-timeseries'/)
+    expect(config).toMatch(/name: 'charts-nivo', test: [^\n]*\(@nivo\|d3-\)/)
+    expect(config).toMatch(/name: 'charts-timeseries', test: [^\n]*lightweight-charts/)
   })
 })
