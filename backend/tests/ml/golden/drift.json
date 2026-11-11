@@ -1,0 +1,92 @@
+{
+  "bear": {
+    "drifted_features": [
+      "returns",
+      "volatility_10d",
+      "momentum_5d",
+      "log_price"
+    ],
+    "overall_psi": 2.4811,
+    "psi_values": {
+      "log_price": 5.3217,
+      "momentum_5d": 0.201,
+      "returns": 0.354,
+      "volatility_10d": 4.0476
+    },
+    "status": "drift",
+    "symbol": "BEAR"
+  },
+  "bull": {
+    "drifted_features": [
+      "returns",
+      "volatility_10d",
+      "momentum_5d",
+      "log_price"
+    ],
+    "overall_psi": 3.9381,
+    "psi_values": {
+      "log_price": 12.434,
+      "momentum_5d": 0.3428,
+      "returns": 0.2236,
+      "volatility_10d": 2.7521
+    },
+    "status": "drift",
+    "symbol": "BULL"
+  },
+  "calm": {
+    "drifted_features": [
+      "volatility_10d",
+      "momentum_5d",
+      "log_price"
+    ],
+    "overall_psi": 1.6129,
+    "psi_values": {
+      "log_price": 4.1804,
+      "momentum_5d": 0.3342,
+      "returns": 0.1227,
+      "volatility_10d": 1.8141
+    },
+    "status": "drift",
+    "symbol": "CALM"
+  },
+  "range": {
+    "drifted_features": [
+      "returns",
+      "volatility_10d",
+      "log_price"
+    ],
+    "overall_psi": 0.9028,
+    "psi_values": {
+      "log_price": 0.6734,
+      "momentum_5d": 0.095,
+      "returns": 0.2071,
+      "volatility_10d": 2.6357
+    },
+    "status": "drift",
+    "symbol": "RANGE"
+  },
+  "regime_change": {
+    "drifted_features": [
+      "returns",
+      "volatility_10d",
+      "momentum_5d",
+      "log_price"
+    ],
+    "overall_psi": 6.9199,
+    "psi_values": {
+      "log_price": 12.434,
+      "momentum_5d": 1.6417,
+      "returns": 1.1804,
+      "volatility_10d": 12.4237
+    },
+    "status": "drift",
+    "symbol": "SHIFT"
+  },
+  "too_short": {
+    "drifted_features": [],
+    "overall_psi": 0.0,
+    "psi_values": {},
+    "status": "ok",
+    "symbol": "TINY"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "bear_drop": {
+    "anomaly_type": "price_drop",
+    "description": "Baisse significative de 64.7% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": -64.72,
+    "severity": "high",
+    "symbol": "BEAR",
+    "z_score": 0.0
+  },
+  "bear_normal": {
+    "anomaly_type": "price_drop",
+    "description": "Baisse significative de 49.6% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": -49.6,
+    "severity": "high",
+    "symbol": "BEAR",
+    "z_score": 0.0
+  },
+  "bear_spike": {
+    "anomaly_type": "price_drop",
+    "description": "Baisse significative de 32.0% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": -31.96,
+    "severity": "high",
+    "symbol": "BEAR",
+    "z_score": 0.0
+  },
+  "bull_drop": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 129.7% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 129.66,
+    "severity": "high",
+    "symbol": "BULL",
+    "z_score": 0.0
+  },
+  "bull_normal": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 228.1% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 228.09,
+    "severity": "high",
+    "symbol": "BULL",
+    "z_score": 0.0
+  },
+  "bull_spike": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 342.9% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 342.92,
+    "severity": "high",
+    "symbol": "BULL",
+    "z_score": 0.0
+  },
+  "calm_drop": null,
+  "calm_normal": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 29.3% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 29.35,
+    "severity": "high",
+    "symbol": "CALM",
+    "z_score": 0.0
+  },
+  "calm_spike": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 74.6% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 74.62,
+    "severity": "high",
+    "symbol": "CALM",
+    "z_score": 0.0
+  },
+  "range_drop": {
+    "anomaly_type": "price_drop",
+    "description": "Baisse significative de 31.8% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": -31.83,
+    "severity": "high",
+    "symbol": "RANGE",
+    "z_score": 0.0
+  },
+  "range_normal": null,
+  "range_spike": {
+    "anomaly_type": "price_spike",
+    "description": "Hausse significative de 31.5% par rapport au prix d'achat moyen",
+    "detected_at": "2025-09-01T12:00:00+00:00",
+    "is_anomaly": true,
+    "price_change_percent": 31.48,
+    "severity": "high",
+    "symbol": "RANGE",
+    "z_score": 0.0
+  },
+  "short": null
+}
