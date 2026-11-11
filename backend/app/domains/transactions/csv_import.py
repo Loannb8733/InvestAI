@@ -13,11 +13,11 @@ from app.domains.market_data.history.tasks import schedule_refresh
 from app.domains.portfolio.classification import is_fiat
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.transactions import ledger
+from app.domains.transactions.csv_parsers.registry import detect_csv_format, get_parser_by_name
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
 from app.domains.transactions.schemas import CsvImportResult
 from app.domains.transactions.transfers import COLD_WALLET_DESTINATION, create_mirror_transfer_in
-from app.services.csv_parsers import detect_csv_format, get_parser_by_name
 
 logger = logging.getLogger(__name__)
 

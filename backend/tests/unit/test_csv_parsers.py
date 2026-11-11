@@ -9,17 +9,16 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.csv_parsers import (
+from app.domains.transactions.csv_parsers.base import ParsedTransaction, parse_timestamp
+from app.domains.transactions.csv_parsers.binance import BinanceCSVParser
+from app.domains.transactions.csv_parsers.crypto_com import CryptoComCSVParser
+from app.domains.transactions.csv_parsers.generic import GenericCSVParser
+from app.domains.transactions.csv_parsers.kraken import KrakenCSVParser
+from app.domains.transactions.csv_parsers.registry import (
     AVAILABLE_PARSERS,
-    BinanceCSVParser,
-    CryptoComCSVParser,
-    GenericCSVParser,
-    KrakenCSVParser,
-    ParsedTransaction,
     detect_csv_format,
     get_available_platforms,
     get_parser_by_name,
-    parse_timestamp,
 )
 
 

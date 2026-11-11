@@ -16,7 +16,7 @@ hypothèses de l'audit. Ce qui suit prime sur le reste du document.
 |---|---|
 | FIN-01 « non entamé », P0 🔴 | **Déjà implémenté à ~80 %** avant la session : `pair_utils`, `_resolve_trade_fx`, `_heal_transaction_fx`, `fx_history_service`, script de backfill et 5 fichiers de tests existaient. |
 | « coût de base faux de ~8-9 % pour la majorité des traders crypto » | **0 ligne concernée en production.** Les 164 achats/ventes du compte sont réellement en EUR. Le correctif reste juste, mais ne justifiait pas la priorité P0 *pour cet usage*. |
-| FIN-01 localisé dans `tasks/sync_exchanges.py` | Périmètre incomplet : `services/csv_parsers.py:639` force aussi `currency="EUR"` sans lire de colonne devise. |
+| FIN-01 localisé dans `tasks/sync_exchanges.py` | Périmètre incomplet : `domains/transactions/csv_parsers/` (Binance, Kraken, InvestAI) force aussi `currency="EUR"` sans lire de colonne devise. |
 | Les 11 violations de l'invariant A | Ni un bug de calcul ni un historique « incomplet » : **5 étaient des écritures fantômes** créées par le mirroring (voir NEW-02). |
 
 **Leçon de méthode** : chaque ticket de ce backlog a été écrit en lisant du code, pas en

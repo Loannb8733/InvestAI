@@ -144,14 +144,7 @@ jobs:
         run: mypy --config-file ../pyproject.toml app
 
       - name: Run tests with coverage
-        run: pytest --cov=app --cov-report=xml --cov-report=term-missing -v
-
-      - name: Upload coverage
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage
-          path: backend/coverage.xml
+        run: pytest --cov=app --cov-report=term-missing -v
 
   # ──────────────────────────────────────────
   # Frontend: Lint (ESLint + TypeScript)
@@ -217,13 +210,6 @@ jobs:
         run: npx vitest run --coverage
         env:
           VITE_API_URL: http://localhost:8000/api/v1
-
-      - name: Upload coverage
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-coverage
-          path: frontend/coverage/
 
   # ──────────────────────────────────────────
   # Docker: Build validation
