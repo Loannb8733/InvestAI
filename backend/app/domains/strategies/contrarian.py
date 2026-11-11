@@ -13,7 +13,7 @@ from app.core.redis_guard import GuardedSyncRedis
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_THRESHOLD = 25
+EXTREME_FEAR = 25
 HORIZON_12M = 365
 HORIZON_SHORT = 90
 MIN_BTC_ROWS = 300
@@ -118,7 +118,7 @@ def _forward_returns(closes: pd.Series, entry_dates: pd.Index, horizon: int) -> 
     return returns
 
 
-def compute_contrarian_stats(threshold: int = DEFAULT_THRESHOLD) -> dict[str, Any]:
+def compute_contrarian_stats(threshold: int = EXTREME_FEAR) -> dict[str, Any]:
     """Rendement du BTC 12 mois et 90 jours après chaque jour où Fear & Greed était sous ``threshold``."""
     fear_greed = pd.DataFrame(_fetch_fear_greed())
     fear_greed["value"] = fear_greed["value"].astype(int)
