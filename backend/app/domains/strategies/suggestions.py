@@ -7,7 +7,6 @@ from typing import Any
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import get_cached_contrarian_stats
 from app.domains.predictions.service import prediction_service
 from app.domains.strategies.builders_buy import build_conviction_buy_strategy, build_dca_strategy, build_vca_strategy
 from app.domains.strategies.builders_portfolio import (
@@ -20,6 +19,7 @@ from app.domains.strategies.builders_sell import (
     build_progressive_profit_plan,
     build_rotation_strategy,
 )
+from app.domains.strategies.contrarian import cached_contrarian_stats
 from app.domains.strategies.disclaimer import AI_DISCLAIMER
 from app.domains.strategies.models import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
 from app.domains.strategies.service import strategy_service
@@ -155,7 +155,7 @@ def _signal_strategies(sig: _Signals) -> list[Suggestion | None]:
 
 
 async def _cycle_strategies(sig: _Signals) -> list[Suggestion | None]:
-    contrarian_stats = await get_cached_contrarian_stats()
+    contrarian_stats = await cached_contrarian_stats()
     return [
         build_conviction_buy_strategy(
             sig.buy, sig.assets, sig.regime, sig.confidence, sig.fear_greed, sig.liquidity, contrarian_stats

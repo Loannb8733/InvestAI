@@ -13,8 +13,8 @@ from app.domains.market_data.history.tasks import backfill_all, refresh_all
 from app.domains.market_data.prices.tasks import publish_crypto_prices, publish_stock_prices
 from app.domains.notifications.tasks import run_daily_digest, run_monthly_reports, run_weekly_reports
 from app.domains.predictions import tasks as predictions
+from app.domains.strategies.contrarian import refresh_contrarian_stats
 from app.domains.system.maintenance import check_holdings, weekly_cleanup
-from app.tasks.contrarian_stats import refresh_contrarian_stats
 
 Job = Callable[[], Awaitable[Any]]
 
@@ -47,6 +47,6 @@ JOBS: dict[str, Job] = {
     "app.domains.system.tasks.run_weekly_cleanup": weekly_cleanup,
     "app.domains.system.tasks.validate_portfolio_consistency": check_holdings,
     "app.domains.crowdfunding.tasks.check_crowdfunding_delays": flag_crowdfunding_delays,
-    "app.tasks.contrarian_stats.refresh_contrarian_stats": _contrarian_stats,
+    "app.domains.strategies.tasks.refresh_contrarian_stats": _contrarian_stats,
 }
 HEAVY_PREFIX = "app.domains.predictions.tasks."

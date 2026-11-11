@@ -19,10 +19,10 @@ from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.predictions import tasks as prediction_tasks
 from app.domains.predictions.models import PredictionLog
+from app.domains.strategies import contrarian
 from app.domains.system import price_socket, router
 from app.domains.system.jobs import JOBS
 from app.domains.system.scheduler import Entry, Scheduler
-from app.tasks import contrarian_stats
 from app.tasks.celery_app import celery_app
 from tests.conftest import TestSessionLocal
 from tests.sample_portfolio import FROZEN_NOW
@@ -157,7 +157,7 @@ async def test_prediction_accuracy_is_checked(db_session: AsyncSession, monkeypa
 @pytest.mark.usefixtures("offline")
 def test_contrarian_refresh_failure_is_raised() -> None:
     with pytest.raises(ServiceUnavailableError, match="Statistiques contrarian non rafraîchies"):
-        contrarian_stats.refresh_contrarian_stats()
+        contrarian.refresh_contrarian_stats()
 
 
 async def test_binance_follows_held_crypto_only_and_shrinks(
