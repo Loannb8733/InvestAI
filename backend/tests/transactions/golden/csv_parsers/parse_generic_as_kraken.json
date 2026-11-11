@@ -1,0 +1,19 @@
+{
+  "errors": [
+    "Row 2: Invalid timestamp: ",
+    "Row 3: Invalid timestamp: ",
+    "Row 4: Invalid timestamp: ",
+    "Row 5: Invalid timestamp: ",
+    "Row 6: Invalid timestamp: ",
+    "Row 7: Invalid timestamp: ",
+    "Row 8: Invalid timestamp: ",
+    "Row 9: Invalid timestamp: ",
+    "Row 10: Invalid timestamp: ",
+    "Row 11: Invalid timestamp: ",
+    "Row 12: Invalid timestamp: ",
+    "Row 13: Invalid timestamp: ",
+    "Row 14: Invalid timestamp: "
+  ],
+  "parser": "Kraken",
+  "rows": []
+}

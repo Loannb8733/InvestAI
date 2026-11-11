@@ -1,0 +1,140 @@
+{
+  "errors": [
+    "Row 13: Invalid number: [<class 'decimal.ConversionSyntax'>]"
+  ],
+  "parser": "InvestAI / Generic",
+  "rows": [
+    {
+      "currency": "EUR",
+      "fee": "5",
+      "notes": "premier achat",
+      "price": "40000",
+      "quantity": "0.1",
+      "symbol": "BTC",
+      "timestamp": "2025-01-10T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "1",
+      "notes": null,
+      "price": "42000",
+      "quantity": "0.02",
+      "symbol": "BTC",
+      "timestamp": "2025-01-11T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "2500",
+      "quantity": "0.5",
+      "symbol": "ETH",
+      "timestamp": "2025-01-10T09:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "dividende",
+      "price": "0.24",
+      "quantity": "1",
+      "symbol": "AAPL",
+      "timestamp": "2025-10-01T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "dividend"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "0",
+      "quantity": "3",
+      "symbol": "SOL",
+      "timestamp": "2025-01-12T08:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0.01",
+      "notes": null,
+      "price": "0",
+      "quantity": "1",
+      "symbol": "SOL",
+      "timestamp": "2025-01-12T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "6",
+      "quantity": "10",
+      "symbol": "DOT",
+      "timestamp": "2025-01-12T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "0.3",
+      "quantity": "5",
+      "symbol": "ADA",
+      "timestamp": "2025-01-13T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "swap"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "sans date",
+      "price": "0.5",
+      "quantity": "2",
+      "symbol": "XRP",
+      "timestamp": "2025-06-01T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "date inconnue",
+      "price": "0.5",
+      "quantity": "3",
+      "symbol": "XRP",
+      "timestamp": "2025-06-01T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "1",
+      "quantity": "100",
+      "symbol": "EUR",
+      "timestamp": "2025-01-14T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    }
+  ]
+}

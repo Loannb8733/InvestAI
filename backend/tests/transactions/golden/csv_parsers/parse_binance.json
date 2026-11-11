@@ -1,0 +1,176 @@
+{
+  "errors": [
+    "Row 17: Invalid change amount: x"
+  ],
+  "parser": "Binance",
+  "rows": [
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: buy",
+      "price": "0",
+      "quantity": "0.01",
+      "symbol": "BTC",
+      "timestamp": "2025-02-01T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: buy",
+      "price": "0",
+      "quantity": "900",
+      "symbol": "EUR",
+      "timestamp": "2025-02-01T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: commission",
+      "price": "0",
+      "quantity": "0.00001",
+      "symbol": "BTC",
+      "timestamp": "2025-02-01T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "fee"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: sell",
+      "price": "0",
+      "quantity": "0.2",
+      "symbol": "ETH",
+      "timestamp": "2025-02-02T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: deposit",
+      "price": "0",
+      "quantity": "5",
+      "symbol": "SOL",
+      "timestamp": "2025-02-03T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: withdraw",
+      "price": "0",
+      "quantity": "2",
+      "symbol": "SOL",
+      "timestamp": "2025-02-03T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: simple earn flexible interest",
+      "price": "0",
+      "quantity": "0.03",
+      "symbol": "USDC",
+      "timestamp": "2025-02-04T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: simple earn flexible subscription",
+      "price": "0",
+      "quantity": "100",
+      "symbol": "USDC",
+      "timestamp": "2025-02-04T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: simple earn locked redemption",
+      "price": "0",
+      "quantity": "100",
+      "symbol": "USDC",
+      "timestamp": "2025-02-04T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "unstaking"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: distribution",
+      "price": "0",
+      "quantity": "0.01",
+      "symbol": "BNB",
+      "timestamp": "2025-02-05T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "airdrop"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: convert",
+      "price": "0",
+      "quantity": "50",
+      "symbol": "ADA",
+      "timestamp": "2025-02-05T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: convert",
+      "price": "0",
+      "quantity": "4",
+      "symbol": "DOT",
+      "timestamp": "2025-02-05T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: small assets exchange bnb",
+      "price": "0",
+      "quantity": "0.002",
+      "symbol": "BNB",
+      "timestamp": "2025-02-05T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Binance: eth 2.0 staking rewards",
+      "price": "0",
+      "quantity": "0.0004",
+      "symbol": "ETH",
+      "timestamp": "2025-02-07T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    }
+  ]
+}

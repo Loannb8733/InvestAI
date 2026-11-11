@@ -1,0 +1,35 @@
+{
+  "foreign_portfolio": {
+    "body": {
+      "detail": "Portefeuille non trouvé"
+    },
+    "status": 404
+  },
+  "no_portfolio": {
+    "body": {
+      "detail": "L'identifiant du portefeuille est requis"
+    },
+    "status": 400
+  },
+  "undecodable": {
+    "body": {
+      "detail": "Impossible de lire le fichier. Vérifiez le format du fichier."
+    },
+    "status": 400
+  },
+  "with_bom": {
+    "body": {
+      "error_count": 0,
+      "errors": [],
+      "skipped_count": 0,
+      "success_count": 1
+    },
+    "status": 200
+  },
+  "wrong_extension": {
+    "body": {
+      "detail": "Le fichier doit être au format CSV"
+    },
+    "status": 400
+  }
+}

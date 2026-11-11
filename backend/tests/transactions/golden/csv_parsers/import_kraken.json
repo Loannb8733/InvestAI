@@ -1,0 +1,250 @@
+{
+  "again": {
+    "body": {
+      "error_count": 2,
+      "errors": [
+        "Row 17: Invalid timestamp: 05/03/2025",
+        "Row 18: Invalid amount: 1,5"
+      ],
+      "skipped_count": 11,
+      "success_count": 0
+    },
+    "status": 200
+  },
+  "first": {
+    "body": {
+      "error_count": 2,
+      "errors": [
+        "Row 17: Invalid timestamp: 05/03/2025",
+        "Row 18: Invalid amount: 1,5"
+      ],
+      "skipped_count": 0,
+      "success_count": 11
+    },
+    "status": 200
+  },
+  "state": [
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "40.00000000",
+      "symbol": "ADA",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-03T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: spend",
+          "price": "0E-12",
+          "quantity": "40.000000000000",
+          "type": "sell"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-03T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: receive",
+          "price": "0E-12",
+          "quantity": "40.000000000000",
+          "type": "transfer_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "0.04000000",
+      "symbol": "BTC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-01T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: deposit",
+          "price": "0E-12",
+          "quantity": "0.050000000000",
+          "type": "transfer_in"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-01T11:00:00+00:00",
+          "fee": "0.000020000000",
+          "fee_currency": "BTC",
+          "notes": "Kraken: trade",
+          "price": "0E-12",
+          "quantity": "0.010000000000",
+          "type": "buy"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-04T10:00:00+00:00",
+          "fee": "0.000100000000",
+          "fee_currency": "BTC",
+          "notes": "Kraken: withdrawal",
+          "price": "0E-12",
+          "quantity": "0.020000000000",
+          "type": "transfer_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "0.40000000",
+      "symbol": "DOT.S",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-02T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: staking",
+          "price": "0E-12",
+          "quantity": "0.400000000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "0E-8",
+      "symbol": "ETH",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-02T10:00:00+00:00",
+          "fee": "0.000100000000",
+          "fee_currency": "ETH",
+          "notes": "Kraken: trade",
+          "price": "0E-12",
+          "quantity": "0.300000000000",
+          "type": "sell"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "1.00000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-04T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: transfer",
+          "price": "0E-12",
+          "quantity": "1.000000000000",
+          "type": "transfer_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "0.20000000",
+      "symbol": "USDC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-03T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: earn",
+          "price": "0E-12",
+          "quantity": "0.200000000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "15.00000000",
+      "symbol": "XDG",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-02T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: reward",
+          "price": "0E-12",
+          "quantity": "15.000000000000",
+          "type": "airdrop"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "3.00000000",
+      "symbol": "XRP",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-05T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: bonus",
+          "price": "0E-12",
+          "quantity": "3.000000000000",
+          "type": "airdrop"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Tangem",
+      "quantity": "0.01990000",
+      "symbol": "BTC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Tangem",
+          "executed_at": "2025-03-04T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Auto-mirror from Kraken",
+          "price": "0E-12",
+          "quantity": "0.019900000000",
+          "type": "transfer_in"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "errors": [
+    "Row 17: Invalid timestamp: 05/03/2025",
+    "Row 18: Invalid amount: 1,5"
+  ],
+  "parser": "Kraken",
+  "rows": [
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: deposit",
+      "price": "0",
+      "quantity": "0.05",
+      "symbol": "BTC",
+      "timestamp": "2025-03-01T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0.00002",
+      "notes": "Kraken: trade",
+      "price": "0",
+      "quantity": "0.01",
+      "symbol": "BTC",
+      "timestamp": "2025-03-01T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0.0001",
+      "notes": "Kraken: trade",
+      "price": "0",
+      "quantity": "0.3",
+      "symbol": "ETH",
+      "timestamp": "2025-03-02T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: staking",
+      "price": "0",
+      "quantity": "0.4",
+      "symbol": "DOT.S",
+      "timestamp": "2025-03-02T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: reward",
+      "price": "0",
+      "quantity": "15",
+      "symbol": "XDG",
+      "timestamp": "2025-03-02T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "airdrop"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: earn",
+      "price": "0",
+      "quantity": "0.2",
+      "symbol": "USDC",
+      "timestamp": "2025-03-03T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: spend",
+      "price": "0",
+      "quantity": "40",
+      "symbol": "ADA",
+      "timestamp": "2025-03-03T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: receive",
+      "price": "0",
+      "quantity": "40",
+      "symbol": "ADA",
+      "timestamp": "2025-03-03T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0.0001",
+      "notes": "Kraken: withdrawal",
+      "price": "0",
+      "quantity": "0.02",
+      "symbol": "BTC",
+      "timestamp": "2025-03-04T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: transfer",
+      "price": "0",
+      "quantity": "1",
+      "symbol": "SOL",
+      "timestamp": "2025-03-04T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Kraken: bonus",
+      "price": "0",
+      "quantity": "3",
+      "symbol": "XRP",
+      "timestamp": "2025-03-05T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "airdrop"
+    }
+  ]
+}

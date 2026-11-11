@@ -1,0 +1,207 @@
+{
+  "again": {
+    "body": {
+      "error_count": 3,
+      "errors": [
+        "Row 13: Invalid number: [<class 'decimal.ConversionSyntax'>]",
+        "Unknown transaction type: staking",
+        "Unknown transaction type: swap"
+      ],
+      "skipped_count": 8,
+      "success_count": 0
+    },
+    "status": 200
+  },
+  "first": {
+    "body": {
+      "error_count": 3,
+      "errors": [
+        "Row 13: Invalid number: [<class 'decimal.ConversionSyntax'>]",
+        "Unknown transaction type: staking",
+        "Unknown transaction type: swap"
+      ],
+      "skipped_count": 0,
+      "success_count": 8
+    },
+    "status": 200
+  },
+  "state": [
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "0E-8",
+      "symbol": "AAPL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-10-01T00:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "dividende",
+          "price": "0.240000000000",
+          "quantity": "1.000000000000",
+          "type": "dividend"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "0E-8",
+      "symbol": "ADA",
+      "transactions": []
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "40050.00000000",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "0.08000000",
+      "symbol": "BTC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-10T10:00:00+00:00",
+          "fee": "5.000000000000",
+          "fee_currency": "BTC",
+          "notes": "premier achat",
+          "price": "40000.000000000000",
+          "quantity": "0.100000000000",
+          "type": "buy"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-11T00:00:00+00:00",
+          "fee": "1.000000000000",
+          "fee_currency": "BTC",
+          "notes": null,
+          "price": "42000.000000000000",
+          "quantity": "0.020000000000",
+          "type": "sell"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "0E-8",
+      "symbol": "DOT",
+      "transactions": []
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "0E-8",
+      "symbol": "ETH",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-10T09:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": null,
+          "price": "2500.000000000000",
+          "quantity": "0.500000000000",
+          "type": "sell"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "3.00000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-12T00:00:00+00:00",
+          "fee": "0.010000000000",
+          "fee_currency": "SOL",
+          "notes": null,
+          "price": "0E-12",
+          "quantity": "1.000000000000",
+          "type": "transfer_out"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-12T08:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": null,
+          "price": "0E-12",
+          "quantity": "3.000000000000",
+          "type": "transfer_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0.50000000",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "5.00000000",
+      "symbol": "XRP",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-06-01T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "sans date",
+          "price": "0.500000000000",
+          "quantity": "2.000000000000",
+          "type": "buy"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-06-01T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "date inconnue",
+          "price": "0.500000000000",
+          "quantity": "3.000000000000",
+          "type": "buy"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Tangem",
+      "quantity": "0.99000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Tangem",
+          "executed_at": "2025-01-12T00:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Auto-mirror from InvestAI / Generic",
+          "price": "0E-12",
+          "quantity": "0.990000000000",
+          "type": "transfer_in"
+        }
+      ]
+    }
+  ]
+}

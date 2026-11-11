@@ -1,0 +1,298 @@
+{
+  "outcomes": {
+    "destination": {
+      "body": {
+        "error_count": 3,
+        "errors": [
+          "Row 17: Invalid change amount: x",
+          "Unknown transaction type: staking",
+          "Unknown transaction type: unstaking"
+        ],
+        "skipped_count": 0,
+        "success_count": 11
+      },
+      "status": 200
+    },
+    "forced_platform": {
+      "body": {
+        "error_count": 13,
+        "errors": [
+          "Row 2: Invalid timestamp: ",
+          "Row 3: Invalid timestamp: ",
+          "Row 4: Invalid timestamp: ",
+          "Row 5: Invalid timestamp: ",
+          "Row 6: Invalid timestamp: ",
+          "Row 7: Invalid timestamp: ",
+          "Row 8: Invalid timestamp: ",
+          "Row 9: Invalid timestamp: ",
+          "Row 10: Invalid timestamp: ",
+          "Row 11: Invalid timestamp: ",
+          "Row 12: Invalid timestamp: ",
+          "Row 13: Invalid timestamp: ",
+          "Row 14: Invalid timestamp: "
+        ],
+        "skipped_count": 0,
+        "success_count": 0
+      },
+      "status": 200
+    },
+    "semicolon": {
+      "body": {
+        "error_count": 1,
+        "errors": [
+          "Row 2: Invalid number: [<class 'decimal.ConversionSyntax'>]"
+        ],
+        "skipped_count": 0,
+        "success_count": 1
+      },
+      "status": 200
+    },
+    "unknown_format": {
+      "body": {
+        "detail": "Format CSV non reconnu. Veuillez spécifier la plateforme."
+      },
+      "status": 400
+    },
+    "unknown_platform": {
+      "body": {
+        "detail": "Unknown platform: coinbase"
+      },
+      "status": 400
+    }
+  },
+  "state": [
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "0E-8",
+      "symbol": "ADA",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-05T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: convert",
+          "price": "0E-12",
+          "quantity": "50.000000000000",
+          "type": "conversion_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "0.01200000",
+      "symbol": "BNB",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-05T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: distribution",
+          "price": "0E-12",
+          "quantity": "0.010000000000",
+          "type": "airdrop"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-05T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: small assets exchange bnb",
+          "price": "0E-12",
+          "quantity": "0.002000000000",
+          "type": "conversion_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "0.00999000",
+      "symbol": "BTC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-01T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: buy",
+          "price": "0E-12",
+          "quantity": "0.010000000000",
+          "type": "buy"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-01T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: commission",
+          "price": "0E-12",
+          "quantity": "0.000010000000",
+          "type": "fee"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "4.00000000",
+      "symbol": "DOT",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-05T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: convert",
+          "price": "0E-12",
+          "quantity": "4.000000000000",
+          "type": "conversion_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "0.00040000",
+      "symbol": "ETH",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-02T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: sell",
+          "price": "0E-12",
+          "quantity": "0.200000000000",
+          "type": "sell"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-07T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: eth 2.0 staking rewards",
+          "price": "0E-12",
+          "quantity": "0.000400000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "3.00000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-03T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: deposit",
+          "price": "0E-12",
+          "quantity": "5.000000000000",
+          "type": "transfer_in"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-03T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: withdraw",
+          "price": "0E-12",
+          "quantity": "2.000000000000",
+          "type": "transfer_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Binance",
+      "quantity": "0.03000000",
+      "symbol": "USDC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-04T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: simple earn flexible interest",
+          "price": "0E-12",
+          "quantity": "0.030000000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "2500.00000000",
+      "currency": "EUR",
+      "exchange": "InvestAI / Generic",
+      "quantity": "1.00000000",
+      "symbol": "ETH",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-10T00:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": null,
+          "price": "2500.000000000000",
+          "quantity": "1.000000000000",
+          "type": "buy"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Ledger",
+      "quantity": "2.00000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Ledger",
+          "executed_at": "2025-02-03T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Auto-mirror from Binance",
+          "price": "0E-12",
+          "quantity": "2.000000000000",
+          "type": "transfer_in"
+        }
+      ]
+    }
+  ]
+}
