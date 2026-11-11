@@ -1,7 +1,7 @@
 from typing import Any
 
+from app.domains.strategies.contrarian import format_reasoning
 from app.domains.strategies.suggestion_types import BEAR_REGIMES, BULL_REGIMES, AssetRow, Suggestion, asset_count
-from app.services.contrarian_stats_service import format_reasoning
 
 
 def _vca_action(asset: AssetRow, base_amount: float, liquidity: float) -> dict[str, Any]:

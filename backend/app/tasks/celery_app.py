@@ -17,7 +17,7 @@ celery_app = Celery(
         "app.domains.notifications.tasks",
         "app.domains.system.tasks",
         "app.domains.crowdfunding.tasks",
-        "app.tasks.contrarian_stats",
+        "app.domains.strategies.tasks",
         "app.domains.market_data.fx.tasks",
         "app.domains.market_data.history.tasks",
         "app.domains.exchanges.sync.tasks",
@@ -155,7 +155,7 @@ celery_app.conf.beat_schedule = {
     },
     # === Contrarian (Fear & Greed) backtest stats ===
     "refresh-contrarian-stats": {
-        "task": "app.tasks.contrarian_stats.refresh_contrarian_stats",
+        "task": "app.domains.strategies.tasks.refresh_contrarian_stats",
         "schedule": crontab(hour=2, minute=15),  # Daily at 02:15 UTC (off-peak)
     },
 }

@@ -316,7 +316,7 @@
         "next_run_at": "2026-10-18T02:15:00Z",
         "running": false,
         "schedule": "<crontab: 15 2 * * * (m/h/dM/MY/d)>",
-        "task": "app.tasks.contrarian_stats.refresh_contrarian_stats"
+        "task": "app.domains.strategies.tasks.refresh_contrarian_stats"
       }
     ]
   },

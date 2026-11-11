@@ -13,7 +13,6 @@ comments	backend/app/ml/hyperparameter_tuner.py
 comments	backend/app/ml/market_context.py
 comments	backend/app/ml/regime_detector.py
 comments	backend/app/schemas/_money.py
-comments	backend/app/services/contrarian_stats_service.py
 comments	backend/app/services/csv_parsers.py
 comments	backend/app/tasks/celery_app.py
 comments	frontend/src/App.tsx

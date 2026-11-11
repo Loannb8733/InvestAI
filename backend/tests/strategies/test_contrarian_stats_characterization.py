@@ -10,9 +10,8 @@ import pytest
 import redis
 import time_machine
 
-from app.core.redis_client import CONTRARIAN_STATS_KEY, CONTRARIAN_STATS_TTL, redis_async_url
-from app.services.contrarian_stats_service import format_reasoning
-from app.tasks.contrarian_stats import refresh_contrarian_stats
+from app.core.redis_client import redis_async_url
+from app.domains.strategies.contrarian import CACHE_KEY, CACHE_TTL_S, format_reasoning, refresh_contrarian_stats
 from tests.http_stubs import HttpStub
 
 GOLDEN = Path(__file__).parent / "golden" / "contrarian_stats"
@@ -76,11 +75,11 @@ def _run(http_stub: HttpStub) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             outcome = {"error": f"{type(exc).__name__}: {exc}"}
     client = _client()
-    cached = client.get(CONTRARIAN_STATS_KEY)
-    ttl = client.ttl(CONTRARIAN_STATS_KEY)
+    cached = client.get(CACHE_KEY)
+    ttl = client.ttl(CACHE_KEY)
     client.close()
     outcome["cached"] = json.loads(cached) if cached else None
-    outcome["cache_ttl_is_8_days"] = ttl == CONTRARIAN_STATS_TTL
+    outcome["cache_ttl_is_8_days"] = ttl == CACHE_TTL_S
     outcome["requests"] = _requests(http_stub)
     return outcome
 
@@ -109,7 +108,7 @@ def test_refresh_falls_back_to_cryptocompare(http_stub: HttpStub) -> None:
 
 def test_failure_keeps_the_cached_stats(http_stub: HttpStub) -> None:
     client = _client()
-    client.setex(CONTRARIAN_STATS_KEY, 3600, json.dumps({"median_12m_pct": 42.0}))
+    client.setex(CACHE_KEY, 3600, json.dumps({"median_12m_pct": 42.0}))
     client.close()
     http_stub.on(FEAR_GREED, _fear_greed)
     http_stub.on(YAHOO, _unavailable)
