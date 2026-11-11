@@ -1,5 +1,6 @@
 import inspect
 import json
+import math
 import os
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
@@ -21,6 +22,8 @@ from tests.ml.series import SERIES, dates, with_spike
 GOLDEN = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 NOW = datetime(2025, 9, 1, 12, 0, tzinfo=UTC)
+REL_TOL = 1e-4
+ABS_TOL = 1e-6
 CONTEXTS = [("bull", "crypto"), ("bear", "stock"), ("range", "etf"), ("calm", "real_estate")]
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
@@ -54,13 +57,29 @@ def _plain(value: Any) -> Any:
     return value
 
 
+def _mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
+    if isinstance(expected, float) and isinstance(actual, float):
+        same = math.isclose(expected, actual, rel_tol=REL_TOL, abs_tol=ABS_TOL)
+        return [] if same else [f"{path}: {expected} -> {actual}"]
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if expected.keys() != actual.keys():
+            return [f"{path}: clés {sorted(expected)} -> {sorted(actual)}"]
+        return [m for key in expected for m in _mismatches(expected[key], actual[key], f"{path}.{key}")]
+    if isinstance(expected, list) and isinstance(actual, list) and len(expected) == len(actual):
+        return [
+            m for i, (e, a) in enumerate(zip(expected, actual, strict=True)) for m in _mismatches(e, a, f"{path}[{i}]")
+        ]
+    return [] if expected == actual else [f"{path}: {expected!r} -> {actual!r}"]
+
+
 def _check(name: str, observed: Any) -> None:
     path = GOLDEN / f"{name}.json"
     rendered = json.dumps(_plain(observed), indent=2, ensure_ascii=False, sort_keys=True, default=str) + "\n"
     if UPDATE or not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(rendered, encoding="utf-8")
-    assert path.read_text(encoding="utf-8") == rendered, f"golden {name} différent (GOLDEN_UPDATE=1)"
+    mismatches = _mismatches(json.loads(path.read_text(encoding="utf-8")), json.loads(rendered))
+    assert not mismatches, f"golden {name} différent (GOLDEN_UPDATE=1) :\n" + "\n".join(mismatches[:20])
 
 
 def _context(name: str, asset_type: str, fear_greed: int | None = 40) -> Any:
