@@ -1,0 +1,324 @@
+{
+  "again": {
+    "body": {
+      "error_count": 2,
+      "errors": [
+        "Row 18: Invalid amount: [<class 'decimal.ConversionSyntax'>]",
+        "Row 19: Invalid timestamp: not a date"
+      ],
+      "skipped_count": 15,
+      "success_count": 0
+    },
+    "status": 200
+  },
+  "first": {
+    "body": {
+      "error_count": 2,
+      "errors": [
+        "Row 18: Invalid amount: [<class 'decimal.ConversionSyntax'>]",
+        "Row 19: Invalid timestamp: not a date"
+      ],
+      "skipped_count": 0,
+      "success_count": 15
+    },
+    "status": 200
+  },
+  "state": [
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0.80000000",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "100.00000000",
+      "symbol": "ADA",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-02T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Received ADA",
+          "price": "0.800000000000",
+          "quantity": "100.000000000000",
+          "type": "conversion_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0.30000000",
+      "symbol": "ATOM",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-07T08:30:00.250000+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Supercharger",
+          "price": "7.500000000000",
+          "quantity": "0.200000000000",
+          "type": "staking_reward"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-07T09:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Staking",
+          "price": "7.000000000000",
+          "quantity": "0.100000000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "96666.66666667",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0.00300000",
+      "symbol": "BTC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-02T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: CRO -> BTC",
+          "price": "90000.000000000000",
+          "quantity": "0.001000000000",
+          "type": "conversion_in"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-03T09:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Buy BTC",
+          "price": "100000.000000000000",
+          "quantity": "0.002000000000",
+          "type": "buy"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "25.00000000",
+      "symbol": "CRO",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-05T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Referral",
+          "price": "0.080000000000",
+          "quantity": "25.000000000000",
+          "type": "airdrop"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0E-8",
+      "symbol": "DOGE",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-05T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Balance Conversion",
+          "price": "0.100000000000",
+          "quantity": "30.000000000000",
+          "type": "conversion_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0E-8",
+      "symbol": "DOT",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-04T09:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Sell DOT",
+          "price": "6.000000000000",
+          "quantity": "10.000000000000",
+          "type": "sell"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "3000.00000000",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0.10000000",
+      "symbol": "ETH",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-02T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: ETH -> SOL",
+          "price": "3000.000000000000",
+          "quantity": "0.500000000000",
+          "type": "conversion_out"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-03T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Card buy ETH",
+          "price": "3000.000000000000",
+          "quantity": "0.100000000000",
+          "type": "buy"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0.00300000",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "1000.00000000",
+      "symbol": "SHIB",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-05T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Balance Conversion",
+          "price": "0.003000000000",
+          "quantity": "1000.000000000000",
+          "type": "conversion_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "187.50000000",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "8.00000000",
+      "symbol": "SOL",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-02T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: ETH -> SOL",
+          "price": "187.500000000000",
+          "quantity": "8.000000000000",
+          "type": "conversion_in"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "0.50000000",
+      "symbol": "USDC",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-05T09:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Earn interest",
+          "price": "0.920000000000",
+          "quantity": "0.500000000000",
+          "type": "staking_reward"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0.50000000",
+      "currency": "EUR",
+      "exchange": "Crypto.com",
+      "quantity": "30.00000000",
+      "symbol": "XRP",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-04T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Deposit XRP",
+          "price": "0.500000000000",
+          "quantity": "50.000000000000",
+          "type": "transfer_in"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Crypto.com",
+          "executed_at": "2025-01-04T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Crypto.com: Withdraw XRP",
+          "price": "0.500000000000",
+          "quantity": "20.000000000000",
+          "type": "transfer_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0.50000000",
+      "currency": "EUR",
+      "exchange": "Tangem",
+      "quantity": "20.00000000",
+      "symbol": "XRP",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Tangem",
+          "executed_at": "2025-01-04T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Auto-mirror from Crypto.com",
+          "price": "0.500000000000",
+          "quantity": "20.000000000000",
+          "type": "transfer_in"
+        }
+      ]
+    }
+  ]
+}

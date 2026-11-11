@@ -1,0 +1,189 @@
+{
+  "errors": [
+    "Row 18: Invalid amount: [<class 'decimal.ConversionSyntax'>]",
+    "Row 19: Invalid timestamp: not a date"
+  ],
+  "parser": "Crypto.com",
+  "rows": [
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: CRO -> BTC",
+      "price": "9.0E+4",
+      "quantity": "0.001",
+      "symbol": "BTC",
+      "timestamp": "2025-01-02T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: ETH -> SOL",
+      "price": "3.00E+3",
+      "quantity": "0.5",
+      "symbol": "ETH",
+      "timestamp": "2025-01-02T11:00:00",
+      "to_quantity": "8",
+      "to_symbol": "SOL",
+      "transaction_type": "conversion_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: ETH -> SOL",
+      "price": "187.5",
+      "quantity": "8",
+      "symbol": "SOL",
+      "timestamp": "2025-01-02T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Received ADA",
+      "price": "0.8",
+      "quantity": "100",
+      "symbol": "ADA",
+      "timestamp": "2025-01-02T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Buy BTC",
+      "price": "1.00E+5",
+      "quantity": "0.002",
+      "symbol": "BTC",
+      "timestamp": "2025-01-03T09:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Card buy ETH",
+      "price": "3.00E+3",
+      "quantity": "0.1",
+      "symbol": "ETH",
+      "timestamp": "2025-01-03T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Sell DOT",
+      "price": "6",
+      "quantity": "10",
+      "symbol": "DOT",
+      "timestamp": "2025-01-04T09:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "sell"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Deposit XRP",
+      "price": "0.5",
+      "quantity": "50",
+      "symbol": "XRP",
+      "timestamp": "2025-01-04T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Withdraw XRP",
+      "price": "0.5",
+      "quantity": "20",
+      "symbol": "XRP",
+      "timestamp": "2025-01-04T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "transfer_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Earn interest",
+      "price": "0.92",
+      "quantity": "0.5",
+      "symbol": "USDC",
+      "timestamp": "2025-01-05T09:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Referral",
+      "price": "0.08",
+      "quantity": "25",
+      "symbol": "CRO",
+      "timestamp": "2025-01-05T10:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "airdrop"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Balance Conversion",
+      "price": "0.1",
+      "quantity": "30",
+      "symbol": "DOGE",
+      "timestamp": "2025-01-05T11:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_out"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Balance Conversion",
+      "price": "0.003",
+      "quantity": "1000",
+      "symbol": "SHIB",
+      "timestamp": "2025-01-05T12:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "conversion_in"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Supercharger",
+      "price": "7.5",
+      "quantity": "0.2",
+      "symbol": "ATOM",
+      "timestamp": "2025-01-07T08:30:00.250000",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    },
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": "Crypto.com: Staking",
+      "price": "7",
+      "quantity": "0.1",
+      "symbol": "ATOM",
+      "timestamp": "2025-01-07T09:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "staking_reward"
+    }
+  ]
+}
