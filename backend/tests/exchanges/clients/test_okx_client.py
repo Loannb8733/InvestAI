@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 import app.domains.exchanges.connectors.okx as module
+import app.domains.exchanges.connectors.okx_core as core
 from app.domains.exchanges.connectors.okx import OkxService
 from tests.exchanges.clients.harness import assert_golden, install, record
 
@@ -24,7 +25,7 @@ def _fill(trade_id: str, bill: str, side: str, ts: str) -> dict[str, Any]:
 
 
 async def test_okx_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
-    api = install(monkeypatch, module)
+    api = install(monkeypatch, module, core)
     client = OkxService("key", "secret", "pass")
     api.on(
         "GET",
@@ -90,3 +91,14 @@ async def test_okx_client_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
     observed["balances_refused"] = await record(api, client.get_balances)
     observed["connection_refused"] = await record(api, client.test_connection)
     assert_golden("okx", observed)
+
+
+async def test_an_eea_key_is_served_by_eea_okx_com(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = install(monkeypatch, module, core)
+    client = OkxService("key", "secret", "pass")
+    balance = {"code": OK, "data": [{"details": [{"ccy": "BTC", "availBal": "0.5", "frozenBal": "0"}]}]}
+    unknown = {"code": "50119", "msg": "API key doesn't exist"}
+    api.on("GET", "/api/v5/account/balance", lambda request: balance if request.url.host == "eea.okx.com" else unknown)
+    assert await client.test_connection()
+    assert [b.symbol for b in await client.get_balances()] == ["BTC"]
+    assert [call.split()[1].split("/")[0] for call in api.calls] == ["www.okx.com", "eea.okx.com", "eea.okx.com"]

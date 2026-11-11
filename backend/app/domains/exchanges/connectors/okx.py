@@ -1,67 +1,25 @@
-import base64
-import hashlib
-import hmac
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 
-import httpx
-
-from app.domains.exchanges.connectors.base import (
-    BaseExchangeService,
-    ExchangeBalance,
-    ExchangeDeposit,
-    ExchangeTrade,
-    ExchangeWithdrawal,
-)
+from app.domains.exchanges.connectors.base import ExchangeBalance, ExchangeDeposit, ExchangeTrade, ExchangeWithdrawal
+from app.domains.exchanges.connectors.okx_core import OkxCore
 
 logger = logging.getLogger(__name__)
 
 
-class OkxService(BaseExchangeService):
+class OkxService(OkxCore):
     """Connecteur OKX (API v5)."""
-
-    BASE_URL = "https://www.okx.com"
-
-    @property
-    def exchange_name(self) -> str:
-        return "OKX"
-
-    def _get_timestamp(self) -> str:
-        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-
-    def _sign_request(self, timestamp: str, method: str, request_path: str, body: str = "") -> str:
-        pre_sign = f"{timestamp}{method}{request_path}{body}"
-        signature = hmac.new(
-            self._require_secret_key().encode("utf-8"),
-            pre_sign.encode("utf-8"),
-            hashlib.sha256,
-        ).digest()
-        return base64.b64encode(signature).decode("utf-8")
-
-    def _get_headers(self, timestamp: str, method: str, request_path: str, body: str = "") -> dict[str, Any]:
-        signature = self._sign_request(timestamp, method, request_path, body)
-        return {
-            "OK-ACCESS-KEY": self.api_key,
-            "OK-ACCESS-SIGN": signature,
-            "OK-ACCESS-TIMESTAMP": timestamp,
-            "OK-ACCESS-PASSPHRASE": self.passphrase or "",
-            "Content-Type": "application/json",
-        }
-
-    def _get_http_client(self, timeout: float = 30.0) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=timeout)
 
     async def test_connection(self) -> bool:
         try:
             async with self._get_http_client(timeout=15.0) as client:
                 request_path = "/api/v5/account/balance"
-                timestamp = self._get_timestamp()
-                headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
+                response = await self._get(client, request_path)
                 data = response.json()
                 connected: bool = data.get("code") == "0"
+                if not connected:
+                    logger.warning("OKX test_connection refused: %s %s", data.get("code"), data.get("msg"))
                 return connected
         except Exception as e:  # noqa: BLE001
             logger.error(f"OKX test_connection error: {e}")
@@ -72,9 +30,7 @@ class OkxService(BaseExchangeService):
         try:
             async with self._get_http_client() as client:
                 request_path = "/api/v5/account/balance"
-                timestamp = self._get_timestamp()
-                headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
+                response = await self._get(client, request_path)
                 response.raise_for_status()
                 data = response.json()
 
@@ -130,9 +86,7 @@ class OkxService(BaseExchangeService):
                     if after:
                         request_path += f"&after={after}"
 
-                    timestamp = self._get_timestamp()
-                    headers = self._get_headers(timestamp, "GET", request_path)
-                    response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
+                    response = await self._get(client, request_path)
                     response.raise_for_status()
                     data = response.json()
 
@@ -193,9 +147,7 @@ class OkxService(BaseExchangeService):
                 if query_parts:
                     request_path += "?" + "&".join(query_parts)
 
-                timestamp = self._get_timestamp()
-                headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
+                response = await self._get(client, request_path)
                 response.raise_for_status()
                 data = response.json()
 
@@ -251,9 +203,7 @@ class OkxService(BaseExchangeService):
                 if query_parts:
                     request_path += "?" + "&".join(query_parts)
 
-                timestamp = self._get_timestamp()
-                headers = self._get_headers(timestamp, "GET", request_path)
-                response = await client.get(f"{self.BASE_URL}{request_path}", headers=headers)
+                response = await self._get(client, request_path)
                 response.raise_for_status()
                 data = response.json()
 
