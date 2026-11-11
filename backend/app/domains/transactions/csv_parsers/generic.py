@@ -21,6 +21,12 @@ DATE_FORMATS = (
 )
 
 
+def _number(value: str) -> Decimal:
+    if "," in value and "." not in value:
+        value = value.replace(",", ".")
+    return Decimal(value) if value else Decimal("0")
+
+
 def _date(value: str) -> datetime:
     if not value:
         return datetime.now()
@@ -34,7 +40,7 @@ def _date(value: str) -> datetime:
 
 
 class GenericCSVParser(BaseCSVParser):
-    """Format InvestAI : symbole, type, quantité et prix, en anglais ou en français."""
+    """Format InvestAI : symbole, type, quantité et prix, en anglais ou en français, virgule décimale admise."""
 
     name: ClassVar[str] = "InvestAI / Generic"
     supported_headers: ClassVar[tuple[str, ...]] = ("symbol", "type", "quantity", "price")
@@ -71,9 +77,9 @@ class GenericCSVParser(BaseCSVParser):
         if not symbol or not trans_type:
             return []
         try:
-            quantity = Decimal(quantity_str) if quantity_str else Decimal("0")
-            price = Decimal(price_str) if price_str else Decimal("0")
-            fee = Decimal(fee_str) if fee_str else Decimal("0")
+            quantity = _number(quantity_str)
+            price = _number(price_str)
+            fee = _number(fee_str)
         except InvalidOperation as e:
             raise ValueError(f"Invalid number: {e}") from e
         return [

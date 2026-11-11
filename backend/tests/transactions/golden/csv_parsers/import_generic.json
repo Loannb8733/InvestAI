@@ -1,27 +1,25 @@
 {
   "again": {
     "body": {
-      "error_count": 3,
+      "error_count": 2,
       "errors": [
         "Row 13: Invalid number: [<class 'decimal.ConversionSyntax'>]",
-        "Unknown transaction type: staking",
         "Unknown transaction type: swap"
       ],
-      "skipped_count": 8,
+      "skipped_count": 9,
       "success_count": 0
     },
     "status": 200
   },
   "first": {
     "body": {
-      "error_count": 3,
+      "error_count": 2,
       "errors": [
         "Row 13: Invalid number: [<class 'decimal.ConversionSyntax'>]",
-        "Unknown transaction type: staking",
         "Unknown transaction type: swap"
       ],
       "skipped_count": 0,
-      "success_count": 8
+      "success_count": 9
     },
     "status": 200
   },
@@ -95,7 +93,19 @@
       "exchange": "InvestAI / Generic",
       "quantity": "0E-8",
       "symbol": "DOT",
-      "transactions": []
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "InvestAI / Generic",
+          "executed_at": "2025-01-12T10:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": null,
+          "price": "6.000000000000",
+          "quantity": "10.000000000000",
+          "type": "staking"
+        }
+      ]
     },
     {
       "asset_type": "crypto",

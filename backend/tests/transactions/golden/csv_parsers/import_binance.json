@@ -1,27 +1,23 @@
 {
   "again": {
     "body": {
-      "error_count": 3,
+      "error_count": 1,
       "errors": [
-        "Row 17: Invalid change amount: x",
-        "Unknown transaction type: staking",
-        "Unknown transaction type: unstaking"
+        "Row 17: Invalid change amount: x"
       ],
-      "skipped_count": 11,
+      "skipped_count": 13,
       "success_count": 0
     },
     "status": 200
   },
   "first": {
     "body": {
-      "error_count": 3,
+      "error_count": 1,
       "errors": [
-        "Row 17: Invalid change amount: x",
-        "Unknown transaction type: staking",
-        "Unknown transaction type: unstaking"
+        "Row 17: Invalid change amount: x"
       ],
       "skipped_count": 0,
-      "success_count": 11
+      "success_count": 13
     },
     "status": 200
   },
@@ -214,6 +210,28 @@
           "price": "0E-12",
           "quantity": "0.030000000000",
           "type": "staking_reward"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-04T11:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: simple earn flexible subscription",
+          "price": "0E-12",
+          "quantity": "100.000000000000",
+          "type": "staking"
+        },
+        {
+          "currency": "EUR",
+          "exchange": "Binance",
+          "executed_at": "2025-02-04T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Binance: simple earn locked redemption",
+          "price": "0E-12",
+          "quantity": "100.000000000000",
+          "type": "unstaking"
         }
       ]
     },
