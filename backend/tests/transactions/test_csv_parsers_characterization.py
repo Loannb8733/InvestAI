@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.portfolio.models import Asset, Portfolio
+from app.domains.transactions.csv_parsers.base import parse_timestamp
+from app.domains.transactions.csv_parsers.registry import detect_csv_format, get_available_platforms, get_parser_by_name
 from app.domains.transactions.models import Transaction
-from app.services.csv_parsers import detect_csv_format, get_available_platforms, get_parser_by_name, parse_timestamp
 from tests.transactions import csv_samples
 
 GOLDEN = Path(__file__).parent / "golden" / "csv_parsers"

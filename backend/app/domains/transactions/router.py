@@ -12,6 +12,7 @@ from app.core.rate_limit import limiter
 from app.domains.identity.dependencies import CurrentUser
 from app.domains.transactions.balance_gaps import credit_gaps, find_gaps
 from app.domains.transactions.csv_import import CsvImporter
+from app.domains.transactions.csv_parsers.registry import get_available_platforms
 from app.domains.transactions.listing import TransactionQueries, parse_types
 from app.domains.transactions.repository import TransactionFilters
 from app.domains.transactions.schemas import (
@@ -27,7 +28,6 @@ from app.domains.transactions.schemas import (
     TransactionWithAsset,
 )
 from app.domains.transactions.service import Requester, TransactionService
-from app.services.csv_parsers import get_available_platforms
 
 router = APIRouter()
 
