@@ -46,7 +46,8 @@ def parse_timestamp(value: str) -> datetime:
     raise ValueError(f"Invalid timestamp: {value}")
 
 
-def _widest_reader(content: str) -> csv.DictReader[str] | None:
+def widest_reader(content: str) -> csv.DictReader[str] | None:
+    """Lecteur du séparateur qui donne le plus de colonnes, en-têtes tels quels ; None si aucun."""
     reader = None
     best_col_count = 0
     for delimiter in _DELIMITERS:
@@ -80,7 +81,7 @@ class BaseCSVParser(ABC):
         """Transactions du fichier et erreurs par ligne, avec le séparateur qui donne le plus de colonnes."""
         transactions: list[ParsedTransaction] = []
         errors: list[str] = []
-        reader = _widest_reader(content)
+        reader = widest_reader(content)
         if reader is None or not reader.fieldnames:
             errors.append("Could not parse CSV headers")
             return transactions, errors

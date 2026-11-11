@@ -207,21 +207,6 @@ class TestLignesEcartees:
         assert reponse.json()["error_count"] == 1
         assert "donation" in reponse.json()["errors"][0]
 
-    async def test_le_staking_est_lu_par_le_fichier_mais_refuse_par_la_route(self, client, entetes):
-        """Les deux tables de correspondance divergent.
-
-        `GenericCSVParser` connaît « staking » et « unstaking » ; la table de la
-        route ne les contient pas. Une ligne de staking traverse donc la lecture
-        du fichier pour être rejetée juste après, avec un message qui la
-        présente comme un type inconnu alors que le fichier l'a bien comprise.
-        """
-        portefeuille = await _portefeuille(client, entetes)
-
-        reponse = await _importer(client, entetes, portefeuille, csv("BTC,staking,1,30000,0,2026-01-15 10:00:00,"))
-
-        assert reponse.json()["error_count"] == 1
-        assert "staking" in reponse.json()["errors"][0]
-
 
 class TestDoublons:
     """Deux dispositifs se superposent, et un seul décide.

@@ -58,7 +58,7 @@
     },
     {
       "asset_type": "crypto",
-      "avg_buy_price": "0E-8",
+      "avg_buy_price": "90000.00200000",
       "currency": "EUR",
       "exchange": "Kraken",
       "quantity": "0.04000000",
@@ -82,7 +82,7 @@
           "fee": "0.000020000000",
           "fee_currency": "BTC",
           "notes": "Kraken: trade",
-          "price": "0E-12",
+          "price": "90000.000000000000",
           "quantity": "0.010000000000",
           "type": "buy"
         },
@@ -96,6 +96,27 @@
           "price": "0E-12",
           "quantity": "0.020000000000",
           "type": "transfer_out"
+        }
+      ]
+    },
+    {
+      "asset_type": "crypto",
+      "avg_buy_price": "0E-8",
+      "currency": "EUR",
+      "exchange": "Kraken",
+      "quantity": "15.00000000",
+      "symbol": "DOGE",
+      "transactions": [
+        {
+          "currency": "EUR",
+          "exchange": "Kraken",
+          "executed_at": "2025-03-02T12:00:00+00:00",
+          "fee": "0E-12",
+          "fee_currency": null,
+          "notes": "Kraken: reward",
+          "price": "0E-12",
+          "quantity": "15.000000000000",
+          "type": "airdrop"
         }
       ]
     },
@@ -180,27 +201,6 @@
           "price": "0E-12",
           "quantity": "0.200000000000",
           "type": "staking_reward"
-        }
-      ]
-    },
-    {
-      "asset_type": "crypto",
-      "avg_buy_price": "0E-8",
-      "currency": "EUR",
-      "exchange": "Kraken",
-      "quantity": "15.00000000",
-      "symbol": "XDG",
-      "transactions": [
-        {
-          "currency": "EUR",
-          "exchange": "Kraken",
-          "executed_at": "2025-03-02T12:00:00+00:00",
-          "fee": "0E-12",
-          "fee_currency": null,
-          "notes": "Kraken: reward",
-          "price": "0E-12",
-          "quantity": "15.000000000000",
-          "type": "airdrop"
         }
       ]
     },

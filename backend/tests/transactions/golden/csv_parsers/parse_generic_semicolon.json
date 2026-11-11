@@ -1,9 +1,19 @@
 {
-  "errors": [
-    "Row 2: Invalid number: [<class 'decimal.ConversionSyntax'>]"
-  ],
+  "errors": [],
   "parser": "InvestAI / Generic",
   "rows": [
+    {
+      "currency": "EUR",
+      "fee": "0",
+      "notes": null,
+      "price": "40000",
+      "quantity": "0.1",
+      "symbol": "BTC",
+      "timestamp": "2025-01-10T00:00:00",
+      "to_quantity": null,
+      "to_symbol": null,
+      "transaction_type": "buy"
+    },
     {
       "currency": "EUR",
       "fee": "0",
