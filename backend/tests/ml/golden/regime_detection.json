@@ -1,0 +1,1523 @@
+{
+  "bear_stock_fg15": {
+    "result": {
+      "confidence": 0.9,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (39%), avec signes d'accumulation.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.394,
+        "bottom": 0.307,
+        "bullish": 0.174,
+        "top": 0.124
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (41)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 40.7
+        },
+        {
+          "description": "MACD negatif, histogram positif mais ralentit",
+          "name": "MACD",
+          "signal": "bottom",
+          "strength": 0.12,
+          "value": 9.1041
+        },
+        {
+          "description": "Prix au milieu des bandes de Bollinger — neutre",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.1,
+          "value": 0.36
+        },
+        {
+          "description": "MA courte sous la MA longue (-12.5%)",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.34,
+          "value": -12.45
+        },
+        {
+          "description": "Momentum neutre (+0.8%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.2,
+          "value": 0.8
+        },
+        {
+          "description": "Volatilite elevee (46%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "bearish",
+          "strength": 0.4,
+          "value": 46.0
+        },
+        {
+          "description": "Extreme Fear (15) — panique, opportunite d'achat potentielle",
+          "name": "Fear & Greed",
+          "signal": "bottom",
+          "strength": 0.5,
+          "value": 15.0
+        }
+      ],
+      "symbol": "BEAR"
+    },
+    "six_phase": "markdown"
+  },
+  "bear_stock_fg85": {
+    "result": {
+      "confidence": 0.86,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (39%), avec signes de distribution.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.388,
+        "bottom": 0.174,
+        "bullish": 0.181,
+        "top": 0.258
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (41)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 40.7
+        },
+        {
+          "description": "MACD negatif, histogram positif mais ralentit",
+          "name": "MACD",
+          "signal": "bottom",
+          "strength": 0.12,
+          "value": 9.1041
+        },
+        {
+          "description": "Prix au milieu des bandes de Bollinger — neutre",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.1,
+          "value": 0.36
+        },
+        {
+          "description": "MA courte sous la MA longue (-12.5%)",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.34,
+          "value": -12.45
+        },
+        {
+          "description": "Momentum neutre (+0.8%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.2,
+          "value": 0.8
+        },
+        {
+          "description": "Volatilite elevee (46%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "bearish",
+          "strength": 0.4,
+          "value": 46.0
+        },
+        {
+          "description": "Extreme Greed (85) — euphorie, risque de correction",
+          "name": "Fear & Greed",
+          "signal": "top",
+          "strength": 0.5,
+          "value": 85.0
+        }
+      ],
+      "symbol": "BEAR"
+    },
+    "six_phase": "markdown"
+  },
+  "bear_stock_fgNone": {
+    "result": {
+      "confidence": 0.88,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (46%).",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.462,
+        "bottom": 0.21,
+        "bullish": 0.183,
+        "top": 0.145
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (41)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 40.7
+        },
+        {
+          "description": "MACD negatif, histogram positif mais ralentit",
+          "name": "MACD",
+          "signal": "bottom",
+          "strength": 0.12,
+          "value": 9.1041
+        },
+        {
+          "description": "Prix au milieu des bandes de Bollinger — neutre",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.1,
+          "value": 0.36
+        },
+        {
+          "description": "MA courte sous la MA longue (-12.5%)",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.34,
+          "value": -12.45
+        },
+        {
+          "description": "Momentum neutre (+0.8%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.2,
+          "value": 0.8
+        },
+        {
+          "description": "Volatilite elevee (46%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "bearish",
+          "strength": 0.4,
+          "value": 46.0
+        }
+      ],
+      "symbol": "BEAR"
+    },
+    "six_phase": "markdown"
+  },
+  "bear_stock_multi": {
+    "daily": {
+      "confidence": 0.91,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (43%).",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.429,
+        "bottom": 0.206,
+        "bullish": 0.214,
+        "top": 0.151
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (41)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 40.7
+        },
+        {
+          "description": "MACD negatif, histogram positif mais ralentit",
+          "name": "MACD",
+          "signal": "bottom",
+          "strength": 0.12,
+          "value": 9.1041
+        },
+        {
+          "description": "Prix au milieu des bandes de Bollinger — neutre",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.1,
+          "value": 0.36
+        },
+        {
+          "description": "MA courte sous la MA longue (-12.5%)",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.34,
+          "value": -12.45
+        },
+        {
+          "description": "Momentum neutre (+0.8%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.2,
+          "value": 0.8
+        },
+        {
+          "description": "Volatilite elevee (46%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "bearish",
+          "strength": 0.4,
+          "value": 46.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "BEAR"
+    },
+    "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+    "timeframe_alignment": "aligned",
+    "weekly": {
+      "confidence": 0.71,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (39%), avec signes d'accumulation.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.388,
+        "bottom": 0.251,
+        "bullish": 0.13,
+        "top": 0.231
+      },
+      "signals": [
+        {
+          "description": "RSI baissier (33)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.69,
+          "value": 33.4
+        },
+        {
+          "description": "Prix dans la partie basse des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.58,
+          "value": 0.14
+        },
+        {
+          "description": "Death cross — la MA courte croise la MA longue a la baisse",
+          "name": "MA Cross (SMA7/SMA20)",
+          "signal": "top",
+          "strength": 0.8,
+          "value": -3.94
+        },
+        {
+          "description": "Momentum baissier (-14.1%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.2,
+          "value": -14.1
+        },
+        {
+          "description": "Volatilite extreme (112%) avec prix en bas de range — capitulation possible",
+          "name": "Volatilite 14j",
+          "signal": "bottom",
+          "strength": 0.8,
+          "value": 112.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "BEAR_weekly"
+    }
+  },
+  "bear_stock_vix": {
+    "confidence": 0.98,
+    "description": "Markdown — structure de prix descendante (Lower Highs) (52%).",
+    "dominant_regime": "bearish",
+    "probabilities": {
+      "bearish": 0.515,
+      "bottom": 0.198,
+      "bullish": 0.152,
+      "top": 0.135
+    },
+    "signals": [
+      {
+        "description": "RSI neutre (41)",
+        "name": "RSI 14",
+        "signal": "bearish",
+        "strength": 0.15,
+        "value": 40.7
+      },
+      {
+        "description": "MACD negatif, histogram positif mais ralentit",
+        "name": "MACD",
+        "signal": "bottom",
+        "strength": 0.12,
+        "value": 9.1041
+      },
+      {
+        "description": "Prix au milieu des bandes de Bollinger — neutre",
+        "name": "Bollinger Bands",
+        "signal": "bearish",
+        "strength": 0.1,
+        "value": 0.36
+      },
+      {
+        "description": "MA courte sous la MA longue (-12.5%)",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bearish",
+        "strength": 0.34,
+        "value": -12.45
+      },
+      {
+        "description": "Momentum neutre (+0.8%)",
+        "name": "Momentum 14j",
+        "signal": "bullish",
+        "strength": 0.2,
+        "value": 0.8
+      },
+      {
+        "description": "Volatilite elevee (46%) — marche incertain",
+        "name": "Volatilite 14j",
+        "signal": "bearish",
+        "strength": 0.4,
+        "value": 46.0
+      },
+      {
+        "description": "VIX tres eleve (32) — forte crainte sur les marches TradFi",
+        "name": "VIX (TradFi)",
+        "signal": "bearish",
+        "strength": 0.56,
+        "value": 32.0
+      }
+    ],
+    "symbol": "BEAR"
+  },
+  "bull_crypto_fg15": {
+    "result": {
+      "confidence": 0.87,
+      "description": "Topping — RSI surchauffe, risque de retournement (36%), avec tendance haussiere.",
+      "dominant_regime": "top",
+      "probabilities": {
+        "bearish": 0.135,
+        "bottom": 0.18,
+        "bullish": 0.324,
+        "top": 0.361
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (59)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 58.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 408.734
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.68
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 2.04
+        },
+        {
+          "description": "Momentum haussier (+9.3%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.18,
+          "value": 9.3
+        },
+        {
+          "description": "Volatilite elevee (40%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.4,
+          "value": 40.0
+        },
+        {
+          "description": "Extreme Fear (15) — panique, opportunite d'achat potentielle",
+          "name": "Fear & Greed",
+          "signal": "bottom",
+          "strength": 0.5,
+          "value": 15.0
+        }
+      ],
+      "symbol": "BULL"
+    },
+    "six_phase": "topping"
+  },
+  "bull_crypto_fg85": {
+    "result": {
+      "confidence": 0.98,
+      "description": "Topping — RSI surchauffe, risque de retournement (46%), avec tendance haussiere.",
+      "dominant_regime": "top",
+      "probabilities": {
+        "bearish": 0.13,
+        "bottom": 0.083,
+        "bullish": 0.328,
+        "top": 0.458
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (59)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 58.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 408.734
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.68
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 2.04
+        },
+        {
+          "description": "Momentum haussier (+9.3%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.18,
+          "value": 9.3
+        },
+        {
+          "description": "Volatilite elevee (40%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.4,
+          "value": 40.0
+        },
+        {
+          "description": "Extreme Greed (85) — euphorie, risque de correction",
+          "name": "Fear & Greed",
+          "signal": "top",
+          "strength": 0.5,
+          "value": 85.0
+        }
+      ],
+      "symbol": "BULL"
+    },
+    "six_phase": "topping"
+  },
+  "bull_crypto_fgNone": {
+    "result": {
+      "confidence": 0.9,
+      "description": "Topping — RSI surchauffe, risque de retournement (43%), avec tendance haussiere.",
+      "dominant_regime": "top",
+      "probabilities": {
+        "bearish": 0.125,
+        "bottom": 0.089,
+        "bullish": 0.36,
+        "top": 0.426
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (59)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 58.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 408.734
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.68
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 2.04
+        },
+        {
+          "description": "Momentum haussier (+9.3%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.18,
+          "value": 9.3
+        },
+        {
+          "description": "Volatilite elevee (40%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.4,
+          "value": 40.0
+        }
+      ],
+      "symbol": "BULL"
+    },
+    "six_phase": "topping"
+  },
+  "bull_crypto_multi": {
+    "daily": {
+      "confidence": 0.93,
+      "description": "Topping — RSI surchauffe, risque de retournement (41%), avec tendance haussiere.",
+      "dominant_regime": "top",
+      "probabilities": {
+        "bearish": 0.127,
+        "bottom": 0.096,
+        "bullish": 0.368,
+        "top": 0.409
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (59)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 58.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 408.734
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.68
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 2.04
+        },
+        {
+          "description": "Momentum haussier (+9.3%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.18,
+          "value": 9.3
+        },
+        {
+          "description": "Volatilite elevee (40%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.4,
+          "value": 40.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "BULL"
+    },
+    "note": "Divergence: regime journalier = top, regime hebdomadaire = bullish. Prudence recommandee.",
+    "timeframe_alignment": "divergent",
+    "weekly": {
+      "confidence": 0.82,
+      "description": "Mark-up — cassure de resistance, volume croissant (54%), avec signes de distribution.",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.087,
+        "bottom": 0.096,
+        "bullish": 0.537,
+        "top": 0.28
+      },
+      "signals": [
+        {
+          "description": "RSI haussier (73)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.5,
+          "value": 72.9
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.55,
+          "value": 0.83
+        },
+        {
+          "description": "MA courte au-dessus de la MA longue (+26.7%)",
+          "name": "MA Cross (SMA7/SMA20)",
+          "signal": "bullish",
+          "strength": 0.59,
+          "value": 26.7
+        },
+        {
+          "description": "Momentum haussier (+50.1%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.28,
+          "value": 50.1
+        },
+        {
+          "description": "Volatilite extreme (155%) avec prix en haut de range — instabilite",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.68,
+          "value": 155.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "BULL_weekly"
+    }
+  },
+  "bull_crypto_vix": {
+    "confidence": 0.9,
+    "description": "Topping — RSI surchauffe, risque de retournement (37%), avec tendance haussiere.",
+    "dominant_regime": "top",
+    "probabilities": {
+      "bearish": 0.222,
+      "bottom": 0.102,
+      "bullish": 0.306,
+      "top": 0.37
+    },
+    "signals": [
+      {
+        "description": "RSI neutre (59)",
+        "name": "RSI 14",
+        "signal": "bullish",
+        "strength": 0.15,
+        "value": 58.8
+      },
+      {
+        "description": "MACD positif mais ralentit — possible sommet",
+        "name": "MACD",
+        "signal": "top",
+        "strength": 0.95,
+        "value": 408.734
+      },
+      {
+        "description": "Prix dans la partie haute des bandes de Bollinger",
+        "name": "Bollinger Bands",
+        "signal": "bullish",
+        "strength": 0.3,
+        "value": 0.68
+      },
+      {
+        "description": "MA courte legerement au-dessus de la MA longue",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bullish",
+        "strength": 0.3,
+        "value": 2.04
+      },
+      {
+        "description": "Momentum haussier (+9.3%)",
+        "name": "Momentum 14j",
+        "signal": "bullish",
+        "strength": 0.18,
+        "value": 9.3
+      },
+      {
+        "description": "Volatilite elevee (40%) — marche incertain",
+        "name": "Volatilite 14j",
+        "signal": "top",
+        "strength": 0.4,
+        "value": 40.0
+      },
+      {
+        "description": "VIX tres eleve (32) — forte crainte sur les marches TradFi",
+        "name": "VIX (TradFi)",
+        "signal": "bearish",
+        "strength": 0.56,
+        "value": 32.0
+      }
+    ],
+    "symbol": "BULL"
+  },
+  "calm_real_estate_fg15": {
+    "result": {
+      "confidence": 0.87,
+      "description": "Mark-up — cassure de resistance, volume croissant (36%), avec signes de distribution.",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.17,
+        "bottom": 0.186,
+        "bullish": 0.361,
+        "top": 0.283
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (69)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 68.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 2.3934
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.62,
+          "value": 0.92
+        },
+        {
+          "description": "MA courte legerement sous la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.3,
+          "value": -4.73
+        },
+        {
+          "description": "Momentum haussier (+13.4%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.48,
+          "value": 13.4
+        },
+        {
+          "description": "Volatilite moderee (14%) — marche stable",
+          "name": "Volatilite 14j",
+          "signal": "bullish",
+          "strength": 0.1,
+          "value": 14.0
+        },
+        {
+          "description": "Extreme Fear (15) — panique, opportunite d'achat potentielle",
+          "name": "Fear & Greed",
+          "signal": "bottom",
+          "strength": 0.5,
+          "value": 15.0
+        }
+      ],
+      "symbol": "CALM"
+    },
+    "six_phase": "markup"
+  },
+  "calm_real_estate_fg85": {
+    "result": {
+      "confidence": 0.92,
+      "description": "Topping — RSI surchauffe, risque de retournement (37%), avec tendance haussiere.",
+      "dominant_regime": "top",
+      "probabilities": {
+        "bearish": 0.166,
+        "bottom": 0.097,
+        "bullish": 0.365,
+        "top": 0.372
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (69)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 68.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 2.3934
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.62,
+          "value": 0.92
+        },
+        {
+          "description": "MA courte legerement sous la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.3,
+          "value": -4.73
+        },
+        {
+          "description": "Momentum haussier (+13.4%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.48,
+          "value": 13.4
+        },
+        {
+          "description": "Volatilite moderee (14%) — marche stable",
+          "name": "Volatilite 14j",
+          "signal": "bullish",
+          "strength": 0.1,
+          "value": 14.0
+        },
+        {
+          "description": "Extreme Greed (85) — euphorie, risque de correction",
+          "name": "Fear & Greed",
+          "signal": "top",
+          "strength": 0.5,
+          "value": 85.0
+        }
+      ],
+      "symbol": "CALM"
+    },
+    "six_phase": "topping"
+  },
+  "calm_real_estate_fgNone": {
+    "result": {
+      "confidence": 0.88,
+      "description": "Mark-up — cassure de resistance, volume croissant (40%), avec signes de distribution.",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.167,
+        "bottom": 0.105,
+        "bullish": 0.4,
+        "top": 0.328
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (69)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 68.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 2.3934
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.62,
+          "value": 0.92
+        },
+        {
+          "description": "MA courte legerement sous la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.3,
+          "value": -4.73
+        },
+        {
+          "description": "Momentum haussier (+13.4%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.48,
+          "value": 13.4
+        },
+        {
+          "description": "Volatilite moderee (14%) — marche stable",
+          "name": "Volatilite 14j",
+          "signal": "bullish",
+          "strength": 0.1,
+          "value": 14.0
+        }
+      ],
+      "symbol": "CALM"
+    },
+    "six_phase": "markup"
+  },
+  "calm_real_estate_multi": {
+    "daily": {
+      "confidence": 0.93,
+      "description": "Mark-up — cassure de resistance, volume croissant (40%), avec signes de distribution.",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.165,
+        "bottom": 0.11,
+        "bullish": 0.405,
+        "top": 0.32
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (69)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 68.8
+        },
+        {
+          "description": "MACD positif mais ralentit — possible sommet",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.95,
+          "value": 2.3934
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.62,
+          "value": 0.92
+        },
+        {
+          "description": "MA courte legerement sous la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bearish",
+          "strength": 0.3,
+          "value": -4.73
+        },
+        {
+          "description": "Momentum haussier (+13.4%)",
+          "name": "Momentum 14j",
+          "signal": "bullish",
+          "strength": 0.48,
+          "value": 13.4
+        },
+        {
+          "description": "Volatilite moderee (14%) — marche stable",
+          "name": "Volatilite 14j",
+          "signal": "bullish",
+          "strength": 0.1,
+          "value": 14.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "CALM"
+    },
+    "note": "Les timeframes journalier et hebdomadaire convergent: bullish.",
+    "timeframe_alignment": "aligned",
+    "weekly": {
+      "confidence": 0.72,
+      "description": "Mark-up — cassure de resistance, volume croissant (38%), avec signes de distribution.",
+      "dominant_regime": "bullish",
+      "probabilities": {
+        "bearish": 0.171,
+        "bottom": 0.109,
+        "bullish": 0.375,
+        "top": 0.345
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (57)",
+          "name": "RSI 14",
+          "signal": "bullish",
+          "strength": 0.15,
+          "value": 57.3
+        },
+        {
+          "description": "Prix dans la partie haute des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bullish",
+          "strength": 0.34,
+          "value": 0.68
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA7/SMA20)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 1.18
+        },
+        {
+          "description": "Momentum neutre (-0.1%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.2,
+          "value": -0.1
+        },
+        {
+          "description": "Volatilite extreme (74%) avec prix en haut de range — instabilite",
+          "name": "Volatilite 14j",
+          "signal": "top",
+          "strength": 0.8,
+          "value": 74.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "CALM_weekly"
+    }
+  },
+  "calm_real_estate_vix": {
+    "confidence": 0.89,
+    "description": "Mark-up — cassure de resistance, volume croissant (34%), avec signes de distribution.",
+    "dominant_regime": "bullish",
+    "probabilities": {
+      "bearish": 0.248,
+      "bottom": 0.116,
+      "bullish": 0.343,
+      "top": 0.293
+    },
+    "signals": [
+      {
+        "description": "RSI neutre (69)",
+        "name": "RSI 14",
+        "signal": "bullish",
+        "strength": 0.15,
+        "value": 68.8
+      },
+      {
+        "description": "MACD positif mais ralentit — possible sommet",
+        "name": "MACD",
+        "signal": "top",
+        "strength": 0.95,
+        "value": 2.3934
+      },
+      {
+        "description": "Prix dans la partie haute des bandes de Bollinger",
+        "name": "Bollinger Bands",
+        "signal": "bullish",
+        "strength": 0.62,
+        "value": 0.92
+      },
+      {
+        "description": "MA courte legerement sous la MA longue",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bearish",
+        "strength": 0.3,
+        "value": -4.73
+      },
+      {
+        "description": "Momentum haussier (+13.4%)",
+        "name": "Momentum 14j",
+        "signal": "bullish",
+        "strength": 0.48,
+        "value": 13.4
+      },
+      {
+        "description": "Volatilite moderee (14%) — marche stable",
+        "name": "Volatilite 14j",
+        "signal": "bullish",
+        "strength": 0.1,
+        "value": 14.0
+      },
+      {
+        "description": "VIX tres eleve (32) — forte crainte sur les marches TradFi",
+        "name": "VIX (TradFi)",
+        "signal": "bearish",
+        "strength": 0.56,
+        "value": 32.0
+      }
+    ],
+    "symbol": "CALM"
+  },
+  "range_etf_fg15": {
+    "result": {
+      "confidence": 0.83,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (31%), avec signes d'accumulation.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.313,
+        "bottom": 0.288,
+        "bullish": 0.182,
+        "top": 0.217
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (44)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 44.3
+        },
+        {
+          "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.69,
+          "value": -0.0399
+        },
+        {
+          "description": "Prix dans la partie basse des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.35,
+          "value": 0.28
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.14
+        },
+        {
+          "description": "Momentum fortement baissier (-3.6%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.5,
+          "value": -3.6
+        },
+        {
+          "description": "Volatilite extreme (30%) avec prix en bas de range — capitulation possible",
+          "name": "Volatilite 14j",
+          "signal": "bottom",
+          "strength": 0.52,
+          "value": 30.0
+        },
+        {
+          "description": "Extreme Fear (15) — panique, opportunite d'achat potentielle",
+          "name": "Fear & Greed",
+          "signal": "bottom",
+          "strength": 0.5,
+          "value": 15.0
+        }
+      ],
+      "symbol": "RANGE"
+    },
+    "six_phase": "markdown"
+  },
+  "range_etf_fg85": {
+    "result": {
+      "confidence": 0.83,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (31%), avec signes de distribution.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.308,
+        "bottom": 0.197,
+        "bullish": 0.187,
+        "top": 0.308
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (44)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 44.3
+        },
+        {
+          "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.69,
+          "value": -0.0399
+        },
+        {
+          "description": "Prix dans la partie basse des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.35,
+          "value": 0.28
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.14
+        },
+        {
+          "description": "Momentum fortement baissier (-3.6%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.5,
+          "value": -3.6
+        },
+        {
+          "description": "Volatilite extreme (30%) avec prix en bas de range — capitulation possible",
+          "name": "Volatilite 14j",
+          "signal": "bottom",
+          "strength": 0.52,
+          "value": 30.0
+        },
+        {
+          "description": "Extreme Greed (85) — euphorie, risque de correction",
+          "name": "Fear & Greed",
+          "signal": "top",
+          "strength": 0.5,
+          "value": 85.0
+        }
+      ],
+      "symbol": "RANGE"
+    },
+    "six_phase": "markdown"
+  },
+  "range_etf_fgNone": {
+    "result": {
+      "confidence": 0.79,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (34%).",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.338,
+        "bottom": 0.225,
+        "bullish": 0.187,
+        "top": 0.249
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (44)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 44.3
+        },
+        {
+          "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.69,
+          "value": -0.0399
+        },
+        {
+          "description": "Prix dans la partie basse des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.35,
+          "value": 0.28
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.14
+        },
+        {
+          "description": "Momentum fortement baissier (-3.6%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.5,
+          "value": -3.6
+        },
+        {
+          "description": "Volatilite extreme (30%) avec prix en bas de range — capitulation possible",
+          "name": "Volatilite 14j",
+          "signal": "bottom",
+          "strength": 0.52,
+          "value": 30.0
+        }
+      ],
+      "symbol": "RANGE"
+    },
+    "six_phase": "markdown"
+  },
+  "range_etf_multi": {
+    "daily": {
+      "confidence": 0.82,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (32%).",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.325,
+        "bottom": 0.222,
+        "bullish": 0.207,
+        "top": 0.246
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (44)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 44.3
+        },
+        {
+          "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+          "name": "MACD",
+          "signal": "top",
+          "strength": 0.69,
+          "value": -0.0399
+        },
+        {
+          "description": "Prix dans la partie basse des bandes de Bollinger",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.35,
+          "value": 0.28
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA20/SMA50)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 0.14
+        },
+        {
+          "description": "Momentum fortement baissier (-3.6%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.5,
+          "value": -3.6
+        },
+        {
+          "description": "Volatilite extreme (30%) avec prix en bas de range — capitulation possible",
+          "name": "Volatilite 14j",
+          "signal": "bottom",
+          "strength": 0.52,
+          "value": 30.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "RANGE"
+    },
+    "note": "Les timeframes journalier et hebdomadaire convergent: bearish.",
+    "timeframe_alignment": "aligned",
+    "weekly": {
+      "confidence": 0.73,
+      "description": "Markdown — structure de prix descendante (Lower Highs) (43%), avec tendance haussiere.",
+      "dominant_regime": "bearish",
+      "probabilities": {
+        "bearish": 0.429,
+        "bottom": 0.166,
+        "bullish": 0.254,
+        "top": 0.152
+      },
+      "signals": [
+        {
+          "description": "RSI neutre (49)",
+          "name": "RSI 14",
+          "signal": "bearish",
+          "strength": 0.15,
+          "value": 49.3
+        },
+        {
+          "description": "Prix au milieu des bandes de Bollinger — neutre",
+          "name": "Bollinger Bands",
+          "signal": "bearish",
+          "strength": 0.1,
+          "value": 0.42
+        },
+        {
+          "description": "MA courte legerement au-dessus de la MA longue",
+          "name": "MA Cross (SMA7/SMA20)",
+          "signal": "bullish",
+          "strength": 0.3,
+          "value": 1.23
+        },
+        {
+          "description": "Momentum baissier (-1.0%)",
+          "name": "Momentum 14j",
+          "signal": "bearish",
+          "strength": 0.25,
+          "value": -1.0
+        },
+        {
+          "description": "Volatilite elevee (36%) — marche incertain",
+          "name": "Volatilite 14j",
+          "signal": "bearish",
+          "strength": 0.4,
+          "value": 36.0
+        },
+        {
+          "description": "Neutre (50)",
+          "name": "Fear & Greed",
+          "signal": "bullish",
+          "strength": 0.11,
+          "value": 50.0
+        }
+      ],
+      "symbol": "RANGE_weekly"
+    }
+  },
+  "range_etf_vix": {
+    "confidence": 0.89,
+    "description": "Markdown — structure de prix descendante (Lower Highs) (39%).",
+    "dominant_regime": "bearish",
+    "probabilities": {
+      "bearish": 0.393,
+      "bottom": 0.216,
+      "bullish": 0.165,
+      "top": 0.226
+    },
+    "signals": [
+      {
+        "description": "RSI neutre (44)",
+        "name": "RSI 14",
+        "signal": "bearish",
+        "strength": 0.15,
+        "value": 44.3
+      },
+      {
+        "description": "MACD positif mais histogram negatif — fin de tendance haussiere",
+        "name": "MACD",
+        "signal": "top",
+        "strength": 0.69,
+        "value": -0.0399
+      },
+      {
+        "description": "Prix dans la partie basse des bandes de Bollinger",
+        "name": "Bollinger Bands",
+        "signal": "bearish",
+        "strength": 0.35,
+        "value": 0.28
+      },
+      {
+        "description": "MA courte legerement au-dessus de la MA longue",
+        "name": "MA Cross (SMA20/SMA50)",
+        "signal": "bullish",
+        "strength": 0.3,
+        "value": 0.14
+      },
+      {
+        "description": "Momentum fortement baissier (-3.6%)",
+        "name": "Momentum 14j",
+        "signal": "bearish",
+        "strength": 0.5,
+        "value": -3.6
+      },
+      {
+        "description": "Volatilite extreme (30%) avec prix en bas de range — capitulation possible",
+        "name": "Volatilite 14j",
+        "signal": "bottom",
+        "strength": 0.52,
+        "value": 30.0
+      },
+      {
+        "description": "VIX tres eleve (32) — forte crainte sur les marches TradFi",
+        "name": "VIX (TradFi)",
+        "signal": "bearish",
+        "strength": 0.56,
+        "value": 32.0
+      }
+    ],
+    "symbol": "RANGE"
+  },
+  "short": {
+    "confidence": 0.0,
+    "description": "Indicateurs insuffisants.",
+    "dominant_regime": "unknown",
+    "probabilities": {
+      "bearish": 0.25,
+      "bottom": 0.25,
+      "bullish": 0.25,
+      "top": 0.25
+    },
+    "signals": [],
+    "symbol": "SHORT"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "prophet": {
+    "changepoint_prior_scale": 0.0302853,
+    "seasonality_mode": "additive"
+  },
+  "xgboost": {
+    "colsample_bytree": 0.769462,
+    "learning_rate": 0.0776881,
+    "max_depth": 7,
+    "n_estimators": 187,
+    "subsample": 0.817953
+  },
+  "xgboost_short": {
+    "learning_rate": 0.1,
+    "max_depth": 4,
+    "n_estimators": 100
+  }
+}

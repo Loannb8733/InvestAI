@@ -1,0 +1,806 @@
+{
+  "bear_stock": {
+    "anomaly_price_threshold": 45.2688,
+    "anomaly_zscore_threshold": 2.60267,
+    "bearish_drift_factor": 0.00550995,
+    "bollinger_thresholds": [
+      0.951321,
+      0.664151,
+      0.335849,
+      0.0486792
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 1.5,
+        "strong": 2.9
+      },
+      "volatility": {
+        "extreme": 49.0,
+        "high": 43.2,
+        "low": 25.9
+      }
+    },
+    "ci_floor": [
+      0.0264575,
+      0.0547723,
+      0.0948683
+    ],
+    "ci_widening_factor": [
+      0.0320755,
+      0.0320755,
+      0.0692453,
+      0.101321,
+      0.0692453,
+      0.101321,
+      0.0320755,
+      0.0320755
+    ],
+    "concentration_thresholds": [
+      0.25,
+      0.4
+    ],
+    "confidence_weights": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "correlation_thresholds": [
+      0.7,
+      -0.3
+    ],
+    "cycle_position": [
+      50.0,
+      38.9
+    ],
+    "fear_greed_thresholds": [
+      70.0,
+      52.5,
+      47.5,
+      30.0
+    ],
+    "ma_cross_significance": 12.3206,
+    "macd_signal_scaling": 18.149,
+    "momentum_thresholds": [
+      9.50522,
+      2.85157,
+      -4.45145,
+      -14.8382
+    ],
+    "phase_spillover_weights": {
+      "adjacent": 0.164,
+      "diagonal": 0.214,
+      "opposite": 0.08
+    },
+    "regime_adjustment_factor": [
+      0.218805,
+      0.218805,
+      0.481372,
+      0.481372,
+      0.437611,
+      0.437611,
+      0.350089,
+      0.350089
+    ],
+    "rsi_midpoints": [
+      56.2696,
+      36.4678
+    ],
+    "rsi_thresholds": [
+      62.5391,
+      22.9356
+    ],
+    "sharpe_classification": [
+      1.5,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "trend_significance_threshold": [
+      1.4578,
+      3.01792,
+      5.2272
+    ],
+    "trend_strength_scale": [
+      2.91559,
+      6.03585,
+      10.4544
+    ],
+    "var_warning_thresholds": [
+      0.1,
+      0.15
+    ],
+    "volatility_regime_thresholds": [
+      48.9879,
+      43.1546
+    ],
+    "volatility_warning_thresholds": [
+      39.1903,
+      63.6843
+    ]
+  },
+  "bull_crypto": {
+    "anomaly_price_threshold": 35.3622,
+    "anomaly_zscore_threshold": 2.5,
+    "bearish_drift_factor": 0.00430415,
+    "bollinger_thresholds": [
+      0.957358,
+      0.671698,
+      0.328302,
+      0.0426415
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 1.1,
+        "strong": 2.3
+      },
+      "volatility": {
+        "extreme": 46.0,
+        "high": 37.9,
+        "low": 22.7
+      }
+    },
+    "ci_floor": [
+      0.0793725,
+      0.164317,
+      0.284605
+    ],
+    "ci_widening_factor": [
+      0.0358491,
+      0.0358491,
+      0.0715094,
+      0.107358,
+      0.0715094,
+      0.107358,
+      0.0358491,
+      0.0358491
+    ],
+    "concentration_thresholds": [
+      0.25,
+      0.4
+    ],
+    "confidence_weights": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "correlation_thresholds": [
+      0.7,
+      -0.3
+    ],
+    "cycle_position": [
+      50.0,
+      38.9
+    ],
+    "fear_greed_thresholds": [
+      70.0,
+      52.5,
+      47.5,
+      30.0
+    ],
+    "ma_cross_significance": 9.62437,
+    "macd_signal_scaling": 23.2334,
+    "momentum_thresholds": [
+      25.1295,
+      7.53884,
+      -2.35031,
+      -7.83436
+    ],
+    "phase_spillover_weights": {
+      "adjacent": 0.172,
+      "diagonal": 0.222,
+      "opposite": 0.085
+    },
+    "regime_adjustment_factor": [
+      0.180808,
+      0.180808,
+      0.397778,
+      0.397778,
+      0.361617,
+      0.361617,
+      0.289293,
+      0.289293
+    ],
+    "rsi_midpoints": [
+      70.92,
+      39.5408
+    ],
+    "rsi_thresholds": [
+      91.84,
+      29.0816
+    ],
+    "sharpe_classification": [
+      1.5,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "trend_significance_threshold": [
+      1.13877,
+      2.35748,
+      4.08327
+    ],
+    "trend_strength_scale": [
+      2.27754,
+      4.71496,
+      8.16655
+    ],
+    "var_warning_thresholds": [
+      0.1,
+      0.15
+    ],
+    "volatility_regime_thresholds": [
+      46.0097,
+      37.8778
+    ],
+    "volatility_warning_thresholds": [
+      36.8078,
+      59.8126
+    ]
+  },
+  "calm_real_estate": {
+    "anomaly_price_threshold": 19.5576,
+    "anomaly_zscore_threshold": 2.5,
+    "bearish_drift_factor": 0.00238047,
+    "bollinger_thresholds": [
+      0.975472,
+      0.69434,
+      0.30566,
+      0.0245283
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.6,
+        "strong": 1.3
+      },
+      "volatility": {
+        "extreme": 18.1,
+        "high": 15.4,
+        "low": 9.2
+      }
+    },
+    "ci_floor": [
+      0.0396863,
+      0.0821584,
+      0.142302
+    ],
+    "ci_widening_factor": [
+      0.0471698,
+      0.0471698,
+      0.0783019,
+      0.125472,
+      0.0783019,
+      0.125472,
+      0.0471698,
+      0.0471698
+    ],
+    "concentration_thresholds": [
+      0.25,
+      0.4
+    ],
+    "confidence_weights": [
+      0.35,
+      0.4,
+      0.25
+    ],
+    "correlation_thresholds": [
+      0.8,
+      -0.25
+    ],
+    "cycle_position": [
+      50.0,
+      38.9
+    ],
+    "fear_greed_thresholds": [
+      70.0,
+      52.5,
+      47.5,
+      30.0
+    ],
+    "ma_cross_significance": 5.32289,
+    "macd_signal_scaling": 42.0085,
+    "momentum_thresholds": [
+      13.921,
+      4.17631,
+      -3.09443,
+      -10.3148
+    ],
+    "phase_spillover_weights": {
+      "adjacent": 0.194,
+      "diagonal": 0.244,
+      "opposite": 0.101
+    },
+    "regime_adjustment_factor": [
+      0.142421,
+      0.142421,
+      0.313326,
+      0.313326,
+      0.284842,
+      0.284842,
+      0.227874,
+      0.227874
+    ],
+    "rsi_midpoints": [
+      73.3899,
+      26.9362
+    ],
+    "rsi_thresholds": [
+      96.7798,
+      3.87248
+    ],
+    "sharpe_classification": [
+      1.5,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "trend_significance_threshold": [
+      0.629813,
+      1.30384,
+      2.25831
+    ],
+    "trend_strength_scale": [
+      1.25963,
+      2.60767,
+      4.51662
+    ],
+    "var_warning_thresholds": [
+      0.1,
+      0.15
+    ],
+    "volatility_regime_thresholds": [
+      18.0915,
+      15.3516
+    ],
+    "volatility_warning_thresholds": [
+      20.0,
+      40.0
+    ]
+  },
+  "fear_greed_none": {
+    "anomaly_price_threshold": 35.3622,
+    "anomaly_zscore_threshold": 2.5,
+    "bearish_drift_factor": 0.00430415,
+    "bollinger_thresholds": [
+      0.957358,
+      0.671698,
+      0.328302,
+      0.0426415
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 1.1,
+        "strong": 2.3
+      },
+      "volatility": {
+        "extreme": 46.0,
+        "high": 37.9,
+        "low": 22.7
+      }
+    },
+    "ci_floor": [
+      0.0793725,
+      0.164317,
+      0.284605
+    ],
+    "ci_widening_factor": [
+      0.0358491,
+      0.0358491,
+      0.0715094,
+      0.107358,
+      0.0715094,
+      0.107358,
+      0.0358491,
+      0.0358491
+    ],
+    "concentration_thresholds": [
+      0.25,
+      0.4
+    ],
+    "confidence_weights": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "correlation_thresholds": [
+      0.7,
+      -0.3
+    ],
+    "cycle_position": [
+      50.0,
+      39.9
+    ],
+    "fear_greed_thresholds": [
+      70.0,
+      52.5,
+      47.5,
+      30.0
+    ],
+    "ma_cross_significance": 9.62437,
+    "macd_signal_scaling": 23.2334,
+    "momentum_thresholds": [
+      25.1295,
+      7.53884,
+      -2.35031,
+      -7.83436
+    ],
+    "phase_spillover_weights": {
+      "adjacent": 0.172,
+      "diagonal": 0.222,
+      "opposite": 0.085
+    },
+    "regime_adjustment_factor": [
+      0.180808,
+      0.180808,
+      0.397778,
+      0.397778,
+      0.361617,
+      0.361617,
+      0.289293,
+      0.289293
+    ],
+    "rsi_midpoints": [
+      70.92,
+      39.5408
+    ],
+    "rsi_thresholds": [
+      91.84,
+      29.0816
+    ],
+    "sharpe_classification": [
+      1.5,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "trend_significance_threshold": [
+      1.13877,
+      2.35748,
+      4.08327
+    ],
+    "trend_strength_scale": [
+      2.27754,
+      4.71496,
+      8.16655
+    ],
+    "var_warning_thresholds": [
+      0.1,
+      0.15
+    ],
+    "volatility_regime_thresholds": [
+      46.0097,
+      37.8778
+    ],
+    "volatility_warning_thresholds": [
+      36.8078,
+      59.8126
+    ]
+  },
+  "range_etf": {
+    "anomaly_price_threshold": 28.2858,
+    "anomaly_zscore_threshold": 2.54717,
+    "bearish_drift_factor": 0.00344284,
+    "bollinger_thresholds": [
+      0.966415,
+      0.683019,
+      0.316981,
+      0.0335849
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 30,
+        "extreme_greed": 70,
+        "fear": 48,
+        "greed": 52
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 0.9,
+        "strong": 1.8
+      },
+      "volatility": {
+        "extreme": 28.8,
+        "high": 25.0,
+        "low": 15.0
+      }
+    },
+    "ci_floor": [
+      0.021166,
+      0.0438178,
+      0.0758947
+    ],
+    "ci_widening_factor": [
+      0.0415094,
+      0.0415094,
+      0.0749057,
+      0.116415,
+      0.0749057,
+      0.116415,
+      0.0415094,
+      0.0415094
+    ],
+    "concentration_thresholds": [
+      0.25,
+      0.4
+    ],
+    "confidence_weights": [
+      0.35,
+      0.4,
+      0.25
+    ],
+    "correlation_thresholds": [
+      0.8,
+      -0.25
+    ],
+    "cycle_position": [
+      50.0,
+      38.9
+    ],
+    "fear_greed_thresholds": [
+      70.0,
+      52.5,
+      47.5,
+      30.0
+    ],
+    "ma_cross_significance": 7.69842,
+    "macd_signal_scaling": 29.0458,
+    "momentum_thresholds": [
+      4.43828,
+      1.33149,
+      -1.06084,
+      -3.53612
+    ],
+    "phase_spillover_weights": {
+      "adjacent": 0.183,
+      "diagonal": 0.233,
+      "opposite": 0.093
+    },
+    "regime_adjustment_factor": [
+      0.218553,
+      0.218553,
+      0.480817,
+      0.480817,
+      0.437106,
+      0.437106,
+      0.349685,
+      0.349685
+    ],
+    "rsi_midpoints": [
+      55.2971,
+      44.2363
+    ],
+    "rsi_thresholds": [
+      60.5942,
+      38.4726
+    ],
+    "sharpe_classification": [
+      1.5,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "trend_significance_threshold": [
+      0.910889,
+      1.88572,
+      3.26616
+    ],
+    "trend_strength_scale": [
+      1.82178,
+      3.77144,
+      6.53232
+    ],
+    "var_warning_thresholds": [
+      0.1,
+      0.15
+    ],
+    "volatility_regime_thresholds": [
+      28.8199,
+      24.9986
+    ],
+    "volatility_warning_thresholds": [
+      23.0559,
+      40.0
+    ]
+  },
+  "without_context": {
+    "beta_classification": [
+      "inverse",
+      "very_defensive",
+      "neutral",
+      "aggressive",
+      "very_aggressive",
+      "very_aggressive"
+    ],
+    "build_display_thresholds": {
+      "beta": {
+        "high": 1.0,
+        "low": 0.5
+      },
+      "correlation": {
+        "moderate_negative": -0.3,
+        "moderate_positive": 0.4,
+        "strong_negative": -0.5,
+        "strong_positive": 0.7
+      },
+      "diversification": {
+        "good": 60,
+        "poor": 40
+      },
+      "fear_greed": {
+        "extreme_fear": 25,
+        "extreme_greed": 75,
+        "fear": 45,
+        "greed": 55
+      },
+      "prediction_score": {
+        "good": 70,
+        "poor": 45
+      },
+      "sharpe": {
+        "excellent": 1.5,
+        "fair": 0.5,
+        "good": 1.0,
+        "neutral": 0.0
+      },
+      "trend_strength": {
+        "moderate": 2.0,
+        "strong": 4.0
+      },
+      "volatility": {
+        "extreme": 80,
+        "high": 50,
+        "low": 30.0
+      }
+    },
+    "correlation_thresholds": [
+      0.7,
+      -0.3
+    ],
+    "volatility_warning_thresholds": [
+      50.0,
+      80.0
+    ]
+  }
+}
