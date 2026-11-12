@@ -16,7 +16,7 @@ from app.domains.insights.schemas import (
     RegimeResultResponse,
     RiskClusterResponse,
 )
-from app.ml.regime_detector import MarketRegime, RegimeResult
+from app.ml.regime.types import MarketRegime, RegimeResult
 
 
 def _insight(insight: SmartInsight) -> InsightResponse:

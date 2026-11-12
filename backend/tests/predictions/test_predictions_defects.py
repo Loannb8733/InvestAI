@@ -1,3 +1,5 @@
+from functools import partial
+
 import pytest
 import time_machine
 from httpx import AsyncClient
@@ -7,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.predictions.models import PredictionLog
-from app.ml import forecaster as forecaster_module
-from app.ml.forecaster import PriceForecaster
+from app.ml.forecasting import cache as forecast_cache
+from app.ml.forecasting.cache import run_cached
+from app.ml.forecasting.ensemble import PriceForecaster
 from tests.forecaster_double import WEIGHTS
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
@@ -67,9 +70,9 @@ def test_a_failing_model_releases_its_compute_lock(monkeypatch: pytest.MonkeyPat
     def broken(*args: object, **kwargs: object) -> None:
         raise RuntimeError("model crashed")
 
-    monkeypatch.setattr(forecaster, "_run_model_by_name", broken)
+    monkeypatch.setattr(forecaster, "run_model", broken)
     with pytest.raises(RuntimeError):
-        forecaster._get_or_run_model("Prophet", "BTC", "hash", 7, [1.0, 2.0], [])
-    redis = forecaster_module._get_sync_redis()
+        run_cached("Prophet", "BTC", "hash", 7, partial(forecaster.run_model, "Prophet", [1.0, 2.0], [], 7))
+    redis = forecast_cache.sync_redis()
     assert redis is not None
     assert not redis.exists("computing:BTC:Prophet:hash:7")

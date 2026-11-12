@@ -13,7 +13,7 @@ from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.portfolio.models import AssetType
 from app.domains.predictions.recommendation import generate_recommendation
 from app.domains.predictions.service import prediction_service
-from app.ml.forecaster import ForecastResult
+from app.ml.forecasting.types import ForecastResult
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes")

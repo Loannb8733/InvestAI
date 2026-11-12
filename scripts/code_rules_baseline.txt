@@ -5,13 +5,6 @@ comments	backend/app/core/rate_limit.py
 comments	backend/app/core/redis_client.py
 comments	backend/app/core/sentry_scrub.py
 comments	backend/app/core/symbol_map.py
-comments	backend/app/ml/adaptive_thresholds.py
-comments	backend/app/ml/anomaly_detector.py
-comments	backend/app/ml/drift_detector.py
-comments	backend/app/ml/forecaster.py
-comments	backend/app/ml/hyperparameter_tuner.py
-comments	backend/app/ml/market_context.py
-comments	backend/app/ml/regime_detector.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/tasks/celery_app.py
 comments	frontend/src/App.tsx
@@ -140,9 +133,6 @@ comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
 too-long	backend/app/core/redis_client.py
-too-long	backend/app/ml/adaptive_thresholds.py
-too-long	backend/app/ml/forecaster.py
-too-long	backend/app/ml/regime_detector.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
 too-long	frontend/src/components/dashboard/IASummaryWidget.tsx
 too-long	frontend/src/components/exchanges/exchange-guides.ts

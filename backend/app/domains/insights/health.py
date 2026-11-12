@@ -28,7 +28,7 @@ from app.domains.insights.rules.regime import regime_insight
 from app.domains.insights.rules.risk import risk_insights
 from app.domains.insights.safe_haven import gold_exposure
 from app.domains.insights.score import overall_score
-from app.ml.regime_detector import MarketRegime
+from app.ml.regime.types import MarketRegime
 
 logger = logging.getLogger(__name__)
 

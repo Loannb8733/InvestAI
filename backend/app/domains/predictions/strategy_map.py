@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.domains.portfolio.classification import is_safe_haven
-from app.ml.regime_detector import RegimeConfig
+from app.ml.regime.types import RegimeConfig
 
 StrategyDecision = tuple[str, str, float]
 

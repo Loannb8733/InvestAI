@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.analytics.service import analytics_service
 from app.domains.insights.results import RebalancingOrder
-from app.ml.regime_detector import MarketRegime
+from app.ml.regime.types import MarketRegime
 
 logger = logging.getLogger(__name__)
 

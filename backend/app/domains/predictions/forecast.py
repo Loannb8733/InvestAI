@@ -29,7 +29,7 @@ from app.domains.predictions.prediction_log import log_prediction
 from app.domains.predictions.recommendation import generate_recommendation
 from app.domains.predictions.types import HISTORY_DAYS, ForecastPoint, PricePrediction
 from app.ml import adaptive_thresholds as at
-from app.ml.forecaster import ForecastResult
+from app.ml.forecasting.types import ForecastResult
 from app.ml.market_context import MarketContext, compute_market_context
 
 logger = logging.getLogger(__name__)

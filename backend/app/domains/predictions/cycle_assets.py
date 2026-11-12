@@ -9,7 +9,8 @@ from app.domains.portfolio.classification import is_safe_haven
 from app.domains.portfolio.models import Asset
 from app.ml import adaptive_thresholds as at
 from app.ml.market_context import MarketContext, compute_market_context
-from app.ml.regime_detector import MarketRegimeDetector, RegimeResult
+from app.ml.regime.detector import MarketRegimeDetector
+from app.ml.regime.types import RegimeResult
 
 logger = logging.getLogger(__name__)
 

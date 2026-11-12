@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from app.domains.insights.results import InsightCategory, InsightSeverity, SmartInsight
-from app.ml.regime_detector import RegimeResult
+from app.ml.regime.types import RegimeResult
 
 _MIN_PROBABILITY = 0.30
 _CONFIRMED_PROBABILITY = 0.55

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domains.alerts import regime
-from app.ml.regime_detector import RegimeConfig
+from app.ml.regime.types import RegimeConfig
 
 REGIMES = ("bearish", "markdown", "bottom", "accumulation", "markup", "bullish", "topping", "top")
 

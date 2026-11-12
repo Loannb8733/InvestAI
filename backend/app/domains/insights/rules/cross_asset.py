@@ -4,7 +4,7 @@ from typing import Any
 
 from app.domains.analytics.results import CorrelationData
 from app.domains.insights.results import InsightCategory, InsightSeverity, SmartInsight
-from app.ml.regime_detector import MarketRegime
+from app.ml.regime.types import MarketRegime
 
 _HIGH_BETA_CORRELATION = 0.60
 _HIGH_NASDAQ_CORRELATION = 0.70

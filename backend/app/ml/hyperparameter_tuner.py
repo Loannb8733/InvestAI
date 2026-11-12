@@ -1,14 +1,52 @@
-"""Hyperparameter tuning for ML models using Optuna."""
+"""Réglage des hyperparamètres d'XGBoost et de Prophet par Optuna."""
 
 import logging
+from datetime import datetime
+from typing import Any
 
 import numpy as np
 
+from app.ml.forecasting.features import build_features
+
 logger = logging.getLogger(__name__)
 
+XGBOOST_DEFAULTS = {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1}
+PROPHET_DEFAULTS = {"changepoint_prior_scale": 0.1}
+LOOKBACK = 7
+HORIZON = 7
 
-def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict:
-    """Tune XGBoost hyperparameters using Optuna with walk-forward validation."""
+
+def _split_errors(regressor: Any, params: dict[str, Any], arr: np.ndarray, split: int) -> list[float]:
+    rows = [build_features(arr[:split], i) for i in range(LOOKBACK + 14, split)]
+    if len(rows) < 10:
+        return []
+    model = regressor(**params, random_state=42, verbosity=0)
+    model.fit(np.array(rows), np.array([arr[i] for i in range(LOOKBACK + 14, split)]))
+    errors = []
+    extended = list(arr[:split])
+    for d in range(HORIZON):
+        if split + d >= len(arr):
+            break
+        pred = float(model.predict(np.array([build_features(np.array(extended), len(extended))]))[0])
+        actual = arr[split + d]
+        if actual > 0:
+            errors.append(abs(pred - actual) / actual)
+        extended.append(pred)
+    return errors
+
+
+def _walk_forward_mape(regressor: Any, params: dict[str, Any], arr: np.ndarray) -> float:
+    errors: list[float] = []
+    for split_pct in (0.6, 0.7, 0.8):
+        split = int(len(arr) * split_pct)
+        if split < 30 or split + HORIZON > len(arr):
+            continue
+        errors.extend(_split_errors(regressor, params, arr, split))
+    return float(np.mean(errors)) * 100 if errors else 100.0
+
+
+def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict[str, Any]:
+    """Hyperparamètres d'XGBoost minimisant l'erreur à 7 jours sur trois coupes successives ; défauts sous 40 cours."""
     try:
         import optuna
         from xgboost import XGBRegressor
@@ -16,78 +54,30 @@ def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict:
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
         logger.warning("Optuna not available, using defaults")
-        return {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1}
-
+        return dict(XGBOOST_DEFAULTS)
     arr = np.array(prices, dtype=float)
     if len(arr) < 40:
-        return {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1}
+        return dict(XGBOOST_DEFAULTS)
 
-    from app.ml.forecaster import PriceForecaster
-
-    def objective(trial):
-        n_estimators = trial.suggest_int("n_estimators", 50, 300)
-        max_depth = trial.suggest_int("max_depth", 2, 8)
-        learning_rate = trial.suggest_float("learning_rate", 0.01, 0.3, log=True)
-        subsample = trial.suggest_float("subsample", 0.6, 1.0)
-        colsample_bytree = trial.suggest_float("colsample_bytree", 0.6, 1.0)
-
-        # Walk-forward: train on [0:split], test on [split:split+7]
-        errors = []
-        for split_pct in [0.6, 0.7, 0.8]:
-            split = int(len(arr) * split_pct)
-            if split < 30 or split + 7 > len(arr):
-                continue
-
-            features, targets = [], []
-            lookback = 7
-            for i in range(lookback + 14, split):
-                row = PriceForecaster._build_features(arr[:split], i)
-                features.append(row)
-                targets.append(arr[i])
-
-            if len(features) < 10:
-                continue
-
-            X = np.array(features)
-            y_train = np.array(targets)
-
-            model = XGBRegressor(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                learning_rate=learning_rate,
-                subsample=subsample,
-                colsample_bytree=colsample_bytree,
-                random_state=42,
-                verbosity=0,
-            )
-            model.fit(X, y_train)
-
-            # Predict next 7 days iteratively
-            extended = list(arr[:split])
-            for d in range(7):
-                if split + d >= len(arr):
-                    break
-                feat = PriceForecaster._build_features(np.array(extended), len(extended))
-                pred = float(model.predict(np.array([feat]))[0])
-                actual = arr[split + d]
-                if actual > 0:
-                    errors.append(abs(pred - actual) / actual)
-                extended.append(pred)
-
-        if not errors:
-            return 100.0
-        return float(np.mean(errors)) * 100  # MAPE
+    def objective(trial: Any) -> float:
+        params = {
+            "n_estimators": trial.suggest_int("n_estimators", 50, 300),
+            "max_depth": trial.suggest_int("max_depth", 2, 8),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+        }
+        return _walk_forward_mape(XGBRegressor, params, arr)
 
     study = optuna.create_study(direction="minimize")
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
-
-    best = study.best_params
+    best: dict[str, Any] = study.best_params
     logger.info("XGBoost tuning complete: MAPE=%.2f%%, params=%s", study.best_value, best)
     return best
 
 
-def tune_prophet(prices: list[float], dates: list, n_trials: int = 15) -> dict:
-    """Tune Prophet hyperparameters."""
+def tune_prophet(prices: list[float], dates: list[datetime], n_trials: int = 15) -> dict[str, Any]:
+    """Hyperparamètres de Prophet minimisant l'erreur sur les 7 derniers cours ; défauts sous 30 cours."""
     try:
         import optuna
         import pandas as pd
@@ -95,18 +85,14 @@ def tune_prophet(prices: list[float], dates: list, n_trials: int = 15) -> dict:
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
-        return {"changepoint_prior_scale": 0.1}
-
+        return dict(PROPHET_DEFAULTS)
     if len(prices) < 30:
-        return {"changepoint_prior_scale": 0.1}
+        return dict(PROPHET_DEFAULTS)
 
-    def objective(trial):
+    def objective(trial: Any) -> float:
         cps = trial.suggest_float("changepoint_prior_scale", 0.001, 0.5, log=True)
         seasonality_mode = trial.suggest_categorical("seasonality_mode", ["additive", "multiplicative"])
-
-        split = len(prices) - 7
-        train_df = pd.DataFrame({"ds": dates[:split], "y": prices[:split]})
-
+        split = len(prices) - HORIZON
         model = Prophet(
             daily_seasonality=False,
             weekly_seasonality=len(prices) >= 14,
@@ -114,25 +100,19 @@ def tune_prophet(prices: list[float], dates: list, n_trials: int = 15) -> dict:
             changepoint_prior_scale=cps,
             seasonality_mode=seasonality_mode,
             interval_width=0.95,
-            mcmc_samples=0,  # MAP estimation — fully deterministic
+            mcmc_samples=0,
         )
-        model.fit(train_df)
-        future = model.make_future_dataframe(periods=7)
-        fc = model.predict(future).tail(7)
-
-        errors = []
-        for i, pred in enumerate(fc["yhat"].values):
-            if split + i < len(prices) and prices[split + i] > 0:
-                errors.append(abs(pred - prices[split + i]) / prices[split + i])
-
+        model.fit(pd.DataFrame({"ds": dates[:split], "y": prices[:split]}))
+        fc = model.predict(model.make_future_dataframe(periods=HORIZON)).tail(HORIZON)
+        errors = [
+            abs(pred - prices[split + i]) / prices[split + i]
+            for i, pred in enumerate(fc["yhat"].values)
+            if split + i < len(prices) and prices[split + i] > 0
+        ]
         return float(np.mean(errors)) * 100 if errors else 100.0
 
     study = optuna.create_study(direction="minimize")
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
-
-    logger.info(
-        "Prophet tuning complete: MAPE=%.2f%%, params=%s",
-        study.best_value,
-        study.best_params,
-    )
-    return study.best_params
+    logger.info("Prophet tuning complete: MAPE=%.2f%%, params=%s", study.best_value, study.best_params)
+    best: dict[str, Any] = study.best_params
+    return best

@@ -12,7 +12,8 @@ import numpy as np
 import pytest
 
 from app.domains.predictions.strategy_map import STRATEGY_MATRIX
-from app.ml.regime_detector import MarketRegimeDetector, _ema, _rsi
+from app.ml.regime import indicators as regime_indicators
+from app.ml.regime.detector import MarketRegimeDetector
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ class TestBullMarketRegimeDetection:
     def test_ema20_slope_positive_in_bull(self):
         """Bull trend should produce positive EMA-20 slope."""
         prices = _generate_bull_prices(120)
-        ema_series = _ema(prices, 20)
+        ema_series = regime_indicators.ema(prices, 20)
         assert ema_series is not None and len(ema_series) >= 5
         slope = (ema_series[-1] - ema_series[-5]) / max(abs(ema_series[-5]), 1e-10)
         assert slope > 0.01, f"EMA-20 slope should be strongly positive in bull, got {slope:.4f}"
@@ -68,7 +69,7 @@ class TestBullMarketRegimeDetection:
     def test_rsi_in_bullish_range(self):
         """Bull trend RSI should be in the 50-70 range (bullish, not overbought)."""
         prices = _generate_bull_prices(120)
-        rsi = _rsi(prices)
+        rsi = regime_indicators.rsi(prices)
         assert rsi is not None
         assert 45 < rsi < 80, f"RSI should be in bullish range, got {rsi:.1f}"
 
@@ -150,7 +151,7 @@ class TestGoldBonusSuppressedInBull:
         Uses penalizing params so the score isn't capped at 100 (leaving room
         for the +10 gold bonus to be visible).
         """
-        from app.ml.regime_detector import MarketRegime, RegimeResult
+        from app.ml.regime.types import MarketRegime, RegimeResult
 
         regime_result = RegimeResult(
             symbol="BTC",
@@ -217,7 +218,7 @@ class TestRSIOverboughtTakesProfits:
     def test_overbought_prices_detected_as_top(self):
         """Price series with strong acceleration → RSI > 70 → top regime."""
         prices = _generate_overbought_prices(120)
-        rsi = _rsi(prices)
+        rsi = regime_indicators.rsi(prices)
         assert rsi is not None
         # RSI should be elevated (we're testing the general concept)
         assert rsi > 65, f"Overbought prices should have high RSI, got {rsi:.1f}"

@@ -93,7 +93,7 @@ async def _anomaly_note(db: AsyncSession, asset: Asset, price: float) -> str:
         )
         prices = [float(row[0]) for row in rows.all()]
         if len(prices) >= ANOMALY_MIN_PRICES:
-            anomaly = AnomalyDetector().detect(  # type: ignore[no-untyped-call]
+            anomaly = AnomalyDetector().detect(
                 symbol=asset.symbol,
                 prices=prices,
                 current_price=price,

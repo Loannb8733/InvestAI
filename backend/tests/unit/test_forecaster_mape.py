@@ -13,7 +13,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.ml.forecaster import ForecastResult, PriceForecaster, _ensemble_total_variance_ci, _ou_reversion_speed
+from app.ml.forecasting.confidence import ensemble_total_variance_ci
+from app.ml.forecasting.ensemble import PriceForecaster
+from app.ml.forecasting.models.simple import ou_reversion_speed
+from app.ml.forecasting.types import ForecastResult
+from app.ml.forecasting.weighting import compute_weights, single_window_weights
 
 
 class TestEnsembleTotalVarianceCi:
@@ -23,20 +27,20 @@ class TestEnsembleTotalVarianceCi:
     def test_agreeing_models_use_within_variance_only(self):
         # Both models: point 100, native half-width 1.96 (=> std 1). Between-model
         # variance is 0, within is 1 => total std 1 => 95% CI = 100 +/- 1.96.
-        lo, hi = _ensemble_total_variance_ci([100.0, 100.0], [1.96, 1.96], [0.5, 0.5], 100.0)
+        lo, hi = ensemble_total_variance_ci([100.0, 100.0], [1.96, 1.96], [0.5, 0.5], 100.0)
         assert lo == pytest.approx(98.04, abs=0.03)
         assert hi == pytest.approx(101.96, abs=0.03)
 
     def test_disagreeing_models_widen_via_between_variance(self):
         # Points 100 and 110 around mid 105 inject between-model dispersion, so the
         # ensemble interval is wider than any single model's native half-width.
-        lo, hi = _ensemble_total_variance_ci([100.0, 110.0], [1.96, 1.96], [0.5, 0.5], 105.0)
+        lo, hi = ensemble_total_variance_ci([100.0, 110.0], [1.96, 1.96], [0.5, 0.5], 105.0)
         assert (hi - lo) / 2 > 1.96
         assert lo < 105 < hi
 
     def test_zero_native_width_uses_point_dispersion_only(self):
         # No native intervals => CI driven purely by the spread of point forecasts.
-        lo, hi = _ensemble_total_variance_ci([100.0, 110.0], [0.0, 0.0], [0.5, 0.5], 105.0)
+        lo, hi = ensemble_total_variance_ci([100.0, 110.0], [0.0, 0.0], [0.5, 0.5], 105.0)
         assert hi > lo
         assert lo < 105 < hi
 
@@ -51,19 +55,19 @@ class TestOuReversionSpeed:
 
     def test_unit_root_gives_no_reversion(self):
         # phi >= 0.98 -> theta 0 -> the OU forecast stays flat (random walk).
-        assert _ou_reversion_speed(1.05) == 0.0
-        assert _ou_reversion_speed(1.0) == 0.0
-        assert _ou_reversion_speed(0.99) == 0.0
-        assert _ou_reversion_speed(0.98) == 0.0
+        assert ou_reversion_speed(1.05) == 0.0
+        assert ou_reversion_speed(1.0) == 0.0
+        assert ou_reversion_speed(0.99) == 0.0
+        assert ou_reversion_speed(0.98) == 0.0
 
     def test_genuinely_reverting_series_keeps_speed(self):
         # A clearly stationary phi still reverts.
-        assert _ou_reversion_speed(0.90) == pytest.approx(0.1053605, rel=1e-4)  # -ln(0.9)
+        assert ou_reversion_speed(0.90) == pytest.approx(0.1053605, rel=1e-4)  # -ln(0.9)
 
     def test_tiny_phi_is_floored(self):
         # phi below the floor is clamped to 0.01 (finite, positive theta), not 0/neg.
-        assert _ou_reversion_speed(-0.5) == pytest.approx(4.60517, rel=1e-4)  # -ln(0.01)
-        assert _ou_reversion_speed(0.0) == pytest.approx(4.60517, rel=1e-4)
+        assert ou_reversion_speed(-0.5) == pytest.approx(4.60517, rel=1e-4)  # -ln(0.01)
+        assert ou_reversion_speed(0.0) == pytest.approx(4.60517, rel=1e-4)
 
 
 def _fr(prices):
@@ -98,8 +102,10 @@ def test_compute_weights_single_returns_real_mapes():
 
     from unittest.mock import patch
 
-    with patch.object(f, "_run_model_by_name", side_effect=fake_run):
-        weights, mapes = f._compute_weights_single(prices, dates, [("perfect", None), ("off10", None)], split=split)
+    with patch.object(f, "run_model", side_effect=fake_run):
+        weights, mapes = single_window_weights(
+            prices, dates, [("perfect", None), ("off10", None)], f.run_model, split=split
+        )
 
     assert len(mapes) == 2
     assert mapes[0] == pytest.approx(0.1, abs=0.05)  # ~0, floored to 0.1
@@ -121,8 +127,8 @@ def test_compute_weights_surfaces_per_model_mape():
 
     from unittest.mock import patch
 
-    with patch.object(f, "_run_model_by_name", side_effect=fake_run):
-        weights, ci_cal, mapes = f._compute_weights(prices, dates, [("perfect", None), ("off10", None)])
+    with patch.object(f, "run_model", side_effect=fake_run):
+        weights, ci_cal, mapes = compute_weights(prices, dates, [("perfect", None), ("off10", None)], f.run_model)
 
     assert len(weights) == 2
     assert len(mapes) == 2
