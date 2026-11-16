@@ -91,6 +91,7 @@ def _asset_entry(asset: Asset, prediction: PricePrediction) -> dict[str, Any]:
         "model_confidence": _model_confidence(reliability_score),
         "models_agree": models_agree,
         "models_detail": models_detail,
+        "skipped_models": prediction.skipped_models or [],
         "explanations": prediction.explanations or [],
         "regime_info": prediction.regime_info,
         "display_thresholds": prediction.display_thresholds,

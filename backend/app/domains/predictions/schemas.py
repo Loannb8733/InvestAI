@@ -54,6 +54,13 @@ class ModelDetail(BaseModel):
     mape: float | None = None
 
 
+class SkippedModel(BaseModel):
+    """Modèle écarté de l'ensemble et pourquoi (non installé, historique trop court, erreur, prévision aberrante)."""
+
+    name: str
+    reason: str
+
+
 class FeatureExplanation(BaseModel):
     feature_name: str
     importance: float
@@ -84,6 +91,7 @@ class PortfolioAssetPrediction(BaseModel):
     model_confidence: str = "uncertain"
     models_agree: bool = True
     models_detail: list[ModelDetail] | None = None
+    skipped_models: list[SkippedModel] = Field(default_factory=list)
     explanations: list[FeatureExplanation] = Field(default_factory=list)
     regime_info: RegimeInfo | None = None
 

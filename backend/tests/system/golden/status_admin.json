@@ -55,7 +55,7 @@
         "name": "run-daily-predictions",
         "next_run_at": null,
         "running": false,
-        "schedule": "<freq: 1.00 day>",
+        "schedule": "<crontab: 45 2 * * * (m/h/dM/MY/d)>",
         "task": "app.domains.predictions.tasks.run_daily_predictions"
       },
       {

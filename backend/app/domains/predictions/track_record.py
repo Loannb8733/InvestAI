@@ -112,19 +112,20 @@ def _backtest(symbols: list[str], logs: Sequence[PredictionLog], days: int) -> d
 
 
 class TrackRecordMixin(PredictionCore):
-    async def get_track_record(self, symbol: str, limit: int = 20, user_id: str | None = None) -> dict[str, Any]:
+    async def get_track_record(self, symbol: str, limit: int = 20) -> dict[str, Any]:
         """Dernières prévisions vérifiées d'un symbole avec leur issue, MAPE moyen, précision de direction et
-        couverture de l'intervalle ; vide en cas d'erreur."""
+        couverture de l'intervalle ; vide en cas d'erreur.
+
+        Une prévision porte sur le cours d'un symbole, commun à tous : elle est journalisée sans utilisateur, et le
+        suivi ne filtre donc pas par utilisateur.
+        """
         try:
             async with session_factory() as db:
-                filters = [
-                    PredictionLog.symbol == symbol.upper(),
-                    PredictionLog.accuracy_checked.isnot(None),
-                ]
-                if user_id:
-                    filters.append(PredictionLog.user_id == user_id)
                 result = await db.execute(
-                    select(PredictionLog).where(*filters).order_by(PredictionLog.created_at.desc()).limit(limit)
+                    select(PredictionLog)
+                    .where(PredictionLog.symbol == symbol.upper(), PredictionLog.accuracy_checked.isnot(None))
+                    .order_by(PredictionLog.created_at.desc())
+                    .limit(limit)
                 )
                 logs = result.scalars().all()
                 if not logs:

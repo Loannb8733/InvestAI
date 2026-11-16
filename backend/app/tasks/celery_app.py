@@ -49,6 +49,8 @@ celery_app.conf.update(
     # `health_check_interval` : un PING par connexion toutes les 25 s par défaut,
     # soit la moitié des commandes restantes au repos.
     broker_transport_options={"polling_interval": 30, "health_check_interval": 120},
+    # Le remplissage d'historique a duré 924 s en local : la limite commune de 5 min le tuerait.
+    task_annotations={"app.domains.market_data.history.tasks.backfill_history": {"time_limit": 3600}},
 )
 
 # Scheduled tasks (Celery Beat)
@@ -67,7 +69,8 @@ celery_app.conf.beat_schedule = {
     },
     "run-daily-predictions": {
         "task": "app.domains.predictions.tasks.run_daily_predictions",
-        "schedule": 86400.0,  # Every 24 hours
+        # Calcul par lots des prévisions 7/14/30 j, après la clôture UTC de la veille.
+        "schedule": crontab(hour=2, minute=45),
     },
     "detect-anomalies": {
         "task": "app.domains.predictions.tasks.detect_anomalies",

@@ -139,7 +139,7 @@ class AlphaMixin(ForecastMixin, CyclesMixin):
                 pred = await self.get_price_prediction(sym, atype, days_ahead=7)
                 return (sym, pred)
             except Exception as e:  # noqa: BLE001
-                logger.debug("7d prediction failed for %s: %s", sym, e)
+                logger.warning("7d prediction failed for %s (alpha scored without it): %s", sym, e)
                 return (sym, None)
 
         for batch_start in range(0, len(items), PREDICTION_BATCH_SIZE):

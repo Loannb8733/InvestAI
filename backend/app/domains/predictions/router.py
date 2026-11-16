@@ -234,7 +234,7 @@ async def get_portfolio_backtest(user: CurrentUser, session: Session, days: Days
 async def get_track_record(
     symbol: str, user: CurrentUser, limit: Annotated[int, Query(ge=1, le=100)] = 20
 ) -> dict[str, Any]:
-    return await prediction_service.get_track_record(symbol.upper(), limit, str(user.id))
+    return await prediction_service.get_track_record(symbol.upper(), limit)
 
 
 @router.get("/planned-orders", response_model=list)

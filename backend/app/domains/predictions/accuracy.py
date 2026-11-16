@@ -1,7 +1,12 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from app.domains.market_data.history.series import PriceSeries
 from app.domains.predictions.models import PredictionLog
+
+SETTLE_DELAY = timedelta(days=1)
+GIVE_UP_AFTER = timedelta(days=7)
+LOOKBACK_DAYS = 3
 
 
 def _direction_correct(price_at_creation: Decimal | None, predicted_price: float, actual_price: float) -> bool | None:
@@ -10,6 +15,16 @@ def _direction_correct(price_at_creation: Decimal | None, predicted_price: float
     baseline = float(price_at_creation)
     if baseline > 0:
         return (predicted_price > baseline) == (actual_price > baseline)
+    return None
+
+
+def price_on(series: PriceSeries, day: date) -> float | None:
+    """Cours enregistré pour ``day``, ou à défaut le dernier des trois jours précédents (week-end, jour férié)."""
+    known = {moment.date(): price for moment, price in zip(series.dates, series.prices, strict=False)}
+    for back in range(LOOKBACK_DAYS + 1):
+        price = known.get(day - timedelta(days=back))
+        if price is not None and price > 0:
+            return float(price)
     return None
 
 
@@ -30,3 +45,12 @@ def record_outcome(log: PredictionLog, actual_price: float, now: datetime) -> fl
 
     threshold = 20.0 if log.asset_type == "crypto" else 10.0
     return threshold if log.mape > threshold else None
+
+
+def give_up(log: PredictionLog, now: datetime) -> bool:
+    """Clôt sans mesure une prédiction dont le cours de la date cible manque encore une semaine après ; vrai si
+    elle est close."""
+    if log.target_date is None or now - log.target_date <= GIVE_UP_AFTER:
+        return False
+    log.accuracy_checked = now
+    return True

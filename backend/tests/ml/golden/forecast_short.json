@@ -40,6 +40,7 @@
         32566.3,
         32864.7
       ],
+      "skipped_models": [],
       "trend": "bullish",
       "trend_strength": 100.0
     },
@@ -83,6 +84,7 @@
         32566.3,
         32864.7
       ],
+      "skipped_models": [],
       "trend": "bullish",
       "trend_strength": 100.0
     }
@@ -90,22 +92,22 @@
   "len_8": {
     "ensemble": {
       "confidence_high": [
-        31652.7,
-        31863.4,
-        32054.6,
-        32233.0,
-        32402.2,
-        32564.6,
-        32721.7
+        32621.3,
+        33234.7,
+        33707.4,
+        34107.0,
+        34459.8,
+        34779.2,
+        35073.3
       ],
       "confidence_low": [
-        29587.2,
-        29405.3,
-        29242.9,
-        29093.4,
-        28953.0,
-        28819.5,
-        28691.3
+        29704.2,
+        29106.4,
+        28647.9,
+        28261.1,
+        27919.8,
+        27610.7,
+        27325.9
       ],
       "dates": [
         "2025-01-09",
@@ -117,51 +119,75 @@
         "2025-01-15"
       ],
       "explanations": [],
-      "model_used": "ensemble (EMA: 50%, Linear: 50%)",
+      "model_used": "ensemble (EMA: 33%, Linear: 33%, Naive: 33%)",
       "models_detail": [
         {
-          "mape": 50.0,
+          "mape": 0.1,
           "name": "EMA",
           "trend": "neutral",
-          "weight_pct": 50
+          "weight_pct": 33
         },
         {
-          "mape": 50.0,
+          "mape": 0.1,
           "name": "Linear",
           "trend": "neutral",
-          "weight_pct": 50
+          "weight_pct": 33
+        },
+        {
+          "mape": 0.2,
+          "name": "Naive",
+          "trend": "neutral",
+          "weight_pct": 33
         }
       ],
       "prices": [
-        30619.9,
-        30634.4,
-        30648.8,
-        30663.2,
-        30677.6,
-        30692.0,
-        30706.5
+        31162.7,
+        31170.6,
+        31177.7,
+        31184.0,
+        31189.8,
+        31194.9,
+        31199.6
+      ],
+      "skipped_models": [
+        {
+          "name": "Prophet",
+          "reason": "historique insuffisant (8 cours, 14 requis)"
+        },
+        {
+          "name": "ARIMA",
+          "reason": "historique insuffisant (8 cours, 20 requis)"
+        },
+        {
+          "name": "XGBoost",
+          "reason": "historique insuffisant (8 cours, 30 requis)"
+        },
+        {
+          "name": "MeanReversion",
+          "reason": "historique insuffisant (8 cours, 30 requis)"
+        }
       ],
       "trend": "neutral",
-      "trend_strength": 56.8
+      "trend_strength": 100.0
     },
     "single": {
       "confidence_high": [
-        31896.5,
-        32005.9,
-        32126.3,
-        32255.8,
-        32392.8,
-        32535.9,
-        32684.3
+        32907.9,
+        33672.1,
+        34272.9,
+        34788.5,
+        35249.5,
+        35671.5,
+        36063.7
       ],
       "confidence_low": [
-        29491.5,
-        29427.2,
-        29353.3,
-        29271.8,
-        29184.2,
-        29091.8,
-        28995.7
+        29526.5,
+        28885.3,
+        28404.7,
+        28006.5,
+        27660.5,
+        27351.3,
+        27069.9
       ],
       "dates": [
         "2025-01-09",
@@ -176,16 +202,17 @@
       "model_used": "linear",
       "models_detail": [],
       "prices": [
-        30670.5,
-        30689.5,
-        30708.5,
-        30727.6,
-        30746.6,
-        30765.7,
-        30784.8
+        31171.4,
+        31187.0,
+        31201.1,
+        31213.8,
+        31225.3,
+        31235.6,
+        31244.8
       ],
+      "skipped_models": [],
       "trend": "neutral",
-      "trend_strength": 19.1
+      "trend_strength": 100.0
     }
   }
 }

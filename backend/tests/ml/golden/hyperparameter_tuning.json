@@ -4,11 +4,11 @@
     "seasonality_mode": "additive"
   },
   "xgboost": {
-    "colsample_bytree": 0.769462,
-    "learning_rate": 0.0776881,
-    "max_depth": 7,
-    "n_estimators": 187,
-    "subsample": 0.817953
+    "colsample_bytree": 0.753377,
+    "learning_rate": 0.207614,
+    "max_depth": 5,
+    "n_estimators": 212,
+    "subsample": 0.985465
   },
   "xgboost_short": {
     "learning_rate": 0.1,

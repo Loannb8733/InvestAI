@@ -6,6 +6,9 @@ from app.ml.forecasting.confidence import fat_tail_z
 from app.ml.forecasting.trend import compute_trend
 from app.ml.forecasting.types import ForecastResult, rounded
 
+LINEAR_WINDOW = 90
+TREND_DAMPING = 0.9
+
 
 def ou_reversion_speed(phi: float) -> float:
     """Vitesse de retour à la moyenne (Ornstein-Uhlenbeck) d'un coefficient AR(1) ; 0 près d'une racine unitaire."""
@@ -28,8 +31,14 @@ def _day(last: datetime, offset: int) -> str:
     return (last + timedelta(days=offset)).strftime("%Y-%m-%d")
 
 
+def damped_steps(i: int, phi: float = TREND_DAMPING) -> float:
+    """Nombre de pas de pente cumulés au pas ``i`` d'une tendance amortie : φ + φ² + … + φⁱ."""
+    return phi * (1 - phi**i) / (1 - phi)
+
+
 def ema_forecast(prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
-    """Prolonge la pente des trois derniers points de l'EMA 7, corrigée de l'écart entre EMA 7 et EMA 21."""
+    """Pente des trois derniers points de l'EMA 7, corrigée de l'écart entre EMA 7 et EMA 21, prolongée depuis le
+    dernier prix et amortie (φ = 0,9)."""
     arr = np.array(prices, dtype=float)
     ema7 = ema(arr, 7)
     ema21 = ema(arr, min(21, len(arr)))
@@ -43,10 +52,10 @@ def ema_forecast(prices: list[float], dates: list[datetime], days_ahead: int) ->
     residuals = arr[-min(30, len(arr)) :] - ema7[-min(30, len(ema7)) :]
     std_r = float(np.std(residuals)) if len(residuals) > 1 else abs(arr[-1]) * 0.02
     z = fat_tail_z(residuals)
-    base = ema7[-1]
+    base = float(arr[-1])
     result_prices, result_low, result_high = [], [], []
     for i in range(1, days_ahead + 1):
-        pred = max(0.0, float(base + slope * i))
+        pred = max(0.0, float(base + slope * damped_steps(i)))
         ci = z * std_r * np.sqrt(i)
         result_prices.append(pred)
         result_low.append(max(0.0, pred - ci))
@@ -56,27 +65,47 @@ def ema_forecast(prices: list[float], dates: list[datetime], days_ahead: int) ->
     return rounded(dates_out, result_prices, result_low, result_high, trend, "ema")
 
 
+def _log_window(prices: list[float]) -> np.ndarray:
+    window: np.ndarray = np.log(np.maximum(np.array(prices[-LINEAR_WINDOW:], dtype=float), 1e-10))
+    return window
+
+
+def _random_walk_band(y: np.ndarray) -> tuple[float, float]:
+    returns = np.diff(y)
+    step_std = float(np.std(returns)) if len(returns) > 1 else 0.02
+    return step_std, fat_tail_z(returns)
+
+
 def linear_forecast(prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
-    """Régression linéaire du logarithme des prix, intervalle de prédiction aux queues épaisses."""
-    n = len(prices)
-    x = np.arange(n, dtype=float)
-    y = np.log(np.maximum(np.array(prices, dtype=float), 1e-10))
-    slope, intercept = np.polyfit(x, y, 1)
-    residuals = y - (slope * x + intercept)
-    std_r = float(np.std(residuals))
-    z = fat_tail_z(residuals)
+    """Pente de la régression linéaire du logarithme des ``LINEAR_WINDOW`` derniers prix, prolongée depuis le
+    dernier prix et amortie (φ = 0,9) ; intervalle aux queues épaisses qui s'élargit comme une marche aléatoire
+    des rendements."""
+    y = _log_window(prices)
+    slope = float(np.polyfit(np.arange(len(y), dtype=float), y, 1)[0]) if len(y) >= 2 else 0.0
+    step_std, z = _random_walk_band(y)
     result_prices, result_low, result_high = [], [], []
     for i in range(1, days_ahead + 1):
-        fx = n + i - 1
-        pred_log = slope * fx + intercept
-        pred = float(np.exp(pred_log))
-        ci = z * std_r * np.sqrt(1 + 1 / n + (fx - np.mean(x)) ** 2 / np.sum((x - np.mean(x)) ** 2))
-        result_prices.append(max(0.0, pred))
+        pred_log = float(y[-1]) + slope * damped_steps(i)
+        ci = z * step_std * np.sqrt(i)
+        result_prices.append(max(0.0, float(np.exp(pred_log))))
         result_low.append(max(0.0, float(np.exp(pred_log - ci))))
         result_high.append(float(np.exp(pred_log + ci)))
     dates_out = [_day(dates[-1], i) for i in range(1, days_ahead + 1)]
     trend = compute_trend(prices[-1], result_prices[-1], prices)
     return rounded(dates_out, result_prices, result_low, result_high, trend, "linear")
+
+
+def naive_forecast(prices: list[float], dates: list[datetime], days_ahead: int) -> ForecastResult:
+    """Prévision naïve (marche aléatoire) : le dernier prix, avec l'intervalle d'une marche aléatoire des rendements
+    logarithmiques ; la référence que les autres modèles doivent battre."""
+    y = _log_window(prices)
+    step_std, z = _random_walk_band(y)
+    last = float(prices[-1])
+    result_low = [max(0.0, last * float(np.exp(-z * step_std * np.sqrt(i)))) for i in range(1, days_ahead + 1)]
+    result_high = [last * float(np.exp(z * step_std * np.sqrt(i))) for i in range(1, days_ahead + 1)]
+    dates_out = [_day(dates[-1], i) for i in range(1, days_ahead + 1)]
+    trend = compute_trend(prices[-1], last, prices)
+    return rounded(dates_out, [last] * days_ahead, result_low, result_high, trend, "naive")
 
 
 def _reversion_speed(log_prices: np.ndarray) -> float:

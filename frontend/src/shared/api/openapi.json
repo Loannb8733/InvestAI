@@ -15432,6 +15432,13 @@
             ],
             "title": "Models Detail"
           },
+          "skipped_models": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedModel"
+            },
+            "type": "array",
+            "title": "Skipped Models"
+          },
           "explanations": {
             "items": {
               "$ref": "#/components/schemas/FeatureExplanation"
@@ -17689,6 +17696,25 @@
           "reason"
         ],
         "title": "SkippedGap"
+      },
+      "SkippedModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "SkippedModel",
+        "description": "Modèle écarté de l'ensemble et pourquoi (non installé, historique trop court, erreur, prévision aberrante)."
       },
       "SparklineData": {
         "properties": {

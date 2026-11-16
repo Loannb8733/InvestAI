@@ -86,6 +86,7 @@ def _store(key: str, result: ForecastResult) -> None:
                 "model_used": result.model_used,
                 "models_detail": result.models_detail,
                 "explanations": result.explanations,
+                "skipped_models": result.skipped_models,
             },
             default=str,
         )

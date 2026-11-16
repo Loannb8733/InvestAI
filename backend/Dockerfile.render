@@ -1,9 +1,12 @@
-# Dockerfile optimisé pour Render Free Tier (512MB RAM)
-# - Pas de CmdStan/Prophet (trop lourd)
+# Image de production de l'API, du worker et du planificateur Celery.
+# - Render gratuit (512 Mo) : sans Prophet (WITH_PROPHET=false, par défaut).
+# - VM Oracle (deploy/oracle) : avec Prophet (WITH_PROPHET=true) ; mesuré +30 Mo au pic d'une prévision.
 # - Multi-stage build pour réduire la taille de l'image
 # - Dépendances système minimales
 
 FROM python:3.12-slim AS builder
+
+ARG WITH_PROPHET=false
 
 WORKDIR /build
 
@@ -14,8 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements.txt requirements-prophet.txt ./
+RUN if [ "$WITH_PROPHET" = "true" ]; then EXTRA="-r requirements-prophet.txt"; else EXTRA=""; fi \
+    && pip install --no-cache-dir --prefix=/install -r requirements.txt $EXTRA
 
 # --- Runtime stage ---
 FROM python:3.12-slim
@@ -29,7 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 
-RUN adduser --disabled-password --gecos '' appuser
+RUN adduser --disabled-password --gecos '' appuser \
+    && mkdir -p /beat && chown appuser /beat
 COPY --chown=appuser . .
 USER appuser
 

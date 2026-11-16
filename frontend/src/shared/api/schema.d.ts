@@ -5283,6 +5283,8 @@ export interface components {
             models_agree: boolean;
             /** Models Detail */
             models_detail?: components["schemas"]["ModelDetail"][] | null;
+            /** Skipped Models */
+            skipped_models?: components["schemas"]["SkippedModel"][];
             /** Explanations */
             explanations?: components["schemas"]["FeatureExplanation"][];
             regime_info?: components["schemas"]["RegimeInfo"] | null;
@@ -6083,6 +6085,16 @@ export interface components {
              * @enum {string}
              */
             reason: "already_credited_today" | "no_market_price";
+        };
+        /**
+         * SkippedModel
+         * @description Modèle écarté de l'ensemble et pourquoi (non installé, historique trop court, erreur, prévision aberrante).
+         */
+        SkippedModel: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * SparklineData

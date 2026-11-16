@@ -11,7 +11,10 @@ FloatArray = npt.NDArray[np.float64]
 
 @dataclass
 class ForecastResult:
-    """Prévision d'un modèle ou de l'ensemble : dates, prix, intervalle à 95 % et tendance."""
+    """Prévision d'un modèle ou de l'ensemble : dates, prix, intervalle à 95 % et tendance.
+
+    ``skipped_models`` liste les modèles de l'ensemble écartés et pourquoi (``name``, ``reason``).
+    """
 
     dates: list[str]
     prices: list[float]
@@ -22,6 +25,7 @@ class ForecastResult:
     model_used: str
     models_detail: list[dict[str, Any]] = field(default_factory=list)
     explanations: list[dict[str, Any]] = field(default_factory=list)
+    skipped_models: list[dict[str, str]] = field(default_factory=list)
 
 
 Candidate = tuple[str, ForecastResult]
