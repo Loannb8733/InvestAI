@@ -2,34 +2,37 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
+import QueryErrorState from '@/components/ui/query-error-state'
+import DeleteNoteDialog from '@/features/journal/components/DeleteNoteDialog'
 import NoteFilters from '@/features/journal/components/NoteFilters'
 import NoteFormDialog from '@/features/journal/components/NoteFormDialog'
 import NoteList from '@/features/journal/components/NoteList'
 import NoteSummaryCards from '@/features/journal/components/NoteSummaryCards'
 import ScorecardCard from '@/features/journal/components/ScorecardCard'
-import { useAssetOptions, useNoteMutations, useNotes, useNoteSummary } from '@/features/journal/hooks'
+import { useNoteMutations, useNotes, useNoteSummary } from '@/features/journal/hooks'
 import type { Note } from '@/features/journal/types'
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 
 const TITLE = 'Journal'
 const DESCRIPTION = 'Prenez des notes sur vos investissements et stratégies.'
+const SEARCH_DELAY_MS = 300
 
 export default function NotesPage() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Note | null>(null)
+  const [deleting, setDeleting] = useState<Note | null>(null)
   const [search, setSearch] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
 
-  const { data: notes, isLoading } = useNotes(search, selectedTag, page)
+  const notes = useNotes(useDebouncedValue(search, SEARCH_DELAY_MS), selectedTag)
   const { data: summary } = useNoteSummary()
-  const { data: assets } = useAssetOptions()
   const closeDialog = () => {
     setCreating(false)
     setEditing(null)
   }
   const { create, update, remove } = useNoteMutations(closeDialog)
 
-  if (isLoading) {
+  if (notes.isLoading) {
     return <PageSkeleton titre={TITLE} description={DESCRIPTION} forme="liste" action />
   }
 
@@ -54,22 +57,40 @@ export default function NotesPage() {
         selectedTag={selectedTag}
         onSelectTag={setSelectedTag}
       />
-      <NoteList
-        notes={notes}
-        page={page}
-        onPage={setPage}
-        onCreate={() => setCreating(true)}
-        onEdit={setEditing}
-        onDelete={(id) => remove.mutate(id)}
-      />
+      {notes.isError ? (
+        <QueryErrorState
+          error={notes.error}
+          onRetry={() => notes.refetch()}
+          busy={notes.isFetching}
+          title="Notes indisponibles"
+          description="Le journal n'a pas pu être chargé."
+        />
+      ) : (
+        <NoteList
+          notes={notes.data?.pages.flat() ?? []}
+          hasMore={notes.hasNextPage}
+          loadingMore={notes.isFetchingNextPage}
+          onMore={() => notes.fetchNextPage()}
+          onCreate={() => setCreating(true)}
+          onEdit={setEditing}
+          onDelete={setDeleting}
+        />
+      )}
       <NoteFormDialog
         open={creating || editing !== null}
         note={editing}
-        assets={assets}
         pending={create.isPending || update.isPending}
         onClose={closeDialog}
         onCreate={(body) => create.mutate(body)}
         onUpdate={(id, body) => update.mutate({ id, body })}
+      />
+      <DeleteNoteDialog
+        note={deleting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={(id) => {
+          setDeleting(null)
+          remove.mutate(id)
+        }}
       />
     </div>
   )

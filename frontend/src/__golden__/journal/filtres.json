@@ -14,10 +14,6 @@
     },
     {
       "method": "GET",
-      "url": "/assets"
-    },
-    {
-      "method": "GET",
       "url": "/notes",
       "params": {
         "search": "btc",

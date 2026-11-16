@@ -11,10 +11,6 @@
     {
       "method": "GET",
       "url": "/notes/summary"
-    },
-    {
-      "method": "GET",
-      "url": "/assets"
     }
   ],
   "text": [

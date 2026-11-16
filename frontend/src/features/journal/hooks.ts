@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 import { queryKeys } from '@/lib/queryKeys'
 import { apiClient } from '@/shared/api/client'
@@ -6,18 +6,21 @@ import type { NoteCreate, NoteUpdate } from './types'
 
 export const NOTES_PER_PAGE = 50
 
-export function useNotes(search: string, tag: string | null, page: number) {
-  return useQuery({
-    queryKey: [...queryKeys.notes.list(search, tag), page],
-    queryFn: () =>
+export function useNotes(search: string, tag: string | null) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.notes.list(search, tag),
+    queryFn: ({ pageParam }) =>
       apiClient.get('/notes', {
         query: {
           search: search || undefined,
           tag: tag || undefined,
-          skip: page * NOTES_PER_PAGE,
+          skip: pageParam * NOTES_PER_PAGE,
           limit: NOTES_PER_PAGE,
         },
+        silent: true,
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => (lastPage.length === NOTES_PER_PAGE ? pages.length : undefined),
     placeholderData: keepPreviousData,
   })
 }
@@ -33,7 +36,7 @@ export function useAssetOptions() {
 export function useScorecard() {
   return useQuery({
     queryKey: [...queryKeys.notes.all, 'scorecard'],
-    queryFn: () => apiClient.get('/notes/scorecard'),
+    queryFn: () => apiClient.get('/notes/scorecard', { silent: true }),
     staleTime: 60_000,
   })
 }
@@ -41,13 +44,10 @@ export function useScorecard() {
 export function useNoteMutations(onSaved: () => void) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
-    queryClient.invalidateQueries({ queryKey: queryKeys.notes.summary })
-  }
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.notes.all })
 
   const create = useMutation({
-    mutationFn: (body: NoteCreate) => apiClient.post('/notes', { body }),
+    mutationFn: (body: NoteCreate) => apiClient.post('/notes', { body, silent: true }),
     onSuccess: () => {
       refresh()
       onSaved()
@@ -60,7 +60,7 @@ export function useNoteMutations(onSaved: () => void) {
 
   const update = useMutation({
     mutationFn: ({ id, body }: { id: string; body: NoteUpdate }) =>
-      apiClient.patch('/notes/{note_id}', { path: { note_id: id }, body }),
+      apiClient.patch('/notes/{note_id}', { path: { note_id: id }, body, silent: true }),
     onSuccess: () => {
       refresh()
       onSaved()
@@ -72,7 +72,7 @@ export function useNoteMutations(onSaved: () => void) {
   })
 
   const remove = useMutation({
-    mutationFn: (id: string) => apiClient.delete('/notes/{note_id}', { path: { note_id: id } }),
+    mutationFn: (id: string) => apiClient.delete('/notes/{note_id}', { path: { note_id: id }, silent: true }),
     onSuccess: () => {
       refresh()
       toast({ title: 'Note supprimée' })

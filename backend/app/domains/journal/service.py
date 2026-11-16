@@ -15,7 +15,7 @@ from app.domains.journal.scorecard import build_scorecard, earliest_price_date
 
 NOTE_NOT_FOUND = "Note non trouvée"
 ASSET_NOT_FOUND = "Actif non trouvé"
-_UPDATABLE_TEXT_FIELDS = ("title", "content", "tags", "transaction_ids", "attachments", "sentiment")
+_CLEARABLE_FIELDS = ("content", "tags", "transaction_ids", "attachments", "sentiment")
 
 
 def _to_response(note: Note, asset: AssetRef | None) -> NoteResponse:
@@ -80,12 +80,13 @@ class JournalService:
         return _to_response(note, asset)
 
     async def update(self, note_id: UUID, user_id: UUID, data: NoteUpdate) -> NoteResponse:
-        """Met à jour les champs fournis ; asset_id explicitement nul délie l'actif."""
+        """Met à jour les champs fournis ; un champ explicitement nul est vidé, asset_id nul délie l'actif."""
         note = await self._owned_note(note_id, user_id)
-        for name in _UPDATABLE_TEXT_FIELDS:
-            value = getattr(data, name)
-            if value is not None:
-                setattr(note, name, value)
+        if data.title is not None:
+            note.title = data.title
+        for name in _CLEARABLE_FIELDS:
+            if name in data.model_fields_set:
+                setattr(note, name, getattr(data, name))
         if "asset_id" in data.model_fields_set and data.asset_id is None:
             note.asset_id = None
         if data.asset_id is not None:

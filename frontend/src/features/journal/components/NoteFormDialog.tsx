@@ -13,15 +13,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { SENTIMENT_OPTIONS } from '../format'
-import type { AssetOption, Note, NoteCreate, NoteUpdate } from '../types'
+import { assetLabel, SENTIMENT_OPTIONS } from '../format'
+import { useAssetOptions } from '../hooks'
+import type { Note, NoteCreate, NoteUpdate } from '../types'
 
-const NO_ASSET = 'none'
+const NONE = 'none'
 
 interface NoteFormDialogProps {
   open: boolean
   note: Note | null
-  assets: AssetOption[] | undefined
   pending: boolean
   onClose: () => void
   onCreate: (body: NoteCreate) => void
@@ -30,23 +30,33 @@ interface NoteFormDialogProps {
 
 type NoteFormProps = Omit<NoteFormDialogProps, 'open'>
 
-function NoteForm({ note, assets, pending, onClose, onCreate, onUpdate }: NoteFormProps) {
-  const [sentiment, setSentiment] = useState(note?.sentiment || '')
-  const [linkedAssetId, setLinkedAssetId] = useState(note?.asset_id || NO_ASSET)
+const chosen = (value: string) => (value === NONE ? null : value)
+
+function NoteForm({ note, pending, onClose, onCreate, onUpdate }: NoteFormProps) {
+  const { data: assets } = useAssetOptions()
+  const [sentiment, setSentiment] = useState(note?.sentiment || NONE)
+  const [linkedAssetId, setLinkedAssetId] = useState(note?.asset_id || NONE)
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const base = {
-      title: formData.get('title') as string,
-      content: (formData.get('content') as string) || undefined,
-      tags: (formData.get('tags') as string) || undefined,
-      sentiment: sentiment || undefined,
-    }
+    const text = (field: string) => (formData.get(field) as string) || null
     if (note) {
-      onUpdate(note.id, { ...base, asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : null })
+      onUpdate(note.id, {
+        title: formData.get('title') as string,
+        content: text('content'),
+        tags: text('tags'),
+        sentiment: chosen(sentiment),
+        asset_id: chosen(linkedAssetId),
+      })
     } else {
-      onCreate({ ...base, asset_id: linkedAssetId !== NO_ASSET ? linkedAssetId : undefined })
+      onCreate({
+        title: formData.get('title') as string,
+        content: text('content') ?? undefined,
+        tags: text('tags') ?? undefined,
+        sentiment: chosen(sentiment) ?? undefined,
+        asset_id: chosen(linkedAssetId) ?? undefined,
+      })
     }
   }
 
@@ -75,9 +85,10 @@ function NoteForm({ note, assets, pending, onClose, onCreate, onUpdate }: NoteFo
           <Label>Sentiment</Label>
           <Select value={sentiment} onValueChange={setSentiment}>
             <SelectTrigger>
-              <SelectValue placeholder="Aucun sentiment" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={NONE}>Aucun sentiment</SelectItem>
               {SENTIMENT_OPTIONS.map((s) => (
                 <SelectItem key={s.value} value={s.value}>
                   <span className={`flex items-center gap-2 ${s.color}`}>
@@ -93,14 +104,13 @@ function NoteForm({ note, assets, pending, onClose, onCreate, onUpdate }: NoteFo
           <Label>Actif lié (optionnel)</Label>
           <Select value={linkedAssetId} onValueChange={setLinkedAssetId}>
             <SelectTrigger>
-              <SelectValue placeholder="Aucun actif" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_ASSET}>Aucun actif</SelectItem>
+              <SelectItem value={NONE}>Aucun actif</SelectItem>
               {assets?.map((asset) => (
                 <SelectItem key={asset.id} value={asset.id}>
-                  {asset.symbol}
-                  {asset.name ? ` — ${asset.name}` : ''}
+                  {assetLabel(asset)}
                 </SelectItem>
               ))}
             </SelectContent>

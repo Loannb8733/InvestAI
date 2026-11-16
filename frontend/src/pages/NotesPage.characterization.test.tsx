@@ -1,13 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AxiosError, AxiosHeaders, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { http } from '@/shared/api/http'
+import { createFakeServer, ok, polyfillRadixPointer, visibleText } from '@/test/fakeServer'
+import { journalRoutes, NOTE_PLAIN } from '@/test/journalFixtures'
+import { chooseOption, renderWithQuery, settle } from '@/test/render'
 import NotesPage from './NotesPage'
-
-type Call = { method: string; url: string; params?: unknown; body?: unknown }
-type Reply = { status: number; data?: unknown }
-type Handler = (config: InternalAxiosRequestConfig) => Reply
 
 const toasts = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 
@@ -18,163 +15,27 @@ vi.mock('@/hooks/use-toast', () => {
   return { toast, useToast: () => ({ toast }) }
 })
 
-const NOTE_BTC = {
-  id: 'n1',
-  title: 'Accumuler le BTC',
-  content: 'Achat progressif sous 60 000.',
-  tags: 'crypto, long terme',
-  asset_id: 'a1',
-  asset_symbol: 'BTC',
-  asset_name: 'Bitcoin',
-  transaction_ids: null,
-  attachments: null,
-  sentiment: 'bullish',
-  created_at: '2026-03-04T09:15:00Z',
-  updated_at: '2026-03-04T09:15:00Z',
-}
+const server = createFakeServer()
+const { calls, routes } = server
 
-const NOTE_PLAIN = {
-  id: 'n2',
-  title: 'Revue trimestrielle',
-  content: null,
-  tags: null,
-  asset_id: null,
-  asset_symbol: null,
-  asset_name: null,
-  transaction_ids: null,
-  attachments: null,
-  sentiment: null,
-  created_at: '2026-01-15T18:00:00Z',
-  updated_at: '2026-01-15T18:00:00Z',
-}
-
-const SUMMARY = { total_notes: 2, notes_this_month: 1, unique_tags: ['crypto', 'long terme'] }
-
-const ASSETS = [
-  { id: 'a1', symbol: 'BTC', name: 'Bitcoin' },
-  { id: 'a2', symbol: 'ETH', name: null },
-]
-
-const SCORECARD = {
-  entries: [
-    {
-      note_id: 'n1',
-      title: 'Accumuler le BTC',
-      symbol: 'BTC',
-      sentiment: 'bullish',
-      note_date: '2026-03-04T09:15:00Z',
-      perf_30d: 4.25,
-      perf_90d: -3.5,
-      verdict_30d: 'correct',
-      verdict_90d: 'incorrect',
-    },
-    {
-      note_id: 'n3',
-      title: 'Prudence sur ETH',
-      symbol: 'ETH',
-      sentiment: 'neutral',
-      note_date: '2026-05-20T10:00:00Z',
-      perf_30d: 0,
-      perf_90d: null,
-      verdict_30d: 'correct',
-      verdict_90d: 'pending',
-    },
-  ],
-  summary: {
-    total_scored: 2,
-    unscorable: 1,
-    hit_rate_30d: 100,
-    hit_rate_90d: 0,
-    by_sentiment: { bullish: { n: 1, hit_rate: 50 }, neutral: { n: 1, hit_rate: null } },
-  },
-}
-
-let calls: Call[]
-let routes: Record<string, Handler>
-
-const ok = (data: unknown): Handler => () => ({ status: 200, data })
-
-function defaultRoutes(): Record<string, Handler> {
-  return {
-    'GET /notes': ok([NOTE_BTC, NOTE_PLAIN]),
-    'GET /notes/summary': ok(SUMMARY),
-    'GET /assets': ok(ASSETS),
-    'GET /notes/scorecard': ok(SCORECARD),
-    'POST /notes': (config) => ({ status: 201, data: { ...NOTE_PLAIN, id: 'n9', ...JSON.parse(String(config.data)) } }),
-    'PATCH /notes/n1': (config) => ({ status: 200, data: { ...NOTE_BTC, ...JSON.parse(String(config.data)) } }),
-    'DELETE /notes/n1': () => ({ status: 204 }),
-  }
-}
-
-const fakeServer: AxiosAdapter = async (config) => {
-  const method = (config.method ?? 'get').toUpperCase()
-  const url = config.url ?? ''
-  const call: Call = { method, url }
-  if (config.params && Object.keys(config.params).length > 0) call.params = config.params
-  if (config.data !== undefined) call.body = JSON.parse(String(config.data))
-  calls.push(call)
-  const handler = routes[`${method} ${url}`]
-  const reply = handler ? handler(config) : { status: 404, data: { detail: 'Not Found' } }
-  const response = {
-    data: reply.data ?? '',
-    status: reply.status,
-    statusText: String(reply.status),
-    headers: new AxiosHeaders(),
-    config,
-  }
-  if (reply.status >= 400) {
-    throw new AxiosError(`Request failed with status code ${reply.status}`, 'ERR_BAD_RESPONSE', config, null, response)
-  }
-  return response
-}
-
-function visibleText(): string[] {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
-  const lines: string[] = []
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node.textContent?.replace(/\s+/g, ' ').trim()
-    if (text) lines.push(text)
-  }
-  return lines
-}
-
-function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <NotesPage />
-    </QueryClientProvider>
-  )
-}
+const renderPage = () => renderWithQuery(<NotesPage />)
 
 async function golden(name: string, value: unknown) {
   await expect(`${JSON.stringify(value, null, 2)}\n`).toMatchFileSnapshot(`../__golden__/journal/${name}.json`)
-}
-
-async function settle(predicate: () => boolean) {
-  await waitFor(() => expect(predicate()).toBe(true))
 }
 
 function requested(method: string, url: string) {
   return calls.some((c) => c.method === method && c.url === url)
 }
 
-function chooseOption(combobox: HTMLElement, name: string) {
-  fireEvent.keyDown(combobox, { key: 'Enter' })
-  fireEvent.keyDown(screen.getByRole('option', { name }), { key: 'Enter' })
-}
-
 beforeAll(() => {
   process.env.TZ = 'UTC'
-  Element.prototype.hasPointerCapture ??= () => false
-  Element.prototype.releasePointerCapture ??= () => {}
-  Element.prototype.scrollIntoView ??= () => {}
-  http.defaults.adapter = fakeServer
+  polyfillRadixPointer()
+  http.defaults.adapter = server.adapter
 })
 
 beforeEach(() => {
-  calls = []
-  routes = defaultRoutes()
+  server.reset(journalRoutes())
   toasts.length = 0
 })
 
@@ -208,17 +69,19 @@ describe('NotesPage — caractérisation', () => {
     await golden('filtres', { calls })
   })
 
-  it('charge la page suivante puis revient au début', async () => {
-    const page = Array.from({ length: 50 }, (_, i) => ({ ...NOTE_PLAIN, id: `p${i}`, title: `Note ${i}` }))
-    routes['GET /notes'] = ok(page)
+  it('charge la page suivante à la suite de la première', async () => {
+    const page = (start: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({ ...NOTE_PLAIN, id: `p${start + i}`, title: `Note ${start + i}` }))
+    routes['GET /notes'] = (config) => ({ status: 200, data: config.params.skip === 0 ? page(0, 50) : page(50, 3) })
     renderPage()
     await screen.findByText('Note 0')
     fireEvent.click(screen.getByRole('button', { name: 'Charger plus' }))
-    await screen.findByRole('button', { name: 'Retour au début' })
-    fireEvent.click(screen.getByRole('button', { name: 'Retour au début' }))
-    await settle(() => !screen.queryByRole('button', { name: 'Retour au début' }))
-    await settle(() => calls.filter((c) => c.url === '/notes').length === 3)
-    await golden('pagination', { calls: calls.filter((c) => c.url === '/notes') })
+    await screen.findByText('Note 52')
+    await golden('pagination', {
+      calls: calls.filter((c) => c.url === '/notes'),
+      shown: screen.getAllByRole('button', { name: 'Modifier la note' }).length,
+      more: screen.queryByRole('button', { name: 'Charger plus' }) !== null,
+    })
   })
 
   it('déplie la scorecard', async () => {
@@ -266,6 +129,8 @@ describe('NotesPage — caractérisation', () => {
     fireEvent.change(within(dialog).getByLabelText('Tags (séparés par des virgules)'), { target: { value: 'crypto' } })
     const [sentiment, asset] = within(dialog).getAllByRole('combobox')
     chooseOption(sentiment, 'Bearish')
+    await settle(() => requested('GET', '/assets'))
+    await within(dialog).findAllByText('Aucun actif')
     chooseOption(asset, 'ETH')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Créer' }))
     await settle(() => toasts.length > 0)
@@ -292,7 +157,7 @@ describe('NotesPage — caractérisation', () => {
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Titre *'), { target: { value: 'Idée' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Créer' }))
-    await settle(() => toasts.length >= 2)
+    await settle(() => toasts.length > 0)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     await golden('creation_echec', { toasts })
   })
@@ -302,6 +167,7 @@ describe('NotesPage — caractérisation', () => {
     await screen.findByText('Accumuler le BTC')
     fireEvent.click(screen.getAllByRole('button', { name: 'Modifier la note' })[0])
     const dialog = await screen.findByRole('dialog')
+    await within(dialog).findAllByText('BTC — Bitcoin')
     const form = {
       title: (within(dialog).getByLabelText('Titre *') as HTMLInputElement).value,
       content: (within(dialog).getByLabelText('Contenu') as HTMLTextAreaElement).value,
@@ -316,17 +182,17 @@ describe('NotesPage — caractérisation', () => {
   })
 
   it('supprime une note seulement après confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     renderPage()
     await screen.findByText('Accumuler le BTC')
     fireEvent.click(screen.getAllByRole('button', { name: 'Supprimer la note' })[0])
+    const first = await screen.findByRole('alertdialog')
+    const question = within(first).getAllByText(/./).map((el) => el.textContent)
+    fireEvent.click(within(first).getByRole('button', { name: 'Annuler' }))
+    await settle(() => !screen.queryByRole('alertdialog'))
     expect(requested('DELETE', '/notes/n1')).toBe(false)
     fireEvent.click(screen.getAllByRole('button', { name: 'Supprimer la note' })[0])
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Supprimer' }))
     await settle(() => toasts.length > 0)
-    await golden('suppression', {
-      confirmations: confirm.mock.calls,
-      calls: calls.filter((c) => c.method !== 'GET'),
-      toasts,
-    })
+    await golden('suppression', { question, calls: calls.filter((c) => c.method !== 'GET'), toasts })
   })
 })

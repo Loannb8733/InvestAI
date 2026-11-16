@@ -8,7 +8,7 @@ import type { Note } from '../types'
 interface NoteCardProps {
   note: Note
   onEdit: (note: Note) => void
-  onDelete: (id: string) => void
+  onDelete: (note: Note) => void
 }
 
 function SentimentBadge({ sentiment }: { sentiment: string }) {
@@ -33,16 +33,7 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             <Button variant="ghost" size="icon" onClick={() => onEdit(note)} aria-label="Modifier la note">
               <Edit className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (confirm('Supprimer cette note ?')) {
-                  onDelete(note.id)
-                }
-              }}
-              aria-label="Supprimer la note"
-            >
+            <Button variant="ghost" size="icon" onClick={() => onDelete(note)} aria-label="Supprimer la note">
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
