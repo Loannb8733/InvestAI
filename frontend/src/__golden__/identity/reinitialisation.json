@@ -1,0 +1,19 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/reset-password",
+      "body": {
+        "token": "tok-123",
+        "new_password": "Nouveau-Passe42"
+      }
+    }
+  ],
+  "toasts": [],
+  "text": [
+    "Nouveau mot de passe",
+    "Mot de passe réinitialisé",
+    "Votre mot de passe a été réinitialisé avec succès.",
+    "Se connecter"
+  ]
+}

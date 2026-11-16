@@ -1,0 +1,16 @@
+{
+  "calls": [
+    {
+      "method": "PATCH",
+      "url": "/users/u2",
+      "body": {
+        "is_active": true
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Statut mis à jour"
+    }
+  ]
+}

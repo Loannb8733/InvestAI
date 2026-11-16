@@ -1,0 +1,31 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/mfa/setup"
+    },
+    {
+      "method": "POST",
+      "url": "/auth/mfa/verify",
+      "body": {
+        "code": "123456"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "MFA activée",
+      "description": "L'authentification à deux facteurs est maintenant active."
+    }
+  ],
+  "shown": [
+    "Configurer la MFA",
+    "Scannez le QR code avec votre application d'authentification (Google Authenticator, Authy, etc.)",
+    "Clé secrète (si vous ne pouvez pas scanner) :",
+    "JBSWY3DPEHPK3PXP",
+    "Code à 6 chiffres",
+    "Vérifier et activer",
+    "Fermer"
+  ],
+  "me": 2
+}

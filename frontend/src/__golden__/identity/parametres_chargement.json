@@ -1,0 +1,31 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/auth/me"
+    }
+  ],
+  "fields": [
+    [
+      "email",
+      "jeanne@example.com"
+    ],
+    [
+      "firstName",
+      "Jeanne"
+    ],
+    [
+      "lastName",
+      "Martin"
+    ],
+    [
+      "monthlyDca",
+      "250"
+    ]
+  ],
+  "selects": [
+    "EUR (€)",
+    "30 %",
+    "Modéré"
+  ]
+}

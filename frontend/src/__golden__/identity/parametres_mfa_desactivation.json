@@ -1,0 +1,18 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/mfa/disable",
+      "body": {
+        "code": "654321"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "MFA désactivée",
+      "description": "L'authentification à deux facteurs a été désactivée."
+    }
+  ],
+  "auth": false
+}

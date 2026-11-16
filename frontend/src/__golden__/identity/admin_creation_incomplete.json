@@ -1,0 +1,9 @@
+{
+  "calls": [],
+  "toasts": [
+    {
+      "variant": "destructive",
+      "title": "Email et mot de passe requis"
+    }
+  ]
+}

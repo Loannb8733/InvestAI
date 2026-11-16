@@ -1,0 +1,40 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/login",
+      "body": {
+        "email": "jeanne@example.com",
+        "password": "Secret-42xyz",
+        "remember_me": false
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/auth/me"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Connexion réussie",
+      "description": "Bienvenue sur InvestAI"
+    }
+  ],
+  "where": "/",
+  "auth": {
+    "user": {
+      "id": "u1",
+      "email": "jeanne@example.com",
+      "role": "user",
+      "firstName": "Jeanne",
+      "lastName": "Martin",
+      "preferredCurrency": "EUR",
+      "mfaEnabled": false,
+      "telegramEnabled": false
+    },
+    "accessToken": "access-1",
+    "refreshToken": "refresh-1",
+    "isAuthenticated": true,
+    "error": null
+  }
+}

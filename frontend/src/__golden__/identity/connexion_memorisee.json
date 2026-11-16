@@ -1,0 +1,11 @@
+{
+  "login": {
+    "method": "POST",
+    "url": "/auth/login",
+    "body": {
+      "email": "jeanne@example.com",
+      "password": "Secret-42xyz",
+      "remember_me": true
+    }
+  }
+}
