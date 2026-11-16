@@ -1,18 +1,25 @@
 name: investai
 
+x-app: &app
+  build:
+    context: ../../backend
+    dockerfile: Dockerfile.render
+    args:
+      WITH_PROPHET: "true"
+  image: investai-app
+  env_file: .env
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
 services:
   api:
-    build:
-      context: ../../backend
-      dockerfile: Dockerfile.render
-    env_file: .env
+    <<: *app
     environment:
       PORT: "8000"
       REDIS_URL: redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+      CELERY_WORKER_AVAILABLE: "true"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 30s
@@ -20,9 +27,28 @@ services:
       retries: 3
       start_period: 60s
 
+  worker:
+    <<: *app
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_WORKER_AVAILABLE: "true"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    command: >-
+      celery -A app.tasks.celery_app worker --beat --loglevel=info --concurrency=2
+      --schedule=/beat/celerybeat-schedule --without-heartbeat --without-gossip --without-mingle
+    volumes:
+      - beat_schedule:/beat
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
   redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -50,5 +76,6 @@ services:
 
 volumes:
   redis_data:
+  beat_schedule:
   caddy_data:
   caddy_config:

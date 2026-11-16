@@ -1,8 +1,10 @@
 # Héberger l'API sur Oracle Cloud (Always Free)
 
-L'API tourne aujourd'hui sur Render gratuit : un dixième de processeur, mise en veille après 15 minutes. Ce guide la
-déplace sur une VM ARM Oracle Cloud toujours allumée (2 processeurs, 12 Go), avec Caddy pour le HTTPS et un Redis
-local à la place d'Upstash. La base reste sur Supabase, le frontend sur Vercel.
+L'API tourne aujourd'hui sur Render gratuit : un dixième de processeur, 512 Mo, mise en veille après 15 minutes. Ce
+guide la déplace sur une VM ARM Oracle Cloud toujours allumée (4 processeurs, 24 Go), avec Caddy pour le HTTPS, un
+Redis local à la place d'Upstash et un **worker Celery** (avec son planificateur `beat`) qui exécute les tâches
+planifiées, dont le calcul par lots des prévisions (Prophet compris). La base reste sur Supabase, le frontend sur
+Vercel. Pourquoi : `docs/ADR.md`, ADR-014.
 
 Fichiers : `deploy/oracle/` (`docker-compose.yml`, `Caddyfile`, `.env.example`, `setup-vm.sh`, `deploy.sh`) et
 `.github/workflows/deploy-oracle.yml`.
@@ -29,7 +31,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/oracle_investai -C investai-oracle
 *Compute → Instances → Create instance* :
 
 - Image : **Canonical Ubuntu 24.04**.
-- Shape : **Ampere VM.Standard.A1.Flex**, 2 OCPU, 12 Go.
+- Shape : **Ampere VM.Standard.A1.Flex**, 4 OCPU, 24 Go (tout le quota Always Free : le calcul ML en profite).
 - Réseau : sous-réseau public, adresse IPv4 publique attribuée.
 - SSH : coller le contenu de `~/.ssh/oracle_investai.pub`.
 
@@ -83,6 +85,21 @@ curl https://api.<ton-domaine>/health/ready
 
 `/health/ready` doit répondre `"database":"ok"` et `"redis":"ok"`. Le premier build prend une dizaine de minutes.
 
+Le worker démarre après l'API (qui applique les migrations) :
+
+```bash
+cd ~/InvestAI/deploy/oracle
+docker compose logs --tail 30 worker
+docker compose exec worker celery -A app.tasks.celery_app inspect registered
+```
+
+Le premier calcul par lots des prévisions a lieu à 02 h 45 UTC ; pour ne pas attendre :
+
+```bash
+docker compose exec worker celery -A app.tasks.celery_app call app.domains.predictions.tasks.run_daily_predictions
+docker compose logs -f worker
+```
+
 ## 8. Déploiement automatique
 
 À chaque CI verte sur `main`, `.github/workflows/deploy-oracle.yml` se connecte en SSH et lance `deploy.sh`. Clé
@@ -108,8 +125,13 @@ Tant que `ORACLE_HOST` n'existe pas, le workflow ne fait rien.
 ## 9. Basculer le frontend
 
 Une fois `/health/ready` correct, changer dans `vercel.json` la destination des réécritures `/api/v1/:path*` et
-`VITE_WS_URL` vers `https://api.<ton-domaine>`. Garder Render quelques jours en secours, puis le suspendre
+`VITE_WS_URL` vers `https://api.<ton-domaine>`. Dans GitHub, *Settings → Secrets and variables → Actions →
+Variables*, créer `API_BASE_URL` = `https://api.<ton-domaine>` : le workflow *Scheduled Tasks* appellera la VM au
+lieu de Render. Garder Render quelques jours en secours, puis le suspendre
 (*Render → investai-api → Settings → Suspend*). Upstash n'est plus utilisé par InvestAI.
+
+Tant que Render tourne, son planificateur interne exécute aussi les tâches quand il est éveillé : sans conséquence
+(mêmes calculs, même base), mais le suspendre évite les doublons dans le journal des tâches.
 
 ## Exploitation
 

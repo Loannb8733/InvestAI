@@ -322,3 +322,38 @@ recevait un historique tiré au hasard, utilisé ensuite dans la VaR et les corr
 incomplète au lieu d'attendre une API tierce. La migration `d5f9a3b4c6e7` ajoute
 `volume` et supprime les lignes d'actions et d'ETF, rechargées converties au passage
 suivant de la tâche.
+
+
+## ADR-014 : Prévisions calculées par lots dans un worker, sur une VM Oracle
+
+**Contexte :** sur Render gratuit (0,1 processeur, 512 Mo, mise en veille après 15 min),
+le moteur de prévision ne fonctionnait pas réellement en production (mesures du
+2026-11-16) : une prévision d'ensemble sur 365 jours coûte ~10 s de processeur en local,
+soit ~100 s par actif à 0,1 processeur, refaite dans la requête dès que le cache de 30 min
+expire ; Prophet était absent de l'image (pic mémoire mesuré à 433 Mo avec lui, pour une
+limite de 512 Mo) ; le planificateur intégré à l'API (ADR-011) ne lance une tâche
+quotidienne que si le service reste éveillé, et repart de « vient de tourner » quand Redis
+est illisible.
+
+**Options :** (A) rester sur Render et calculer les prévisions dans un job GitHub Actions
+qui écrit en base, l'API ne faisant que lire ; (B) reprendre la migration Oracle (kit
+`deploy/oracle`) et y ajouter un worker Celery. Choix de l'utilisateur : **B**.
+
+**Décision :**
+
+| Élément | Choix |
+|---|---|
+| Hébergement | VM Ampere A1 Always Free, 4 OCPU / 24 Go ; API, worker, Redis local, Caddy |
+| Exécution planifiée | worker Celery avec `beat` embarqué (`--beat`), état du planificateur dans un volume ; l'API a `CELERY_WORKER_AVAILABLE=true`, son planificateur interne est éteint |
+| Image | `Dockerfile.render` avec `WITH_PROPHET=true` sur la VM (Prophet, XGBoost, ARIMA présents) ; `false` par défaut pour Render |
+| Prévisions | calcul par lots à 02 h 45 UTC (`run_daily_predictions`) des horizons proposés par l'interface (7, 14, 30 j) pour les actifs détenus hors stablecoins ; résultat en cache 25 h et servi tel quel ; une requête ne calcule que ce que le lot n'a pas couvert (cache de 30 min) |
+| Journal des prévisions | une entrée par symbole, horizon et date cible ; contrôle à la date cible + 1 jour avec le cours enregistré ce jour-là |
+| Durées | `run_daily_predictions` 1 h, `tune_hyperparameters` 2 h, `backfill_history` 1 h (au lieu de la limite commune de 5 min) |
+| Redis | `volatile-lru` : seules les clés de cache à durée de vie sont évincées, jamais la file Celery |
+
+**Conséquences :** les pages de prévision lisent un cache rempli chaque nuit ; le cours
+« actuel » d'une prévision servie date du calcul (au plus 25 h). Tant que Render reste
+actif, son planificateur interne lance aussi ces tâches quand il est éveillé : suspendre
+Render une fois la VM en service (`docs/deploy-oracle.md`, étape 9). Le jour où la VM
+disparaît, retirer `CELERY_WORKER_AVAILABLE` remet le planificateur dans l'API (ADR-011).
+Évaluation du moteur avant/après : `docs/ml-evaluation.md`.

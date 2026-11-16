@@ -12,7 +12,7 @@ on:
         type: string
 
 env:
-  BASE_URL: https://investai-api.onrender.com/api/v1/cron
+  BASE_URL: ${{ vars.API_BASE_URL || 'https://investai-api.onrender.com' }}/api/v1/cron
 
 jobs:
   trigger:
