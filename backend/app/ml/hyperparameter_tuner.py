@@ -14,6 +14,7 @@ XGBOOST_DEFAULTS = {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1}
 PROPHET_DEFAULTS = {"changepoint_prior_scale": 0.1}
 LOOKBACK = 7
 HORIZON = 7
+TUNING_SEED = 0
 
 
 def _split_errors(regressor: Any, params: dict[str, Any], arr: np.ndarray, split: int) -> list[float]:
@@ -69,7 +70,7 @@ def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict[str, Any]:
         }
         return _walk_forward_mape(XGBRegressor, params, arr)
 
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=TUNING_SEED))
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
     best: dict[str, Any] = study.best_params
     logger.info("XGBoost tuning complete: MAPE=%.2f%%, params=%s", study.best_value, best)
@@ -99,8 +100,8 @@ def tune_prophet(prices: list[float], dates: list[datetime], n_trials: int = 15)
             yearly_seasonality=False,
             changepoint_prior_scale=cps,
             seasonality_mode=seasonality_mode,
-            interval_width=0.95,
             mcmc_samples=0,
+            uncertainty_samples=0,
         )
         model.fit(pd.DataFrame({"ds": dates[:split], "y": prices[:split]}))
         fc = model.predict(model.make_future_dataframe(periods=HORIZON)).tail(HORIZON)
@@ -111,7 +112,7 @@ def tune_prophet(prices: list[float], dates: list[datetime], n_trials: int = 15)
         ]
         return float(np.mean(errors)) * 100 if errors else 100.0
 
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=TUNING_SEED))
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
     logger.info("Prophet tuning complete: MAPE=%.2f%%, params=%s", study.best_value, study.best_params)
     best: dict[str, Any] = study.best_params
