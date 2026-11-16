@@ -15,6 +15,7 @@ from app.ml import adaptive_thresholds
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.drift_detector import check_drift
 from app.ml.forecasting.ensemble import PriceForecaster
+from app.ml.forecasting.types import ForecastResult
 from app.ml.market_context import compute_market_context
 from app.ml.regime.detector import MarketRegimeDetector
 from tests.ml.series import SERIES, dates, with_spike
@@ -24,6 +25,10 @@ UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 NOW = datetime(2025, 9, 1, 12, 0, tzinfo=UTC)
 REL_TOL = 1e-4
 ABS_TOL = 1e-6
+FITTED_REL_TOL = 5e-2
+PROPHET_MIN_POINTS = 14
+DETERMINISTIC_MODELS = ("EMA", "Linear", "MeanReversion")
+TRENDS = {"bullish", "bearish", "neutral"}
 CONTEXTS = [("bull", "crypto"), ("bear", "stock"), ("range", "etf"), ("calm", "real_estate")]
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis")
@@ -56,28 +61,30 @@ def _plain(value: Any) -> Any:
     return value
 
 
-def _mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
+def _mismatches(expected: Any, actual: Any, rel_tol: float, path: str = "") -> list[str]:
     if isinstance(expected, float) and isinstance(actual, float):
-        same = math.isclose(expected, actual, rel_tol=REL_TOL, abs_tol=ABS_TOL)
+        same = math.isclose(expected, actual, rel_tol=rel_tol, abs_tol=ABS_TOL)
         return [] if same else [f"{path}: {expected} -> {actual}"]
     if isinstance(expected, dict) and isinstance(actual, dict):
         if expected.keys() != actual.keys():
             return [f"{path}: clés {sorted(expected)} -> {sorted(actual)}"]
-        return [m for key in expected for m in _mismatches(expected[key], actual[key], f"{path}.{key}")]
+        return [m for key in expected for m in _mismatches(expected[key], actual[key], rel_tol, f"{path}.{key}")]
     if isinstance(expected, list) and isinstance(actual, list) and len(expected) == len(actual):
         return [
-            m for i, (e, a) in enumerate(zip(expected, actual, strict=True)) for m in _mismatches(e, a, f"{path}[{i}]")
+            m
+            for i, (e, a) in enumerate(zip(expected, actual, strict=True))
+            for m in _mismatches(e, a, rel_tol, f"{path}[{i}]")
         ]
     return [] if expected == actual else [f"{path}: {expected!r} -> {actual!r}"]
 
 
-def _check(name: str, observed: Any) -> None:
+def _check(name: str, observed: Any, rel_tol: float = REL_TOL) -> None:
     path = GOLDEN / f"{name}.json"
     rendered = json.dumps(_plain(observed), indent=2, ensure_ascii=False, sort_keys=True, default=str) + "\n"
     if UPDATE or not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(rendered, encoding="utf-8")
-    mismatches = _mismatches(json.loads(path.read_text(encoding="utf-8")), json.loads(rendered))
+    mismatches = _mismatches(json.loads(path.read_text(encoding="utf-8")), json.loads(rendered), rel_tol)
     assert not mismatches, f"golden {name} différent (GOLDEN_UPDATE=1) :\n" + "\n".join(mismatches[:20])
 
 
@@ -174,16 +181,45 @@ def test_drift() -> None:
     _check("drift", observed)
 
 
+def _assert_coherent(result: ForecastResult, days: int) -> None:
+    bands = zip(result.confidence_low, result.prices, result.confidence_high, strict=True)
+    assert len(result.dates) == len(result.prices) == days
+    assert all(0 <= low <= price <= high and math.isfinite(high) for low, price, high in bands)
+    assert result.trend in TRENDS
+    if len(result.models_detail) > 1:
+        assert abs(sum(d["weight_pct"] for d in result.models_detail) - 100) <= len(result.models_detail)
+        assert all(d["trend"] in TRENDS for d in result.models_detail)
+
+
+def _fitted_anchor(results: dict[str, ForecastResult]) -> dict[str, Any]:
+    for key, result in results.items():
+        _assert_coherent(result, int(key.rsplit("_", 1)[1]))
+    return {
+        key: {"dates": r.dates, "models": [d["name"] for d in r.models_detail], "prices": r.prices}
+        for key, r in results.items()
+    }
+
+
 @pytest.mark.parametrize("name", ["bull", "bear", "range", "calm"])
 def test_forecast(name: str) -> None:
     forecaster = PriceForecaster()
-    prices = SERIES[name]
-    observed = {f"single_{horizon}": forecaster.forecast(prices, dates(len(prices)), horizon) for horizon in (7, 30)}
-    observed["ensemble_7"] = forecaster.ensemble_forecast(prices, dates(len(prices)), 7)
-    observed["ensemble_30"] = forecaster.ensemble_forecast(
-        prices, dates(len(prices)), 30, market_context=_context(name, "crypto")
-    )
+    prices, when = SERIES[name], dates(len(SERIES[name]))
+    observed = {
+        f"{model}_{horizon}": forecaster.run_model(model, prices, when, horizon)
+        for model in DETERMINISTIC_MODELS
+        for horizon in (7, 30)
+    }
     _check(f"forecast_{name}", observed)
+
+
+@pytest.mark.parametrize("name", ["bull", "bear", "range", "calm"])
+def test_fitted_forecast(name: str) -> None:
+    forecaster = PriceForecaster()
+    prices, when = SERIES[name], dates(len(SERIES[name]))
+    results = {f"single_{horizon}": forecaster.forecast(prices, when, horizon) for horizon in (7, 30)}
+    results["ensemble_7"] = forecaster.ensemble_forecast(prices, when, 7)
+    results["ensemble_30"] = forecaster.ensemble_forecast(prices, when, 30, market_context=_context(name, "crypto"))
+    _check(f"forecast_{name}_fitted", _fitted_anchor(results), rel_tol=FITTED_REL_TOL)
 
 
 def test_hyperparameter_tuning() -> None:
@@ -202,11 +238,15 @@ def test_hyperparameter_tuning() -> None:
 
 def test_forecast_short_series() -> None:
     forecaster = PriceForecaster()
-    observed = {}
+    observed: dict[str, Any] = {}
+    fitted: dict[str, ForecastResult] = {}
     for count in (3, 8, 16, 25):
         prices = SERIES["bull"][:count]
-        observed[f"len_{count}"] = {
-            "single": forecaster.forecast(prices, dates(count), 7),
-            "ensemble": forecaster.ensemble_forecast(prices, dates(count), 7),
-        }
+        single = forecaster.forecast(prices, dates(count), 7)
+        ensemble = forecaster.ensemble_forecast(prices, dates(count), 7)
+        if count < PROPHET_MIN_POINTS:
+            observed[f"len_{count}"] = {"single": single, "ensemble": ensemble}
+        else:
+            fitted |= {f"len_{count}_single_7": single, f"len_{count}_ensemble_7": ensemble}
     _check("forecast_short", observed)
+    _check("forecast_short_fitted", _fitted_anchor(fitted), rel_tol=FITTED_REL_TOL)
