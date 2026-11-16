@@ -96,7 +96,6 @@ comments	frontend/src/lib/constants.ts
 comments	frontend/src/lib/lazyWithRetry.ts
 comments	frontend/src/lib/oklch.ts
 comments	frontend/src/lib/platforms.ts
-comments	frontend/src/lib/queryClient.ts
 comments	frontend/src/lib/queryKeys.ts
 comments	frontend/src/lib/utils.ts
 comments	frontend/src/pages/AdminPage.tsx

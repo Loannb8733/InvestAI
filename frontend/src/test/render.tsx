@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createQueryClient } from '@/lib/queryClient'
 
 export function renderWithQuery(element: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
+  return render(<QueryClientProvider client={createQueryClient(false)}>{element}</QueryClientProvider>)
 }
 
 export async function settle(predicate: () => boolean) {

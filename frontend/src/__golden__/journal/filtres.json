@@ -30,15 +30,6 @@
         "skip": 0,
         "limit": 50
       }
-    },
-    {
-      "method": "GET",
-      "url": "/notes",
-      "params": {
-        "search": "btc",
-        "skip": 0,
-        "limit": 50
-      }
     }
   ]
 }

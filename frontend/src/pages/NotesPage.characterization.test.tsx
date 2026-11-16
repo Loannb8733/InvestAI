@@ -65,7 +65,6 @@ describe('NotesPage — caractérisation', () => {
     fireEvent.click(screen.getByText('long terme', { selector: '.cursor-pointer' }))
     await settle(() => calls.some((c) => (c.params as { tag?: string } | undefined)?.tag === 'long terme'))
     fireEvent.click(screen.getByText('Tous'))
-    await settle(() => calls.filter((c) => JSON.stringify(c.params) === '{"search":"btc","skip":0,"limit":50}').length === 2)
     await golden('filtres', { calls })
   })
 
