@@ -1,7 +1,7 @@
+import asyncio
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
 
 import numpy as np
 from sqlalchemy import Row, and_, select
@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db.session import session_factory
 from app.core.redis_client import cache_hyperparams
 from app.domains.identity.models import User
-from app.domains.market_data.history.reader import local_series
-from app.domains.market_data.prices.service import price_feed
+from app.domains.market_data.history.reader import local_history, local_series
 from app.domains.notifications.telegram.client import telegram_service
-from app.domains.portfolio.models import Asset, AssetType, Portfolio
-from app.domains.predictions.accuracy import record_outcome
+from app.domains.portfolio.classification import is_stablecoin
+from app.domains.portfolio.models import Asset, AssetType
+from app.domains.predictions.accuracy import LOOKBACK_DAYS, SETTLE_DELAY, give_up, price_on, record_outcome
+from app.domains.predictions.bottom_zones import bottom_zone_alerts
+from app.domains.predictions.forecast import PRECOMPUTED_TTL_S
 from app.domains.predictions.models import PredictionLog
 from app.domains.predictions.service import prediction_service
 from app.domains.predictions.types import AnomalyDetection
@@ -26,8 +28,9 @@ from app.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 ACCURACY_BATCH = 100
-BOTTOM_CONFIDENCE = 0.80
-BOTTOM_DISTANCE_PCT = 5.0
+BATCH_HORIZONS = (7, 14, 30)
+BATCH_TIME_LIMIT_S = 3600
+TUNING_TIME_LIMIT_S = 7200
 
 
 async def _held_assets(db: AsyncSession) -> Sequence[Row[str, AssetType]]:
@@ -35,29 +38,36 @@ async def _held_assets(db: AsyncSession) -> Sequence[Row[str, AssetType]]:
     return result.all()
 
 
-@celery_app.task(name="app.domains.predictions.tasks.run_daily_predictions")  # type: ignore[untyped-decorator]
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="app.domains.predictions.tasks.run_daily_predictions", time_limit=BATCH_TIME_LIMIT_S
+)
 def run_daily_predictions() -> None:
-    """Prévision à 7 jours de chaque actif détenu, pour alimenter le journal des prédictions."""
+    """Calcul par lots des prévisions à 7, 14 et 30 jours de chaque actif détenu hors stablecoins : mises en cache
+    pour la journée, servies telles quelles aux pages, et journalisées pour le suivi de précision."""
     run_async(_run_daily_predictions())
 
 
-async def _run_daily_predictions() -> None:
+async def _run_daily_predictions() -> dict[str, int]:
     async with session_factory() as db:
-        assets = await _held_assets(db)
-        logger.info("Running daily predictions for %d unique assets", len(assets))
+        assets = [(s, t) for s, t in await _held_assets(db) if not is_stablecoin(s)]
+    logger.info("Running batch predictions for %d unique assets", len(assets))
 
-        success = 0
-        errors = 0
-        for symbol, asset_type in assets:
+    success = 0
+    errors = 0
+    for symbol, asset_type in assets:
+        for days in BATCH_HORIZONS:
             try:
-                prediction = await prediction_service.get_price_prediction(symbol, asset_type, days_ahead=7)
-                logger.info("Prediction for %s: trend=%s, model=%s", symbol, prediction.trend, prediction.model_used)
+                prediction = await prediction_service.get_price_prediction(
+                    symbol, asset_type, days, refresh=True, cache_ttl=PRECOMPUTED_TTL_S
+                )
+                logger.info("Prediction %s %dd: model=%s", symbol, days, prediction.model_used)
                 success += 1
             except Exception as e:  # noqa: BLE001
-                logger.error("Failed prediction for %s: %s", symbol, e)
+                logger.error("Failed prediction for %s %dd: %s", symbol, days, e)
                 errors += 1
 
-        logger.info("Daily predictions complete: %d success, %d errors", success, errors)
+    logger.info("Batch predictions complete: %d success, %d errors", success, errors)
+    return {"assets": len(assets), "success": success, "errors": errors}
 
 
 @celery_app.task(name="app.domains.predictions.tasks.detect_anomalies")  # type: ignore[untyped-decorator]
@@ -106,8 +116,10 @@ async def _detect_anomalies() -> None:
 
 @celery_app.task(name="app.domains.predictions.tasks.check_prediction_accuracy")  # type: ignore[untyped-decorator]
 def check_prediction_accuracy() -> None:
-    """Confronte les prédictions échues au cours réel : MAPE, direction, couverture de l'intervalle, alerte de dérive
-    au-delà de 20 % (crypto) ou 10 % de MAPE. Échéance et date de contrôle sont stockées en UTC sans fuseau."""
+    """Confronte les prédictions échues au cours enregistré à leur date cible : MAPE, direction, couverture de
+    l'intervalle, alerte de dérive au-delà de 20 % (crypto) ou 10 % de MAPE. Une prédiction n'est contrôlée qu'un
+    jour après sa date cible, quand le cours de ce jour est définitif ; sans cours une semaine plus tard, elle est
+    close sans mesure. Échéance et date de contrôle sont stockées en UTC sans fuseau."""
     run_async(_check_prediction_accuracy())
 
 
@@ -116,7 +128,8 @@ async def _check_prediction_accuracy() -> None:
     async with session_factory() as db:
         result = await db.execute(
             select(PredictionLog)
-            .where(and_(PredictionLog.target_date <= now, PredictionLog.accuracy_checked.is_(None)))
+            .where(and_(PredictionLog.target_date <= now - SETTLE_DELAY, PredictionLog.accuracy_checked.is_(None)))
+            .order_by(PredictionLog.target_date)
             .limit(ACCURACY_BATCH)
         )
         logs = result.scalars().all()
@@ -124,15 +137,18 @@ async def _check_prediction_accuracy() -> None:
             logger.info("No predictions to check")
             return
 
+        oldest = min(log.target_date for log in logs if log.target_date is not None)
+        history = await local_history({log.symbol for log in logs}, (now - oldest).days + LOOKBACK_DAYS + 1, db)
         checked = 0
         drift_alerts = 0
+        expired = 0
         for log in logs:
             try:
-                asset_type = AssetType(log.asset_type) if log.asset_type else AssetType.CRYPTO
-                quote = await price_feed.quote(log.symbol, asset_type)
-                if quote is None:
+                actual = price_on(history[log.symbol.upper()], log.target_date.date()) if log.target_date else None
+                if actual is None:
+                    expired += give_up(log, now)
                     continue
-                threshold = record_outcome(log, float(quote.price), now)
+                threshold = record_outcome(log, actual, now)
                 if threshold is not None:
                     drift_alerts += 1
                     logger.warning(
@@ -147,7 +163,12 @@ async def _check_prediction_accuracy() -> None:
                 logger.error("Failed to check prediction for %s: %s", log.symbol, e)
 
         await db.commit()
-        logger.info("Prediction accuracy check: %d checked, %d drift alerts", checked, drift_alerts)
+        logger.info(
+            "Prediction accuracy check: %d checked, %d drift alerts, %d closed without price",
+            checked,
+            drift_alerts,
+            expired,
+        )
 
 
 @celery_app.task(name="app.domains.predictions.tasks.check_data_drift")  # type: ignore[untyped-decorator]
@@ -191,7 +212,9 @@ async def _check_data_drift() -> None:
     )
 
 
-@celery_app.task(name="app.domains.predictions.tasks.tune_hyperparameters")  # type: ignore[untyped-decorator]
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="app.domains.predictions.tasks.tune_hyperparameters", time_limit=TUNING_TIME_LIMIT_S
+)
 def tune_hyperparameters() -> None:
     """Réglage hebdomadaire des hyperparamètres XGBoost et Prophet sur 90 jours, mis en cache par symbole."""
     run_async(_tune_hyperparameters())
@@ -209,10 +232,10 @@ async def _tune_hyperparameters() -> None:
             if not prices or len(prices) < 40:
                 continue
 
-            xgb_params = tune_xgboost(prices, n_trials=20)
+            xgb_params = await asyncio.to_thread(tune_xgboost, prices, 20)
             await cache_hyperparams(symbol, "xgboost", xgb_params)
             if len(prices) >= 30:
-                prophet_params = tune_prophet(prices, dates, n_trials=10)
+                prophet_params = await asyncio.to_thread(tune_prophet, prices, dates, 10)
                 await cache_hyperparams(symbol, "prophet", prophet_params)
 
             logger.info("Tuned hyperparameters for %s", symbol)
@@ -224,51 +247,6 @@ async def _tune_hyperparameters() -> None:
 def check_bottom_zones() -> None:
     """Alerte Telegram aux détenteurs d'un actif à moins de 5 % d'un creux estimé avec plus de 80 % de confiance."""
     run_async(_check_bottom_zones())
-
-
-async def _holders(db: AsyncSession, symbol: str) -> Sequence[User]:
-    result = await db.execute(
-        select(User)
-        .join(Portfolio, Portfolio.user_id == User.id)
-        .join(Asset, Asset.portfolio_id == Portfolio.id)
-        .where(
-            Asset.symbol == symbol,
-            Asset.quantity > 0,
-            User.telegram_enabled.is_(True),
-            User.telegram_chat_id.isnot(None),
-        )
-        .distinct()
-    )
-    return result.scalars().all()
-
-
-async def _bottom_zone_alerts(
-    db: AsyncSession, symbol: str, current_price: float, bottom: dict[str, Any]
-) -> AsyncIterator[None]:
-    confidence = bottom.get("confidence", 0)
-    distance_pct = abs(bottom.get("distance_pct", 100))
-    if not (confidence > BOTTOM_CONFIDENCE and distance_pct < BOTTOM_DISTANCE_PCT):
-        return
-
-    for holder in await _holders(db, symbol):
-        sent = await telegram_service.alert_bottom_zone(
-            symbol=symbol,
-            current_price=current_price,
-            estimated_bottom=bottom.get("estimated_price", 0),
-            confidence=confidence,
-            distance_pct=distance_pct,
-            chat_id=holder.telegram_chat_id or "",
-            user_id=str(holder.id),
-        )
-        if sent:
-            yield
-            logger.info(
-                "Bottom zone alert sent for %s to user %s (conf=%.0f%%, dist=%.1f%%)",
-                symbol,
-                holder.id,
-                confidence * 100,
-                distance_pct,
-            )
 
 
 async def _check_bottom_zones() -> None:
@@ -285,7 +263,7 @@ async def _check_bottom_zones() -> None:
                 estimate = prediction_service.estimate_top_bottom(
                     symbol=symbol, prices=prices, current_price=current_price
                 )
-                async for _ in _bottom_zone_alerts(db, symbol, current_price, estimate.get("next_bottom", {})):
+                async for _ in bottom_zone_alerts(db, symbol, current_price, estimate.get("next_bottom", {})):
                     alerts_sent += 1
             except Exception as e:  # noqa: BLE001
                 logger.debug("Bottom zone check failed for %s: %s", symbol, e)

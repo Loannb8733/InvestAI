@@ -6,43 +6,36 @@ from typing import Any
 
 import numpy as np
 
-from app.ml.forecasting.features import build_features
+from app.ml.forecasting.models.xgboost import FIRST_ROW, forecast_prices
 
 logger = logging.getLogger(__name__)
 
 XGBOOST_DEFAULTS = {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1}
 PROPHET_DEFAULTS = {"changepoint_prior_scale": 0.1}
-LOOKBACK = 7
 HORIZON = 7
+MIN_ROWS = 10
 TUNING_SEED = 0
 
 
-def _split_errors(regressor: Any, params: dict[str, Any], arr: np.ndarray, split: int) -> list[float]:
-    rows = [build_features(arr[:split], i) for i in range(LOOKBACK + 14, split)]
-    if len(rows) < 10:
+def _split_errors(params: dict[str, Any], arr: np.ndarray, split: int) -> list[float]:
+    """Erreurs relatives à 1..7 jours du modèle de production entraîné sur ``arr[:split]``."""
+    if split - FIRST_ROW < MIN_ROWS:
         return []
-    model = regressor(**params, random_state=42, verbosity=0)
-    model.fit(np.array(rows), np.array([arr[i] for i in range(LOOKBACK + 14, split)]))
-    errors = []
-    extended = list(arr[:split])
-    for d in range(HORIZON):
-        if split + d >= len(arr):
-            break
-        pred = float(model.predict(np.array([build_features(np.array(extended), len(extended))]))[0])
-        actual = arr[split + d]
-        if actual > 0:
-            errors.append(abs(pred - actual) / actual)
-        extended.append(pred)
-    return errors
+    predicted = forecast_prices(arr[:split], HORIZON, params)
+    return [
+        abs(pred - arr[split + d]) / arr[split + d]
+        for d, pred in enumerate(predicted)
+        if split + d < len(arr) and arr[split + d] > 0
+    ]
 
 
-def _walk_forward_mape(regressor: Any, params: dict[str, Any], arr: np.ndarray) -> float:
+def _walk_forward_mape(params: dict[str, Any], arr: np.ndarray) -> float:
     errors: list[float] = []
     for split_pct in (0.6, 0.7, 0.8):
         split = int(len(arr) * split_pct)
         if split < 30 or split + HORIZON > len(arr):
             continue
-        errors.extend(_split_errors(regressor, params, arr, split))
+        errors.extend(_split_errors(params, arr, split))
     return float(np.mean(errors)) * 100 if errors else 100.0
 
 
@@ -50,7 +43,7 @@ def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict[str, Any]:
     """Hyperparamètres d'XGBoost minimisant l'erreur à 7 jours sur trois coupes successives ; défauts sous 40 cours."""
     try:
         import optuna
-        from xgboost import XGBRegressor
+        import xgboost  # noqa: F401
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
@@ -68,7 +61,7 @@ def tune_xgboost(prices: list[float], n_trials: int = 30) -> dict[str, Any]:
             "subsample": trial.suggest_float("subsample", 0.6, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
         }
-        return _walk_forward_mape(XGBRegressor, params, arr)
+        return _walk_forward_mape(params, arr)
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=TUNING_SEED))
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)

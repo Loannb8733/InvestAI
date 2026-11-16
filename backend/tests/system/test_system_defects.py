@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -14,8 +14,7 @@ from app.core.config import settings
 from app.core.errors import ServiceUnavailableError
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
-from app.domains.market_data.prices.quote import PriceQuote
-from app.domains.market_data.prices.service import price_feed
+from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.predictions import tasks as prediction_tasks
 from app.domains.predictions.models import PredictionLog
@@ -141,12 +140,8 @@ async def test_prediction_accuracy_is_checked(db_session: AsyncSession, monkeypa
             horizon_days=7,
         )
     )
+    db_session.add(AssetPriceHistory(symbol="BTC", price_date=date(2026, 10, 10), price_eur=Decimal("100"), source="t"))
     await db_session.commit()
-
-    async def quote(symbol: str, asset_type: str, currency: str = "EUR") -> PriceQuote:
-        return PriceQuote(price=Decimal("100"))
-
-    monkeypatch.setattr(price_feed, "quote", quote)
     monkeypatch.setattr(prediction_tasks, "session_factory", TestSessionLocal)
     with time_machine.travel(FROZEN_NOW, tick=False):
         await prediction_tasks._check_prediction_accuracy()

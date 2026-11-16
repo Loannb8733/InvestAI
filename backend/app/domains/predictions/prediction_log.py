@@ -2,6 +2,8 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import select
+
 from app.core.db.session import session_factory
 from app.domains.portfolio.models import AssetType
 from app.domains.predictions.models import PredictionLog
@@ -28,6 +30,20 @@ def _prediction_data(
     }
 
 
+async def _already_logged(symbol: str, days_ahead: int, target_date: datetime) -> bool:
+    async with session_factory() as db:
+        found = await db.execute(
+            select(PredictionLog.id)
+            .where(
+                PredictionLog.symbol == symbol,
+                PredictionLog.horizon_days == days_ahead,
+                PredictionLog.target_date == target_date,
+            )
+            .limit(1)
+        )
+        return found.first() is not None
+
+
 async def log_prediction(
     *,
     symbol: str,
@@ -42,18 +58,21 @@ async def log_prediction(
     regime_info: dict[str, Any] | None,
     prices: list[float],
 ) -> None:
-    """Journalise le dernier point de la prévision et son intervalle pour la calibration ; un échec est seulement
-    signalé dans les logs."""
+    """Journalise le dernier point de la prévision et son intervalle pour la calibration, une seule fois par symbole,
+    horizon et date cible ; un échec est seulement signalé dans les logs."""
     try:
         if predictions:
             last_pred = predictions[-1]
+            target_date = datetime.strptime(last_pred["date"], "%Y-%m-%d")
+            if await _already_logged(symbol, days_ahead, target_date):
+                return
             log_entry = PredictionLog(
                 symbol=symbol,
                 asset_type=asset_type.value,
                 model_name=model_used,
                 predicted_price=float(last_pred["price"]),
                 price_at_creation=float(current_price),
-                target_date=datetime.strptime(last_pred["date"], "%Y-%m-%d"),
+                target_date=target_date,
                 horizon_days=days_ahead,
                 models_detail=models_detail,
                 confidence_low=float(last_pred.get("confidence_low", 0)),

@@ -30,7 +30,9 @@ def prophet_forecast(
     params: dict[str, Any],
     volumes: list[float] | None = None,
 ) -> ForecastResult:
-    """Prophet estimé au maximum a posteriori, avec le volume en régresseur s'il couvre toute la série."""
+    """Prophet estimé au maximum a posteriori, avec le volume en régresseur s'il couvre toute la série ; trajectoire
+    et intervalle décalés de l'écart entre le dernier prix et la valeur ajustée de ce jour, pour partir du dernier
+    prix réel."""
     from prophet import Prophet
 
     df = pd.DataFrame({"ds": dates, "y": prices})
@@ -53,13 +55,15 @@ def prophet_forecast(
     if regressor is not None:
         recent = float(np.mean(regressor[-7:])) if len(regressor) >= 7 else float(np.mean(regressor))
         future["volume"] = (list(regressor) + [recent] * days_ahead)[: len(future)]
-    fc = _seeded_predict(model, future).tail(days_ahead)
-    result_prices = [max(0.0, p) for p in fc["yhat"].tolist()]
+    full = _seeded_predict(model, future)
+    offset = float(prices[-1]) - float(full["yhat"].iloc[len(prices) - 1])
+    fc = full.tail(days_ahead)
+    result_prices = [max(0.0, p + offset) for p in fc["yhat"].tolist()]
     return rounded(
         [d.strftime("%Y-%m-%d") for d in fc["ds"]],
         result_prices,
-        [max(0.0, p) for p in fc["yhat_lower"].tolist()],
-        fc["yhat_upper"].tolist(),
+        [max(0.0, p + offset) for p in fc["yhat_lower"].tolist()],
+        [p + offset for p in fc["yhat_upper"].tolist()],
         compute_trend(prices[-1], result_prices[-1], prices),
         "prophet",
     )

@@ -22,6 +22,7 @@ class PricePrediction:
     model_used: str
     models_detail: list[dict[str, Any]] | None = None
     explanations: list[dict[str, Any]] | None = None
+    skipped_models: list[dict[str, str]] | None = None
     regime_info: dict[str, Any] | None = None
     display_thresholds: dict[str, Any] | None = None
     _history_dates: list[datetime] | None = None

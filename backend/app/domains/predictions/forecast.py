@@ -17,24 +17,20 @@ from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import AssetType
 from app.domains.predictions.adjustments import apply_liquidity, apply_regime, clamp_intervals, with_liquidity_warning
 from app.domains.predictions.core import PredictionCore
-from app.domains.predictions.fallbacks import (
-    daily_volatility,
-    ema20_forecast,
-    empty_prediction,
-    random_walk_forecast,
-    smart_round,
-)
+from app.domains.predictions.fallbacks import daily_volatility, empty_prediction, random_walk_forecast, smart_round
 from app.domains.predictions.levels import support_resistance
 from app.domains.predictions.prediction_log import log_prediction
 from app.domains.predictions.recommendation import generate_recommendation
-from app.domains.predictions.types import HISTORY_DAYS, ForecastPoint, PricePrediction
+from app.domains.predictions.sanity import MAX_MOVE_PCT, Forecast, sanity_checked
+from app.domains.predictions.types import HISTORY_DAYS, PricePrediction
 from app.ml import adaptive_thresholds as at
 from app.ml.forecasting.types import ForecastResult
 from app.ml.market_context import MarketContext, compute_market_context
 
 logger = logging.getLogger(__name__)
 
-MAX_MOVE_PCT = 50
+ON_DEMAND_TTL_S = 1800
+PRECOMPUTED_TTL_S = 25 * 3600
 
 
 @dataclass
@@ -46,16 +42,6 @@ class _MarketInputs:
     fear_greed: int | None
     btc_dominance: float | None
     ctx: MarketContext | None
-
-
-@dataclass
-class _Forecast:
-    predictions: list[ForecastPoint]
-    trend: str
-    trend_strength: float
-    model_used: str
-    models_detail: list[dict[str, Any]]
-    explanations: list[dict[str, Any]]
 
 
 async def _cached_prediction(symbol: str, days_ahead: int) -> PricePrediction | None:
@@ -91,53 +77,6 @@ async def _market_inputs(symbol: str, asset_type: AssetType) -> _MarketInputs:
     prices = history.prices
     ctx = compute_market_context(prices, symbol, asset_type.value, fear_greed) if prices and len(prices) >= 30 else None
     return _MarketInputs(history.dates, prices, history.volumes, btc_prices, fear_greed, btc_dominance, ctx)
-
-
-def _points(result: ForecastResult) -> list[ForecastPoint]:
-    return [
-        {
-            "date": result.dates[i],
-            "price": smart_round(result.prices[i]),
-            "confidence_low": smart_round(result.confidence_low[i]),
-            "confidence_high": smart_round(result.confidence_high[i]),
-        }
-        for i in range(len(result.dates))
-    ]
-
-
-def _clamped(predictions: list[ForecastPoint], current_price: float) -> list[ForecastPoint]:
-    low = current_price * (1 - MAX_MOVE_PCT / 100)
-    high = current_price * (1 + MAX_MOVE_PCT / 100)
-    return [
-        {
-            **p,
-            **{key: smart_round(min(max(p[key], low), high)) for key in ("price", "confidence_low", "confidence_high")},
-        }
-        for p in predictions
-    ]
-
-
-def _sanity_checked(
-    result: ForecastResult, prices: list[float], current_price: float, days_ahead: int, symbol: str
-) -> _Forecast:
-    predictions = _points(result)
-    if predictions and current_price > 0:
-        ensemble_change_pct = (predictions[-1]["price"] - current_price) / current_price * 100
-        if abs(ensemble_change_pct) > MAX_MOVE_PCT:
-            logger.warning(
-                "SANITY CHECK: %s ensemble prediction unrealistic (%.1f%% in %dd). Falling back to EMA-20.",
-                symbol,
-                ensemble_change_pct,
-                days_ahead,
-            )
-            ema_predictions, ema_trend, ema_strength = ema20_forecast(prices, current_price, days_ahead)
-            if ema_predictions:
-                detail = [{"name": "EMA-20 (sanity fallback)", "weight_pct": 100, "mape": None, "trend": ema_trend}]
-                return _Forecast(ema_predictions, ema_trend, ema_strength, "ema20_sanity_fallback", detail, [])
-            predictions = _clamped(predictions, current_price)
-    return _Forecast(
-        predictions, result.trend, result.trend_strength, result.model_used, result.models_detail, result.explanations
-    )
 
 
 async def _levels(symbol: str, asset_type: AssetType, prices: list[float], current_price: float) -> tuple[float, float]:
@@ -180,30 +119,37 @@ class ForecastMixin(PredictionCore):
                 "model_used": result.model_used,
                 "models_detail": result.models_detail,
                 "explanations": result.explanations,
+                "skipped_models": result.skipped_models,
             },
         )
         return result
 
     async def _forecast(
         self, symbol: str, asset_type: AssetType, days_ahead: int, current_price: float, market: _MarketInputs
-    ) -> _Forecast:
+    ) -> Forecast:
         if market.prices and len(market.prices) >= 5:
             result = await self._ensemble_result(symbol, days_ahead, market)
-            return _sanity_checked(result, market.prices, current_price, days_ahead, symbol)
+            return sanity_checked(result, market.prices, current_price, days_ahead, symbol)
         logger.warning("No historical data for %s, using random walk", symbol)
         predictions, trend, trend_strength = await random_walk_forecast(symbol, current_price, asset_type, days_ahead)
-        return _Forecast(predictions, trend, trend_strength, "random_walk", [], [])
+        return Forecast(predictions, trend, trend_strength, "random_walk", [], [], [])
 
     async def get_price_prediction(
         self,
         symbol: str,
         asset_type: AssetType,
         days_ahead: int = 7,
+        *,
+        refresh: bool = False,
+        cache_ttl: int = ON_DEMAND_TTL_S,
     ) -> PricePrediction:
         """Prévision servie depuis le cache sauf si elle annonce plus de ±50 % ; sinon ensemble de modèles
         (cache d'ensemble par empreinte des cours, repli EMA-20 au-delà de ±50 %, marche déterministe sans
-        historique), corrigée du régime et de la liquidité, journalisée puis mise en cache."""
-        cached = await _cached_prediction(symbol, days_ahead)
+        historique), corrigée du régime et de la liquidité, journalisée puis mise en cache ``cache_ttl`` secondes.
+
+        ``refresh`` recalcule sans lire le cache : c'est le calcul par lots des tâches planifiées.
+        """
+        cached = None if refresh else await _cached_prediction(symbol, days_ahead)
         if cached is not None:
             return cached
 
@@ -250,7 +196,17 @@ class ForecastMixin(PredictionCore):
             prices=market.prices,
         )
         return await _cached_result(
-            symbol, days_ahead, current_price, forecast, trend, support, resistance, recommendation, regime_info, market
+            symbol,
+            days_ahead,
+            current_price,
+            forecast,
+            trend,
+            support,
+            resistance,
+            recommendation,
+            regime_info,
+            market,
+            cache_ttl,
         )
 
 
@@ -258,13 +214,14 @@ async def _cached_result(
     symbol: str,
     days_ahead: int,
     current_price: float,
-    forecast: _Forecast,
+    forecast: Forecast,
     trend: str,
     support: float,
     resistance: float,
     recommendation: str,
     regime_info: dict[str, Any] | None,
     market: _MarketInputs,
+    cache_ttl: int,
 ) -> PricePrediction:
     result_dict = {
         "symbol": symbol,
@@ -277,10 +234,11 @@ async def _cached_result(
         "recommendation": recommendation,
         "model_used": forecast.model_used,
         "models_detail": forecast.models_detail or [],
+        "skipped_models": forecast.skipped_models,
         "regime_info": regime_info,
         "display_thresholds": at.build_display_thresholds(market.ctx),
     }
-    await cache_prediction(symbol, days_ahead, result_dict)
+    await cache_prediction(symbol, days_ahead, result_dict, ttl=cache_ttl)
     return PricePrediction(
         symbol=symbol,
         current_price=current_price,
@@ -293,6 +251,7 @@ async def _cached_result(
         model_used=forecast.model_used,
         models_detail=forecast.models_detail or [],
         explanations=forecast.explanations or [],
+        skipped_models=forecast.skipped_models,
         regime_info=regime_info,
         display_thresholds=at.build_display_thresholds(market.ctx),
         _history_dates=market.dates,
