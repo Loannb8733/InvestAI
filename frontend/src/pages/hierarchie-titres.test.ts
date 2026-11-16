@@ -24,7 +24,7 @@ const lire = (f: string) => readFileSync(join(PAGES, f), 'utf-8')
 const sansCommentaires = (s: string) =>
   s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 
-const APP = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf-8')
+const APP = readFileSync(resolve(process.cwd(), 'src/app/AppRoutes.tsx'), 'utf-8')
 
 /** Pages montées comme onglet par un conteneur, et absentes des routes. */
 function pagesEnOnglet(): string[] {

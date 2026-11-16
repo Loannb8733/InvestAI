@@ -14,7 +14,7 @@ import { LEGACY_TAB_MAP, TABS } from '@/pages/intelligenceTabs'
  */
 
 // jsdom sert import.meta.url en http: — on repart de la racine du projet.
-const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf-8')
+const appSource = readFileSync(resolve(process.cwd(), 'src/app/AppRoutes.tsx'), 'utf-8')
 
 /** Chemins absolus servis par une <Route> (les enfants sont relatifs à "/"). */
 const declaredRoutes = new Set(

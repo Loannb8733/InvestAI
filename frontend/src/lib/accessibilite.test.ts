@@ -72,7 +72,7 @@ describe('A11Y-02 — les animations JS respectent prefers-reduced-motion', () =
     // La media query CSS ne neutralise que les animations/transitions CSS.
     // framer-motion pilote ses valeurs en JS : sans ce garde global, chaque
     // composant devrait se protéger lui-même, et le prochain oubli passerait.
-    const app = readFileSync(join(SRC, 'App.tsx'), 'utf-8')
+    const app = readFileSync(join(SRC, 'app', 'App.tsx'), 'utf-8')
     expect(app).toMatch(/<MotionConfig\s+reducedMotion="user">/)
   })
 })

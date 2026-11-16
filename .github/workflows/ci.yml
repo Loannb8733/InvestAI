@@ -143,6 +143,11 @@ jobs:
       - name: Type check (mypy)
         run: mypy --config-file ../pyproject.toml app
 
+      - name: Schéma OpenAPI du client à jour
+        run: |
+          python scripts/export_openapi.py ../frontend/src/shared/api/openapi.json
+          git diff --exit-code -- ../frontend/src/shared/api/openapi.json
+
       - name: Run tests with coverage
         run: pytest --cov=app --cov-report=term-missing -v
 
@@ -174,6 +179,11 @@ jobs:
 
       - name: Type check (TypeScript)
         run: npx tsc --noEmit
+
+      - name: Types du client générés à jour
+        run: |
+          npm run api:schema
+          git diff --exit-code -- src/shared/api/schema.d.ts
 
       # Les URL du client sont ecrites a la main : rien ne les relie aux routes
       # que FastAPI declare. Une route renommee d'un cote fait partir l'appel en
