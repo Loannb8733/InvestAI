@@ -13,9 +13,19 @@ export const fmtCount = (n: number) => Math.round(n).toString()
 
 export const fmtHitRate = (v: number | null | undefined) => (v == null ? '—' : `${v.toFixed(0)} %`)
 
-export const fmtPerf = (v: number | null | undefined) => {
-  if (v == null) return '—'
-  return `${v > 0 ? '+' : ''}${v.toFixed(1)} %`
+const PERF_FORMAT = new Intl.NumberFormat('fr-FR', {
+  style: 'percent',
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+})
+
+export const fmtPerf = (v: number | null | undefined) => (v == null ? '—' : PERF_FORMAT.format(v / 100))
+
+export const assetLabel = (asset: { symbol: string; name?: string | null; exchange?: string | null }) => {
+  const name = asset.name && asset.name !== asset.symbol ? ` — ${asset.name}` : ''
+  const exchange = asset.exchange ? ` · ${asset.exchange}` : ''
+  return `${asset.symbol}${name}${exchange}`
 }
 
 export const perfClass = (v: number | null | undefined) => {

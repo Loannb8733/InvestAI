@@ -30,7 +30,7 @@ type BodyOption<O> = O extends { requestBody: { content: { 'application/json': i
     ? { body?: B }
     : { body?: never }
 
-type Options<O> = PathOption<O> & QueryOption<O> & BodyOption<O>
+type Options<O> = PathOption<O> & QueryOption<O> & BodyOption<O> & { silent?: boolean }
 
 type Args<O> = object extends Options<O> ? [options?: Options<O>] : [options: Options<O>]
 
@@ -44,7 +44,7 @@ export type ResponseOf<O> = O extends { responses: { 200: infer S } }
 
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
 
-type LooseOptions = { path?: Record<string, string | number>; query?: object; body?: unknown }
+type LooseOptions = { path?: Record<string, string | number>; query?: object; body?: unknown; silent?: boolean }
 
 function fill(route: string, path: LooseOptions['path']): string {
   return route.replace(/\{(\w+)\}/g, (_, key: string) => encodeURIComponent(String(path?.[key])))
@@ -55,8 +55,8 @@ function verb<M extends Method>(method: M) {
     route: R,
     ...[options]: Args<Operation<M, R>>
   ): Promise<ResponseOf<Operation<M, R>>> => {
-    const { path, query, body } = (options ?? {}) as LooseOptions
-    const response = await http.request({ method, url: fill(route, path), params: query, data: body })
+    const { path, query, body, silent } = (options ?? {}) as LooseOptions
+    const response = await http.request({ method, url: fill(route, path), params: query, data: body, silent })
     return response.data
   }
 }

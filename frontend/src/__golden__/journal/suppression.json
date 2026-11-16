@@ -1,11 +1,9 @@
 {
-  "confirmations": [
-    [
-      "Supprimer cette note ?"
-    ],
-    [
-      "Supprimer cette note ?"
-    ]
+  "question": [
+    "Supprimer cette note ?",
+    "« Accumuler le BTC » sera définitivement supprimée.",
+    "Annuler",
+    "Supprimer"
   ],
   "calls": [
     {

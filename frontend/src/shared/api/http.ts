@@ -2,6 +2,12 @@ import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from '@/hooks/use-toast'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    silent?: boolean
+  }
+}
+
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 const MAX_RETRIES = 2
 const RETRY_DELAY_MS = 3000
@@ -63,6 +69,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
 }
 
 const notifyFailure = (error: AxiosError) => {
+  if (error.config?.silent) return
   if (error.response) {
     const status = error.response.status
     const detail = (error.response.data as { detail?: string })?.detail
