@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -45,8 +45,16 @@ const CRITIQUES = [
  */
 const DEGRADATION_GRACIEUSE = ['ReportsPage', 'SettingsPage'] as const
 
-const source = (page: string) =>
-  readFileSync(resolve(process.cwd(), `src/pages/${page}.tsx`), 'utf-8')
+const lireModule = (chemin: string) => {
+  const fichier = ['.tsx', '.ts'].map((ext) => resolve(process.cwd(), `src/${chemin}${ext}`)).find(existsSync)
+  return fichier ? readFileSync(fichier, 'utf-8') : ''
+}
+
+const source = (page: string) => {
+  const src = lireModule(`pages/${page}`)
+  const features = [...src.matchAll(/from '@\/(features\/[^']+)'/g)].map(([, chemin]) => lireModule(chemin))
+  return [src, ...features].join('\n')
+}
 
 const composant = () =>
   readFileSync(resolve(process.cwd(), 'src/components/ui/query-error-state.tsx'), 'utf-8')

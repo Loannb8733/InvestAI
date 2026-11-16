@@ -7,7 +7,6 @@ comments	backend/app/core/sentry_scrub.py
 comments	backend/app/core/symbol_map.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/tasks/celery_app.py
-comments	frontend/src/App.tsx
 comments	frontend/src/components/analytics/CorrelationMatrix.tsx
 comments	frontend/src/components/charts/CurrencyExposureChart.tsx
 comments	frontend/src/components/charts/PerformanceChart.tsx
@@ -114,7 +113,6 @@ comments	frontend/src/pages/GoalsPage.tsx
 comments	frontend/src/pages/IntelligencePage.tsx
 comments	frontend/src/pages/LoginPage.tsx
 comments	frontend/src/pages/MasterDashboardPage.tsx
-comments	frontend/src/pages/NotesPage.tsx
 comments	frontend/src/pages/PortfolioPage.tsx
 comments	frontend/src/pages/ReportsPage.tsx
 comments	frontend/src/pages/SettingsPage.tsx
@@ -166,7 +164,6 @@ too-long	frontend/src/pages/DashboardPage.tsx
 too-long	frontend/src/pages/ExchangesPage.tsx
 too-long	frontend/src/pages/GoalsPage.tsx
 too-long	frontend/src/pages/MasterDashboardPage.tsx
-too-long	frontend/src/pages/NotesPage.tsx
 too-long	frontend/src/pages/PortfolioPage.tsx
 too-long	frontend/src/pages/RegisterPage.tsx
 too-long	frontend/src/pages/ReportsPage.tsx

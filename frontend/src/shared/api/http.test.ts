@@ -39,7 +39,7 @@ vi.mock('@/stores/authStore', () => ({
 }))
 vi.mock('@/hooks/use-toast', () => ({ toast: toastMock }))
 
-const { default: api } = await import('./api')
+const { http: api } = await import('./http')
 
 type Reponse = { status: number; data?: unknown }
 let scenario: Array<Reponse | 'reseau'> = []

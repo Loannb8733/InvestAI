@@ -1,14 +1,5 @@
 import ReactDOM from 'react-dom/client'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter } from 'react-router'
-import App from './App'
-import { queryClient } from '@/lib/queryClient'
+import App from '@/app/App'
 import './index.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </QueryClientProvider>
-)
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />)
