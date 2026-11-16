@@ -22,6 +22,7 @@ export function useNotes(search: string, tag: string | null) {
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => (lastPage.length === NOTES_PER_PAGE ? pages.length : undefined),
     placeholderData: keepPreviousData,
+    meta: { suppressGlobalError: true },
   })
 }
 
@@ -38,6 +39,7 @@ export function useScorecard() {
     queryKey: [...queryKeys.notes.all, 'scorecard'],
     queryFn: () => apiClient.get('/notes/scorecard', { silent: true }),
     staleTime: 60_000,
+    meta: { suppressGlobalError: true },
   })
 }
 
