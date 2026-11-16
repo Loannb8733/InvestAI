@@ -1,0 +1,19 @@
+{
+  "calls": [
+    {
+      "method": "PATCH",
+      "url": "/auth/me",
+      "body": {
+        "tmi_rate": 0.3,
+        "risk_profile": "aggressive",
+        "monthly_dca_eur": 400
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Profil investisseur mis à jour",
+      "description": "Vos paramètres financiers ont été enregistrés."
+    }
+  ]
+}

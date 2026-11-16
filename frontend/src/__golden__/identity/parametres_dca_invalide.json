@@ -1,0 +1,10 @@
+{
+  "calls": [],
+  "toasts": [
+    {
+      "title": "Montant invalide",
+      "description": "Le DCA mensuel doit être un montant positif ou nul.",
+      "variant": "destructive"
+    }
+  ]
+}

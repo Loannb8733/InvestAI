@@ -1,0 +1,28 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/refresh"
+    },
+    {
+      "method": "GET",
+      "url": "/auth/me"
+    }
+  ],
+  "auth": {
+    "user": {
+      "id": "u1",
+      "email": "jeanne@example.com",
+      "role": "user",
+      "firstName": "Jeanne",
+      "lastName": "Martin",
+      "preferredCurrency": "EUR",
+      "mfaEnabled": false,
+      "telegramEnabled": false
+    },
+    "accessToken": "access-2",
+    "refreshToken": "refresh-2",
+    "isAuthenticated": true,
+    "error": null
+  }
+}

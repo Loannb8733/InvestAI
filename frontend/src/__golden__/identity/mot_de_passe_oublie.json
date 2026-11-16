@@ -1,0 +1,22 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/forgot-password",
+      "body": {
+        "email": "jeanne@example.com"
+      }
+    }
+  ],
+  "toasts": [],
+  "text": [
+    "Mot de passe oublié",
+    "Vérifiez votre boîte email",
+    "Si un compte existe avec l'adresse",
+    "jeanne@example.com",
+    ", vous recevrez un email avec un lien pour réinitialiser votre mot de passe.",
+    "Le lien est valable 1 heure. Pensez à vérifier vos spams.",
+    "Envoyer à une autre adresse",
+    "Retour à la connexion"
+  ]
+}

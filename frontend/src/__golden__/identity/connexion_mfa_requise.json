@@ -1,0 +1,33 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/login",
+      "body": {
+        "email": "jeanne@example.com",
+        "password": "Secret-42xyz",
+        "remember_me": false
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "MFA code required",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de connexion",
+      "description": "Request failed with status code 400"
+    }
+  ],
+  "mfaField": false,
+  "auth": {
+    "user": null,
+    "accessToken": null,
+    "refreshToken": null,
+    "isAuthenticated": false,
+    "error": "Request failed with status code 400"
+  }
+}

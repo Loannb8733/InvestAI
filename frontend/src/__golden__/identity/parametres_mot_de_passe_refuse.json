@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "Mot de passe actuel incorrect",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur",
+      "description": "Mot de passe actuel incorrect.",
+      "variant": "destructive"
+    }
+  ]
+}

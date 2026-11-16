@@ -1,0 +1,23 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/change-password",
+      "body": {
+        "current_password": "Ancien-Passe42",
+        "new_password": "Nouveau-Passe42"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Mot de passe modifié",
+      "description": "Votre mot de passe a été mis à jour."
+    }
+  ],
+  "cleared": [
+    "",
+    "",
+    ""
+  ]
+}

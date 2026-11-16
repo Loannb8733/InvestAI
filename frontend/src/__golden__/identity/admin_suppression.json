@@ -1,0 +1,20 @@
+{
+  "question": [
+    "Supprimer cet utilisateur ?",
+    "Vous êtes sur le point de supprimer le compte de paul@example.com. Cette action est irréversible.",
+    "paul@example.com",
+    "Annuler",
+    "Supprimer"
+  ],
+  "calls": [
+    {
+      "method": "DELETE",
+      "url": "/users/u2"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Utilisateur supprimé"
+    }
+  ]
+}

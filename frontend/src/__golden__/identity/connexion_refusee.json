@@ -1,0 +1,36 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/login",
+      "body": {
+        "email": "jeanne@example.com",
+        "password": "Secret-42xyz",
+        "remember_me": false
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/auth/refresh"
+    },
+    {
+      "method": "POST",
+      "url": "/auth/logout"
+    }
+  ],
+  "toasts": [
+    {
+      "variant": "destructive",
+      "title": "Erreur de connexion",
+      "description": "Request failed with status code 401"
+    }
+  ],
+  "where": null,
+  "auth": {
+    "user": null,
+    "accessToken": null,
+    "refreshToken": null,
+    "isAuthenticated": false,
+    "error": null
+  }
+}

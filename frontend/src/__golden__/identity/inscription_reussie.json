@@ -1,0 +1,21 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/register",
+      "body": {
+        "email": "jeanne@example.com",
+        "password": "Solide-Passe42",
+        "first_name": "Jeanne",
+        "last_name": "Martin"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Inscription enregistrée",
+      "description": "Inscription enregistrée. Connectez-vous avec cette adresse."
+    }
+  ],
+  "where": "/login"
+}

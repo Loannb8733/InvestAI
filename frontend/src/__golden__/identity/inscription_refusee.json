@@ -1,0 +1,64 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/register",
+      "body": {
+        "email": "jeanne@example.com",
+        "password": "Solide-Passe42",
+        "first_name": "Jeanne",
+        "last_name": "Martin"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "Cette adresse est déjà utilisée",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur d'inscription",
+      "description": "Request failed with status code 400"
+    }
+  ],
+  "where": null,
+  "text": [
+    "InvestAI",
+    "Créer un compte",
+    "Commencez à gérer vos investissements dès aujourd'hui",
+    "Prénom",
+    "Nom",
+    "Adresse email",
+    "*",
+    "Mot de passe",
+    "*",
+    "Minimum 10 caractères, dont une majuscule et un chiffre",
+    "Confirmer le mot de passe",
+    "*",
+    "J'accepte les",
+    "conditions d'utilisation",
+    "et la",
+    "politique de confidentialité",
+    "Request failed with status code 400",
+    "Créer mon compte",
+    "Vous avez déjà un compte ?",
+    "Se connecter",
+    "InvestAI",
+    "Rejoignez des milliers",
+    "d'investisseurs",
+    "Créez votre compte gratuitement et prenez le contrôle de votre avenir financier.",
+    "Suivi de portefeuille en temps réel",
+    "Analyses et rapports détaillés",
+    "Alertes de prix personnalisées",
+    "Prédictions basées sur l'IA",
+    "100%",
+    "Gratuit",
+    "24/7",
+    "Disponible",
+    "SSL",
+    "Sécurisé",
+    "© 2026 InvestAI. Tous droits réservés."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/users"
+    }
+  ],
+  "text": [
+    "Administration",
+    "Nouvel utilisateur",
+    "Utilisateurs totaux",
+    "2",
+    "2",
+    "Utilisateurs actifs",
+    "1",
+    "1",
+    "MFA activé",
+    "1",
+    "1",
+    "Utilisateurs",
+    "Utilisateur",
+    "Rôle",
+    "Statut",
+    "MFA",
+    "Créé le",
+    "Actions",
+    "J",
+    "Jeanne",
+    "Martin",
+    "jeanne@example.com",
+    "admin",
+    "Actif",
+    "10 janv. 2026, 08:00",
+    "Désactiver",
+    "P",
+    "paul@example.com",
+    "user",
+    "Inactif",
+    "-",
+    "20 févr. 2026, 16:30",
+    "Activer"
+  ]
+}

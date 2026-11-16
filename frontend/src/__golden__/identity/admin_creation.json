@@ -1,0 +1,20 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/users",
+      "body": {
+        "email": "lea@example.com",
+        "password": "Solide-Passe42",
+        "first_name": "Léa",
+        "last_name": "Durand",
+        "role": "admin"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Utilisateur créé"
+    }
+  ]
+}

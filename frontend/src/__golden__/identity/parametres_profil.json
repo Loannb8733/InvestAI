@@ -1,0 +1,20 @@
+{
+  "calls": [
+    {
+      "method": "PATCH",
+      "url": "/auth/me",
+      "body": {
+        "first_name": "Jeanne-Marie",
+        "last_name": "Martin",
+        "preferred_currency": "EUR"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Profil mis à jour",
+      "description": "Vos informations ont été enregistrées."
+    }
+  ],
+  "me": 3
+}

@@ -1,0 +1,15 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/auth/logout"
+    }
+  ],
+  "auth": {
+    "user": null,
+    "accessToken": null,
+    "refreshToken": null,
+    "isAuthenticated": false,
+    "error": null
+  }
+}
