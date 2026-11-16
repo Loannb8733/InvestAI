@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { TrendingUp, Loader2, ArrowLeft, Lock, CheckCircle2 } from 'lucide-react'
-import { http } from '@/shared/api/http'
+import { apiClient } from '@/shared/api/client'
 
 export default function ResetPasswordPage() {
   const { toast } = useToast()
@@ -21,10 +21,7 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: async (data: { token: string; new_password: string }) => {
-      const response = await http.post('/auth/reset-password', data)
-      return response.data
-    },
+    mutationFn: (body: { token: string; new_password: string }) => apiClient.post('/auth/reset-password', { body }),
     onSuccess: () => {
       setSuccess(true)
     },

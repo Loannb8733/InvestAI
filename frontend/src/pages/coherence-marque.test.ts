@@ -16,7 +16,9 @@ import { resolve } from 'node:path'
 
 const lire = (f: string) => readFileSync(resolve(process.cwd(), 'src/pages', f), 'utf-8')
 const LOGIN = lire('LoginPage.tsx')
-const REGISTER = lire('RegisterPage.tsx')
+const REGISTER = ['RegisterForm.tsx', 'RegisterBrandPanel.tsx']
+  .map((f) => readFileSync(resolve(process.cwd(), 'src/features/identity/components', f), 'utf-8'))
+  .join('\n')
 
 const sansCommentaires = (s: string) =>
   s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/.*$/gm, '')

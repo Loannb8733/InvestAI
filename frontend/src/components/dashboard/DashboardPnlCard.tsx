@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import type { PnLBreakdown } from '@/types'
-import { profileApi, investorProfileQueryKey, reportsApi, type TaxSummary } from '@/services/api'
+import { reportsApi, type TaxSummary } from '@/services/api'
+import { useInvestorProfile } from '@/features/identity/hooks'
 import { queryKeys } from '@/lib/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -60,12 +61,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
 
   // TMI du profil investisseur (Réglages) : si renseignée, le mode barème
   // affiche PS 17,2 % + IR à la TMI au lieu du seul plancher PS.
-  const { data: investorProfile } = useQuery({
-    queryKey: investorProfileQueryKey,
-    queryFn: profileApi.getInvestorProfile,
-    staleTime: 10 * 60_000, // le profil change rarement
-    meta: { suppressGlobalError: true }, // best-effort : fallback silencieux
-  })
+  const { data: investorProfile } = useInvestorProfile(10 * 60_000, true)
   const tmiRate = investorProfile?.tmi_rate ?? null
   const tmiPct = tmiRate != null ? Math.round(tmiRate * 100) : null
 
