@@ -1,0 +1,11 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/notes",
+      "body": {
+        "title": "Idée"
+      }
+    }
+  ]
+}

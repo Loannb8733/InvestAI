@@ -1,0 +1,21 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/notes",
+      "body": {
+        "title": "Rotation vers ETH",
+        "content": "Ratio ETH/BTC bas.",
+        "tags": "crypto",
+        "sentiment": "bearish",
+        "asset_id": "a2"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Note créée",
+      "description": "La note a été ajoutée avec succès."
+    }
+  ]
+}

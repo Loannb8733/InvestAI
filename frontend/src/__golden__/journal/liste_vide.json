@@ -1,0 +1,41 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/notes",
+      "params": {
+        "skip": 0,
+        "limit": 50
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/notes/summary"
+    },
+    {
+      "method": "GET",
+      "url": "/assets"
+    }
+  ],
+  "text": [
+    "Journal",
+    "Prenez des notes sur vos investissements et stratégies.",
+    "Nouvelle note",
+    "Total notes",
+    "2",
+    "2",
+    "Ce mois-ci",
+    "1",
+    "1",
+    "Tags utilisés",
+    "2",
+    "2",
+    "Scorecard de vos analyses",
+    "Tous",
+    "crypto",
+    "long terme",
+    "Aucune note",
+    "Commencez à documenter vos décisions d'investissement.",
+    "Créer une note"
+  ]
+}

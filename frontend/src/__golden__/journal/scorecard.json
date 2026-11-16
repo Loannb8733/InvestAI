@@ -1,0 +1,43 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/notes/scorecard"
+    }
+  ],
+  "text": [
+    "Taux de réussite à 30 j",
+    "100 %",
+    "à 90 j",
+    "0 %",
+    "Bullish : 50 % (1)",
+    "Neutre : — (1)",
+    "Vos intuitions font moins bien que pile ou face sur 90 jours — le journal sert exactement à voir ça.",
+    "Note",
+    "Actif",
+    "Sentiment",
+    "Perf 30 j",
+    "30 j",
+    "Perf 90 j",
+    "90 j",
+    "Accumuler le BTC",
+    "04/03/2026",
+    "BTC",
+    "Bullish",
+    "+4.3 %",
+    "-3.5 %",
+    "Prudence sur ETH",
+    "20/05/2026",
+    "ETH",
+    "Neutre",
+    "0.0 %",
+    "—",
+    "Verdict : Bullish correct si perf > +2 %, Bearish correct si perf < −2 %, Neutre correct si |perf| ≤ 5 %. 1 note(s) non évaluable(s) (historique de prix manquant)."
+  ],
+  "verdicts": [
+    "Correct",
+    "Incorrect",
+    "Correct",
+    "En attente"
+  ]
+}
