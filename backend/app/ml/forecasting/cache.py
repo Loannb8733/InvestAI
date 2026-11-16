@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 RESULT_TTL_S = 14400
 LOCK_TTL_S = 120
 POLL_ATTEMPTS = 30
-_client: "redis.Redis[str] | None" = None
+_client: redis.Redis | None = None
 
 
-def sync_redis() -> "redis.Redis[str] | None":
+def sync_redis() -> redis.Redis | None:
     """Client Redis synchrone vérifié par PING à chaque accès ; None, et client oublié, si Redis ne répond pas."""
     global _client
     if _client is None:
