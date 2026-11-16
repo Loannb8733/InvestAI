@@ -8,7 +8,8 @@ from numpy.typing import NDArray
 
 from app.domains.portfolio.models import Asset
 from app.domains.predictions.types import PricePrediction
-from app.ml.regime_detector import RegimeResult, _rsi
+from app.ml.regime import indicators as regime_indicators
+from app.ml.regime.types import RegimeResult
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,8 @@ def _unconfirmed_divergence(m: _Momentum, log: dict[str, Any]) -> tuple[float, R
 
 def rsi_divergence(symbol: str, prices: list[float]) -> tuple[float, Reason | None, dict[str, Any]]:
     """Points RSI/prix (0-35) : divergence haussière, divergence non confirmée pénalisée, ou survente sous 35."""
-    rsi_now = _rsi(prices, period=14)
-    rsi_prev = _rsi(prices[:-7], period=14) if len(prices) > 21 else None
+    rsi_now = regime_indicators.rsi(prices, period=14)
+    rsi_prev = regime_indicators.rsi(prices[:-7], period=14) if len(prices) > 21 else None
     price_t = prices[-1]
     price_t7 = prices[-8] if len(prices) > 8 else price_t
     price_change_7d = (price_t / price_t7 - 1) * 100 if price_t7 > 0 else 0

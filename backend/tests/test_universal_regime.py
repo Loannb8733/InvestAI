@@ -11,7 +11,8 @@ import pytest
 
 from app.domains.analytics.metrics import compute_returns, var_historical
 from app.domains.predictions.strategy_map import STRATEGY_MATRIX
-from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
+from app.ml.regime.detector import MarketRegimeDetector
+from app.ml.regime.types import MarketRegime, RegimeConfig, RegimeResult
 
 # ── Synthetic price generators ───────────────────────────────────
 

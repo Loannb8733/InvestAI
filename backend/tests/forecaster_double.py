@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Any
 
-from app.ml.forecaster import ForecastResult
+from app.ml.forecasting.types import ForecastResult
 
 CONFIDENCE = 0.05
 WEIGHTS = {"Prophet": 60, "XGBoost": 40}

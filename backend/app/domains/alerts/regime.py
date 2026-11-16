@@ -9,7 +9,8 @@ from app.domains.identity.models import User
 from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.notifications.telegram.client import telegram_service
-from app.ml.regime_detector import MarketRegimeDetector, RegimeConfig
+from app.ml.regime.detector import MarketRegimeDetector
+from app.ml.regime.types import RegimeConfig
 
 logger = logging.getLogger(__name__)
 

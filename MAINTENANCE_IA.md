@@ -62,7 +62,7 @@ En production (`APP_ENV=production`), les logs sont en JSON :
 {
   "timestamp": "2026-03-03T12:00:00Z",
   "level": "WARNING",
-  "logger": "app.ml.forecaster",
+  "logger": "app.ml.forecasting.ensemble",
   "message": "Prophet failed: ...",
   "trace_id": "a1b2c3d4e5f6g7h8"
 }
@@ -72,7 +72,7 @@ En production (`APP_ENV=production`), les logs sont en JSON :
 | Probleme | Fichier | Pattern de log |
 |----------|---------|----------------|
 | Prediction echouee | `prediction_service.py` | `Failed to save prediction log` |
-| Modele divergent | `forecaster.py` | `Prophet failed`, `ARIMA ensemble`, `XGBoost ensemble` |
+| Modele divergent | `ml/forecasting/ensemble.py` | `Prophet failed`, `ARIMA ensemble`, `XGBoost ensemble` |
 | Derive des donnees | `drift_detector.py` | `DATA DRIFT detected` |
 | Accuracy degradee | `tasks/predictions.py` | `DRIFT ALERT: ... MAPE=` |
 | Cache Redis | `core/redis_client.py` | `HMAC verification failed` |

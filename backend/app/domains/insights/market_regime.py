@@ -6,7 +6,8 @@ from typing import Any
 from app.domains.market_data.fear_greed import fetch_fear_greed_index
 from app.domains.market_data.history.reader import local_series
 from app.domains.market_data.prices.service import price_feed
-from app.ml.regime_detector import MarketRegime, MarketRegimeDetector, RegimeConfig, RegimeResult
+from app.ml.regime.detector import MarketRegimeDetector
+from app.ml.regime.types import MarketRegime, RegimeConfig, RegimeResult
 
 logger = logging.getLogger(__name__)
 

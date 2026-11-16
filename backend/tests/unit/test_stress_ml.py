@@ -13,7 +13,10 @@ import pytest
 
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.drift_detector import DriftResult, _compute_psi, check_drift
-from app.ml.forecaster import ForecastResult, PriceForecaster
+from app.ml.forecasting.ensemble import PriceForecaster
+from app.ml.forecasting.features import precompute_rsi
+from app.ml.forecasting.models.simple import fallback_forecast, linear_forecast
+from app.ml.forecasting.types import ForecastResult
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ def _make_prices(n: int, base: float = 100.0, seed: int = 42) -> list:
 @pytest.fixture
 def forecaster():
     f = PriceForecaster()
-    f._prophet_available = False  # Deterministic (no MCMC)
+    f.prophet_available = False  # Deterministic (no MCMC)
     return f
 
 
@@ -122,7 +125,7 @@ class TestForecasterNullsAndInf:
     def test_zero_prices(self, forecaster):
         """All zeros: edge case for division and log."""
         prices = [0.0] * 30
-        result = forecaster._fallback_forecast(prices, 5)
+        result = fallback_forecast(prices, 5)
         assert all(math.isfinite(p) for p in result.prices)
 
     def test_near_zero_prices(self, forecaster):
@@ -267,8 +270,8 @@ class TestDeterminism:
     def test_linear_determinism(self, forecaster):
         prices = _make_prices(30)
         dates = _make_dates(30)
-        r1 = forecaster._linear_forecast(prices, dates, 7)
-        r2 = forecaster._linear_forecast(prices, dates, 7)
+        r1 = linear_forecast(prices, dates, 7)
+        r2 = linear_forecast(prices, dates, 7)
         for i in range(7):
             assert abs(r1.prices[i] - r2.prices[i]) < 1e-6, f"Day {i}: {r1.prices[i]} != {r2.prices[i]}"
             assert abs(r1.confidence_low[i] - r2.confidence_low[i]) < 1e-6
@@ -276,8 +279,8 @@ class TestDeterminism:
 
     def test_fallback_determinism(self, forecaster):
         prices = [100.0, 102.0, 101.5]
-        r1 = forecaster._fallback_forecast(prices, 5)
-        r2 = forecaster._fallback_forecast(prices, 5)
+        r1 = fallback_forecast(prices, 5)
+        r2 = fallback_forecast(prices, 5)
         for i in range(5):
             assert abs(r1.prices[i] - r2.prices[i]) < 1e-6
 
@@ -324,30 +327,30 @@ class TestPrecomputeRSI:
 
     def test_constant_prices(self):
         arr = np.full(50, 100.0)
-        rsi = PriceForecaster._precompute_rsi(arr, 14)
+        rsi = precompute_rsi(arr, 14)
         assert len(rsi) == 50
         assert all(math.isfinite(v) for v in rsi)
 
     def test_monotonic_up(self):
         arr = np.arange(1, 51, dtype=float)
-        rsi = PriceForecaster._precompute_rsi(arr, 14)
+        rsi = precompute_rsi(arr, 14)
         # Monotonic up: RSI should be close to 100
         assert rsi[-1] > 90
 
     def test_monotonic_down(self):
         arr = np.arange(50, 0, -1, dtype=float)
-        rsi = PriceForecaster._precompute_rsi(arr, 14)
+        rsi = precompute_rsi(arr, 14)
         # Monotonic down: RSI should be close to 0
         assert rsi[-1] < 10
 
     def test_too_short(self):
         arr = np.array([100.0, 101.0, 99.0])
-        rsi = PriceForecaster._precompute_rsi(arr, 14)
+        rsi = precompute_rsi(arr, 14)
         assert len(rsi) == 3
         # All should be default 50.0
         assert all(v == 50.0 for v in rsi)
 
     def test_single_element(self):
         arr = np.array([42.0])
-        rsi = PriceForecaster._precompute_rsi(arr, 14)
+        rsi = precompute_rsi(arr, 14)
         assert len(rsi) == 1

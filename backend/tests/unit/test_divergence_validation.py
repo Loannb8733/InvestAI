@@ -11,7 +11,7 @@ Validates that:
 
 import numpy as np
 
-from app.ml.regime_detector import _rsi
+from app.ml.regime import indicators as regime_indicators
 
 
 class TestRSIDivergenceDetection:
@@ -23,8 +23,8 @@ class TestRSIDivergenceDetection:
 
         Returns (divergence_log, score_delta, reason_or_none).
         """
-        rsi_now = _rsi(prices, period=14)
-        rsi_prev = _rsi(prices[:-7], period=14) if len(prices) > 21 else None
+        rsi_now = regime_indicators.rsi(prices, period=14)
+        rsi_prev = regime_indicators.rsi(prices[:-7], period=14) if len(prices) > 21 else None
         price_t = prices[-1]
         price_t7 = prices[-8] if len(prices) > 8 else price_t
         price_change_7d = (price_t / price_t7 - 1) * 100 if price_t7 > 0 else 0
@@ -141,8 +141,8 @@ class TestDivergenceScoreDegradation:
     @staticmethod
     def _compute_divergence_with_score(prices: list) -> tuple:
         """Same logic as TestRSIDivergenceDetection."""
-        rsi_now = _rsi(prices, period=14)
-        rsi_prev = _rsi(prices[:-7], period=14) if len(prices) > 21 else None
+        rsi_now = regime_indicators.rsi(prices, period=14)
+        rsi_prev = regime_indicators.rsi(prices[:-7], period=14) if len(prices) > 21 else None
         price_t = prices[-1]
         price_t7 = prices[-8] if len(prices) > 8 else price_t
         price_change_7d = (price_t / price_t7 - 1) * 100 if price_t7 > 0 else 0

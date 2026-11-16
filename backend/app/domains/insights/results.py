@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from app.ml.regime_detector import MarketRegime
+from app.ml.regime.types import MarketRegime
 
 
 class InsightSeverity(StrEnum):

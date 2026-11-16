@@ -2,7 +2,7 @@ from typing import Any
 
 from app.domains.market_data.history.reader import local_series
 from app.domains.predictions.types import HISTORY_DAYS
-from app.ml.regime_detector import _rsi
+from app.ml.regime import indicators as regime_indicators
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -66,7 +66,7 @@ async def distribution_diagnostic(
             a_prices_diag = btc_prices
 
         if a_prices_diag and len(a_prices_diag) >= 15:
-            rsi_val = _rsi(a_prices_diag, period=14)
+            rsi_val = regime_indicators.rsi(a_prices_diag, period=14)
 
         diagnostic.append(_diagnostic_entry(asset_data, top_prob, rsi_val, total_value))
 

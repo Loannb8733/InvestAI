@@ -1,4 +1,4 @@
-from app.ml.regime_detector import RegimeConfig
+from app.ml.regime.types import RegimeConfig
 
 Advice = dict[str, str]
 

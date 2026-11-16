@@ -14,9 +14,9 @@ import time_machine
 from app.ml import adaptive_thresholds
 from app.ml.anomaly_detector import AnomalyDetector
 from app.ml.drift_detector import check_drift
-from app.ml.forecaster import PriceForecaster
+from app.ml.forecasting.ensemble import PriceForecaster
 from app.ml.market_context import compute_market_context
-from app.ml.regime_detector import MarketRegimeDetector
+from app.ml.regime.detector import MarketRegimeDetector
 from tests.ml.series import SERIES, dates, with_spike
 
 GOLDEN = Path(__file__).parent / "golden"

@@ -11,7 +11,7 @@ Validates that:
 import numpy as np
 import pytest
 
-from app.ml.regime_detector import _rsi
+from app.ml.regime import indicators as regime_indicators
 
 
 class TestRSIDivergence:
@@ -27,8 +27,8 @@ class TestRSIDivergence:
         for i in range(10):
             prices.append(prices[-1] + np.random.normal(0.2, 0.1))
 
-        rsi_early = _rsi(prices[:30], period=14)
-        rsi_late = _rsi(prices, period=14)
+        rsi_early = regime_indicators.rsi(prices[:30], period=14)
+        rsi_late = regime_indicators.rsi(prices, period=14)
 
         assert rsi_early is not None
         assert rsi_late is not None
@@ -39,18 +39,18 @@ class TestRSIDivergence:
 
     def test_rsi_returns_none_insufficient_data(self):
         """RSI requires at least period+1 prices."""
-        assert _rsi([100, 101, 102], period=14) is None
+        assert regime_indicators.rsi([100, 101, 102], period=14) is None
         # 15 prices = period+1 → just enough for RSI to compute
-        assert _rsi(list(range(15)), period=14) is not None
-        assert _rsi(list(range(16)), period=14) is not None
+        assert regime_indicators.rsi(list(range(15)), period=14) is not None
+        assert regime_indicators.rsi(list(range(16)), period=14) is not None
 
     def test_rsi_overbought_oversold(self):
         """Consistently rising prices → RSI > 70; falling → RSI < 30."""
         rising = [100 + i * 2 for i in range(30)]
         falling = [100 - i * 2 for i in range(30)]
 
-        rsi_up = _rsi(rising, period=14)
-        rsi_down = _rsi(falling, period=14)
+        rsi_up = regime_indicators.rsi(rising, period=14)
+        rsi_down = regime_indicators.rsi(falling, period=14)
 
         assert rsi_up is not None and rsi_up > 70, f"Expected RSI > 70, got {rsi_up}"
         assert rsi_down is not None and rsi_down < 30, f"Expected RSI < 30, got {rsi_down}"

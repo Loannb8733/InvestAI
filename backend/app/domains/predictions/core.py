@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.market_data.prices.service import price_feed
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.ml.anomaly_detector import AnomalyDetector
-from app.ml.forecaster import PriceForecaster
-from app.ml.regime_detector import MarketRegimeDetector
+from app.ml.forecasting.ensemble import PriceForecaster
+from app.ml.regime.detector import MarketRegimeDetector
 
 
 async def user_portfolio_ids(db: AsyncSession, user_id: str) -> list[uuid.UUID]:
@@ -24,7 +24,7 @@ async def held_assets(db: AsyncSession, portfolio_ids: list[uuid.UUID]) -> Seque
 class PredictionCore:
     def __init__(self) -> None:
         self.forecaster = PriceForecaster()
-        self.anomaly_detector = AnomalyDetector()  # type: ignore[no-untyped-call]
+        self.anomaly_detector = AnomalyDetector()
         self.regime_detector = MarketRegimeDetector()
 
     async def _get_current_price(self, symbol: str, asset_type: AssetType) -> float | None:

@@ -1,7 +1,7 @@
 """Note de santé du portefeuille, de 0 à 100."""
 
 from app.ml import adaptive_thresholds as adaptive_th
-from app.ml.regime_detector import MarketRegime
+from app.ml.regime.types import MarketRegime
 
 _MAX_ANOMALY_PENALTY = 20
 _ANOMALY_PENALTY = 5
