@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime
 from typing import Any
 
@@ -6,6 +7,20 @@ import pandas as pd
 
 from app.ml.forecasting.trend import compute_trend
 from app.ml.forecasting.types import ForecastResult, rounded
+
+UNCERTAINTY_SEED = 0
+_GLOBAL_RNG_LOCK = threading.Lock()
+
+
+def _seeded_predict(model: Any, future: pd.DataFrame) -> pd.DataFrame:
+    """Prédiction Prophet aux intervalles reproductibles : aléa global de numpy amorcé sous verrou, puis restauré."""
+    with _GLOBAL_RNG_LOCK:
+        state = np.random.get_state()
+        np.random.seed(UNCERTAINTY_SEED)
+        try:
+            return model.predict(future)
+        finally:
+            np.random.set_state(state)
 
 
 def prophet_forecast(
@@ -38,7 +53,7 @@ def prophet_forecast(
     if regressor is not None:
         recent = float(np.mean(regressor[-7:])) if len(regressor) >= 7 else float(np.mean(regressor))
         future["volume"] = (list(regressor) + [recent] * days_ahead)[: len(future)]
-    fc = model.predict(future).tail(days_ahead)
+    fc = _seeded_predict(model, future).tail(days_ahead)
     result_prices = [max(0.0, p) for p in fc["yhat"].tolist()]
     return rounded(
         [d.strftime("%Y-%m-%d") for d in fc["ds"]],

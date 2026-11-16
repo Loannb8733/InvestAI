@@ -116,8 +116,7 @@ def _volume_features(prices: np.ndarray, idx: int, volumes: np.ndarray | None) -
     prev_vol = max(volumes[idx - 2], 1e-10)
     feats = [(volumes[idx - 1] - prev_vol) / prev_vol]
     if idx >= 8:
-        vol_window = volumes[max(0, idx - 7) : idx]
-        vol_sma = float(np.mean(vol_window)) if vol_window else 1e-10
+        vol_sma = float(np.mean(volumes[idx - 7 : idx]))
         feats.append(volumes[idx - 1] / max(vol_sma, 1e-10))
     else:
         feats.append(1.0)

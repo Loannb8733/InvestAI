@@ -30,8 +30,7 @@ pytestmark = pytest.mark.usefixtures("empty_test_redis")
 
 
 @pytest.fixture(autouse=True)
-def _seeded_and_frozen() -> Any:
-    np.random.seed(0)
+def _frozen() -> Any:
     with time_machine.travel(NOW, tick=False):
         yield
 
@@ -187,15 +186,9 @@ def test_forecast(name: str) -> None:
     _check(f"forecast_{name}", observed)
 
 
-def test_hyperparameter_tuning(monkeypatch: pytest.MonkeyPatch) -> None:
-    import optuna
-
+def test_hyperparameter_tuning() -> None:
     from app.ml import hyperparameter_tuner
 
-    create_study = optuna.create_study
-    monkeypatch.setattr(
-        optuna, "create_study", lambda **kwargs: create_study(sampler=optuna.samplers.TPESampler(seed=0), **kwargs)
-    )
     prices = SERIES["bull"]
     _check(
         "hyperparameter_tuning",
