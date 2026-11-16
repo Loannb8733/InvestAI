@@ -1,0 +1,48 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/notes",
+      "params": {
+        "skip": 0,
+        "limit": 50
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/notes/summary"
+    },
+    {
+      "method": "GET",
+      "url": "/assets"
+    },
+    {
+      "method": "GET",
+      "url": "/notes",
+      "params": {
+        "search": "btc",
+        "skip": 0,
+        "limit": 50
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/notes",
+      "params": {
+        "search": "btc",
+        "tag": "long terme",
+        "skip": 0,
+        "limit": 50
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/notes",
+      "params": {
+        "search": "btc",
+        "skip": 0,
+        "limit": 50
+      }
+    }
+  ]
+}

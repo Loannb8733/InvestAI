@@ -1,0 +1,21 @@
+{
+  "confirmations": [
+    [
+      "Supprimer cette note ?"
+    ],
+    [
+      "Supprimer cette note ?"
+    ]
+  ],
+  "calls": [
+    {
+      "method": "DELETE",
+      "url": "/notes/n1"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Note supprimée"
+    }
+  ]
+}

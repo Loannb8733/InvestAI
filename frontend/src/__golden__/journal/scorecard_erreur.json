@@ -1,0 +1,9 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    }
+  ]
+}

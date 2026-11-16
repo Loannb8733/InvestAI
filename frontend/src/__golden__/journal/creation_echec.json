@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "indisponible",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de créer la note."
+    }
+  ]
+}

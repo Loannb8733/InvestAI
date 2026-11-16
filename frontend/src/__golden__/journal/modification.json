@@ -1,0 +1,29 @@
+{
+  "form": {
+    "title": "Accumuler le BTC",
+    "content": "Achat progressif sous 60 000.",
+    "tags": "crypto, long terme",
+    "selects": [
+      "Bullish",
+      "BTC — Bitcoin"
+    ]
+  },
+  "calls": [
+    {
+      "method": "PATCH",
+      "url": "/notes/n1",
+      "body": {
+        "title": "Accumuler le BTC (révisé)",
+        "content": "Achat progressif sous 60 000.",
+        "tags": "crypto, long terme",
+        "sentiment": "bullish",
+        "asset_id": null
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Note mise à jour"
+    }
+  ]
+}
