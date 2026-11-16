@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
-import api from '@/services/api'
+import { http } from '@/shared/api/http'
 import NotesPage from './NotesPage'
 
 type Call = { method: string; url: string; params?: unknown; body?: unknown }
@@ -169,7 +169,7 @@ beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false
   Element.prototype.releasePointerCapture ??= () => {}
   Element.prototype.scrollIntoView ??= () => {}
-  api.defaults.adapter = fakeServer
+  http.defaults.adapter = fakeServer
 })
 
 beforeEach(() => {

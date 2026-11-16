@@ -102,6 +102,7 @@ temp/
 .vercel/
 
 *openapi.json
+!frontend/src/shared/api/openapi.json
 .claude/
 .mypy_cache/
 

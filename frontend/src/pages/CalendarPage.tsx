@@ -28,7 +28,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import api, { calendarApi, predictionsApi } from '@/services/api'
+import { calendarApi, predictionsApi } from '@/services/api'
+import { http } from '@/shared/api/http'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatCurrency } from '@/lib/utils'
 import {
@@ -235,7 +236,7 @@ export default function CalendarPage() {
   // Seed French tax deadlines mutation
   const seedTaxMutation = useMutation({
     mutationFn: async (): Promise<SeedTaxEventsResult> => {
-      const response = await api.post('/calendar/seed-tax-events')
+      const response = await http.post('/calendar/seed-tax-events')
       return response.data
     },
     onSuccess: (data) => {

@@ -26,7 +26,7 @@ const toastMock = vi.hoisted(() => vi.fn())
 const naviguer = vi.hoisted(() => vi.fn())
 let parametresUrl = new URLSearchParams()
 
-vi.mock('@/services/api', () => ({ default: { post: posterApi } }))
+vi.mock('@/shared/api/http', () => ({ http: { post: posterApi } }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 // Le fond animé peint sur un canvas WebGL, que jsdom ne fournit pas.
 vi.mock('@/components/ui/aurora-canvas', () => ({ default: () => null }))
