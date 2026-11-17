@@ -1,0 +1,57 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "asset_id": "a1",
+        "limit": 20
+      }
+    }
+  ],
+  "text": [
+    "BTC",
+    "Bitcoin",
+    "Crypto",
+    "60 000,00 €",
+    "+",
+    "20.00",
+    "% · 30j",
+    "Quantité totale",
+    "0,5",
+    "0,5",
+    "Valeur actuelle",
+    "30 000,00 €",
+    "30 000,00 €",
+    "PRU",
+    "Prix de revient unitaire, frais inclus.",
+    "30 100,00 €",
+    "30 100,00 €",
+    "PRA hors frais : 30 000,00 €",
+    "P&L latent",
+    "14 950,00 €",
+    "14 950,00 €",
+    "+99,34 %",
+    "Part du portefeuille",
+    "74,06 %",
+    "74,06 %",
+    "Investi : 15 050,00 €",
+    "Transactions",
+    "Date",
+    "Type",
+    "Quantité",
+    "Prix",
+    "Total",
+    "01 juin 2025",
+    "Achat",
+    "0,2",
+    "33 000,00 €",
+    "6 600,00 €",
+    "10 janv. 2025",
+    "Achat",
+    "0,3",
+    "28 000,00 €",
+    "8 400,00 €",
+    "Fermer"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/portfolios",
+      "body": {
+        "name": "Crypto",
+        "description": ""
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Portefeuille créé",
+      "description": "Votre portefeuille a été créé avec succès."
+    }
+  ]
+}

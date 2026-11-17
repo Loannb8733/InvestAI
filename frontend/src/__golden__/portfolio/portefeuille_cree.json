@@ -1,0 +1,47 @@
+{
+  "text": [
+    "Nouveau portefeuille",
+    "Créez un nouveau portefeuille pour organiser vos investissements.",
+    "Nom du portefeuille",
+    "Description (optionnel)",
+    "Annuler",
+    "Créer",
+    "Fermer"
+  ],
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/portfolios",
+      "body": {
+        "name": "PEA",
+        "description": "Actions européennes"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Portefeuille créé",
+      "description": "Votre portefeuille a été créé avec succès."
+    }
+  ],
+  "open": false
+}

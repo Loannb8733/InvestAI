@@ -1,0 +1,60 @@
+{
+  "text": [
+    "Gérer le cash disponible",
+    "Ajoutez ou modifiez vos soldes EUR sur vos plateformes d'échange.",
+    "Soldes actuels",
+    "Binance",
+    "120.50",
+    "€",
+    "Total:",
+    "120.50",
+    "€",
+    "Plateforme",
+    "Sélectionner une plateforme",
+    "Binance",
+    "Kraken",
+    "Coinbase",
+    "Crypto.com",
+    "Bitstamp",
+    "KuCoin",
+    "Bybit",
+    "OKX",
+    "Gate.io",
+    "Bitpanda",
+    "Revolut",
+    "Trade Republic",
+    "Tangem",
+    "Ledger",
+    "Trezor",
+    "SafePal",
+    "Metamask",
+    "Autre",
+    "Montant (EUR)",
+    "Fermer",
+    "Ajouter / Modifier",
+    "Fermer"
+  ],
+  "refetched": {
+    "writes": [
+      {
+        "method": "PUT",
+        "url": "/portfolios/p1/cash-balance",
+        "body": {
+          "exchange": "Kraken",
+          "amount": 300
+        }
+      }
+    ],
+    "reads": [
+      "/portfolios",
+      "/dashboard/portfolio/p1",
+      "/dashboard/portfolio/p1/sparklines"
+    ]
+  },
+  "toasts": [
+    {
+      "title": "Solde mis à jour"
+    }
+  ],
+  "amount": ""
+}

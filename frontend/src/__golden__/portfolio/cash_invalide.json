@@ -1,0 +1,10 @@
+{
+  "writes": [],
+  "toasts": [
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Sélectionnez une plateforme"
+    }
+  ]
+}

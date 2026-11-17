@@ -1,0 +1,95 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/history"
+    }
+  ],
+  "text": [
+    "Portefeuille",
+    "Le détail de ce que tu possèdes, ligne par ligne.",
+    "Importer CSV",
+    "Exporter CSV",
+    "Nouveau portefeuille",
+    "Crypto",
+    "Bourse",
+    "Crypto",
+    "Mes cryptos",
+    "40 510,00 €",
+    "▲",
+    "18 410,00 €",
+    "(",
+    "83,30 %",
+    ")",
+    "Actifs actuels",
+    "Historique",
+    "Total investi (historique)",
+    "30 000,00 €",
+    "30 000,00 €",
+    "Total vendu",
+    "12 000,00 €",
+    "12 000,00 €",
+    "Frais totaux",
+    "95,00 €",
+    "95,00 €",
+    "Gains réalisés",
+    "641,00 €",
+    "641,00 €",
+    "Actifs vendus (",
+    "2",
+    ")",
+    "Kraken",
+    "1 500,00 €",
+    "1",
+    "actif",
+    "Binance",
+    "800,00 €",
+    "2",
+    "actif",
+    "s",
+    "Actif",
+    "Plateforme",
+    "Qté achetée",
+    "Total investi",
+    "Qté vendue",
+    "Total vendu",
+    "+/- Réalisé",
+    "Détention",
+    "2",
+    "plateformes",
+    "500.50",
+    "1 250,00 €",
+    "500.50",
+    "1 700,00 €",
+    "▲",
+    "443,00 €",
+    "05/01/2025 → 20/02/2026",
+    "Binance",
+    "1000.00",
+    "400,00 €",
+    "1000.00",
+    "600,00 €",
+    "▲",
+    "198,00 €",
+    "01/03/2025 → 15/09/2025"
+  ]
+}

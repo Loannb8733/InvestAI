@@ -1,0 +1,39 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "DELETE",
+      "url": "/portfolios/p1"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de supprimer le portefeuille"
+    }
+  ]
+}

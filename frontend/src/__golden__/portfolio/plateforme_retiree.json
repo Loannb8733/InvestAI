@@ -1,0 +1,16 @@
+{
+  "calls": [
+    {
+      "method": "PATCH",
+      "url": "/assets/a3",
+      "body": {
+        "exchange": null
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Plateforme mise à jour"
+    }
+  ]
+}

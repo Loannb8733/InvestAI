@@ -1,0 +1,32 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur de validation",
+      "description": [
+        {
+          "type": "too_long",
+          "loc": [
+            "body",
+            "symbol"
+          ],
+          "msg": "String should have at most 20 characters"
+        }
+      ],
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": [
+        {
+          "type": "too_long",
+          "loc": [
+            "body",
+            "symbol"
+          ],
+          "msg": "String should have at most 20 characters"
+        }
+      ]
+    }
+  ]
+}

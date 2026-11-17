@@ -1,0 +1,77 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "asset_id": "a2",
+        "limit": 20
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "asset_id": "a3",
+        "limit": 20
+      }
+    }
+  ],
+  "text": [
+    "ETH",
+    "ETH",
+    "Crypto",
+    "3 000,00 €",
+    "-9.09",
+    "% · 30j",
+    "Quantité totale",
+    "3",
+    "3",
+    "Valeur actuelle",
+    "9 000,00 €",
+    "9 000,00 €",
+    "PRU",
+    "Prix de revient unitaire, frais inclus.",
+    "1 676,67 €",
+    "1 676,67 €",
+    "PRA hors frais : 1 676,67 €",
+    "P&L latent",
+    "3 970,00 €",
+    "3 970,00 €",
+    "+78,93 %",
+    "Part du portefeuille",
+    "22,22 %",
+    "22,22 %",
+    "Investi : 5 030,00 €",
+    "Positions par plateforme",
+    "Plateforme",
+    "Quantité",
+    "Valeur",
+    "PRU",
+    "Binance",
+    "2",
+    "6 000,00 €",
+    "1 510,00 €",
+    "Kraken",
+    "1",
+    "3 000,00 €",
+    "2 010,00 €",
+    "Transactions",
+    "Date",
+    "Type",
+    "Quantité",
+    "Prix",
+    "Total",
+    "01 mars 2026",
+    "Transfert entrant",
+    "1",
+    "2 000,00 €",
+    "2 000,00 €",
+    "01 juil. 2025",
+    "Achat",
+    "2",
+    "1 500,00 €",
+    "3 000,00 €",
+    "Fermer"
+  ]
+}

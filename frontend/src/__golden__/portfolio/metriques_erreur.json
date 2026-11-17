@@ -1,0 +1,51 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ],
+  "text": [
+    "Portefeuille",
+    "Le détail de ce que tu possèdes, ligne par ligne.",
+    "Importer CSV",
+    "Exporter CSV",
+    "Nouveau portefeuille",
+    "Crypto",
+    "Bourse",
+    "Crypto",
+    "Mes cryptos",
+    "Actifs actuels",
+    "Historique",
+    "Cash disponible",
+    "120,50 €",
+    "Binance",
+    ":",
+    "120,50 €",
+    "$",
+    "Stablecoins",
+    "0,00 €",
+    "Aucun actif dans ce portefeuille",
+    "Ajouter un actif"
+  ]
+}

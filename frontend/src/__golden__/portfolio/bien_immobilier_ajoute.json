@@ -1,0 +1,51 @@
+{
+  "text": [
+    "Ajouter un actif",
+    "Ajoutez un nouvel actif au portefeuille \"",
+    "Crypto",
+    "\".",
+    "Type d'actif",
+    "Immobilier",
+    "Crypto-monnaie",
+    "Action",
+    "ETF",
+    "Immobilier",
+    "Obligation",
+    "Autre",
+    "Nom du projet",
+    "Montant investi (€)",
+    "Taux annuel (%)",
+    "Date d'échéance",
+    "Plateforme",
+    "Sélectionner une plateforme",
+    "Nouvelle",
+    "Annuler",
+    "Ajouter",
+    "Fermer"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/assets",
+      "body": {
+        "portfolio_id": "p1",
+        "symbol": "RESIDENCE-ETOILE-LYO",
+        "name": "Résidence Étoile — Lyon 3e arrondissement",
+        "asset_type": "real_estate",
+        "quantity": 1,
+        "avg_buy_price": 2000,
+        "currency": "EUR",
+        "invested_amount": 2000,
+        "interest_rate": 9.5,
+        "maturity_date": "2027-06-30",
+        "project_status": "active"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Actif ajouté",
+      "description": "L'actif a été ajouté à votre portefeuille."
+    }
+  ]
+}
