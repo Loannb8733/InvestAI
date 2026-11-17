@@ -46,7 +46,8 @@ import SpotlightGroup from '@/components/ui/spotlight-group'
 import EmptyState from '@/components/ui/empty-state'
 import { formatCurrency } from '@/lib/utils'
 import { queryKeys } from '@/lib/queryKeys'
-import { alertsApi, assetsApi, profileApi, notificationsApi } from '@/services/api'
+import { alertsApi, assetsApi, notificationsApi } from '@/services/api'
+import { apiClient } from '@/shared/api/client'
 import { useAuthStore } from '@/stores/authStore'
 import {
   Bell,
@@ -213,7 +214,8 @@ export default function AlertsPage() {
   })
 
   const telegramMutation = useMutation({
-    mutationFn: () => profileApi.updateProfile({ telegram_chat_id: telegramChatId, telegram_enabled: telegramEnabled }),
+    mutationFn: () =>
+      apiClient.patch('/auth/me', { body: { telegram_chat_id: telegramChatId, telegram_enabled: telegramEnabled } }),
     onSuccess: () => {
       fetchCurrentUser()
       toast({ title: 'Configuration Telegram enregistr\u00e9e' })

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { TrendingUp, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react'
-import { http } from '@/shared/api/http'
+import { apiClient } from '@/shared/api/client'
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast()
@@ -16,10 +16,7 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await http.post('/auth/forgot-password', { email })
-      return response.data
-    },
+    mutationFn: (email: string) => apiClient.post('/auth/forgot-password', { body: { email } }),
     onSuccess: () => {
       setSent(true)
     },

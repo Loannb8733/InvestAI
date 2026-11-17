@@ -1,56 +1,5 @@
 import { http as api } from '@/shared/api/http'
 
-// Auth API
-export const authApi = {
-  register: async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const response = await api.post('/auth/register', {
-      email,
-      password,
-      first_name: firstName,
-      last_name: lastName,
-    })
-    return response.data
-  },
-
-  login: async (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => {
-    const response = await api.post('/auth/login', { email, password, mfa_code: mfaCode, remember_me: rememberMe ?? false })
-    return response.data
-  },
-
-  refresh: async (refreshToken?: string) => {
-    const response = await api.post('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : undefined)
-    return response.data
-  },
-
-  logout: async () => {
-    try {
-      await api.post('/auth/logout')
-    } catch {
-      // Ignore errors on logout
-    }
-  },
-
-  getCurrentUser: async () => {
-    const response = await api.get('/auth/me')
-    return response.data
-  },
-
-  setupMFA: async () => {
-    const response = await api.post('/auth/mfa/setup')
-    return response.data
-  },
-
-  verifyMFA: async (code: string) => {
-    const response = await api.post('/auth/mfa/verify', { code })
-    return response.data
-  },
-
-  disableMFA: async (code: string) => {
-    const response = await api.post('/auth/mfa/disable', { code })
-    return response.data
-  },
-}
-
 // Dashboard API
 export const dashboardApi = {
   getMetrics: async (days: number = 30) => {
@@ -878,45 +827,6 @@ export const reportsApi = {
   },
 }
 
-// Users API (admin only)
-export const usersApi = {
-  list: async () => {
-    const response = await api.get('/users')
-    return response.data
-  },
-
-  create: async (data: {
-    email: string
-    password: string
-    role?: string
-    first_name?: string
-    last_name?: string
-  }) => {
-    const response = await api.post('/users', data)
-    return response.data
-  },
-
-  get: async (id: string) => {
-    const response = await api.get(`/users/${id}`)
-    return response.data
-  },
-
-  update: async (id: string, data: {
-    email?: string
-    password?: string
-    first_name?: string
-    last_name?: string
-    is_active?: boolean
-  }) => {
-    const response = await api.patch(`/users/${id}`, data)
-    return response.data
-  },
-
-  delete: async (id: string) => {
-    await api.delete(`/users/${id}`)
-  },
-}
-
 // Notes API
 // Calendar API
 export const calendarApi = {
@@ -1097,51 +1007,6 @@ export const notificationsApi = {
 // Profile API (user self-service)
 
 /** Profil investisseur (paramètres financiers). `null` = non renseigné. */
-export type RiskProfile = 'conservative' | 'moderate' | 'aggressive'
-
-export interface InvestorProfile {
-  /** Tranche marginale d'imposition : 0, 0.11, 0.3, 0.41 ou 0.45 */
-  tmi_rate: number | null
-  risk_profile: RiskProfile | null
-  monthly_dca_eur: number | null
-}
-
-/** Clé de query partagée : SettingsPage écrit, DashboardPnlCard lit. */
-export const investorProfileQueryKey = ['auth', 'investor-profile'] as const
-
-const toInvestorProfile = (data: Record<string, unknown>): InvestorProfile => ({
-  tmi_rate: (data.tmi_rate as number | null | undefined) ?? null,
-  risk_profile: (data.risk_profile as RiskProfile | null | undefined) ?? null,
-  monthly_dca_eur: (data.monthly_dca_eur as number | null | undefined) ?? null,
-})
-
-export const profileApi = {
-  updateProfile: async (data: { first_name?: string; last_name?: string; preferred_currency?: string; telegram_chat_id?: string; telegram_enabled?: boolean }) => {
-    const response = await api.patch('/auth/me', data)
-    return response.data
-  },
-
-  changePassword: async (currentPassword: string, newPassword: string) => {
-    const response = await api.post('/auth/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword,
-    })
-    return response.data
-  },
-
-  // Profil investisseur — porté par /auth/me (colonnes users.tmi_rate,
-  // risk_profile, monthly_dca_eur). Envoyer null efface la valeur.
-  getInvestorProfile: async (): Promise<InvestorProfile> => {
-    const response = await api.get('/auth/me')
-    return toInvestorProfile(response.data)
-  },
-
-  updateInvestorProfile: async (payload: Partial<InvestorProfile>): Promise<InvestorProfile> => {
-    const response = await api.patch('/auth/me', payload)
-    return toInvestorProfile(response.data)
-  },
-}
-
 // Smart Insights API
 export const smartInsightsApi = {
   getHealth: async (days: number = 30) => {

@@ -1,8 +1,8 @@
 import type { AxiosError } from 'axios'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { authApi } from '@/services/api'
 import { queryClient } from '@/lib/queryClient'
+import { apiClient } from '@/shared/api/client'
 
 interface User {
   id: string
@@ -53,7 +53,9 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string, mfaCode?: string, rememberMe?: boolean) => {
         set({ isLoading: true, error: null })
         try {
-          const response = await authApi.login(email, password, mfaCode, rememberMe)
+          const response = await apiClient.post('/auth/login', {
+            body: { email, password, mfa_code: mfaCode, remember_me: rememberMe ?? false },
+          })
           set({
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
@@ -69,7 +71,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        try { await authApi.logout() } catch { /* best-effort: clear local state even if server call fails */ }
+        await apiClient.post('/auth/logout').catch(() => undefined)
         set({
           user: null,
           accessToken: null,
@@ -77,18 +79,16 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           error: null,
         })
-        // Wipe the cached portfolios/transactions/analytics of the previous user.
-        // Without this, the next user who logs into the same tab briefly sees the
-        // outgoing user's data (cache key is shared by HTTP path, not by user id).
         queryClient.removeQueries()
         queryClient.cancelQueries()
       },
 
       refreshAccessToken: async () => {
         try {
-          // Try cookie-based refresh first (no token needed), fall back to stored token
           const { refreshToken } = get()
-          const response = await authApi.refresh(refreshToken || undefined)
+          const response = await apiClient.post('/auth/refresh', {
+            body: refreshToken ? { refresh_token: refreshToken } : undefined,
+          })
           set({
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
@@ -101,14 +101,14 @@ export const useAuthStore = create<AuthState>()(
 
       fetchCurrentUser: async () => {
         try {
-          const user = await authApi.getCurrentUser()
+          const user = await apiClient.get('/auth/me')
           set({
             user: {
               id: user.id,
               email: user.email,
-              role: user.role,
-              firstName: user.first_name,
-              lastName: user.last_name,
+              role: user.role as User['role'],
+              firstName: user.first_name ?? undefined,
+              lastName: user.last_name ?? undefined,
               preferredCurrency: user.preferred_currency || 'EUR',
               mfaEnabled: user.mfa_enabled,
               telegramChatId: user.telegram_chat_id || undefined,
@@ -122,23 +122,16 @@ export const useAuthStore = create<AuthState>()(
 
       hydrateSession: async () => {
         const { isAuthenticated, accessToken } = get()
-        // Only hydrate if store says authenticated but token is missing (page refresh)
-        if (!isAuthenticated) return
-        if (accessToken) return // Already have a token, no need to hydrate
-
+        if (!isAuthenticated || accessToken) return
         set({ isHydrating: true })
-        try {
-          // Try to refresh using the httpOnly cookie.
-          await get().refreshAccessToken()
-          // If refresh succeeded (still authenticated), fetch fresh user data
-          if (get().isAuthenticated && get().accessToken) {
-            await get().fetchCurrentUser()
-          }
-        } catch {
-          // Session refusée : déjà fermée. Panne passagère : la prochaine requête retente.
-        } finally {
-          set({ isHydrating: false })
+        const refreshed = await get().refreshAccessToken().then(
+          () => true,
+          () => false
+        )
+        if (refreshed && get().isAuthenticated && get().accessToken) {
+          await get().fetchCurrentUser()
         }
+        set({ isHydrating: false })
       },
 
       setTokens: (accessToken: string, refreshToken: string) => {
@@ -157,8 +150,6 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Do NOT persist tokens or PII to localStorage — tokens are in httpOnly cookies,
-      // user PII (email, role) is refetched on boot via hydrateSession/fetchCurrentUser.
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
       }),

@@ -23,10 +23,7 @@ const inscrire = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => vi.fn())
 const naviguer = vi.hoisted(() => vi.fn())
 
-vi.mock('@/services/api', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/services/api')>()),
-  authApi: { register: inscrire },
-}))
+vi.mock('@/shared/api/client', () => ({ apiClient: { post: inscrire } }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/components/ui/aurora-canvas', () => ({ default: () => null }))
 vi.mock('react-router', async () => {

@@ -98,7 +98,6 @@ comments	frontend/src/lib/oklch.ts
 comments	frontend/src/lib/platforms.ts
 comments	frontend/src/lib/queryKeys.ts
 comments	frontend/src/lib/utils.ts
-comments	frontend/src/pages/AdminPage.tsx
 comments	frontend/src/pages/AlertsPage.tsx
 comments	frontend/src/pages/CalendarPage.tsx
 comments	frontend/src/pages/CrowdfundingAuditLabPage.tsx
@@ -110,11 +109,9 @@ comments	frontend/src/pages/DashboardPage.tsx
 comments	frontend/src/pages/ExchangesPage.tsx
 comments	frontend/src/pages/GoalsPage.tsx
 comments	frontend/src/pages/IntelligencePage.tsx
-comments	frontend/src/pages/LoginPage.tsx
 comments	frontend/src/pages/MasterDashboardPage.tsx
 comments	frontend/src/pages/PortfolioPage.tsx
 comments	frontend/src/pages/ReportsPage.tsx
-comments	frontend/src/pages/SettingsPage.tsx
 comments	frontend/src/pages/SimulationsPage.tsx
 comments	frontend/src/pages/TransactionsPage.tsx
 comments	frontend/src/pages/crowdfunding-projets.ts
@@ -122,7 +119,6 @@ comments	frontend/src/pages/intelligenceTabs.ts
 comments	frontend/src/pages/transactions-format.ts
 comments	frontend/src/services/api.ts
 comments	frontend/src/setupTests.ts
-comments	frontend/src/stores/authStore.ts
 comments	frontend/src/types/crowdfunding.ts
 comments	frontend/src/types/dashboard.ts
 comments	frontend/src/types/exchanges.ts
@@ -152,7 +148,6 @@ too-long	frontend/src/components/simulations/FireTab.tsx
 too-long	frontend/src/components/simulations/MonteCarloTab.tsx
 too-long	frontend/src/components/simulations/ProjectionTab.tsx
 too-long	frontend/src/hooks/usePredictionData.ts
-too-long	frontend/src/pages/AdminPage.tsx
 too-long	frontend/src/pages/AlertsPage.tsx
 too-long	frontend/src/pages/CalendarPage.tsx
 too-long	frontend/src/pages/CrowdfundingAuditLabPage.tsx
@@ -164,9 +159,7 @@ too-long	frontend/src/pages/ExchangesPage.tsx
 too-long	frontend/src/pages/GoalsPage.tsx
 too-long	frontend/src/pages/MasterDashboardPage.tsx
 too-long	frontend/src/pages/PortfolioPage.tsx
-too-long	frontend/src/pages/RegisterPage.tsx
 too-long	frontend/src/pages/ReportsPage.tsx
-too-long	frontend/src/pages/SettingsPage.tsx
 too-long	frontend/src/pages/SimulationsPage.tsx
 too-long	frontend/src/pages/TransactionsPage.tsx
 too-long	frontend/src/services/api.ts

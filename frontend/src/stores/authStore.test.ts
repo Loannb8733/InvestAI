@@ -1,19 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAuthStore } from './authStore'
 
-// Mock the API module
-vi.mock('@/services/api', () => ({
-  authApi: {
-    login: vi.fn(),
-    refresh: vi.fn(),
-    getCurrentUser: vi.fn(),
-    logout: vi.fn(),
-  },
-}))
+const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 
-import { authApi } from '@/services/api'
+vi.mock('@/shared/api/client', () => ({ apiClient: client }))
 
-const mockedAuthApi = vi.mocked(authApi)
+type Outcome = { ok: unknown } | { fail: unknown }
+
+function serve(routes: Record<string, Outcome>) {
+  const answer = (route: string) => {
+    const outcome = routes[route] ?? { ok: {} }
+    return 'ok' in outcome ? Promise.resolve(outcome.ok) : Promise.reject(outcome.fail)
+  }
+  client.get.mockImplementation(answer)
+  client.post.mockImplementation(answer)
+}
+
+const posted = (route: string) => client.post.mock.calls.some(([called]) => called === route)
 
 const rejected = { response: { status: 401, data: {} } }
 const transientFailures: Array<[string, unknown]> = [
@@ -24,7 +27,6 @@ const transientFailures: Array<[string, unknown]> = [
 
 describe('authStore', () => {
   beforeEach(() => {
-    // Reset store state
     useAuthStore.setState({
       user: null,
       accessToken: null,
@@ -34,6 +36,7 @@ describe('authStore', () => {
       error: null,
     })
     vi.clearAllMocks()
+    serve({})
   })
 
   describe('initial state', () => {
@@ -61,17 +64,11 @@ describe('authStore', () => {
 
   describe('login', () => {
     it('sets tokens and isAuthenticated on success', async () => {
-      mockedAuthApi.login.mockResolvedValue({
-        access_token: 'access123',
-        refresh_token: 'refresh123',
-      })
-      mockedAuthApi.getCurrentUser.mockResolvedValue({
-        id: '1',
-        email: 'test@test.com',
-        role: 'user',
-        first_name: 'Test',
-        last_name: 'User',
-        mfa_enabled: false,
+      serve({
+        '/auth/login': { ok: { access_token: 'access123', refresh_token: 'refresh123' } },
+        '/auth/me': {
+          ok: { id: '1', email: 'test@test.com', role: 'user', first_name: 'Test', last_name: 'User', mfa_enabled: false },
+        },
       })
 
       await useAuthStore.getState().login('test@test.com', 'password')
@@ -85,11 +82,9 @@ describe('authStore', () => {
     })
 
     it('sets error on failure', async () => {
-      mockedAuthApi.login.mockRejectedValue(new Error('Invalid credentials'))
+      serve({ '/auth/login': { fail: new Error('Invalid credentials') } })
 
-      await expect(
-        useAuthStore.getState().login('bad@test.com', 'wrong')
-      ).rejects.toThrow()
+      await expect(useAuthStore.getState().login('bad@test.com', 'wrong')).rejects.toThrow()
 
       const state = useAuthStore.getState()
       expect(state.error).toBe('Invalid credentials')
@@ -117,6 +112,15 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(false)
       expect(state.error).toBeNull()
     })
+
+    it('clears the session even when the server call fails', async () => {
+      serve({ '/auth/logout': { fail: new Error('Network Error') } })
+      useAuthStore.setState({ accessToken: 'token', isAuthenticated: true })
+
+      await useAuthStore.getState().logout()
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    })
   })
 
   describe('setTokens', () => {
@@ -141,21 +145,19 @@ describe('authStore', () => {
   describe('refreshAccessToken', () => {
     it('refreshes tokens on success', async () => {
       useAuthStore.setState({ refreshToken: 'old-refresh' })
-      mockedAuthApi.refresh.mockResolvedValue({
-        access_token: 'new-access',
-        refresh_token: 'new-refresh',
-      })
+      serve({ '/auth/refresh': { ok: { access_token: 'new-access', refresh_token: 'new-refresh' } } })
 
       await useAuthStore.getState().refreshAccessToken()
 
       const state = useAuthStore.getState()
       expect(state.accessToken).toBe('new-access')
       expect(state.refreshToken).toBe('new-refresh')
+      expect(client.post).toHaveBeenCalledWith('/auth/refresh', { body: { refresh_token: 'old-refresh' } })
     })
 
     it('logs out and reports the failure when the server rejects the session', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.refresh.mockRejectedValue(rejected)
+      serve({ '/auth/refresh': { fail: rejected } })
 
       await expect(useAuthStore.getState().refreshAccessToken()).rejects.toBe(rejected)
 
@@ -164,24 +166,21 @@ describe('authStore', () => {
 
     it.each(transientFailures)('keeps the session and reports the failure on %s', async (_, failure) => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.refresh.mockRejectedValue(failure)
+      serve({ '/auth/refresh': { fail: failure } })
 
       await expect(useAuthStore.getState().refreshAccessToken()).rejects.toBe(failure)
 
-      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(posted('/auth/logout')).toBe(false)
       expect(useAuthStore.getState().isAuthenticated).toBe(true)
     })
   })
 
   describe('fetchCurrentUser', () => {
     it('sets user on success', async () => {
-      mockedAuthApi.getCurrentUser.mockResolvedValue({
-        id: '42',
-        email: 'admin@test.com',
-        role: 'admin',
-        first_name: 'Admin',
-        last_name: 'User',
-        mfa_enabled: true,
+      serve({
+        '/auth/me': {
+          ok: { id: '42', email: 'admin@test.com', role: 'admin', first_name: 'Admin', last_name: 'User', mfa_enabled: true },
+        },
       })
 
       await useAuthStore.getState().fetchCurrentUser()
@@ -197,7 +196,7 @@ describe('authStore', () => {
 
     it('logs out when the server rejects the session', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.getCurrentUser.mockRejectedValue(rejected)
+      serve({ '/auth/me': { fail: rejected } })
 
       await useAuthStore.getState().fetchCurrentUser()
 
@@ -206,11 +205,11 @@ describe('authStore', () => {
 
     it.each(transientFailures)('keeps the session on %s', async (_, failure) => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.getCurrentUser.mockRejectedValue(failure)
+      serve({ '/auth/me': { fail: failure } })
 
       await useAuthStore.getState().fetchCurrentUser()
 
-      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(posted('/auth/logout')).toBe(false)
       expect(useAuthStore.getState().isAuthenticated).toBe(true)
     })
   })
@@ -218,7 +217,7 @@ describe('authStore', () => {
   describe('hydrateSession', () => {
     it('closes a session the server rejects when the page loads', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.refresh.mockRejectedValue(rejected)
+      serve({ '/auth/refresh': { fail: rejected } })
 
       await useAuthStore.getState().hydrateSession()
 
@@ -228,11 +227,11 @@ describe('authStore', () => {
 
     it.each(transientFailures)('keeps the session and stops waiting on %s', async (_, failure) => {
       useAuthStore.setState({ isAuthenticated: true })
-      mockedAuthApi.refresh.mockRejectedValue(failure)
+      serve({ '/auth/refresh': { fail: failure } })
 
       await useAuthStore.getState().hydrateSession()
 
-      expect(mockedAuthApi.logout).not.toHaveBeenCalled()
+      expect(posted('/auth/logout')).toBe(false)
       expect(useAuthStore.getState().isAuthenticated).toBe(true)
       expect(useAuthStore.getState().isHydrating).toBe(false)
     })

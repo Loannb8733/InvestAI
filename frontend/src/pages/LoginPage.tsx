@@ -63,17 +63,13 @@ export default function LoginPage() {
     }
   }
 
-  // Ce que l'application gère réellement. « Actions » figurait ici comme dans
-  // le guide de démarrage : aucun parcours ne lui correspond (UX-03).
   const univers = ['Crypto', 'Crowdfunding', 'Analyses IA', 'Fiscalité']
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-background">
-      {/* Left — brand panel */}
       <div className="relative hidden overflow-hidden border-r border-border bg-card lg:flex">
         <AuroraCanvas opacity={0.45} />
         <div className="relative z-10 flex w-full flex-col justify-between p-14 animate-in fade-in duration-700 motion-reduce:animate-none">
-          {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
               <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
@@ -81,7 +77,6 @@ export default function LoginPage() {
             <span className="text-xl font-semibold tracking-tight">InvestAI</span>
           </div>
 
-          {/* Narrative headline */}
           <div className="max-w-lg space-y-6">
             <div className="eyebrow text-primary">Votre patrimoine, une seule histoire</div>
             <h1 className="text-5xl font-serif font-medium leading-[1.08] tracking-tight">
@@ -94,7 +89,6 @@ export default function LoginPage() {
               et prédictions comprises, sans le bruit.
             </p>
 
-            {/* Univers pills */}
             <div className="flex flex-wrap gap-2 pt-2">
               {univers.map((u) => (
                 <span
@@ -107,7 +101,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-[oklch(var(--gain))]" />
             Chiffrement de bout en bout · © 2026 InvestAI
@@ -115,10 +108,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right — form */}
       <div className="relative flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none">
-          {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
               <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
@@ -126,7 +117,6 @@ export default function LoginPage() {
             <span className="text-xl font-semibold tracking-tight">InvestAI</span>
           </div>
 
-          {/* Header */}
           <div className="mb-8 space-y-2">
             <div className="eyebrow text-primary">Connexion</div>
             <h2 className="text-3xl font-semibold tracking-tight">Bon retour</h2>
@@ -231,7 +221,6 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Register */}
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Pas encore de compte ?{' '}
             <Link

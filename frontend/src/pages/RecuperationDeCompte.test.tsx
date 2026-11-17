@@ -26,7 +26,7 @@ const toastMock = vi.hoisted(() => vi.fn())
 const naviguer = vi.hoisted(() => vi.fn())
 let parametresUrl = new URLSearchParams()
 
-vi.mock('@/shared/api/http', () => ({ http: { post: posterApi } }))
+vi.mock('@/shared/api/client', () => ({ apiClient: { post: posterApi } }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 // Le fond animé peint sur un canvas WebGL, que jsdom ne fournit pas.
 vi.mock('@/components/ui/aurora-canvas', () => ({ default: () => null }))
@@ -72,7 +72,7 @@ describe('la demande de réinitialisation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Envoyer le lien/i }))
 
     await waitFor(() =>
-      expect(posterApi).toHaveBeenCalledWith('/auth/forgot-password', { email: 'titulaire@test.com' }),
+      expect(posterApi).toHaveBeenCalledWith('/auth/forgot-password', { body: { email: 'titulaire@test.com' } }),
     )
   })
 
@@ -156,8 +156,7 @@ describe('le choix du nouveau mot de passe', () => {
 
     await waitFor(() =>
       expect(posterApi).toHaveBeenCalledWith('/auth/reset-password', {
-        token: 'jeton-du-courriel',
-        new_password: 'MotDePasseValide1',
+        body: { token: 'jeton-du-courriel', new_password: 'MotDePasseValide1' },
       }),
     )
   })
