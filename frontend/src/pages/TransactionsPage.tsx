@@ -43,7 +43,8 @@ import {
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
-import { transactionsApi, portfoliosApi } from '@/services/api'
+import { transactionsApi } from '@/services/api'
+import { usePortfolioList } from '@/features/portfolio/hooks'
 import { useToast } from '@/hooks/use-toast'
 import {
   Plus,
@@ -85,12 +86,11 @@ import AddTransactionForm from '@/components/forms/AddTransactionForm'
 import ImportCSVForm from '@/components/forms/ImportCSVForm'
 import EditTransactionForm from '@/components/forms/EditTransactionForm'
 
-import type { TransactionWithAssetInfo, PortfolioSummary } from '@/types'
+import type { TransactionWithAssetInfo } from '@/types'
 
 // ============== Interfaces ==============
 
 type Transaction = TransactionWithAssetInfo
-type Portfolio = PortfolioSummary
 
 interface CurrencyTotals {
   bought: number
@@ -231,11 +231,7 @@ export default function TransactionsPage() {
 
   // ============== Queries ==============
 
-  const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: queryKeys.portfolios.list(),
-    queryFn: portfoliosApi.list,
-    staleTime: 60_000,
-  })
+  const { data: portfolios } = usePortfolioList()
 
   // Recherche débouncée (300 ms) : évite une requête serveur à chaque frappe
   const [debouncedSearch, setDebouncedSearch] = useState('')

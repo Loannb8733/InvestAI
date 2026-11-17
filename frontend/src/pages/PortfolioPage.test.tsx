@@ -1,131 +1,81 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { http } from '@/shared/api/http'
+import { createFakeServer, ok } from '@/test/fakeServer'
+import { resetAuth, SIGNED_IN_USER } from '@/test/identityFixtures'
+import { BOURSE, CROWDFUNDING, CRYPTO, portfolioRoutes } from '@/test/portfolioFixtures'
+import { renderWithQuery } from '@/test/render'
 import PortfolioPage from './PortfolioPage'
 
-/**
- * La page qui montre les 56 actifs, ligne par ligne.
- *
- * 759 lignes, **0 %** de couverture. C'est la vue centrale du produit : les
- * autres pages sans test — objectifs, notes, alertes, simulations — portent des
- * fonctionnalités dont la base ne contient aucun enregistrement ; celle-ci
- * affiche tout ce que l'utilisateur possède.
- *
- * Le filet porte sur la charpente : les quatre états de chargement, le
- * portefeuille masqué, la sélection automatique, et l'export CSV — le seul
- * geste de la page qui écrit un fichier sur le poste.
- */
+const toasts = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 
-const listerPortefeuilles = vi.hoisted(() => vi.fn())
-const metriques = vi.hoisted(() => vi.fn())
-const historique = vi.hoisted(() => vi.fn())
-const sparklines = vi.hoisted(() => vi.fn())
-const exporterCSV = vi.hoisted(() => vi.fn())
-const toastMock = vi.hoisted(() => vi.fn())
+vi.mock('@/hooks/use-toast', () => {
+  const toast = (props: Record<string, unknown>) => {
+    toasts.push(props)
+  }
+  return { toast, useToast: () => ({ toast }) }
+})
 
-vi.mock('@/services/api', () => ({
-  portfoliosApi: { list: listerPortefeuilles, delete: vi.fn(), create: vi.fn() },
-  dashboardApi: {
-    getPortfolioMetrics: metriques,
-    getPortfolioHistory: historique,
-    getPortfolioSparklines: sparklines,
-  },
-  assetsApi: { delete: vi.fn(), update: vi.fn(), list: vi.fn(), create: vi.fn() },
-  // `getCSVPlatforms` alimente une requête montée par le formulaire d'import :
-  // rendre `undefined` la ferait échouer bruyamment sans rien apprendre.
-  transactionsApi: {
-    exportCSV: exporterCSV,
-    create: vi.fn(),
-    getCSVPlatforms: vi.fn().mockResolvedValue({ platforms: [] }),
-    importCSV: vi.fn(),
-  },
-}))
-vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
-vi.mock('@/lib/invalidate-queries', () => ({ invalidateAllFinancialData: vi.fn() }))
-vi.mock('@/stores/authStore', () => ({
-  useAuthStore: (selecteur: (e: unknown) => unknown) => selecteur({ user: { preferredCurrency: 'EUR' } }),
-}))
+const server = createFakeServer()
+const { calls, routes } = server
+const called = (method: string, url: string) => calls.some((c) => c.method === method && c.url === url)
 
-const CRYPTO = { id: 'p-crypto', name: 'Crypto', total_value: 100000 }
-const CROWDFUNDING = { id: 'p-cf', name: 'Crowdfunding', kind: 'crowdfunding', total_value: 6000 }
-
-const METRIQUES_VIDES = {
-  total_value: 0,
-  total_invested: 0,
-  total_gain_loss: 0,
-  total_gain_loss_percent: 0,
-  assets: [],
-  allocation: [],
-}
-
-function afficher() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <PortfolioPage />
-      </MemoryRouter>
-    </QueryClientProvider>,
+function show() {
+  renderWithQuery(
+    <MemoryRouter>
+      <PortfolioPage />
+    </MemoryRouter>
   )
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  listerPortefeuilles.mockResolvedValue([CRYPTO])
-  metriques.mockResolvedValue(METRIQUES_VIDES)
-  historique.mockResolvedValue({
-    total_invested_all_time: 0,
-    total_sold: 0,
-    total_fees: 0,
-    realized_gains: 0,
-    current_holdings_count: 0,
-    sold_assets_count: 0,
-    sold_assets: [],
-  })
-  sparklines.mockResolvedValue([])
-})
-
-/**
- * Le bouton d'export apparaît au rendu où les portefeuilles arrivent, mais la
- * sélection automatique du premier n'est posée qu'à l'effet suivant. Cliquer
- * entre les deux exporte sans portefeuille : sur un runner CI lent, le test
- * tombait dans cette fenêtre. Les métriques ne sont demandées qu'une fois un
- * portefeuille sélectionné — c'est le signal attendu.
- */
-async function boutonExportPret() {
-  await waitFor(() => expect(metriques).toHaveBeenCalledWith('p-crypto'))
+async function exportButtonReady() {
+  await waitFor(() => expect(called('GET', '/dashboard/portfolio/p1')).toBe(true))
   return screen.getByRole('button', { name: /Exporter CSV/i })
 }
 
+beforeAll(() => {
+  http.defaults.adapter = server.adapter
+})
+
+beforeEach(() => {
+  server.reset(portfolioRoutes())
+  routes['GET /portfolios'] = ok([CRYPTO])
+  toasts.length = 0
+  resetAuth({ isAuthenticated: true, accessToken: 'access-1', user: SIGNED_IN_USER })
+})
+
+afterEach(() => {
+  http.defaults.adapter = server.adapter
+  vi.restoreAllMocks()
+})
+
 describe('les états de la page', () => {
   it('montre un squelette tant que les portefeuilles arrivent', () => {
-    listerPortefeuilles.mockReturnValue(new Promise(() => {}))
-    afficher()
+    http.defaults.adapter = () => new Promise(() => {})
+    show()
 
     expect(screen.getByText(/ligne par ligne/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Exporter CSV/i })).not.toBeInTheDocument()
   })
 
   it("affiche une erreur rattrapable plutôt qu'une page vide", async () => {
-    // Une requête rejetée ne lève rien pendant le rendu : sans cet état, la
-    // frontière d'erreur de la route ne la voit pas et l'écran reste blanc.
-    listerPortefeuilles.mockRejectedValue(new Error('réseau'))
-    afficher()
+    routes['GET /portfolios'] = () => ({ status: 500, data: { detail: 'réseau' } })
+    show()
 
     expect(await screen.findByText(/Impossible de charger le portefeuille/i)).toBeInTheDocument()
   })
 
   it('propose de créer un portefeuille quand il n’y en a aucun', async () => {
-    listerPortefeuilles.mockResolvedValue([])
-    afficher()
+    routes['GET /portfolios'] = ok([])
+    show()
 
-    await waitFor(() => expect(listerPortefeuilles).toHaveBeenCalled())
+    expect(await screen.findByText('Aucun portefeuille')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Exporter CSV/i })).not.toBeInTheDocument()
   })
 
   it('affiche la page une fois les portefeuilles chargés', async () => {
-    afficher()
+    show()
 
     expect(await screen.findByRole('button', { name: /Exporter CSV/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Portefeuille', level: 2 })).toBeInTheDocument()
@@ -134,97 +84,86 @@ describe('les états de la page', () => {
 
 describe('le choix du portefeuille', () => {
   it('écarte le portefeuille de crowdfunding, qui a sa propre page', async () => {
-    listerPortefeuilles.mockResolvedValue([CRYPTO, CROWDFUNDING])
-    afficher()
+    routes['GET /portfolios'] = ok([CRYPTO, { ...CROWDFUNDING, name: 'Crowdfunding' }])
+    show()
 
     await screen.findByRole('button', { name: 'Crypto' })
     expect(screen.queryByRole('button', { name: 'Crowdfunding' })).not.toBeInTheDocument()
   })
 
   it('l’écarte même s’il a été renommé', async () => {
-    // NEW-68 : le portefeuille se reconnaît à son marqueur, non à son libellé.
-    // Le reconnaître au nom laissait un simple renommage faire réapparaître ses
-    // actifs ici — et disperser les projets à venir côté serveur.
-    listerPortefeuilles.mockResolvedValue([CRYPTO, { ...CROWDFUNDING, name: 'Mes prêts' }])
-    afficher()
+    routes['GET /portfolios'] = ok([CRYPTO, CROWDFUNDING])
+    show()
 
     await screen.findByRole('button', { name: 'Crypto' })
     expect(screen.queryByRole('button', { name: 'Mes prêts' })).not.toBeInTheDocument()
   })
 
   it('l’écarte encore par son nom quand la réponse ne porte pas de marqueur', async () => {
-    // Repli pour les réponses d'avant NEW-68 : le serveur peut ne pas encore
-    // exposer `kind`, et l'écran ne doit pas se mettre à afficher un
-    // portefeuille qu'il masquait la veille.
-    listerPortefeuilles.mockResolvedValue([CRYPTO, { id: 'p-cf', name: 'crowdfunding', total_value: 6000 }])
-    afficher()
+    routes['GET /portfolios'] = ok([CRYPTO, { ...CROWDFUNDING, name: 'crowdfunding', kind: null }])
+    show()
 
     await screen.findByRole('button', { name: 'Crypto' })
     expect(screen.queryByRole('button', { name: /^crowdfunding$/i })).not.toBeInTheDocument()
   })
 
   it('sélectionne le premier portefeuille sans attendre un clic', async () => {
-    listerPortefeuilles.mockResolvedValue([CRYPTO, { id: 'p-2', name: 'Bourse', total_value: 5000 }])
-    afficher()
+    routes['GET /portfolios'] = ok([CRYPTO, BOURSE])
+    show()
 
-    await waitFor(() => expect(metriques).toHaveBeenCalledWith('p-crypto'))
+    await waitFor(() => expect(called('GET', '/dashboard/portfolio/p1')).toBe(true))
   })
 
   it('charge les métriques du portefeuille choisi', async () => {
-    listerPortefeuilles.mockResolvedValue([CRYPTO, { id: 'p-2', name: 'Bourse', total_value: 5000 }])
-    afficher()
-    await waitFor(() => expect(metriques).toHaveBeenCalledWith('p-crypto'))
+    routes['GET /portfolios'] = ok([CRYPTO, BOURSE])
+    show()
+    await waitFor(() => expect(called('GET', '/dashboard/portfolio/p1')).toBe(true))
 
     fireEvent.click(screen.getByRole('button', { name: 'Bourse' }))
 
-    await waitFor(() => expect(metriques).toHaveBeenCalledWith('p-2'))
+    await waitFor(() => expect(called('GET', '/dashboard/portfolio/p2')).toBe(true))
   })
 
   it("ne demande l'historique qu'une fois son onglet ouvert", async () => {
-    // Il est plus lourd que les métriques : le charger d'emblée ralentirait
-    // l'affichage de la page pour un onglet que l'utilisateur n'ouvre pas.
-    afficher()
+    show()
     await screen.findByRole('button', { name: /Exporter CSV/i })
 
-    expect(historique).not.toHaveBeenCalled()
+    expect(called('GET', '/dashboard/portfolio/p1/history')).toBe(false)
   })
 })
 
 describe("l'export CSV", () => {
   beforeEach(() => {
+    routes['GET /transactions/export-csv'] = ok('symbol,type\n')
     Object.defineProperty(window.URL, 'createObjectURL', { value: vi.fn(() => 'blob:faux'), writable: true })
     Object.defineProperty(window.URL, 'revokeObjectURL', { value: vi.fn(), writable: true })
   })
 
   it('exporte les transactions du portefeuille affiché', async () => {
-    exporterCSV.mockResolvedValue(new Blob(['symbol,type\n']))
-    afficher()
+    show()
 
-    fireEvent.click(await boutonExportPret())
+    fireEvent.click(await exportButtonReady())
 
-    await waitFor(() => expect(exporterCSV).toHaveBeenCalledWith('p-crypto'))
-    expect(toastMock.mock.calls.at(-1)![0].title).toBe('Export réussi')
+    await waitFor(() => expect(toasts.at(-1)?.title).toBe('Export réussi'))
+    expect(calls.find((c) => c.url === '/transactions/export-csv')?.params).toEqual({ portfolio_id: 'p1' })
   })
 
   it("libère l'URL du fichier après le téléchargement", async () => {
-    // Sans quoi le contenu reste en mémoire pour toute la durée de l'onglet.
-    exporterCSV.mockResolvedValue(new Blob(['symbol,type\n']))
-    afficher()
+    show()
 
-    fireEvent.click(await boutonExportPret())
+    fireEvent.click(await exportButtonReady())
 
     await waitFor(() => expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:faux'))
   })
 
   it("signale l'échec au lieu de laisser croire au succès", async () => {
-    exporterCSV.mockRejectedValue(new Error('serveur'))
-    afficher()
+    routes['GET /transactions/export-csv'] = () => ({ status: 500, data: { detail: 'serveur' } })
+    show()
 
-    fireEvent.click(await boutonExportPret())
+    fireEvent.click(await exportButtonReady())
 
-    await waitFor(() => expect(toastMock).toHaveBeenCalled())
-    const message = toastMock.mock.calls.at(-1)![0]
-    expect(message.variant).toBe('destructive')
+    await waitFor(() => expect(toasts.at(-1)?.description).toBe("Impossible d'exporter les transactions."))
+    expect(toasts.at(-1)?.variant).toBe('destructive')
     expect(window.URL.createObjectURL).not.toHaveBeenCalled()
   })
 })

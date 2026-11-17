@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query'
-import type { PortfolioSummary as Portfolio } from '@/types'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -11,7 +10,8 @@ import {
 } from '@/components/ui/select'
 import EmptyState from '@/components/ui/empty-state'
 import { SkeletonStatCard } from '@/components/ui/skeleton'
-import { analyticsApi, dashboardApi, portfoliosApi, predictionsApi, smartInsightsApi } from '@/services/api'
+import { analyticsApi, dashboardApi, predictionsApi, smartInsightsApi } from '@/services/api'
+import { usePortfolioList } from '@/features/portfolio/hooks'
 import { queryKeys } from '@/lib/queryKeys'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -94,11 +94,7 @@ export default function RiskPerformancePillar() {
   const periodDays = PERIOD_OPTIONS.find((o) => o.value === period)?.days ?? 30
   const portfolioParam = selectedPortfolio === 'all' ? undefined : selectedPortfolio
 
-  const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: queryKeys.portfolios.list(),
-    queryFn: portfoliosApi.list,
-    staleTime: 60_000,
-  })
+  const { data: portfolios } = usePortfolioList()
 
   const analyticsQueryOpts = { retry: 1, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const
 

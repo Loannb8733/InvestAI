@@ -16,12 +16,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { transactionsApi, portfoliosApi } from '@/services/api'
+import { transactionsApi } from '@/services/api'
+import { usePortfolioList } from '@/features/portfolio/hooks'
 import { Upload, FileText, Loader2, CheckCircle, XCircle, Download, Wallet, HelpCircle, SkipForward } from 'lucide-react'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
 import { PlatformSelect } from '@/components/forms/PlatformSelect'
-import type { PortfolioSummary as Portfolio } from '@/types'
 
 interface ImportCSVFormProps {
   onSuccess?: () => void
@@ -55,11 +55,7 @@ export default function ImportCSVForm({
   const [destinationExchange, setDestinationExchange] = useState<string>('')
 
   // Fetch portfolios for selection
-  const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: queryKeys.portfolios.list(),
-    queryFn: portfoliosApi.list,
-    staleTime: 60_000,
-  })
+  const { data: portfolios } = usePortfolioList()
 
   // Fetch available platforms
   const { data: platformsData } = useQuery<{ platforms: string[] }>({

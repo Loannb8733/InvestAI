@@ -938,7 +938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Get Portfolio Dashboard Api V1 Dashboard Portfolio  Portfolio Id  Get"
+                  "$ref": "#/components/schemas/PortfolioPerformance"
                 }
               }
             }
@@ -987,9 +987,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Portfolio History Api V1 Dashboard Portfolio  Portfolio Id  History Get"
+                  "$ref": "#/components/schemas/PortfolioHistory"
                 }
               }
             }
@@ -1951,7 +1949,20 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TransactionWithAsset"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/TransactionListPage"
+                    }
+                  ],
+                  "title": "Response List Transactions Api V1 Transactions Get"
+                }
               }
             }
           },
@@ -12726,6 +12737,25 @@
         ],
         "title": "ExchangeInfo"
       },
+      "ExchangeSales": {
+        "properties": {
+          "realized": {
+            "type": "number",
+            "title": "Realized"
+          },
+          "cost_sold": {
+            "type": "number",
+            "title": "Cost Sold"
+          }
+        },
+        "type": "object",
+        "required": [
+          "realized",
+          "cost_sold"
+        ],
+        "title": "ExchangeSales",
+        "description": "Gain réalisé et coût sorti des ventes d'une plateforme."
+      },
       "FIREProbabilisticParameters": {
         "properties": {
           "current_value": {
@@ -12973,6 +13003,35 @@
           "direction"
         ],
         "title": "FeatureExplanation"
+      },
+      "FiatHolding": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "quantity",
+          "value"
+        ],
+        "title": "FiatHolding",
+        "description": "Une monnaie détenue, valorisée au taux de change."
       },
       "ForgotPasswordRequest": {
         "properties": {
@@ -15564,6 +15623,403 @@
         "title": "PortfolioHealthResponse",
         "description": "Rapport de santé complet."
       },
+      "PortfolioHistory": {
+        "properties": {
+          "total_invested_all_time": {
+            "type": "number",
+            "title": "Total Invested All Time"
+          },
+          "total_sold": {
+            "type": "number",
+            "title": "Total Sold"
+          },
+          "total_sold_fiat": {
+            "type": "number",
+            "title": "Total Sold Fiat",
+            "default": 0.0
+          },
+          "total_fees": {
+            "type": "number",
+            "title": "Total Fees"
+          },
+          "realized_gains": {
+            "type": "number",
+            "title": "Realized Gains"
+          },
+          "current_holdings_count": {
+            "type": "integer",
+            "title": "Current Holdings Count"
+          },
+          "sold_assets_count": {
+            "type": "integer",
+            "title": "Sold Assets Count"
+          },
+          "sold_assets": {
+            "items": {
+              "$ref": "#/components/schemas/SoldAsset"
+            },
+            "type": "array",
+            "title": "Sold Assets"
+          },
+          "by_exchange": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExchangeSales"
+            },
+            "type": "object",
+            "title": "By Exchange"
+          },
+          "realized_by_year": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Realized By Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_invested_all_time",
+          "total_sold",
+          "total_fees",
+          "realized_gains",
+          "current_holdings_count",
+          "sold_assets_count",
+          "sold_assets",
+          "by_exchange",
+          "realized_by_year"
+        ],
+        "title": "PortfolioHistory",
+        "description": "Historique d'investissement d'un portefeuille ; un portefeuille vide n'a pas `total_sold_fiat`."
+      },
+      "PortfolioPerformance": {
+        "properties": {
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "total_invested": {
+            "type": "number",
+            "title": "Total Invested"
+          },
+          "unrealized_gain": {
+            "type": "number",
+            "title": "Unrealized Gain"
+          },
+          "total_dividend_income": {
+            "type": "number",
+            "title": "Total Dividend Income"
+          },
+          "assets_count": {
+            "type": "integer",
+            "title": "Assets Count"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPosition"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "cash_from_stablecoins": {
+            "type": "number",
+            "title": "Cash From Stablecoins"
+          },
+          "stablecoins": {
+            "items": {
+              "$ref": "#/components/schemas/StablecoinHolding"
+            },
+            "type": "array",
+            "title": "Stablecoins"
+          },
+          "cash_from_fiat": {
+            "type": "number",
+            "title": "Cash From Fiat"
+          },
+          "fiat_assets": {
+            "items": {
+              "$ref": "#/components/schemas/FiatHolding"
+            },
+            "type": "array",
+            "title": "Fiat Assets"
+          },
+          "available_liquidity": {
+            "type": "number",
+            "title": "Available Liquidity",
+            "default": 0.0
+          },
+          "forex_stale": {
+            "type": "boolean",
+            "title": "Forex Stale",
+            "default": false
+          },
+          "unpriced_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unpriced Symbols",
+            "default": []
+          },
+          "crowdfunding_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_gain_loss": {
+            "type": "number",
+            "title": "Total Gain Loss"
+          },
+          "total_gain_loss_percent": {
+            "type": "number",
+            "title": "Total Gain Loss Percent"
+          },
+          "total_return": {
+            "type": "number",
+            "title": "Total Return"
+          },
+          "by_exchange": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExchangeSales"
+            },
+            "type": "object",
+            "title": "By Exchange"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_value",
+          "total_invested",
+          "unrealized_gain",
+          "total_dividend_income",
+          "assets_count",
+          "assets",
+          "cash_from_stablecoins",
+          "stablecoins",
+          "cash_from_fiat",
+          "fiat_assets",
+          "total_gain_loss",
+          "total_gain_loss_percent",
+          "total_return",
+          "by_exchange"
+        ],
+        "title": "PortfolioPerformance",
+        "description": "Positions, liquidités et gain total d'un portefeuille ; un portefeuille vide n'a pas les champs facultatifs."
+      },
+      "PortfolioPosition": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "avg_buy_price": {
+            "type": "number",
+            "title": "Avg Buy Price"
+          },
+          "total_invested": {
+            "type": "number",
+            "title": "Total Invested"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "current_value": {
+            "type": "number",
+            "title": "Current Value"
+          },
+          "gain_loss": {
+            "type": "number",
+            "title": "Gain Loss"
+          },
+          "gain_loss_percent": {
+            "type": "number",
+            "title": "Gain Loss Percent"
+          },
+          "change_percent_24h": {
+            "type": "number",
+            "title": "Change Percent 24H"
+          },
+          "total_fees": {
+            "type": "number",
+            "title": "Total Fees"
+          },
+          "breakeven_price": {
+            "type": "number",
+            "title": "Breakeven Price"
+          },
+          "first_buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Buy Date"
+          },
+          "holding_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Days"
+          },
+          "annualized_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Return"
+          },
+          "dividend_income": {
+            "type": "number",
+            "title": "Dividend Income"
+          },
+          "fx_gain": {
+            "type": "number",
+            "title": "Fx Gain"
+          },
+          "asset_gain": {
+            "type": "number",
+            "title": "Asset Gain"
+          },
+          "total_return": {
+            "type": "number",
+            "title": "Total Return"
+          },
+          "risk_weight": {
+            "type": "number",
+            "title": "Risk Weight"
+          },
+          "interest_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interest Rate"
+          },
+          "maturity_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maturity Date"
+          },
+          "project_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Status"
+          },
+          "invested_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invested Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "asset_type",
+          "exchange",
+          "quantity",
+          "avg_buy_price",
+          "total_invested",
+          "current_price",
+          "current_value",
+          "gain_loss",
+          "gain_loss_percent",
+          "change_percent_24h",
+          "total_fees",
+          "breakeven_price",
+          "first_buy_date",
+          "holding_days",
+          "annualized_return",
+          "dividend_income",
+          "fx_gain",
+          "asset_gain",
+          "total_return",
+          "risk_weight"
+        ],
+        "title": "PortfolioPosition",
+        "description": "Une position de quantité positive ; les champs de projet n'existent que pour un bien valorisé à son coût."
+      },
       "PortfolioPredictionResponse": {
         "properties": {
           "predictions": {
@@ -16414,6 +16870,47 @@
           "defaulted"
         ],
         "title": "ProjectStatus"
+      },
+      "ProjectSummary": {
+        "properties": {
+          "total_invested": {
+            "type": "number",
+            "title": "Total Invested"
+          },
+          "active_projects": {
+            "type": "integer",
+            "title": "Active Projects"
+          },
+          "completed_projects": {
+            "type": "integer",
+            "title": "Completed Projects"
+          },
+          "projected_annual_interest": {
+            "type": "number",
+            "title": "Projected Annual Interest"
+          },
+          "next_maturity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Maturity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_invested",
+          "active_projects",
+          "completed_projects",
+          "projected_annual_interest",
+          "next_maturity"
+        ],
+        "title": "ProjectSummary",
+        "description": "Synthèse des biens valorisés à leur montant investi."
       },
       "ProjectionParameters": {
         "properties": {
@@ -17716,6 +18213,113 @@
         "title": "SkippedModel",
         "description": "Modèle écarté de l'ensemble et pourquoi (non installé, historique trop court, erreur, prévision aberrante)."
       },
+      "SoldAsset": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "current_quantity": {
+            "type": "number",
+            "title": "Current Quantity"
+          },
+          "total_bought": {
+            "type": "number",
+            "title": "Total Bought"
+          },
+          "total_bought_value": {
+            "type": "number",
+            "title": "Total Bought Value"
+          },
+          "total_sold": {
+            "type": "number",
+            "title": "Total Sold"
+          },
+          "total_sold_value": {
+            "type": "number",
+            "title": "Total Sold Value"
+          },
+          "total_fees": {
+            "type": "number",
+            "title": "Total Fees"
+          },
+          "realized_gain": {
+            "type": "number",
+            "title": "Realized Gain"
+          },
+          "first_transaction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Transaction"
+          },
+          "last_transaction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Transaction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "asset_type",
+          "exchange",
+          "current_quantity",
+          "total_bought",
+          "total_bought_value",
+          "total_sold",
+          "total_sold_value",
+          "total_fees",
+          "realized_gain",
+          "first_transaction",
+          "last_transaction"
+        ],
+        "title": "SoldAsset",
+        "description": "Un actif soldé ou presque, avec ses montants achetés et vendus."
+      },
       "SparklineData": {
         "properties": {
           "symbol": {
@@ -17742,6 +18346,57 @@
         ],
         "title": "SparklineData",
         "description": "Mini-courbe d'un symbole, normalisée entre 0 et 1."
+      },
+      "StablecoinHolding": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit_price": {
+            "type": "number",
+            "title": "Unit Price"
+          },
+          "depeg_warning": {
+            "type": "boolean",
+            "title": "Depeg Warning"
+          },
+          "depeg_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Depeg Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "quantity",
+          "value",
+          "unit_price",
+          "depeg_warning",
+          "depeg_percent"
+        ],
+        "title": "StablecoinHolding",
+        "description": "Un stablecoin valorisé à son cours, avec l'écart à sa parité."
       },
       "StrategyActionCreate": {
         "properties": {
@@ -18614,6 +19269,27 @@
         ],
         "title": "TransactionCreate"
       },
+      "TransactionListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionWithAsset"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "TransactionListPage"
+      },
       "TransactionResponse": {
         "properties": {
           "id": {
@@ -18860,6 +19536,136 @@
         },
         "type": "object",
         "title": "TransactionUpdate"
+      },
+      "TransactionWithAsset": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Asset Id"
+          },
+          "transaction_type": {
+            "$ref": "#/components/schemas/TransactionType"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "fee": {
+            "type": "number",
+            "title": "Fee",
+            "default": 0.0
+          },
+          "fee_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Currency"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "executed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executed At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "asset_symbol": {
+            "type": "string",
+            "title": "Asset Symbol"
+          },
+          "asset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Name"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "asset_id",
+          "transaction_type",
+          "quantity",
+          "price",
+          "exchange",
+          "external_id",
+          "created_at",
+          "asset_symbol",
+          "asset_name",
+          "asset_type"
+        ],
+        "title": "TransactionWithAsset"
       },
       "UpcomingEvent": {
         "properties": {

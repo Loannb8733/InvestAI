@@ -25,8 +25,8 @@ const toastMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/api', () => ({
   transactionsApi: { importCSV: importerCSV, getCSVPlatforms: listePlateformes },
-  portfoliosApi: { list: listePortefeuilles },
 }))
+vi.mock('@/shared/api/client', () => ({ apiClient: { get: () => listePortefeuilles() } }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/lib/invalidate-queries', () => ({ invalidateAllFinancialData: vi.fn() }))
 

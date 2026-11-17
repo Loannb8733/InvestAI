@@ -4275,6 +4275,16 @@ export interface components {
             description: string;
         };
         /**
+         * ExchangeSales
+         * @description Gain réalisé et coût sorti des ventes d'une plateforme.
+         */
+        ExchangeSales: {
+            /** Realized */
+            realized: number;
+            /** Cost Sold */
+            cost_sold: number;
+        };
+        /**
          * FIREProbabilisticParameters
          * @description Taux en décimal (0.04 = 4 %) ; les valeurs omises sont déduites du portefeuille live et du profil.
          */
@@ -4386,6 +4396,20 @@ export interface components {
             importance: number;
             /** Direction */
             direction: string;
+        };
+        /**
+         * FiatHolding
+         * @description Une monnaie détenue, valorisée au taux de change.
+         */
+        FiatHolding: {
+            /** Id */
+            id: string;
+            /** Symbol */
+            symbol: string;
+            /** Quantity */
+            quantity: number;
+            /** Value */
+            value: number;
         };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
@@ -5316,6 +5340,151 @@ export interface components {
             /** Generated At */
             generated_at: string;
         };
+        /**
+         * PortfolioHistory
+         * @description Historique d'investissement d'un portefeuille ; un portefeuille vide n'a pas `total_sold_fiat`.
+         */
+        PortfolioHistory: {
+            /** Total Invested All Time */
+            total_invested_all_time: number;
+            /** Total Sold */
+            total_sold: number;
+            /**
+             * Total Sold Fiat
+             * @default 0
+             */
+            total_sold_fiat: number;
+            /** Total Fees */
+            total_fees: number;
+            /** Realized Gains */
+            realized_gains: number;
+            /** Current Holdings Count */
+            current_holdings_count: number;
+            /** Sold Assets Count */
+            sold_assets_count: number;
+            /** Sold Assets */
+            sold_assets: components["schemas"]["SoldAsset"][];
+            /** By Exchange */
+            by_exchange: {
+                [key: string]: components["schemas"]["ExchangeSales"];
+            };
+            /** Realized By Year */
+            realized_by_year: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * PortfolioPerformance
+         * @description Positions, liquidités et gain total d'un portefeuille ; un portefeuille vide n'a pas les champs facultatifs.
+         */
+        PortfolioPerformance: {
+            /** Total Value */
+            total_value: number;
+            /** Total Invested */
+            total_invested: number;
+            /** Unrealized Gain */
+            unrealized_gain: number;
+            /** Total Dividend Income */
+            total_dividend_income: number;
+            /** Assets Count */
+            assets_count: number;
+            /** Assets */
+            assets: components["schemas"]["PortfolioPosition"][];
+            /** Cash From Stablecoins */
+            cash_from_stablecoins: number;
+            /** Stablecoins */
+            stablecoins: components["schemas"]["StablecoinHolding"][];
+            /** Cash From Fiat */
+            cash_from_fiat: number;
+            /** Fiat Assets */
+            fiat_assets: components["schemas"]["FiatHolding"][];
+            /**
+             * Available Liquidity
+             * @default 0
+             */
+            available_liquidity: number;
+            /**
+             * Forex Stale
+             * @default false
+             */
+            forex_stale: boolean;
+            /**
+             * Unpriced Symbols
+             * @default []
+             */
+            unpriced_symbols: string[];
+            crowdfunding_summary?: components["schemas"]["ProjectSummary"] | null;
+            /** Total Gain Loss */
+            total_gain_loss: number;
+            /** Total Gain Loss Percent */
+            total_gain_loss_percent: number;
+            /** Total Return */
+            total_return: number;
+            /** By Exchange */
+            by_exchange: {
+                [key: string]: components["schemas"]["ExchangeSales"];
+            };
+        };
+        /**
+         * PortfolioPosition
+         * @description Une position de quantité positive ; les champs de projet n'existent que pour un bien valorisé à son coût.
+         */
+        PortfolioPosition: {
+            /** Id */
+            id: string;
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /** Asset Type */
+            asset_type: string;
+            /** Exchange */
+            exchange: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Avg Buy Price */
+            avg_buy_price: number;
+            /** Total Invested */
+            total_invested: number;
+            /** Current Price */
+            current_price: number | null;
+            /** Current Value */
+            current_value: number;
+            /** Gain Loss */
+            gain_loss: number;
+            /** Gain Loss Percent */
+            gain_loss_percent: number;
+            /** Change Percent 24H */
+            change_percent_24h: number;
+            /** Total Fees */
+            total_fees: number;
+            /** Breakeven Price */
+            breakeven_price: number;
+            /** First Buy Date */
+            first_buy_date: string | null;
+            /** Holding Days */
+            holding_days: number | null;
+            /** Annualized Return */
+            annualized_return: number | null;
+            /** Dividend Income */
+            dividend_income: number;
+            /** Fx Gain */
+            fx_gain: number;
+            /** Asset Gain */
+            asset_gain: number;
+            /** Total Return */
+            total_return: number;
+            /** Risk Weight */
+            risk_weight: number;
+            /** Interest Rate */
+            interest_rate?: number | null;
+            /** Maturity Date */
+            maturity_date?: string | null;
+            /** Project Status */
+            project_status?: string | null;
+            /** Invested Amount */
+            invested_amount?: number | null;
+        };
         /** PortfolioPredictionResponse */
         PortfolioPredictionResponse: {
             /** Predictions */
@@ -5583,6 +5752,22 @@ export interface components {
          * @enum {string}
          */
         ProjectStatus: "funding" | "active" | "completed" | "delayed" | "defaulted";
+        /**
+         * ProjectSummary
+         * @description Synthèse des biens valorisés à leur montant investi.
+         */
+        ProjectSummary: {
+            /** Total Invested */
+            total_invested: number;
+            /** Active Projects */
+            active_projects: number;
+            /** Completed Projects */
+            completed_projects: number;
+            /** Projected Annual Interest */
+            projected_annual_interest: number;
+            /** Next Maturity */
+            next_maturity: string | null;
+        };
         /**
          * ProjectionParameters
          * @description Taux en pourcentage ; ``expense_ratio`` (TER) est déduit du rendement attendu.
@@ -6097,6 +6282,40 @@ export interface components {
             reason: string;
         };
         /**
+         * SoldAsset
+         * @description Un actif soldé ou presque, avec ses montants achetés et vendus.
+         */
+        SoldAsset: {
+            /** Id */
+            id: string;
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /** Asset Type */
+            asset_type: string;
+            /** Exchange */
+            exchange: string | null;
+            /** Current Quantity */
+            current_quantity: number;
+            /** Total Bought */
+            total_bought: number;
+            /** Total Bought Value */
+            total_bought_value: number;
+            /** Total Sold */
+            total_sold: number;
+            /** Total Sold Value */
+            total_sold_value: number;
+            /** Total Fees */
+            total_fees: number;
+            /** Realized Gain */
+            realized_gain: number;
+            /** First Transaction */
+            first_transaction: string | null;
+            /** Last Transaction */
+            last_transaction: string | null;
+        };
+        /**
          * SparklineData
          * @description Mini-courbe d'un symbole, normalisée entre 0 et 1.
          */
@@ -6107,6 +6326,26 @@ export interface components {
             prices: number[];
             /** Change Pct */
             change_pct: number;
+        };
+        /**
+         * StablecoinHolding
+         * @description Un stablecoin valorisé à son cours, avec l'écart à sa parité.
+         */
+        StablecoinHolding: {
+            /** Id */
+            id: string;
+            /** Symbol */
+            symbol: string;
+            /** Quantity */
+            quantity: number;
+            /** Value */
+            value: number;
+            /** Unit Price */
+            unit_price: number;
+            /** Depeg Warning */
+            depeg_warning: boolean;
+            /** Depeg Percent */
+            depeg_percent: number;
         };
         /** StrategyActionCreate */
         StrategyActionCreate: {
@@ -6428,6 +6667,13 @@ export interface components {
              */
             destination_exchange?: string | null;
         };
+        /** TransactionListPage */
+        TransactionListPage: {
+            /** Items */
+            items: components["schemas"]["TransactionWithAsset"][];
+            /** Total */
+            total: number;
+        };
         /** TransactionResponse */
         TransactionResponse: {
             /**
@@ -6495,6 +6741,55 @@ export interface components {
             exchange?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** TransactionWithAsset */
+        TransactionWithAsset: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Asset Id
+             * Format: uuid
+             */
+            asset_id: string;
+            transaction_type: components["schemas"]["TransactionType"];
+            /** Quantity */
+            quantity: number;
+            /** Price */
+            price: number;
+            /**
+             * Fee
+             * @default 0
+             */
+            fee: number;
+            /** Fee Currency */
+            fee_currency?: string | null;
+            /**
+             * Currency
+             * @default EUR
+             */
+            currency: string;
+            /** Executed At */
+            executed_at?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Exchange */
+            exchange: string | null;
+            /** External Id */
+            external_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Asset Symbol */
+            asset_symbol: string;
+            /** Asset Name */
+            asset_name: string | null;
+            /** Asset Type */
+            asset_type: string;
         };
         /**
          * UpcomingEvent
@@ -7267,7 +7562,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PortfolioPerformance"];
                 };
             };
             /** @description Validation Error */
@@ -7298,9 +7593,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioHistory"];
                 };
             };
             /** @description Validation Error */
@@ -7813,7 +8106,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TransactionWithAsset"][] | components["schemas"]["TransactionListPage"];
                 };
             };
             /** @description Validation Error */

@@ -46,7 +46,8 @@ import SpotlightGroup from '@/components/ui/spotlight-group'
 import EmptyState from '@/components/ui/empty-state'
 import { formatCurrency } from '@/lib/utils'
 import { queryKeys } from '@/lib/queryKeys'
-import { alertsApi, assetsApi, notificationsApi } from '@/services/api'
+import { alertsApi, notificationsApi } from '@/services/api'
+import { useAssetList } from '@/features/portfolio/hooks'
 import { apiClient } from '@/shared/api/client'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -99,13 +100,6 @@ interface AlertSummary {
   total_triggers: number
 }
 
-interface Asset {
-  id: string
-  symbol: string
-  name: string
-  asset_type: string
-}
-
 const fmtCount = (n: number) => Math.round(n).toString()
 
 export default function AlertsPage() {
@@ -152,11 +146,7 @@ export default function AlertsPage() {
     queryFn: alertsApi.getSummary,
   })
 
-  const { data: assets } = useQuery<Asset[]>({
-    queryKey: queryKeys.assets.list(),
-    queryFn: () => assetsApi.list(),
-    staleTime: 60_000,
-  })
+  const { data: assets } = useAssetList()
 
   const createMutation = useMutation({
     mutationFn: alertsApi.create,

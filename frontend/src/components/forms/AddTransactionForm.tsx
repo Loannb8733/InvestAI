@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
-import type { PortfolioSummary as Portfolio } from '@/types'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,7 +15,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { transactionsApi, assetsApi, portfoliosApi } from '@/services/api'
+import { assetsApi, transactionsApi } from '@/services/api'
+import { apiClient } from '@/shared/api/client'
+import { usePortfolioList } from '@/features/portfolio/hooks'
 import {
   Dialog,
   DialogContent,
@@ -67,16 +68,6 @@ const schema = z.object({
 type FormInput = z.input<typeof schema>
 type FormData = z.output<typeof schema>
 
-interface Asset {
-  id: string
-  symbol: string
-  name: string
-  portfolio_id: string
-  exchange?: string
-  quantity?: number
-  asset_type?: string
-}
-
 interface AddTransactionFormProps {
   onSuccess?: () => void
   assetId?: string
@@ -126,15 +117,11 @@ export default function AddTransactionForm({
   // formateur local mémoïsé (ARC-11).
   const fmt = useCallback((v: number) => formatCurrency(v, preferredCurrency), [preferredCurrency])
 
-  const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: queryKeys.portfolios.list(),
-    queryFn: () => portfoliosApi.list(),
-    staleTime: 60_000,
-  })
+  const { data: portfolios } = usePortfolioList()
 
-  const { data: assets } = useQuery<Asset[]>({
+  const { data: assets } = useQuery({
     queryKey: queryKeys.assets.list(),
-    queryFn: () => assetsApi.list(),
+    queryFn: () => apiClient.get('/assets'),
   })
 
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('')
@@ -245,9 +232,8 @@ export default function AddTransactionForm({
   const typeConfig = transactionTypes.find((t) => t.value === transactionType)
 
   const createAssetMutation = useMutation({
-    mutationFn: (data: Parameters<typeof assetsApi.create>[0]) =>
-      assetsApi.create(data),
-    onSuccess: (newAsset: Asset) => {
+    mutationFn: assetsApi.create,
+    onSuccess: (newAsset: { id: string; symbol: string }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
       setValue('asset_id', newAsset.id)
       setShowNewAsset(false)

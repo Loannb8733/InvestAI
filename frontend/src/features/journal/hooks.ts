@@ -30,10 +30,6 @@ export function useNoteSummary() {
   return useQuery({ queryKey: queryKeys.notes.summary, queryFn: () => apiClient.get('/notes/summary') })
 }
 
-export function useAssetOptions() {
-  return useQuery({ queryKey: queryKeys.assets.list(), queryFn: () => apiClient.get('/assets'), staleTime: 60_000 })
-}
-
 export function useScorecard() {
   return useQuery({
     queryKey: [...queryKeys.notes.all, 'scorecard'],
