@@ -27,9 +27,11 @@ const toastMock = vi.hoisted(() => vi.fn())
 const coursEnDirect = vi.hoisted(() => vi.fn(() => ({ prices: { BTC: { price: 45000, currency: 'EUR' } } })))
 
 vi.mock('@/services/api', () => ({
-  assetsApi: { list: listeActifs, create: vi.fn() },
-  portfoliosApi: { list: listePortefeuilles },
+  assetsApi: { create: vi.fn() },
   transactionsApi: { create: creerTransaction },
+}))
+vi.mock('@/shared/api/client', () => ({
+  apiClient: { get: (route: string) => (route === '/assets' ? listeActifs() : listePortefeuilles()) },
 }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/hooks/useRealtimePrices', () => ({ useRealtimePrices: coursEnDirect }))

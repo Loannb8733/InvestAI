@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { assetLabel, SENTIMENT_OPTIONS } from '../format'
-import { useAssetOptions } from '../hooks'
+import { useAssetList } from '@/features/portfolio/hooks'
 import type { Note, NoteCreate, NoteUpdate } from '../types'
 
 const NONE = 'none'
@@ -33,7 +33,7 @@ type NoteFormProps = Omit<NoteFormDialogProps, 'open'>
 const chosen = (value: string) => (value === NONE ? null : value)
 
 function NoteForm({ note, pending, onClose, onCreate, onUpdate }: NoteFormProps) {
-  const { data: assets } = useAssetOptions()
+  const { data: assets } = useAssetList()
   const [sentiment, setSentiment] = useState(note?.sentiment || NONE)
   const [linkedAssetId, setLinkedAssetId] = useState(note?.asset_id || NONE)
 

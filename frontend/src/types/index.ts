@@ -79,20 +79,6 @@ export interface Transaction {
   createdAt: string
 }
 
-// Portfolio summary (for selectors/dropdowns — snake_case matches API response)
-export interface PortfolioSummary {
-  id: string
-  name: string
-  /**
-   * Nature du portefeuille, quand elle n'est pas ordinaire — `'crowdfunding'`
-   * pour celui que l'application gère elle-même. Facultatif : une réponse
-   * d'avant NEW-68 n'en porte pas, et le nom sert alors de repli.
-   */
-  kind?: string | null
-  description?: string
-  cash_balances?: Record<string, number>
-}
-
 // Transaction with asset info (API response shape — snake_case)
 export interface TransactionWithAssetInfo {
   id: string
@@ -215,52 +201,6 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   detail: string
   status: number
-}
-
-// Portfolio metrics (API response — snake_case)
-export interface StablecoinEntry {
-  id: string
-  symbol: string
-  quantity: number
-  value: number
-}
-
-export interface AssetMetrics {
-  id: string
-  symbol: string
-  name?: string
-  asset_type: string
-  exchange?: string | null
-  quantity: number
-  avg_buy_price: number
-  current_price?: number
-  current_value: number
-  total_invested: number
-  gain_loss: number
-  gain_loss_percent: number
-  total_fees?: number
-  breakeven_price?: number | null
-  risk_weight?: number
-  first_buy_date?: string | null
-  holding_days?: number | null
-  annualized_return?: number | null
-  // Crowdfunding fields
-  interest_rate?: number
-  maturity_date?: string
-  project_status?: string
-  invested_amount?: number
-}
-
-export interface PortfolioMetrics {
-  total_value: number
-  total_invested: number
-  total_gain_loss: number
-  total_gain_loss_percent: number
-  assets: AssetMetrics[]
-  cash_from_stablecoins?: number
-  stablecoins?: StablecoinEntry[]
-  cash_from_fiat?: number
-  fiat_assets?: StablecoinEntry[]
 }
 
 // Display thresholds (adaptive, from backend)

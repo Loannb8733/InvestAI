@@ -7,21 +7,6 @@ export const dashboardApi = {
     return response.data
   },
 
-  getPortfolioMetrics: async (portfolioId: string) => {
-    const response = await api.get(`/dashboard/portfolio/${portfolioId}`)
-    return response.data
-  },
-
-  getPortfolioHistory: async (portfolioId: string) => {
-    const response = await api.get(`/dashboard/portfolio/${portfolioId}/history`)
-    return response.data
-  },
-
-  getPortfolioSparklines: async (portfolioId: string, days: number = 30) => {
-    const response = await api.get(`/dashboard/portfolio/${portfolioId}/sparklines`, { params: { days } })
-    return response.data as { symbol: string; prices: number[]; change_pct: number }[]
-  },
-
   getHistoricalData: async (days: number = 30) => {
     const response = await api.get('/dashboard/historical-data', { params: { days } })
     return response.data
@@ -54,51 +39,8 @@ export const dashboardApi = {
   },
 }
 
-// Portfolios API
-export const portfoliosApi = {
-  list: async () => {
-    const response = await api.get('/portfolios')
-    return response.data
-  },
-
-  create: async (data: { name: string; description?: string }) => {
-    const response = await api.post('/portfolios', data)
-    return response.data
-  },
-
-  get: async (id: string) => {
-    const response = await api.get(`/portfolios/${id}`)
-    return response.data
-  },
-
-  update: async (id: string, data: { name?: string; description?: string }) => {
-    const response = await api.patch(`/portfolios/${id}`, data)
-    return response.data
-  },
-
-  delete: async (id: string) => {
-    await api.delete(`/portfolios/${id}`)
-  },
-
-  updateCashBalance: async (id: string, exchange: string, amount: number) => {
-    const response = await api.put(`/portfolios/${id}/cash-balance`, { exchange, amount })
-    return response.data
-  },
-
-  deleteCashBalance: async (id: string, exchange: string) => {
-    const response = await api.delete(`/portfolios/${id}/cash-balance/${encodeURIComponent(exchange)}`)
-    return response.data
-  },
-}
-
 // Assets API
 export const assetsApi = {
-  list: async (portfolioId?: string) => {
-    const params = portfolioId ? { portfolio_id: portfolioId } : {}
-    const response = await api.get('/assets', { params })
-    return response.data
-  },
-
   create: async (data: {
     portfolio_id: string
     symbol: string
@@ -115,29 +57,6 @@ export const assetsApi = {
   }) => {
     const response = await api.post('/assets', data)
     return response.data
-  },
-
-  get: async (id: string) => {
-    const response = await api.get(`/assets/${id}`)
-    return response.data
-  },
-
-  update: async (id: string, data: {
-    name?: string
-    quantity?: number
-    avg_buy_price?: number
-    exchange?: string | null
-    interest_rate?: number
-    maturity_date?: string
-    project_status?: string
-    invested_amount?: number
-  }) => {
-    const response = await api.patch(`/assets/${id}`, data)
-    return response.data
-  },
-
-  delete: async (id: string) => {
-    await api.delete(`/assets/${id}`)
   },
 }
 

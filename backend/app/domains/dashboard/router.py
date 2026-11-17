@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -18,6 +18,7 @@ from app.domains.dashboard.charts import (
 )
 from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.dashboard.overview import build_overview
+from app.domains.dashboard.portfolio_schemas import PortfolioHistory, PortfolioPerformance
 from app.domains.dashboard.schemas import (
     BenchmarkSeries,
     EnhancedDashboardResponse,
@@ -92,29 +93,31 @@ async def get_munitions(
     )
 
 
-@router.get("/portfolio/{portfolio_id}")
+@router.get("/portfolio/{portfolio_id}", response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def get_portfolio_dashboard(
     current_user: CurrentUser,
     db: Session,
     request: Request,
     portfolio_id: UUID,
-) -> Any:
+) -> PortfolioPerformance:
     """Métriques d'un portefeuille."""
     await require_owned_portfolio(db, portfolio_id, current_user.id)
     currency = current_user.preferred_currency or "EUR"
-    return ensure_json_safe(await metrics_service.get_portfolio_performance(db, str(portfolio_id), currency))
+    performance = await metrics_service.get_portfolio_performance(db, str(portfolio_id), currency)
+    return PortfolioPerformance.model_validate(ensure_json_safe(performance))
 
 
-@router.get("/portfolio/{portfolio_id}/history")
+@router.get("/portfolio/{portfolio_id}/history", response_model_exclude_unset=True)
 async def get_portfolio_history(
     current_user: CurrentUser,
     db: Session,
     portfolio_id: UUID,
-) -> dict[str, Any]:
+) -> PortfolioHistory:
     """Historique d'investissement d'un portefeuille, actifs soldés compris."""
     await require_owned_portfolio(db, portfolio_id, current_user.id)
-    return await metrics_service.get_portfolio_history(db, str(portfolio_id), current_user.preferred_currency or "EUR")
+    currency = current_user.preferred_currency or "EUR"
+    return PortfolioHistory.model_validate(await metrics_service.get_portfolio_history(db, str(portfolio_id), currency))
 
 
 @router.get("/portfolio/{portfolio_id}/sparklines", response_model=list[SparklineData])

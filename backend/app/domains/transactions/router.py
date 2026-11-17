@@ -42,7 +42,7 @@ def _requester(request: Request, user_id: UUID) -> Requester:
     )
 
 
-@router.get("", response_model=None)
+@router.get("")
 async def list_transactions(
     user: CurrentUser,
     session: Session,

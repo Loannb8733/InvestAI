@@ -1,17 +1,11 @@
+import { useState } from 'react'
+import { Plus, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import EmptyState from '@/components/ui/empty-state'
-import { Plus, Wallet } from 'lucide-react'
-import AddPortfolioForm from '@/components/forms/AddPortfolioForm'
+import AddPortfolioDialog from './AddPortfolioDialog'
 
-interface CreatePortfolioFormProps {
-  showAddPortfolio: boolean
-  onShowAddPortfolioChange: (open: boolean) => void
-}
-
-export default function CreatePortfolioForm({
-  showAddPortfolio,
-  onShowAddPortfolioChange,
-}: CreatePortfolioFormProps) {
+export default function NoPortfolio() {
+  const [adding, setAdding] = useState(false)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -22,13 +16,13 @@ export default function CreatePortfolioForm({
         title="Aucun portefeuille"
         description="Créez votre premier portefeuille pour commencer à suivre vos investissements."
         action={
-          <Button onClick={() => onShowAddPortfolioChange(true)}>
+          <Button onClick={() => setAdding(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Créer un portefeuille
           </Button>
         }
       />
-      <AddPortfolioForm open={showAddPortfolio} onOpenChange={onShowAddPortfolioChange} />
+      <AddPortfolioDialog open={adding} onOpenChange={setAdding} />
     </div>
   )
 }
