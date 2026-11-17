@@ -126,12 +126,18 @@ Tant que `ORACLE_HOST` n'existe pas, le workflow ne fait rien.
 
 Une fois `/health/ready` correct, changer dans `vercel.json` la destination des réécritures `/api/v1/:path*` et
 `VITE_WS_URL` vers `https://api.<ton-domaine>`. Dans GitHub, *Settings → Secrets and variables → Actions →
-Variables*, créer `API_BASE_URL` = `https://api.<ton-domaine>` : le workflow *Scheduled Tasks* appellera la VM au
-lieu de Render. Garder Render quelques jours en secours, puis le suspendre
+Variables*, créer `API_BASE_URL` = `https://api.<ton-domaine>` : les workflows *Scheduled Tasks* et *Invariants
+Watchdog* appelleront la VM au lieu de Render. Garder Render quelques jours en secours, puis le suspendre
 (*Render → investai-api → Settings → Suspend*). Upstash n'est plus utilisé par InvestAI.
 
-Tant que Render tourne, son planificateur interne exécute aussi les tâches quand il est éveillé : sans conséquence
-(mêmes calculs, même base), mais le suspendre évite les doublons dans le journal des tâches.
+Tant que Render est éveillé, son planificateur interne exécute les mêmes tâches que le worker, sur la même base. Les
+instantanés quotidiens le supportent (un par jour), mais deux synchronisations d'exchange lancées au même instant
+peuvent chacune écrire leur transaction d'ajustement. Basculer `vercel.json` et `API_BASE_URL` le même jour : sans
+trafic, Render s'endort au bout de 15 minutes et son planificateur s'arrête avec lui.
+
+Si le réseau inspecte le TLS (pare-feu d'entreprise), un domaine tout juste créé peut être servi avec le certificat
+du pare-feu tant qu'il n'est pas catégorisé : vérifier `/health/ready` depuis la VM
+(`curl https://<domaine>/health/ready`) avant de conclure à une panne.
 
 ## Exploitation
 

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  BASE_URL: https://investai-api.onrender.com/api/v1/cron
+  BASE_URL: ${{ vars.API_BASE_URL || 'https://investai-api.onrender.com' }}/api/v1/cron
   BASELINE: ${{ vars.INVARIANTS_BASELINE || '25' }}
 
 permissions:
