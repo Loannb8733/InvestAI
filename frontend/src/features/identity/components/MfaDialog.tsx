@@ -42,6 +42,20 @@ export default function MfaDialog({ open, enabled, setup, onOpenChange }: MfaDia
               <p className="text-sm text-muted-foreground mb-1">Clé secrète (si vous ne pouvez pas scanner) :</p>
               <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">{setup.secret}</code>
             </div>
+            {setup.backup_codes.length > 0 && (
+              <div className="w-full space-y-2 rounded-lg border p-3">
+                <p className="text-sm font-medium">Codes de secours</p>
+                <p className="text-xs text-muted-foreground">
+                  Notez-les maintenant, ils ne seront plus affichés. Chacun permet une connexion si vous perdez votre
+                  application d'authentification.
+                </p>
+                <ul aria-label="Codes de secours" className="grid grid-cols-2 gap-1 font-mono text-sm">
+                  {setup.backup_codes.map((code) => (
+                    <li key={code}>{code}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         <div className="space-y-4">

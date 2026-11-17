@@ -107,7 +107,7 @@ describe('SettingsPage — caractérisation', () => {
     type('newPassword', 'Nouveau-Passe42')
     type('confirmPassword', 'Nouveau-Passe42')
     fireEvent.click(screen.getByRole('button', { name: 'Changer le mot de passe' }))
-    await settle(() => toasts.length > 1)
+    await settle(() => toasts.length > 0)
     await golden('parametres_mot_de_passe_refuse', { toasts })
   })
 

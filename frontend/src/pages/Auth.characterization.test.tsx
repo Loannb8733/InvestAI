@@ -90,14 +90,14 @@ describe('Connexion', () => {
     routes['POST /auth/login'] = () => ({ status: 401, data: { detail: 'Email ou mot de passe invalide' } })
     routes['POST /auth/refresh'] = () => ({ status: 401, data: { detail: 'Refresh token invalide' } })
     await login()
-    await settle(() => toasts.some((t) => t.title === 'Erreur de connexion'))
+    await screen.findByText('Email ou mot de passe invalide')
     await golden('connexion_refusee', { calls, toasts, where: where(), auth: authSnapshot() })
   })
 
   it('réagit à un compte protégé par MFA', async () => {
     routes['POST /auth/login'] = () => ({ status: 400, data: { detail: 'MFA code required' } })
     await login()
-    await settle(() => toasts.some((t) => t.title === 'Erreur de connexion'))
+    await settle(() => document.getElementById('mfaCode') !== null)
     await golden('connexion_mfa_requise', {
       calls,
       toasts,

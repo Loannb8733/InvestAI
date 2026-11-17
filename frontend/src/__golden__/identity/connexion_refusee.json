@@ -8,29 +8,15 @@
         "password": "Secret-42xyz",
         "remember_me": false
       }
-    },
-    {
-      "method": "POST",
-      "url": "/auth/refresh"
-    },
-    {
-      "method": "POST",
-      "url": "/auth/logout"
     }
   ],
-  "toasts": [
-    {
-      "variant": "destructive",
-      "title": "Erreur de connexion",
-      "description": "Request failed with status code 401"
-    }
-  ],
+  "toasts": [],
   "where": null,
   "auth": {
     "user": null,
     "accessToken": null,
     "refreshToken": null,
     "isAuthenticated": false,
-    "error": null
+    "error": "Email ou mot de passe invalide"
   }
 }

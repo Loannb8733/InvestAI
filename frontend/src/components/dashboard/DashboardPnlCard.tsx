@@ -61,7 +61,7 @@ export default function DashboardPnlCard({ pnlBreakdown, periodLabel, privacyMod
 
   // TMI du profil investisseur (Réglages) : si renseignée, le mode barème
   // affiche PS 17,2 % + IR à la TMI au lieu du seul plancher PS.
-  const { data: investorProfile } = useInvestorProfile(10 * 60_000, true)
+  const { data: investorProfile } = useInvestorProfile(10 * 60_000)
   const tmiRate = investorProfile?.tmi_rate ?? null
   const tmiPct = tmiRate != null ? Math.round(tmiRate * 100) : null
 

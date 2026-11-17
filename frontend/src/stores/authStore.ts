@@ -2,7 +2,8 @@ import type { AxiosError } from 'axios'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queryClient } from '@/lib/queryClient'
-import { apiClient } from '@/shared/api/client'
+import { apiClient, type Schema } from '@/shared/api/client'
+import { serverMessage } from '@/shared/api/errors'
 
 interface User {
   id: string
@@ -28,11 +29,24 @@ interface AuthState {
   logout: () => Promise<void>
   refreshAccessToken: () => Promise<void>
   fetchCurrentUser: () => Promise<void>
+  applyProfile: (profile: Schema<'ProfileResponse'>) => void
   hydrateSession: () => Promise<void>
   setTokens: (accessToken: string, refreshToken: string) => void
   fetchUser: () => Promise<void>
   clearError: () => void
 }
+
+const toUser = (profile: Schema<'ProfileResponse'>): User => ({
+  id: profile.id,
+  email: profile.email,
+  role: profile.role as User['role'],
+  firstName: profile.first_name ?? undefined,
+  lastName: profile.last_name ?? undefined,
+  preferredCurrency: profile.preferred_currency || 'EUR',
+  mfaEnabled: profile.mfa_enabled,
+  telegramChatId: profile.telegram_chat_id || undefined,
+  telegramEnabled: profile.telegram_enabled ?? false,
+})
 
 function isSessionRejected(error: unknown): boolean {
   const status = (error as AxiosError | undefined)?.response?.status
@@ -55,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await apiClient.post('/auth/login', {
             body: { email, password, mfa_code: mfaCode, remember_me: rememberMe ?? false },
+            silent: true,
           })
           set({
             accessToken: response.access_token,
@@ -64,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
           })
           await get().fetchCurrentUser()
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : 'Login failed'
+          const message = serverMessage(error) ?? 'Connexion impossible pour le moment. Réessayez.'
           set({ error: message, isLoading: false })
           throw error
         }
@@ -101,24 +116,13 @@ export const useAuthStore = create<AuthState>()(
 
       fetchCurrentUser: async () => {
         try {
-          const user = await apiClient.get('/auth/me')
-          set({
-            user: {
-              id: user.id,
-              email: user.email,
-              role: user.role as User['role'],
-              firstName: user.first_name ?? undefined,
-              lastName: user.last_name ?? undefined,
-              preferredCurrency: user.preferred_currency || 'EUR',
-              mfaEnabled: user.mfa_enabled,
-              telegramChatId: user.telegram_chat_id || undefined,
-              telegramEnabled: user.telegram_enabled ?? false,
-            },
-          })
+          set({ user: toUser(await apiClient.get('/auth/me')) })
         } catch (error) {
           if (isSessionRejected(error)) get().logout()
         }
       },
+
+      applyProfile: (profile) => set({ user: toUser(profile) }),
 
       hydrateSession: async () => {
         const { isAuthenticated, accessToken } = get()

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateTime } from '@/lib/utils'
+import { roleLabel } from '../format'
 import type { ManagedUser } from '../types'
 
 interface UsersTableProps {
@@ -30,7 +31,7 @@ function UserRow({ user, onToggleActive, onDelete }: { user: ManagedUser } & Omi
         </div>
       </td>
       <td className="py-3">
-        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>{user.role}</Badge>
+        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>{roleLabel(user.role)}</Badge>
       </td>
       <td className="py-3">
         <Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'Actif' : 'Inactif'}</Badge>

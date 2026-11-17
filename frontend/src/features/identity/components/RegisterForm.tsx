@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { apiClient } from '@/shared/api/client'
+import { serverMessage } from '@/shared/api/errors'
 
 const registerSchema = z.object({
   email: z.email('Email invalide'),
@@ -58,6 +59,7 @@ export default function RegisterForm() {
     try {
       const response = await apiClient.post('/auth/register', {
         body: { email: data.email, password: data.password, first_name: data.firstName, last_name: data.lastName },
+        silent: true,
       })
 
       toast({
@@ -66,9 +68,7 @@ export default function RegisterForm() {
       })
       navigate('/login')
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message :
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Une erreur est survenue lors de l\'inscription'
+      const errorMessage = serverMessage(err) ?? "Une erreur est survenue lors de l'inscription"
       setError(errorMessage)
       toast({
         variant: 'destructive',

@@ -10,24 +10,13 @@
       }
     }
   ],
-  "toasts": [
-    {
-      "title": "Erreur 400",
-      "description": "MFA code required",
-      "variant": "destructive"
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de connexion",
-      "description": "Request failed with status code 400"
-    }
-  ],
-  "mfaField": false,
+  "toasts": [],
+  "mfaField": true,
   "auth": {
     "user": null,
     "accessToken": null,
     "refreshToken": null,
     "isAuthenticated": false,
-    "error": "Request failed with status code 400"
+    "error": null
   }
 }
