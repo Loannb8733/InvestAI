@@ -1,0 +1,61 @@
+{
+  "dialog": [
+    "Supprimer cet actif ?",
+    "Voulez-vous vraiment supprimer",
+    "SOL",
+    "?",
+    "Toutes les transactions associées seront également supprimées.",
+    "Cette action est irréversible.",
+    "Annuler",
+    "Supprimer"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "DELETE",
+      "url": "/assets/a4"
+    },
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Actif et transactions supprimés"
+    }
+  ]
+}

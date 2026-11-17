@@ -1,0 +1,59 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p2"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p2/sparklines",
+      "params": {
+        "days": 30
+      }
+    }
+  ],
+  "text": [
+    "Portefeuille",
+    "Le détail de ce que tu possèdes, ligne par ligne.",
+    "Importer CSV",
+    "Exporter CSV",
+    "Nouveau portefeuille",
+    "Crypto",
+    "Bourse",
+    "Bourse",
+    "0,00 €",
+    "▲",
+    "0,00 €",
+    "(",
+    "0,00 %",
+    ")",
+    "Actifs actuels",
+    "Historique",
+    "Cash disponible",
+    "0,00 €",
+    "$",
+    "Stablecoins",
+    "0,00 €",
+    "Aucun actif dans ce portefeuille",
+    "Ajouter un actif"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "refetched": {
+    "writes": [
+      {
+        "method": "DELETE",
+        "url": "/portfolios/p1/cash-balance/Binance"
+      }
+    ],
+    "reads": [
+      "/portfolios",
+      "/dashboard/portfolio/p1",
+      "/dashboard/portfolio/p1/sparklines"
+    ]
+  },
+  "toasts": [
+    {
+      "title": "Solde supprimé"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/portfolios",
+      "body": {
+        "name": "Crypto",
+        "description": ""
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "Nom déjà utilisé",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de créer le portefeuille."
+    }
+  ]
+}

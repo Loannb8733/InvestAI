@@ -1,0 +1,14 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    }
+  ],
+  "text": [
+    "Portefeuille",
+    "Aucun portefeuille",
+    "Créez votre premier portefeuille pour commencer à suivre vos investissements.",
+    "Créer un portefeuille"
+  ]
+}

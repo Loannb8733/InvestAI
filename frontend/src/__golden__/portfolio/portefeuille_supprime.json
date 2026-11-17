@@ -1,0 +1,106 @@
+{
+  "dialog": [
+    "Supprimer ce portefeuille ?",
+    "Voulez-vous vraiment supprimer le portefeuille",
+    "Crypto",
+    "?",
+    "Tous les actifs et transactions associés seront également supprimés.",
+    "Cette action est irréversible.",
+    "Annuler",
+    "Supprimer"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "DELETE",
+      "url": "/portfolios/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p1/sparklines",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/csv-platforms"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p2"
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/portfolio/p2/sparklines",
+      "params": {
+        "days": 30
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Portefeuille supprimé"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ],
+  "text": [
+    "Portefeuille",
+    "Le détail de ce que tu possèdes, ligne par ligne.",
+    "Importer CSV",
+    "Exporter CSV",
+    "Nouveau portefeuille",
+    "Bourse",
+    "Bourse",
+    "0,00 €",
+    "▲",
+    "0,00 €",
+    "(",
+    "0,00 %",
+    ")",
+    "Actifs actuels",
+    "Historique",
+    "Cash disponible",
+    "0,00 €",
+    "$",
+    "Stablecoins",
+    "0,00 €",
+    "Aucun actif dans ce portefeuille",
+    "Ajouter un actif"
+  ]
+}

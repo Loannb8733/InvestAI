@@ -1,0 +1,17 @@
+{
+  "writes": [
+    {
+      "method": "PUT",
+      "url": "/portfolios/p1/cash-balance",
+      "body": {
+        "exchange": "Boursorama",
+        "amount": 50.25
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Solde mis à jour"
+    }
+  ]
+}

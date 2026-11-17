@@ -1,0 +1,28 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/assets",
+      "body": {
+        "portfolio_id": "p1",
+        "symbol": "BTC",
+        "asset_type": "crypto",
+        "quantity": 0,
+        "avg_buy_price": 0,
+        "currency": "EUR"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "Actif déjà présent",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Actif déjà présent"
+    }
+  ]
+}

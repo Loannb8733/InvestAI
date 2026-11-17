@@ -1,0 +1,24 @@
+{
+  "writes": [
+    {
+      "method": "PUT",
+      "url": "/portfolios/p1/cash-balance",
+      "body": {
+        "exchange": "Kraken",
+        "amount": 300
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de mettre à jour le solde"
+    }
+  ]
+}

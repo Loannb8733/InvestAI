@@ -43,8 +43,8 @@ export function createFakeServer() {
   return { calls, routes, adapter, reset }
 }
 
-export function visibleText(): string[] {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+export function visibleText(root: Node = document.body): string[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   const lines: string[] = []
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent?.replace(/\s+/g, ' ').trim()
