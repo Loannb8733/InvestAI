@@ -26,7 +26,7 @@ class PortfolioPosition(BaseModel):
     fx_gain: float
     asset_gain: float
     total_return: float
-    risk_weight: float
+    risk_weight: float | int
     interest_rate: float | None = None
     maturity_date: str | None = None
     project_status: str | None = None

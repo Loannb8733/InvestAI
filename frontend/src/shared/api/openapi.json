@@ -15943,7 +15943,14 @@
             "title": "Total Return"
           },
           "risk_weight": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Risk Weight"
           },
           "interest_rate": {
