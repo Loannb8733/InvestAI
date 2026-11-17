@@ -23,6 +23,10 @@
     "Scannez le QR code avec votre application d'authentification (Google Authenticator, Authy, etc.)",
     "Clé secrète (si vous ne pouvez pas scanner) :",
     "JBSWY3DPEHPK3PXP",
+    "Codes de secours",
+    "Notez-les maintenant, ils ne seront plus affichés. Chacun permet une connexion si vous perdez votre application d'authentification.",
+    "AAAA-1111",
+    "BBBB-2222",
     "Code à 6 chiffres",
     "Vérifier et activer",
     "Fermer"

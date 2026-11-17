@@ -13,14 +13,9 @@
   ],
   "toasts": [
     {
-      "title": "Erreur 400",
-      "description": "Cette adresse est déjà utilisée",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur d'inscription",
-      "description": "Request failed with status code 400"
+      "description": "Cette adresse est déjà utilisée"
     }
   ],
   "where": null,
@@ -41,7 +36,7 @@
     "conditions d'utilisation",
     "et la",
     "politique de confidentialité",
-    "Request failed with status code 400",
+    "Cette adresse est déjà utilisée",
     "Créer mon compte",
     "Vous avez déjà un compte ?",
     "Se connecter",

@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast'
 import AuroraCanvas from '@/components/ui/aurora-canvas'
 import { TrendingUp, Loader2, ArrowLeft, Lock, CheckCircle2 } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
+import { serverMessage } from '@/shared/api/errors'
 
 export default function ResetPasswordPage() {
   const { toast } = useToast()
@@ -21,13 +22,12 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: (body: { token: string; new_password: string }) => apiClient.post('/auth/reset-password', { body }),
+    mutationFn: (body: { token: string; new_password: string }) => apiClient.post('/auth/reset-password', { body, silent: true }),
     onSuccess: () => {
       setSuccess(true)
     },
     onError: (error: unknown) => {
-      const msg = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Une erreur est survenue.'
+      const msg = serverMessage(error) ?? 'Une erreur est survenue.'
       toast({ variant: 'destructive', title: 'Erreur', description: msg })
     },
   })

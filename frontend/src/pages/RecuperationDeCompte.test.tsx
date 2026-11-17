@@ -157,6 +157,7 @@ describe('le choix du nouveau mot de passe', () => {
     await waitFor(() =>
       expect(posterApi).toHaveBeenCalledWith('/auth/reset-password', {
         body: { token: 'jeton-du-courriel', new_password: 'MotDePasseValide1' },
+        silent: true,
       }),
     )
   })

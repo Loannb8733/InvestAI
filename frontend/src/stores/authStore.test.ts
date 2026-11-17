@@ -81,16 +81,24 @@ describe('authStore', () => {
       expect(state.user?.email).toBe('test@test.com')
     })
 
-    it('sets error on failure', async () => {
-      serve({ '/auth/login': { fail: new Error('Invalid credentials') } })
+    it('keeps the server message on failure', async () => {
+      serve({ '/auth/login': { fail: { response: { status: 401, data: { detail: 'Email ou mot de passe invalide' } } } } })
 
-      await expect(useAuthStore.getState().login('bad@test.com', 'wrong')).rejects.toThrow()
+      await expect(useAuthStore.getState().login('bad@test.com', 'wrong')).rejects.toBeTruthy()
 
       const state = useAuthStore.getState()
-      expect(state.error).toBe('Invalid credentials')
+      expect(state.error).toBe('Email ou mot de passe invalide')
       expect(state.isLoading).toBe(false)
       expect(state.isAuthenticated).toBe(false)
     })
+  })
+
+  it('explains a failure without server message in French', async () => {
+    serve({ '/auth/login': { fail: new Error('Network Error') } })
+
+    await expect(useAuthStore.getState().login('a@test.com', 'x')).rejects.toThrow()
+
+    expect(useAuthStore.getState().error).toBe('Connexion impossible pour le moment. Réessayez.')
   })
 
   describe('logout', () => {

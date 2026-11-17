@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/stores/authStore'
+import { roleLabel } from '../format'
 import { useUpdateProfile } from '../hooks'
 
 const CURRENCIES = [
@@ -47,7 +48,7 @@ export default function ProfileCard() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Rôle</Label>
-            <Input id="role" value={user?.role || ''} disabled className="capitalize" />
+            <Input id="role" value={roleLabel(user?.role)} disabled />
           </div>
           <div className="space-y-2">
             <Label htmlFor="firstName">Prénom</Label>

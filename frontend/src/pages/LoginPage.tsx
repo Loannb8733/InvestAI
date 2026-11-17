@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { serverMessage } from '@/shared/api/errors'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -23,6 +24,8 @@ type LoginFormData = z.infer<typeof loginSchema>
 
 const fieldClass =
   'h-12 rounded-xl border-border bg-secondary/40 px-4 text-base transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary/50'
+
+const MFA_REQUIRED = 'MFA code required'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -50,15 +53,9 @@ export default function LoginPage() {
       toast({ title: 'Connexion réussie', description: 'Bienvenue sur InvestAI' })
       navigate('/')
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
-      if (errorMessage.includes('MFA')) {
+      if (serverMessage(err) === MFA_REQUIRED) {
+        clearError()
         setRequiresMFA(true)
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Erreur de connexion',
-          description: errorMessage,
-        })
       }
     }
   }

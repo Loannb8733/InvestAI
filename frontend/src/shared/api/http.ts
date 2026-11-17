@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from '@/hooks/use-toast'
+import { serverMessage } from './errors'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -12,6 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 const MAX_RETRIES = 2
 const RETRY_DELAY_MS = 3000
 const NO_RETRY_PATHS = ['/notifications/count', '/notifications']
+const SESSIONLESS_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password']
 
 export const http = axios.create({
   baseURL: API_URL,
@@ -98,7 +100,7 @@ http.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/auth/refresh')
+      !SESSIONLESS_PATHS.some((path) => originalRequest.url?.startsWith(path))
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -132,9 +134,7 @@ http.interceptors.response.use(
         }
       } catch (refreshError) {
         processQueue(refreshError, null)
-        const reason = (
-          (refreshError as AxiosError)?.response?.data as { detail?: string } | undefined
-        )?.detail
+        const reason = serverMessage(refreshError)
         if (reason?.includes('mot de passe')) {
           toast({ title: 'Session expirée', description: reason, variant: 'destructive' })
         }
