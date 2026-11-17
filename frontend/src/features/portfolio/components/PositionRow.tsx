@@ -2,8 +2,9 @@ import type { HTMLAttributes } from 'react'
 import { ArrowRightLeft, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
-import { formatCurrency, formatPercent } from '@/lib/utils'
-import { arrow, formatQuantity, gainClass } from '../format'
+import { formatPercent } from '@/lib/utils'
+import { arrow, formatNumber, formatQuantity, formatSignedPercent, gainClass } from '../format'
+import { useMoney } from '../hooks'
 import type { Position, PositionGroup, SparklineSeries } from '../types'
 import PlatformBadge from './PlatformBadge'
 import { RiskCell, SparkCell } from './PositionCells'
@@ -20,9 +21,10 @@ interface PositionRowProps extends RowActions {
   rowProps: HTMLAttributes<HTMLTableRowElement>
 }
 
-const holdingLabel = (days: number) => (days < 365 ? `${days}j` : `${(days / 365.25).toFixed(1)}a`)
+const holdingLabel = (days: number) => (days < 365 ? `${days}j` : `${formatNumber(days / 365.25, 1)}a`)
 
 export default function PositionRow({ group, sparkline, rowProps, ...actions }: PositionRowProps) {
+  const money = useMoney()
   const asset = group.assets[0]
   const days = asset.holding_days
   return (
@@ -40,22 +42,22 @@ export default function PositionRow({ group, sparkline, rowProps, ...actions }: 
       </td>
       <td className="text-center py-3">{formatQuantity(group.totalQuantity)}</td>
       <td className="text-center py-3 text-muted-foreground">
-        <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}`}>
-          {formatCurrency(asset.breakeven_price)}
+        <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? money(group.avgBuyPrice) : '-'}`}>
+          {money(asset.breakeven_price)}
         </span>
       </td>
-      <td className="text-center py-3">{group.currentPrice ? formatCurrency(group.currentPrice) : '-'}</td>
-      <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
+      <td className="text-center py-3">{group.currentPrice ? money(group.currentPrice) : '-'}</td>
+      <td className="text-center py-3 font-medium">{money(group.totalValue)}</td>
       <td className={`text-center py-3 ${gainClass(group.totalGainLoss)}`}>
         <div>
-          <p>{arrow(group.totalGainLoss)} {formatCurrency(group.totalGainLoss)}</p>
+          <p>{arrow(group.totalGainLoss)} {money(group.totalGainLoss)}</p>
           <p className="text-xs">
             {arrow(group.totalGainLoss)}{' '}
             {formatPercent(group.totalGainLossPercent)}
           </p>
           {asset.annualized_return != null && days != null && days >= 7 && (
             <p className="text-[10px] text-muted-foreground mt-0.5" title={`Détenu depuis ${days}j`}>
-              CAGR: {asset.annualized_return >= 0 ? '+' : ''}{asset.annualized_return.toFixed(1)}%/an
+              CAGR: {`${formatSignedPercent(asset.annualized_return)}/an`}
               {' '}({holdingLabel(days)})
             </p>
           )}

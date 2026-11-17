@@ -40,10 +40,6 @@
       "params": {
         "days": 30
       }
-    },
-    {
-      "method": "GET",
-      "url": "/transactions/csv-platforms"
     }
   ],
   "toasts": [

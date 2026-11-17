@@ -2,9 +2,10 @@ import type { HTMLAttributes } from 'react'
 import { ArrowRightLeft, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
-import { formatCurrency, formatPercent } from '@/lib/utils'
-import { arrow, formatQuantity, gainClass } from '../format'
+import { formatPercent } from '@/lib/utils'
+import { arrow, formatQuantity, formatSignedPercent, gainClass } from '../format'
 import { weightedBreakeven } from '../grouping'
+import { useMoney } from '../hooks'
 import type { PositionGroup, SparklineSeries } from '../types'
 import PlatformBadge from './PlatformBadge'
 import { RiskCell, SparkCell } from './PositionCells'
@@ -33,12 +34,13 @@ function GroupCagr({ group }: { group: PositionGroup }) {
   const weightedCagr = withCagr.reduce((s, a) => s + (a.annualized_return ?? 0) * a.total_invested, 0) / coveredInvested
   return (
     <p className="text-[10px] text-muted-foreground mt-0.5" title="Pondéré par le capital investi">
-      CAGR: {weightedCagr >= 0 ? '+' : ''}{weightedCagr.toFixed(1)}%/an
+      CAGR: {`${formatSignedPercent(weightedCagr)}/an`}
     </p>
   )
 }
 
 export default function PositionGroupRows({ group, sparkline, rowProps, expanded, onToggle, ...actions }: PositionGroupRowsProps) {
+  const money = useMoney()
   return (
     <>
       <tr
@@ -68,15 +70,15 @@ export default function PositionGroupRows({ group, sparkline, rowProps, expanded
         </td>
         <td className="text-center py-3 font-medium">{formatQuantity(group.totalQuantity)}</td>
         <td className="text-center py-3 text-muted-foreground">
-          <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? formatCurrency(group.avgBuyPrice) : '-'}`}>
-            {formatCurrency(weightedBreakeven(group.assets))}
+          <span title={`PRA hors frais : ${group.avgBuyPrice > 0 ? money(group.avgBuyPrice) : '-'}`}>
+            {money(weightedBreakeven(group.assets))}
           </span>
         </td>
-        <td className="text-center py-3">{group.currentPrice ? formatCurrency(group.currentPrice) : '-'}</td>
-        <td className="text-center py-3 font-medium">{formatCurrency(group.totalValue)}</td>
+        <td className="text-center py-3">{group.currentPrice ? money(group.currentPrice) : '-'}</td>
+        <td className="text-center py-3 font-medium">{money(group.totalValue)}</td>
         <td className={`text-center py-3 ${gainClass(group.totalGainLoss)}`}>
           <div>
-            <p>{arrow(group.totalGainLoss)} {formatCurrency(group.totalGainLoss)}</p>
+            <p>{arrow(group.totalGainLoss)} {money(group.totalGainLoss)}</p>
             <p className="text-xs">
               {arrow(group.totalGainLoss)}{' '}
               {formatPercent(group.totalGainLossPercent)}
@@ -97,14 +99,14 @@ export default function PositionGroupRows({ group, sparkline, rowProps, expanded
             </td>
             <td className="text-center py-2 text-sm">{formatQuantity(asset.quantity)}</td>
             <td className="text-center py-2 text-sm text-muted-foreground">
-              <span title={`PRA hors frais : ${asset.avg_buy_price > 0 ? formatCurrency(asset.avg_buy_price) : '-'}`}>
-                {formatCurrency(asset.breakeven_price)}
+              <span title={`PRA hors frais : ${asset.avg_buy_price > 0 ? money(asset.avg_buy_price) : '-'}`}>
+                {money(asset.breakeven_price)}
               </span>
             </td>
-            <td className="text-center py-2 text-sm">{asset.current_price ? formatCurrency(asset.current_price) : '-'}</td>
-            <td className="text-center py-2 text-sm">{formatCurrency(asset.current_value)}</td>
+            <td className="text-center py-2 text-sm">{asset.current_price ? money(asset.current_price) : '-'}</td>
+            <td className="text-center py-2 text-sm">{money(asset.current_value)}</td>
             <td className={`text-center py-2 text-sm ${gainClass(asset.gain_loss)}`}>
-              {arrow(asset.gain_loss)} {formatCurrency(asset.gain_loss)}
+              {arrow(asset.gain_loss)} {money(asset.gain_loss)}
             </td>
             <RiskCell weight={asset.risk_weight} className="py-2" />
             <SparkCell series={sparkline} className="py-2" />

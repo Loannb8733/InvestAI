@@ -84,6 +84,7 @@ class PortfolioPerformance(BaseModel):
     stablecoins: list[StablecoinHolding]
     cash_from_fiat: float
     fiat_assets: list[FiatHolding]
+    cash_from_balances: float
     available_liquidity: float = 0.0
     forex_stale: bool = False
     unpriced_symbols: list[str] = []

@@ -1,4 +1,9 @@
-export const formatQuantity = (quantity: number) => quantity.toFixed(quantity < 1 ? 8 : 2)
+export const formatNumber = (value: number, digits: number) =>
+  value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+
+export const formatQuantity = (quantity: number) => formatNumber(quantity, quantity < 1 ? 8 : 2)
+
+export const formatSignedPercent = (value: number, digits = 1) => `${value >= 0 ? '+' : ''}${formatNumber(value, digits)} %`
 
 export const formatDetailQuantity = (q: number) =>
   q.toLocaleString('fr-FR', { maximumFractionDigits: Math.abs(q) < 1 ? 8 : 4 })

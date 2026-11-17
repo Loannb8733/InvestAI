@@ -42,6 +42,12 @@ def _without_estimated_dust(assets: Sequence[Asset], min_value: float) -> list[A
     return kept
 
 
+async def _balances_value(db: AsyncSession, portfolio_id: str, reference: ReferenceRates) -> float:
+    balances = await repository.portfolio_cash_balances(db, portfolio_id)
+    total = sum((Decimal(str(amount)) for amount in balances.values()), ZERO)
+    return float(total * Decimal(str(reference.eur_to_target)))
+
+
 async def _reference_rates(rates: RateResolver, target: str) -> ReferenceRates:
     usd = 1.0 if target == "USD" else await rates.tracked_rate("USD", target)
     eur = 1.0 if target == "EUR" else await rates.tracked_rate("EUR", target)
@@ -62,6 +68,7 @@ def _assemble(
     positions: Positions,
     stablecoins: CashHoldings,
     fiat: CashHoldings,
+    balances: float,
     total_dividends: float,
     forex_stale: bool,
 ) -> dict[str, Any]:
@@ -77,6 +84,7 @@ def _assemble(
         "stablecoins": stablecoins.entries,
         "cash_from_fiat": float(fiat.total),
         "fiat_assets": fiat.entries,
+        "cash_from_balances": balances,
         "available_liquidity": float(stablecoins.total + fiat.total),
         "forex_stale": forex_stale,
         "unpriced_symbols": sorted(positions.unpriced),
@@ -93,15 +101,16 @@ async def compute_portfolio_metrics(
     include_zero_quantity: bool = False,
     min_value_eur: float = 0.10,
 ) -> dict[str, Any]:
-    """Positions, liquidités et totaux d'un portefeuille, valorisés dans `currency`."""
-    stored = await repository.portfolio_assets(db, portfolio_id, include_zero=include_zero_quantity)
-    assets = list(stored) if include_zero_quantity else _without_estimated_dust(stored, min_value_eur)
-    if not assets:
-        return {**EMPTY_PORTFOLIO, "assets": [], "stablecoins": [], "fiat_assets": []}
-    investments = [a for a in assets if not is_cash_like(a.symbol) and a.asset_type != AssetType.CROWDFUNDING]
+    """Positions, liquidités et totaux d'un portefeuille dans `currency` ; les soldes saisis sont en euros."""
     target = currency.upper()
     resolver = RateResolver(db)
     reference = await _reference_rates(resolver, target)
+    balances = await _balances_value(db, portfolio_id, reference)
+    stored = await repository.portfolio_assets(db, portfolio_id, include_zero=include_zero_quantity)
+    assets = list(stored) if include_zero_quantity else _without_estimated_dust(stored, min_value_eur)
+    if not assets:
+        return {**EMPTY_PORTFOLIO, "assets": [], "stablecoins": [], "fiat_assets": [], "cash_from_balances": balances}
+    investments = [a for a in assets if not is_cash_like(a.symbol) and a.asset_type != AssetType.CROWDFUNDING]
     book = await load_cost_book(db, investments, currency, reference.usd_to_target, resolver)
     quotes = await fetch_market_quotes(investments, currency)
     positions = build_positions(investments, book, quotes, include_zero=include_zero_quantity, min_value=min_value_eur)
@@ -113,4 +122,4 @@ async def compute_portfolio_metrics(
     fiat = await value_fiat([a for a in assets if is_fiat(a.symbol)], reference)
     positions.entries.sort(key=lambda entry: entry["current_value"], reverse=True)
     await _add_risk_weights(db, positions)
-    return _assemble(positions, stablecoins, fiat, total_dividends, resolver.stale)
+    return _assemble(positions, stablecoins, fiat, balances, total_dividends, resolver.stale)

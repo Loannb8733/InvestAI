@@ -159,7 +159,7 @@ class MetricsService:
         for portfolio in portfolios:
             figures = await self._portfolio_figures(db, portfolio, currency)
             if figures is not None:
-                totals.add(portfolio, *figures)
+                totals.add(*figures)
         aggregated = aggregate_by_symbol(totals.assets)
         changes = await self.fetch_period_changes(symbols_by_type(aggregated), days)
         apply_period_changes(aggregated, changes)

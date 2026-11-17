@@ -239,7 +239,7 @@ describe('Portefeuille — historique', () => {
     routes['GET /dashboard/portfolio/p1/history'] = failure()
     await open()
     await openHistory()
-    await settle(() => toasts.length > 1)
+    await screen.findByText("Impossible de charger l'historique")
     await pause(50)
     await golden('historique_erreur', { toasts, text: visibleText() })
   })
@@ -253,8 +253,7 @@ describe('Portefeuille — états', () => {
         <PortfolioPage />
       </MemoryRouter>
     )
-    await screen.findByText('Aucun actif dans ce portefeuille')
-    await settle(() => toasts.length > 1)
+    await screen.findByText('Impossible de charger les positions')
     await pause(50)
     await golden('metriques_erreur', { calls, toasts, text: visibleText() })
   })

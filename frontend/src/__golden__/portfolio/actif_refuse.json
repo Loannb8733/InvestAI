@@ -15,11 +15,6 @@
   ],
   "toasts": [
     {
-      "title": "Erreur 400",
-      "description": "Actif déjà présent",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur",
       "description": "Actif déjà présent"

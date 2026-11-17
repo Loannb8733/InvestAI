@@ -1,16 +1,5 @@
 {
-  "toasts": [
-    {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de chargement",
-      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
-    }
-  ],
+  "toasts": [],
   "text": [
     "Portefeuille",
     "Le détail de ce que tu possèdes, ligne par ligne.",
@@ -29,6 +18,8 @@
     ")",
     "Actifs actuels",
     "Historique",
-    "Aucune donnée historique"
+    "Impossible de charger l'historique",
+    "La requête a échoué : Request failed with status code 500",
+    "Réessayer"
   ]
 }

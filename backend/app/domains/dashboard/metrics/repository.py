@@ -19,6 +19,12 @@ async def user_portfolios(db: AsyncSession, user_id: str) -> Sequence[Portfolio]
     return result.scalars().all()
 
 
+async def portfolio_cash_balances(db: AsyncSession, portfolio_id: Any) -> dict[str, float]:
+    """Soldes en espèces saisis par plateforme, en euros."""
+    result = await db.execute(select(Portfolio.cash_balances).where(Portfolio.id == portfolio_id))
+    return dict(result.scalar_one_or_none() or {})
+
+
 async def portfolio_assets(db: AsyncSession, portfolio_id: Any, *, include_zero: bool = True) -> Sequence[Asset]:
     """Actifs d'un portefeuille, avec ou sans ceux à quantité nulle."""
     query = select(Asset).where(Asset.portfolio_id == portfolio_id)

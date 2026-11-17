@@ -21,7 +21,7 @@ export const queryKeys = {
       [...queryKeys.transactions.all, 'list', ...(portfolioId ? [portfolioId] : [])] as const,
     detail: (id: string) => [...queryKeys.transactions.all, 'detail', id] as const,
     byAsset: (assetId: string) => [...queryKeys.transactions.all, 'byAsset', assetId] as const,
-    csvPlatforms: ['transactions', 'csvPlatforms'] as const,
+    csvPlatforms: ['csv-platforms'] as const,
   },
 
   dashboard: {

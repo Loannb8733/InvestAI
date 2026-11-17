@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from app.domains.portfolio.models import Portfolio
 from app.domains.transactions.cost_basis.layers import ZERO
 
 _TOP_COUNT = 5
@@ -62,7 +61,7 @@ class DashboardTotals:
     assets: list[dict[str, Any]] = field(default_factory=list)
     stablecoins: list[dict[str, Any]] = field(default_factory=list)
 
-    def add(self, portfolio: Portfolio, metrics: dict[str, Any], history: dict[str, Any]) -> None:
+    def add(self, metrics: dict[str, Any], history: dict[str, Any]) -> None:
         """Ajoute un portefeuille ; ses soldes en espèces comptent dans la liquidité."""
         self.value += Decimal(str(metrics["total_value"]))
         self.unrealized += Decimal(str(metrics["unrealized_gain"]))
@@ -72,7 +71,7 @@ class DashboardTotals:
         self.realized += Decimal(str(history.get("realized_gains", 0)))
         self.fees += Decimal(str(history.get("total_fees", 0)))
         self.liquidity += Decimal(str(metrics.get("available_liquidity", 0)))
-        self.liquidity += sum((Decimal(str(amount)) for amount in (portfolio.cash_balances or {}).values()), ZERO)
+        self.liquidity += Decimal(str(metrics["cash_from_balances"]))
         self.assets.extend(metrics["assets"])
         self.stablecoins.extend(metrics.get("stablecoins", []))
         self.dividends += Decimal(str(metrics.get("total_dividend_income", 0)))

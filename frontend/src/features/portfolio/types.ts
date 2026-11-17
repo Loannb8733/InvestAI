@@ -30,10 +30,8 @@ export interface PlatformShare {
   value: number
   totalInvested: number
   gainLoss: number
-  totalFees: number
   assets: { symbol: string; value: number }[]
   roi: number
-  netPnl: number
 }
 
 export interface SoldGroup {

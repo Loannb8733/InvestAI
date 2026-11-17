@@ -5,14 +5,13 @@ export const UNASSIGNED = 'Non assigné'
 export const platformOf = (exchange: string | null) => exchange || UNASSIGNED
 
 export function platformShares(positions: Position[]): PlatformShare[] {
-  const map = new Map<string, Omit<PlatformShare, 'platform' | 'roi' | 'netPnl'>>()
+  const map = new Map<string, Omit<PlatformShare, 'platform' | 'roi'>>()
   for (const asset of positions) {
     const platform = platformOf(asset.exchange)
-    const entry = map.get(platform) || { value: 0, totalInvested: 0, gainLoss: 0, totalFees: 0, assets: [] }
+    const entry = map.get(platform) || { value: 0, totalInvested: 0, gainLoss: 0, assets: [] }
     entry.value += asset.current_value
     entry.totalInvested += asset.total_invested
     entry.gainLoss += asset.gain_loss
-    entry.totalFees += asset.total_fees
     entry.assets.push({ symbol: asset.symbol, value: asset.current_value })
     map.set(platform, entry)
   }
@@ -21,7 +20,6 @@ export function platformShares(positions: Position[]): PlatformShare[] {
       platform,
       ...data,
       roi: data.totalInvested > 0 ? ((data.value - data.totalInvested) / data.totalInvested) * 100 : 0,
-      netPnl: data.gainLoss - data.totalFees,
     }))
     .sort((a, b) => b.value - a.value)
 }

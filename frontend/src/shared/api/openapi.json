@@ -15742,6 +15742,10 @@
             "type": "array",
             "title": "Fiat Assets"
           },
+          "cash_from_balances": {
+            "type": "number",
+            "title": "Cash From Balances"
+          },
           "available_liquidity": {
             "type": "number",
             "title": "Available Liquidity",
@@ -15802,6 +15806,7 @@
           "stablecoins",
           "cash_from_fiat",
           "fiat_assets",
+          "cash_from_balances",
           "total_gain_loss",
           "total_gain_loss_percent",
           "total_return",
