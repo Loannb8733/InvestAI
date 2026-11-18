@@ -3,7 +3,7 @@ import { History, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import AddTransactionForm from '@/components/forms/AddTransactionForm'
+import AddTransactionForm from '@/features/transactions/components/AddTransactionForm'
 import { formatPercent } from '@/lib/utils'
 import { arrow, gainClass } from '../format'
 import { useDeleteAsset, useDeletePortfolio, useMoney, useUpdateAssetExchange } from '../hooks'
@@ -47,6 +47,8 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
     () => setConfirmingDelete(false)
   )
   const totals = performance.data
+
+  const cashBalances = portfolio.cash_balances ?? {}
 
   return (
     <>
@@ -95,7 +97,7 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
                 loading={performance.isLoading}
                 error={performance.error}
                 onRetry={() => performance.refetch()}
-                cashBalances={portfolio.cash_balances}
+                cashBalances={cashBalances}
                 sparklines={sparklines}
                 onAddAsset={() => setAddingAsset(true)}
                 onAddTransaction={(assetId, assetSymbol) => setTransactionFor({ assetId, assetSymbol })}
@@ -120,7 +122,7 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
       {transactionFor && (
         <AddTransactionForm open onOpenChange={() => setTransactionFor(null)} assetId={transactionFor.assetId} assetSymbol={transactionFor.assetSymbol} />
       )}
-      <CashBalanceDialog portfolioId={portfolio.id} cashBalances={portfolio.cash_balances} open={cashOpen} onOpenChange={setCashOpen} />
+      <CashBalanceDialog portfolioId={portfolio.id} cashBalances={cashBalances} open={cashOpen} onOpenChange={setCashOpen} />
 
       <ConfirmDeleteDialog
         title="Supprimer cet actif ?"

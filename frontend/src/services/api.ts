@@ -39,27 +39,6 @@ export const dashboardApi = {
   },
 }
 
-// Assets API
-export const assetsApi = {
-  create: async (data: {
-    portfolio_id: string
-    symbol: string
-    name?: string
-    asset_type: string
-    quantity?: number
-    avg_buy_price?: number
-    currency?: string
-    exchange?: string
-    interest_rate?: number
-    maturity_date?: string
-    project_status?: string
-    invested_amount?: number
-  }) => {
-    const response = await api.post('/assets', data)
-    return response.data
-  },
-}
-
 // Transactions API
 export interface BalanceGap {
   asset_id: string
@@ -94,37 +73,6 @@ export interface BalanceGapCreditResult {
 }
 
 export const transactionsApi = {
-  /**
-   * Liste les transactions avec filtres SERVEUR (exhaustifs sur tout l'historique).
-   * Avec `include_total: true`, la réponse devient `{ items, total }` où `total`
-   * est le nombre total filtré (compat : sans ce paramètre, liste nue comme avant).
-   */
-  list: async (params?: {
-    asset_id?: string
-    portfolio_id?: string
-    skip?: number
-    limit?: number
-    /** Valeur de l'enum backend (ex. 'buy') ou alias 'conversions'. */
-    transaction_type?: string
-    /** Plateforme (insensible à la casse) — 'Manuel' cible les transactions sans plateforme. */
-    exchange?: string
-    /** Symbole d'actif exact (insensible à la casse). */
-    asset_symbol?: string
-    /** Date de début (YYYY-MM-DD, incluse). */
-    date_from?: string
-    /** Date de fin (YYYY-MM-DD, incluse). */
-    date_to?: string
-    /** Recherche partielle sur le symbole et les notes. */
-    search?: string
-    /** Si vrai, bascule la réponse en { items, total }. */
-    include_total?: boolean
-  }) => {
-    const response = await api.get('/transactions', { params })
-    return response.data
-  },
-
-  /** Surfaces assets where the exchange reports more units than the
-   * transaction history (Binance reward vouchers, unrecognized airdrops). */
   balanceGaps: async (thresholdEur = 5) => {
     const response = await api.get('/transactions/balance-gaps', {
       params: { threshold_eur: thresholdEur },
@@ -139,93 +87,6 @@ export const transactionsApi = {
       params: { threshold_eur: thresholdEur },
     })
     return response.data as BalanceGapCreditResult
-  },
-
-  create: async (data: {
-    asset_id: string
-    transaction_type: string
-    quantity: number
-    price: number
-    fee?: number
-    currency?: string
-    executed_at?: string
-    exchange?: string
-    notes?: string
-  }) => {
-    const response = await api.post('/transactions', data)
-    return response.data
-  },
-
-  get: async (id: string) => {
-    const response = await api.get(`/transactions/${id}`)
-    return response.data
-  },
-
-  delete: async (id: string) => {
-    await api.delete(`/transactions/${id}`)
-  },
-
-  update: async (id: string, data: {
-    transaction_type?: string
-    quantity?: number
-    price?: number
-    fee?: number
-    fee_currency?: string
-    currency?: string
-    executed_at?: string
-    exchange?: string
-    notes?: string
-  }) => {
-    const response = await api.patch(`/transactions/${id}`, data)
-    return response.data
-  },
-
-  deleteAll: async (portfolio_id?: string) => {
-    const response = await api.delete('/transactions/all', {
-      params: portfolio_id ? { portfolio_id } : undefined,
-    })
-    return response.data
-  },
-
-  importCSV: async (file: File, portfolioId?: string, platform?: string, destinationExchange?: string) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const params: Record<string, string> = {}
-    if (portfolioId) {
-      params.portfolio_id = portfolioId
-    }
-    if (platform) {
-      params.platform = platform
-    }
-    if (destinationExchange) {
-      params.destination_exchange = destinationExchange
-    }
-    const response = await api.post('/transactions/import-csv', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      params,
-    })
-    return response.data
-  },
-
-  getCSVPlatforms: async () => {
-    const response = await api.get('/transactions/csv-platforms')
-    return response.data
-  },
-
-  getPlatforms: async (): Promise<{ platforms: string[] }> => {
-    const response = await api.get('/transactions/platforms')
-    return response.data
-  },
-
-  exportCSV: async (portfolioId?: string) => {
-    const params = portfolioId ? { portfolio_id: portfolioId } : {}
-    const response = await api.get('/transactions/export-csv', {
-      params,
-      responseType: 'blob',
-    })
-    return response.data
   },
 }
 

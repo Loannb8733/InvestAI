@@ -23,10 +23,14 @@ const listePlateformes = vi.hoisted(() => vi.fn())
 const listePortefeuilles = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => vi.fn())
 
-vi.mock('@/services/api', () => ({
-  transactionsApi: { importCSV: importerCSV, getCSVPlatforms: listePlateformes },
+vi.mock('@/shared/api/http', () => ({
+  http: { post: async (...args: unknown[]) => ({ data: await importerCSV(...args) }) },
 }))
-vi.mock('@/shared/api/client', () => ({ apiClient: { get: () => listePortefeuilles() } }))
+vi.mock('@/shared/api/client', () => ({
+  apiClient: {
+    get: (route: string) => (route === '/transactions/csv-platforms' ? listePlateformes() : listePortefeuilles()),
+  },
+}))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/lib/invalidate-queries', () => ({ invalidateAllFinancialData: vi.fn() }))
 

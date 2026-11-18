@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatQuantity, generateCSV, getDateRangeStart } from './transactions-format'
+import { formatQuantity, generateCSV, getDateRangeStart } from './format'
 
 /**
  * Les trois fonctions pures de la page des transactions.

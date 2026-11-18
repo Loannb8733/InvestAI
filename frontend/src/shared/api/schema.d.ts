@@ -2997,12 +2997,12 @@ export interface components {
              * Status
              * @default active
              */
-            status: string;
+            status?: string;
             /**
              * Error Count
              * @default 0
              */
-            error_count: number;
+            error_count?: number;
             /** Last Sync At */
             last_sync_at: string | null;
             /** Last Error */
@@ -3113,7 +3113,7 @@ export interface components {
              * Is Portfolio
              * @default false
              */
-            is_portfolio: boolean;
+            is_portfolio?: boolean;
             /** Threshold Unit */
             threshold_unit?: string | null;
         };
@@ -3131,22 +3131,22 @@ export interface components {
              * Threshold
              * @default 0
              */
-            threshold: number;
+            threshold?: number;
             /**
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /**
              * Notify Email
              * @default true
              */
-            notify_email: boolean;
+            notify_email?: boolean;
             /**
              * Notify In App
              * @default true
              */
-            notify_in_app: boolean;
+            notify_in_app?: boolean;
         };
         /** AlertResponse */
         AlertResponse: {
@@ -3308,17 +3308,17 @@ export interface components {
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /**
              * Quantity
              * @default 0
              */
-            quantity: number | string;
+            quantity?: number | string;
             /**
              * Avg Buy Price
              * @default 0
              */
-            avg_buy_price: number | string;
+            avg_buy_price?: number | string;
             /** Exchange */
             exchange?: string | null;
             /** Interest Rate */
@@ -3452,17 +3452,17 @@ export interface components {
              * Events Planned
              * @default 0
              */
-            events_planned: number;
+            events_planned?: number;
             /**
              * Events Simulated
              * @default 0
              */
-            events_simulated: number;
+            events_simulated?: number;
             /**
              * Missing Prices
              * @default 0
              */
-            missing_prices: number;
+            missing_prices?: number;
             /** Invested Eur */
             invested_eur?: number | null;
             /** Withdrawn Eur */
@@ -3481,12 +3481,12 @@ export interface components {
              * Trades
              * @default []
              */
-            trades: components["schemas"]["BacktestTrade"][];
+            trades?: components["schemas"]["BacktestTrade"][];
             /**
              * Trades Truncated
              * @default false
              */
-            trades_truncated: boolean;
+            trades_truncated?: boolean;
             /** Note */
             note: string;
         };
@@ -3530,7 +3530,7 @@ export interface components {
              * @default credit_airdrop
              * @constant
              */
-            suggested_action: "credit_airdrop";
+            suggested_action?: "credit_airdrop";
             /**
              * Source Hint
              * @enum {string}
@@ -3612,12 +3612,12 @@ export interface components {
              * Projected Income This Month
              * @default 0
              */
-            projected_income_this_month: number;
+            projected_income_this_month?: number;
             /**
              * Unconverted Currencies
              * @default []
              */
-            unconverted_currencies: string[];
+            unconverted_currencies?: string[];
         };
         /** CashBalanceUpdate */
         CashBalanceUpdate: {
@@ -3637,17 +3637,17 @@ export interface components {
              * Expected Capital
              * @default 0
              */
-            expected_capital: number;
+            expected_capital?: number;
             /**
              * Expected Interest
              * @default 0
              */
-            expected_interest: number;
+            expected_interest?: number;
             /**
              * Total
              * @default 0
              */
-            total: number;
+            total?: number;
             /** Projects */
             projects?: components["schemas"]["CashflowProjectAmount"][];
         };
@@ -3729,12 +3729,12 @@ export interface components {
              * Credited
              * @default []
              */
-            credited: components["schemas"]["CreditedGap"][];
+            credited?: components["schemas"]["CreditedGap"][];
             /**
              * Skipped
              * @default []
              */
-            skipped: components["schemas"]["SkippedGap"][];
+            skipped?: components["schemas"]["SkippedGap"][];
         };
         /** CreditResult */
         CreditResult: {
@@ -3770,32 +3770,32 @@ export interface components {
              * Total Interest Received
              * @default 0
              */
-            total_interest_received: number;
+            total_interest_received?: number;
             /**
              * Total Interest Net
              * @default 0
              */
-            total_interest_net: number;
+            total_interest_net?: number;
             /**
              * Total Capital Repaid
              * @default 0
              */
-            total_capital_repaid: number;
+            total_capital_repaid?: number;
             /**
              * Capital Outstanding
              * @default 0
              */
-            capital_outstanding: number;
+            capital_outstanding?: number;
             /**
              * Defaulted Outstanding
              * @default 0
              */
-            defaulted_outstanding: number;
+            defaulted_outstanding?: number;
             /**
              * Total Referral
              * @default 0
              */
-            total_referral: number;
+            total_referral?: number;
             /** Projected Annual Interest */
             projected_annual_interest: number;
             /** Weighted Average Rate */
@@ -3842,7 +3842,7 @@ export interface components {
             /** Duration Months */
             duration_months: number;
             /** @default in_fine */
-            repayment_type: components["schemas"]["RepaymentType"];
+            repayment_type?: components["schemas"]["RepaymentType"];
             /** Start Date */
             start_date?: string | null;
             /** Estimated End Date */
@@ -3851,19 +3851,19 @@ export interface components {
              * Interest Frequency
              * @default at_maturity
              */
-            interest_frequency: ("at_maturity" | "monthly" | "quarterly" | "semi_annual" | "annual") | null;
+            interest_frequency?: ("at_maturity" | "monthly" | "quarterly" | "semi_annual" | "annual") | null;
             /**
              * Tax Rate
              * @default 30.00
              */
-            tax_rate: number | string;
+            tax_rate?: number | string;
             /**
              * Delay Months
              * @default 0
              */
-            delay_months: number;
+            delay_months?: number;
             /** @default active */
-            status: components["schemas"]["ProjectStatus"];
+            status?: components["schemas"]["ProjectStatus"];
         };
         /**
          * CrowdfundingProjectResponse
@@ -3899,17 +3899,17 @@ export interface components {
              * Interest Frequency
              * @default at_maturity
              */
-            interest_frequency: string | null;
+            interest_frequency?: string | null;
             /**
              * Tax Rate
              * @default 30
              */
-            tax_rate: number;
+            tax_rate?: number;
             /**
              * Delay Months
              * @default 0
              */
-            delay_months: number;
+            delay_months?: number;
             /** Start Date */
             start_date?: string | null;
             /** Estimated End Date */
@@ -3941,17 +3941,17 @@ export interface components {
              * Documents
              * @default []
              */
-            documents: components["schemas"]["ProjectDocumentResponse"][];
+            documents?: components["schemas"]["ProjectDocumentResponse"][];
             /**
              * Repayments
              * @default []
              */
-            repayments: components["schemas"]["RepaymentResponse"][];
+            repayments?: components["schemas"]["RepaymentResponse"][];
             /**
              * Schedule
              * @default []
              */
-            schedule: components["schemas"]["PaymentScheduleEntryResponse"][];
+            schedule?: components["schemas"]["PaymentScheduleEntryResponse"][];
         };
         /** CrowdfundingProjectUpdate */
         CrowdfundingProjectUpdate: {
@@ -4016,7 +4016,7 @@ export interface components {
              * Skipped Count
              * @default 0
              */
-            skipped_count: number;
+            skipped_count?: number;
             /** Errors */
             errors: string[];
             /** Created Transactions */
@@ -4046,22 +4046,22 @@ export interface components {
              * @default monthly
              * @enum {string}
              */
-            frequency: "weekly" | "monthly" | "quarterly";
+            frequency?: "weekly" | "monthly" | "quarterly";
             /**
              * Duration Months
              * @default 12
              */
-            duration_months: number;
+            duration_months?: number;
             /**
              * Expected Volatility
              * @default 20
              */
-            expected_volatility: number;
+            expected_volatility?: number;
             /**
              * Expected Return
              * @default 7
              */
-            expected_return: number;
+            expected_return?: number;
         };
         /**
          * DCAResult
@@ -4225,12 +4225,12 @@ export interface components {
              * Period Change
              * @default 0
              */
-            period_change: number;
+            period_change?: number;
             /**
              * Period Change Percent
              * @default 0
              */
-            period_change_percent: number;
+            period_change_percent?: number;
             /** Period Twr Percent */
             period_twr_percent?: number | null;
             /** Portfolios Count */
@@ -4268,43 +4268,43 @@ export interface components {
              * Available Liquidity
              * @default 0
              */
-            available_liquidity: number;
+            available_liquidity?: number;
             earn_summary?: components["schemas"]["EarnSummary"] | null;
             /**
              * Currency Exposure
              * @default []
              */
-            currency_exposure: components["schemas"]["CurrencyExposure"][];
+            currency_exposure?: components["schemas"]["CurrencyExposure"][];
             /**
              * Total Dividend Income
              * @default 0
              */
-            total_dividend_income: number;
+            total_dividend_income?: number;
             /**
              * Total Return
              * @default 0
              */
-            total_return: number;
+            total_return?: number;
             /**
              * Period Days
              * @default 30
              */
-            period_days: number;
+            period_days?: number;
             /**
              * Period Label
              * @default 30j
              */
-            period_label: string;
+            period_label?: string;
             /**
              * Unpriced Symbols
              * @default []
              */
-            unpriced_symbols: string[];
+            unpriced_symbols?: string[];
             /**
              * Forex Stale
              * @default false
              */
-            forex_stale: boolean;
+            forex_stale?: boolean;
             /** Last Updated */
             last_updated: string;
         };
@@ -4324,7 +4324,7 @@ export interface components {
              * Is Recurring
              * @default false
              */
-            is_recurring: boolean;
+            is_recurring?: boolean;
             /** Recurrence Rule */
             recurrence_rule?: string | null;
             /** Amount */
@@ -4333,7 +4333,7 @@ export interface components {
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
         };
         /** EventResponse */
         EventResponse: {
@@ -4457,7 +4457,7 @@ export interface components {
              * Withdrawal Rate
              * @default 0.04
              */
-            withdrawal_rate: number;
+            withdrawal_rate?: number;
             /**
              * Annual Return Mean
              * @description Rendement annuel moyen. Si omis, dérivé de users.risk_profile, sinon 0.07.
@@ -4472,23 +4472,23 @@ export interface components {
              * Inflation
              * @default 0.02
              */
-            inflation: number;
+            inflation?: number;
             /**
              * Index Contributions
              * @description Indexer l'épargne mensuelle sur l'inflation (le nombre FIRE l'est toujours).
              * @default true
              */
-            index_contributions: boolean;
+            index_contributions?: boolean;
             /**
              * Years Horizon
              * @default 30
              */
-            years_horizon: number;
+            years_horizon?: number;
             /**
              * N Paths
              * @default 1000
              */
-            n_paths: number;
+            n_paths?: number;
             /**
              * Seed
              * @description Reproductibilité — tests uniquement.
@@ -4576,32 +4576,32 @@ export interface components {
             /** Name */
             name: string;
             /** @default ASSET */
-            goal_type: components["schemas"]["GoalType"];
+            goal_type?: components["schemas"]["GoalType"];
             /** Target Amount */
             target_amount: number | string;
             /**
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Target Date */
             target_date?: string | null;
             /** Deadline Date */
             deadline_date?: string | null;
             /** @default MEDIUM */
-            priority: components["schemas"]["GoalPriority"];
+            priority?: components["schemas"]["GoalPriority"];
             /** @default MODERATE */
-            strategy_type: components["schemas"]["GoalStrategy"];
+            strategy_type?: components["schemas"]["GoalStrategy"];
             /**
              * Icon
              * @default target
              */
-            icon: string;
+            icon?: string;
             /**
              * Color
              * @default #6366f1
              */
-            color: string;
+            color?: string;
             /** Notes */
             notes?: string | null;
         };
@@ -4656,7 +4656,7 @@ export interface components {
              * Goal Type
              * @default asset
              */
-            goal_type: string;
+            goal_type?: string;
             /** Name */
             name: string;
             /** Target Amount */
@@ -4685,7 +4685,7 @@ export interface components {
              * Is Resilient
              * @default false
              */
-            is_resilient: boolean;
+            is_resilient?: boolean;
             /** Progress Percent */
             progress_percent: number;
             /** Days Remaining */
@@ -4776,7 +4776,7 @@ export interface components {
              * Is Estimated
              * @default false
              */
-            is_estimated: boolean;
+            is_estimated?: boolean;
         };
         /**
          * IndexComparison
@@ -4833,7 +4833,7 @@ export interface components {
              * Actions
              * @default []
              */
-            actions: components["schemas"]["ActionResponse"][];
+            actions?: components["schemas"]["ActionResponse"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -4850,7 +4850,7 @@ export interface components {
              * Remember Me
              * @default false
              */
-            remember_me: boolean;
+            remember_me?: boolean;
         };
         /**
          * MarketRegimeResponse
@@ -5001,34 +5001,34 @@ export interface components {
              * Next Signal Amount
              * @default 0
              */
-            next_signal_amount: number;
+            next_signal_amount?: number;
             /**
              * Can Execute
              * @default true
              */
-            can_execute: boolean;
+            can_execute?: boolean;
             /**
              * Shortfall
              * @default 0
              */
-            shortfall: number;
+            shortfall?: number;
             /** Message */
             message?: string | null;
             /**
              * Profile
              * @default moderate
              */
-            profile: string;
+            profile?: string;
             /**
              * Deploy To Risk
              * @default 0
              */
-            deploy_to_risk: number;
+            deploy_to_risk?: number;
             /**
              * Keep In Reserve
              * @default 0
              */
-            keep_in_reserve: number;
+            keep_in_reserve?: number;
         };
         /** NoteCreate */
         NoteCreate: {
@@ -5173,7 +5173,7 @@ export interface components {
              * Unconverted Currencies
              * @default []
              */
-            unconverted_currencies: string[];
+            unconverted_currencies?: string[];
         };
         /** PassiveIncomeSources */
         PassiveIncomeSources: {
@@ -5223,7 +5223,7 @@ export interface components {
              * Status
              * @default pending
              */
-            status: string;
+            status?: string;
         };
         /**
          * PaymentType
@@ -5300,7 +5300,7 @@ export interface components {
              * Source
              * @default frontend
              */
-            source: string;
+            source?: string;
         };
         /** PlatformDistributionItem */
         PlatformDistributionItem: {
@@ -5362,7 +5362,7 @@ export interface components {
              * Var 95 Description
              * @default
              */
-            var_95_description: string;
+            var_95_description?: string;
             /** Diversification Score */
             diversification_score: number;
             /** Concentration Risk */
@@ -5387,7 +5387,7 @@ export interface components {
              * Interpretations
              * @default {}
              */
-            interpretations: {
+            interpretations?: {
                 [key: string]: string;
             };
         };
@@ -5423,7 +5423,7 @@ export interface components {
              * Skill Score
              * @default 50
              */
-            skill_score: number;
+            skill_score?: number;
             /**
              * Hit Rate
              * @description Direction juste (%) sur les prévisions passées vérifiées ; None si moins de 10.
@@ -5433,13 +5433,13 @@ export interface components {
              * Hit Rate Significant
              * @default false
              */
-            hit_rate_significant: boolean;
+            hit_rate_significant?: boolean;
             /**
              * Hit Rate N Samples
              * @description Nombre de prévisions passées vérifiées à cet horizon.
              * @default 0
              */
-            hit_rate_n_samples: number;
+            hit_rate_n_samples?: number;
             /** Measured Mape */
             measured_mape?: number | null;
             /** Reliability Score */
@@ -5448,12 +5448,12 @@ export interface components {
              * Model Confidence
              * @default insufficient_history
              */
-            model_confidence: string;
+            model_confidence?: string;
             /**
              * Models Agree
              * @default true
              */
-            models_agree: boolean;
+            models_agree?: boolean;
             /** Models Detail */
             models_detail?: components["schemas"]["ModelDetail"][] | null;
             /** Skipped Models */
@@ -5502,7 +5502,7 @@ export interface components {
              * Total Sold Fiat
              * @default 0
              */
-            total_sold_fiat: number;
+            total_sold_fiat?: number;
             /** Total Fees */
             total_fees: number;
             /** Realized Gains */
@@ -5553,17 +5553,17 @@ export interface components {
              * Available Liquidity
              * @default 0
              */
-            available_liquidity: number;
+            available_liquidity?: number;
             /**
              * Forex Stale
              * @default false
              */
-            forex_stale: boolean;
+            forex_stale?: boolean;
             /**
              * Unpriced Symbols
              * @default []
              */
-            unpriced_symbols: string[];
+            unpriced_symbols?: string[];
             crowdfunding_summary?: components["schemas"]["ProjectSummary"] | null;
             /** Total Gain Loss */
             total_gain_loss: number;
@@ -5687,7 +5687,7 @@ export interface components {
              * Cash Balances
              * @default {}
              */
-            cash_balances: {
+            cash_balances?: {
                 [key: string]: number;
             };
             /**
@@ -5741,7 +5741,7 @@ export interface components {
              * Telegram Enabled
              * @default false
              */
-            telegram_enabled: boolean;
+            telegram_enabled?: boolean;
             /** Tmi Rate */
             tmi_rate?: number | null;
             /** Risk Profile */
@@ -5839,7 +5839,7 @@ export interface components {
              * Guarantees
              * @default []
              */
-            guarantees: components["schemas"]["GuaranteeInfo"][];
+            guarantees?: components["schemas"]["GuaranteeInfo"][];
             /** Admin Status */
             admin_status?: string | null;
             /** Score Operator */
@@ -5858,22 +5858,22 @@ export interface components {
              * Points Forts
              * @default []
              */
-            points_forts: string[];
+            points_forts?: string[];
             /**
              * Points Vigilance
              * @default []
              */
-            points_vigilance: string[];
+            points_vigilance?: string[];
             /**
              * Red Flags
              * @default []
              */
-            red_flags: string[];
+            red_flags?: string[];
             /**
              * Verdict
              * @default VIGILANCE
              */
-            verdict: string;
+            verdict?: string;
             /** Suggested Investment */
             suggested_investment?: number | null;
             /** Diversification Impact */
@@ -5953,33 +5953,33 @@ export interface components {
              * Years
              * @default 10
              */
-            years: number;
+            years?: number;
             /**
              * Expected Return
              * @default 7
              */
-            expected_return: number;
+            expected_return?: number;
             /**
              * Expense Ratio
              * @description Annual expense ratio / TER (%), deducted from expected return.
              * @default 0
              */
-            expense_ratio: number;
+            expense_ratio?: number;
             /**
              * Monthly Contribution
              * @default 0
              */
-            monthly_contribution: number;
+            monthly_contribution?: number;
             /**
              * Inflation Adjustment
              * @default true
              */
-            inflation_adjustment: boolean;
+            inflation_adjustment?: boolean;
             /**
              * Inflation Rate
              * @default 2
              */
-            inflation_rate: number;
+            inflation_rate?: number;
         };
         /** ProjectionPointResponse */
         ProjectionPointResponse: {
@@ -6045,12 +6045,12 @@ export interface components {
              * Contribution
              * @default 0
              */
-            contribution: number;
+            contribution?: number;
             /**
              * Threshold Pct
              * @default 0
              */
-            threshold_pct: number;
+            threshold_pct?: number;
             /**
              * Frequency
              * @enum {string}
@@ -6178,21 +6178,21 @@ export interface components {
              * Probabilities
              * @default {}
              */
-            probabilities: {
+            probabilities?: {
                 [key: string]: number;
             };
             /**
              * Timeframe Alignment
              * @default unknown
              */
-            timeframe_alignment: string;
+            timeframe_alignment?: string;
             /** Weekly Regime */
             weekly_regime?: string | null;
             /**
              * Note
              * @default
              */
-            note: string;
+            note?: string;
             /** Liquidity Warning */
             liquidity_warning?: string | null;
             /** Regime Price Adjustment */
@@ -6590,7 +6590,7 @@ export interface components {
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Reason */
             reason?: string | null;
         };
@@ -6690,7 +6690,7 @@ export interface components {
              * Actions
              * @default []
              */
-            actions: components["schemas"]["StrategyActionResponse"][];
+            actions?: components["schemas"]["StrategyActionResponse"][];
             /**
              * Created At
              * Format: date-time
@@ -6803,7 +6803,7 @@ export interface components {
              * @default dispatched
              * @constant
              */
-            status: "dispatched";
+            status?: "dispatched";
             /** Message */
             message: string;
         };
@@ -6862,7 +6862,7 @@ export interface components {
              * Token Type
              * @default bearer
              */
-            token_type: string;
+            token_type?: string;
         };
         /**
          * TopInsightResponse
@@ -6894,14 +6894,14 @@ export interface components {
              * Fee
              * @default 0
              */
-            fee: number | string;
+            fee?: number | string;
             /** Fee Currency */
             fee_currency?: string | null;
             /**
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Executed At */
             executed_at?: string | null;
             /** Notes */
@@ -6944,14 +6944,14 @@ export interface components {
              * Fee
              * @default 0
              */
-            fee: number;
+            fee?: number;
             /** Fee Currency */
             fee_currency?: string | null;
             /**
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Executed At */
             executed_at?: string | null;
             /** Notes */
@@ -7012,14 +7012,14 @@ export interface components {
              * Fee
              * @default 0
              */
-            fee: number;
+            fee?: number;
             /** Fee Currency */
             fee_currency?: string | null;
             /**
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Executed At */
             executed_at?: string | null;
             /** Notes */
@@ -7066,7 +7066,7 @@ export interface components {
             /** Password */
             password: string;
             /** @default user */
-            role: components["schemas"]["UserRole"];
+            role?: components["schemas"]["UserRole"];
             /** First Name */
             first_name?: string | null;
             /** Last Name */
@@ -7180,7 +7180,7 @@ export interface components {
              * Allow Sell
              * @default false
              */
-            allow_sell: boolean;
+            allow_sell?: boolean;
         };
         /** WhatIfRequest */
         WhatIfRequest: {
@@ -7202,7 +7202,7 @@ export interface components {
              * Currency
              * @default EUR
              */
-            currency: string;
+            currency?: string;
             /** Description */
             description: string;
         };
