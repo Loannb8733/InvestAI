@@ -1,0 +1,16 @@
+{
+  "bar": [
+    "2",
+    "sélectionnée",
+    "s",
+    "Exporter",
+    "Supprimer",
+    "Désélectionner"
+  ],
+  "toasts": [
+    {
+      "title": "2 transactions exportées"
+    }
+  ],
+  "csv": "symbol;type;quantity;price;fee;date;notes\nBTC;buy;0.01;55000;1.5;2026-04-05 08:30:00;\nETH;sell;0.5;3200;2.5;2026-02-20 16:45:00;"
+}

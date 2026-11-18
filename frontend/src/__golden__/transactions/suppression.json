@@ -1,0 +1,31 @@
+{
+  "dialog": [
+    "Supprimer cette transaction ?",
+    "Voulez-vous vraiment supprimer la transaction",
+    "Vente",
+    "de",
+    "0,5",
+    "ETH",
+    "?",
+    "Cette action est irréversible.",
+    "Annuler",
+    "Supprimer"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "url": "/transactions/t2"
+    }
+  ],
+  "reads": [
+    "/portfolios",
+    "/transactions",
+    "/portfolios",
+    "/transactions"
+  ],
+  "toasts": [
+    {
+      "title": "Transaction supprimée"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "transaction_type": "sell",
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "text": [
+    "Transactions",
+    "Chaque mouvement qui a façonné ton patrimoine.",
+    "Exporter",
+    "Importer",
+    "Nouvelle",
+    "Total achats (filtrés)",
+    "0,00 €",
+    "Total ventes (filtrés)",
+    "1 600,00 €",
+    "Total frais (filtrés)",
+    "2,50 €",
+    "Flux net investi (filtrés)",
+    "-1 600,00 €",
+    "hors transferts internes, conversions et récompenses",
+    "Historique",
+    "1",
+    "Tous les portefeuilles",
+    "Toutes les dates",
+    "Ventes",
+    "Tous les actifs",
+    "Effacer (",
+    "1",
+    ")",
+    "Ventes",
+    "Date",
+    "Type",
+    "Actif",
+    "Plateforme",
+    "Quantité",
+    "Prix",
+    "Total",
+    "Frais",
+    "Actions",
+    "20 févr. 2026, 16:45",
+    "Vente",
+    "Binance",
+    "0,5",
+    "3 200,00 €",
+    "1 600,00 €",
+    "2,50 €",
+    "Zone dangereuse",
+    "Supprimer toutes les transactions",
+    "Supprime",
+    "1",
+    "transactions et remet les quantités à zéro.",
+    "Tout supprimer"
+  ]
+}

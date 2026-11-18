@@ -1,0 +1,28 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "search": "eth",
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "rows": [
+    "20 févr. 2026, 16:45 Vente Binance 0,5 3 200,00 € 1 600,00 € 2,50 €",
+    "1 juin 2025, 10:00 Transfert entrant Kraken 1 0,00 € 0,00 € -",
+    "10 mars 2025, 14:00 Achat Binance 2 1 500,00 € 3 000,00 € 4,00 €"
+  ]
+}

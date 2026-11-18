@@ -1,0 +1,64 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/assets",
+      "body": {
+        "portfolio_id": "p1",
+        "symbol": "LINK",
+        "name": "Chainlink",
+        "asset_type": "crypto",
+        "exchange": "Kraken"
+      }
+    }
+  ],
+  "reads": [
+    "/assets"
+  ],
+  "toasts": [
+    {
+      "title": "Actif créé",
+      "description": "LINK ajouté au portefeuille."
+    }
+  ],
+  "text": [
+    "Ajouter une transaction",
+    "Enregistrez une nouvelle transaction",
+    "Type de transaction",
+    "Achat",
+    "Vente",
+    "Transfert In",
+    "Transfert Out",
+    "Reward",
+    "Airdrop",
+    "Conv. In",
+    "Conv. Out",
+    "Staking",
+    "Unstaking",
+    "Portefeuille",
+    "Crypto",
+    "Crypto",
+    "Bourse",
+    "Mes prêts",
+    "Actif",
+    "Nouveau",
+    "BTC (Binance) - Bitcoin",
+    "ETH (Binance) - Ethereum",
+    "ETH (Kraken) - Ethereum",
+    "SOL (Tangem) - Solana",
+    "Plateforme",
+    "Sélectionner une plateforme",
+    "Nouvelle",
+    "Quantité",
+    "Prix unitaire",
+    "Frais (",
+    "EUR",
+    ")",
+    "Montant total",
+    "Quantité x Prix + Frais",
+    "Date",
+    "Notes",
+    "Achat",
+    "Fermer"
+  ]
+}

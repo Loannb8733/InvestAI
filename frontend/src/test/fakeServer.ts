@@ -8,6 +8,10 @@ export const ok =
   (data: unknown): Handler =>
   () => ({ status: 200, data })
 
+function formFields(form: FormData) {
+  return Object.fromEntries([...form.entries()].map(([key, value]) => [key, value instanceof File ? value.name : value]))
+}
+
 export function createFakeServer() {
   const calls: Call[] = []
   const routes: Record<string, Handler> = {}
@@ -17,7 +21,8 @@ export function createFakeServer() {
     const url = config.url ?? ''
     const call: Call = { method, url }
     if (config.params && Object.keys(config.params).length > 0) call.params = config.params
-    if (config.data !== undefined) call.body = JSON.parse(String(config.data))
+    if (config.data instanceof FormData) call.body = formFields(config.data)
+    else if (config.data !== undefined) call.body = JSON.parse(String(config.data))
     calls.push(call)
     const handler = routes[`${method} ${url}`]
     const reply = handler ? handler(config) : { status: 404, data: { detail: 'Not Found' } }

@@ -1,0 +1,16 @@
+{
+  "dialog": [
+    "Supprimer toutes les transactions ?",
+    "Cette action est irréversible.",
+    "Toutes vos transactions (1) seront",
+    "définitivement supprimées et les quantités des actifs concernés seront remises à zéro.",
+    "Annuler",
+    "Supprimer tout"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "url": "/transactions/all"
+    }
+  ]
+}

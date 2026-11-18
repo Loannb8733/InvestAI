@@ -1,0 +1,32 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "text": [
+    "Transactions",
+    "Chaque mouvement qui a façonné ton patrimoine.",
+    "Exporter",
+    "Importer",
+    "Nouvelle",
+    "Historique",
+    "0",
+    "Tous les portefeuilles",
+    "Toutes les dates",
+    "Tous les types",
+    "Aucune transaction",
+    "Ajoutez votre première transaction ou importez un fichier CSV.",
+    "Ajouter une transaction"
+  ]
+}

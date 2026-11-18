@@ -1,0 +1,24 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "transaction_type": "sell",
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "rows": 20
+}

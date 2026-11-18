@@ -1,0 +1,15 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions/export-csv"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Export complet téléchargé",
+      "description": "Toutes les transactions ont été exportées."
+    }
+  ],
+  "files": 1
+}

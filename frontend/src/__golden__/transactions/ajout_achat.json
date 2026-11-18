@@ -1,0 +1,80 @@
+{
+  "text": [
+    "Ajouter une transaction",
+    "Enregistrez une nouvelle transaction",
+    "Type de transaction",
+    "Achat",
+    "Vente",
+    "Transfert In",
+    "Transfert Out",
+    "Reward",
+    "Airdrop",
+    "Conv. In",
+    "Conv. Out",
+    "Staking",
+    "Unstaking",
+    "Portefeuille",
+    "Crypto",
+    "Crypto",
+    "Bourse",
+    "Mes prêts",
+    "Actif",
+    "Nouveau",
+    "BTC",
+    "(Binance)",
+    "- Bitcoin",
+    "BTC (Binance) - Bitcoin",
+    "ETH (Binance) - Ethereum",
+    "ETH (Kraken) - Ethereum",
+    "SOL (Tangem) - Solana",
+    "Plateforme",
+    "Binance",
+    "7",
+    "Nouvelle",
+    "Quantité",
+    "Prix unitaire",
+    "Frais (",
+    "EUR",
+    ")",
+    "Montant total",
+    "Quantité x Prix + Frais",
+    "Date",
+    "Notes",
+    "Résumé de l'impact",
+    "Nouveau solde",
+    "0.52 BTC",
+    "Impact Cash",
+    "-",
+    "1 002,00 €",
+    "Achat",
+    "Fermer"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/transactions",
+      "body": {
+        "asset_id": "a1",
+        "transaction_type": "buy",
+        "quantity": 0.02,
+        "price": 50000,
+        "fee": 2,
+        "exchange": "Binance"
+      }
+    }
+  ],
+  "reads": [
+    "/portfolios",
+    "/assets",
+    "/transactions",
+    "/transactions",
+    "/assets"
+  ],
+  "toasts": [
+    {
+      "title": "Transaction ajoutée",
+      "description": "La transaction a été enregistrée."
+    }
+  ],
+  "open": false
+}

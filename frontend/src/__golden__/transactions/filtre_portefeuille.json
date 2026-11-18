@@ -1,0 +1,74 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "portfolio_id": "p2",
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "text": [
+    "Transactions",
+    "Chaque mouvement qui a façonné ton patrimoine.",
+    "Exporter",
+    "Importer",
+    "Nouvelle",
+    "Total achats",
+    "0,00 €",
+    "+",
+    "525,75 $US",
+    "Total ventes",
+    "0,00 €",
+    "Total frais",
+    "0,00 €",
+    "+",
+    "1,00 $US",
+    "Flux net investi",
+    "0,00 €",
+    "hors transferts internes, conversions et récompenses",
+    "+",
+    "525,75 $US",
+    "Historique",
+    "1",
+    "Bourse",
+    "Toutes les dates",
+    "Tous les types",
+    "Tous les actifs",
+    "Date",
+    "Type",
+    "Actif",
+    "Plateforme",
+    "Quantité",
+    "Prix",
+    "Total",
+    "Frais",
+    "Actions",
+    "15 sept. 2025, 15:30",
+    "Achat",
+    "AA",
+    "Manuel",
+    "3",
+    "175,25 $US",
+    "525,75 $US",
+    "1,00 $US",
+    "Zone dangereuse",
+    "Supprimer toutes les transactions",
+    "Supprime",
+    "1",
+    "transactions et remet les quantités à zéro.",
+    "Tout supprimer"
+  ]
+}
