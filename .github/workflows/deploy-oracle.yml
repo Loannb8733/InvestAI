@@ -23,6 +23,9 @@ jobs:
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
           ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
           ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+          # Le commit dont la CI a passé, pas la tête de main (github.sha) : un merge plus récent peut avoir sa CI
+          # encore en cours, ou en échec.
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           if [ -z "$ORACLE_HOST" ]; then
             echo "ORACLE_HOST absent : deploiement Oracle ignore."
@@ -32,4 +35,4 @@ jobs:
           printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle
           chmod 600 ~/.ssh/oracle
           printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/oracle "$ORACLE_USER@$ORACLE_HOST" 'bash ~/InvestAI/deploy/oracle/deploy.sh'
+          ssh -i ~/.ssh/oracle "$ORACLE_USER@$ORACLE_HOST" "bash ~/InvestAI/deploy/oracle/deploy.sh $TARGET_SHA"
