@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { COLD_WALLETS, EXCHANGES } from '@/lib/platforms'
+import { formatCurrency } from '@/lib/utils'
 import { useCashBalance } from '../hooks'
 
 interface CashBalanceDialogProps {
@@ -26,7 +27,7 @@ function CurrentBalances({ cashBalances, onDelete, deleting }: { cashBalances: R
           <div key={ex} className="flex items-center justify-between p-2 rounded bg-muted">
             <span className="font-medium">{ex}</span>
             <div className="flex items-center gap-2">
-              <span>{amt.toFixed(2)} €</span>
+              <span>{formatCurrency(amt)}</span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -42,7 +43,7 @@ function CurrentBalances({ cashBalances, onDelete, deleting }: { cashBalances: R
         ))}
       </div>
       <div className="text-right text-sm text-muted-foreground">
-        Total: <span className="font-bold text-foreground">{totalCash.toFixed(2)} €</span>
+        Total: <span className="font-bold text-foreground">{formatCurrency(totalCash)}</span>
       </div>
     </div>
   )

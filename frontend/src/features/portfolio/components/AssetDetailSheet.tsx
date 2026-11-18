@@ -4,9 +4,10 @@ import StatCard from '@/components/ui/stat-card'
 import { Badge } from '@/components/ui/badge'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
 import { Sparkline } from '@/components/ui/sparkline'
-import { formatCurrency, formatPercent } from '@/lib/utils'
-import { formatDetailQuantity } from '../format'
+import { formatPercent } from '@/lib/utils'
+import { formatDetailQuantity, formatSignedPercent } from '../format'
 import { weightedBreakeven } from '../grouping'
+import { useMoney } from '../hooks'
 import type { Position, PositionGroup, SparklineSeries } from '../types'
 import AssetTransactions from './AssetTransactions'
 
@@ -35,14 +36,14 @@ function SparklineTrend({ sparkline }: { sparkline: SparklineSeries }) {
       <Sparkline data={sparkline.prices} positive={positive} />
       <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${positive ? 'text-gain' : 'text-loss'}`}>
         {positive ? <TrendingUp aria-hidden className="h-3 w-3" /> : <TrendingDown aria-hidden className="h-3 w-3" />}
-        {positive ? '+' : ''}
-        {sparkline.change_pct.toFixed(2)} % · 30j
+        {`${formatSignedPercent(sparkline.change_pct, 2)} · 30j`}
       </span>
     </div>
   )
 }
 
 function PlatformPositions({ assets }: { assets: Position[] }) {
+  const money = useMoney()
   return (
     <section aria-label="Positions par plateforme">
       <h3 className="mb-2 text-sm font-medium text-muted-foreground">Positions par plateforme</h3>
@@ -61,8 +62,8 @@ function PlatformPositions({ assets }: { assets: Position[] }) {
               <tr key={asset.id} className="border-b last:border-0">
                 <td className="px-3 py-2">{asset.exchange || 'Non assigné'}</td>
                 <td className="px-3 py-2 text-right">{formatDetailQuantity(asset.quantity)}</td>
-                <td className="px-3 py-2 text-right font-medium">{formatCurrency(asset.current_value)}</td>
-                <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(asset.breakeven_price)}</td>
+                <td className="px-3 py-2 text-right font-medium">{money(asset.current_value)}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground">{money(asset.breakeven_price)}</td>
               </tr>
             ))}
           </tbody>
@@ -73,27 +74,28 @@ function PlatformPositions({ assets }: { assets: Position[] }) {
 }
 
 function DetailKpis({ group, portfolioTotalValue }: { group: PositionGroup; portfolioTotalValue: number | undefined }) {
+  const money = useMoney()
   const portfolioShare =
     portfolioTotalValue && portfolioTotalValue > 0 ? (group.totalValue / portfolioTotalValue) * 100 : null
   return (
     <div className="grid grid-cols-2 gap-3">
       <StatCard static label="Quantité totale" icon={Coins} value={group.totalQuantity} format={formatDetailQuantity} />
-      <StatCard static label="Valeur actuelle" icon={Wallet} value={group.totalValue} format={formatCurrency} />
+      <StatCard static label="Valeur actuelle" icon={Wallet} value={group.totalValue} format={money} />
       <StatCard
         static
         label="PRU"
         tooltip="Prix de revient unitaire, frais inclus."
         icon={Target}
         value={weightedBreakeven(group.assets)}
-        format={formatCurrency}
-        hint={group.avgBuyPrice > 0 ? `PRA hors frais : ${formatCurrency(group.avgBuyPrice)}` : undefined}
+        format={money}
+        hint={group.avgBuyPrice > 0 ? `PRA hors frais : ${money(group.avgBuyPrice)}` : undefined}
       />
       <StatCard
         static
         label="P&L latent"
         icon={TrendingUp}
         value={group.totalGainLoss}
-        format={formatCurrency}
+        format={money}
         delta={group.totalGainLossPercent}
         tone="auto"
       />
@@ -103,13 +105,14 @@ function DetailKpis({ group, portfolioTotalValue }: { group: PositionGroup; port
         icon={PieChart}
         value={portfolioShare}
         format={formatPercent}
-        hint={`Investi : ${formatCurrency(group.totalInvested)}`}
+        hint={`Investi : ${money(group.totalInvested)}`}
       />
     </div>
   )
 }
 
 export default function AssetDetailSheet({ open, onOpenChange, group, portfolioTotalValue, sparkline }: AssetDetailSheetProps) {
+  const money = useMoney()
   if (!group) return null
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -135,7 +138,7 @@ export default function AssetDetailSheet({ open, onOpenChange, group, portfolioT
               </div>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-lg font-semibold">{group.currentPrice ? formatCurrency(group.currentPrice) : '—'}</p>
+              <p className="text-lg font-semibold">{group.currentPrice ? money(group.currentPrice) : '—'}</p>
               {sparkline && sparkline.prices.length > 1 && <SparklineTrend sparkline={sparkline} />}
             </div>
           </div>

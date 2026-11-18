@@ -1,14 +1,15 @@
 import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { AssetIconCompact } from '@/components/ui/asset-icon'
-import { formatCurrency } from '@/lib/utils'
 import { arrow, formatHoldingPeriod, formatQuantity, gainClass } from '../format'
 import { groupSoldAssets } from '../grouping'
+import { useMoney } from '../hooks'
 import type { SoldAsset } from '../types'
 
 const COLUMNS = ['Actif', 'Plateforme', 'Qté achetée', 'Total investi', 'Qté vendue', 'Total vendu', '+/- Réalisé', 'Détention']
 
 function SoldCells({ asset, pad, text }: { asset: SoldAsset; pad: string; text: string }) {
+  const money = useMoney()
   const cell = `${pad}${text}`
   return (
     <>
@@ -16,11 +17,11 @@ function SoldCells({ asset, pad, text }: { asset: SoldAsset; pad: string; text: 
         <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{asset.exchange || '-'}</span>
       </td>
       <td className={`text-center ${cell}`}>{formatQuantity(asset.total_bought)}</td>
-      <td className={`text-center ${cell}`}>{formatCurrency(asset.total_bought_value)}</td>
+      <td className={`text-center ${cell}`}>{money(asset.total_bought_value)}</td>
       <td className={`text-center ${cell}`}>{formatQuantity(asset.total_sold)}</td>
-      <td className={`text-center ${cell}`}>{formatCurrency(asset.total_sold_value)}</td>
+      <td className={`text-center ${cell}`}>{money(asset.total_sold_value)}</td>
       <td className={`text-center ${cell} ${gainClass(asset.realized_gain)}`}>
-        {arrow(asset.realized_gain)} {formatCurrency(asset.realized_gain)}
+        {arrow(asset.realized_gain)} {money(asset.realized_gain)}
       </td>
       <td className={`text-center ${pad} text-xs text-muted-foreground whitespace-nowrap`}>
         {formatHoldingPeriod(asset.first_transaction, asset.last_transaction)}
@@ -30,6 +31,7 @@ function SoldCells({ asset, pad, text }: { asset: SoldAsset; pad: string; text: 
 }
 
 export default function SoldAssetsTable({ soldAssets }: { soldAssets: SoldAsset[] }) {
+  const money = useMoney()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggle = (symbol: string) => {
     setExpanded((prev) => {
@@ -83,11 +85,11 @@ export default function SoldAssetsTable({ soldAssets }: { soldAssets: SoldAsset[
                     </div>
                   </td>
                   <td className="text-center py-3 font-medium">{formatQuantity(group.totalBought)}</td>
-                  <td className="text-center py-3 font-medium">{formatCurrency(group.totalBoughtValue)}</td>
+                  <td className="text-center py-3 font-medium">{money(group.totalBoughtValue)}</td>
                   <td className="text-center py-3 font-medium">{formatQuantity(group.totalSold)}</td>
-                  <td className="text-center py-3 font-medium">{formatCurrency(group.totalSoldValue)}</td>
+                  <td className="text-center py-3 font-medium">{money(group.totalSoldValue)}</td>
                   <td className={`text-center py-3 font-medium ${gainClass(group.realizedGain)}`}>
-                    {arrow(group.realizedGain)} {formatCurrency(group.realizedGain)}
+                    {arrow(group.realizedGain)} {money(group.realizedGain)}
                   </td>
                   <td className="text-center py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {formatHoldingPeriod(group.firstTx, group.lastTx)}

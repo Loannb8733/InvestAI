@@ -13,18 +13,7 @@
       "url": "/dashboard/portfolio/p1"
     }
   ],
-  "toasts": [
-    {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de chargement",
-      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
-    }
-  ],
+  "toasts": [],
   "text": [
     "Portefeuille",
     "Le détail de ce que tu possèdes, ligne par ligne.",
@@ -37,15 +26,8 @@
     "Mes cryptos",
     "Actifs actuels",
     "Historique",
-    "Cash disponible",
-    "120,50 €",
-    "Binance",
-    ":",
-    "120,50 €",
-    "$",
-    "Stablecoins",
-    "0,00 €",
-    "Aucun actif dans ce portefeuille",
-    "Ajouter un actif"
+    "Impossible de charger les positions",
+    "La requête a échoué : Request failed with status code 500",
+    "Réessayer"
   ]
 }

@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AddTransactionForm from '@/components/forms/AddTransactionForm'
-import { formatCurrency, formatPercent } from '@/lib/utils'
+import { formatPercent } from '@/lib/utils'
 import { arrow, gainClass } from '../format'
-import { useDeleteAsset, useDeletePortfolio, useUpdateAssetExchange } from '../hooks'
+import { useDeleteAsset, useDeletePortfolio, useMoney, useUpdateAssetExchange } from '../hooks'
 import type { Portfolio, PortfolioHistory, PortfolioPerformance, Position, SparklineSeries } from '../types'
 import AddAssetDialog from './AddAssetDialog'
 import CashBalanceDialog from './CashBalanceDialog'
@@ -14,10 +14,16 @@ import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import HistoryTab from './HistoryTab'
 import PositionsTab from './PositionsTab'
 
+interface QueryState<T> {
+  data: T | undefined
+  error: unknown
+  refetch: () => unknown
+}
+
 interface PortfolioCardProps {
   portfolio: Portfolio
-  performance: { data: PortfolioPerformance | undefined; isLoading: boolean }
-  history: { data: PortfolioHistory | undefined; isLoading: boolean; isPlaceholderData: boolean }
+  performance: QueryState<PortfolioPerformance> & { isLoading: boolean }
+  history: QueryState<PortfolioHistory> & { isLoading: boolean; isPlaceholderData: boolean }
   sparklines: Record<string, SparklineSeries> | undefined
   activeTab: string
   onTabChange: (tab: string) => void
@@ -25,6 +31,7 @@ interface PortfolioCardProps {
 }
 
 export default function PortfolioCard({ portfolio, performance, history, sparklines, activeTab, onTabChange, onDeleted }: PortfolioCardProps) {
+  const money = useMoney()
   const [addingAsset, setAddingAsset] = useState(false)
   const [transactionFor, setTransactionFor] = useState<{ assetId: string; assetSymbol: string } | null>(null)
   const [cashOpen, setCashOpen] = useState(false)
@@ -58,9 +65,9 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
             <div className="flex items-center gap-4">
               {totals && (
                 <div className="text-right">
-                  <p className="text-2xl font-serif font-medium">{formatCurrency(totals.total_value)}</p>
+                  <p className="text-2xl font-serif font-medium">{money(totals.total_value)}</p>
                   <p className={`text-sm ${gainClass(totals.total_gain_loss)}`}>
-                    {arrow(totals.total_gain_loss)} {formatCurrency(totals.total_gain_loss)} ({formatPercent(totals.total_gain_loss_percent)})
+                    {arrow(totals.total_gain_loss)} {money(totals.total_gain_loss)} ({formatPercent(totals.total_gain_loss_percent)})
                   </p>
                 </div>
               )}
@@ -86,6 +93,8 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
               <PositionsTab
                 performance={totals}
                 loading={performance.isLoading}
+                error={performance.error}
+                onRetry={() => performance.refetch()}
                 cashBalances={portfolio.cash_balances}
                 sparklines={sparklines}
                 onAddAsset={() => setAddingAsset(true)}
@@ -96,7 +105,10 @@ export default function PortfolioCard({ portfolio, performance, history, sparkli
               />
             </TabsContent>
             <TabsContent value="history">
-              <HistoryTab history={history.data} loading={history.isLoading} stale={history.isPlaceholderData} />
+              <HistoryTab history={history.data} loading={history.isLoading} stale={history.isPlaceholderData}
+                error={history.error}
+                onRetry={() => history.refetch()}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>

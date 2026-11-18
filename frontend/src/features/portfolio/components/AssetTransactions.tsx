@@ -73,8 +73,8 @@ function TransactionsTable({ transactions }: { transactions: AssetTransaction[] 
                 </Badge>
               </td>
               <td className="px-3 py-2 text-right">{formatDetailQuantity(tx.quantity)}</td>
-              <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(tx.price)}</td>
-              <td className="px-3 py-2 text-right font-medium">{formatCurrency(tx.quantity * tx.price)}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(tx.price, tx.currency)}</td>
+              <td className="px-3 py-2 text-right font-medium">{formatCurrency(tx.quantity * tx.price, tx.currency)}</td>
             </tr>
           ))}
         </tbody>

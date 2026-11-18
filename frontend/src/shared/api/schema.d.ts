@@ -5414,6 +5414,8 @@ export interface components {
             cash_from_fiat: number;
             /** Fiat Assets */
             fiat_assets: components["schemas"]["FiatHolding"][];
+            /** Cash From Balances */
+            cash_from_balances: number;
             /**
              * Available Liquidity
              * @default 0

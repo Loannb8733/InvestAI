@@ -74,7 +74,7 @@ const notifyFailure = (error: AxiosError) => {
   if (error.config?.silent) return
   if (error.response) {
     const status = error.response.status
-    const detail = (error.response.data as { detail?: string })?.detail
+    const detail = serverMessage(error)
     if (status === 422) {
       toast({ title: 'Erreur de validation', description: detail || 'Données invalides. Vérifiez les champs.', variant: 'destructive' })
     } else if (status >= 500) {

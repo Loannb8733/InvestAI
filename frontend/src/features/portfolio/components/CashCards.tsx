@@ -1,6 +1,8 @@
 import { Banknote } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
+import { formatNumber } from '../format'
+import { useMoney } from '../hooks'
 import type { PortfolioPerformance } from '../types'
 
 interface CashCardsProps {
@@ -10,8 +12,8 @@ interface CashCardsProps {
 }
 
 export default function CashCards({ performance, cashBalances, onOpenCashBalance }: CashCardsProps) {
-  const manualCash = Object.values(cashBalances).reduce((sum, val) => sum + val, 0)
-  const totalCash = manualCash + (performance?.cash_from_fiat ?? 0)
+  const money = useMoney()
+  const totalCash = (performance?.cash_from_balances ?? 0) + (performance?.cash_from_fiat ?? 0)
   const cashEntries = Object.entries(cashBalances)
   const fiatEntries = performance?.fiat_assets ?? []
   const stablecoins = performance?.stablecoins.filter((sc) => sc.value >= 0.01) ?? []
@@ -26,14 +28,14 @@ export default function CashCards({ performance, cashBalances, onOpenCashBalance
             </div>
             <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Cash disponible</p>
-              <p className="text-xl font-bold">{formatCurrency(totalCash)}</p>
+              <p className="text-xl font-bold">{money(totalCash)}</p>
               {(cashEntries.length > 0 || fiatEntries.length > 0) && (
                 <div className="text-xs text-muted-foreground mt-1">
                   {cashEntries.map(([ex, amt]) => (
                     <span key={ex} className="mr-2">{ex}: {formatCurrency(amt)}</span>
                   ))}
                   {fiatEntries.map((f) => (
-                    <span key={f.id} className="mr-2">{f.symbol}: {formatCurrency(f.value)}</span>
+                    <span key={f.id} className="mr-2">{f.symbol}: {money(f.value)}</span>
                   ))}
                 </div>
               )}
@@ -50,11 +52,11 @@ export default function CashCards({ performance, cashBalances, onOpenCashBalance
             </div>
             <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Stablecoins</p>
-              <p className="text-xl font-bold">{formatCurrency(performance?.cash_from_stablecoins || 0)}</p>
+              <p className="text-xl font-bold">{money(performance?.cash_from_stablecoins || 0)}</p>
               {stablecoins.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
                   {stablecoins.map((sc) => (
-                    <span key={sc.id} className="mr-2">{sc.symbol}: {sc.quantity.toFixed(2)}</span>
+                    <span key={sc.id} className="mr-2">{sc.symbol}: {formatNumber(sc.quantity, 2)}</span>
                   ))}
                 </div>
               )}

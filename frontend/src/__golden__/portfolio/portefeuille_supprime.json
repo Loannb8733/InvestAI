@@ -39,21 +39,6 @@
     },
     {
       "method": "GET",
-      "url": "/dashboard/portfolio/p1"
-    },
-    {
-      "method": "GET",
-      "url": "/dashboard/portfolio/p1/sparklines",
-      "params": {
-        "days": 30
-      }
-    },
-    {
-      "method": "GET",
-      "url": "/transactions/csv-platforms"
-    },
-    {
-      "method": "GET",
       "url": "/dashboard/portfolio/p2"
     },
     {
@@ -67,16 +52,6 @@
   "toasts": [
     {
       "title": "Portefeuille supprimé"
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de chargement",
-      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de chargement",
-      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
     }
   ],
   "text": [

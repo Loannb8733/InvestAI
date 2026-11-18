@@ -197,6 +197,7 @@
         "realized": 0.0
       }
     },
+    "cash_from_balances": 0.0,
     "cash_from_fiat": 0.0,
     "cash_from_stablecoins": 1849.2,
     "fiat_assets": [],

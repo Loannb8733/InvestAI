@@ -59,6 +59,7 @@ export const CRYPTO_METRICS = {
   ],
   cash_from_fiat: 200,
   fiat_assets: [{ id: 'f1', symbol: 'EUR', quantity: 200, value: 200, unit_price: 1, depeg_percent: 0, depeg_warning: false }],
+  cash_from_balances: 120.5,
 }
 
 export const EMPTY_METRICS = {
@@ -71,6 +72,7 @@ export const EMPTY_METRICS = {
   stablecoins: [],
   cash_from_fiat: 0,
   fiat_assets: [],
+  cash_from_balances: 0,
 }
 
 const sold = (fields: Record<string, unknown>) => ({

@@ -1,12 +1,12 @@
 import { Sparkline } from '@/components/ui/sparkline'
-import { riskClass } from '../format'
+import { formatNumber, riskClass } from '../format'
 import type { SparklineSeries } from '../types'
 
 export function RiskCell({ weight, className }: { weight: number; className: string }) {
   return (
     <td className={`text-center ${className} hidden lg:table-cell`}>
       {weight > 0 ? (
-        <span className={`text-xs px-2 py-0.5 rounded ${riskClass(weight)}`}>{weight.toFixed(1)}%</span>
+        <span className={`text-xs px-2 py-0.5 rounded ${riskClass(weight)}`}>{`${formatNumber(weight, 1)} %`}</span>
       ) : (
         '-'
       )}
