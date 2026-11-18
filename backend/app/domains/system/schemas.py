@@ -4,6 +4,16 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+class AiProviderStatus(BaseModel):
+    """Fournisseur de l'Audit Lab : configuré ou non, modèle visé, disponibilité quand elle est vérifiable."""
+
+    name: str
+    configured: bool
+    model: str | None
+    available: bool | None
+    detail: str | None
+
+
 class ScheduledTaskStatus(BaseModel):
     """Rythme, dernière exécution et dernière issue d'une tâche planifiée."""
 
@@ -29,3 +39,4 @@ class SystemStatusResponse(BaseModel):
     smtp_from: str
     scheduler: Literal["api", "celery"]
     tasks: list[ScheduledTaskStatus]
+    ai_providers: list[AiProviderStatus]

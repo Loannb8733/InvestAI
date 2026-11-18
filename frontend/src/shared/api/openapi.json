@@ -8964,7 +8964,7 @@
           "System"
         ],
         "summary": "Get System Status",
-        "description": "Configuration e-mail et état de chaque tâche planifiée (administrateur seulement).",
+        "description": "Configuration e-mail, état de chaque tâche planifiée et des fournisseurs IA (administrateur seulement).",
         "operationId": "get_system_status_api_v1_system_status_get",
         "responses": {
           "200": {
@@ -9401,6 +9401,61 @@
         ],
         "title": "AdvancedMetrics",
         "description": "Indicateurs d'analyse du portefeuille."
+      },
+      "AiProviderStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "configured",
+          "model",
+          "available",
+          "detail"
+        ],
+        "title": "AiProviderStatus",
+        "description": "Fournisseur de l'Audit Lab : configuré ou non, modèle visé, disponibilité quand elle est vérifiable."
       },
       "AlertCondition": {
         "type": "string",
@@ -18951,6 +19006,13 @@
             },
             "type": "array",
             "title": "Tasks"
+          },
+          "ai_providers": {
+            "items": {
+              "$ref": "#/components/schemas/AiProviderStatus"
+            },
+            "type": "array",
+            "title": "Ai Providers"
           }
         },
         "type": "object",
@@ -18960,7 +19022,8 @@
           "smtp_port",
           "smtp_from",
           "scheduler",
-          "tasks"
+          "tasks",
+          "ai_providers"
         ],
         "title": "SystemStatusResponse",
         "description": "Configuration e-mail, exécutant des tâches planifiées (API ou worker Celery) et état de chacune."

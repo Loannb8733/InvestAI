@@ -10,10 +10,10 @@ ANALYSIS_SCHEMA = {
     "duration_min": "integer — durée minimale en mois",
     "duration_max": "integer — durée maximale en mois",
     "collection_amount": "number — montant de la collecte en euros",
-    "margin_percent": "number — marge brute promoteur en %",
+    "margin_percent": "number — marge brute promoteur en %, ou null si non communiquée",
     "ltv": "number — Loan-to-Value en % (dette senior / valeur du bien)",
     "ltc": "number — Loan-to-Cost en % (dette totale / coût total du projet)",
-    "pre_sales_percent": "number — taux de pré-commercialisation en % (0 si non mentionné)",
+    "pre_sales_percent": "number — taux de pré-commercialisation en %, ou null si non mentionné",
     "equity_contribution": "number — apport en fonds propres de l'opérateur en euros",
     "guarantees": [
         {
@@ -44,7 +44,8 @@ Règles d'analyse :
 - LTV (Loan-to-Value) : dette senior / valeur du bien estimée × 100
 - LTC (Loan-to-Cost) : dette totale / coût total du projet × 100
 - Marge : marge brute promoteur = (CA prévisionnel - coût total) / CA prévisionnel × 100
-- Pré-commercialisation : % des lots déjà vendus ou réservés (0 si non mentionné)
+- Pré-commercialisation : % des lots déjà vendus ou réservés
+- Valeur absente des documents : null, jamais 0 ni une estimation (marge, LTV, LTC, pré-commercialisation, apport)
 - Garanties : identifie le rang exact (1er, 2ème) et le type (hypothèque, caution, GAPD, nantissement)
 - Score : note de 1 à 10 sur chaque pilier (10 = excellent)
 
@@ -55,14 +56,13 @@ Règles de scoring :
 - Rendement/Risque : TRI vs risque, marge de sécurité, LTV/LTC
 - Administratif : PC purgé, assurances, conformité réglementaire
 
-Red flags automatiques à détecter :
-- LTV > 80%
-- Marge < 10%
-- Pré-commercialisation = 0% sur un projet VEFA
-- Pas d'hypothèque de 1er rang
-- Opérateur sans historique vérifié
-- PC non purgé
+Red flags :
+- Les seuils (LTV > 80 %, marge < 10 %, pré-commercialisation nulle, absence d'hypothèque de 1er rang, permis non
+  purgé) sont vérifiés par l'application à partir des champs extraits : ne les répète pas dans red_flags
+- red_flags ne contient que les autres risques critiques propres au dossier (opérateur sans historique vérifié,
+  risque de change, montage atypique…), chacun appuyé sur le texte des documents
 
+Rédige tous les textes (points forts, points de vigilance, red flags) en français.
 Tu dois TOUJOURS répondre en JSON valide, sans markdown ni commentaires."""  # noqa: RUF001
 
 

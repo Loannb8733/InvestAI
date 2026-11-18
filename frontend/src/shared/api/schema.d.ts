@@ -2848,7 +2848,7 @@ export interface paths {
         };
         /**
          * Get System Status
-         * @description Configuration e-mail et état de chaque tâche planifiée (administrateur seulement).
+         * @description Configuration e-mail, état de chaque tâche planifiée et des fournisseurs IA (administrateur seulement).
          */
         get: operations["get_system_status_api_v1_system_status_get"];
         put?: never;
@@ -3051,6 +3051,22 @@ export interface components {
             /** Stress Tests */
             stress_tests: components["schemas"]["StressTest"][];
             pnl_breakdown: components["schemas"]["PnLBreakdown"];
+        };
+        /**
+         * AiProviderStatus
+         * @description Fournisseur de l'Audit Lab : configuré ou non, modèle visé, disponibilité quand elle est vérifiable.
+         */
+        AiProviderStatus: {
+            /** Name */
+            name: string;
+            /** Configured */
+            configured: boolean;
+            /** Model */
+            model: string | null;
+            /** Available */
+            available: boolean | null;
+            /** Detail */
+            detail: string | null;
         };
         /**
          * AlertCondition
@@ -6553,6 +6569,8 @@ export interface components {
             scheduler: "api" | "celery";
             /** Tasks */
             tasks: components["schemas"]["ScheduledTaskStatus"][];
+            /** Ai Providers */
+            ai_providers: components["schemas"]["AiProviderStatus"][];
         };
         /** TaskDispatched */
         TaskDispatched: {

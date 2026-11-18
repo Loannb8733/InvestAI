@@ -41,7 +41,9 @@
     "points_forts": [
       "Emplacement"
     ],
-    "points_vigilance": [],
+    "points_vigilance": [
+      "Non communiqué dans les documents : LTC — à demander à la plateforme"
+    ],
     "portfolio_concentration": {
       "asset_type": {
         "detail": "Crowdfunding = 2.9% du portefeuille après investissement",

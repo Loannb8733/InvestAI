@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.crowdfunding.audit import providers
 from app.domains.crowdfunding.audit.models import ProjectAudit
+from app.domains.crowdfunding.audit.page_selection import select_pages
 from app.domains.crowdfunding.audit.pdf_text import extract_text
 from app.domains.crowdfunding.audit.prompt import build_messages, parse_answer
 from app.domains.crowdfunding.audit.scoring import (
@@ -108,14 +109,14 @@ async def analyze_documents(
     """
     texts = _texts(file_contents)
     exposure = exposure or await portfolio_exposure(db, user_id)
-    messages = build_messages(texts, exposure.cash, exposure.total)
+    messages = build_messages(select_pages(texts), exposure.cash, exposure.total)
     data, raw_text, source = await _ask_models(messages)
     if data is None:
         logger.info("All LLM providers failed or unavailable — using static analysis")
         data = analyze_statically(file_contents)
         raw_text = json.dumps(data, ensure_ascii=False)
         source = STATIC_SOURCE
-    data = add_red_flags(data)
+    data = add_red_flags(data, guarantees_read=source != STATIC_SOURCE)
     data.update(diversification(exposure, data))
     data = suggest_investment(data, exposure)
     audit = _audit(
