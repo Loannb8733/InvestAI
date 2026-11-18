@@ -22,6 +22,7 @@ import pymupdf
 from app.domains.reports.styles import money
 from app.domains.reports.tax import TaxEvent2086, TaxSummary2086
 from app.domains.reports.tax_pdf import render_tax_pdf
+from app.domains.reports.tax_rates import pfu_rates
 
 
 def _cession(symbole="BTC", quantite=0.5, prix_cession=15000.0, gain=5000.0, duree="long_terme"):
@@ -46,6 +47,9 @@ def _resume(evenements=None, **surcharges):
     plus_values = sum(e.gain_loss for e in evenements if e.gain_loss > 0)
     moins_values = sum(-e.gain_loss for e in evenements if e.gain_loss < 0)
     net = plus_values - moins_values
+    taux = pfu_rates(surcharges.get("year", 2026))
+    exonere = surcharges.get("exempt", False)
+    base = 0.0 if exonere else max(net, 0.0)
     defauts = dict(
         year=2026,
         total_cessions=sum(e.cession_price for e in evenements),
@@ -56,9 +60,9 @@ def _resume(evenements=None, **surcharges):
         nb_cessions=len(evenements),
         nb_court_terme=sum(1 for e in evenements if e.holding_period == "court_terme"),
         nb_long_terme=sum(1 for e in evenements if e.holding_period == "long_terme"),
-        flat_tax_30=max(net, 0.0) * 0.30,
-        ir_12_8=max(net, 0.0) * 0.128,
-        ps_17_2=max(net, 0.0) * 0.172,
+        pfu_total=base * float(taux.total),
+        pfu_ir=base * float(taux.ir),
+        pfu_ps=base * float(taux.ps),
         events=evenements,
     )
     defauts.update(surcharges)
@@ -123,7 +127,7 @@ class TestMontantsImprimes:
         """Le PFU se décompose en impôt sur le revenu et prélèvements sociaux.
 
         Ce sont les **montants** qui sont vérifiés, pas les taux : « 12,8 % » et
-        « 17,2 % » figurent aussi dans le paragraphe explicatif du formulaire,
+        « 18,6 % » figurent aussi dans le paragraphe explicatif du formulaire,
         si bien qu'un test portant sur les taux passait au vert même en
         supprimant la ligne du tableau — vérifié par canari.
         """
@@ -133,7 +137,7 @@ class TestMontantsImprimes:
         # Montants formatés en entier, tels que `money` les écrit — « 1,280.00 € ».
         # Une première version comparait un « noyau » tronqué à la virgule, donc
         # au seul chiffre « 1 » : présent partout, le test ne prouvait rien.
-        for montant in (resume.ir_12_8, resume.ps_17_2):
+        for montant in (resume.pfu_ir, resume.pfu_ps):
             attendu = money(montant)
             assert attendu in texte, f"{attendu} absent du document"
 
@@ -151,7 +155,7 @@ class TestCasSansCession:
     async def test_aucune_taxe_sur_une_annee_blanche(self, db_session):
         resume = _resume([])
 
-        assert resume.flat_tax_30 == 0.0
+        assert resume.pfu_total == 0.0
         texte = _texte(await _generer(db_session, resume))
         assert texte, "le document reste lisible"
 
@@ -162,7 +166,7 @@ class TestMoinsValues:
         resume = _resume([_cession(gain=-3000.0)])
 
         assert resume.net_plus_value < 0
-        assert resume.flat_tax_30 == 0.0
+        assert resume.pfu_total == 0.0
         texte = _texte(await _generer(db_session, resume))
         assert "2086" in texte
 
@@ -174,3 +178,38 @@ class TestMoinsValues:
         texte = _texte(await _generer(db_session, _resume(evenements)))
 
         assert "BTC" in texte and "ETH" in texte
+
+
+class TestTauxEtExoneration:
+    """PFU de l'année des revenus (LFSS 2026) et seuil de 305 € (art. 150 VH bis II-B)."""
+
+    async def test_le_taux_2026_est_31_4_pour_cent_et_non_30(self, db_session):
+        texte = _texte(await _generer(db_session, _resume([_cession(gain=10000.0)])))
+
+        assert "31,4 %" in texte
+        assert "18,6 %" in texte
+        assert "30,0 %" not in texte and "17,2 %" not in texte
+        assert money(3140.0) in texte
+
+    async def test_les_taux_2024_restent_a_30_pour_cent(self, db_session):
+        resume = _resume([_cession(gain=10000.0)], year=2024)
+
+        texte = _texte(render_tax_pdf(resume, 2024))
+
+        assert "30,0 %" in texte and "17,2 %" in texte
+        assert money(3000.0) in texte
+
+    async def test_une_annee_exoneree_l_annonce_sans_impot(self, db_session):
+        petite = _cession(prix_cession=300.0, gain=90.0)
+        resume = _resume([petite], exempt=True)
+
+        texte = _texte(await _generer(db_session, resume))
+
+        assert resume.pfu_total == 0.0
+        assert "305" in texte and "exonérée" in texte
+
+    async def test_les_lignes_du_formulaire_sont_imprimees(self, db_session):
+        texte = _texte(await _generer(db_session, _resume()))
+
+        for libelle in ("ligne 51", "ligne 52", "(212)", "(217)", "(223)"):
+            assert libelle in texte

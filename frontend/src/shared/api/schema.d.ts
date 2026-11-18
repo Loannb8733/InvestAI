@@ -1535,9 +1535,10 @@ export interface paths {
         };
         /**
          * Get Tax Summary
-         * @description Synthèse 2086 en JSON : vraie base imposable (acquisition globale, cessions crypto→fiat de l'année).
+         * @description Synthèse 2086 en JSON : méthode du portefeuille, cessions crypto→fiat de l'année, PFU de l'année.
          *
-         *     Le détail des cessions est réservé au PDF.
+         *     Le détail des cessions est réservé au PDF. flat_tax_30, ir_12_8 et ps_17_2 sont des alias dépréciés de
+         *     pfu_total, pfu_ir et pfu_ps, gardés pour les clients existants : ils portent le taux de l'année, 31,4 % dès 2025.
          */
         get: operations["get_tax_summary_api_v1_reports_tax__year__summary_get"];
         put?: never;

@@ -1,5 +1,6 @@
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -10,20 +11,25 @@ from app.domains.dashboard.metrics.service import metrics_service
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
 from app.domains.reports.classes import CRYPTO_ASSET_CLASSES, CRYPTO_CLASS_LABELS
 from app.domains.reports.tax import TAX_MODE
+from app.domains.reports.tax_rates import PfuRates, pfu_rates
 from app.domains.transactions.cost_basis.replay import replay, sort_transactions
 from app.domains.transactions.models import Transaction
 
 _ZERO = Decimal("0")
 _DUST_VALUE = 0.10
 _MIN_DRIFT_EUR = 1.0
-_PFU_RATE = 0.30
 
 FifoLayers = dict[tuple[str, str], list[Any]]
 
 
+def sale_rates() -> PfuRates:
+    """PFU d'une vente réalisée aujourd'hui : celui de l'année en cours."""
+    return pfu_rates(datetime.now(UTC).year)
+
+
 @dataclass
 class RebalanceOrder:
-    """Achat ou vente d'une classe crypto ; drift_pct = actuel - cible, estimated_tax = PFU 30 % (ventes seules)."""
+    """Achat ou vente d'une classe crypto ; drift_pct = actuel - cible, estimated_tax = PFU de l'année (ventes)."""
 
     category: str
     action: str
@@ -46,6 +52,7 @@ class RebalancingReport:
     total_estimated_tax: float = 0.0
     hhi_before: float = 0.0
     hhi_after: float = 0.0
+    pfu_rate: float = field(default_factory=lambda: float(sale_rates().total))
 
 
 def _group_by_class(
@@ -272,9 +279,10 @@ class RebalancingMixin:
             TAX_MODE.config,
         ).fifo
 
+        rate = sale_rates().total
         for order in orders:
             if order.action != "sell":
                 continue
             estimated_gain = _estimate_order_gain(order, class_assets.get(order.category, []), fifo)
             order.estimated_gain = round(float(estimated_gain), 2)
-            order.estimated_tax = round(max(0.0, float(estimated_gain)) * _PFU_RATE, 2)
+            order.estimated_tax = round(float(max(_ZERO, estimated_gain) * rate), 2)

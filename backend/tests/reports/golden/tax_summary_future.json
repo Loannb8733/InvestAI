@@ -1,13 +1,22 @@
 {
   "body": {
-    "flat_tax_30": 262.59,
-    "ir_12_8": 112.04,
+    "exempt": false,
+    "exemption_threshold": 305.0,
+    "flat_tax_30": 312.88,
+    "ir_12_8": 127.55,
     "nb_cessions": 1,
-    "net_plus_value": 875.29,
-    "ps_17_2": 150.55,
+    "net_plus_value": 996.45,
+    "pfu_ir": 127.55,
+    "pfu_ir_rate": 0.128,
+    "pfu_ps": 185.34,
+    "pfu_ps_rate": 0.186,
+    "pfu_rate": 0.314,
+    "pfu_total": 312.88,
+    "ps_17_2": 185.34,
+    "taxable_plus_value": 996.45,
     "total_cessions": 3497.0,
     "total_moins_values": 0,
-    "total_plus_values": 875.29,
+    "total_plus_values": 996.45,
     "year": 2026
   },
   "headers": {

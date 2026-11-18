@@ -183,9 +183,9 @@ class TestTaxExcel:
             nb_cessions=1,
             nb_court_terme=1,
             nb_long_terme=0,
-            flat_tax_30=1500.0,
-            ir_12_8=640.0,
-            ps_17_2=860.0,
+            pfu_total=1570.0,
+            pfu_ir=640.0,
+            pfu_ps=930.0,
             events=[],
         )
 
@@ -202,9 +202,9 @@ class TestTaxExcel:
             nb_cessions=0,
             nb_court_terme=0,
             nb_long_terme=0,
-            flat_tax_30=0.0,
-            ir_12_8=0.0,
-            ps_17_2=0.0,
+            pfu_total=0.0,
+            pfu_ir=0.0,
+            pfu_ps=0.0,
             events=[],
         )
 

@@ -10,12 +10,24 @@ replays: every place the implementations DISAGREE is asserted with BOTH
 values and tagged ``# DIVERGENCE #N``. Any refactor that changes one of
 those numbers is a behaviour change that must be signed off explicitly.
 
+2026-11-18 — 2086 portfolio method (signed off). ``compute_tax_2086`` no
+longer reads the FIFO cost removed by a sale: it applies art. 150 VH bis
+(PTA net * sale price before fees / portfolio value BEFORE the sale, the
+fraction then leaves the PTA), and crypto->crypto conversions are in
+sursis (no cession). On the tax side ``total_acquisition_cost`` is now the
+2086 line 223 BEFORE the cession (it used to be the FIFO basis AFTER it)
+and ``portfolio_value`` includes the sold quantity (line 212). The FIFO
+divergences below still hold for the replay layers, and only reach the
+2086 through the acquisition total (BUY fees, zero-cost rewards and
+unmatched transfers in). PFU = 31.4 % from 2025 income (LFSS 2026).
+
 Divergence index
 ----------------
 #1 Conversion destination basis: metrics uses the RECORDED CONVERSION_IN
    price; tax carries the consumed source cost.
 #2 Unmatched CONVERSION_OUT: metrics preserves the source layers (cost
-   unchanged); tax consumes them AND emits a taxable cession.
+   unchanged); tax used to consume them AND emit a taxable cession —
+   converged (PRESERVE), and since 2026-11-18 no cession at all (sursis).
 #3 Fee in portfolio currency (EUR) on a USD trade: metrics adds the fee
    as-is; tax multiplies the EUR fee by the trade's conversion_rate.
 #4 Fee in foreign currency (USD): metrics converts it at the LIVE forex
@@ -43,6 +55,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import time_machine
 
 from app.domains.dashboard.metrics.service import MetricsService
 from app.domains.market_data.fx.spot import spot_rates
@@ -198,36 +211,30 @@ async def test_multibuy_partial_sells_metrics_and_tax_agree(db_session, regular_
     assert summary.nb_cessions == 2
     ev1, ev2 = summary.events
 
-    # Event 1: cost_removed = 10000 + 0.5*20000 = 20000 (surfaced via
-    # total_acquisition_cost = 60000 - 20000 = 40000). Same layers the
-    # metrics replay consumed — the engines agree on plain BUY/SELL FIFO.
     assert ev1.quantity == pytest.approx(1.5, abs=1e-9)
     assert ev1.cession_price == pytest.approx(60000.0, abs=1e-6)
-    assert ev1.total_acquisition_cost == pytest.approx(40000.0, abs=1e-6)
-    # portfolio_value at cession = remaining 1.5 BTC * cession unit price.
-    assert ev1.portfolio_value == pytest.approx(60000.0, abs=1e-6)
-    assert ev1.acquisition_fraction == pytest.approx(40000.0, abs=1e-6)
-    assert ev1.gain_loss == pytest.approx(20000.0, abs=1e-6)
+    assert ev1.total_acquisition_cost == pytest.approx(60000.0, abs=1e-6)
+    assert ev1.portfolio_value == pytest.approx(120000.0, abs=1e-6)
+    assert ev1.acquisition_fraction == pytest.approx(30000.0, abs=1e-6)
+    assert ev1.gain_loss == pytest.approx(30000.0, abs=1e-6)
     assert ev1.holding_period == "long_terme"  # oldest consumed lot: 2023-01-01
 
     assert ev2.cession_price == pytest.approx(20000.0, abs=1e-6)
     assert ev2.total_acquisition_cost == pytest.approx(30000.0, abs=1e-6)
-    assert ev2.portfolio_value == pytest.approx(40000.0, abs=1e-6)
-    assert ev2.acquisition_fraction == pytest.approx(15000.0, abs=1e-6)
-    assert ev2.gain_loss == pytest.approx(5000.0, abs=1e-6)
+    assert ev2.portfolio_value == pytest.approx(60000.0, abs=1e-6)
+    assert ev2.acquisition_fraction == pytest.approx(10000.0, abs=1e-6)
+    assert ev2.gain_loss == pytest.approx(10000.0, abs=1e-6)
     assert ev2.holding_period == "court_terme"  # oldest consumed lot: 2024-06-01 (639d)
 
     assert summary.total_cessions == pytest.approx(80000.0, abs=1e-6)
-    assert summary.net_plus_value == pytest.approx(25000.0, abs=1e-6)
+    assert summary.net_plus_value == pytest.approx(40000.0, abs=1e-6)
     assert summary.nb_court_terme == 1
     assert summary.nb_long_terme == 1
-    assert summary.ir_12_8 == pytest.approx(3200.0, abs=1e-6)
-    assert summary.ps_17_2 == pytest.approx(4300.0, abs=1e-6)
-    assert summary.flat_tax_30 == pytest.approx(7500.0, abs=1e-6)
+    assert summary.pfu_ir == pytest.approx(5120.0, abs=1e-6)
+    assert summary.pfu_ps == pytest.approx(7440.0, abs=1e-6)
+    assert summary.pfu_total == pytest.approx(12560.0, abs=1e-6)
 
-    # Cross-engine agreement: metrics' remaining basis == tax's remaining
-    # total_acquisition_cost after the last cession.
-    assert result["total_invested"] == pytest.approx(ev2.total_acquisition_cost, abs=1e-6)
+    assert result["total_invested"] == pytest.approx(30000.0, abs=1e-6)
 
 
 # ── Scenario 2 — matched conversion chain (Kraken format) ───────────
@@ -281,31 +288,14 @@ async def test_conversion_chain_dest_basis_diverges(db_session, regular_user):
     assert result["unrealized_gain"] == pytest.approx(2000.0, abs=1e-6)
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
-    assert summary.nb_cessions == 2
-    ev_conv, ev_sell = summary.events
 
-    # The CONVERSION_OUT is itself a taxable cession in the tax replay.
-    assert ev_conv.symbol == "BTC"
-    assert ev_conv.event_type == "conversion_out"
-    assert ev_conv.cession_price == pytest.approx(25000.0, abs=1e-6)
-    # Consumed source cost (20000) re-enters as the dest basis:
-    # total_acquisition_cost = 20000 - 20000 + 20000 = 20000.
-    assert ev_conv.total_acquisition_cost == pytest.approx(20000.0, abs=1e-6)
-    # No asset_price_history rows and the destination ETH is booked by the
-    # LATER CONVERSION_IN tx -> portfolio_value 0 at the CONVERSION_OUT,
-    # so acquisition_fraction collapses to 0 and gain = full cession.
-    assert ev_conv.portfolio_value == pytest.approx(0.0, abs=1e-9)
-    assert ev_conv.acquisition_fraction == pytest.approx(0.0, abs=1e-9)
-    assert ev_conv.gain_loss == pytest.approx(25000.0, abs=1e-6)
-    assert ev_conv.holding_period == "long_terme"  # lot 2024-01-01, 762d
+    assert summary.nb_cessions == 1
+    (ev_sell,) = summary.events
 
-    # DIVERGENCE #1 (tax side): dest layer carries the consumed SOURCE cost
-    #   (10 ETH @ 20000/10 = 2000) -> after selling 5, remaining acquisition
-    #   cost = 5 * 2000 = 10000 (vs metrics 13000 above).
     assert ev_sell.symbol == "ETH"
     assert ev_sell.cession_price == pytest.approx(15000.0, abs=1e-6)
-    assert ev_sell.total_acquisition_cost == pytest.approx(10000.0, abs=1e-6)
-    assert ev_sell.portfolio_value == pytest.approx(15000.0, abs=1e-6)
+    assert ev_sell.total_acquisition_cost == pytest.approx(20000.0, abs=1e-6)
+    assert ev_sell.portfolio_value == pytest.approx(30000.0, abs=1e-6)
     assert ev_sell.acquisition_fraction == pytest.approx(10000.0, abs=1e-6)
     assert ev_sell.gain_loss == pytest.approx(5000.0, abs=1e-6)
     assert ev_sell.holding_period == "court_terme"  # dest lot acquired at conversion
@@ -347,33 +337,10 @@ async def test_unmatched_conversion_out_diverges(db_session, regular_user):
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
 
-    # CONVERGED (2026-07-04, UnmatchedConversionOutPolicy.PRESERVE): the
-    # unmatched CONVERSION_OUT no longer DESTROYS the source cost basis. It is
-    # now preserved (20000, matching metrics), so a later sale of the source
-    # keeps its basis instead of being taxed on the full proceeds. Pre-
-    # convergence this was 0.0 (DIVERGENCE #2, the accidental consume+destroy).
-    #
-    # The conversion still emits a cession event — whether a crypto->crypto
-    # swap is a taxable disposal at all under art. 150 VH bis (sursis) is a
-    # separate domain question left deliberately unchanged by this refactor.
-    assert summary.nb_cessions == 1
-    ev = summary.events[0]
-    assert ev.event_type == "conversion_out"
-    assert ev.cession_price == pytest.approx(25000.0, abs=1e-6)
-    assert ev.total_acquisition_cost == pytest.approx(20000.0, abs=1e-6)  # was 0.0 pre-convergence
-    assert ev.portfolio_value == pytest.approx(0.0, abs=1e-9)  # nothing held after
-    assert ev.acquisition_fraction == pytest.approx(0.0, abs=1e-9)
-    # gain still 25000 here only because portfolio_value is 0 (acq_fraction=0);
-    # the preserved basis matters on the NEXT disposal, not this one.
-    assert ev.gain_loss == pytest.approx(25000.0, abs=1e-6)
-    # court_terme (was long_terme): PRESERVE consumes no FIFO layer, so the
-    # event carries no acquisition date and falls to the court_terme default.
-    assert ev.holding_period == "court_terme"
-
-    # Cross-check the payoff of the convergence: the LEGACY mode still destroys
-    # the basis (acquisition 0), proving the fix is what changed the number.
+    assert summary.nb_cessions == 0
+    assert summary.total_cessions == 0
     legacy = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026, mode=TAX_MODE_LEGACY)
-    assert legacy.events[0].total_acquisition_cost == pytest.approx(0.0, abs=1e-9)
+    assert legacy.nb_cessions == 0
 
 
 # ── Scenario 4 — FX conversion & fee-currency semantics ─────────────
@@ -402,8 +369,8 @@ async def test_usd_buy_sell_no_fee_agreement(db_session, regular_user):
     assert summary.nb_cessions == 1
     ev = summary.events[0]
     assert ev.cession_price == pytest.approx(142.5, abs=1e-6)  # 150 USD * 0.95
-    assert ev.total_acquisition_cost == pytest.approx(92.0, abs=1e-6)  # agrees with metrics
-    assert ev.portfolio_value == pytest.approx(142.5, abs=1e-6)
+    assert ev.total_acquisition_cost == pytest.approx(184.0, abs=1e-6)
+    assert ev.portfolio_value == pytest.approx(285.0, abs=1e-6)
     assert ev.acquisition_fraction == pytest.approx(92.0, abs=1e-6)
     assert ev.gain_loss == pytest.approx(50.5, abs=1e-6)
     assert ev.holding_period == "long_terme"  # 2024-01-15 -> 2026-06-15 (>=730d)
@@ -445,8 +412,7 @@ async def test_eur_fee_on_usd_trade_diverges(db_session, regular_user):
     ev = summary.events[0]
     # DIVERGENCE #3 (tax side): tax IGNORES fee_currency and multiplies the
     # EUR fee by conversion_rate anyway: fee = 10 * 0.92 = 9.2.
-    #   Layer = (184 + 9.2)/2 = 96.6/unit -> remaining acquisition = 96.6.
-    assert ev.total_acquisition_cost == pytest.approx(96.6, abs=1e-6)
+    assert ev.total_acquisition_cost == pytest.approx(193.2, abs=1e-6)
     assert ev.cession_price == pytest.approx(142.5, abs=1e-6)
     assert ev.acquisition_fraction == pytest.approx(96.6, abs=1e-6)
     assert ev.gain_loss == pytest.approx(45.9, abs=1e-6)
@@ -487,9 +453,8 @@ async def test_usd_fee_on_usd_trade_diverges(db_session, regular_user):
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
     ev = summary.events[0]
     # DIVERGENCE #4 (tax side): tax bakes fee*conversion_rate (10*0.92=9.2)
-    # into the BUY layer; the sell consumes half of it proportionally:
-    #   remaining acquisition = (184 + 9.2)/2 = 96.6  (vs metrics 101.2).
-    assert ev.total_acquisition_cost == pytest.approx(96.6, abs=1e-6)
+    assert ev.total_acquisition_cost == pytest.approx(193.2, abs=1e-6)
+    assert ev.acquisition_fraction == pytest.approx(96.6, abs=1e-6)
     assert ev.gain_loss == pytest.approx(45.9, abs=1e-6)
 
 
@@ -521,15 +486,11 @@ async def test_matched_transfer_exact_qty_agreement(db_session, regular_user):
     assert summary.nb_cessions == 1
     ev = summary.events[0]
     assert ev.cession_price == pytest.approx(15000.0, abs=1e-6)
-    # Transfers do not change acquisition cost: 40000 - 0.5*20000 = 30000
-    # — identical to the metrics remaining basis (agreement).
-    assert ev.total_acquisition_cost == pytest.approx(30000.0, abs=1e-6)
-    assert ev.portfolio_value == pytest.approx(45000.0, abs=1e-6)  # 1.5 BTC * 30000
+    assert ev.total_acquisition_cost == pytest.approx(40000.0, abs=1e-6)
+    assert ev.portfolio_value == pytest.approx(60000.0, abs=1e-6)
     assert ev.acquisition_fraction == pytest.approx(10000.0, abs=1e-6)
     assert ev.gain_loss == pytest.approx(5000.0, abs=1e-6)
     assert ev.holding_period == "long_terme"  # layer date travels with the transfer
-
-    assert result["total_invested"] == pytest.approx(ev.total_acquisition_cost, abs=1e-6)
 
 
 @pytest.mark.asyncio
@@ -556,15 +517,11 @@ async def test_transfer_network_fee_diverges(db_session, regular_user):
 
     summary = await ReportService().compute_tax_2086(db_session, str(regular_user.id), 2026)
     ev = summary.events[0]
-    # DIVERGENCE #5 (tax side): tax appends the FULL transit (1.0 @ 20000 —
-    # phantom 0.005 qty + 100 EUR of cost kept). After selling 0.5:
-    #   total_acquisition_cost = 40000 - 10000 = 30000 (vs metrics 29900).
-    assert ev.total_acquisition_cost == pytest.approx(30000.0, abs=1e-6)
+    assert ev.total_acquisition_cost == pytest.approx(40000.0, abs=1e-6)
     assert ev.cession_price == pytest.approx(15000.0, abs=1e-6)
-    # holdings replay: 2 - 1 + 0.995 - 0.5 = 1.495 BTC * 30000 = 44850.
-    assert ev.portfolio_value == pytest.approx(44850.0, abs=1e-6)
-    assert ev.acquisition_fraction == pytest.approx(10033.444816, abs=1e-3)
-    assert ev.gain_loss == pytest.approx(4966.555184, abs=1e-3)
+    assert ev.portfolio_value == pytest.approx(59850.0, abs=1e-6)
+    assert ev.acquisition_fraction == pytest.approx(10025.062657, abs=1e-3)
+    assert ev.gain_loss == pytest.approx(4974.937343, abs=1e-3)
 
 
 @pytest.mark.asyncio
@@ -595,7 +552,7 @@ async def test_unmatched_transfer_in_diverges(db_session, regular_user):
     # cost — the entire cession is taxed as gain (100 vs the economic 20).
     assert ev.cession_price == pytest.approx(100.0, abs=1e-6)
     assert ev.total_acquisition_cost == pytest.approx(0.0, abs=1e-9)
-    assert ev.portfolio_value == pytest.approx(100.0, abs=1e-6)
+    assert ev.portfolio_value == pytest.approx(200.0, abs=1e-6)
     assert ev.acquisition_fraction == pytest.approx(0.0, abs=1e-9)
     assert ev.gain_loss == pytest.approx(100.0, abs=1e-6)
     assert ev.holding_period == "long_terme"
@@ -642,7 +599,8 @@ async def test_estimate_rebalancing_tax_two_assets(db_session, regular_user):
 
     BTC: 1 @ 20000 (now 30000) — full 30000 sold  -> gain 10000
     ETH: 5 @ 1000  (now 2000)  — 5000 EUR sold (2.5 units) -> gain 2500
-    estimated_gain = 12500, estimated_tax = 30% PFU = 3750.
+    estimated_gain = 12500, estimated_tax = PFU of the sale year: 31.4 % in
+    2026 = 3925 (was a hard-coded 30 % = 3750).
     """
     portfolio = await _make_portfolio(db_session, regular_user)
     btc = await _make_asset(db_session, portfolio, symbol="BTC", qty=1, current_price=30000)
@@ -666,10 +624,11 @@ async def test_estimate_rebalancing_tax_two_assets(db_session, regular_user):
         ]
     }
 
-    await ReportService()._estimate_rebalancing_tax(db_session, str(regular_user.id), [order], class_assets, "EUR")
+    with time_machine.travel(datetime(2026, 11, 18, 12, 0, tzinfo=UTC), tick=False):
+        await ReportService()._estimate_rebalancing_tax(db_session, str(regular_user.id), [order], class_assets, "EUR")
 
     assert order.estimated_gain == pytest.approx(12500.0, abs=1e-6)
-    assert order.estimated_tax == pytest.approx(3750.0, abs=1e-6)
+    assert order.estimated_tax == pytest.approx(3925.0, abs=1e-6)
 
 
 @pytest.mark.asyncio
@@ -696,11 +655,12 @@ async def test_estimate_rebalancing_tax_applies_conversion_rate(db_session, regu
     )
     class_assets = {"L1": [{"symbol": "BTC", "current_price": 150.0, "value": 150.0}]}
 
-    await ReportService()._estimate_rebalancing_tax(db_session, str(regular_user.id), [order], class_assets, "EUR")
+    with time_machine.travel(datetime(2026, 11, 18, 12, 0, tzinfo=UTC), tick=False):
+        await ReportService()._estimate_rebalancing_tax(db_session, str(regular_user.id), [order], class_assets, "EUR")
 
     # CONVERGED: FX applied — basis 92 EUR, gain = 150 - 92 = 58 (was 50).
     assert order.estimated_gain == pytest.approx(58.0, abs=1e-6)
-    assert order.estimated_tax == pytest.approx(17.4, abs=1e-6)  # 58 * 0.30
+    assert order.estimated_tax == pytest.approx(18.21, abs=1e-6)
 
     # Rebalancing estimate and metrics now agree on the 92 EUR cost basis.
     result = await _metrics(db_session, portfolio, {"BTC": 150.0}, forex={("USD", "EUR"): 0.92})

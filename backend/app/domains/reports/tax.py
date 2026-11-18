@@ -1,38 +1,38 @@
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.market_data.history.models import AssetPriceHistory
 from app.domains.portfolio.models import Asset, AssetType, Portfolio
+from app.domains.reports.tax_ledger import CessionLines, PortfolioLedger
+from app.domains.reports.tax_rates import EXEMPTION_THRESHOLD, PfuRates, pfu_rates
+from app.domains.reports.tax_valuation import (
+    Holdings,
+    PriceCache,
+    historical_prices,
+    holdings_before_sales,
+    portfolio_value,
+)
 from app.domains.transactions.cost_basis import config as replay_config
 from app.domains.transactions.cost_basis.replay import replay, sort_transactions
-from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.transactions.models import Transaction
 
-_ZERO = Decimal("0")
-
-_HOLDING_IN = (
-    TransactionType.BUY,
-    TransactionType.AIRDROP,
-    TransactionType.STAKING_REWARD,
-    TransactionType.TRANSFER_IN,
-    TransactionType.CONVERSION_IN,
-)
-_HOLDING_OUT = (TransactionType.SELL, TransactionType.TRANSFER_OUT, TransactionType.CONVERSION_OUT)
-_TAXABLE = (TransactionType.SELL, TransactionType.CONVERSION_OUT)
 _LONG_TERM_DAYS = 730
-
-PriceCache = dict[date, dict[str, Decimal]]
+_CENT = Decimal("0.01")
 
 
 @dataclass
 class TaxEvent2086:
-    """Cession imposable : cession_price = qté * prix - frais, gain_loss = cession_price - acquisition_fraction."""
+    """Cession imposable, lignes du 2086 en EUR.
+
+    cession_price = l. 218 (net de frais), gross_cession_price = l. 217, fees = l. 214, portfolio_value = l. 212,
+    acquisition_cost_gross = l. 220, prior_fractions = l. 221, total_acquisition_cost = l. 223 (PTA net avant la
+    cession), acquisition_fraction = l. 223 * l. 217 / l. 212, gain_loss = l. 218 - acquisition_fraction.
+    """
 
     date: datetime
     symbol: str
@@ -46,10 +46,18 @@ class TaxEvent2086:
     gain_loss: float
     holding_period: str
     fees: float
+    gross_cession_price: float = 0.0
+    acquisition_cost_gross: float = 0.0
+    prior_fractions: float = 0.0
 
 
 @dataclass
 class TaxSummary2086:
+    """Récapitulatif annuel : total_cessions = l. 51, net_plus_value = l. 52, PFU selon l'année des revenus.
+
+    exempt : total des prix de cession inférieur ou égal à 305 € (art. 150 VH bis II-B), PFU nul.
+    """
+
     year: int
     total_cessions: float
     total_acquisitions_fraction: float
@@ -59,18 +67,44 @@ class TaxSummary2086:
     nb_cessions: int
     nb_court_terme: int
     nb_long_terme: int
-    flat_tax_30: float
-    ir_12_8: float
-    ps_17_2: float
+    pfu_total: float
+    pfu_ir: float
+    pfu_ps: float
+    exempt: bool = False
     events: list[TaxEvent2086] = field(default_factory=list)
+    rates: PfuRates = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.rates = pfu_rates(self.year)
+
+    @property
+    def taxable_plus_value(self) -> float:
+        """Base du PFU : plus-value nette positive d'une année non exonérée."""
+        return 0.0 if self.exempt else max(0.0, self.net_plus_value)
+
+    @property
+    def flat_tax_30(self) -> float:
+        """Alias déprécié de pfu_total, gardé pour l'API et les scripts : le taux n'est plus 30 % dès 2025."""
+        return self.pfu_total
+
+    @property
+    def ir_12_8(self) -> float:
+        """Alias déprécié de pfu_ir."""
+        return self.pfu_ir
+
+    @property
+    def ps_17_2(self) -> float:
+        """Alias déprécié de pfu_ps : les prélèvements sociaux sont à 18,6 % dès les revenus 2025."""
+        return self.pfu_ps
 
 
 @dataclass(frozen=True)
 class TaxMode:
-    """Rejeu fiscal : TAX_MODE corrige les quatre divergences accidentelles que TAX_MODE_LEGACY fige pour comparaison.
+    """Rejeu fiscal : TAX_MODE corrige les divergences accidentelles du rejeu que TAX_MODE_LEGACY fige pour comparaison.
 
     Legacy : ordre SQL brut au lieu de TRANSFER_OUT avant TRANSFER_IN simultané, pas de repli external_id pour les
-    conversions, frais réseau des transferts non rognés, CONVERSION_OUT non apparié consommé et taxé (pas de sursis).
+    conversions, frais réseau des transferts non rognés, CONVERSION_OUT non apparié consommé. Le 2086 ne dépend plus
+    des couches FIFO (seulement la durée de détention indicative) : les deux modes ne diffèrent que par l'ordre.
     """
 
     config: replay_config.ReplayConfig
@@ -99,176 +133,102 @@ TAX_MODE = _tax_mode(converged=True)
 
 
 def _empty_summary(year: int) -> TaxSummary2086:
-    return TaxSummary2086(year, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [])
+    return TaxSummary2086(year, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 
 @dataclass
-class _CessionLedger:
-    year_start: datetime
+class _Operations2086:
+    """Achats et ventes jusqu'à la fin de l'année, dans l'ordre du rejeu ; les conversions sont en sursis."""
+
     year_end: datetime
-    total_acquisition_cost: Decimal = _ZERO
-    events: list[TaxEvent2086] = field(default_factory=list)
-    cession_dates: set[date] = field(default_factory=set)
+    steps: list[replay_config.ReplayEvent] = field(default_factory=list)
 
     def on_event(self, ev: replay_config.ReplayEvent) -> None:
+        if ev.kind in ("BUY", "SELL") and ev.tx_dt is not None and ev.tx_dt <= self.year_end:
+            self.steps.append(ev)
+
+    def cession_days(self) -> set[date]:
+        return {cast(datetime, ev.tx_dt).date() for ev in self.steps if ev.kind == "SELL"}
+
+
+def _event(ev: replay_config.ReplayEvent, tx_dt: datetime, lines: CessionLines) -> TaxEvent2086:
+    tx = cast(Transaction, ev.tx)
+    long_term = ev.oldest_acquired_at and (tx_dt - ev.oldest_acquired_at).days >= _LONG_TERM_DAYS
+    return TaxEvent2086(
+        date=cast(datetime, tx.executed_at),
+        symbol=ev.symbol,
+        event_type=tx.transaction_type.value,
+        quantity=float(ev.quantity),
+        unit_price=float(ev.price),
+        cession_price=float(lines.net_price),
+        portfolio_value=float(lines.portfolio_value),
+        total_acquisition_cost=float(lines.net_acquisition_cost),
+        acquisition_fraction=float(lines.fraction),
+        gain_loss=float(lines.gain),
+        holding_period="long_terme" if long_term else "court_terme",
+        fees=float(ev.fee),
+        gross_cession_price=float(lines.gross_price),
+        acquisition_cost_gross=float(lines.acquisition_cost_gross),
+        prior_fractions=float(lines.prior_fractions),
+    )
+
+
+def _settle(
+    ops: _Operations2086, holdings: dict[uuid.UUID, Holdings], prices: PriceCache, year_start: datetime
+) -> list[TaxEvent2086]:
+    ledger = PortfolioLedger()
+    events: list[TaxEvent2086] = []
+    for ev in ops.steps:
         if ev.kind == "BUY":
-            self.total_acquisition_cost += ev.total_cost
-            return
-        if ev.kind == "CONVERSION_IN_FEE":
-            self.total_acquisition_cost += ev.fee
-            return
-        if ev.kind not in ("SELL", "CONVERSION_OUT"):
-            return
-        self.total_acquisition_cost -= ev.cost_removed
-        if ev.kind == "CONVERSION_OUT":
-            self.total_acquisition_cost += ev.dest_cost
+            ledger.acquire(ev.total_cost)
+            continue
         tx_dt = cast(datetime, ev.tx_dt)
-        if self.year_start <= tx_dt <= self.year_end:
-            self.cession_dates.add(tx_dt.date())
-            self.events.append(self._event(ev, tx_dt))
-
-    def _event(self, ev: replay_config.ReplayEvent, tx_dt: datetime) -> TaxEvent2086:
-        tx = cast(Transaction, ev.tx)
-        cession_price = ev.quantity * ev.price - ev.fee
-        long_term = ev.oldest_acquired_at and (tx_dt - ev.oldest_acquired_at).days >= _LONG_TERM_DAYS
-        return TaxEvent2086(
-            date=cast(datetime, tx.executed_at),
-            symbol=ev.symbol,
-            event_type=tx.transaction_type.value,
-            quantity=float(ev.quantity),
-            unit_price=float(ev.price),
-            cession_price=float(cession_price),
-            portfolio_value=0.0,
-            total_acquisition_cost=float(self.total_acquisition_cost),
-            acquisition_fraction=0.0,
-            gain_loss=0.0,
-            holding_period="long_terme" if long_term else "court_terme",
-            fees=float(ev.fee),
-        )
-
-
-def _apply_holding(holdings: dict[str, Decimal], ttype: TransactionType, sym: str, qty: Decimal) -> None:
-    if ttype in _HOLDING_IN:
-        holdings[sym] += qty
-    elif ttype in _HOLDING_OUT:
-        holdings[sym] = max(_ZERO, holdings[sym] - qty)
-
-
-def _portfolio_value(
-    holdings: dict[str, Decimal], sym: str, tx: Transaction, day_prices: dict[str, Decimal]
-) -> Decimal:
-    portfolio_value = _ZERO
-    for held_sym, held_qty in holdings.items():
-        if held_qty > _ZERO:
-            if held_sym == sym:
-                sell_fx = Decimal(str(tx.conversion_rate)) if tx.conversion_rate else Decimal("1")
-                portfolio_value += held_qty * Decimal(str(tx.price or 0)) * sell_fx
-            else:
-                hist_price = day_prices.get(held_sym.upper(), _ZERO)
-                portfolio_value += held_qty * hist_price
-    return portfolio_value
-
-
-def _apply_2086_formula(ev: TaxEvent2086, portfolio_value: Decimal) -> None:
-    cession_d = Decimal(str(ev.cession_price))
-    total_acq_d = Decimal(str(ev.total_acquisition_cost))
-    acq_fraction = float(total_acq_d * cession_d / portfolio_value) if portfolio_value > 0 else 0.0
-    ev.portfolio_value = float(portfolio_value)
-    ev.acquisition_fraction = acq_fraction
-    ev.gain_loss = ev.cession_price - acq_fraction
-
-
-def _fill_portfolio_values(
-    replay_txs: list[Transaction], asset_map: dict[uuid.UUID, Asset], ledger: _CessionLedger, price_cache: PriceCache
-) -> None:
-    holdings: dict[str, Decimal] = defaultdict(lambda: _ZERO)
-    events = ledger.events
-    event_idx = 0
-    for tx in replay_txs:
-        asset = asset_map.get(tx.asset_id)
-        if not asset or not tx.executed_at:
-            continue
-        sym = asset.symbol.upper()
-        tx_dt = tx.executed_at
-        if tx_dt.tzinfo is None:
-            tx_dt = tx_dt.replace(tzinfo=UTC)
-        _apply_holding(holdings, tx.transaction_type, sym, Decimal(str(tx.quantity)))
-        is_in_year = ledger.year_start <= tx_dt <= ledger.year_end
-        is_taxable = tx.transaction_type in _TAXABLE
-        if not (is_in_year and is_taxable and event_idx < len(events)):
-            continue
-        ev = events[event_idx]
-        if ev.date == tx.executed_at and ev.symbol == sym:
-            _apply_2086_formula(ev, _portfolio_value(holdings, sym, tx, price_cache.get(tx_dt.date(), {})))
-            event_idx += 1
+        before = holdings.get(cast(Transaction, ev.tx).id, {})
+        value = portfolio_value(before, ev.symbol, ev.price, prices.get(tx_dt.date(), {}))
+        lines = ledger.cede(ev.quantity * ev.price, ev.fee, value)
+        if tx_dt >= year_start:
+            events.append(_event(ev, tx_dt, lines))
+    return events
 
 
 def _summarize(year: int, events: list[TaxEvent2086]) -> TaxSummary2086:
     total_cessions = sum(e.cession_price for e in events)
-    total_acq_fraction = sum(e.acquisition_fraction for e in events)
     total_pv = sum(e.gain_loss for e in events if e.gain_loss > 0)
     total_mv = sum(e.gain_loss for e in events if e.gain_loss < 0)
     net_pv = total_pv + total_mv
-    nb_ct = sum(1 for e in events if e.holding_period == "court_terme")
-    nb_lt = sum(1 for e in events if e.holding_period == "long_terme")
-    taxable = max(0.0, net_pv)
-    ir = taxable * 0.128
-    ps = taxable * 0.172
-    flat_tax = ir + ps
+    exempt = Decimal(str(total_cessions)).quantize(_CENT) <= EXEMPTION_THRESHOLD
+    rates = pfu_rates(year)
+    taxable = Decimal("0") if exempt else max(Decimal("0"), Decimal(str(net_pv)))
+    ir, ps = taxable * rates.ir, taxable * rates.ps
     return TaxSummary2086(
         year=year,
         total_cessions=total_cessions,
-        total_acquisitions_fraction=total_acq_fraction,
+        total_acquisitions_fraction=sum(e.acquisition_fraction for e in events),
         total_plus_values=total_pv,
         total_moins_values=total_mv,
         net_plus_value=net_pv,
         nb_cessions=len(events),
-        nb_court_terme=nb_ct,
-        nb_long_terme=nb_lt,
-        flat_tax_30=flat_tax,
-        ir_12_8=ir,
-        ps_17_2=ps,
+        nb_court_terme=sum(1 for e in events if e.holding_period == "court_terme"),
+        nb_long_terme=sum(1 for e in events if e.holding_period == "long_terme"),
+        pfu_total=float(ir + ps),
+        pfu_ir=float(ir),
+        pfu_ps=float(ps),
+        exempt=exempt and bool(events),
         events=events,
     )
 
 
 class TaxMixin:
-    async def _get_historical_prices(
-        self, db: AsyncSession, symbols: list[str], price_date: date
-    ) -> dict[str, Decimal]:
-        if not symbols:
-            return {}
-        history = AssetPriceHistory
-        result = await db.execute(
-            select(history.symbol, history.price_eur).where(
-                history.symbol.in_(symbols), history.price_date == price_date
-            )
-        )
-        prices: dict[str, Decimal] = {row[0].upper(): Decimal(str(row[1])) for row in result.all()}
-        missing = [s for s in symbols if s.upper() not in prices]
-        if missing:
-            fallback_start = price_date - timedelta(days=7)
-            fb_result = await db.execute(
-                select(history.symbol, history.price_eur, history.price_date)
-                .where(history.symbol.in_(missing), history.price_date.between(fallback_start, price_date))
-                .order_by(history.symbol, history.price_date.desc())
-            )
-            seen: set[str] = set()
-            for row in fb_result.all():
-                sym_upper = row[0].upper()
-                if sym_upper not in seen:
-                    prices[sym_upper] = Decimal(str(row[1]))
-                    seen.add(sym_upper)
-        return prices
-
     async def compute_tax_2086(
         self, db: AsyncSession, user_id: str, year: int, *, mode: TaxMode = TAX_MODE
     ) -> TaxSummary2086:
-        """Plus-values crypto selon le 2086 (art. 150 VH bis CGI), rejeu FIFO de toutes les années.
+        """Plus-values crypto de `year` selon le 2086 (art. 150 VH bis CGI), méthode du portefeuille.
 
-        PV = prix de cession - coût total d'acquisition * prix de cession / valeur du portefeuille, où le coût cumule
-        achats et coût reporté des conversions (hors transferts) et la valeur du portefeuille vient des cours
-        historiques en EUR du jour de cession (repli jusqu'à 7 jours avant). Long terme à partir de 730 jours.
+        Rejoue toutes les transactions crypto depuis l'origine : les achats en euros alimentent le prix total
+        d'acquisition, chaque vente (années antérieures comprises) en retire sa fraction de capital initial, et les
+        conversions crypto → crypto, stablecoins compris, sont en sursis (sans soulte, ni cession ni effet sur le
+        PTA). Exonération si les prix de cession nets de l'année n'excèdent pas 305 €. La durée de détention (FIFO,
+        730 jours) est indicative : le régime ne distingue pas court et long terme.
         """
         result = await db.execute(select(Portfolio).where(Portfolio.user_id == user_id))
         portfolio_ids = [p.id for p in result.scalars().all()]
@@ -276,25 +236,20 @@ class TaxMixin:
             return _empty_summary(year)
         asset_result = await db.execute(select(Asset).where(Asset.portfolio_id.in_(portfolio_ids)))
         crypto_assets = [a for a in asset_result.scalars().all() if a.asset_type == AssetType.CRYPTO]
-        crypto_asset_ids = [a.id for a in crypto_assets]
-        if not crypto_asset_ids:
+        if not crypto_assets:
             return _empty_summary(year)
         asset_map = {a.id: a for a in crypto_assets}
         aid_to_symbol: dict[str, str] = {str(a.id): a.symbol.upper() for a in crypto_assets}
         trans_result = await db.execute(
-            select(Transaction)
-            .where(Transaction.asset_id.in_(crypto_asset_ids))
-            .order_by(Transaction.executed_at.asc())
+            select(Transaction).where(Transaction.asset_id.in_(list(asset_map))).order_by(Transaction.executed_at.asc())
         )
         all_transactions = list(trans_result.scalars().all())
         replay_txs = sort_transactions(all_transactions) if mode.canonical_sort else all_transactions
 
-        ledger = _CessionLedger(datetime(year, 1, 1, tzinfo=UTC), datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC))
-        replay(replay_txs, aid_to_symbol, mode.config, on_event=ledger.on_event)
-
-        all_symbols_ever = set(aid_to_symbol.values())
-        price_cache: PriceCache = {}
-        for d in ledger.cession_dates:
-            price_cache[d] = await self._get_historical_prices(db, list(all_symbols_ever), d)
-        _fill_portfolio_values(replay_txs, asset_map, ledger, price_cache)
-        return _summarize(year, ledger.events)
+        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC)
+        ops = _Operations2086(year_end)
+        replay(replay_txs, aid_to_symbol, mode.config, on_event=ops.on_event)
+        prices = await historical_prices(db, aid_to_symbol.values(), ops.cession_days())
+        holdings = holdings_before_sales(replay_txs, asset_map, year_end)
+        events = _settle(ops, holdings, prices, datetime(year, 1, 1, tzinfo=UTC))
+        return _summarize(year, events)

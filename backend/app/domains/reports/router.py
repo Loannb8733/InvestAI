@@ -20,6 +20,7 @@ from app.domains.reports.schemas import RebalancingRequest
 from app.domains.reports.service import report_service
 from app.domains.reports.tax_excel import render_tax_excel
 from app.domains.reports.tax_pdf import render_tax_pdf
+from app.domains.reports.tax_rates import EXEMPTION_THRESHOLD
 from app.domains.reports.transactions_export import (
     render_transactions_csv,
     render_transactions_excel,
@@ -93,6 +94,7 @@ def _rebalancing_payload(report: RebalancingReport) -> dict[str, Any]:
         "total_estimated_tax": report.total_estimated_tax,
         "hhi_before": report.hhi_before,
         "hhi_after": report.hhi_after,
+        "pfu_rate": report.pfu_rate,
     }
 
 
@@ -113,9 +115,10 @@ async def get_performance_report_excel(request: Request, user: CurrentUser, sess
 @router.get("/tax/{year}/summary", response_model=None)
 @limiter.limit("20/minute")
 async def get_tax_summary(request: Request, year: int, user: CurrentUser, session: Session) -> dict[str, Any]:
-    """Synthèse 2086 en JSON : vraie base imposable (acquisition globale, cessions crypto→fiat de l'année).
+    """Synthèse 2086 en JSON : méthode du portefeuille, cessions crypto→fiat de l'année, PFU de l'année.
 
-    Le détail des cessions est réservé au PDF.
+    Le détail des cessions est réservé au PDF. flat_tax_30, ir_12_8 et ps_17_2 sont des alias dépréciés de
+    pfu_total, pfu_ir et pfu_ps, gardés pour les clients existants : ils portent le taux de l'année, 31,4 % dès 2025.
     """
     if year < 2015 or year > datetime.now().year:
         year = datetime.now().year
@@ -128,9 +131,18 @@ async def get_tax_summary(request: Request, year: int, user: CurrentUser, sessio
         "total_plus_values": round(tax.total_plus_values, 2),
         "total_moins_values": round(tax.total_moins_values, 2),
         "net_plus_value": round(tax.net_plus_value, 2),
-        "flat_tax_30": round(tax.flat_tax_30, 2),
-        "ir_12_8": round(tax.ir_12_8, 2),
-        "ps_17_2": round(tax.ps_17_2, 2),
+        "taxable_plus_value": round(tax.taxable_plus_value, 2),
+        "exempt": tax.exempt,
+        "exemption_threshold": float(EXEMPTION_THRESHOLD),
+        "pfu_rate": float(tax.rates.total),
+        "pfu_ir_rate": float(tax.rates.ir),
+        "pfu_ps_rate": float(tax.rates.ps),
+        "pfu_total": round(tax.pfu_total, 2),
+        "pfu_ir": round(tax.pfu_ir, 2),
+        "pfu_ps": round(tax.pfu_ps, 2),
+        "flat_tax_30": round(tax.pfu_total, 2),
+        "ir_12_8": round(tax.pfu_ir, 2),
+        "ps_17_2": round(tax.pfu_ps, 2),
     }
 
 

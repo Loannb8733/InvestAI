@@ -286,17 +286,20 @@ class TestFiscalite:
         patrimoine["total_value"] = 40000.0
         patrimoine["aggregated_assets"] = [ligne("BTC", 40000.0, prix=40000.0)]
 
-        res = await report_service.get_rebalancing_report(
-            db_session, str(regular_user.id), {"L1": 0.5, "Stable": 0.5}, estimate_tax=True
-        )
+        import time_machine
+
+        with time_machine.travel(datetime(2026, 11, 18, 12, 0, tzinfo=UTC), tick=False):
+            res = await report_service.get_rebalancing_report(
+                db_session, str(regular_user.id), {"L1": 0.5, "Stable": 0.5}, estimate_tax=True
+            )
 
         # Céder 20 000 EUR au cours de 40 000 revient à vendre 0,5 BTC, dont la
         # couche FIFO coûte 20 000 : 0,5 x (40 000 - 20 000) = 10 000 EUR de
-        # plus-value, taxée à 30 %.
         vente = next(o for o in res.orders if o.action == "sell")
         assert vente.amount_eur == 20000.0
         assert res.total_estimated_gain == 10000.0
-        assert res.total_estimated_tax == 3000.0
+        assert res.total_estimated_tax == 3140.0
+        assert res.pfu_rate == 0.314
 
     async def test_sans_portefeuille_l_estimation_fiscale_ne_leve_pas(self, db_session, regular_user, patrimoine):
         # `estimate_tax=True` sur un utilisateur sans portefeuille en base :
