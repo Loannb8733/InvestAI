@@ -1131,11 +1131,6 @@ export const strategiesApi = {
     await api.delete(`/strategies/${id}`)
   },
 
-  aiSuggest: async () => {
-    const response = await api.post('/strategies/ai-suggest', {}, { timeout: 300000 }) // 5 min — fetches historical prices
-    return response.data
-  },
-
   accept: async (id: string) => {
     const response = await api.patch(`/strategies/${id}/accept`)
     return response.data

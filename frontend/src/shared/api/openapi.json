@@ -8809,38 +8809,6 @@
         ]
       }
     },
-    "/api/v1/strategies/ai-suggest": {
-      "post": {
-        "tags": [
-          "Strategies"
-        ],
-        "summary": "Ai Suggest Strategies",
-        "description": "Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.\nRépond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et\n``/from-template``.",
-        "operationId": "ai_suggest_strategies_api_v1_strategies_ai_suggest_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/StrategyResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Ai Suggest Strategies Api V1 Strategies Ai Suggest Post"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": true,
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/strategies/{strategy_id}/accept": {
       "patch": {
         "tags": [

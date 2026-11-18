@@ -2787,29 +2787,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/strategies/ai-suggest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Ai Suggest Strategies
-         * @deprecated
-         * @description Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.
-         *     Répond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et
-         *     ``/from-template``.
-         */
-        post: operations["ai_suggest_strategies_api_v1_strategies_ai_suggest_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/strategies/{strategy_id}/accept": {
         parameters: {
             query?: never;
@@ -12691,26 +12668,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    ai_suggest_strategies_api_v1_strategies_ai_suggest_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StrategyResponse"][];
                 };
             };
         };

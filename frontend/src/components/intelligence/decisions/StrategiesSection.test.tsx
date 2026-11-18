@@ -110,7 +110,6 @@ describe('Stratégies programmées', () => {
     expect(text).toContain('Stratégies programmées')
     expect(text).not.toMatch(/Stratégies IA|Analyser mon portefeuille|Propositions IA|Munitions|liquidités/)
     expect(screen.queryByRole('button', { name: /Accepter/ })).toBeNull()
-    expect(calls.some((c) => c.url.includes('ai-suggest'))).toBe(false)
   })
 
   it('affiche les anciennes suggestions sans leur analyse, et permet de les archiver', async () => {

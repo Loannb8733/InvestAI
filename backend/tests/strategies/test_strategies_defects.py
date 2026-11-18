@@ -38,7 +38,7 @@ async def test_an_unknown_action_status_is_rejected_as_invalid(client: AsyncClie
     assert response.status_code == 422
 
 
-async def test_suggest_no_longer_generates_anything_and_keeps_legacy_proposals(
+async def test_the_suggestion_route_is_gone_and_legacy_proposals_remain(
     client: AsyncClient, db_session: AsyncSession, regular_user: User
 ) -> None:
     with time_machine.travel(FROZEN_NOW, tick=False):
@@ -46,8 +46,7 @@ async def test_suggest_no_longer_generates_anything_and_keeps_legacy_proposals(
         proposed, _ = await seed_legacy_ai_strategies(db_session, regular_user)
         suggested = await client.post(f"{BASE}/ai-suggest", headers=headers)
         listed = (await client.get(BASE, headers=headers)).json()
-    assert suggested.status_code == 200
-    assert suggested.json() == []
+    assert suggested.status_code == 405
     assert [s["status"] for s in listed if s["id"] == str(proposed.id)] == ["PROPOSED"]
     assert len(listed) == 2
 

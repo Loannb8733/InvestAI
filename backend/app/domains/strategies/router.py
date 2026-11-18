@@ -226,15 +226,6 @@ async def create_strategy_from_template(
     return await _enrich(session, strategy)
 
 
-@router.post("/ai-suggest", response_model=list[StrategyResponse], deprecated=True)
-@limiter.limit("5/minute")
-async def ai_suggest_strategies(request: Request, user: CurrentUser, session: Session) -> list[dict[str, Any]]:
-    """Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.
-    Répond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et
-    ``/from-template``."""
-    return []
-
-
 @router.patch("/{strategy_id}/accept", response_model=StrategyResponse)
 @limiter.limit("10/minute")
 async def accept_strategy(request: Request, strategy_id: UUID, user: CurrentUser, session: Session) -> dict[str, Any]:

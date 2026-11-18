@@ -177,7 +177,6 @@ async def _legacy_flow(
     rec: _Recorder, headers: dict[str, str], other: dict[str, str], db: AsyncSession, user: User
 ) -> None:
     proposed, accepted = await seed_legacy_ai_strategies(db, user)
-    await rec.shot("ai_suggest", "POST", f"{BASE}/ai-suggest", headers)
     await rec.shot("legacy_list", "GET", BASE, headers)
     await rec.shot("legacy_performance", "GET", f"{BASE}/{accepted.id}/performance", headers)
     await rec.shot("accept", "PATCH", f"{BASE}/{proposed.id}/accept", headers)
