@@ -102,14 +102,23 @@ docker compose logs -f worker
 
 ## 8. Déploiement automatique
 
-À chaque CI verte sur `main`, `.github/workflows/deploy-oracle.yml` se connecte en SSH et lance `deploy.sh`. Clé
-dédiée au déploiement, sur ton PC :
+À chaque CI verte sur `main`, `.github/workflows/deploy-oracle.yml` se connecte en SSH et lance `deploy.sh` avec
+le commit dont la CI vient de passer, pas la tête de `main` : un merge plus récent peut avoir sa CI encore en cours.
+`deploy.sh` refuse un commit absent de `main` et ignore un commit plus ancien que celui en place (une CI qui finit
+en retard ne fait pas revenir en arrière). Lancé à la main sans argument, il prend la dernière version de `main`.
+
+Clé dédiée au déploiement, sur ton PC, autorisée sur la VM à lancer **uniquement** `deploy.sh` : si le secret
+GitHub fuitait, il ne donnerait pas de shell.
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/oracle_deploy -N "" -C github-deploy
-ssh-copy-id -i ~/.ssh/oracle_deploy.pub -o "IdentityFile ~/.ssh/oracle_investai" ubuntu@<IP>
+echo "command=\"bash /home/ubuntu/InvestAI/deploy/oracle/deploy.sh\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty $(cat ~/.ssh/oracle_deploy.pub)" \
+  | ssh -i ~/.ssh/oracle_investai ubuntu@<IP> 'cat >> ~/.ssh/authorized_keys'
 ssh-keyscan -t ed25519 <IP>
 ```
+
+Copier la clé privée pour le secret sans l'afficher, depuis WSL : `clip.exe < ~/.ssh/oracle_deploy`. Passer par
+PowerShell ajoute des fins de ligne Windows qui rendent la clé illisible.
 
 Dans GitHub, *Settings → Secrets and variables → Actions*, créer :
 
