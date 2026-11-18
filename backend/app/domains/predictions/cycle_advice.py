@@ -1,84 +1,83 @@
-from app.ml.regime.types import RegimeConfig
+"""Repères sur la phase de cycle, en information générale.
+
+Les textes décrivent la phase de marché et les comportements historiquement observés ; ils ne disent jamais quoi
+acheter, vendre ou à quel montant. Le champ ``action`` est un thème d'affichage (CONTEXTE, RISQUE, HISTORIQUE,
+CONCENTRATION), pas une consigne.
+"""
 
 Advice = dict[str, str]
 
 RISK_WEIGHT_CAP = 60.0
+
+CONCENTRATION = "CONCENTRATION"
+CONTEXT = "CONTEXTE"
+RISK = "RISQUE"
+HISTORY = "HISTORIQUE"
 
 
 def _concentration_warning(max_risk_weight: float) -> Advice:
     return {
         "title": "Concentration de risque élevée",
         "description": (
-            f"Un actif représente {max_risk_weight:.0f}% de votre risque total. "
-            "Tout achat supplémentaire sur cet actif augmenterait dangereusement "
-            "votre exposition. Privilégiez la diversification."
+            f"Un actif représente {max_risk_weight:.0f} % du risque total du portefeuille, au-delà du seuil de "
+            f"{RISK_WEIGHT_CAP:.0f} % : sa variation pèse davantage sur l'ensemble que celle de tous les autres "
+            "actifs réunis."
         ),
-        "action": "DIVERSIFIER",
+        "action": CONCENTRATION,
         "priority": "critical",
     }
 
 
-def _dca_hint(portfolio_value: float, risk_mult: float) -> str:
-    if portfolio_value <= 0:
-        return ""
-    low = round(portfolio_value * 0.02 * risk_mult, 2)
-    high = round(portfolio_value * 0.05 * risk_mult, 2)
-    return f" Montant suggéré par tranche : {low:.0f}–{high:.0f} € ({risk_mult:.1f}× régime)."  # noqa: RUF001
-
-
-def _bottom_advice(dca_hint: str) -> list[Advice]:
+def _bottom_advice() -> list[Advice]:
     return [
         {
-            "title": "Zone d'accumulation",
+            "title": "Phase de creux potentiel",
             "description": (
-                "Les indicateurs suggèrent un creux potentiel. C'est historiquement "
-                "le meilleur moment pour accumuler via DCA (achat périodique). "
-                "Ne tentez pas de timer le bottom exact — étalez vos achats." + dca_hint
+                "Les indicateurs (RSI, momentum, Fear & Greed) sont proches des niveaux observés lors des creux "
+                "passés. Un creux ne se confirme qu'a posteriori : la baisse peut se prolonger."
             ),
-            "action": "DCA",
+            "action": CONTEXT,
             "priority": "high",
         },
         {
-            "title": "Préparation au rebond",
+            "title": "Ce que montre l'historique",
             "description": (
-                "Identifiez les actifs de qualité qui ont le plus corrigé. "
-                "Préparez votre watchlist pour être prêt quand le rebond se confirme."
+                "Sur les cycles passés, les achats étalés dans le temps (DCA) en phase de creux ont lissé le prix "
+                "d'entrée. Les performances passées ne préjugent pas des performances futures."
             ),
-            "action": "RECHERCHE",
+            "action": HISTORY,
             "priority": "medium",
         },
     ]
 
 
-def _bearish_advice(dca_hint: str) -> list[Advice]:
+def _bearish_advice() -> list[Advice]:
     return [
         {
-            "title": "Zone d'accumulation — Be greedy when others are fearful",
+            "title": "Marché baissier",
             "description": (
-                "Marché baissier = opportunité d'accumulation ! "
-                "Les prix sont décotés, c'est historiquement le meilleur moment "
-                "pour construire son portefeuille via DCA/VCA agressif." + dca_hint
+                "La tendance de fond est baissière : prix sous leurs moyennes mobiles et momentum négatif. Les "
+                "rebonds y sont fréquents et souvent de courte durée."
             ),
-            "action": "DCA",
+            "action": CONTEXT,
             "priority": "high",
         },
         {
-            "title": "Évitez le levier",
+            "title": "Levier et liquidations",
             "description": (
-                "Accumulez avec du capital réel, jamais avec du levier. "
-                "Les liquidations en cascade amplifient les baisses en bear market."
+                "En marché baissier, les liquidations en cascade de positions à effet de levier amplifient les baisses."
             ),
-            "action": "RISQUE",
+            "action": RISK,
             "priority": "high",
         },
         {
-            "title": "VCA > DCA en bear market",
+            "title": "DCA et VCA : définitions",
             "description": (
-                "Le Value Cost Averaging (investir plus quand les prix baissent) "
-                "surperforme le DCA classique en marché volatile. "
-                "Augmentez vos montants d'achat quand les prix chutent davantage."
+                "Le DCA investit un montant fixe à intervalle régulier ; le VCA ajuste le montant pour suivre une "
+                "trajectoire de valeur cible, donc investit davantage quand les prix baissent. Le simulateur de "
+                "stratégies permet de tester ces règles avec vos propres paramètres."
             ),
-            "action": "VCA",
+            "action": HISTORY,
             "priority": "medium",
         },
     ]
@@ -87,28 +86,22 @@ def _bearish_advice(dca_hint: str) -> list[Advice]:
 def _top_advice() -> list[Advice]:
     return [
         {
-            "title": "Prise de profits",
+            "title": "Phase d'euphorie",
             "description": (
-                "Signes d'euphorie — prenez des profits partiels (20-30%). "
-                "Personne ne regrette d'avoir sécurisé des gains."
+                "Les indicateurs sont proches des niveaux observés lors des sommets passés (RSI élevé, Fear & Greed "
+                "en zone d'avidité). Un sommet ne se confirme qu'a posteriori."
             ),
-            "action": "VENDRE",
+            "action": CONTEXT,
             "priority": "high",
         },
         {
-            "title": "Stop-loss protecteurs",
+            "title": "Volatilité en sommet de cycle",
             "description": (
-                "Placez des stop-loss 10-15% sous le prix actuel pour protéger "
-                "vos positions restantes en cas de correction brutale."
+                "Historiquement, les corrections qui suivent les phases d'euphorie ont été rapides et profondes, "
+                "souvent de plus de 30 % sur les cryptoactifs."
             ),
-            "action": "PROTÉGER",
+            "action": RISK,
             "priority": "high",
-        },
-        {
-            "title": "N'achetez pas sur l'euphorie",
-            "description": "Quand tout le monde est euphorique, c'est le pire moment pour acheter. Résistez au FOMO.",
-            "action": "ATTENDRE",
-            "priority": "medium",
         },
     ]
 
@@ -116,31 +109,21 @@ def _top_advice() -> list[Advice]:
 def _bullish_advice() -> list[Advice]:
     return [
         {
-            "title": "Préparez la prise de profits",
+            "title": "Marché haussier",
             "description": (
-                "Tendance haussière — laissez courir vos positions mais "
-                "définissez VOS niveaux de sortie maintenant. "
-                '"Be fearful when others are greedy." Ne soyez pas le dernier à vendre.'
+                "La tendance de fond est haussière : prix au-dessus de leurs moyennes mobiles et momentum positif."
             ),
-            "action": "PLANIFIER",
+            "action": CONTEXT,
             "priority": "high",
         },
         {
-            "title": "Stop-loss progressifs",
+            "title": "Ce que montre l'historique",
             "description": (
-                "Remontez progressivement vos stop-loss pour verrouiller les gains. "
-                "Un trailing stop sous l'EMA-20 protège sans couper trop tôt."
+                "Les phases haussières se sont terminées par des corrections d'ampleur variable ; un repère comme "
+                "l'EMA-20 sert souvent à suivre la tendance. Les performances passées ne préjugent pas des "
+                "performances futures."
             ),
-            "action": "PROTÉGER",
-            "priority": "high",
-        },
-        {
-            "title": "Réduisez le DCA",
-            "description": (
-                "En marché haussier, les prix sont chers. Réduisez vos montants "
-                "d'achat réguliers et gardez du cash pour accumuler au prochain creux."
-            ),
-            "action": "ATTENDRE",
+            "action": HISTORY,
             "priority": "medium",
         },
     ]
@@ -149,21 +132,19 @@ def _bullish_advice() -> list[Advice]:
 def _neutral_advice() -> list[Advice]:
     return [
         {
-            "title": "Observation",
-            "description": (
-                "Tendance incertaine — attendez un signal plus clair avant de prendre de nouvelles positions."
-            ),
-            "action": "ATTENDRE",
+            "title": "Tendance incertaine",
+            "description": "Les indicateurs ne dégagent pas de tendance nette ; le régime de marché est indéterminé.",
+            "action": CONTEXT,
             "priority": "low",
         }
     ]
 
 
-def _phase_advice(regime: str, fear_greed: int | None, dca_hint: str) -> list[Advice]:
+def _phase_advice(regime: str, fear_greed: int | None) -> list[Advice]:
     if regime == "bottom" or (fear_greed and fear_greed < 20):
-        return _bottom_advice(dca_hint)
+        return _bottom_advice()
     if regime == "bearish":
-        return _bearish_advice(dca_hint)
+        return _bearish_advice()
     if regime == "top" or (fear_greed and fear_greed > 80):
         return _top_advice()
     if regime == "bullish":
@@ -178,10 +159,11 @@ def cycle_advice(
     portfolio_value: float = 0.0,
     max_risk_weight: float = 0.0,
 ) -> list[Advice]:
-    """Conseils de cycle : alerte si un actif dépasse 60 % du risque, tranches DCA de 2-5 % modulées par le régime."""
+    """Repères généraux sur la phase de cycle, précédés d'un constat si un actif dépasse 60 % du risque.
+
+    ``cycle_pos`` et ``portfolio_value`` sont conservés pour les appelants : aucun montant n'est plus calculé."""
     advice: list[Advice] = []
     if max_risk_weight > RISK_WEIGHT_CAP:
         advice.append(_concentration_warning(max_risk_weight))
-    risk_mult = RegimeConfig.from_regime(regime).risk_multiplier
-    advice.extend(_phase_advice(regime, fear_greed, _dca_hint(portfolio_value, risk_mult)))
+    advice.extend(_phase_advice(regime, fear_greed))
     return advice

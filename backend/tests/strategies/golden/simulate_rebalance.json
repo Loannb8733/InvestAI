@@ -1,0 +1,87 @@
+{
+  "body": {
+    "backtest": {
+      "available": true,
+      "benchmark_label": "Ne jamais rééquilibrer",
+      "benchmark_value_eur": 1647.02,
+      "end_date": "2026-10-17",
+      "events_planned": 3,
+      "events_simulated": 3,
+      "final_value_eur": 1647.02,
+      "invested_eur": 1300.0,
+      "missing_prices": 0,
+      "note": "Simulation passée : ce que la règle aurait donné sur l'historique de prix enregistré, aux clôtures journalières, sans frais ni fiscalité. Elle n'a aucune valeur prédictive.",
+      "pnl_eur": 347.02,
+      "pnl_pct": 26.69,
+      "reason": null,
+      "start_date": "2026-01-01",
+      "trades": [
+        {
+          "action": "BUY",
+          "amount": 780.0,
+          "date": "2026-01-01",
+          "price": 44235.3697,
+          "symbol": "BTC"
+        },
+        {
+          "action": "BUY",
+          "amount": 520.0,
+          "date": "2026-01-01",
+          "price": 2637.5398,
+          "symbol": "ETH"
+        }
+      ],
+      "trades_truncated": false,
+      "withdrawn_eur": 0.0
+    },
+    "disclaimer": "Simulation calculée uniquement à partir des paramètres que vous avez saisis. Ce n'est pas un conseil en investissement ni une recommandation personnalisée : InvestAI ne choisit ni les actifs, ni les montants, ni le moment d'agir. Les performances passées ne préjugent pas des performances futures.",
+    "has_amounts_at_execution": false,
+    "rule_summary": "Rééquilibrage vers BTC 60 % · ETH 40 %, revue chaque trimestre, 3 échéances à partir du 01/11/2026, seuil d'écart 5 point(s), apport de 100,00 € à répartir.",
+    "schedule": [
+      {
+        "action": "SELL",
+        "amount": 120.0,
+        "date": "2026-11-01",
+        "note": "Revue 1/3 : ramener BTC de 75 % à 60 %, vendre 120,00 €",
+        "quantity": null,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 220.0,
+        "date": "2026-11-01",
+        "note": "Revue 1/3 : ramener ETH de 25 % à 40 %, acheter 220,00 €",
+        "quantity": null,
+        "symbol": "ETH",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "REVIEW",
+        "amount": null,
+        "date": "2027-02-01",
+        "note": "Revue 2/3 : comparer l'allocation à la cible et rééquilibrer si un écart dépasse 5 point(s)",
+        "quantity": null,
+        "symbol": null,
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "REVIEW",
+        "amount": null,
+        "date": "2027-05-01",
+        "note": "Revue 3/3 : comparer l'allocation à la cible et rééquilibrer si un écart dépasse 5 point(s)",
+        "quantity": null,
+        "symbol": null,
+        "target_value": null,
+        "trigger_price": null
+      }
+    ],
+    "template": "rebalance",
+    "total_buy_eur": 220.0,
+    "total_sell_eur": 120.0
+  },
+  "status": 200
+}

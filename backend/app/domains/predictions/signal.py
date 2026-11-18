@@ -22,18 +22,11 @@ def _target(alpha_data: dict[str, Any], symbol: str | None) -> dict[str, Any]:
     return top
 
 
-def _strategy_row(strategy_data: dict[str, Any], symbol: str, action: str | None) -> tuple[str, float, str]:
-    effective_action = action if action else "OBSERVER"
-    impact_pct = 0.0
-    regime = "unknown"
+def _strategy_row(strategy_data: dict[str, Any], symbol: str) -> tuple[str, str]:
     for row in strategy_data.get("rows", []):
         if row["symbol"] == symbol:
-            if not action:
-                effective_action = row["action"]
-            impact_pct = row["impact_pct"]
-            regime = row["regime"]
-            break
-    return effective_action, impact_pct, regime
+            return row.get("tone", "neutre"), row["regime"]
+    return "neutre", "unknown"
 
 
 def _risk_label(ruin_delta: float) -> str:
@@ -52,22 +45,6 @@ def _btc_correlation(top: dict[str, Any]) -> float | None:
             if match:
                 return float(match.group())
             return None
-    return None
-
-
-def _rebalance_suggestion(
-    alpha_data: dict[str, Any], symbol: str, order_eur: float, new_weight: float
-) -> dict[str, Any] | None:
-    if new_weight > 60:
-        all_scores = alpha_data.get("all_scores", [])
-        candidates = [s for s in all_scores if s["symbol"] != symbol and s.get("value", 0) > 0]
-        if candidates:
-            worst = min(candidates, key=lambda s: s.get("score", 100))
-            return {
-                "trim_symbol": worst["symbol"],
-                "trim_eur": round(order_eur * 0.5, 2),
-                "reason": f"Réduire {worst['symbol']} (score {worst.get('score', 0):.0f}) pour financer l'achat",
-            }
     return None
 
 
@@ -102,44 +79,41 @@ async def _monte_carlo_pair(
 
 
 async def validate_top_alpha(
-    db: AsyncSession, user_id: str, alpha_data: dict[str, Any], symbol: str | None, action: str | None
+    db: AsyncSession, user_id: str, alpha_data: dict[str, Any], symbol: str | None, amount_eur: float = 0.0
 ) -> dict[str, Any]:
-    """Valide le signal alpha (ou l'actif demandé) : ordre suggéré par la matrice de stratégie, probabilité de ruine
-    Monte-Carlo avant et après l'achat, poids post-achat et écart au total du dashboard."""
+    """Simule l'effet d'un achat hypothétique dont l'utilisateur fixe le montant : probabilité de ruine Monte-Carlo
+    avant et après, poids post-achat et concentration. Aucun montant n'est proposé et aucun achat n'est validé ni
+    recommandé ; sans montant, seul l'état actuel est simulé."""
     top = _target(alpha_data, symbol)
     symbol = top["symbol"]
     total_value = alpha_data.get("total_portfolio_value", 0)
     concentration_risk = alpha_data.get("concentration_risk", False)
 
     strategy_data = await prediction_service.get_strategy_map(db, user_id)
-    action, impact_pct, regime = _strategy_row(strategy_data, symbol, action)
+    tone, regime = _strategy_row(strategy_data, symbol)
 
-    order_eur = round(total_value * abs(impact_pct) / 100, 2) if total_value > 0 else 0.0
+    amount = round(max(amount_eur, 0.0), 2)
     current_weight = top.get("weight_pct", 0)
     current_value = top.get("value", 0)
-    new_weight = round((current_value + order_eur) / (total_value + order_eur) * 100, 1) if total_value > 0 else 0
+    new_weight = round((current_value + amount) / (total_value + amount) * 100, 1) if total_value > 0 else 0
     weight_overflow = bool(new_weight > 50)
 
-    mc_before, mc_after = await _monte_carlo_pair(db, user_id, symbol, order_eur)
+    mc_before, mc_after = await _monte_carlo_pair(db, user_id, symbol, amount)
     prob_ruin_before = mc_before.prob_ruin
     prob_ruin_after = mc_after.prob_ruin
     btc_correlation = _btc_correlation(top)
-    rebalance_suggestion = _rebalance_suggestion(alpha_data, symbol, order_eur, new_weight)
 
     cycle_data = await prediction_service.get_market_cycle(db, user_id)
     dashboard_total = sum(a.get("value", 0) for a in cycle_data.get("per_asset", []))
 
-    score = top.get("score", 0)
     return {
-        "validated": bool(score > 85 and impact_pct > 0 and not weight_overflow),
         "symbol": symbol,
-        "score": round(score, 1),
+        "score": round(top.get("score", 0), 1),
         "predicted_7d_pct": top.get("predicted_7d_pct", 0),
         "prediction_source": top.get("prediction_source", "none"),
         "regime": regime,
-        "action": action,
-        "order_eur": order_eur,
-        "impact_pct": impact_pct,
+        "tone": tone,
+        "amount_eur": amount,
         "current_weight_pct": current_weight,
         "post_purchase_weight_pct": new_weight,
         "weight_overflow": weight_overflow,
@@ -155,5 +129,4 @@ async def validate_top_alpha(
         "ecart_eur": round(abs(total_value - dashboard_total), 2),
         "reasons": top.get("reasons", []),
         "divergence_log": top.get("divergence_log"),
-        "rebalance_suggestion": rebalance_suggestion,
     }

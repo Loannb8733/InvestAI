@@ -10,6 +10,7 @@
       "market_regime": null,
       "name": "Vide",
       "params": {},
+      "rule_summary": null,
       "source": "USER",
       "status": "ACTIVE",
       "updated_at": "<volatile>",
@@ -54,6 +55,7 @@
       "params": {
         "frequency": "weekly"
       },
+      "rule_summary": null,
       "source": "USER",
       "status": "PAUSED",
       "updated_at": "<volatile>",

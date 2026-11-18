@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "alert_type": "CYCLE_INSIGHT",
+    "chat_id": "4242",
+    "message": "🎯 <b>Marché haussier</b>\n\nLa tendance de fond est haussière : prix au-dessus de leurs moyennes mobiles et momentum positif.\n\n📊 Régime: <b>bullish</b>\n\n<i>Information générale, pas un conseil en investissement.</i>",
+    "priority": "normal",
+    "symbol": "MARKET",
+    "user_id": "<id-0>"
+  }
+]

@@ -1,11 +1,9 @@
 """Tests de polyvalence face aux cycles de marché.
 
-Vérifie que le système produit les bonnes actions selon le régime :
-1. Bull market (EMA+5%, RSI 60) → markup → MAINTENIR
-2. Bear market → gold bonus +10, bot messages adaptées
-3. RSI > 80 → PRENDRE PROFITS même en plein bull run
-4. DCA amounts cohérents avec le capital
-5. Telegram alert tone adapté au régime
+Vérifie que le système lit correctement le régime :
+1. Bull market (EMA+5%, RSI 60) → markup → lecture neutre
+2. Bear market → gold bonus +10
+3. RSI > 80 → sommet → lecture défavorable même en plein bull run
 """
 
 import numpy as np
@@ -94,49 +92,17 @@ class TestBullMarketRegimeDetection:
 
 
 class TestBullMarketStrategyMatrix:
-    """In mark-up phase, strategy should be MAINTENIR (let profits run)."""
+    """In mark-up phase, every alpha level reads neutral: the trend is described, no hold/sell instruction."""
 
-    def test_high_alpha_markup_is_maintenir(self):
-        action, desc, impact = STRATEGY_MATRIX[("high", "markup")]
-        assert action == "MAINTENIR"
-        assert impact == 0.0
+    @pytest.mark.parametrize("level", ["high", "medium", "low"])
+    def test_markup_reads_neutral(self, level):
+        tone, _ = STRATEGY_MATRIX[(level, "markup")]
+        assert tone == "neutre"
 
-    def test_medium_alpha_markup_is_maintenir(self):
-        action, desc, impact = STRATEGY_MATRIX[("medium", "markup")]
-        assert action == "MAINTENIR"
-        assert impact == 0.0
-
-    def test_low_alpha_markup_is_conserver(self):
-        action, desc, impact = STRATEGY_MATRIX[("low", "markup")]
-        assert action == "CONSERVER"
-
-    def test_high_alpha_bullish_compat_is_maintenir(self):
-        """Backward-compat: bullish (4-phase) → MAINTENIR."""
-        action, desc, impact = STRATEGY_MATRIX[("high", "bullish")]
-        assert action == "MAINTENIR"
-
-
-class TestDCAAmountsCoherence:
-    """DCA amounts should be 2-5% of portfolio value."""
-
-    @pytest.mark.parametrize("portfolio_value", [500, 1296, 10_000, 100_000])
-    def test_dca_range_is_2_to_5_percent(self, portfolio_value):
-        low = round(portfolio_value * 0.02, 2)
-        high = round(portfolio_value * 0.05, 2)
-        # DCA should never be negative
-        assert low > 0
-        assert high > low
-        # DCA should be proportional to portfolio
-        assert low == pytest.approx(portfolio_value * 0.02, abs=0.01)
-        assert high == pytest.approx(portfolio_value * 0.05, abs=0.01)
-
-    def test_dca_1296_eur_portfolio(self):
-        """Example: 1296€ portfolio → DCA = 25.92€ - 64.80€."""
-        pv = 1296.0
-        low = round(pv * 0.02, 2)
-        high = round(pv * 0.05, 2)
-        assert low == pytest.approx(25.92, abs=0.01)
-        assert high == pytest.approx(64.80, abs=0.01)
+    def test_high_alpha_bullish_compat_reads_neutral(self):
+        """Backward-compat: bullish (4-phase) → neutral reading."""
+        tone, _ = STRATEGY_MATRIX[("high", "bullish")]
+        assert tone == "neutre"
 
 
 # ── Point 2: Safe Haven Adjustment ──────────────────────────────
@@ -223,14 +189,9 @@ class TestRSIOverboughtTakesProfits:
         # RSI should be elevated (we're testing the general concept)
         assert rsi > 65, f"Overbought prices should have high RSI, got {rsi:.1f}"
 
-    def test_strategy_matrix_top_takes_profits(self):
-        """Regardless of bull run, top/topping → PRENDRE PROFITS or ALLÉGER."""
-        for phase in ("top", "topping"):
-            action, desc, impact = STRATEGY_MATRIX.get(("high", phase), ("UNKNOWN", "", 0))
-            assert "PROFIT" in action or "ALLÉGER" in action, f"High alpha + {phase} should take profits, got {action}"
-
-    def test_low_alpha_top_is_vendre(self):
-        """Low alpha at top → VENDRE (strongest sell signal)."""
-        for phase in ("top", "topping"):
-            action, desc, impact = STRATEGY_MATRIX.get(("low", phase), ("UNKNOWN", "", 0))
-            assert action == "VENDRE", f"Low alpha + {phase} should be VENDRE, got {action}"
+    def test_strategy_matrix_top_reads_unfavorable(self):
+        """Regardless of alpha, top/topping reads unfavorable."""
+        for level in ("high", "low"):
+            for phase in ("top", "topping"):
+                tone, _ = STRATEGY_MATRIX.get((level, phase), ("UNKNOWN", ""))
+                assert tone == "défavorable", f"{level} alpha + {phase} should read unfavorable, got {tone}"

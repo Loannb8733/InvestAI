@@ -513,7 +513,7 @@ export const predictionsApi = {
     return response.data
   },
 
-  validateSignal: async (params?: { symbol?: string; action?: string }) => {
+  validateSignal: async (params: { symbol?: string; amount_eur: number }) => {
     const response = await api.get('/predictions/validate-signal', {
       params,
       timeout: ANALYTICS_TIMEOUT,
@@ -1129,11 +1129,6 @@ export const strategiesApi = {
 
   delete: async (id: string) => {
     await api.delete(`/strategies/${id}`)
-  },
-
-  aiSuggest: async () => {
-    const response = await api.post('/strategies/ai-suggest', {}, { timeout: 300000 }) // 5 min — fetches historical prices
-    return response.data
   },
 
   accept: async (id: string) => {

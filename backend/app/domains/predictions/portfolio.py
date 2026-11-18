@@ -2,13 +2,15 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.portfolio.classification import is_stablecoin
 from app.domains.portfolio.models import Asset
 from app.domains.predictions.core import held_assets, user_portfolio_ids
 from app.domains.predictions.forecast import ForecastMixin
-from app.domains.predictions.levels import reliability_from_ensemble
+from app.domains.predictions.levels import measured_reliability, skill_from_ensemble
+from app.domains.predictions.models import PredictionLog
 from app.domains.predictions.types import PricePrediction
 from app.ml import adaptive_thresholds as at
 
@@ -45,12 +47,32 @@ def _merged_by_symbol(raw_assets: Sequence[Asset]) -> tuple[list[Asset], dict[st
     return list(asset_map.values()), quantity_map
 
 
-def _model_confidence(reliability_score: float) -> str:
-    if reliability_score >= 60:
-        return "useful"
-    if reliability_score >= 40:
-        return "uncertain"
-    return "unreliable"
+Accuracy = tuple[int, int, float | None]
+
+
+async def _measured_accuracy(db: AsyncSession, symbols: list[str], days_ahead: int) -> dict[str, Accuracy]:
+    """(vérifiées, direction juste, MAPE moyen) des prévisions passées à cet horizon, par symbole."""
+    if not symbols:
+        return {}
+    query = (
+        select(
+            PredictionLog.symbol,
+            func.count(),
+            func.sum(case((PredictionLog.direction_correct.is_(True), 1), else_=0)),
+            func.avg(PredictionLog.mape),
+        )
+        .where(
+            PredictionLog.symbol.in_(symbols),
+            PredictionLog.horizon_days == days_ahead,
+            PredictionLog.accuracy_checked.isnot(None),
+            PredictionLog.direction_correct.isnot(None),
+        )
+        .group_by(PredictionLog.symbol)
+    )
+    rows = (await db.execute(query)).all()
+    return {
+        sym: (int(n), int(correct or 0), float(mape) if mape is not None else None) for sym, n, correct, mape in rows
+    }
 
 
 def _final_price(prediction: PricePrediction) -> float:
@@ -58,7 +80,7 @@ def _final_price(prediction: PricePrediction) -> float:
     return price
 
 
-def _asset_entry(asset: Asset, prediction: PricePrediction) -> dict[str, Any]:
+def _asset_entry(asset: Asset, prediction: PricePrediction, accuracy: Accuracy) -> dict[str, Any]:
     predicted_price = _final_price(prediction)
     change_percent = (
         ((predicted_price - prediction.current_price) / prediction.current_price * 100)
@@ -66,8 +88,6 @@ def _asset_entry(asset: Asset, prediction: PricePrediction) -> dict[str, Any]:
         else 0.0
     )
     models_detail = prediction.models_detail or []
-    skill_score, hit_rate, hit_rate_n, hit_rate_significant = reliability_from_ensemble(models_detail, prediction.trend)
-    reliability_score = round(min(skill_score * 0.6 + hit_rate * 0.4, 95.0), 1)
     models_agree = len({m.get("trend", "neutral") for m in models_detail}) == 1 if len(models_detail) >= 2 else True
     return {
         "symbol": asset.symbol,
@@ -83,12 +103,8 @@ def _asset_entry(asset: Asset, prediction: PricePrediction) -> dict[str, Any]:
         "predictions": prediction.predictions,
         "support_level": prediction.support_level,
         "resistance_level": prediction.resistance_level,
-        "skill_score": skill_score,
-        "hit_rate": round(hit_rate, 1),
-        "hit_rate_significant": hit_rate_significant,
-        "hit_rate_n_samples": hit_rate_n,
-        "reliability_score": reliability_score,
-        "model_confidence": _model_confidence(reliability_score),
+        "skill_score": skill_from_ensemble(models_detail),
+        **measured_reliability(*accuracy),
         "models_agree": models_agree,
         "models_detail": models_detail,
         "skipped_models": prediction.skipped_models or [],
@@ -128,8 +144,9 @@ class PortfolioMixin(ForecastMixin):
         user_id: str,
         days_ahead: int = 7,
     ) -> dict[str, Any]:
-        """Prévisions des dix premiers actifs détenus, regroupés par symbole et hors stablecoins, avec fiabilité
-        (60 % compétence, 40 % accord des modèles, plafonnée à 95) et valeur prévue du portefeuille."""
+        """Prévisions des dix premiers actifs détenus, regroupés par symbole et hors stablecoins, avec la fiabilité
+        mesurée sur les prévisions passées vérifiées (aucune tant que l'historique est insuffisant) et la valeur
+        prévue du portefeuille."""
         portfolio_ids = await user_portfolio_ids(db, user_id)
         if not portfolio_ids:
             return _empty_portfolio(days_ahead)
@@ -138,6 +155,8 @@ class PortfolioMixin(ForecastMixin):
             return _empty_portfolio(days_ahead)
 
         assets, quantity_map = _merged_by_symbol(raw_assets)
+        symbols = [a.symbol.upper() for a in assets[:MAX_PREDICTED_ASSETS] if not is_stablecoin(a.symbol)]
+        accuracy = await _measured_accuracy(db, symbols, days_ahead)
         predictions: list[dict[str, Any]] = []
         total_current = Decimal("0")
         total_predicted = Decimal("0")
@@ -148,7 +167,7 @@ class PortfolioMixin(ForecastMixin):
             qty = quantity_map[asset.symbol]
             total_current += Decimal(str(prediction.current_price)) * qty
             total_predicted += Decimal(str(_final_price(prediction))) * qty
-            predictions.append(_asset_entry(asset, prediction))
+            predictions.append(_asset_entry(asset, prediction, accuracy.get(asset.symbol.upper(), (0, 0, None))))
 
         first_thresholds = (
             predictions[0].get("display_thresholds") if predictions else at.build_display_thresholds(None)

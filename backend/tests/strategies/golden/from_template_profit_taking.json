@@ -1,0 +1,60 @@
+{
+  "body": {
+    "actions": [
+      {
+        "action": "SELL",
+        "amount": 3000.0,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-12>",
+        "reason": "Palier 1 : si le cours atteint 60 000,00 €, vendre 25 % de la quantité indiquée, soit 0,05 BTC (≈ 3 000,00 €)",
+        "scheduled_at": null,
+        "status": "PENDING",
+        "strategy_id": "<id-13>",
+        "symbol": "BTC"
+      },
+      {
+        "action": "SELL",
+        "amount": 9000.0,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-14>",
+        "reason": "Palier 2 : si le cours atteint 90 000,00 €, vendre 50 % de la quantité indiquée, soit 0,1 BTC (≈ 9 000,00 €)",
+        "scheduled_at": null,
+        "status": "PENDING",
+        "strategy_id": "<id-13>",
+        "symbol": "BTC"
+      }
+    ],
+    "ai_reasoning": null,
+    "confidence": null,
+    "created_at": "<volatile>",
+    "description": null,
+    "id": "<id-13>",
+    "market_regime": null,
+    "name": "Paliers BTC",
+    "params": {
+      "quantity": 0.2,
+      "symbol": "BTC",
+      "template": "profit_taking",
+      "tiers": [
+        {
+          "price": 60000.0,
+          "sell_pct": 25.0
+        },
+        {
+          "price": 90000.0,
+          "sell_pct": 50.0
+        }
+      ]
+    },
+    "rule_summary": "Prise de profits par paliers sur 0,2 BTC : 25 % à 60 000,00 €, 50 % à 90 000,00 € (75 % de la quantité au total).",
+    "source": "USER",
+    "status": "ACTIVE",
+    "updated_at": "<volatile>",
+    "user_id": "<id-3>"
+  },
+  "status": 201
+}

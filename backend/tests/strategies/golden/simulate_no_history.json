@@ -1,0 +1,52 @@
+{
+  "body": {
+    "backtest": {
+      "available": false,
+      "benchmark_label": null,
+      "benchmark_value_eur": null,
+      "end_date": null,
+      "events_planned": 0,
+      "events_simulated": 0,
+      "final_value_eur": null,
+      "invested_eur": null,
+      "missing_prices": 0,
+      "note": "Simulation passée : ce que la règle aurait donné sur l'historique de prix enregistré, aux clôtures journalières, sans frais ni fiscalité. Elle n'a aucune valeur prédictive.",
+      "pnl_eur": null,
+      "pnl_pct": null,
+      "reason": "Pas d'historique de prix enregistré pour XYZ",
+      "start_date": null,
+      "trades": [],
+      "trades_truncated": false,
+      "withdrawn_eur": null
+    },
+    "disclaimer": "Simulation calculée uniquement à partir des paramètres que vous avez saisis. Ce n'est pas un conseil en investissement ni une recommandation personnalisée : InvestAI ne choisit ni les actifs, ni les montants, ni le moment d'agir. Les performances passées ne préjugent pas des performances futures.",
+    "has_amounts_at_execution": false,
+    "rule_summary": "Prise de profits par paliers sur 0,2 XYZ : 25 % à 60 000,00 €, 50 % à 90 000,00 € (75 % de la quantité au total).",
+    "schedule": [
+      {
+        "action": "SELL",
+        "amount": 3000.0,
+        "date": null,
+        "note": "Palier 1 : si le cours atteint 60 000,00 €, vendre 25 % de la quantité indiquée, soit 0,05 XYZ (≈ 3 000,00 €)",
+        "quantity": 0.05,
+        "symbol": "XYZ",
+        "target_value": null,
+        "trigger_price": 60000.0
+      },
+      {
+        "action": "SELL",
+        "amount": 9000.0,
+        "date": null,
+        "note": "Palier 2 : si le cours atteint 90 000,00 €, vendre 50 % de la quantité indiquée, soit 0,1 XYZ (≈ 9 000,00 €)",
+        "quantity": 0.1,
+        "symbol": "XYZ",
+        "target_value": null,
+        "trigger_price": 90000.0
+      }
+    ],
+    "template": "profit_taking",
+    "total_buy_eur": 0.0,
+    "total_sell_eur": 12000.0
+  },
+  "status": 200
+}

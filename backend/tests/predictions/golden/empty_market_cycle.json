@@ -3,22 +3,16 @@
     "btc_dominance": null,
     "cycle_advice": [
       {
-        "action": "PLANIFIER",
-        "description": "Tendance haussière — laissez courir vos positions mais définissez VOS niveaux de sortie maintenant. \"Be fearful when others are greedy.\" Ne soyez pas le dernier à vendre.",
+        "action": "CONTEXTE",
+        "description": "La tendance de fond est haussière : prix au-dessus de leurs moyennes mobiles et momentum positif.",
         "priority": "high",
-        "title": "Préparez la prise de profits"
+        "title": "Marché haussier"
       },
       {
-        "action": "PROTÉGER",
-        "description": "Remontez progressivement vos stop-loss pour verrouiller les gains. Un trailing stop sous l'EMA-20 protège sans couper trop tôt.",
-        "priority": "high",
-        "title": "Stop-loss progressifs"
-      },
-      {
-        "action": "ATTENDRE",
-        "description": "En marché haussier, les prix sont chers. Réduisez vos montants d'achat réguliers et gardez du cash pour accumuler au prochain creux.",
+        "action": "HISTORIQUE",
+        "description": "Les phases haussières se sont terminées par des corrections d'ampleur variable ; un repère comme l'EMA-20 sert souvent à suivre la tendance. Les performances passées ne préjugent pas des performances futures.",
         "priority": "medium",
-        "title": "Réduisez le DCA"
+        "title": "Ce que montre l'historique"
       }
     ],
     "cycle_position": 42,

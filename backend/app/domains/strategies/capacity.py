@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.dashboard.metrics.service import metrics_service
-from app.domains.predictions.service import prediction_service
 
 logger = logging.getLogger(__name__)
 
@@ -45,44 +44,17 @@ async def _liquidity_and_value(db: AsyncSession, user_id: str) -> tuple[float, f
     return available_liquidity, total_value
 
 
-async def _next_buy_signal(db: AsyncSession, user_id: str) -> tuple[str | None, str | None, float]:
-    next_symbol = None
-    next_action = None
-    next_amount = 0.0
-    try:
-        strategy_data = await prediction_service.get_strategy_map(db, user_id)
-        assets = strategy_data.get("assets", [])
-        for asset in assets:
-            action = asset.get("action", "")
-            if "ACHAT" in action or action == "DCA":
-                next_symbol = asset.get("symbol")
-                next_action = action
-                next_amount = round(float(asset.get("impact_eur", 0)), 2)
-                break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("Failed to get strategy table: %s", e)
-    return next_symbol, next_action, next_amount
-
-
 async def compute_deployment_capacity(
     db: AsyncSession, user_id: str, monthly_dca: float, profile: str
 ) -> DeploymentCapacity:
-    """Liquidité (cash + stablecoins) face au premier signal ACHAT/DCA de la table de stratégie, et répartition du DCA
-    mensuel entre risque et réserve selon le profil ; montants arrondis au centime."""
+    """Liquidité (cash + stablecoins) du patrimoine, et répartition du DCA mensuel saisi par l'utilisateur entre
+    risque et réserve selon le profil qu'il a choisi ; montants arrondis au centime.
+
+    Les champs ``next_signal_*``, ``can_execute``, ``shortfall`` et ``message`` restent pour la compatibilité de
+    l'API mais ne portent plus de signal d'achat : l'application ne propose pas d'ordre."""
     available_liquidity, total_value = await _liquidity_and_value(db, user_id)
     liquidity_pct = round(available_liquidity / total_value * 100, 1) if total_value > 0 else 0.0
     invested_pct = round(100 - liquidity_pct, 1) if total_value > 0 else 0.0
-
-    next_symbol, next_action, next_amount = await _next_buy_signal(db, user_id)
-
-    can_execute = available_liquidity >= next_amount if next_amount > 0 else True
-    shortfall = round(max(0, next_amount - available_liquidity), 2) if not can_execute else 0.0
-    message = None
-    if not can_execute and next_symbol:
-        message = (
-            f"Liquidité insuffisante pour le signal Alpha sur {next_symbol} "
-            f"({next_amount:.2f} € requis, {available_liquidity:.2f} € disponible)."
-        )
 
     alloc = PROFILE_ALLOCATION[profile]
     deploy_risk = round(monthly_dca * alloc["risk_pct"] / 100, 2)
@@ -93,12 +65,6 @@ async def compute_deployment_capacity(
         total_value=total_value,
         liquidity_pct=liquidity_pct,
         invested_pct=invested_pct,
-        next_signal_symbol=next_symbol,
-        next_signal_action=next_action,
-        next_signal_amount=next_amount,
-        can_execute=can_execute,
-        shortfall=shortfall,
-        message=message,
         profile=profile,
         deploy_to_risk=deploy_risk,
         keep_in_reserve=keep_reserve,

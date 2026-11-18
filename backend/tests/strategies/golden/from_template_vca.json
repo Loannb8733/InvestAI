@@ -1,0 +1,81 @@
+{
+  "body": {
+    "actions": [
+      {
+        "action": "BUY",
+        "amount": 40.0,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-15>",
+        "reason": "Échéance 1/4 : valeur visée 40,00 € ; la ligne part de zéro, achat de 40,00 €",
+        "scheduled_at": "2026-11-01T00:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-16>",
+        "symbol": "SOL"
+      },
+      {
+        "action": "BUY",
+        "amount": null,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-17>",
+        "reason": "Échéance 2/4 : valeur visée 80,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+        "scheduled_at": "2026-11-15T00:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-16>",
+        "symbol": "SOL"
+      },
+      {
+        "action": "BUY",
+        "amount": null,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-18>",
+        "reason": "Échéance 3/4 : valeur visée 120,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+        "scheduled_at": "2026-11-29T00:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-16>",
+        "symbol": "SOL"
+      },
+      {
+        "action": "BUY",
+        "amount": null,
+        "created_at": "<volatile>",
+        "currency": "EUR",
+        "executed_at": null,
+        "id": "<id-19>",
+        "reason": "Échéance 4/4 : valeur visée 160,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+        "scheduled_at": "2026-12-13T00:00:00Z",
+        "status": "PENDING",
+        "strategy_id": "<id-16>",
+        "symbol": "SOL"
+      }
+    ],
+    "ai_reasoning": null,
+    "confidence": null,
+    "created_at": "<volatile>",
+    "description": null,
+    "id": "<id-16>",
+    "market_regime": null,
+    "name": "VCA SOL",
+    "params": {
+      "allow_sell": false,
+      "frequency": "biweekly",
+      "max_per_period": 60.0,
+      "periods": 4,
+      "start_date": "2026-11-01",
+      "symbol": "SOL",
+      "target_increment": 40.0,
+      "template": "vca"
+    },
+    "rule_summary": "Value averaging sur SOL : la valeur visée de la ligne augmente de 40,00 € toutes les deux semaines, 4 échéances à partir du 01/11/2026 ; à chaque échéance on investit l'écart entre la cible et la valeur de la ligne, plafonné à 60,00 € par échéance ; aucune vente si la ligne dépasse la cible.",
+    "source": "USER",
+    "status": "ACTIVE",
+    "updated_at": "<volatile>",
+    "user_id": "<id-3>"
+  },
+  "status": 201
+}

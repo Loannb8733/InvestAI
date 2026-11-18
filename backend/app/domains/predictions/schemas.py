@@ -84,11 +84,14 @@ class PortfolioAssetPrediction(BaseModel):
     support_level: float
     resistance_level: float
     skill_score: float = 50.0
-    hit_rate: float = 50.0
+    hit_rate: float | None = Field(
+        default=None, description="Direction juste (%) sur les prévisions passées vérifiées ; None si moins de 10."
+    )
     hit_rate_significant: bool = False
-    hit_rate_n_samples: int = 0
-    reliability_score: float = 50.0
-    model_confidence: str = "uncertain"
+    hit_rate_n_samples: int = Field(default=0, description="Nombre de prévisions passées vérifiées à cet horizon.")
+    measured_mape: float | None = None
+    reliability_score: float | None = None
+    model_confidence: str = "insufficient_history"
     models_agree: bool = True
     models_detail: list[ModelDetail] | None = None
     skipped_models: list[SkippedModel] = Field(default_factory=list)

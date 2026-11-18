@@ -24,10 +24,11 @@ export interface PortfolioPrediction {
   support_level: number
   resistance_level: number
   skill_score: number
-  hit_rate: number
+  hit_rate: number | null
   hit_rate_significant: boolean
   hit_rate_n_samples: number
-  reliability_score: number
+  measured_mape?: number | null
+  reliability_score: number | null
   model_confidence: string
   models_agree: boolean
   models_detail?: ModelDetail[]

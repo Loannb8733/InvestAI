@@ -6,7 +6,7 @@ import StrategiesSection from './decisions/StrategiesSection'
  * Pilier « Décisions » du hub Intelligence — l'unique endroit où l'on AGIT.
  *
  * 1. Ordres planifiés (issus du rééquilibrage MPT et de la matrice de stratégie)
- * 2. Stratégies IA (cycle de vie complet + performance P&L)
+ * 2. Stratégies programmées (simulateur paramétré + performance P&L)
  *
  * Pas de <h1> ni de bannière de régime : le hub parent fournit le chrome.
  */

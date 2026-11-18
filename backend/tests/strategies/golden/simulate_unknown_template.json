@@ -1,0 +1,23 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "discriminator": "'template'",
+          "expected_tags": "'dca', 'vca', 'profit_taking', 'rebalance'",
+          "tag": "conviction_buy"
+        },
+        "input": {
+          "template": "conviction_buy"
+        },
+        "loc": [
+          "body",
+          "params"
+        ],
+        "msg": "Input tag 'conviction_buy' found using 'template' does not match any of the expected tags: 'dca', 'vca', 'profit_taking', 'rebalance'",
+        "type": "union_tag_invalid"
+      }
+    ]
+  },
+  "status": 422
+}

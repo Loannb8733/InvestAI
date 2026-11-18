@@ -1,5 +1,3 @@
-from typing import Any
-
 from app.domains.notifications.formatting import amount, percent
 
 PRIORITY_PREFIXES = {
@@ -35,18 +33,5 @@ def bottom_zone_text(
         f"Bottom estimé : {amount(estimated_bottom, '€')}\n"
         f"Distance : {percent(distance_pct)}\n"
         f"Confiance : {percent(confidence * 100, decimals=0)}\n\n"
-        f"Opportunité d'achat potentielle."
+        "Information générale, pas un conseil en investissement."
     )
-
-
-def alpha_keyboard(user_id: str, symbol: str, order_eur: float) -> dict[str, Any]:
-    """Boutons d'un signal alpha : simuler l'impact sur la ruine, ou planifier l'ordre."""
-    payload = f"alpha:{user_id}:{symbol}:{order_eur}"
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "\U0001f50d Simuler Impact Ruine", "callback_data": f"sim_ruin:{payload}"},
-                {"text": "✅ Marquer comme Planifié", "callback_data": f"plan_order:{payload}"},
-            ]
-        ]
-    }

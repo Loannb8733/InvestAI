@@ -1,0 +1,32 @@
+{
+  "body": {
+    "detail": [
+      {
+        "ctx": {
+          "error": {}
+        },
+        "input": {
+          "amount_per_period": 50,
+          "assets": [
+            {
+              "symbol": "BTC",
+              "weight_pct": 70
+            }
+          ],
+          "frequency": "monthly",
+          "periods": 3,
+          "start_date": "2026-11-01",
+          "template": "dca"
+        },
+        "loc": [
+          "body",
+          "params",
+          "dca"
+        ],
+        "msg": "Value error, Les pourcentages doivent totaliser 100 % (actuellement 70 %)",
+        "type": "value_error"
+      }
+    ]
+  },
+  "status": 422
+}

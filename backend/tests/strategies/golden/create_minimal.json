@@ -9,6 +9,7 @@
     "market_regime": null,
     "name": "Vide",
     "params": {},
+    "rule_summary": null,
     "source": "USER",
     "status": "ACTIVE",
     "updated_at": "<volatile>",

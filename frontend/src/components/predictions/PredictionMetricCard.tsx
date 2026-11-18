@@ -132,9 +132,9 @@ CycleGauge.displayName = 'CycleGauge'
 // ── Reliability Score ────────────────────────────────────────────────
 
 export interface ReliabilityScoreProps {
-  reliabilityScore: number
+  reliabilityScore: number | null
   skillScore: number
-  hitRate: number
+  hitRate: number | null
   hitRateSignificant: boolean
   hitRateN: number
   modelConfidence: string
@@ -143,10 +143,32 @@ export interface ReliabilityScoreProps {
 export const ReliabilityScore = React.memo(({
   reliabilityScore, skillScore, hitRate, hitRateSignificant, hitRateN, modelConfidence,
 }: ReliabilityScoreProps) => {
+  if (reliabilityScore == null || hitRate == null) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-xs text-muted-foreground cursor-help">Pas encore mesurée</span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="text-xs">
+              {hitRateN} prévision{hitRateN > 1 ? 's' : ''} passée{hitRateN > 1 ? 's' : ''} vérifiée{hitRateN > 1 ? 's' : ''} à cet horizon :
+              il en faut au moins 10 pour mesurer une fiabilité.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
   const score = Math.round(reliabilityScore)
-  const color = score >= 60 ? 'bg-gain' : score >= 40 ? 'bg-warning' : 'bg-loss'
-  const textColor = score >= 60 ? 'text-gain' : score >= 40 ? 'text-warning' : 'text-loss'
-  const label = modelConfidence === 'useful' ? 'Utile' : modelConfidence === 'uncertain' ? 'Incertain' : 'Non fiable'
+  const color = score >= 60 ? 'bg-gain' : score >= 50 ? 'bg-warning' : 'bg-loss'
+  const textColor = score >= 60 ? 'text-gain' : score >= 50 ? 'text-warning' : 'text-loss'
+  const label = modelConfidence === 'useful'
+    ? 'Mieux que le hasard (significatif)'
+    : modelConfidence === 'uncertain'
+      ? 'Pas significativement mieux que le hasard'
+      : 'Moins bien que le hasard'
 
   return (
     <TooltipProvider>
@@ -161,8 +183,13 @@ export const ReliabilityScore = React.memo(({
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">
           <p className="text-xs font-medium mb-1">{label}</p>
-          <p className="text-xs">Skill: {skillScore.toFixed(0)}% · Direction: {hitRate.toFixed(0)}% ({hitRateN} tests{hitRateSignificant ? ', significatif' : ', non significatif'})</p>
-          <p className="text-xs text-muted-foreground mt-1">Mesure si le modèle fait mieux qu'une prédiction naïve (prix inchangé)</p>
+          <p className="text-xs">
+            Direction juste : {hitRate.toFixed(0)}% sur {hitRateN} prévisions passées vérifiées
+            {hitRateSignificant ? ' (significatif)' : ' (non significatif)'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Mesuré contre le cours réel à la date cible. Skill du backtest interne : {skillScore.toFixed(0)}%.
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

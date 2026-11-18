@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import time_machine
@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from app.domains.notifications.telegram.client import telegram_service
-from app.domains.predictions import alerts as prediction_alerts
 from app.domains.predictions.models import PredictionLog
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
 
@@ -36,7 +35,8 @@ GET_ROUTES = [
     ("market_cycle", "/api/v1/predictions/market-cycle"),
     ("top_alpha", "/api/v1/predictions/top-alpha"),
     ("validate_signal", "/api/v1/predictions/validate-signal"),
-    ("validate_signal_eth_buy", "/api/v1/predictions/validate-signal?symbol=ETH&action=ACHAT"),
+    ("validate_signal_eth_buy", "/api/v1/predictions/validate-signal?symbol=ETH&amount_eur=250"),
+    ("validate_signal_negative_amount", "/api/v1/predictions/validate-signal?symbol=ETH&amount_eur=-5"),
     ("validate_signal_unknown_symbol", "/api/v1/predictions/validate-signal?symbol=XRP"),
     ("strategy_map", "/api/v1/predictions/strategy-map"),
     ("events", "/api/v1/predictions/events"),
@@ -204,7 +204,6 @@ async def test_predictions_telegram_alerts_match_golden(
 ) -> None:
     sent = AsyncMock(return_value=True)
     monkeypatch.setattr(telegram_service, "send_smart_alert", sent)
-    monkeypatch.setattr(prediction_alerts, "alpha_keyboard", MagicMock(return_value={"keyboard": "alpha"}))
     regular_user.telegram_enabled = True
     regular_user.telegram_chat_id = "4242"
     await db_session.commit()

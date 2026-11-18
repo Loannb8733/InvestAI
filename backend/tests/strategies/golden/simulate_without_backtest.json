@@ -1,0 +1,74 @@
+{
+  "body": {
+    "backtest": null,
+    "disclaimer": "Simulation calculée uniquement à partir des paramètres que vous avez saisis. Ce n'est pas un conseil en investissement ni une recommandation personnalisée : InvestAI ne choisit ni les actifs, ni les montants, ni le moment d'agir. Les performances passées ne préjugent pas des performances futures.",
+    "has_amounts_at_execution": false,
+    "rule_summary": "Achat périodique : 50,00 € chaque mois, 3 échéances à partir du 01/11/2026, répartis BTC 70 % · ETH 30 %.",
+    "schedule": [
+      {
+        "action": "BUY",
+        "amount": 35.0,
+        "date": "2026-11-01",
+        "note": "Échéance 1/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 15.0,
+        "date": "2026-11-01",
+        "note": "Échéance 1/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "ETH",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 35.0,
+        "date": "2026-12-01",
+        "note": "Échéance 2/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 15.0,
+        "date": "2026-12-01",
+        "note": "Échéance 2/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "ETH",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 35.0,
+        "date": "2027-01-01",
+        "note": "Échéance 3/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": null
+      },
+      {
+        "action": "BUY",
+        "amount": 15.0,
+        "date": "2027-01-01",
+        "note": "Échéance 3/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+        "quantity": null,
+        "symbol": "ETH",
+        "target_value": null,
+        "trigger_price": null
+      }
+    ],
+    "template": "dca",
+    "total_buy_eur": 150.0,
+    "total_sell_eur": 0.0
+  },
+  "status": 200
+}

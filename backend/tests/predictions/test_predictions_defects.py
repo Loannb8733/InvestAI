@@ -52,9 +52,14 @@ async def test_signal_validation_returns_a_json_response(
 ) -> None:
     with time_machine.travel(FROZEN_NOW, tick=False):
         await _seed(client, db_session, regular_user)
-        response = await client.get("/api/v1/predictions/validate-signal", headers=_headers(regular_user))
+        response = await client.get(
+            "/api/v1/predictions/validate-signal?amount_eur=100", headers=_headers(regular_user)
+        )
     assert response.status_code == 200, response.text
-    assert isinstance(response.json()["validated"], bool)
+    body = response.json()
+    assert body["amount_eur"] == 100.0
+    for proposal in ("validated", "order_eur", "action", "impact_pct", "rebalance_suggestion"):
+        assert proposal not in body, f"la simulation ne doit plus proposer « {proposal} »"
 
 
 async def test_a_malformed_planned_order_id_is_rejected_as_invalid(client: AsyncClient, regular_user: User) -> None:
