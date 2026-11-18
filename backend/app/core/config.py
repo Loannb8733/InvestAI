@@ -211,6 +211,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_FALLBACK_MODEL: str = "qwen/qwen3.8-27b"
     OLLAMA_URL: str = "http://ollama:11434"
     OLLAMA_MODEL: str = "mistral"
 

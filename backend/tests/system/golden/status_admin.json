@@ -1,5 +1,35 @@
 {
   "body": {
+    "ai_providers": [
+      {
+        "available": null,
+        "configured": false,
+        "detail": null,
+        "model": "openai/gpt-oss-120b",
+        "name": "Groq"
+      },
+      {
+        "available": null,
+        "configured": false,
+        "detail": null,
+        "model": "gemini-2.0-flash",
+        "name": "Gemini"
+      },
+      {
+        "available": null,
+        "configured": false,
+        "detail": null,
+        "model": "claude-sonnet-4-20250514",
+        "name": "Anthropic"
+      },
+      {
+        "available": null,
+        "configured": true,
+        "detail": null,
+        "model": "mistral",
+        "name": "Ollama"
+      }
+    ],
     "email_enabled": false,
     "scheduler": "api",
     "smtp_from": "noreply@investai.local",

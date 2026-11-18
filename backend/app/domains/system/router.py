@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from app.core.config import settings
 from app.core.db.session import session_factory
 from app.core.errors import DomainError, NotFoundError
+from app.domains.crowdfunding.audit.providers import provider_status
 from app.domains.identity.dependencies import CurrentAdmin
 from app.domains.planning.goals.sync import sync_active_goals
 from app.domains.system.invariants import check_invariants
 from app.domains.system.scheduler import api_scheduler
-from app.domains.system.schemas import ScheduledTaskStatus, SystemStatusResponse
+from app.domains.system.schemas import AiProviderStatus, ScheduledTaskStatus, SystemStatusResponse
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def _task_status(name: str) -> ScheduledTaskStatus:
 
 @status_router.get("/status", response_model=SystemStatusResponse)
 async def get_system_status(admin: CurrentAdmin) -> SystemStatusResponse:
-    """Configuration e-mail et état de chaque tâche planifiée (administrateur seulement)."""
+    """Configuration e-mail, état de chaque tâche planifiée et des fournisseurs IA (administrateur seulement)."""
     return SystemStatusResponse(
         email_enabled=settings.email_enabled,
         smtp_host=settings.SMTP_HOST or "(not configured)",
@@ -99,4 +100,5 @@ async def get_system_status(admin: CurrentAdmin) -> SystemStatusResponse:
         smtp_from=settings.SMTP_FROM_EMAIL,
         scheduler="celery" if settings.CELERY_WORKER_AVAILABLE else "api",
         tasks=[_task_status(name) for name in api_scheduler.entries],
+        ai_providers=[AiProviderStatus(**vars(provider)) for provider in await provider_status()],
     )

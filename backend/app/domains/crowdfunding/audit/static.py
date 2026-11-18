@@ -70,7 +70,7 @@ def analyze_statically(file_contents: list[tuple[str, bytes]]) -> dict[str, Any]
         "margin_percent": merged.gross_margin_percent,
         "ltv": merged.ltv,
         "ltc": merged.ltc,
-        "pre_sales_percent": merged.pre_sales or 0,
+        "pre_sales_percent": merged.pre_sales,
         "equity_contribution": merged.equity,
         "guarantees": [],
         "admin_status": None,

@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
@@ -12,9 +13,13 @@ logger = logging.getLogger(__name__)
 
 Provider = Callable[[list[dict[str, str]]], Awaitable[str]]
 TIMEOUT_SECONDS = 90.0
+STATUS_TIMEOUT_SECONDS = 5.0
 MAX_TOKENS = 4096
+GROQ_MAX_TOKENS = 2000
 TEMPERATURE = 0.2
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
+ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="
 
 
@@ -28,7 +33,7 @@ async def call_anthropic(messages: list[dict[str, str]]) -> str:
     logger.info("Calling Claude API for crowdfunding analysis")
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=messages,
@@ -73,18 +78,33 @@ def _check_status(
         raise ValueError(f"Erreur {name} (HTTP {response.status_code}) : {response.text[:200]}")
 
 
-async def call_groq(messages: list[dict[str, str]]) -> str:
-    """Réponse brute de Groq (llama-3.1-8b-instant) ; ``ValueError`` sur toute erreur."""
-    payload = {
-        "model": "llama-3.1-8b-instant",
+def _groq_payload(messages: list[dict[str, str]], model: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": model,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": messages[0]["content"]}],
         "temperature": TEMPERATURE,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": GROQ_MAX_TOKENS,
         "response_format": {"type": "json_object"},
     }
-    logger.info("Calling Groq API (llama-3.1-8b-instant) for crowdfunding analysis")
+    if model.startswith("openai/gpt-oss"):
+        payload["reasoning_effort"] = "low"
+    return payload
+
+
+async def call_groq(messages: list[dict[str, str]]) -> str:
+    """Réponse brute de Groq ; ``ValueError`` sur toute erreur.
+
+    Modèle ``GROQ_MODEL``, puis ``GROQ_FALLBACK_MODEL`` si le premier n'existe plus (404) : Groq retire ses
+    modèles sans préavis, et le retrait de l'ancien modèle avait renvoyé chaque audit vers l'analyse statique.
+    """
     headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"}
-    response = await _post("Groq", GROQ_URL, payload, headers)
+    models = [model for model in (settings.GROQ_MODEL, settings.GROQ_FALLBACK_MODEL) if model]
+    for model in models:
+        logger.info("Calling Groq API (%s) for crowdfunding analysis", model)
+        response = await _post("Groq", GROQ_URL, _groq_payload(messages, model), headers)
+        if response.status_code != 404 or model == models[-1]:
+            break
+        logger.error("Groq model %s is gone (404), trying %s", model, models[-1])
     _check_status("Groq", response, auth_key="GROQ_API_KEY")
     data = response.json()
     try:
@@ -164,3 +184,55 @@ def configured_providers() -> list[tuple[str, Provider]]:
         ("Ollama", settings.OLLAMA_URL, call_ollama),
     ]
     return [(name, provider) for name, configured, provider in candidates if configured]
+
+
+@dataclass
+class ProviderStatus:
+    """État d'un fournisseur de l'Audit Lab : configuré, modèle visé, et disponible quand on sait le vérifier."""
+
+    name: str
+    configured: bool
+    model: str | None = None
+    available: bool | None = None
+    detail: str | None = None
+
+
+async def _get(name: str, url: str, headers: dict[str, str] | None = None) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=STATUS_TIMEOUT_SECONDS) as client:
+        try:
+            return await client.get(url, headers=headers)
+        except httpx.HTTPError as exc:
+            raise ValueError(f"API {name} injoignable : {type(exc).__name__}") from exc
+
+
+async def _groq_status() -> ProviderStatus:
+    status = ProviderStatus("Groq", bool(settings.GROQ_API_KEY), settings.GROQ_MODEL)
+    if not status.configured:
+        return status
+    try:
+        response = await _get("Groq", GROQ_MODELS_URL, {"Authorization": f"Bearer {settings.GROQ_API_KEY}"})
+    except ValueError as exc:
+        status.available, status.detail = False, str(exc)
+        return status
+    if response.status_code != 200:
+        status.available, status.detail = False, f"HTTP {response.status_code} sur la liste des modèles"
+        return status
+    offered = {model.get("id") for model in response.json().get("data", [])}
+    usable = [model for model in (settings.GROQ_MODEL, settings.GROQ_FALLBACK_MODEL) if model in offered]
+    status.available = bool(usable)
+    if settings.GROQ_MODEL not in offered:
+        status.detail = f"{settings.GROQ_MODEL} retiré par Groq" + (f", secours {usable[0]}" if usable else "")
+    return status
+
+
+async def provider_status() -> list[ProviderStatus]:
+    """Fournisseurs dans l'ordre de la cascade ; seul Groq est vérifié en direct (liste de ses modèles)."""
+    ollama = ProviderStatus("Ollama", bool(settings.OLLAMA_URL), settings.OLLAMA_MODEL)
+    if ollama.configured and not ollama_reachable():
+        ollama.available, ollama.detail = False, "ignoré en production (hôte interne à Docker)"
+    return [
+        await _groq_status(),
+        ProviderStatus("Gemini", bool(settings.GEMINI_API_KEY), GEMINI_URL.split("/models/")[1].split(":")[0]),
+        ProviderStatus("Anthropic", bool(settings.ANTHROPIC_API_KEY), ANTHROPIC_MODEL),
+        ollama,
+    ]

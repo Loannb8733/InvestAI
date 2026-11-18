@@ -1,3 +1,4 @@
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -15,29 +16,60 @@ MAX_ALLOCATION = 0.05
 DEFAULT_ALLOCATION = 500.0
 
 
-def _append_threshold_flags(data: dict[str, Any], flags: list[str]) -> None:
+RULE_TOPICS = ("ltv", "marge", "commercialisation", "rang", "hypothe", "garantie", "permis", "pc ", "purge")
+UNDER_REVIEW = ("en cours", "non purge", "recours", "depose", "instruction")
+KEY_RATIOS = {"margin_percent": "marge", "ltv": "LTV", "ltc": "LTC"}
+
+
+def _plain(text: object) -> str:
+    decomposed = unicodedata.normalize("NFD", str(text or "").lower())
+    return "".join(char for char in decomposed if unicodedata.category(char) != "Mn")
+
+
+def _first_rank(guarantee: dict[str, Any]) -> bool:
+    rank = _plain(guarantee.get("rank"))
+    return "1" in rank or "premier" in rank
+
+
+def _threshold_flags(data: dict[str, Any], guarantees_read: bool) -> list[str]:
+    flags = []
     ltv = data.get("ltv")
-    if ltv is not None and ltv > MAX_LTV and not any("LTV" in flag for flag in flags):
+    if ltv is not None and ltv > MAX_LTV:
         flags.append(f"LTV élevé ({ltv:.1f}%) — risque d'endettement excessif")
     margin = data.get("margin_percent")
-    if margin is not None and margin < MIN_MARGIN and not any("Marge" in flag or "marge" in flag for flag in flags):
+    if margin is not None and margin < MIN_MARGIN:
         flags.append(f"Marge faible ({margin:.1f}%) — peu de marge de sécurité")
-    pre_sales = data.get("pre_sales_percent")
-    if pre_sales is not None and pre_sales == 0 and not any("pré-commercialisation" in flag.lower() for flag in flags):
+    if data.get("pre_sales_percent") == 0:
         flags.append("Pas de pré-commercialisation — risque de sortie")
-    guarantees = data.get("guarantees", [])
-    first_rank = any(guarantee.get("rank", "").startswith("1") for guarantee in guarantees)
-    if guarantees and not first_rank and not any("1er rang" in flag for flag in flags):
+    guarantees = [guarantee for guarantee in data.get("guarantees") or [] if isinstance(guarantee, dict)]
+    if guarantees and not any(_first_rank(guarantee) for guarantee in guarantees):
         flags.append("Pas d'hypothèque de 1er rang — garantie affaiblie")
+    elif not guarantees and guarantees_read:
+        flags.append("Aucune garantie identifiée dans les documents — vérifier les sûretés")
+    if any(word in _plain(data.get("admin_status")) for word in UNDER_REVIEW):
+        flags.append("Permis de construire non purgé — risque de recours ou de retard")
+    return flags
 
 
-def add_red_flags(data: dict[str, Any]) -> dict[str, Any]:
-    """Ajoute les alertes de seuil (LTV, marge, pré-commercialisation, rang d'hypothèque) et durcit le verdict.
+def _missing_ratios(data: dict[str, Any]) -> None:
+    missing = [label for key, label in KEY_RATIOS.items() if data.get(key) is None]
+    vigilance = list(data.get("points_vigilance") or [])
+    if missing:
+        vigilance.append(f"Non communiqué dans les documents : {', '.join(missing)} — à demander à la plateforme")
+    data["points_vigilance"] = vigilance
 
-    Trois alertes ou plus : « NE_PAS_INVESTIR » ; deux : « INVESTIR » devient « VIGILANCE ».
+
+def add_red_flags(data: dict[str, Any], *, guarantees_read: bool = True) -> dict[str, Any]:
+    """Alertes de seuil recalculées depuis les champs extraits, puis verdict durci.
+
+    Les alertes du modèle qui portent sur un seuil (LTV, marge, pré-commercialisation, rang d'hypothèque, permis)
+    sont écartées : sur de vrais dossiers, il en inventait que les champs qu'il venait d'extraire contredisaient.
+    ``guarantees_read`` vaut faux pour l'analyse statique, qui ne lit pas les garanties : leur absence n'y prouve
+    rien. Trois alertes ou plus : « NE_PAS_INVESTIR » ; deux : « INVESTIR » devient « VIGILANCE ».
     """
-    flags = list(data.get("red_flags", []))
-    _append_threshold_flags(data, flags)
+    own = [flag for flag in data.get("red_flags") or [] if not any(topic in _plain(flag) for topic in RULE_TOPICS)]
+    flags = own + _threshold_flags(data, guarantees_read)
+    _missing_ratios(data)
     data["red_flags"] = flags
     if len(flags) >= 3:
         data["verdict"] = "NE_PAS_INVESTIR"
